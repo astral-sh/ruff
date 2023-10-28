@@ -2448,7 +2448,7 @@ where
 
     /// Adds a new entry to the join output.
     pub fn entry(&mut self, entry: &dyn Format<Context>) -> &mut Self {
-        self.result = self.result.and_then(|_| {
+        self.result = self.result.and_then(|()| {
             if let Some(with) = &self.with {
                 if self.has_elements {
                     with.fmt(self.fmt)?;
@@ -2519,7 +2519,7 @@ impl<'a, 'buf, Context> FillBuilder<'a, 'buf, Context> {
         separator: &dyn Format<Context>,
         entry: &dyn Format<Context>,
     ) -> &mut Self {
-        self.result = self.result.and_then(|_| {
+        self.result = self.result.and_then(|()| {
             if self.empty {
                 self.empty = false;
             } else {

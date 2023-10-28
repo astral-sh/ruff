@@ -1,5 +1,5 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::{AnyNodeRef, AstNode};
 use ruff_python_ast::{Expr, ExprSubscript};
 
 use crate::comments::SourceComment;

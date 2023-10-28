@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Constant, Expr, ExprCall, ExprConstant};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -8,18 +8,18 @@ use crate::rules::flake8_use_pathlib::rules::{
     Glob, OsPathGetatime, OsPathGetctime, OsPathGetmtime, OsPathGetsize,
 };
 use crate::rules::flake8_use_pathlib::violations::{
-    BuiltinOpen, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
+    BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
     OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir, OsPathIsfile,
     OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove, OsRename,
     OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
 };
 use crate::settings::types::PythonVersion;
 
-pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
     if let Some(diagnostic_kind) =
         checker
             .semantic()
-            .resolve_call_path(expr)
+            .resolve_call_path(&call.func)
             .and_then(|call_path| match call_path.as_slice() {
                 // PTH100
                 ["os", "path", "abspath"] => Some(OsPathAbspath.into()),
@@ -60,12 +60,22 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["os", "path", "join"] => Some(
                     OsPathJoin {
                         module: "path".to_string(),
+                        joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                            Joiner::Joinpath
+                        } else {
+                            Joiner::Slash
+                        },
                     }
                     .into(),
                 ),
                 ["os", "sep", "join"] => Some(
                     OsPathJoin {
                         module: "sep".to_string(),
+                        joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                            Joiner::Joinpath
+                        } else {
+                            Joiner::Slash
+                        },
                     }
                     .into(),
                 ),
@@ -86,7 +96,51 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 // PTH205
                 ["os", "path", "getctime"] => Some(OsPathGetctime.into()),
                 // PTH123
-                ["" | "builtin", "open"] => Some(BuiltinOpen.into()),
+                ["" | "builtin", "open"] => {
+                    // `closefd` and `openener` are not supported by pathlib, so check if they are
+                    // are set to non-default values.
+                    // https://github.com/astral-sh/ruff/issues/7620
+                    // Signature as of Python 3.11 (https://docs.python.org/3/library/functions.html#open):
+                    // ```text
+                    //      0     1         2             3              4            5
+                    // open(file, mode='r', buffering=-1, encoding=None, errors=None, newline=None,
+                    //      6             7
+                    //      closefd=True, opener=None)
+                    //              ^^^^         ^^^^
+                    // ```
+                    // For `pathlib` (https://docs.python.org/3/library/pathlib.html#pathlib.Path.open):
+                    // ```text
+                    // Path.open(mode='r', buffering=-1, encoding=None, errors=None, newline=None)
+                    // ```
+                    if call
+                        .arguments
+                        .find_argument("closefd", 6)
+                        .is_some_and(|expr| {
+                            !matches!(
+                                expr,
+                                Expr::Constant(ExprConstant {
+                                    value: Constant::Bool(true),
+                                    ..
+                                })
+                            )
+                        })
+                        || call
+                            .arguments
+                            .find_argument("opener", 7)
+                            .is_some_and(|expr| {
+                                !matches!(
+                                    expr,
+                                    Expr::Constant(ExprConstant {
+                                        value: Constant::None,
+                                        ..
+                                    })
+                                )
+                            })
+                    {
+                        return None;
+                    }
+                    Some(BuiltinOpen.into())
+                }
                 // PTH124
                 ["py", "path", "local"] => Some(PyPath.into()),
                 // PTH207
@@ -110,7 +164,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 _ => None,
             })
     {
-        let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, expr.range());
+        let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, call.func.range());
 
         if checker.enabled(diagnostic.kind.rule()) {
             checker.diagnostics.push(diagnostic);

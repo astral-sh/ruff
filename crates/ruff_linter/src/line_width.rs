@@ -1,19 +1,23 @@
-use ruff_cache::{CacheKey, CacheKeyHasher};
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::hash::Hasher;
 use std::num::{NonZeroU16, NonZeroU8, ParseIntError};
 use std::str::FromStr;
+
+use serde::{Deserialize, Serialize};
 use unicode_width::UnicodeWidthChar;
 
+use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
+use ruff_text_size::TextSize;
 
 /// The length of a line of text that is considered too long.
 ///
 /// The allowed range of values is 1..=320
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct LineLength(NonZeroU16);
+pub struct LineLength(
+    #[cfg_attr(feature = "schemars", schemars(range(min = 1, max = 320)))] NonZeroU16,
+);
 
 impl LineLength {
     /// Maximum allowed value for a valid [`LineLength`]
@@ -22,6 +26,10 @@ impl LineLength {
     /// Return the numeric value for this [`LineLength`]
     pub fn value(&self) -> u16 {
         self.0.get()
+    }
+
+    pub fn text_len(&self) -> TextSize {
+        TextSize::from(u32::from(self.value()))
     }
 }
 
@@ -121,12 +129,12 @@ pub struct LineWidthBuilder {
     /// This is used to calculate the width of tabs.
     column: usize,
     /// The tab size to use when calculating the width of tabs.
-    tab_size: TabSize,
+    tab_size: IndentWidth,
 }
 
 impl Default for LineWidthBuilder {
     fn default() -> Self {
-        Self::new(TabSize::default())
+        Self::new(IndentWidth::default())
     }
 }
 
@@ -156,7 +164,7 @@ impl LineWidthBuilder {
     }
 
     /// Creates a new `LineWidth` with the given tab size.
-    pub fn new(tab_size: TabSize) -> Self {
+    pub fn new(tab_size: IndentWidth) -> Self {
         LineWidthBuilder {
             width: 0,
             column: 0,
@@ -226,22 +234,28 @@ impl PartialOrd<LineLength> for LineWidthBuilder {
 /// The size of a tab.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct TabSize(NonZeroU8);
+pub struct IndentWidth(NonZeroU8);
 
-impl TabSize {
+impl IndentWidth {
     pub(crate) fn as_usize(self) -> usize {
         self.0.get() as usize
     }
 }
 
-impl Default for TabSize {
+impl Default for IndentWidth {
     fn default() -> Self {
         Self(NonZeroU8::new(4).unwrap())
     }
 }
 
-impl From<NonZeroU8> for TabSize {
+impl From<NonZeroU8> for IndentWidth {
     fn from(tab_size: NonZeroU8) -> Self {
         Self(tab_size)
+    }
+}
+
+impl From<IndentWidth> for NonZeroU8 {
+    fn from(value: IndentWidth) -> Self {
+        value.0
     }
 }

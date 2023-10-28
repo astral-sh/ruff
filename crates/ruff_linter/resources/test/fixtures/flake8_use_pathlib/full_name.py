@@ -33,3 +33,16 @@ with open(p) as fp:
     fp.read()
 open(p).close()
 os.getcwdb(p)
+os.path.join(p, *q)
+os.sep.join(p, *q)
+
+# https://github.com/astral-sh/ruff/issues/7620
+def opener(path, flags):
+    return os.open(path, flags, dir_fd=os.open('somedir', os.O_RDONLY))
+
+
+open(p, closefd=False)
+open(p, opener=opener)
+open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+open(p, 'r', - 1, None, None, None, True, None)
+open(p, 'r', - 1, None, None, None, False, opener)

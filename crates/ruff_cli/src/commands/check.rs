@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::Write;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -7,7 +6,6 @@ use std::time::Instant;
 use anyhow::Result;
 use colored::Colorize;
 use ignore::Error;
-use itertools::Itertools;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
@@ -16,15 +14,18 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
 use ruff_linter::registry::Rule;
+use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::{fs, warn_user_once, IOError};
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
-use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, PyprojectDiscoveryStrategy};
+use ruff_workspace::resolver::{
+    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile,
+};
 
 use crate::args::CliOverrides;
-use crate::cache::{self, Cache};
+use crate::cache::{Cache, PackageCacheMap, PackageCaches};
 use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
@@ -35,159 +36,150 @@ pub(crate) fn check(
     overrides: &CliOverrides,
     cache: flags::Cache,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
     let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
-    let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
+    debug!("Identified files to lint in: {:?}", start.elapsed());
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
         return Ok(Diagnostics::default());
     }
 
-    // Initialize the cache.
-    if cache.into() {
-        fn init_cache(path: &Path) {
-            if let Err(e) = cache::init(path) {
-                error!("Failed to initialize cache at {}: {e:?}", path.display());
-            }
-        }
-
-        match pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => {
-                init_cache(&pyproject_config.settings.cache_dir);
-            }
-            PyprojectDiscoveryStrategy::Hierarchical => {
-                for settings in
-                    std::iter::once(&pyproject_config.settings).chain(resolver.settings())
-                {
-                    init_cache(&settings.cache_dir);
-                }
-            }
-        }
-    };
-
     // Discover the package root for each Python file.
     let package_roots = resolver.package_roots(
         &paths
             .iter()
             .flatten()
-            .map(ignore::DirEntry::path)
+            .map(ResolvedFile::path)
             .collect::<Vec<_>>(),
         pyproject_config,
     );
 
     // Load the caches.
-    let caches = bool::from(cache).then(|| {
-        package_roots
-            .iter()
-            .map(|(package, package_root)| package_root.unwrap_or(package))
-            .unique()
-            .par_bridge()
-            .map(|cache_root| {
-                let settings = resolver.resolve(cache_root, pyproject_config);
-                let cache = Cache::open(cache_root.to_path_buf(), settings);
-                (cache_root, cache)
-            })
-            .collect::<HashMap<&Path, Cache>>()
-    });
+    let caches = if bool::from(cache) {
+        Some(PackageCacheMap::init(
+            pyproject_config,
+            &package_roots,
+            &resolver,
+        ))
+    } else {
+        None
+    };
 
     let start = Instant::now();
-    let mut diagnostics: Diagnostics = paths
-        .par_iter()
-        .map(|entry| {
-            match entry {
-                Ok(entry) => {
-                    let path = entry.path();
-                    let package = path
-                        .parent()
-                        .and_then(|parent| package_roots.get(parent))
-                        .and_then(|package| *package);
+    let diagnostics_per_file = paths.par_iter().filter_map(|resolved_file| {
+        let result = match resolved_file {
+            Ok(resolved_file) => {
+                let path = resolved_file.path();
+                let package = path
+                    .parent()
+                    .and_then(|parent| package_roots.get(parent))
+                    .and_then(|package| *package);
 
-                    let settings = resolver.resolve(path, pyproject_config);
+                let settings = resolver.resolve(path, pyproject_config);
 
-                    let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
-                    let cache = caches.as_ref().and_then(|caches| {
-                        if let Some(cache) = caches.get(&cache_root) {
-                            Some(cache)
-                        } else {
-                            debug!("No cache found for {}", cache_root.display());
-                            None
-                        }
-                    });
-
-                    lint_path(path, package, &settings.linter, cache, noqa, autofix).map_err(|e| {
-                        (Some(path.to_owned()), {
-                            let mut error = e.to_string();
-                            for cause in e.chain() {
-                                write!(&mut error, "\n  Cause: {cause}").unwrap();
-                            }
-                            error
-                        })
-                    })
+                if !resolved_file.is_root()
+                    && match_exclusion(
+                        resolved_file.path(),
+                        resolved_file.file_name(),
+                        &settings.linter.exclude,
+                    )
+                {
+                    return None;
                 }
-                Err(e) => Err((
-                    if let Error::WithPath { path, .. } = e {
-                        Some(path.clone())
-                    } else {
-                        None
-                    },
-                    e.io_error()
-                        .map_or_else(|| e.to_string(), io::Error::to_string),
-                )),
-            }
-            .unwrap_or_else(|(path, message)| {
-                if let Some(path) = &path {
-                    let settings = resolver.resolve(path, pyproject_config);
-                    if settings.linter.rules.enabled(Rule::IOError) {
-                        let dummy =
-                            SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
-                        Diagnostics::new(
-                            vec![Message::from_diagnostic(
-                                Diagnostic::new(IOError { message }, TextRange::default()),
-                                dummy,
-                                TextSize::default(),
-                            )],
-                            ImportMap::default(),
-                            FxHashMap::default(),
-                        )
-                    } else {
-                        warn!(
-                            "{}{}{} {message}",
-                            "Failed to lint ".bold(),
-                            fs::relativize_path(path).bold(),
-                            ":".bold()
-                        );
-                        Diagnostics::default()
-                    }
+                let cache_root = package.unwrap_or_else(|| path.parent().unwrap_or(path));
+                let cache = caches.get(cache_root);
+
+                lint_path(
+                    path,
+                    package,
+                    &settings.linter,
+                    cache,
+                    noqa,
+                    fix_mode,
+                    unsafe_fixes,
+                )
+                .map_err(|e| {
+                    (Some(path.to_path_buf()), {
+                        let mut error = e.to_string();
+                        for cause in e.chain() {
+                            write!(&mut error, "\n  Cause: {cause}").unwrap();
+                        }
+                        error
+                    })
+                })
+            }
+            Err(e) => Err((
+                if let Error::WithPath { path, .. } = e {
+                    Some(path.clone())
                 } else {
-                    warn!("{} {message}", "Encountered error:".bold());
+                    None
+                },
+                e.io_error()
+                    .map_or_else(|| e.to_string(), io::Error::to_string),
+            )),
+        };
+
+        Some(result.unwrap_or_else(|(path, message)| {
+            if let Some(path) = &path {
+                let settings = resolver.resolve(path, pyproject_config);
+                if settings.linter.rules.enabled(Rule::IOError) {
+                    let dummy =
+                        SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
+
+                    Diagnostics::new(
+                        vec![Message::from_diagnostic(
+                            Diagnostic::new(IOError { message }, TextRange::default()),
+                            dummy,
+                            TextSize::default(),
+                        )],
+                        ImportMap::default(),
+                        FxHashMap::default(),
+                    )
+                } else {
+                    warn!(
+                        "{}{}{} {message}",
+                        "Failed to lint ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    );
                     Diagnostics::default()
                 }
-            })
-        })
-        .reduce(Diagnostics::default, |mut acc, item| {
-            acc += item;
-            acc
-        });
+            } else {
+                warn!("{} {message}", "Encountered error:".bold());
+                Diagnostics::default()
+            }
+        }))
+    });
 
-    diagnostics.messages.sort();
+    // Aggregate the diagnostics of all checked files and count the checked files.
+    // This can't be a regular for loop because we use `par_iter`.
+    let (mut all_diagnostics, checked_files) = diagnostics_per_file
+        .fold(
+            || (Diagnostics::default(), 0u64),
+            |(all_diagnostics, checked_files), file_diagnostics| {
+                (all_diagnostics + file_diagnostics, checked_files + 1)
+            },
+        )
+        .reduce(
+            || (Diagnostics::default(), 0u64),
+            |a, b| (a.0 + b.0, a.1 + b.1),
+        );
+
+    all_diagnostics.messages.sort();
 
     // Store the caches.
-    if let Some(caches) = caches {
-        caches
-            .into_par_iter()
-            .try_for_each(|(_, cache)| cache.store())?;
-    }
+    caches.persist()?;
 
     let duration = start.elapsed();
-    debug!("Checked {:?} files in: {:?}", paths.len(), duration);
+    debug!("Checked {:?} files in: {:?}", checked_files, duration);
 
-    Ok(diagnostics)
+    Ok(all_diagnostics)
 }
 
 /// Wraps [`lint_path`](crate::diagnostics::lint_path) in a [`catch_unwind`](std::panic::catch_unwind) and emits
@@ -198,10 +190,11 @@ fn lint_path(
     settings: &LinterSettings,
     cache: Option<&Cache>,
     noqa: flags::Noqa,
-    autofix: flags::FixMode,
+    fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     let result = catch_unwind(|| {
-        crate::diagnostics::lint_path(path, package, settings, cache, noqa, autofix)
+        crate::diagnostics::lint_path(path, package, settings, cache, noqa, fix_mode, unsafe_fixes)
     });
 
     match result {
@@ -238,6 +231,7 @@ mod test {
 
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
     use ruff_linter::registry::Rule;
+    use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{flags, LinterSettings};
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff_workspace::Settings;
@@ -285,6 +279,7 @@ mod test {
             flags::Cache::Disabled,
             flags::Noqa::Disabled,
             flags::FixMode::Generate,
+            UnsafeFixes::Enabled,
         )
         .unwrap();
         let mut output = Vec::new();

@@ -5,8 +5,8 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
 use crate::Mode;
-use num_bigint::BigInt;
-use ruff_python_ast::IpyEscapeKind;
+
+use ruff_python_ast::{Int, IpyEscapeKind};
 use ruff_text_size::TextSize;
 use std::fmt;
 
@@ -21,7 +21,7 @@ pub enum Tok {
     /// Token value for an integer.
     Int {
         /// The integer value.
-        value: BigInt,
+        value: Int,
     },
     /// Token value for a floating point number.
     Float {
@@ -44,6 +44,19 @@ pub enum Tok {
         /// Whether the string is triple quoted.
         triple_quoted: bool,
     },
+    /// Token value for the start of an f-string. This includes the `f`/`F`/`fr` prefix
+    /// and the opening quote(s).
+    FStringStart,
+    /// Token value that includes the portion of text inside the f-string that's not
+    /// part of the expression part and isn't an opening or closing brace.
+    FStringMiddle {
+        /// The string value.
+        value: String,
+        /// Whether the string is raw or not.
+        is_raw: bool,
+    },
+    /// Token value for the end of an f-string. This includes the closing quote.
+    FStringEnd,
     /// Token value for IPython escape commands. These are recognized by the lexer
     /// only when the mode is [`Mode::Ipython`].
     IpyEscapeCommand {
@@ -66,6 +79,8 @@ pub enum Tok {
     EndOfFile,
     /// Token value for a question mark `?`. This is only used in [`Mode::Ipython`].
     Question,
+    /// Token value for a exclamation mark `!`.
+    Exclamation,
     /// Token value for a left parenthesis `(`.
     Lpar,
     /// Token value for a right parenthesis `)`.
@@ -234,6 +249,9 @@ impl fmt::Display for Tok {
                 let quotes = "\"".repeat(if *triple_quoted { 3 } else { 1 });
                 write!(f, "{kind}{quotes}{value}{quotes}")
             }
+            FStringStart => f.write_str("FStringStart"),
+            FStringMiddle { value, .. } => f.write_str(value),
+            FStringEnd => f.write_str("FStringEnd"),
             IpyEscapeCommand { kind, value } => write!(f, "{kind}{value}"),
             Newline => f.write_str("Newline"),
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
@@ -243,6 +261,7 @@ impl fmt::Display for Tok {
             StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
             Question => f.write_str("'?'"),
+            Exclamation => f.write_str("'!'"),
             Lpar => f.write_str("'('"),
             Rpar => f.write_str("')'"),
             Lsqb => f.write_str("'['"),
@@ -336,19 +355,19 @@ impl fmt::Display for Tok {
 /// The kind of string literal as described in the [String and Bytes literals]
 /// section of the Python reference.
 ///
+/// Note that f-strings are not included here, because as of [PEP 701] they
+/// emit different tokens than other string literals.
+///
 /// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
+/// [PEP 701]: https://peps.python.org/pep-0701/
 #[derive(PartialEq, Eq, Debug, Clone, Hash, Copy)] // TODO: is_macro::Is
 pub enum StringKind {
     /// A normal string literal with no prefix.
     String,
-    /// A f-string literal, with a `f` or `F` prefix.
-    FString,
     /// A byte string literal, with a `b` or `B` prefix.
     Bytes,
     /// A raw string literal, with a `r` or `R` prefix.
     RawString,
-    /// A raw f-string literal, with a `rf`/`fr` or `rF`/`Fr` or `Rf`/`fR` or `RF`/`FR` prefix.
-    RawFString,
     /// A raw byte string literal, with a `rb`/`br` or `rB`/`Br` or `Rb`/`bR` or `RB`/`BR` prefix.
     RawBytes,
     /// A unicode string literal, with a `u` or `U` prefix.
@@ -361,7 +380,6 @@ impl TryFrom<char> for StringKind {
     fn try_from(ch: char) -> Result<Self, String> {
         match ch {
             'r' | 'R' => Ok(StringKind::RawString),
-            'f' | 'F' => Ok(StringKind::FString),
             'u' | 'U' => Ok(StringKind::Unicode),
             'b' | 'B' => Ok(StringKind::Bytes),
             c => Err(format!("Unexpected string prefix: {c}")),
@@ -374,8 +392,6 @@ impl TryFrom<[char; 2]> for StringKind {
 
     fn try_from(chars: [char; 2]) -> Result<Self, String> {
         match chars {
-            ['r' | 'R', 'f' | 'F'] => Ok(StringKind::RawFString),
-            ['f' | 'F', 'r' | 'R'] => Ok(StringKind::RawFString),
             ['r' | 'R', 'b' | 'B'] => Ok(StringKind::RawBytes),
             ['b' | 'B', 'r' | 'R'] => Ok(StringKind::RawBytes),
             [c1, c2] => Err(format!("Unexpected string prefix: {c1}{c2}")),
@@ -385,32 +401,16 @@ impl TryFrom<[char; 2]> for StringKind {
 
 impl fmt::Display for StringKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use StringKind::{Bytes, FString, RawBytes, RawFString, RawString, String, Unicode};
-        match self {
-            String => f.write_str(""),
-            FString => f.write_str("f"),
-            Bytes => f.write_str("b"),
-            RawString => f.write_str("r"),
-            RawFString => f.write_str("rf"),
-            RawBytes => f.write_str("rb"),
-            Unicode => f.write_str("u"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
 impl StringKind {
     /// Returns true if the string is a raw string, i,e one of
-    /// [`StringKind::RawString`] or [`StringKind::RawFString`] or [`StringKind::RawBytes`].
+    /// [`StringKind::RawString`] or [`StringKind::RawBytes`].
     pub fn is_raw(&self) -> bool {
-        use StringKind::{RawBytes, RawFString, RawString};
-        matches!(self, RawString | RawFString | RawBytes)
-    }
-
-    /// Returns true if the string is an f-string, i,e one of
-    /// [`StringKind::FString`] or [`StringKind::RawFString`].
-    pub fn is_any_fstring(&self) -> bool {
-        use StringKind::{FString, RawFString};
-        matches!(self, FString | RawFString)
+        use StringKind::{RawBytes, RawString};
+        matches!(self, RawString | RawBytes)
     }
 
     /// Returns true if the string is a byte string, i,e one of
@@ -427,13 +427,24 @@ impl StringKind {
 
     /// Returns the number of characters in the prefix.
     pub fn prefix_len(&self) -> TextSize {
-        use StringKind::{Bytes, FString, RawBytes, RawFString, RawString, String, Unicode};
+        use StringKind::{Bytes, RawBytes, RawString, String, Unicode};
         let len = match self {
             String => 0,
-            RawString | FString | Unicode | Bytes => 1,
-            RawFString | RawBytes => 2,
+            RawString | Unicode | Bytes => 1,
+            RawBytes => 2,
         };
         len.into()
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        use StringKind::{Bytes, RawBytes, RawString, String, Unicode};
+        match self {
+            String => "",
+            Bytes => "b",
+            RawString => "r",
+            RawBytes => "rb",
+            Unicode => "u",
+        }
     }
 }
 
@@ -450,6 +461,14 @@ pub enum TokenKind {
     Complex,
     /// Token value for a string.
     String,
+    /// Token value for the start of an f-string. This includes the `f`/`F`/`fr` prefix
+    /// and the opening quote(s).
+    FStringStart,
+    /// Token value that includes the portion of text inside the f-string that's not
+    /// part of the expression part and isn't an opening or closing brace.
+    FStringMiddle,
+    /// Token value for the end of an f-string. This includes the closing quote.
+    FStringEnd,
     /// Token value for a IPython escape command.
     EscapeCommand,
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
@@ -466,6 +485,8 @@ pub enum TokenKind {
     EndOfFile,
     /// Token value for a question mark `?`.
     Question,
+    /// Token value for an exclamation mark `!`.
+    Exclamation,
     /// Token value for a left parenthesis `(`.
     Lpar,
     /// Token value for a right parenthesis `)`.
@@ -781,6 +802,9 @@ impl TokenKind {
             Tok::Float { .. } => TokenKind::Float,
             Tok::Complex { .. } => TokenKind::Complex,
             Tok::String { .. } => TokenKind::String,
+            Tok::FStringStart => TokenKind::FStringStart,
+            Tok::FStringMiddle { .. } => TokenKind::FStringMiddle,
+            Tok::FStringEnd => TokenKind::FStringEnd,
             Tok::IpyEscapeCommand { .. } => TokenKind::EscapeCommand,
             Tok::Comment(_) => TokenKind::Comment,
             Tok::Newline => TokenKind::Newline,
@@ -789,6 +813,7 @@ impl TokenKind {
             Tok::Dedent => TokenKind::Dedent,
             Tok::EndOfFile => TokenKind::EndOfFile,
             Tok::Question => TokenKind::Question,
+            Tok::Exclamation => TokenKind::Exclamation,
             Tok::Lpar => TokenKind::Lpar,
             Tok::Rpar => TokenKind::Rpar,
             Tok::Lsqb => TokenKind::Lsqb,

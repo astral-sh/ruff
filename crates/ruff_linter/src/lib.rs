@@ -14,7 +14,6 @@ pub use rules::pycodestyle::rules::{IOError, SyntaxError};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-mod autofix;
 mod checkers;
 pub mod codes;
 mod comments;
@@ -22,6 +21,7 @@ mod cst;
 pub mod directives;
 mod doc_lines;
 mod docstrings;
+mod fix;
 pub mod fs;
 mod importer;
 mod lex;

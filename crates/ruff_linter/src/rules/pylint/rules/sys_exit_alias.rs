@@ -1,12 +1,11 @@
 use ruff_python_ast::{self as ast, Expr};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of the `exit()` and `quit()`.
@@ -43,7 +42,7 @@ pub struct SysExitAlias {
 }
 
 impl Violation for SysExitAlias {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -51,7 +50,7 @@ impl Violation for SysExitAlias {
         format!("Use `sys.exit()` instead of `{name}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let SysExitAlias { name } = self;
         Some(format!("Replace `{name}` with `sys.exit()`"))
     }
@@ -77,16 +76,14 @@ pub(crate) fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         },
         func.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("sys", "exit"),
-                func.start(),
-                checker.semantic(),
-            )?;
-            let reference_edit = Edit::range_replacement(binding, func.range());
-            Ok(Fix::suggested_edits(import_edit, [reference_edit]))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("sys", "exit"),
+            func.start(),
+            checker.semantic(),
+        )?;
+        let reference_edit = Edit::range_replacement(binding, func.range());
+        Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+    });
     checker.diagnostics.push(diagnostic);
 }

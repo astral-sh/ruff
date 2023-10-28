@@ -19,12 +19,12 @@ else:  # 12 trailing else condition
 
 if x == y:
     if y == z:
-        ...
+        pass
 
     if a == b:
-        ...
+        pass
     else: # trailing comment
-        ...
+        pass
 
     # trailing else comment
 
@@ -34,11 +34,11 @@ elif aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + 
     2222222222222222222222,
     3333333333
     ]:
-    ...
+    pass
 
 
 else:
-    ...
+    pass
 
 # Regression test: Don't drop the trailing comment by associating it with the elif
 # instead of the else.
@@ -204,6 +204,31 @@ if True:
 
 
 # comment
+else:
+    pass
+
+if True:
+    if True:
+        pass
+    else:
+        pass
+        # a
+
+        # b
+        # c
+
+else:
+    pass
+
+if True:
+    if True:
+        pass
+    else:
+        pass
+
+        # b
+        # c
+
 else:
     pass
 

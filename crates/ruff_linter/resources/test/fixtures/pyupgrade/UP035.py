@@ -80,11 +80,14 @@ from typing import cast
 # OK
 from a import b
 
-# Ok: `typing_extensions` contains backported improvements.
+# OK: `typing_extensions` contains backported improvements.
 from typing_extensions import SupportsIndex
 
-# Ok: `typing_extensions` contains backported improvements.
+# OK: `typing_extensions` contains backported improvements.
 from typing_extensions import NamedTuple
 
-# Ok: `typing_extensions` supports `frozen_default` (backported from 3.12).
+# OK: `typing_extensions` supports `frozen_default` (backported from 3.12).
 from typing_extensions import dataclass_transform
+
+# UP035
+from backports.strenum import StrEnum

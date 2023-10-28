@@ -1,6 +1,6 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.291"
+version = "0.1.3"
 description = """
 Convert Flake8 configuration files to Ruff configuration files.
 """
@@ -23,7 +23,7 @@ configparser = { version = "3.0.2" }
 itertools = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }
-pep440_rs = { version = "0.3.1", features = ["serde"] }
+pep440_rs = { version = "0.3.12", features = ["serde"] }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }

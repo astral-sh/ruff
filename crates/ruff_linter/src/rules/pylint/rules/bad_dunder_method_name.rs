@@ -54,7 +54,7 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt])
         .iter()
         .filter_map(ruff_python_ast::Stmt::as_function_def_stmt)
         .filter(|method| {
-            if is_known_dunder_method(&method.name) {
+            if is_known_dunder_method(&method.name) || matches!(method.name.as_str(), "_") {
                 return false;
             }
             method.name.starts_with('_') && method.name.ends_with('_')
@@ -88,6 +88,7 @@ fn is_known_dunder_method(method: &str) -> bool {
             | "__attrs_pre_init__"
             | "__await__"
             | "__bool__"
+            | "__buffer__"
             | "__bytes__"
             | "__call__"
             | "__ceil__"
@@ -131,6 +132,7 @@ fn is_known_dunder_method(method: &str) -> bool {
             | "__imatmul__"
             | "__imod__"
             | "__imul__"
+            | "__index__"
             | "__init__"
             | "__init_subclass__"
             | "__instancecheck__"
@@ -166,6 +168,7 @@ fn is_known_dunder_method(method: &str) -> bool {
             | "__rdivmod__"
             | "__reduce__"
             | "__reduce_ex__"
+            | "__release_buffer__"
             | "__repr__"
             | "__reversed__"
             | "__rfloordiv__"
@@ -196,5 +199,13 @@ fn is_known_dunder_method(method: &str) -> bool {
             | "__trunc__"
             | "__weakref__"
             | "__xor__"
+            // Overridable sunder names from the `Enum` class.
+            // See: https://docs.python.org/3/library/enum.html#supported-sunder-names
+            | "_name_"
+            | "_value_"
+            | "_missing_"
+            | "_ignore_"
+            | "_order_"
+            | "_generate_next_value_"
     )
 }

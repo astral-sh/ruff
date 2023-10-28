@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
@@ -35,14 +35,14 @@ pub struct UnnecessaryCallAroundSorted {
     func: String,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryCallAroundSorted {
+impl AlwaysFixableViolation for UnnecessaryCallAroundSorted {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryCallAroundSorted { func } = self;
         format!("Unnecessary `{func}` call around `sorted()`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let UnnecessaryCallAroundSorted { func } = self;
         format!("Remove unnecessary `{func}` call")
     }
@@ -82,19 +82,14 @@ pub(crate) fn unnecessary_call_around_sorted(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let edit = fixes::fix_unnecessary_call_around_sorted(
-                expr,
-                checker.locator(),
-                checker.stylist(),
-            )?;
-            if outer.id == "reversed" {
-                Ok(Fix::suggested(edit))
-            } else {
-                Ok(Fix::automatic(edit))
-            }
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let edit =
+            fixes::fix_unnecessary_call_around_sorted(expr, checker.locator(), checker.stylist())?;
+        if outer.id == "reversed" {
+            Ok(Fix::unsafe_edit(edit))
+        } else {
+            Ok(Fix::safe_edit(edit))
+        }
+    });
     checker.diagnostics.push(diagnostic);
 }

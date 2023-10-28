@@ -43,6 +43,7 @@ jobs:
               - "!crates/ruff_dev/**"
               - "!crates/ruff_shrinking/**"
               - scripts/*
+              - .github/workflows/ci.yaml
 
             formatter:
               - Cargo.toml
@@ -57,6 +58,7 @@ jobs:
               - crates/ruff_python_parser/**
               - crates/ruff_dev/**
               - scripts/*
+              - .github/workflows/ci.yaml
 
   cargo-fmt:
     name: "cargo fmt"
@@ -82,12 +84,9 @@ jobs:
       - name: "Clippy (wasm)"
         run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
-  cargo-test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    name: "cargo test | ${{ matrix.os }}"
+  cargo-test-linux:
+    runs-on: ubuntu-latest
+    name: "cargo test (linux)"
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -96,46 +95,35 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-insta
-      - run: pip install black[d]==23.1.0
       - uses: Swatinem/rust-cache@v2
-      - name: "Run tests (Ubuntu)"
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+      - name: "Run tests"
         run: cargo insta test --all --all-features --unreferenced reject
-      - name: "Run tests (Windows)"
-        if: ${{ matrix.os == 'windows-latest' }}
-        shell: bash
-        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
-        run: cargo insta test --all --all-features
-      - run: cargo test --package ruff_cli --test black_compatibility_test -- --ignored
-        # TODO: Skipped as it's currently broken. The resource were moved from the
-        # ruff_cli to ruff crate, but this test was not updated.
-        if: false
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
       - uses: actions/upload-artifact@v3
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         with:
           name: ruff
           path: target/debug/ruff
 
-  cargo-fuzz:
-    runs-on: ubuntu-latest
-    name: "cargo fuzz"
+  cargo-test-windows:
+    runs-on: windows-latest
+    name: "cargo test (windows)"
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "fuzz -> target"
-      - name: "Install cargo-fuzz"
+      - name: "Install cargo insta"
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-fuzz@0.11
-      - run: cargo fuzz build -s none
+          tool: cargo-insta
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run tests"
+        shell: bash
+        # We can't reject unreferenced snapshots on windows because flake8_executable can't run on windows
+        run: cargo insta test --all --all-features
 
   cargo-test-wasm:
     runs-on: ubuntu-latest
@@ -155,6 +143,22 @@ jobs:
         run: |
           cd crates/ruff_wasm
           wasm-pack test --node
+
+  cargo-fuzz:
+    runs-on: ubuntu-latest
+    name: "cargo fuzz"
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "fuzz -> target"
+      - name: "Install cargo-fuzz"
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz@0.11
+      - run: cargo fuzz build -s none
 
   scripts:
     name: "test scripts"
@@ -177,10 +181,10 @@ jobs:
     name: "ecosystem"
     runs-on: ubuntu-latest
     needs:
-      - cargo-test
+      - cargo-test-linux
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-    if: github.event_name == 'pull_request' && needs.determine_changes.outputs.linter == 'true'
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
@@ -188,27 +192,48 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - uses: actions/download-artifact@v3
-        name: Download Ruff binary
+        name: Download comparison Ruff binary
         id: ruff-target
         with:
           name: ruff
           path: target/debug
 
       - uses: dawidd6/action-download-artifact@v2
-        name: Download base results
+        name: Download baseline Ruff binary
         with:
           name: ruff
           branch: ${{ github.event.pull_request.base.ref }}
           check_artifacts: true
 
-      - name: Run ecosystem check
+      - name: Install ruff-ecosystem
+        run: |
+          pip install ./python/ruff-ecosystem
+
+      - name: Run `ruff check` ecosystem check
+        if: ${{ needs.determine_changes.outputs.linter == 'true' }}
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+          chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
 
-          scripts/check_ecosystem.py ruff ${{ steps.ruff-target.outputs.download-path }}/ruff | tee ecosystem-result
-          cat ecosystem-result > $GITHUB_STEP_SUMMARY
+          ruff-ecosystem check ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check
 
+          cat ecosystem-result-check > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-check > ecosystem-result
+          echo "" >> ecosystem-result
+
+      - name: Run `ruff format` ecosystem check
+        if: ${{ needs.determine_changes.outputs.formatter == 'true' }}
+        run: |
+          # Make executable, since artifact download doesn't preserve this
+          chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+
+          ruff-ecosystem format ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
+
+          cat ecosystem-result-format > $GITHUB_STEP_SUMMARY
+          cat ecosystem-result-format >> ecosystem-result
+
+      - name: Export pull request number
+        run: |
           echo ${{ github.event.number }} > pr-number
 
       - uses: actions/upload-artifact@v3
@@ -230,12 +255,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: "Install nightly Rust toolchain"
         # Only pinned to make caching work, update freely
-        run: rustup toolchain install nightly-2023-06-08
+        run: rustup toolchain install nightly-2023-10-15
       - uses: Swatinem/rust-cache@v2
       - name: "Install cargo-udeps"
         uses: taiki-e/install-action@cargo-udeps
       - name: "Run cargo-udeps"
-        run: cargo +nightly-2023-06-08 udeps
+        run: cargo +nightly-2023-10-15 udeps
 
   python-package:
     name: "python package"
@@ -341,6 +366,45 @@ jobs:
         run: cat target/progress_projects_stats.txt > $GITHUB_STEP_SUMMARY
       - name: "Remove checkouts from cache"
         run: rm -r target/progress_projects
+
+  check-ruff-lsp:
+    name: "test ruff-lsp"
+    runs-on: ubuntu-latest
+    needs: cargo-test-linux
+    steps:
+      - uses: extractions/setup-just@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/checkout@v4
+        name: "Download ruff-lsp source"
+        with:
+          repository: "astral-sh/ruff-lsp"
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/download-artifact@v3
+        name: Download development ruff binary
+        id: ruff-target
+        with:
+          name: ruff
+          path: target/debug
+
+      - name: Install ruff-lsp dependencies
+        run: |
+          just install
+
+      - name: Run ruff-lsp tests
+        run: |
+          # Setup development binary
+          pip uninstall --yes ruff
+          chmod +x ${{ steps.ruff-target.outputs.download-path }}/ruff
+          export PATH=${{ steps.ruff-target.outputs.download-path }}:$PATH
+          ruff version
+
+          just test
 
   benchmarks:
     runs-on: ubuntu-latest

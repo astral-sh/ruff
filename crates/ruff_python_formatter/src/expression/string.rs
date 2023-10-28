@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use bitflags::bitflags;
 
 use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Constant, ExprConstant, ExprFString, ExpressionRef};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
@@ -48,10 +48,19 @@ impl<'a> AnyString<'a> {
         match self {
             Self::Constant(_) => Quoting::CanChange,
             Self::FString(f_string) => {
+                let unprefixed = locator
+                    .slice(f_string.range)
+                    .trim_start_matches(|c| c != '"' && c != '\'');
+                let triple_quoted =
+                    unprefixed.starts_with(r#"""""#) || unprefixed.starts_with(r#"'''"#);
                 if f_string.values.iter().any(|value| match value {
                     Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
                         let string_content = locator.slice(*range);
-                        string_content.contains(['"', '\''])
+                        if triple_quoted {
+                            string_content.contains(r#"""""#) || string_content.contains("'''")
+                        } else {
+                            string_content.contains(['"', '\''])
+                        }
                     }
                     _ => false,
                 }) {
@@ -139,7 +148,7 @@ impl<'a> FormatString<'a> {
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let locator = f.context().locator();
-        match self.layout {
+        let result = match self.layout {
             StringLayout::Default => {
                 if self.string.is_implicit_concatenated() {
                     in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
@@ -162,7 +171,73 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
             StringLayout::ImplicitConcatenatedStringInBinaryLike => {
                 FormatStringContinuation::new(self.string).fmt(f)
             }
+        };
+        // TODO(dhruvmanila): With PEP 701, comments can be inside f-strings.
+        // This is to mark all of those comments as formatted but we need to
+        // figure out how to handle them. Note that this needs to be done only
+        // after the f-string is formatted, so only for all the non-formatted
+        // comments.
+        if let AnyString::FString(fstring) = self.string {
+            let comments = f.context().comments();
+            fstring.values.iter().for_each(|value| {
+                comments.mark_verbatim_node_comments_formatted(value.into());
+            });
         }
+        result
+    }
+}
+
+/// A builder for the f-string range.
+///
+/// For now, this is limited to the outermost f-string and doesn't support
+/// nested f-strings.
+#[derive(Debug, Default)]
+struct FStringRangeBuilder {
+    start_location: TextSize,
+    end_location: TextSize,
+    nesting: u32,
+}
+
+impl FStringRangeBuilder {
+    fn visit_token(&mut self, token: &Tok, range: TextRange) {
+        match token {
+            Tok::FStringStart => {
+                if self.nesting == 0 {
+                    self.start_location = range.start();
+                }
+                self.nesting += 1;
+            }
+            Tok::FStringEnd => {
+                // We can assume that this will never overflow because we know
+                // that the program once parsed to a valid AST which means that
+                // the start and end tokens for f-strings are balanced.
+                self.nesting -= 1;
+                if self.nesting == 0 {
+                    self.end_location = range.end();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Returns `true` if the lexer is currently inside of a f-string.
+    ///
+    /// It'll return `false` once the `FStringEnd` token for the outermost
+    /// f-string is visited.
+    const fn in_fstring(&self) -> bool {
+        self.nesting > 0
+    }
+
+    /// Returns the complete range of the previously visited f-string.
+    ///
+    /// This method should only be called once the lexer is outside of any
+    /// f-string otherwise it might return an invalid range.
+    ///
+    /// It doesn't consume the builder because there can be multiple f-strings
+    /// throughout the source code.
+    fn finish(&self) -> TextRange {
+        debug_assert!(!self.in_fstring());
+        TextRange::new(self.start_location, self.end_location)
     }
 }
 
@@ -195,6 +270,10 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         // because this is a black preview style.
         let lexer = lex_starts_at(string_content, Mode::Expression, string_range.start());
 
+        // The lexer emits multiple tokens for a single f-string literal. Each token
+        // will have it's own range but we require the complete range of the f-string.
+        let mut fstring_range_builder = FStringRangeBuilder::default();
+
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
         for token in lexer {
@@ -226,8 +305,31 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                 }
             };
 
+            fstring_range_builder.visit_token(&token, token_range);
+
+            // We need to ignore all the tokens within the f-string as there can
+            // be `String` tokens inside it as well. For example,
+            //
+            // ```python
+            // f"foo {'bar'} foo"
+            // #      ^^^^^
+            // #      Ignore any logic for this `String` token
+            // ```
+            //
+            // Here, we're interested in the complete f-string, not the individual
+            // tokens inside it.
+            if fstring_range_builder.in_fstring() {
+                continue;
+            }
+
             match token {
-                Tok::String { .. } => {
+                Tok::String { .. } | Tok::FStringEnd => {
+                    let token_range = if token.is_f_string_end() {
+                        fstring_range_builder.finish()
+                    } else {
+                        token_range
+                    };
+
                     // ```python
                     // (
                     //      "a"
@@ -323,32 +425,36 @@ impl StringPart {
         self,
         quoting: Quoting,
         locator: &'a Locator,
-        quote_style: QuoteStyle,
+        configured_style: QuoteStyle,
     ) -> NormalizedString<'a> {
+        // Per PEP 8 and PEP 257, always prefer double quotes for docstrings and triple-quoted
+        // strings. (We assume docstrings are always triple-quoted.)
+        let preferred_style = if self.quotes.triple {
+            QuoteStyle::Double
+        } else {
+            configured_style
+        };
+
         let raw_content = locator.slice(self.content_range);
 
-        let preferred_quotes = match quoting {
+        let quotes = match quoting {
             Quoting::Preserve => self.quotes,
             Quoting::CanChange => {
                 if self.prefix.is_raw_string() {
-                    preferred_quotes_raw(raw_content, self.quotes, quote_style)
+                    choose_quotes_raw(raw_content, self.quotes, preferred_style)
                 } else {
-                    preferred_quotes(raw_content, self.quotes, quote_style)
+                    choose_quotes(raw_content, self.quotes, preferred_style)
                 }
             }
         };
 
-        let normalized = normalize_string(
-            locator.slice(self.content_range),
-            preferred_quotes,
-            self.prefix.is_raw_string(),
-        );
+        let normalized = normalize_string(locator.slice(self.content_range), quotes, self.prefix);
 
         NormalizedString {
             prefix: self.prefix,
             content_range: self.content_range,
             text: normalized,
-            quotes: preferred_quotes,
+            quotes,
         }
     }
 }
@@ -434,6 +540,10 @@ impl StringPrefix {
     pub(super) const fn is_raw_string(self) -> bool {
         self.contains(StringPrefix::RAW) || self.contains(StringPrefix::RAW_UPPER)
     }
+
+    pub(super) const fn is_fstring(self) -> bool {
+        self.contains(StringPrefix::F_STRING)
+    }
 }
 
 impl Format<PyFormatContext<'_>> for StringPrefix {
@@ -460,16 +570,17 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
     }
 }
 
-/// Detects the preferred quotes for raw string `input`.
-/// The configured quote style is preferred unless `input` contains unescaped quotes of the
-/// configured style. For example, `r"foo"` is preferred over `r'foo'` if the configured
-/// quote style is double quotes.
-fn preferred_quotes_raw(
+/// Choose the appropriate quote style for a raw string.
+///
+/// The preferred quote style is chosen unless the string contains unescaped quotes of the
+/// preferred style. For example, `r"foo"` is chosen over `r'foo'` if the preferred quote
+/// style is double quotes.
+fn choose_quotes_raw(
     input: &str,
     quotes: StringQuotes,
-    configured_style: QuoteStyle,
+    preferred_style: QuoteStyle,
 ) -> StringQuotes {
-    let configured_quote_char = configured_style.as_char();
+    let preferred_quote_char = preferred_style.as_char();
     let mut chars = input.chars().peekable();
     let contains_unescaped_configured_quotes = loop {
         match chars.next() {
@@ -478,7 +589,7 @@ fn preferred_quotes_raw(
                 chars.next();
             }
             // `"` or `'`
-            Some(c) if c == configured_quote_char => {
+            Some(c) if c == preferred_quote_char => {
                 if !quotes.triple {
                     break true;
                 }
@@ -487,13 +598,13 @@ fn preferred_quotes_raw(
                     // We can't turn `r'''\""'''` into `r"""\"""""`, this would confuse the parser
                     // about where the closing triple quotes start
                     None => break true,
-                    Some(next) if *next == configured_quote_char => {
+                    Some(next) if *next == preferred_quote_char => {
                         // `""` or `''`
                         chars.next();
 
                         // We can't turn `r'''""'''` into `r""""""""`, nor can we have
                         // `"""` or `'''` respectively inside the string
-                        if chars.peek().is_none() || chars.peek() == Some(&configured_quote_char) {
+                        if chars.peek().is_none() || chars.peek() == Some(&preferred_quote_char) {
                             break true;
                         }
                     }
@@ -510,26 +621,27 @@ fn preferred_quotes_raw(
         style: if contains_unescaped_configured_quotes {
             quotes.style
         } else {
-            configured_style
+            preferred_style
         },
     }
 }
 
-/// Detects the preferred quotes for `input`.
-/// * single quoted strings: The preferred quote style is the one that requires less escape sequences.
-/// * triple quoted strings: Use double quotes except the string contains a sequence of `"""`.
-fn preferred_quotes(
-    input: &str,
-    quotes: StringQuotes,
-    configured_style: QuoteStyle,
-) -> StringQuotes {
-    let preferred_style = if quotes.triple {
+/// Choose the appropriate quote style for a string.
+///
+/// For single quoted strings, the preferred quote style is used, unless the alternative quote style
+/// would require fewer escapes.
+///
+/// For triple quoted strings, the preferred quote style is always used, unless the string contains
+/// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
+/// used unless the string contains `"""`).
+fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle) -> StringQuotes {
+    let style = if quotes.triple {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
         let mut chars = input.chars().peekable();
 
         while let Some(c) = chars.next() {
-            let configured_quote_char = configured_style.as_char();
+            let preferred_quote_char = preferred_style.as_char();
             match c {
                 '\\' => {
                     if matches!(chars.peek(), Some('"' | '\\')) {
@@ -537,14 +649,14 @@ fn preferred_quotes(
                     }
                 }
                 // `"` or `'`
-                c if c == configured_quote_char => {
+                c if c == preferred_quote_char => {
                     match chars.peek().copied() {
-                        Some(c) if c == configured_quote_char => {
+                        Some(c) if c == preferred_quote_char => {
                             // `""` or `''`
                             chars.next();
 
                             match chars.peek().copied() {
-                                Some(c) if c == configured_quote_char => {
+                                Some(c) if c == preferred_quote_char => {
                                     // `"""` or `'''`
                                     chars.next();
                                     uses_triple_quotes = true;
@@ -579,7 +691,7 @@ fn preferred_quotes(
             // Keep the existing quote style.
             quotes.style
         } else {
-            configured_style
+            preferred_style
         }
     } else {
         let mut single_quotes = 0u32;
@@ -599,7 +711,7 @@ fn preferred_quotes(
             }
         }
 
-        match configured_style {
+        match preferred_style {
             QuoteStyle::Single => {
                 if single_quotes > double_quotes {
                     QuoteStyle::Double
@@ -619,7 +731,7 @@ fn preferred_quotes(
 
     StringQuotes {
         triple: quotes.triple,
-        style: preferred_style,
+        style,
     }
 }
 
@@ -668,10 +780,10 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
 }
 
 /// Adds the necessary quote escapes and removes unnecessary escape sequences when quoting `input`
-/// with the provided `style`.
+/// with the provided [`StringQuotes`] style.
 ///
 /// Returns the normalized string and whether it contains new lines.
-fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str> {
+fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -683,14 +795,30 @@ fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str>
     let preferred_quote = style.as_char();
     let opposite_quote = style.invert().as_char();
 
-    let mut chars = input.char_indices();
+    let mut chars = input.char_indices().peekable();
+
+    let is_raw = prefix.is_raw_string();
+    let is_fstring = prefix.is_fstring();
+    let mut formatted_value_nesting = 0u32;
 
     while let Some((index, c)) = chars.next() {
+        if is_fstring && matches!(c, '{' | '}') {
+            if chars.peek().copied().is_some_and(|(_, next)| next == c) {
+                // Skip over the second character of the double braces
+                chars.next();
+            } else if c == '{' {
+                formatted_value_nesting += 1;
+            } else {
+                // Safe to assume that `c == '}'` here because of the matched pattern above
+                formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+            }
+            continue;
+        }
         if c == '\r' {
             output.push_str(&input[last_index..index]);
 
             // Skip over the '\r' character, keep the `\n`
-            if input.as_bytes().get(index + 1).copied() == Some(b'\n') {
+            if chars.peek().copied().is_some_and(|(_, next)| next == '\n') {
                 chars.next();
             }
             // Replace the `\r` with a `\n`
@@ -701,9 +829,9 @@ fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str>
             last_index = index + '\r'.len_utf8();
         } else if !quotes.triple && !is_raw {
             if c == '\\' {
-                if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
+                if let Some((_, next)) = chars.peek().copied() {
                     #[allow(clippy::if_same_then_else)]
-                    if next == opposite_quote {
+                    if next == opposite_quote && formatted_value_nesting == 0 {
                         // Remove the escape by ending before the backslash and starting again with the quote
                         chars.next();
                         output.push_str(&input[last_index..index]);
@@ -716,7 +844,7 @@ fn normalize_string(input: &str, quotes: StringQuotes, is_raw: bool) -> Cow<str>
                         chars.next();
                     }
                 }
-            } else if c == preferred_quote {
+            } else if c == preferred_quote && formatted_value_nesting == 0 {
                 // Escape the quote
                 output.push_str(&input[last_index..index]);
                 output.push('\\');

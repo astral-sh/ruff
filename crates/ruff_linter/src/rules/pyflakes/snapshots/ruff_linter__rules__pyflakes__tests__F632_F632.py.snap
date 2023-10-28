@@ -171,6 +171,8 @@ F632.py:26:2: F632 [*] Use `!=` to compare constant literals
    |  __^
 27 | |  not ''}
    | |_______^ F632
+28 |   
+29 |   # Regression test for
    |
    = help: Replace `is not` with `!=`
 
@@ -181,5 +183,42 @@ F632.py:26:2: F632 [*] Use `!=` to compare constant literals
 26    |-{2 is
 27    |- not ''}
    26 |+{2 != ''}
+28 27 | 
+29 28 | # Regression test for
+30 29 | if values[1is not None ] is not '-':
+
+F632.py:30:4: F632 [*] Use `!=` to compare constant literals
+   |
+29 | # Regression test for
+30 | if values[1is not None ] is not '-':
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F632
+31 |     pass
+   |
+   = help: Replace `is not` with `!=`
+
+ℹ Fix
+27 27 |  not ''}
+28 28 | 
+29 29 | # Regression test for
+30    |-if values[1is not None ] is not '-':
+   30 |+if values[1is not None ] != '-':
+31 31 |     pass
+
+F632.py:30:11: F632 [*] Use `!=` to compare constant literals
+   |
+29 | # Regression test for
+30 | if values[1is not None ] is not '-':
+   |           ^^^^^^^^^^^^ F632
+31 |     pass
+   |
+   = help: Replace `is not` with `!=`
+
+ℹ Fix
+27 27 |  not ''}
+28 28 | 
+29 29 | # Regression test for
+30    |-if values[1is not None ] is not '-':
+   30 |+if values[1!= None ] is not '-':
+31 31 |     pass
 
 

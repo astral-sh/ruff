@@ -1,7 +1,7 @@
 use path_absolutize::path_dedot;
 use ruff_cache::cache_dir;
-use ruff_formatter::{FormatOptions, IndentStyle, LineWidth};
-use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFormat};
+use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
+use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFormat, UnsafeFixes};
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
@@ -18,6 +18,8 @@ pub struct Settings {
     pub fix: bool,
     #[cache_key(ignore)]
     pub fix_only: bool,
+    #[cache_key(ignore)]
+    pub unsafe_fixes: UnsafeFixes,
     #[cache_key(ignore)]
     pub output_format: SerializationFormat,
     #[cache_key(ignore)]
@@ -40,6 +42,7 @@ impl Default for Settings {
             output_format: SerializationFormat::default(),
             show_fixes: false,
             show_source: false,
+            unsafe_fixes: UnsafeFixes::default(),
             linter: LinterSettings::new(project_root),
             file_resolver: FileResolverSettings::new(project_root),
             formatter: FormatterSettings::default(),
@@ -108,11 +111,13 @@ impl FileResolverSettings {
 
 #[derive(CacheKey, Clone, Debug)]
 pub struct FormatterSettings {
+    pub exclude: FilePatternSet,
     pub preview: PreviewMode,
 
     pub line_width: LineWidth,
 
     pub indent_style: IndentStyle,
+    pub indent_width: IndentWidth,
 
     pub quote_style: QuoteStyle,
 
@@ -146,6 +151,7 @@ impl FormatterSettings {
 
         PyFormatOptions::from_source_type(source_type)
             .with_indent_style(self.indent_style)
+            .with_indent_width(self.indent_width)
             .with_quote_style(self.quote_style)
             .with_magic_trailing_comma(self.magic_trailing_comma)
             .with_preview(self.preview)
@@ -159,10 +165,12 @@ impl Default for FormatterSettings {
         let default_options = PyFormatOptions::default();
 
         Self {
-            preview: ruff_python_formatter::PreviewMode::Disabled,
+            exclude: FilePatternSet::default(),
+            preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),
-            line_ending: LineEnding::Lf,
+            line_ending: LineEnding::Auto,
             indent_style: default_options.indent_style(),
+            indent_width: default_options.indent_width(),
             quote_style: default_options.quote_style(),
             magic_trailing_comma: default_options.magic_trailing_comma(),
         }
@@ -175,17 +183,17 @@ impl Default for FormatterSettings {
 #[serde(rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum LineEnding {
-    ///  Line endings will be converted to `\n` as is common on Unix.
+    /// The newline style is detected automatically on a file per file basis.
+    /// Files with mixed line endings will be converted to the first detected line ending.
+    /// Defaults to [`LineEnding::Lf`] for a files that contain no line endings.
     #[default]
+    Auto,
+
+    ///  Line endings will be converted to `\n` as is common on Unix.
     Lf,
 
     /// Line endings will be converted to `\r\n` as is common on Windows.
     CrLf,
-
-    /// The newline style is detected automatically on a file per file basis.
-    /// Files with mixed line endings will be converted to the first detected line ending.
-    /// Defaults to [`LineEnding::Lf`] for a files that contain no line endings.
-    Auto,
 
     /// Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     Native,

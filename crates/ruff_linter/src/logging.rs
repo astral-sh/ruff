@@ -177,18 +177,15 @@ impl Display for DisplayParseError<'_> {
                     f,
                     "cell {cell}{colon}",
                     cell = jupyter_index
-                        .cell(source_location.row.get())
-                        .unwrap_or_default(),
+                        .cell(source_location.row)
+                        .unwrap_or(OneIndexed::MIN),
                     colon = ":".cyan(),
                 )?;
 
                 SourceLocation {
-                    row: OneIndexed::new(
-                        jupyter_index
-                            .cell_row(source_location.row.get())
-                            .unwrap_or(1) as usize,
-                    )
-                    .unwrap(),
+                    row: jupyter_index
+                        .cell_row(source_location.row)
+                        .unwrap_or(OneIndexed::MIN),
                     column: source_location.column,
                 }
             } else {

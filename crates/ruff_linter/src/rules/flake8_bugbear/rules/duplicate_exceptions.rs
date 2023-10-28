@@ -3,14 +3,15 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path;
 use ruff_python_ast::call_path::CallPath;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::fix::edits::pad;
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for `try-except` blocks with duplicate exception handlers.
@@ -86,7 +87,7 @@ pub struct DuplicateHandlerException {
     pub names: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for DuplicateHandlerException {
+impl AlwaysFixableViolation for DuplicateHandlerException {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DuplicateHandlerException { names } = self;
@@ -98,7 +99,7 @@ impl AlwaysAutofixableViolation for DuplicateHandlerException {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "De-duplicate exceptions".to_string()
     }
 }
@@ -112,6 +113,7 @@ fn type_pattern(elts: Vec<&Expr>) -> Expr {
     .into()
 }
 
+/// B014
 fn duplicate_handler_exceptions<'a>(
     checker: &mut Checker,
     expr: &'a Expr,
@@ -144,18 +146,22 @@ fn duplicate_handler_exceptions<'a>(
                 },
                 expr.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    if unique_elts.len() == 1 {
-                        checker.generator().expr(unique_elts[0])
-                    } else {
-                        // Multiple exceptions must always be parenthesized. This is done
-                        // manually as the generator never parenthesizes lone tuples.
-                        format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
-                    },
-                    expr.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                // Single exceptions don't require parentheses, but since we're _removing_
+                // parentheses, insert whitespace as needed.
+                if let [elt] = unique_elts.as_slice() {
+                    pad(
+                        checker.generator().expr(elt),
+                        expr.range(),
+                        checker.locator(),
+                    )
+                } else {
+                    // Multiple exceptions must always be parenthesized. This is done
+                    // manually as the generator never parenthesizes lone tuples.
+                    format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
+                },
+                expr.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -163,6 +169,7 @@ fn duplicate_handler_exceptions<'a>(
     seen
 }
 
+/// B025
 pub(crate) fn duplicate_exceptions(checker: &mut Checker, handlers: &[ExceptHandler]) {
     let mut seen: FxHashSet<CallPath> = FxHashSet::default();
     let mut duplicates: FxHashMap<CallPath, Vec<&Expr>> = FxHashMap::default();

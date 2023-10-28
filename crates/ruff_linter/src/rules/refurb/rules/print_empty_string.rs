@@ -1,19 +1,22 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_python_codegen::Generator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks for `print` calls with an empty string as the only positional
-/// argument.
+/// Checks for `print` calls with unnecessary empty strings as positional
+/// arguments and unnecessary `sep` keyword arguments.
 ///
 /// ## Why is this bad?
 /// Prefer calling `print` without any positional arguments, which is
 /// equivalent and more concise.
+///
+/// Similarly, when printing one or fewer items, the `sep` keyword argument,
+/// (used to define the string that separates the `print` arguments) can be
+/// omitted, as it's redundant when there are no items to separate.
 ///
 /// ## Example
 /// ```python
@@ -43,7 +46,7 @@ enum Reason {
 }
 
 impl Violation for PrintEmptyString {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,7 +58,7 @@ impl Violation for PrintEmptyString {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let PrintEmptyString { reason } = self;
         match reason {
             Reason::EmptyArgument => Some("Remove empty string".to_string()),
@@ -77,9 +80,6 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
     }
 
     match &call.arguments.args.as_slice() {
-        // Ex) `print(*args)` or `print(*args, sep="\t")`
-        [arg] if arg.is_starred_expr() => {}
-
         // Ex) `print("")` or `print("", sep="\t")`
         [arg] if is_empty_string(arg) => {
             let reason = if call.arguments.find_keyword("sep").is_some() {
@@ -90,15 +90,17 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
 
             let mut diagnostic = Diagnostic::new(PrintEmptyString { reason }, call.range());
 
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::suggested(Edit::replacement(
-                    generate_suggestion(call, Separator::Remove, checker.generator()),
-                    call.start(),
-                    call.end(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                generate_suggestion(call, Separator::Remove, checker.generator()),
+                call.start(),
+                call.end(),
+            )));
 
             checker.diagnostics.push(diagnostic);
+        }
+
+        [arg] if arg.is_starred_expr() => {
+            // If there's a starred argument, we can't remove the empty string.
         }
 
         // Ex) `print(sep="\t")` or `print(obj, sep="\t")`
@@ -112,13 +114,11 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                     call.range(),
                 );
 
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::suggested(Edit::replacement(
-                        generate_suggestion(call, Separator::Remove, checker.generator()),
-                        call.start(),
-                        call.end(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                    generate_suggestion(call, Separator::Remove, checker.generator()),
+                    call.start(),
+                    call.end(),
+                )));
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -177,13 +177,11 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
                 call.range(),
             );
 
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::suggested(Edit::replacement(
-                    generate_suggestion(call, separator, checker.generator()),
-                    call.start(),
-                    call.end(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                generate_suggestion(call, separator, checker.generator()),
+                call.start(),
+                call.end(),
+            )));
 
             checker.diagnostics.push(diagnostic);
         }

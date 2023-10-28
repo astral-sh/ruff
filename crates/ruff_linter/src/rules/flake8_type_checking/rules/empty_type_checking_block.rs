@@ -1,12 +1,11 @@
 use ruff_python_ast as ast;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix;
 
 /// ## What it does
 /// Checks for an empty type-checking block.
@@ -35,13 +34,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct EmptyTypeCheckingBlock;
 
-impl AlwaysAutofixableViolation for EmptyTypeCheckingBlock {
+impl AlwaysFixableViolation for EmptyTypeCheckingBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Found empty type-checking block")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Delete empty type-checking block")
     }
 }
@@ -56,14 +55,12 @@ pub(crate) fn empty_type_checking_block(checker: &mut Checker, stmt: &ast::StmtI
     }
 
     let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, stmt.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        // Delete the entire type-checking block.
-        let stmt = checker.semantic().current_statement();
-        let parent = checker.semantic().current_statement_parent();
-        let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(
-            checker.semantic().current_statement_parent_id(),
-        )));
-    }
+    // Delete the entire type-checking block.
+    let stmt = checker.semantic().current_statement();
+    let parent = checker.semantic().current_statement_parent();
+    let edit = fix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
+    diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
+        checker.semantic().current_statement_parent_id(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

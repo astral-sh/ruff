@@ -445,4 +445,153 @@ expression: parse_ast
             ],
         },
     ),
+    Match(
+        StmtMatch {
+            range: 298..332,
+            subject: Tuple(
+                ExprTuple {
+                    range: 304..306,
+                    elts: [
+                        Name(
+                            ExprName {
+                                range: 304..305,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 312..332,
+                    pattern: MatchAs(
+                        PatternMatchAs {
+                            range: 317..318,
+                            pattern: None,
+                            name: Some(
+                                Identifier {
+                                    id: "z",
+                                    range: 317..318,
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 328..332,
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 333..369,
+            subject: Tuple(
+                ExprTuple {
+                    range: 339..343,
+                    elts: [
+                        Name(
+                            ExprName {
+                                range: 339..340,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 342..343,
+                                id: "y",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 349..369,
+                    pattern: MatchAs(
+                        PatternMatchAs {
+                            range: 354..355,
+                            pattern: None,
+                            name: Some(
+                                Identifier {
+                                    id: "z",
+                                    range: 354..355,
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 365..369,
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 370..407,
+            subject: Tuple(
+                ExprTuple {
+                    range: 376..381,
+                    elts: [
+                        Name(
+                            ExprName {
+                                range: 376..377,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 379..380,
+                                id: "y",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 387..407,
+                    pattern: MatchAs(
+                        PatternMatchAs {
+                            range: 392..393,
+                            pattern: None,
+                            name: Some(
+                                Identifier {
+                                    id: "z",
+                                    range: 392..393,
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 403..407,
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
 ]

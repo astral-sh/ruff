@@ -1,14 +1,13 @@
 use std::fmt;
 
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `dict.items()` that discard either the key or the value
@@ -43,14 +42,14 @@ pub struct IncorrectDictIterator {
     subset: DictSubset,
 }
 
-impl AlwaysAutofixableViolation for IncorrectDictIterator {
+impl AlwaysFixableViolation for IncorrectDictIterator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let IncorrectDictIterator { subset } = self;
         format!("When using only the {subset} of a dict use the `{subset}()` method")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let IncorrectDictIterator { subset } = self;
         format!("Replace `.items()` with `.{subset}()`")
     }
@@ -100,18 +99,16 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
                 },
                 func.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                let replace_attribute = Edit::range_replacement("values".to_string(), attr.range());
-                let replace_target = Edit::range_replacement(
-                    pad(
-                        checker.locator().slice(value).to_string(),
-                        stmt_for.target.range(),
-                        checker.locator(),
-                    ),
+            let replace_attribute = Edit::range_replacement("values".to_string(), attr.range());
+            let replace_target = Edit::range_replacement(
+                pad(
+                    checker.locator().slice(value).to_string(),
                     stmt_for.target.range(),
-                );
-                diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
-            }
+                    checker.locator(),
+                ),
+                stmt_for.target.range(),
+            );
+            diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
             checker.diagnostics.push(diagnostic);
         }
         (false, true) => {
@@ -122,18 +119,16 @@ pub(crate) fn incorrect_dict_iterator(checker: &mut Checker, stmt_for: &ast::Stm
                 },
                 func.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                let replace_attribute = Edit::range_replacement("keys".to_string(), attr.range());
-                let replace_target = Edit::range_replacement(
-                    pad(
-                        checker.locator().slice(key).to_string(),
-                        stmt_for.target.range(),
-                        checker.locator(),
-                    ),
+            let replace_attribute = Edit::range_replacement("keys".to_string(), attr.range());
+            let replace_target = Edit::range_replacement(
+                pad(
+                    checker.locator().slice(key).to_string(),
                     stmt_for.target.range(),
-                );
-                diagnostic.set_fix(Fix::suggested_edits(replace_attribute, [replace_target]));
-            }
+                    checker.locator(),
+                ),
+                stmt_for.target.range(),
+            );
+            diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
             checker.diagnostics.push(diagnostic);
         }
     }

@@ -1,15 +1,12 @@
 use std::fmt;
 use std::str::FromStr;
 
-use num_bigint::BigInt;
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum LiteralType {
@@ -47,7 +44,7 @@ impl From<LiteralType> for Constant {
                 value: Vec::new(),
                 implicit_concatenated: false,
             }),
-            LiteralType::Int => Constant::Int(BigInt::from(0)),
+            LiteralType::Int => Constant::Int(0.into()),
             LiteralType::Float => Constant::Float(0.0),
             LiteralType::Bool => Constant::Bool(false),
         }
@@ -109,21 +106,21 @@ pub struct NativeLiterals {
     literal_type: LiteralType,
 }
 
-impl AlwaysAutofixableViolation for NativeLiterals {
+impl AlwaysFixableViolation for NativeLiterals {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NativeLiterals { literal_type } = self;
         format!("Unnecessary `{literal_type}` call (rewrite as a literal)")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let NativeLiterals { literal_type } = self;
         match literal_type {
-            LiteralType::Str => "Replace with empty string".to_string(),
-            LiteralType::Bytes => "Replace with empty bytes".to_string(),
-            LiteralType::Int => "Replace with 0".to_string(),
-            LiteralType::Float => "Replace with 0.0".to_string(),
-            LiteralType::Bool => "Replace with `False`".to_string(),
+            LiteralType::Str => "Replace with string literal".to_string(),
+            LiteralType::Bytes => "Replace with bytes literal".to_string(),
+            LiteralType::Int => "Replace with integer literal".to_string(),
+            LiteralType::Float => "Replace with float literal".to_string(),
+            LiteralType::Bool => "Replace with boolean literal".to_string(),
         }
     }
 }
@@ -184,14 +181,12 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            if checker.patch(diagnostic.kind.rule()) {
-                let constant = Constant::from(literal_type);
-                let content = checker.generator().constant(&constant);
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    content,
-                    call.range(),
-                )));
-            }
+            let constant = Constant::from(literal_type);
+            let content = checker.generator().constant(&constant);
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                content,
+                call.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
         Some(arg) => {
@@ -224,12 +219,10 @@ pub(crate) fn native_literals(
             };
 
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    content,
-                    call.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                content,
+                call.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

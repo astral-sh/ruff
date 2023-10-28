@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Expr, ExprContext};
-
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -60,10 +59,12 @@ pub(crate) fn attr(checker: &mut Checker, attribute: &ast::ExprAttribute) {
     };
 
     // Avoid flagging on function calls (e.g., `df.values()`).
-    if let Some(parent) = checker.semantic().current_expression_parent() {
-        if matches!(parent, Expr::Call(_)) {
-            return;
-        }
+    if checker
+        .semantic()
+        .current_expression_parent()
+        .is_some_and(Expr::is_call_expr)
+    {
+        return;
     }
 
     // Avoid flagging on non-DataFrames (e.g., `{"a": 1}.values`), and on irrelevant bindings

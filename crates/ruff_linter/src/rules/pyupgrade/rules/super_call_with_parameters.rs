@@ -1,10 +1,9 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `super` calls that pass redundant arguments.
@@ -47,13 +46,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct SuperCallWithParameters;
 
-impl AlwaysAutofixableViolation for SuperCallWithParameters {
+impl AlwaysFixableViolation for SuperCallWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `super()` instead of `super(__class__, self)`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `__super__` parameters".to_string()
     }
 }
@@ -128,12 +127,10 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
     drop(parents);
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::deletion(
-            call.arguments.start() + TextSize::new(1),
-            call.arguments.end() - TextSize::new(1),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+        call.arguments.start() + TextSize::new(1),
+        call.arguments.end() - TextSize::new(1),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

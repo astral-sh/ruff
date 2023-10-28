@@ -5,7 +5,7 @@
 use itertools::Itertools;
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::AutofixKind;
+use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_linter::upstream_categories::UpstreamCategoryAndPrefix;
 use ruff_workspace::options::Options;
@@ -20,16 +20,18 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push_str("| ---- | ---- | ------- | ------: |");
     table_out.push('\n');
     for rule in rules {
-        let fix_token = match rule.autofixable() {
-            AutofixKind::Always | AutofixKind::Sometimes => {
-                format!("<span style='opacity: 1'>{FIX_SYMBOL}</span>")
+        let fix_token = match rule.fixable() {
+            FixAvailability::Always | FixAvailability::Sometimes => {
+                format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
-            AutofixKind::None => format!("<span style='opacity: 0.1'>{FIX_SYMBOL}</span>"),
+            FixAvailability::None => {
+                format!("<span style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>")
+            }
         };
         let preview_token = if rule.is_preview() || rule.is_nursery() {
-            format!("<span style='opacity: 1'>{PREVIEW_SYMBOL}</span>")
+            format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
         } else {
-            format!("<span style='opacity: 0.1'>{PREVIEW_SYMBOL}</span>")
+            format!("<span style='opacity: 0.1' aria-hidden='true'>{PREVIEW_SYMBOL}</span>")
         };
         let status_token = format!("{fix_token} {preview_token}");
 
@@ -62,7 +64,7 @@ pub(crate) fn generate() -> String {
     table_out.push('\n');
 
     table_out.push_str(&format!(
-        "The {PREVIEW_SYMBOL} emoji indicates that a rule in [\"preview\"](faq.md#what-is-preview)."
+        "The {PREVIEW_SYMBOL} emoji indicates that a rule is in [\"preview\"](faq.md#what-is-preview)."
     ));
     table_out.push('\n');
     table_out.push('\n');

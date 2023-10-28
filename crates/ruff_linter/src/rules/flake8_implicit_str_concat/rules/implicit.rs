@@ -1,13 +1,15 @@
 use itertools::Itertools;
-use ruff_python_parser::lexer::LexResult;
-use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_index::Indexer;
+use ruff_python_parser::lexer::LexResult;
+use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::rules::flake8_implicit_str_concat::settings::Settings;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for implicitly concatenated strings on a single line.
@@ -18,7 +20,7 @@ use crate::rules::flake8_implicit_str_concat::settings::Settings;
 /// negatively affects code readability.
 ///
 /// In some cases, the implicit concatenation may also be unintentional, as
-/// autoformatters are capable of introducing single-line implicit
+/// code formatters are capable of introducing single-line implicit
 /// concatenations when collapsing long lines.
 ///
 /// ## Example
@@ -34,14 +36,14 @@ use crate::rules::flake8_implicit_str_concat::settings::Settings;
 pub struct SingleLineImplicitStringConcatenation;
 
 impl Violation for SingleLineImplicitStringConcatenation {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Implicitly concatenated string literals on one line")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Combine string literals".to_string())
     }
 }
@@ -92,35 +94,62 @@ impl Violation for MultiLineImplicitStringConcatenation {
 pub(crate) fn implicit(
     diagnostics: &mut Vec<Diagnostic>,
     tokens: &[LexResult],
-    settings: &Settings,
+    settings: &LinterSettings,
     locator: &Locator,
+    indexer: &Indexer,
 ) {
     for ((a_tok, a_range), (b_tok, b_range)) in tokens
         .iter()
         .flatten()
         .filter(|(tok, _)| {
-            !tok.is_comment() && (settings.allow_multiline || !tok.is_non_logical_newline())
+            !tok.is_comment()
+                && (settings.flake8_implicit_str_concat.allow_multiline
+                    || !tok.is_non_logical_newline())
         })
         .tuple_windows()
     {
-        if a_tok.is_string() && b_tok.is_string() {
-            if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
-                diagnostics.push(Diagnostic::new(
-                    MultiLineImplicitStringConcatenation,
-                    TextRange::new(a_range.start(), b_range.end()),
-                ));
-            } else {
-                let mut diagnostic = Diagnostic::new(
-                    SingleLineImplicitStringConcatenation,
-                    TextRange::new(a_range.start(), b_range.end()),
-                );
-
-                if let Some(fix) = concatenate_strings(*a_range, *b_range, locator) {
-                    diagnostic.set_fix(fix);
+        let (a_range, b_range) = match (a_tok, b_tok) {
+            (Tok::String { .. }, Tok::String { .. }) => (*a_range, *b_range),
+            (Tok::String { .. }, Tok::FStringStart) => {
+                match indexer.fstring_ranges().innermost(b_range.start()) {
+                    Some(b_range) => (*a_range, b_range),
+                    None => continue,
                 }
+            }
+            (Tok::FStringEnd, Tok::String { .. }) => {
+                match indexer.fstring_ranges().innermost(a_range.start()) {
+                    Some(a_range) => (a_range, *b_range),
+                    None => continue,
+                }
+            }
+            (Tok::FStringEnd, Tok::FStringStart) => {
+                match (
+                    indexer.fstring_ranges().innermost(a_range.start()),
+                    indexer.fstring_ranges().innermost(b_range.start()),
+                ) {
+                    (Some(a_range), Some(b_range)) => (a_range, b_range),
+                    _ => continue,
+                }
+            }
+            _ => continue,
+        };
 
-                diagnostics.push(diagnostic);
-            };
+        if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
+            diagnostics.push(Diagnostic::new(
+                MultiLineImplicitStringConcatenation,
+                TextRange::new(a_range.start(), b_range.end()),
+            ));
+        } else {
+            let mut diagnostic = Diagnostic::new(
+                SingleLineImplicitStringConcatenation,
+                TextRange::new(a_range.start(), b_range.end()),
+            );
+
+            if let Some(fix) = concatenate_strings(a_range, b_range, locator) {
+                diagnostic.set_fix(fix);
+            }
+
+            diagnostics.push(diagnostic);
         };
     }
 }
@@ -151,7 +180,7 @@ fn concatenate_strings(a_range: TextRange, b_range: TextRange, locator: &Locator
     let concatenation = format!("{a_leading_quote}{a_body}{b_body}{a_trailing_quote}");
     let range = TextRange::new(a_range.start(), b_range.end());
 
-    Some(Fix::automatic(Edit::range_replacement(
+    Some(Fix::safe_edit(Edit::range_replacement(
         concatenation,
         range,
     )))

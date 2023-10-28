@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use anyhow::{Context, Result};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
@@ -11,13 +11,12 @@ use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use ruff_python_parser::{lexer, Mode, Tok};
-
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::line_width::LineLength;
-use crate::registry::AsRule;
+use crate::fix::edits::fits_or_shrinks;
+
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
@@ -44,14 +43,14 @@ use crate::rules::pyupgrade::helpers::curly_escape;
 pub struct FString;
 
 impl Violation for FString {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use f-string instead of `format` call")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Convert to f-string".to_string())
     }
 }
@@ -306,7 +305,6 @@ pub(crate) fn f_strings(
     call: &ast::ExprCall,
     summary: &FormatSummary,
     template: &Expr,
-    line_length: LineLength,
 ) {
     if summary.has_nested_parts {
         return;
@@ -329,6 +327,7 @@ pub(crate) fn f_strings(
     let Some(mut summary) = FormatSummaryValues::try_from_call(call, checker.locator()) else {
         return;
     };
+
     let mut patches: Vec<(TextRange, String)> = vec![];
     let mut lex = lexer::lex_starts_at(
         checker.locator().slice(call.func.range()),
@@ -384,22 +383,6 @@ pub(crate) fn f_strings(
     }
     contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
 
-    // Avoid refactors that exceed the line length limit.
-    let col_offset = template.start() - checker.locator().line_start(template.start());
-    if contents.lines().enumerate().any(|(idx, line)| {
-        // If `template` is a multiline string, `col_offset` should only be applied to the first
-        // line:
-        // ```
-        // a = """{}        -> offset = col_offset (= 4)
-        // {}               -> offset = 0
-        // """.format(0, 1) -> offset = 0
-        // ```
-        let offset = if idx == 0 { col_offset.to_usize() } else { 0 };
-        offset + line.chars().count() > line_length.value() as usize
-    }) {
-        return;
-    }
-
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
     let existing = checker.locator().slice(TextRange::up_to(call.start()));
@@ -411,21 +394,50 @@ pub(crate) fn f_strings(
         contents.insert(0, ' ');
     }
 
+    // Avoid refactors that exceed the line length limit.
+    if !fits_or_shrinks(
+        &contents,
+        template.into(),
+        checker.locator(),
+        checker.settings.pycodestyle.max_line_length,
+        checker.settings.tab_size,
+    ) {
+        return;
+    }
+
+    // Finally, avoid refactors that would introduce a runtime error.
+    // For example, Django's `gettext` supports `format`-style arguments, but not f-strings.
+    // See: https://docs.djangoproject.com/en/4.2/topics/i18n/translation
+    if checker.semantic().current_expressions().any(|expr| {
+        expr.as_call_expr().is_some_and(|call| {
+            checker
+                .semantic()
+                .resolve_call_path(call.func.as_ref())
+                .map_or(false, |call_path| {
+                    matches!(
+                        call_path.as_slice(),
+                        ["django", "utils", "translation", "gettext" | "gettext_lazy"]
+                    )
+                })
+        })
+    }) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(FString, call.range());
 
-    // Avoid autofix if there are comments within the call:
+    // Avoid fix if there are comments within the call:
     // ```
     // "{}".format(
     //     0,  # 0
     // )
     // ```
-    if checker.patch(diagnostic.kind.rule())
-        && !checker
-            .indexer()
-            .comment_ranges()
-            .intersects(call.arguments.range())
+    if !checker
+        .indexer()
+        .comment_ranges()
+        .intersects(call.arguments.range())
     {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             contents,
             call.range(),
         )));

@@ -13,11 +13,13 @@ use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
 };
+use crate::settings::types::UnsafeFixes;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
     show_fix_status: bool,
     show_source: bool,
+    unsafe_fixes: UnsafeFixes,
 }
 
 impl GroupedEmitter {
@@ -30,6 +32,12 @@ impl GroupedEmitter {
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
         self.show_source = show_source;
+        self
+    }
+
+    #[must_use]
+    pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
+        self.unsafe_fixes = unsafe_fixes;
         self
     }
 }
@@ -68,6 +76,7 @@ impl Emitter for GroupedEmitter {
                         notebook_index: context.notebook_index(message.filename()),
                         message,
                         show_fix_status: self.show_fix_status,
+                        unsafe_fixes: self.unsafe_fixes,
                         show_source: self.show_source,
                         row_length,
                         column_length,
@@ -89,6 +98,7 @@ impl Emitter for GroupedEmitter {
 struct DisplayGroupedMessage<'a> {
     message: MessageWithLocation<'a>,
     show_fix_status: bool,
+    unsafe_fixes: UnsafeFixes,
     show_source: bool,
     row_length: NonZeroUsize,
     column_length: NonZeroUsize,
@@ -115,18 +125,18 @@ impl Display for DisplayGroupedMessage<'_> {
                 f,
                 "cell {cell}{sep}",
                 cell = jupyter_index
-                    .cell(start_location.row.get())
-                    .unwrap_or_default(),
+                    .cell(start_location.row)
+                    .unwrap_or(OneIndexed::MIN),
                 sep = ":".cyan()
             )?;
             (
                 jupyter_index
-                    .cell_row(start_location.row.get())
-                    .unwrap_or(1) as usize,
-                start_location.column.get(),
+                    .cell_row(start_location.row)
+                    .unwrap_or(OneIndexed::MIN),
+                start_location.column,
             )
         } else {
-            (start_location.row.get(), start_location.column.get())
+            (start_location.row, start_location.column)
         };
 
         writeln!(
@@ -138,7 +148,8 @@ impl Display for DisplayGroupedMessage<'_> {
             ),
             code_and_body = RuleCodeAndBody {
                 message,
-                show_fix_status: self.show_fix_status
+                show_fix_status: self.show_fix_status,
+                unsafe_fixes: self.unsafe_fixes
             },
         )?;
 
@@ -196,6 +207,7 @@ mod tests {
 
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::GroupedEmitter;
+    use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
@@ -218,6 +230,17 @@ mod tests {
         let mut emitter = GroupedEmitter::default()
             .with_show_fix_status(true)
             .with_show_source(true);
+        let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn fix_status_unsafe() {
+        let mut emitter = GroupedEmitter::default()
+            .with_show_fix_status(true)
+            .with_show_source(true)
+            .with_unsafe_fixes(UnsafeFixes::Enabled);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

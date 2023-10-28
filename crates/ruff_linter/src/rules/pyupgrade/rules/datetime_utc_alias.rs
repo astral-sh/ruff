@@ -1,12 +1,11 @@
 use ruff_python_ast::Expr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `datetime.timezone.utc`.
@@ -38,14 +37,14 @@ use crate::registry::AsRule;
 pub struct DatetimeTimezoneUTC;
 
 impl Violation for DatetimeTimezoneUTC {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `datetime.UTC` alias")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Convert to `datetime.UTC` alias".to_string())
     }
 }
@@ -58,17 +57,15 @@ pub(crate) fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["datetime", "timezone", "utc"]))
     {
         let mut diagnostic = Diagnostic::new(DatetimeTimezoneUTC, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import_from("datetime", "UTC"),
-                    expr.start(),
-                    checker.semantic(),
-                )?;
-                let reference_edit = Edit::range_replacement(binding, expr.range());
-                Ok(Fix::suggested_edits(import_edit, [reference_edit]))
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from("datetime", "UTC"),
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let reference_edit = Edit::range_replacement(binding, expr.range());
+            Ok(Fix::safe_edits(import_edit, [reference_edit]))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

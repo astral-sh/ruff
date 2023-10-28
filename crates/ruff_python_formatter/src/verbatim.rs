@@ -4,7 +4,7 @@ use std::iter::FusedIterator;
 use unicode_width::UnicodeWidthStr;
 
 use ruff_formatter::{write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
 use ruff_python_parser::lexer::{lex_starts_at, LexResult};
 use ruff_python_parser::{Mode, Tok};
@@ -327,7 +327,7 @@ fn write_suppressed_statements<'a>(
 
         for range in CommentRangeIter::in_suppression(comments.trailing(statement), source) {
             match range {
-                // All leading comments are suppressed
+                // All trailing comments are suppressed
                 // ```python
                 // statement
                 // # suppressed
@@ -394,10 +394,14 @@ fn write_suppressed_statements<'a>(
             statement = SuiteChildStatement::Other(next_statement);
             leading_node_comments = comments.leading(next_statement);
         } else {
-            let end = comments
-                .trailing(statement)
-                .last()
-                .map_or(statement.end(), Ranged::end);
+            let mut nodes =
+                std::iter::successors(Some(AnyNodeRef::from(statement.statement())), |statement| {
+                    statement.last_child_in_body()
+                });
+
+            let end = nodes
+                .find_map(|statement| comments.trailing(statement).last().map(Ranged::end))
+                .unwrap_or(statement.end());
 
             FormatVerbatimStatementRange {
                 verbatim_range: TextRange::new(format_off_comment.end(), end),

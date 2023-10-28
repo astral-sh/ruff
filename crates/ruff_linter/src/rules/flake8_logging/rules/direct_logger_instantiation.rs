@@ -1,11 +1,10 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for direct instantiation of `logging.Logger`, as opposed to using
@@ -41,14 +40,14 @@ use crate::registry::AsRule;
 pub struct DirectLoggerInstantiation;
 
 impl Violation for DirectLoggerInstantiation {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `logging.getLogger()` to instantiate loggers")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Replace with `logging.getLogger()`"))
     }
 }
@@ -61,17 +60,15 @@ pub(crate) fn direct_logger_instantiation(checker: &mut Checker, call: &ast::Exp
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "Logger"]))
     {
         let mut diagnostic = Diagnostic::new(DirectLoggerInstantiation, call.func.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import("logging", "getLogger"),
-                    call.func.start(),
-                    checker.semantic(),
-                )?;
-                let reference_edit = Edit::range_replacement(binding, call.func.range());
-                Ok(Fix::suggested_edits(import_edit, [reference_edit]))
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("logging", "getLogger"),
+                call.func.start(),
+                checker.semantic(),
+            )?;
+            let reference_edit = Edit::range_replacement(binding, call.func.range());
+            Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

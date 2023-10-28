@@ -228,7 +228,7 @@ PT018.py:33:5: PT018 [*] Assertion should be broken down into multiple parts
    34 |+    assert (b or c)
 34 35 |     assert not (a or not (b and c))
 35 36 | 
-36 37 |     # detected, but no autofix for messages
+36 37 |     # detected, but no fix for messages
 
 PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
    |
@@ -237,7 +237,7 @@ PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
 34 |     assert not (a or not (b and c))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
 35 | 
-36 |     # detected, but no autofix for messages
+36 |     # detected, but no fix for messages
    |
    = help: Break down assertion into multiple parts
 
@@ -249,26 +249,26 @@ PT018.py:34:5: PT018 [*] Assertion should be broken down into multiple parts
    34 |+    assert not a
    35 |+    assert (b and c)
 35 36 | 
-36 37 |     # detected, but no autofix for messages
+36 37 |     # detected, but no fix for messages
 37 38 |     assert something and something_else, "error message"
 
 PT018.py:37:5: PT018 Assertion should be broken down into multiple parts
    |
-36 |     # detected, but no autofix for messages
+36 |     # detected, but no fix for messages
 37 |     assert something and something_else, "error message"
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
 38 |     assert not (something or something_else and something_third), "with message"
-39 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
+39 |     # detected, but no fix for mixed conditions (e.g. `a or b and c`)
    |
    = help: Break down assertion into multiple parts
 
 PT018.py:38:5: PT018 Assertion should be broken down into multiple parts
    |
-36 |     # detected, but no autofix for messages
+36 |     # detected, but no fix for messages
 37 |     assert something and something_else, "error message"
 38 |     assert not (something or something_else and something_third), "with message"
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
-39 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
+39 |     # detected, but no fix for mixed conditions (e.g. `a or b and c`)
 40 |     assert not (something or something_else and something_third)
    |
    = help: Break down assertion into multiple parts
@@ -276,7 +276,7 @@ PT018.py:38:5: PT018 Assertion should be broken down into multiple parts
 PT018.py:40:5: PT018 Assertion should be broken down into multiple parts
    |
 38 |     assert not (something or something_else and something_third), "with message"
-39 |     # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
+39 |     # detected, but no fix for mixed conditions (e.g. `a or b and c`)
 40 |     assert not (something or something_else and something_third)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT018
    |

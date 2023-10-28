@@ -12,7 +12,7 @@ PYI026.pyi:3:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `NewAny:
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Suggested fix
+ℹ Fix
 1   |-from typing import Literal, Any
   1 |+from typing import Literal, Any, TypeAlias
 2 2 | 
@@ -32,7 +32,7 @@ PYI026.pyi:4:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Optiona
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Suggested fix
+ℹ Fix
 1   |-from typing import Literal, Any
   1 |+from typing import Literal, Any, TypeAlias
 2 2 | 
@@ -54,7 +54,7 @@ PYI026.pyi:5:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `Foo: Ty
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Suggested fix
+ℹ Fix
 1   |-from typing import Literal, Any
   1 |+from typing import Literal, Any, TypeAlias
 2 2 | 
@@ -76,7 +76,7 @@ PYI026.pyi:6:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `IntOrSt
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Suggested fix
+ℹ Fix
 1   |-from typing import Literal, Any
   1 |+from typing import Literal, Any, TypeAlias
 2 2 | 
@@ -100,7 +100,7 @@ PYI026.pyi:7:1: PYI026 [*] Use `typing.TypeAlias` for type alias, e.g., `AliasNo
   |
   = help: Add `TypeAlias` annotation
 
-ℹ Suggested fix
+ℹ Fix
 1   |-from typing import Literal, Any
   1 |+from typing import Literal, Any, TypeAlias
 2 2 | 

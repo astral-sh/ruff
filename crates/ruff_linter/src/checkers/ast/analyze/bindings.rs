@@ -10,6 +10,7 @@ pub(crate) fn bindings(checker: &mut Checker) {
     if !checker.any_enabled(&[
         Rule::InvalidAllFormat,
         Rule::InvalidAllObject,
+        Rule::NonAsciiName,
         Rule::UnaliasedCollectionsAbcSetImport,
         Rule::UnconventionalImportAlias,
         Rule::UnusedVariable,
@@ -32,15 +33,10 @@ pub(crate) fn bindings(checker: &mut Checker) {
                     },
                     binding.range(),
                 );
-                if checker.patch(Rule::UnusedVariable) {
-                    diagnostic.try_set_fix(|| {
-                        pyflakes::fixes::remove_exception_handler_assignment(
-                            binding,
-                            checker.locator,
-                        )
-                        .map(Fix::automatic)
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    pyflakes::fixes::remove_exception_handler_assignment(binding, checker.locator)
+                        .map(Fix::safe_edit)
+                });
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -51,6 +47,11 @@ pub(crate) fn bindings(checker: &mut Checker) {
         }
         if checker.enabled(Rule::InvalidAllObject) {
             if let Some(diagnostic) = pylint::rules::invalid_all_object(binding) {
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+        if checker.enabled(Rule::NonAsciiName) {
+            if let Some(diagnostic) = pylint::rules::non_ascii_name(binding, checker.locator) {
                 checker.diagnostics.push(diagnostic);
             }
         }

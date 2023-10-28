@@ -3,7 +3,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
@@ -11,7 +11,6 @@ use ruff_python_trivia::{has_leading_content, has_trailing_content, leading_inde
 use ruff_source_file::UniversalNewlines;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for lambda expressions which are assigned to a variable.
@@ -42,14 +41,14 @@ pub struct LambdaAssignment {
 }
 
 impl Violation for LambdaAssignment {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not assign a `lambda` expression, use a `def`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let LambdaAssignment { name } = self;
         Some(format!("Rewrite `{name}` as a `def`"))
     }
@@ -81,57 +80,58 @@ pub(crate) fn lambda_assignment(
         stmt.range(),
     );
 
-    if checker.patch(diagnostic.kind.rule()) {
-        if !has_leading_content(stmt.start(), checker.locator())
-            && !has_trailing_content(stmt.end(), checker.locator())
+    if !has_leading_content(stmt.start(), checker.locator())
+        && !has_trailing_content(stmt.end(), checker.locator())
+    {
+        let first_line = checker.locator().line(stmt.start());
+        let indentation = leading_indentation(first_line);
+        let mut indented = String::new();
+        for (idx, line) in function(
+            id,
+            parameters.as_deref(),
+            body,
+            annotation,
+            checker.semantic(),
+            checker.generator(),
+        )
+        .universal_newlines()
+        .enumerate()
         {
-            let first_line = checker.locator().line(stmt.start());
-            let indentation = leading_indentation(first_line);
-            let mut indented = String::new();
-            for (idx, line) in function(
-                id,
-                parameters.as_deref(),
-                body,
-                annotation,
-                checker.semantic(),
-                checker.generator(),
-            )
-            .universal_newlines()
-            .enumerate()
-            {
-                if idx == 0 {
-                    indented.push_str(&line);
-                } else {
-                    indented.push_str(checker.stylist().line_ending().as_str());
-                    indented.push_str(indentation);
-                    indented.push_str(&line);
-                }
-            }
-
-            // If the assignment is in a class body, it might not be safe to replace it because the
-            // assignment might be carrying a type annotation that will be used by some package like
-            // dataclasses, which wouldn't consider the rewritten function definition to be
-            // equivalent. Even if it _doesn't_ have an annotation, rewriting safely would require
-            // making this a static method.
-            // See: https://github.com/astral-sh/ruff/issues/3046
-            //
-            // Similarly, if the lambda is shadowing a variable in the current scope,
-            // rewriting it as a function declaration may break type-checking.
-            // See: https://github.com/astral-sh/ruff/issues/5421
-            if checker.semantic().current_scope().kind.is_class()
-                || checker
-                    .semantic()
-                    .current_scope()
-                    .get_all(id)
-                    .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
-            {
-                diagnostic.set_fix(Fix::manual(Edit::range_replacement(indented, stmt.range())));
+            if idx == 0 {
+                indented.push_str(&line);
             } else {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    indented,
-                    stmt.range(),
-                )));
+                indented.push_str(checker.stylist().line_ending().as_str());
+                indented.push_str(indentation);
+                indented.push_str(&line);
             }
+        }
+
+        // If the assignment is in a class body, it might not be safe to replace it because the
+        // assignment might be carrying a type annotation that will be used by some package like
+        // dataclasses, which wouldn't consider the rewritten function definition to be
+        // equivalent. Even if it _doesn't_ have an annotation, rewriting safely would require
+        // making this a static method.
+        // See: https://github.com/astral-sh/ruff/issues/3046
+        //
+        // Similarly, if the lambda is shadowing a variable in the current scope,
+        // rewriting it as a function declaration may break type-checking.
+        // See: https://github.com/astral-sh/ruff/issues/5421
+        if checker.semantic().current_scope().kind.is_class()
+            || checker
+                .semantic()
+                .current_scope()
+                .get_all(id)
+                .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
+        {
+            diagnostic.set_fix(Fix::display_edit(Edit::range_replacement(
+                indented,
+                stmt.range(),
+            )));
+        } else {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                indented,
+                stmt.range(),
+            )));
         }
     }
 

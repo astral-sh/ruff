@@ -1,12 +1,11 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, PySourceType};
-use ruff_python_parser::{lexer, AsMode, StringKind, Tok};
+use ruff_python_ast::{self as ast, Expr, PySourceType};
+use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for f-strings that do not contain any placeholder expressions.
@@ -36,42 +35,65 @@ use crate::registry::AsRule;
 #[violation]
 pub struct FStringMissingPlaceholders;
 
-impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
+impl AlwaysFixableViolation for FStringMissingPlaceholders {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("f-string without any placeholders")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove extraneous `f` prefix".to_string()
     }
 }
 
-/// Find f-strings that don't contain any formatted values in an [`FString`].
-fn find_useless_f_strings<'a>(
-    expr: &'a Expr,
+/// Return an iterator containing a two-element tuple for each f-string part
+/// in the given [`ExprFString`] expression.
+///
+/// The first element of the tuple is the f-string prefix range, and the second
+/// element is the entire f-string range. It returns an iterator because of the
+/// possibility of multiple f-strings implicitly concatenated together.
+///
+/// For example,
+///
+/// ```python
+///   f"first" rf"second"
+/// # ^         ^            (prefix range)
+/// # ^^^^^^^^ ^^^^^^^^^^    (token range)
+/// ```
+///
+/// would return `[(0..1, 0..8), (10..11, 9..19)]`.
+///
+/// This function assumes that the given f-string expression is without any
+/// placeholder expressions.
+///
+/// [`ExprFString`]: `ruff_python_ast::ExprFString`
+fn fstring_prefix_and_tok_range<'a>(
+    fstring: &'a ast::ExprFString,
     locator: &'a Locator,
     source_type: PySourceType,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
-    let contents = locator.slice(expr);
-    lexer::lex_starts_at(contents, source_type.as_mode(), expr.start())
+    let contents = locator.slice(fstring);
+    let mut current_f_string_start = fstring.start();
+    lexer::lex_starts_at(contents, source_type.as_mode(), fstring.start())
         .flatten()
-        .filter_map(|(tok, range)| match tok {
-            Tok::String {
-                kind: StringKind::FString | StringKind::RawFString,
-                ..
-            } => {
-                let first_char = locator.slice(TextRange::at(range.start(), TextSize::from(1)));
+        .filter_map(move |(tok, range)| match tok {
+            Tok::FStringStart => {
+                current_f_string_start = range.start();
+                None
+            }
+            Tok::FStringEnd => {
+                let first_char =
+                    locator.slice(TextRange::at(current_f_string_start, TextSize::from(1)));
                 // f"..."  => f_position = 0
                 // fr"..." => f_position = 0
                 // rf"..." => f_position = 1
                 let f_position = u32::from(!(first_char == "f" || first_char == "F"));
                 Some((
                     TextRange::at(
-                        range.start() + TextSize::from(f_position),
+                        current_f_string_start + TextSize::from(f_position),
                         TextSize::from(1),
                     ),
-                    range,
+                    TextRange::new(current_f_string_start, range.end()),
                 ))
             }
             _ => None,
@@ -79,22 +101,17 @@ fn find_useless_f_strings<'a>(
 }
 
 /// F541
-pub(crate) fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
-    if !values
-        .iter()
-        .any(|value| matches!(value, Expr::FormattedValue(_)))
-    {
+pub(crate) fn f_string_missing_placeholders(fstring: &ast::ExprFString, checker: &mut Checker) {
+    if !fstring.values.iter().any(Expr::is_formatted_value_expr) {
         for (prefix_range, tok_range) in
-            find_useless_f_strings(expr, checker.locator(), checker.source_type)
+            fstring_prefix_and_tok_range(fstring, checker.locator(), checker.source_type)
         {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(convert_f_string_to_regular_string(
-                    prefix_range,
-                    tok_range,
-                    checker.locator(),
-                ));
-            }
+            diagnostic.set_fix(convert_f_string_to_regular_string(
+                prefix_range,
+                tok_range,
+                checker.locator(),
+            ));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -131,7 +148,7 @@ fn convert_f_string_to_regular_string(
         content.insert(0, ' ');
     }
 
-    Fix::automatic(Edit::replacement(
+    Fix::safe_edit(Edit::replacement(
         content,
         prefix_range.start(),
         tok_range.end(),

@@ -1,18 +1,15 @@
 use ruff_python_ast::{self as ast, Constant, Expr};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
-
-#[violation]
-pub struct StringOrBytesTooLong;
 
 /// ## What it does
-/// Checks for the use of string and bytes literals longer than 50 characters.
+/// Checks for the use of string and bytes literals longer than 50 characters
+/// in stub (`.pyi`) files.
 ///
 /// ## Why is this bad?
 /// If a function has a default value where the string or bytes representation
@@ -23,20 +20,25 @@ pub struct StringOrBytesTooLong;
 ///
 /// ## Example
 /// ```python
-/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None: ...
+/// def foo(arg: str = "51 character stringgggggggggggggggggggggggggggggggg") -> None:
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def foo(arg: str = ...) -> None: ...
+/// def foo(arg: str = ...) -> None:
+///     ...
 /// ```
-impl AlwaysAutofixableViolation for StringOrBytesTooLong {
+#[violation]
+pub struct StringOrBytesTooLong;
+
+impl AlwaysFixableViolation for StringOrBytesTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("String and bytes literals longer than 50 characters are not permitted")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `...`".to_string()
     }
 }
@@ -64,11 +66,9 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            "...".to_string(),
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "...".to_string(),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

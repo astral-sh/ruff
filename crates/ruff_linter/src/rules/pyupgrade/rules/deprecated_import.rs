@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_python_ast::{Alias, Stmt};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
@@ -9,7 +9,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
+
 use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
 
@@ -66,7 +66,7 @@ pub struct DeprecatedImport {
 }
 
 impl Violation for DeprecatedImport {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -87,7 +87,7 @@ impl Violation for DeprecatedImport {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         if let Deprecation::WithoutRename(WithoutRename { target, .. }) = &self.deprecation {
             Some(format!("Import from `{target}`"))
         } else {
@@ -100,7 +100,13 @@ impl Violation for DeprecatedImport {
 fn is_relevant_module(module: &str) -> bool {
     matches!(
         module,
-        "collections" | "pipes" | "mypy_extensions" | "typing_extensions" | "typing" | "typing.re"
+        "collections"
+            | "pipes"
+            | "mypy_extensions"
+            | "typing_extensions"
+            | "typing"
+            | "typing.re"
+            | "backports.strenum"
     )
 }
 
@@ -320,6 +326,8 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "reveal_type",
 ];
 
+const BACKPORTS_STR_ENUM_TO_ENUM_311: &[&str] = &["StrEnum"];
+
 // Python 3.12+
 
 // Members of `typing_extensions` that were moved to `typing`.
@@ -482,6 +490,11 @@ impl<'a> ImportReplacer<'a> {
                     operations.push(operation);
                 }
             }
+            "backports.strenum" if self.version >= PythonVersion::Py311 => {
+                if let Some(operation) = self.try_replace(BACKPORTS_STR_ENUM_TO_ENUM_311, "enum") {
+                    operations.push(operation);
+                }
+            }
             _ => {}
         }
         operations
@@ -630,13 +643,11 @@ pub(crate) fn deprecated_import(
             },
             stmt.range(),
         );
-        if checker.patch(Rule::DeprecatedImport) {
-            if let Some(content) = fix {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    content,
-                    stmt.range(),
-                )));
-            }
+        if let Some(content) = fix {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                content,
+                stmt.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

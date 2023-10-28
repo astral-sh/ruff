@@ -6,7 +6,7 @@ info:
     - "-"
     - "--isolated"
     - "--no-cache"
-    - "--format"
+    - "--output-format"
     - json
     - "--stdin-filename"
     - F401.py
@@ -17,6 +17,7 @@ exit_code: 1
 ----- stdout -----
 [
   {
+    "cell": null,
     "code": "F401",
     "end_location": {
       "column": 10,
@@ -24,7 +25,7 @@ exit_code: 1
     },
     "filename": "/path/to/F401.py",
     "fix": {
-      "applicability": "Automatic",
+      "applicability": "safe",
       "edits": [
         {
           "content": "",

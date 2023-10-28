@@ -35,9 +35,9 @@ once_cell.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 url = "2.3.1"
-ureq = "2.6.2"
+ureq = "2.8.0"
 criterion = { version = "0.5.1", default-features = false }
-codspeed-criterion-compat = { version="2.2.0", default-features = false, optional = true}
+codspeed-criterion-compat = { version="2.3.0", default-features = false, optional = true}
 
 [dev-dependencies]
 ruff_linter.path = "../ruff_linter"

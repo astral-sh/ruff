@@ -5,7 +5,7 @@ use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::flake8_logging_format::violations::{
     LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
@@ -153,21 +153,35 @@ impl LoggingCallType {
 
 /// Check logging calls for violations.
 pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
-    let Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) = call.func.as_ref() else {
-        return;
+    // Determine the call type (e.g., `info` vs. `exception`) and the range of the attribute.
+    let (logging_call_type, range) = match call.func.as_ref() {
+        Expr::Attribute(ast::ExprAttribute { value: _, attr, .. }) => {
+            let Some(call_type) = LoggingCallType::from_attribute(attr.as_str()) else {
+                return;
+            };
+            if !logging::is_logger_candidate(
+                &call.func,
+                checker.semantic(),
+                &checker.settings.logger_objects,
+            ) {
+                return;
+            }
+            (call_type, attr.range())
+        }
+        Expr::Name(_) => {
+            let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) else {
+                return;
+            };
+            let ["logging", attribute] = call_path.as_slice() else {
+                return;
+            };
+            let Some(call_type) = LoggingCallType::from_attribute(attribute) else {
+                return;
+            };
+            (call_type, call.func.range())
+        }
+        _ => return,
     };
-
-    let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) else {
-        return;
-    };
-
-    if !logging::is_logger_candidate(
-        &call.func,
-        checker.semantic(),
-        &checker.settings.logger_objects,
-    ) {
-        return;
-    }
 
     // G001 - G004
     let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
@@ -181,13 +195,11 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
             logging_call_type,
             LoggingCallType::LevelCall(LoggingLevel::Warn)
         ) {
-            let mut diagnostic = Diagnostic::new(LoggingWarn, attr.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    "warning".to_string(),
-                    attr.range(),
-                )));
-            }
+            let mut diagnostic = Diagnostic::new(LoggingWarn, range);
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "warning".to_string(),
+                range,
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -213,7 +225,7 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
                     if checker.enabled(Rule::LoggingExcInfo) {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(LoggingExcInfo, attr.range()));
+                            .push(Diagnostic::new(LoggingExcInfo, range));
                     }
                 }
                 LoggingLevel::Exception => {

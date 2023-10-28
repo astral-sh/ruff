@@ -4,16 +4,17 @@ use std::ops::Deref;
 use itertools::{any, Itertools};
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ast::ExprContext;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::hashable::HashableExpr;
 use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for repeated equality comparisons that can rewritten as a membership
@@ -48,7 +49,7 @@ pub struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
 }
 
-impl Violation for RepeatedEqualityComparison {
+impl AlwaysFixableViolation for RepeatedEqualityComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         let RepeatedEqualityComparison { expression } = self;
@@ -61,6 +62,10 @@ impl Violation for RepeatedEqualityComparison {
                 "Consider merging multiple comparisons. Use a `set` if the elements are hashable."
             )
         }
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Merge multiple comparisons")
     }
 }
 
@@ -115,7 +120,7 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
         .sorted_by_key(|(_, (start, _))| *start)
     {
         if comparators.len() > 1 {
-            checker.diagnostics.push(Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 RepeatedEqualityComparison {
                     expression: SourceCodeSnippet::new(merged_membership_test(
                         value.as_expr(),
@@ -125,7 +130,26 @@ pub(crate) fn repeated_equality_comparison(checker: &mut Checker, bool_op: &ast:
                     )),
                 },
                 bool_op.range(),
-            ));
+            );
+
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().expr(&Expr::Compare(ast::ExprCompare {
+                    left: Box::new(value.as_expr().clone()),
+                    ops: match bool_op.op {
+                        BoolOp::Or => vec![CmpOp::In],
+                        BoolOp::And => vec![CmpOp::NotIn],
+                    },
+                    comparators: vec![Expr::Tuple(ast::ExprTuple {
+                        elts: comparators.iter().copied().cloned().collect(),
+                        range: TextRange::default(),
+                        ctx: ExprContext::Load,
+                    })],
+                    range: bool_op.range(),
+                })),
+                bool_op.range(),
+            )));
+
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

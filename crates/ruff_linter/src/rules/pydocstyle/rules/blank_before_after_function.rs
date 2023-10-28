@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
@@ -10,7 +10,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for docstrings on functions that are separated by one or more blank
@@ -42,14 +42,14 @@ pub struct NoBlankLineBeforeFunction {
     num_lines: usize,
 }
 
-impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
+impl AlwaysFixableViolation for NoBlankLineBeforeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoBlankLineBeforeFunction { num_lines } = self;
         format!("No blank lines allowed before function docstring (found {num_lines})")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove blank line(s) before function docstring".to_string()
     }
 }
@@ -86,14 +86,14 @@ pub struct NoBlankLineAfterFunction {
     num_lines: usize,
 }
 
-impl AlwaysAutofixableViolation for NoBlankLineAfterFunction {
+impl AlwaysFixableViolation for NoBlankLineAfterFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoBlankLineAfterFunction { num_lines } = self;
         format!("No blank lines allowed after function docstring (found {num_lines})")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove blank line(s) after function docstring".to_string()
     }
 }
@@ -132,13 +132,11 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Delete the blank line before the docstring.
-                diagnostic.set_fix(Fix::automatic(Edit::deletion(
-                    blank_lines_start,
-                    docstring.start() - docstring.indentation.text_len(),
-                )));
-            }
+            // Delete the blank line before the docstring.
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                blank_lines_start,
+                docstring.start() - docstring.indentation.text_len(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -188,13 +186,11 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Delete the blank line after the docstring.
-                diagnostic.set_fix(Fix::automatic(Edit::deletion(
-                    first_line_end,
-                    blank_lines_end,
-                )));
-            }
+            // Delete the blank line after the docstring.
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                first_line_end,
+                blank_lines_end,
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

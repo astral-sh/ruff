@@ -267,6 +267,7 @@ full_name.py:34:1: PTH123 `open()` should be replaced by `Path.open()`
 34 | open(p).close()
    | ^^^^ PTH123
 35 | os.getcwdb(p)
+36 | os.path.join(p, *q)
    |
 
 full_name.py:35:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
@@ -275,6 +276,46 @@ full_name.py:35:1: PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
 34 | open(p).close()
 35 | os.getcwdb(p)
    | ^^^^^^^^^^ PTH109
+36 | os.path.join(p, *q)
+37 | os.sep.join(p, *q)
+   |
+
+full_name.py:36:1: PTH118 `os.path.join()` should be replaced by `Path.joinpath()`
+   |
+34 | open(p).close()
+35 | os.getcwdb(p)
+36 | os.path.join(p, *q)
+   | ^^^^^^^^^^^^ PTH118
+37 | os.sep.join(p, *q)
+   |
+
+full_name.py:37:1: PTH118 `os.sep.join()` should be replaced by `Path.joinpath()`
+   |
+35 | os.getcwdb(p)
+36 | os.path.join(p, *q)
+37 | os.sep.join(p, *q)
+   | ^^^^^^^^^^^ PTH118
+38 | 
+39 | # https://github.com/astral-sh/ruff/issues/7620
+   |
+
+full_name.py:46:1: PTH123 `open()` should be replaced by `Path.open()`
+   |
+44 | open(p, closefd=False)
+45 | open(p, opener=opener)
+46 | open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   | ^^^^ PTH123
+47 | open(p, 'r', - 1, None, None, None, True, None)
+48 | open(p, 'r', - 1, None, None, None, False, opener)
+   |
+
+full_name.py:47:1: PTH123 `open()` should be replaced by `Path.open()`
+   |
+45 | open(p, opener=opener)
+46 | open(p, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+47 | open(p, 'r', - 1, None, None, None, True, None)
+   | ^^^^ PTH123
+48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
 
 

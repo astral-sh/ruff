@@ -161,7 +161,7 @@ mod tests {
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
 
-    use crate::options::Options;
+    use crate::options::{LintCommonOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
     use crate::tests::test_resource_path;
 
@@ -236,7 +236,10 @@ select = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    select: Some(vec![codes::Pycodestyle::E501.into()]),
+                    lint_top_level: LintCommonOptions {
+                        select: Some(vec![codes::Pycodestyle::E501.into()]),
+                        ..LintCommonOptions::default()
+                    },
                     ..Options::default()
                 })
             })
@@ -254,8 +257,11 @@ ignore = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    extend_select: Some(vec![codes::Ruff::_100.into()]),
-                    ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                    lint_top_level: LintCommonOptions {
+                        extend_select: Some(vec![codes::Ruff::_100.into()]),
+                        ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                        ..LintCommonOptions::default()
+                    },
                     ..Options::default()
                 })
             })
@@ -308,10 +314,14 @@ other-attribute = 1
                     "migrations".to_string(),
                     "with_excluded_file/other_excluded_file.py".to_string(),
                 ]),
-                per_file_ignores: Some(FxHashMap::from_iter([(
-                    "__init__.py".to_string(),
-                    vec![codes::Pyflakes::_401.into()]
-                )])),
+
+                lint_top_level: LintCommonOptions {
+                    per_file_ignores: Some(FxHashMap::from_iter([(
+                        "__init__.py".to_string(),
+                        vec![codes::Pyflakes::_401.into()]
+                    )])),
+                    ..LintCommonOptions::default()
+                },
                 ..Options::default()
             }
         );

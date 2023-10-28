@@ -20,6 +20,7 @@ def test():
 
 # fmt: on
 
+
 def test():
     pass
 ```

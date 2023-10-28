@@ -5,7 +5,7 @@ use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::registry::{AsRule, Rule};
+use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::logical_lines::{
     continuation_line_missing_indentation_or_outdented, extraneous_whitespace, indentation,
     missing_whitespace, missing_whitespace_after_keyword, missing_whitespace_around_operator,
@@ -39,17 +39,6 @@ pub(crate) fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
-    let should_fix_missing_whitespace = settings.rules.should_fix(Rule::MissingWhitespace);
-    let should_fix_whitespace_before_parameters =
-        settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
-    let should_fix_whitespace_after_open_bracket =
-        settings.rules.should_fix(Rule::WhitespaceAfterOpenBracket);
-    let should_fix_whitespace_before_close_bracket = settings
-        .rules
-        .should_fix(Rule::WhitespaceBeforeCloseBracket);
-    let should_fix_whitespace_before_punctuation =
-        settings.rules.should_fix(Rule::WhitespaceBeforePunctuation);
-
     let mut prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
@@ -59,7 +48,7 @@ pub(crate) fn check_logical_lines(
             space_around_operator(&line, &mut context);
             whitespace_around_named_parameter_equals(&line, &mut context);
             missing_whitespace_around_operator(&line, &mut context);
-            missing_whitespace(&line, should_fix_missing_whitespace, &mut context);
+            missing_whitespace(&line, &mut context);
         }
         if line.flags().contains(TokenFlags::PUNCTUATION) {
             space_after_comma(&line, &mut context);
@@ -69,13 +58,7 @@ pub(crate) fn check_logical_lines(
             .flags()
             .intersects(TokenFlags::OPERATOR | TokenFlags::BRACKET | TokenFlags::PUNCTUATION)
         {
-            extraneous_whitespace(
-                &line,
-                &mut context,
-                should_fix_whitespace_after_open_bracket,
-                should_fix_whitespace_before_close_bracket,
-                should_fix_whitespace_before_punctuation,
-            );
+            extraneous_whitespace(&line, &mut context);
         }
 
         if line.flags().contains(TokenFlags::KEYWORD) {
@@ -88,11 +71,7 @@ pub(crate) fn check_logical_lines(
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
-            whitespace_before_parameters(
-                &line,
-                should_fix_whitespace_before_parameters,
-                &mut context,
-            );
+            whitespace_before_parameters(&line, &mut context);
         }
 
         // Extract the indentation level.
@@ -113,6 +92,7 @@ pub(crate) fn check_logical_lines(
         continuation_line_missing_indentation_or_outdented(
             &mut context,
             &line,
+            locator,
             indent_char,
             indent_size,
         );

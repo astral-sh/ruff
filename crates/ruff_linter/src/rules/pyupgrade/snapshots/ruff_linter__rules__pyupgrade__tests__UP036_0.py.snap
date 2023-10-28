@@ -685,4 +685,93 @@ UP036_0.py:182:4: UP036 [*] Version block is outdated for minimum Python version
 185 183 | if sys.version_info <= (3,12):
 186 184 |     print("py3")
 
+UP036_0.py:191:24: UP036 Version specifier is invalid
+    |
+189 |     print("py3")
+190 | 
+191 | if sys.version_info == 10000000:
+    |                        ^^^^^^^^ UP036
+192 |     print("py3")
+    |
+
+UP036_0.py:194:23: UP036 Version specifier is invalid
+    |
+192 |     print("py3")
+193 | 
+194 | if sys.version_info < (3,10000000):
+    |                       ^^^^^^^^^^^^ UP036
+195 |     print("py3")
+    |
+
+UP036_0.py:197:24: UP036 Version specifier is invalid
+    |
+195 |     print("py3")
+196 | 
+197 | if sys.version_info <= (3,10000000):
+    |                        ^^^^^^^^^^^^ UP036
+198 |     print("py3")
+    |
+
+UP036_0.py:203:4: UP036 [*] Version block is outdated for minimum Python version
+    |
+201 |     print("py3")
+202 | 
+203 | if sys.version_info >= (3,12):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+204 |     print("py3")
+    |
+    = help: Remove outdated version block
+
+ℹ Suggested fix
+200 200 | if sys.version_info > (3,12):
+201 201 |     print("py3")
+202 202 | 
+203     |-if sys.version_info >= (3,12):
+204     |-    print("py3")
+    203 |+print("py3")
+205 204 | 
+206 205 | # Slices on `sys.version_info` should be treated equivalently.
+207 206 | if sys.version_info[:2] >= (3,0):
+
+UP036_0.py:207:4: UP036 [*] Version block is outdated for minimum Python version
+    |
+206 | # Slices on `sys.version_info` should be treated equivalently.
+207 | if sys.version_info[:2] >= (3,0):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+208 |     print("py3")
+    |
+    = help: Remove outdated version block
+
+ℹ Suggested fix
+204 204 |     print("py3")
+205 205 | 
+206 206 | # Slices on `sys.version_info` should be treated equivalently.
+207     |-if sys.version_info[:2] >= (3,0):
+208     |-    print("py3")
+    207 |+print("py3")
+209 208 | 
+210 209 | if sys.version_info[:3] >= (3,0):
+211 210 |     print("py3")
+
+UP036_0.py:210:4: UP036 [*] Version block is outdated for minimum Python version
+    |
+208 |     print("py3")
+209 | 
+210 | if sys.version_info[:3] >= (3,0):
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+211 |     print("py3")
+    |
+    = help: Remove outdated version block
+
+ℹ Suggested fix
+207 207 | if sys.version_info[:2] >= (3,0):
+208 208 |     print("py3")
+209 209 | 
+210     |-if sys.version_info[:3] >= (3,0):
+211     |-    print("py3")
+    210 |+print("py3")
+212 211 | 
+213 212 | if sys.version_info[:2] > (3,13):
+214 213 |     print("py3")
+
 

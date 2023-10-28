@@ -1,11 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix::edits::{remove_argument, Parentheses};
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` that set the `universal_newlines`
@@ -37,13 +36,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct ReplaceUniversalNewlines;
 
-impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
+impl AlwaysFixableViolation for ReplaceUniversalNewlines {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`universal_newlines` is deprecated, use `text`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `text` keyword argument".to_string()
     }
 }
@@ -65,23 +64,21 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::Expr
 
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, arg.range());
 
-        if checker.patch(diagnostic.kind.rule()) {
-            if call.arguments.find_keyword("text").is_some() {
-                diagnostic.try_set_fix(|| {
-                    remove_argument(
-                        kwarg,
-                        &call.arguments,
-                        Parentheses::Preserve,
-                        checker.locator().contents(),
-                    )
-                    .map(Fix::suggested)
-                });
-            } else {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    "text".to_string(),
-                    arg.range(),
-                )));
-            }
+        if call.arguments.find_keyword("text").is_some() {
+            diagnostic.try_set_fix(|| {
+                remove_argument(
+                    kwarg,
+                    &call.arguments,
+                    Parentheses::Preserve,
+                    checker.locator().contents(),
+                )
+                .map(Fix::safe_edit)
+            });
+        } else {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "text".to_string(),
+                arg.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

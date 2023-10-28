@@ -153,4 +153,147 @@ ISC.py:52:5: ISC001 [*] Implicitly concatenated string literals on one line
 54 54 | # Single-line explicit concatenation should be ignored.
 55 55 | _ = "abc" + "def" + "ghi"
 
+ISC.py:64:10: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+63 | # Multiple strings nested inside a f-string
+64 | _ = f"a {'b' 'c' 'd'} e"
+   |          ^^^^^^^ ISC001
+65 | _ = f"""abc {"def" "ghi"} jkl"""
+66 | _ = f"""abc {
+   |
+   = help: Combine string literals
+
+ℹ Fix
+61 61 | _ = foo + "abc" + bar
+62 62 | 
+63 63 | # Multiple strings nested inside a f-string
+64    |-_ = f"a {'b' 'c' 'd'} e"
+   64 |+_ = f"a {'bc' 'd'} e"
+65 65 | _ = f"""abc {"def" "ghi"} jkl"""
+66 66 | _ = f"""abc {
+67 67 |     "def"
+
+ISC.py:64:14: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+63 | # Multiple strings nested inside a f-string
+64 | _ = f"a {'b' 'c' 'd'} e"
+   |              ^^^^^^^ ISC001
+65 | _ = f"""abc {"def" "ghi"} jkl"""
+66 | _ = f"""abc {
+   |
+   = help: Combine string literals
+
+ℹ Fix
+61 61 | _ = foo + "abc" + bar
+62 62 | 
+63 63 | # Multiple strings nested inside a f-string
+64    |-_ = f"a {'b' 'c' 'd'} e"
+   64 |+_ = f"a {'b' 'cd'} e"
+65 65 | _ = f"""abc {"def" "ghi"} jkl"""
+66 66 | _ = f"""abc {
+67 67 |     "def"
+
+ISC.py:65:14: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+63 | # Multiple strings nested inside a f-string
+64 | _ = f"a {'b' 'c' 'd'} e"
+65 | _ = f"""abc {"def" "ghi"} jkl"""
+   |              ^^^^^^^^^^^ ISC001
+66 | _ = f"""abc {
+67 |     "def"
+   |
+   = help: Combine string literals
+
+ℹ Fix
+62 62 | 
+63 63 | # Multiple strings nested inside a f-string
+64 64 | _ = f"a {'b' 'c' 'd'} e"
+65    |-_ = f"""abc {"def" "ghi"} jkl"""
+   65 |+_ = f"""abc {"defghi"} jkl"""
+66 66 | _ = f"""abc {
+67 67 |     "def"
+68 68 |     "ghi"
+
+ISC.py:72:5: ISC001 Implicitly concatenated string literals on one line
+   |
+71 | # Nested f-strings
+72 | _ = "a" f"b {f"c" f"d"} e" "f"
+   |     ^^^^^^^^^^^^^^^^^^^^^^ ISC001
+73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+74 | _ = f"b {f"abc" \
+   |
+   = help: Combine string literals
+
+ISC.py:72:9: ISC001 Implicitly concatenated string literals on one line
+   |
+71 | # Nested f-strings
+72 | _ = "a" f"b {f"c" f"d"} e" "f"
+   |         ^^^^^^^^^^^^^^^^^^^^^^ ISC001
+73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+74 | _ = f"b {f"abc" \
+   |
+   = help: Combine string literals
+
+ISC.py:72:14: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+71 | # Nested f-strings
+72 | _ = "a" f"b {f"c" f"d"} e" "f"
+   |              ^^^^^^^^^ ISC001
+73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+74 | _ = f"b {f"abc" \
+   |
+   = help: Combine string literals
+
+ℹ Fix
+69 69 | } jkl"""
+70 70 | 
+71 71 | # Nested f-strings
+72    |-_ = "a" f"b {f"c" f"d"} e" "f"
+   72 |+_ = "a" f"b {f"cd"} e" "f"
+73 73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+74 74 | _ = f"b {f"abc" \
+75 75 |     f"def"} g"
+
+ISC.py:73:10: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+71 | # Nested f-strings
+72 | _ = "a" f"b {f"c" f"d"} e" "f"
+73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+   |          ^^^^^^^^^^^^^^^^^^^^^^^ ISC001
+74 | _ = f"b {f"abc" \
+75 |     f"def"} g"
+   |
+   = help: Combine string literals
+
+ℹ Fix
+70 70 | 
+71 71 | # Nested f-strings
+72 72 | _ = "a" f"b {f"c" f"d"} e" "f"
+73    |-_ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+   73 |+_ = f"b {f"cd {f"e" f"f"} g"} h"
+74 74 | _ = f"b {f"abc" \
+75 75 |     f"def"} g"
+76 76 | 
+
+ISC.py:73:20: ISC001 [*] Implicitly concatenated string literals on one line
+   |
+71 | # Nested f-strings
+72 | _ = "a" f"b {f"c" f"d"} e" "f"
+73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+   |                    ^^^^^^^^^ ISC001
+74 | _ = f"b {f"abc" \
+75 |     f"def"} g"
+   |
+   = help: Combine string literals
+
+ℹ Fix
+70 70 | 
+71 71 | # Nested f-strings
+72 72 | _ = "a" f"b {f"c" f"d"} e" "f"
+73    |-_ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+   73 |+_ = f"b {f"c" f"d {f"ef"} g"} h"
+74 74 | _ = f"b {f"abc" \
+75 75 |     f"def"} g"
+76 76 | 
+
 

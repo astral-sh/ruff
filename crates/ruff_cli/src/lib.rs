@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)]
+
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -6,16 +8,17 @@ use std::sync::mpsc::channel;
 
 use anyhow::Result;
 use clap::CommandFactory;
+use colored::Colorize;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff_linter::logging::{set_up_logging, LogLevel};
-use ruff_linter::settings::flags;
+use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
-use crate::args::{Args, CheckCommand, Command, FormatCommand};
+use crate::args::{Args, CheckCommand, Command, FormatCommand, HelpFormat};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -26,6 +29,7 @@ mod panic;
 mod printer;
 pub mod resolve;
 mod stdin;
+mod version;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -97,6 +101,15 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     file == Path::new("-")
 }
 
+/// Get the actual value of the `format` desired from either `output_format`
+/// or `format`, and warn the user if they're using the deprecated form.
+fn resolve_help_output_format(output_format: HelpFormat, format: Option<HelpFormat>) -> HelpFormat {
+    if format.is_some() {
+        warn_user!("The `--format` argument is deprecated. Use `--output-format` instead.");
+    }
+    format.unwrap_or(output_format)
+}
+
 pub fn run(
     Args {
         command,
@@ -104,8 +117,6 @@ pub fn run(
     }: Args,
 ) -> Result<ExitStatus> {
     {
-        use colored::Colorize;
-
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             #[allow(clippy::print_stderr)]
@@ -135,12 +146,22 @@ pub fn run(
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, all, format } => {
+        Command::Version { output_format } => {
+            commands::version::version(output_format)?;
+            Ok(ExitStatus::Success)
+        }
+        Command::Rule {
+            rule,
+            all,
+            format,
+            mut output_format,
+        } => {
+            output_format = resolve_help_output_format(output_format, format);
             if all {
-                commands::rule::rules(format)?;
+                commands::rule::rules(output_format)?;
             }
             if let Some(rule) = rule {
-                commands::rule::rule(rule, format)?;
+                commands::rule::rule(rule, output_format)?;
             }
             Ok(ExitStatus::Success)
         }
@@ -148,8 +169,12 @@ pub fn run(
             commands::config::config(option.as_deref())?;
             Ok(ExitStatus::Success)
         }
-        Command::Linter { format } => {
-            commands::linter::linter(format)?;
+        Command::Linter {
+            format,
+            mut output_format,
+        } => {
+            output_format = resolve_help_output_format(output_format, format);
+            commands::linter::linter(output_format)?;
             Ok(ExitStatus::Success)
         }
         Command::Clean => {
@@ -166,11 +191,6 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    warn_user_once!(
-        "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
-        experimentation."
-    );
-
     let (cli, overrides) = args.partition();
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
@@ -181,14 +201,6 @@ fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
 }
 
 pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    if args.format.is_some() {
-        if std::env::var("RUFF_FORMAT").is_ok() {
-            warn_user!("The environment variable `RUFF_FORMAT` is deprecated. Use `RUFF_OUTPUT_FORMAT` instead.");
-        } else {
-            warn_user!("The argument `--format=<FORMAT>` is deprecated. Use `--output-format=<FORMAT>` instead.");
-        }
-    }
-
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -208,6 +220,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         }
         _ => Box::new(BufWriter::new(io::stdout())),
     };
+    let stderr_writer = Box::new(BufWriter::new(io::stderr()));
 
     if cli.show_settings {
         commands::show_settings::show_settings(
@@ -228,25 +241,29 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let Settings {
         fix,
         fix_only,
+        unsafe_fixes,
         output_format,
         show_fixes,
         show_source,
         ..
     } = pyproject_config.settings;
 
-    // Autofix rules are as follows:
+    // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
-    // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
+    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
-    // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   fixes).
-    let autofix = if cli.diff {
-        flags::FixMode::Diff
+    // - If `--diff` or `--fix-only` are set, don't print any violations (only applicable fixes)
+    // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
+    //   `--unsafe-fixes` is set, then [`Applicablility::Suggested`] fixes are included.
+
+    let fix_mode = if cli.diff {
+        FixMode::Diff
     } else if fix || fix_only {
-        flags::FixMode::Apply
+        FixMode::Apply
     } else {
-        flags::FixMode::Generate
+        FixMode::Generate
     };
+
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
     let mut printer_flags = PrinterFlags::empty();
@@ -275,7 +292,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     }
 
     if cli.add_noqa {
-        if !autofix.is_generate() {
+        if !fix_mode.is_generate() {
             warn_user!("--fix is incompatible with --add-noqa.");
         }
         let modifications =
@@ -290,11 +307,17 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(output_format, log_level, autofix, printer_flags);
+    let printer = Printer::new(
+        output_format,
+        log_level,
+        fix_mode,
+        unsafe_fixes,
+        printer_flags,
+    );
 
     if cli.watch {
         if output_format != SerializationFormat::Text {
-            warn_user!("--format 'text' is used in watch mode.");
+            warn_user!("`--output-format text` is always used in watch mode.");
         }
 
         // Configure the file watcher.
@@ -317,7 +340,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             &overrides,
             cache.into(),
             noqa.into(),
-            autofix,
+            fix_mode,
+            unsafe_fixes,
         )?;
         printer.write_continuously(&mut writer, &messages)?;
 
@@ -349,7 +373,8 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         &overrides,
                         cache.into(),
                         noqa.into(),
-                        autofix,
+                        fix_mode,
+                        unsafe_fixes,
                     )?;
                     printer.write_continuously(&mut writer, &messages)?;
                 }
@@ -366,7 +391,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 &pyproject_config,
                 &overrides,
                 noqa.into(),
-                autofix,
+                fix_mode,
             )?
         } else {
             commands::check::check(
@@ -375,19 +400,23 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 &overrides,
                 cache.into(),
                 noqa.into(),
-                autofix,
+                fix_mode,
+                unsafe_fixes,
             )?
         };
 
-        // Always try to print violations (the printer itself may suppress output),
-        // unless we're writing fixes via stdin (in which case, the transformed
-        // source code goes to stdout).
-        if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
-            if cli.statistics {
-                printer.write_statistics(&diagnostics, &mut writer)?;
-            } else {
-                printer.write_once(&diagnostics, &mut writer)?;
-            }
+        // Always try to print violations (though the printer itself may suppress output)
+        // If we're writing fixes via stdin, the transformed source code goes to the writer
+        // so send the summary to stderr instead
+        let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
+            stderr_writer
+        } else {
+            writer
+        };
+        if cli.statistics {
+            printer.write_statistics(&diagnostics, &mut summary_writer)?;
+        } else {
+            printer.write_once(&diagnostics, &mut summary_writer)?;
         }
 
         if !cli.exit_zero {

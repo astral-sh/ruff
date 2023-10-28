@@ -1,6 +1,6 @@
 use log::error;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
@@ -11,7 +11,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::importer::Importer;
-use crate::registry::Rule;
+
 use crate::settings::LinterSettings;
 
 /// ## What it does
@@ -40,14 +40,14 @@ use crate::settings::LinterSettings;
 #[violation]
 pub struct MissingRequiredImport(pub String);
 
-impl AlwaysAutofixableViolation for MissingRequiredImport {
+impl AlwaysFixableViolation for MissingRequiredImport {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MissingRequiredImport(name) = self;
         format!("Missing required import: `{name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let MissingRequiredImport(name) = self;
         format!("Insert required import: `{name}`")
     }
@@ -90,7 +90,6 @@ fn add_required_import(
     python_ast: &Suite,
     locator: &Locator,
     stylist: &Stylist,
-    settings: &LinterSettings,
     source_type: PySourceType,
 ) -> Option<Diagnostic> {
     // Don't add imports to semantically-empty files.
@@ -116,12 +115,10 @@ fn add_required_import(
         MissingRequiredImport(required_import.to_string()),
         TextRange::default(),
     );
-    if settings.rules.should_fix(Rule::MissingRequiredImport) {
-        diagnostic.set_fix(Fix::automatic(
-            Importer::new(python_ast, locator, stylist)
-                .add_import(required_import, TextSize::default()),
-        ));
-    }
+    diagnostic.set_fix(Fix::safe_edit(
+        Importer::new(python_ast, locator, stylist)
+            .add_import(required_import, TextSize::default()),
+    ));
     Some(diagnostic)
 }
 
@@ -171,7 +168,6 @@ pub(crate) fn add_required_imports(
                             python_ast,
                             locator,
                             stylist,
-                            settings,
                             source_type,
                         )
                     })
@@ -189,7 +185,6 @@ pub(crate) fn add_required_imports(
                             python_ast,
                             locator,
                             stylist,
-                            settings,
                             source_type,
                         )
                     })

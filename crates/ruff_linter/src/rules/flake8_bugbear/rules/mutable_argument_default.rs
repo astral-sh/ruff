@@ -1,5 +1,5 @@
 use ast::call_path::{from_qualified_name, CallPath};
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault};
@@ -11,7 +11,6 @@ use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of mutable objects as function argument defaults.
@@ -30,6 +29,12 @@ use crate::registry::AsRule;
 /// Arguments with immutable type annotations will be ignored by this rule.
 /// Types outside of the standard library can be marked as immutable with the
 /// [`flake8-bugbear.extend-immutable-calls`] configuration option.
+///
+/// ## Known problems
+/// Mutable argument defaults can be used intentionally to cache computation
+/// results. Replacing the default with `None` or an immutable data structure
+/// does not work for such usages. Instead, prefer the `@functools.lru_cache`
+/// decorator from the standard library.
 ///
 /// ## Example
 /// ```python
@@ -64,14 +69,14 @@ use crate::registry::AsRule;
 pub struct MutableArgumentDefault;
 
 impl Violation for MutableArgumentDefault {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not use mutable data structures for argument defaults")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Replace with `None`; initialize within function"))
     }
 }
@@ -110,18 +115,16 @@ pub(crate) fn mutable_argument_default(checker: &mut Checker, function_def: &ast
             let mut diagnostic = Diagnostic::new(MutableArgumentDefault, default.range());
 
             // If the function body is on the same line as the function def, do not fix
-            if checker.patch(diagnostic.kind.rule()) {
-                if let Some(fix) = move_initialization(
-                    function_def,
-                    parameter,
-                    default,
-                    checker.locator(),
-                    checker.stylist(),
-                    checker.indexer(),
-                    checker.generator(),
-                ) {
-                    diagnostic.set_fix(fix);
-                }
+            if let Some(fix) = move_initialization(
+                function_def,
+                parameter,
+                default,
+                checker.locator(),
+                checker.stylist(),
+                checker.indexer(),
+                checker.generator(),
+            ) {
+                diagnostic.set_fix(fix);
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -139,15 +142,13 @@ fn move_initialization(
     indexer: &Indexer,
     generator: Generator,
 ) -> Option<Fix> {
-    let mut body = function_def.body.iter();
+    let mut body = function_def.body.iter().peekable();
 
-    let statement = body.next()?;
-    if indexer.in_multi_statement_line(statement, locator) {
+    // Avoid attempting to fix single-line functions.
+    let statement = body.peek()?;
+    if indexer.preceded_by_multi_statement_line(statement, locator) {
         return None;
     }
-
-    // Determine the indentation depth of the function body.
-    let indentation = indentation_at_offset(statement.start(), locator)?;
 
     // Set the default argument value to `None`.
     let default_edit = Edit::range_replacement("None".to_string(), default.range());
@@ -164,34 +165,43 @@ fn move_initialization(
     ));
     content.push_str(stylist.line_ending().as_str());
 
+    // Determine the indentation depth of the function body.
+    let indentation = indentation_at_offset(statement.start(), locator)?;
+
     // Indent the edit to match the body indentation.
-    let content = textwrap::indent(&content, indentation).to_string();
+    let mut content = textwrap::indent(&content, indentation).to_string();
 
-    let initialization_edit = if is_docstring_stmt(statement) {
-        // If the first statement in the function is a docstring, insert _after_ it.
-        if let Some(statement) = body.next() {
-            // If there's a second statement, insert _before_ it, but ensure this isn't a
-            // multi-statement line.
-            if indexer.in_multi_statement_line(statement, locator) {
-                return None;
+    // Find the position to insert the initialization after docstring and imports
+    let mut pos = locator.line_start(statement.start());
+    while let Some(statement) = body.next() {
+        // If the statement is a docstring or an import, insert _after_ it.
+        if is_docstring_stmt(statement)
+            || statement.is_import_stmt()
+            || statement.is_import_from_stmt()
+        {
+            if let Some(next) = body.peek() {
+                // If there's a second statement, insert _before_ it, but ensure this isn't a
+                // multi-statement line.
+                if indexer.in_multi_statement_line(statement, locator) {
+                    continue;
+                }
+                pos = locator.line_start(next.start());
+            } else if locator.full_line_end(statement.end()) == locator.text_len() {
+                // If the statement is at the end of the file, without a trailing newline, insert
+                // _after_ it with an extra newline.
+                content = format!("{}{}", stylist.line_ending().as_str(), content);
+                pos = locator.full_line_end(statement.end());
+                break;
+            } else {
+                // If this is the only statement, insert _after_ it.
+                pos = locator.full_line_end(statement.end());
+                break;
             }
-            Edit::insertion(content, locator.line_start(statement.start()))
-        } else if locator.full_line_end(statement.end()) == locator.text_len() {
-            // If the statement is at the end of the file, without a trailing newline, insert
-            // _after_ it with an extra newline.
-            Edit::insertion(
-                format!("{}{}", stylist.line_ending().as_str(), content),
-                locator.full_line_end(statement.end()),
-            )
         } else {
-            // If the docstring is the only statement, insert _after_ it.
-            Edit::insertion(content, locator.full_line_end(statement.end()))
-        }
-    } else {
-        // Otherwise, insert before the first statement.
-        let at = locator.line_start(statement.start());
-        Edit::insertion(content, at)
-    };
+            break;
+        };
+    }
 
-    Some(Fix::manual_edits(default_edit, [initialization_edit]))
+    let initialization_edit = Edit::insertion(content, pos);
+    Some(Fix::unsafe_edits(default_edit, [initialization_edit]))
 }

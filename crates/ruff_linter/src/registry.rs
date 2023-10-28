@@ -428,7 +428,18 @@ mod tests {
     use super::{Linter, Rule, RuleNamespace};
 
     #[test]
-    fn test_rule_naming_convention() {
+    fn documentation() {
+        for rule in Rule::iter() {
+            assert!(
+                rule.explanation().is_some(),
+                "Rule {} is missing documentation",
+                rule.as_ref()
+            );
+        }
+    }
+
+    #[test]
+    fn rule_naming_convention() {
         // The disallowed rule names are defined in a separate file so that they can also be picked up by add_rule.py.
         let patterns: Vec<_> = include_str!("../resources/test/disallowed_rule_names.txt")
             .trim()
@@ -460,7 +471,7 @@ mod tests {
     }
 
     #[test]
-    fn test_linter_parse_code() {
+    fn linter_parse_code() {
         for rule in Rule::iter() {
             let code = format!("{}", rule.noqa_code());
             let (linter, rest) =

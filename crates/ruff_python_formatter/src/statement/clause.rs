@@ -1,5 +1,5 @@
 use ruff_formatter::{write, Argument, Arguments, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
     ElifElseClause, ExceptHandlerExceptHandler, MatchCase, StmtClassDef, StmtFor, StmtFunctionDef,
     StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
@@ -203,15 +203,23 @@ impl<'a> ClauseHeader<'a> {
     fn first_keyword_range(self, source: &str) -> FormatResult<TextRange> {
         match self {
             ClauseHeader::Class(header) => {
-                find_keyword(header.start(), SimpleTokenKind::Class, source)
+                let start_position = header
+                    .decorator_list
+                    .last()
+                    .map_or_else(|| header.start(), Ranged::end);
+                find_keyword(start_position, SimpleTokenKind::Class, source)
             }
             ClauseHeader::Function(header) => {
+                let start_position = header
+                    .decorator_list
+                    .last()
+                    .map_or_else(|| header.start(), Ranged::end);
                 let keyword = if header.is_async {
                     SimpleTokenKind::Async
                 } else {
                     SimpleTokenKind::Def
                 };
-                find_keyword(header.start(), keyword, source)
+                find_keyword(start_position, keyword, source)
             }
             ClauseHeader::If(header) => find_keyword(header.start(), SimpleTokenKind::If, source),
             ClauseHeader::ElifElse(ElifElseClause {
@@ -383,7 +391,9 @@ pub(crate) fn clause_body<'a>(
 
 impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        if f.options().source_type().is_stub()
+        // In stable, stubs are only collapsed in stub files, in preview this is consistently
+        // applied everywhere
+        if (f.options().source_type().is_stub() || f.options().preview().is_enabled())
             && contains_only_an_ellipsis(self.body, f.context().comments())
             && self.trailing_comments.is_empty()
         {

@@ -85,7 +85,7 @@
 //!    return bool(i & 1)
 //! "#;
 //! let tokens = lex(python_source, Mode::Module);
-//! let ast = parse_tokens(tokens, Mode::Module, "<embedded>");
+//! let ast = parse_tokens(tokens, python_source, Mode::Module, "<embedded>");
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -110,8 +110,8 @@
 //! [lexer]: crate::lexer
 
 pub use parser::{
-    parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
-    parse_suite, parse_tokens, ParseError, ParseErrorType,
+    parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
+    parse_starts_at, parse_suite, parse_tokens, ParseError, ParseErrorType,
 };
 use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -146,6 +146,7 @@ pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
 /// Parse a full Python program from its tokens.
 pub fn parse_program_tokens(
     lxr: Vec<LexResult>,
+    source: &str,
     source_path: &str,
     is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
@@ -154,7 +155,7 @@ pub fn parse_program_tokens(
     } else {
         Mode::Module
     };
-    match parse_tokens(lxr, mode, source_path)? {
+    match parse_tokens(lxr, source, mode, source_path)? {
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
@@ -179,66 +180,85 @@ pub fn locate_cmp_ops(expr: &Expr, source: &str) -> Vec<LocatedCmpOp> {
         .peekable();
 
     let mut ops: Vec<LocatedCmpOp> = vec![];
-    let mut count = 0u32;
+
+    // Track the bracket depth.
+    let mut par_count = 0u32;
+    let mut sqb_count = 0u32;
+    let mut brace_count = 0u32;
+
     loop {
         let Some((tok, range)) = tok_iter.next() else {
             break;
         };
-        if matches!(tok, Tok::Lpar) {
-            count = count.saturating_add(1);
-            continue;
-        } else if matches!(tok, Tok::Rpar) {
-            count = count.saturating_sub(1);
+
+        match tok {
+            Tok::Lpar => {
+                par_count = par_count.saturating_add(1);
+            }
+            Tok::Rpar => {
+                par_count = par_count.saturating_sub(1);
+            }
+            Tok::Lsqb => {
+                sqb_count = sqb_count.saturating_add(1);
+            }
+            Tok::Rsqb => {
+                sqb_count = sqb_count.saturating_sub(1);
+            }
+            Tok::Lbrace => {
+                brace_count = brace_count.saturating_add(1);
+            }
+            Tok::Rbrace => {
+                brace_count = brace_count.saturating_sub(1);
+            }
+            _ => {}
+        }
+
+        if par_count > 0 || sqb_count > 0 || brace_count > 0 {
             continue;
         }
-        if count == 0 {
-            match tok {
-                Tok::Not => {
-                    if let Some((_, next_range)) =
-                        tok_iter.next_if(|(tok, _)| matches!(tok, Tok::In))
-                    {
-                        ops.push(LocatedCmpOp::new(
-                            TextRange::new(range.start(), next_range.end()),
-                            CmpOp::NotIn,
-                        ));
-                    }
+
+        match tok {
+            Tok::Not => {
+                if let Some((_, next_range)) = tok_iter.next_if(|(tok, _)| tok.is_in()) {
+                    ops.push(LocatedCmpOp::new(
+                        TextRange::new(range.start(), next_range.end()),
+                        CmpOp::NotIn,
+                    ));
                 }
-                Tok::In => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::In));
-                }
-                Tok::Is => {
-                    let op = if let Some((_, next_range)) =
-                        tok_iter.next_if(|(tok, _)| matches!(tok, Tok::Not))
-                    {
-                        LocatedCmpOp::new(
-                            TextRange::new(range.start(), next_range.end()),
-                            CmpOp::IsNot,
-                        )
-                    } else {
-                        LocatedCmpOp::new(range, CmpOp::Is)
-                    };
-                    ops.push(op);
-                }
-                Tok::NotEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::NotEq));
-                }
-                Tok::EqEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::Eq));
-                }
-                Tok::GreaterEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::GtE));
-                }
-                Tok::Greater => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::Gt));
-                }
-                Tok::LessEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::LtE));
-                }
-                Tok::Less => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::Lt));
-                }
-                _ => {}
             }
+            Tok::In => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::In));
+            }
+            Tok::Is => {
+                let op = if let Some((_, next_range)) = tok_iter.next_if(|(tok, _)| tok.is_not()) {
+                    LocatedCmpOp::new(
+                        TextRange::new(range.start(), next_range.end()),
+                        CmpOp::IsNot,
+                    )
+                } else {
+                    LocatedCmpOp::new(range, CmpOp::Is)
+                };
+                ops.push(op);
+            }
+            Tok::NotEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::NotEq));
+            }
+            Tok::EqEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::Eq));
+            }
+            Tok::GreaterEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::GtE));
+            }
+            Tok::Greater => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::Gt));
+            }
+            Tok::LessEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::LtE));
+            }
+            Tok::Less => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::Lt));
+            }
+            _ => {}
         }
     }
     ops

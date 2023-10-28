@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_source_file::NewlineWithTrailingNewline;
@@ -6,7 +6,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for single-line docstrings that are broken across multiple lines.
@@ -37,14 +36,14 @@ use crate::registry::AsRule;
 pub struct FitsOnOneLine;
 
 impl Violation for FitsOnOneLine {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("One-line docstring should fit on one line")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Reformat to one line".to_string())
     }
 }
@@ -65,24 +64,22 @@ pub(crate) fn one_liner(checker: &mut Checker, docstring: &Docstring) {
 
     if non_empty_line_count == 1 && line_count > 1 {
         let mut diagnostic = Diagnostic::new(FitsOnOneLine, docstring.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if let (Some(leading), Some(trailing)) = (
-                leading_quote(docstring.contents),
-                trailing_quote(docstring.contents),
-            ) {
-                // If removing whitespace would lead to an invalid string of quote
-                // characters, avoid applying the fix.
-                let body = docstring.body();
-                let trimmed = body.trim();
-                if trimmed.chars().rev().take_while(|c| *c == '\\').count() % 2 == 0
-                    && !trimmed.ends_with(trailing.chars().last().unwrap())
-                    && !trimmed.starts_with(leading.chars().last().unwrap())
-                {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        format!("{leading}{trimmed}{trailing}"),
-                        docstring.range(),
-                    )));
-                }
+        if let (Some(leading), Some(trailing)) = (
+            leading_quote(docstring.contents),
+            trailing_quote(docstring.contents),
+        ) {
+            // If removing whitespace would lead to an invalid string of quote
+            // characters, avoid applying the fix.
+            let body = docstring.body();
+            let trimmed = body.trim();
+            if trimmed.chars().rev().take_while(|c| *c == '\\').count() % 2 == 0
+                && !trimmed.ends_with(trailing.chars().last().unwrap())
+                && !trimmed.starts_with(leading.chars().last().unwrap())
+            {
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    format!("{leading}{trimmed}{trailing}"),
+                    docstring.range(),
+                )));
             }
         }
         checker.diagnostics.push(diagnostic);

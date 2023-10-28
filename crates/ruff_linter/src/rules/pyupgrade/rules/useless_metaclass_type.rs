@@ -1,12 +1,11 @@
 use ruff_python_ast::{self as ast, Expr, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix;
 
 /// ## What it does
 /// Checks for the use of `__metaclass__ = type` in class definitions.
@@ -31,13 +30,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UselessMetaclassType;
 
-impl AlwaysAutofixableViolation for UselessMetaclassType {
+impl AlwaysFixableViolation for UselessMetaclassType {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`__metaclass__ = type` is implied")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `__metaclass__ = type`".to_string()
     }
 }
@@ -63,13 +62,11 @@ pub(crate) fn useless_metaclass_type(
     }
 
     let mut diagnostic = Diagnostic::new(UselessMetaclassType, stmt.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let stmt = checker.semantic().current_statement();
-        let parent = checker.semantic().current_statement_parent();
-        let edit = autofix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(
-            checker.semantic().current_statement_parent_id(),
-        )));
-    }
+    let stmt = checker.semantic().current_statement();
+    let parent = checker.semantic().current_statement_parent();
+    let edit = fix::edits::delete_stmt(stmt, parent, checker.locator(), checker.indexer());
+    diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
+        checker.semantic().current_statement_parent_id(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

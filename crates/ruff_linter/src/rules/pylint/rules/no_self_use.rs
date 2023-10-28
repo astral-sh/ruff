@@ -4,7 +4,7 @@ use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_python_semantic::{
     analyze::{function_type, visibility},
-    Scope, ScopeKind,
+    Scope, ScopeId, ScopeKind,
 };
 use ruff_text_size::Ranged;
 
@@ -15,7 +15,7 @@ use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
 ///
 /// ## Why is this bad?
 /// Unused `self` parameters are usually a sign of a method that could be
-/// replaced by a function or a static method.
+/// replaced by a function, class method, or static method.
 ///
 /// ## Example
 /// ```python
@@ -26,10 +26,8 @@ use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
 ///
 /// Use instead:
 /// ```python
-/// class Person:
-///     @staticmethod
-///     def greeting():
-///         print(f"Greetings friend!")
+/// def greeting():
+///     print("Greetings friend!")
 /// ```
 #[violation]
 pub struct NoSelfUse {
@@ -40,12 +38,17 @@ impl Violation for NoSelfUse {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoSelfUse { method_name } = self;
-        format!("Method `{method_name}` could be a function or static method")
+        format!("Method `{method_name}` could be a function, class method, or static method")
     }
 }
 
 /// PLR6301
-pub(crate) fn no_self_use(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
+pub(crate) fn no_self_use(
+    checker: &Checker,
+    scope_id: ScopeId,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     let Some(parent) = &checker.semantic().first_non_type_parent_scope(scope) else {
         return;
     };
@@ -105,11 +108,28 @@ pub(crate) fn no_self_use(checker: &Checker, scope: &Scope, diagnostics: &mut Ve
         return;
     };
 
-    if parameter.name.as_str() == "self"
-        && scope
-            .get("self")
-            .map(|binding_id| checker.semantic().binding(binding_id))
-            .is_some_and(|binding| binding.kind.is_argument() && !binding.is_used())
+    if parameter.name.as_str() != "self" {
+        return;
+    }
+
+    // If the method contains a `super` reference, then it should be considered to use self
+    // implicitly.
+    if let Some(binding_id) = checker.semantic().global_scope().get("super") {
+        let binding = checker.semantic().binding(binding_id);
+        if binding.kind.is_builtin() {
+            if binding
+                .references()
+                .any(|id| checker.semantic().reference(id).scope_id() == scope_id)
+            {
+                return;
+            }
+        }
+    }
+
+    if scope
+        .get("self")
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .is_some_and(|binding| binding.kind.is_argument() && !binding.is_used())
     {
         diagnostics.push(Diagnostic::new(
             NoSelfUse {

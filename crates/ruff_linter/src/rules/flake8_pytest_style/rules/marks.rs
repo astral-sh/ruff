@@ -1,12 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::CallPath;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 use super::helpers::get_mark_decorators;
 
@@ -54,7 +53,7 @@ pub struct PytestIncorrectMarkParenthesesStyle {
     actual_parens: String,
 }
 
-impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
+impl AlwaysFixableViolation for PytestIncorrectMarkParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PytestIncorrectMarkParenthesesStyle {
@@ -68,7 +67,7 @@ impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add/remove parentheses".to_string()
     }
 }
@@ -103,13 +102,13 @@ impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
 #[violation]
 pub struct PytestUseFixturesWithoutParameters;
 
-impl AlwaysAutofixableViolation for PytestUseFixturesWithoutParameters {
+impl AlwaysFixableViolation for PytestUseFixturesWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Useless `pytest.mark.usefixtures` without parameters")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `usefixtures` decorator or pass parameters".to_string()
     }
 }
@@ -117,26 +116,24 @@ impl AlwaysAutofixableViolation for PytestUseFixturesWithoutParameters {
 fn pytest_mark_parentheses(
     checker: &mut Checker,
     decorator: &Decorator,
-    call_path: &CallPath,
+    marker: &str,
     fix: Fix,
     preferred: &str,
     actual: &str,
 ) {
     let mut diagnostic = Diagnostic::new(
         PytestIncorrectMarkParenthesesStyle {
-            mark_name: (*call_path.last().unwrap()).to_string(),
+            mark_name: marker.to_string(),
             expected_parens: preferred.to_string(),
             actual_parens: actual.to_string(),
         },
         decorator.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(fix);
-    }
+    diagnostic.set_fix(fix);
     checker.diagnostics.push(diagnostic);
 }
 
-fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, call_path: &CallPath) {
+fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, marker: &str) {
     match &decorator.expression {
         Expr::Call(ast::ExprCall {
             func,
@@ -152,55 +149,54 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Decorator, call_pat
                 && args.is_empty()
                 && keywords.is_empty()
             {
-                let fix = Fix::automatic(Edit::deletion(func.end(), decorator.end()));
-                pytest_mark_parentheses(checker, decorator, call_path, fix, "", "()");
+                let fix = Fix::safe_edit(Edit::deletion(func.end(), decorator.end()));
+                pytest_mark_parentheses(checker, decorator, marker, fix, "", "()");
             }
         }
         _ => {
             if checker.settings.flake8_pytest_style.mark_parentheses {
-                let fix = Fix::automatic(Edit::insertion("()".to_string(), decorator.end()));
-                pytest_mark_parentheses(checker, decorator, call_path, fix, "()", "");
+                let fix = Fix::safe_edit(Edit::insertion("()".to_string(), decorator.end()));
+                pytest_mark_parentheses(checker, decorator, marker, fix, "()", "");
             }
         }
     }
 }
 
-fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, call_path: &CallPath) {
-    if *call_path.last().unwrap() != "usefixtures" {
+fn check_useless_usefixtures(checker: &mut Checker, decorator: &Decorator, marker: &str) {
+    if marker != "usefixtures" {
         return;
     }
 
-    let mut has_parameters = false;
-
-    if let Expr::Call(ast::ExprCall {
-        arguments: Arguments { args, keywords, .. },
-        ..
-    }) = &decorator.expression
-    {
-        if !args.is_empty() || !keywords.is_empty() {
-            has_parameters = true;
+    match &decorator.expression {
+        // @pytest.mark.usefixtures
+        Expr::Attribute(..) => {}
+        // @pytest.mark.usefixtures(...)
+        Expr::Call(ast::ExprCall {
+            arguments: Arguments { args, keywords, .. },
+            ..
+        }) => {
+            if !args.is_empty() || !keywords.is_empty() {
+                return;
+            }
         }
+        _ => return,
     }
 
-    if !has_parameters {
-        let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::suggested(Edit::range_deletion(decorator.range())));
-        }
-        checker.diagnostics.push(diagnostic);
-    }
+    let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(decorator.range())));
+    checker.diagnostics.push(diagnostic);
 }
 
 pub(crate) fn marks(checker: &mut Checker, decorators: &[Decorator]) {
     let enforce_parentheses = checker.enabled(Rule::PytestIncorrectMarkParenthesesStyle);
     let enforce_useless_usefixtures = checker.enabled(Rule::PytestUseFixturesWithoutParameters);
 
-    for (decorator, call_path) in get_mark_decorators(decorators) {
+    for (decorator, marker) in get_mark_decorators(decorators) {
         if enforce_parentheses {
-            check_mark_parentheses(checker, decorator, &call_path);
+            check_mark_parentheses(checker, decorator, marker);
         }
         if enforce_useless_usefixtures {
-            check_useless_usefixtures(checker, decorator, &call_path);
+            check_useless_usefixtures(checker, decorator, marker);
         }
     }
 }

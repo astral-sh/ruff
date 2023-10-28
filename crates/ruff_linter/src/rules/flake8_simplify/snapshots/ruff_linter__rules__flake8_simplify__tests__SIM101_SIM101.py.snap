@@ -71,30 +71,10 @@ SIM101.py:10:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a sin
 8  8  |     pass
 9  9  | 
 10    |-if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
-   10 |+if isinstance(a, (int, float)) or isinstance(b, bool):  # SIM101
+   10 |+if isinstance(b, bool) or isinstance(a, (int, float)):  # SIM101
 11 11 |     pass
 12 12 | 
 13 13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
-
-SIM101.py:13:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
-   |
-11 |     pass
-12 | 
-13 | if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
-   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
-14 |     pass
-   |
-   = help: Merge `isinstance` calls for `a`
-
-ℹ Suggested fix
-10 10 | if isinstance(b, bool) or isinstance(a, int) or isinstance(a, float):  # SIM101
-11 11 |     pass
-12 12 | 
-13    |-if isinstance(a, int) or isinstance(b, bool) or isinstance(a, float):  # SIM101
-   13 |+if isinstance(a, (int, float)) or isinstance(b, bool):  # SIM101
-14 14 |     pass
-15 15 | 
-16 16 | if (isinstance(a, int) or isinstance(a, float)) and isinstance(b, bool):  # SIM101
 
 SIM101.py:16:5: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
    |
@@ -145,5 +125,45 @@ SIM101.py:22:4: SIM101 Multiple `isinstance` calls for expression, merge into a 
 23 |     pass
    |
    = help: Merge `isinstance` calls
+
+SIM101.py:38:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+   |
+36 |     pass
+37 | 
+38 | if x or isinstance(a, int) or isinstance(a, float):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+39 |     pass
+   |
+   = help: Merge `isinstance` calls for `a`
+
+ℹ Suggested fix
+35 35 | if isinstance(a, int) or unrelated_condition or isinstance(a, float):
+36 36 |     pass
+37 37 | 
+38    |-if x or isinstance(a, int) or isinstance(a, float):
+   38 |+if x or isinstance(a, (int, float)):
+39 39 |     pass
+40 40 | 
+41 41 | if x or y or isinstance(a, int) or isinstance(a, float) or z:
+
+SIM101.py:41:4: SIM101 [*] Multiple `isinstance` calls for `a`, merge into a single call
+   |
+39 |     pass
+40 | 
+41 | if x or y or isinstance(a, int) or isinstance(a, float) or z:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM101
+42 |     pass
+   |
+   = help: Merge `isinstance` calls for `a`
+
+ℹ Suggested fix
+38 38 | if x or isinstance(a, int) or isinstance(a, float):
+39 39 |     pass
+40 40 | 
+41    |-if x or y or isinstance(a, int) or isinstance(a, float) or z:
+   41 |+if x or y or isinstance(a, (int, float)) or z:
+42 42 |     pass
+43 43 | 
+44 44 | def f():
 
 

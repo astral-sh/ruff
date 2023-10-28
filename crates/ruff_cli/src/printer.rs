@@ -7,11 +7,9 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
-use rustc_hash::FxHashMap;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
-use ruff_linter::linter::FixTable;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
@@ -19,10 +17,10 @@ use ruff_linter::message::{
 };
 use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
-use ruff_linter::settings::flags;
-use ruff_linter::settings::types::SerializationFormat;
+use ruff_linter::settings::flags::{self};
+use ruff_linter::settings::types::{SerializationFormat, UnsafeFixes};
 
-use crate::diagnostics::Diagnostics;
+use crate::diagnostics::{Diagnostics, FixMap};
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone)]
@@ -72,7 +70,8 @@ impl From<Rule> for SerializeRuleAsCode {
 pub(crate) struct Printer {
     format: SerializationFormat,
     log_level: LogLevel,
-    autofix_level: flags::FixMode,
+    fix_mode: flags::FixMode,
+    unsafe_fixes: UnsafeFixes,
     flags: Flags,
 }
 
@@ -80,13 +79,15 @@ impl Printer {
     pub(crate) const fn new(
         format: SerializationFormat,
         log_level: LogLevel,
-        autofix_level: flags::FixMode,
+        fix_mode: flags::FixMode,
+        unsafe_fixes: UnsafeFixes,
         flags: Flags,
     ) -> Self {
         Self {
             format,
             log_level,
-            autofix_level,
+            fix_mode,
+            unsafe_fixes,
             flags,
         }
     }
@@ -99,12 +100,15 @@ impl Printer {
 
     fn write_summary_text(&self, writer: &mut dyn Write, diagnostics: &Diagnostics) -> Result<()> {
         if self.log_level >= LogLevel::Default {
+            let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
+
+            let fixed = diagnostics
+                .fixed
+                .values()
+                .flat_map(std::collections::HashMap::values)
+                .sum::<usize>();
+
             if self.flags.intersects(Flags::SHOW_VIOLATIONS) {
-                let fixed = diagnostics
-                    .fixed
-                    .values()
-                    .flat_map(std::collections::HashMap::values)
-                    .sum::<usize>();
                 let remaining = diagnostics.messages.len();
                 let total = fixed + remaining;
                 if fixed > 0 {
@@ -118,32 +122,83 @@ impl Printer {
                     writeln!(writer, "Found {remaining} error{s}.")?;
                 }
 
-                if show_fix_status(self.autofix_level) {
-                    let num_fixable = diagnostics
-                        .messages
-                        .iter()
-                        .filter(|message| message.fix.is_some())
-                        .count();
-                    if num_fixable > 0 {
-                        writeln!(
-                            writer,
-                            "[{}] {num_fixable} potentially fixable with the --fix option.",
-                            "*".cyan(),
-                        )?;
+                if let Some(fixables) = fixables {
+                    let fix_prefix = format!("[{}]", "*".cyan());
+
+                    if self.unsafe_fixes.is_enabled() {
+                        if fixables.applicable > 0 {
+                            writeln!(
+                                writer,
+                                "{fix_prefix} {} fixable with the --fix option.",
+                                fixables.applicable
+                            )?;
+                        }
+                    } else {
+                        if fixables.applicable > 0 && fixables.unapplicable_unsafe > 0 {
+                            let es = if fixables.unapplicable_unsafe == 1 {
+                                ""
+                            } else {
+                                "es"
+                            };
+                            writeln!(writer,
+                                "{fix_prefix} {} fixable with the `--fix` option ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
+                                fixables.applicable, fixables.unapplicable_unsafe
+                            )?;
+                        } else if fixables.applicable > 0 {
+                            // Only applicable fixes
+                            writeln!(
+                                writer,
+                                "{fix_prefix} {} fixable with the `--fix` option.",
+                                fixables.applicable,
+                            )?;
+                        } else {
+                            // Only unapplicable fixes
+                            let es = if fixables.unapplicable_unsafe == 1 {
+                                ""
+                            } else {
+                                "es"
+                            };
+                            writeln!(writer,
+                                "No fixes available ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
+                                fixables.unapplicable_unsafe
+                            )?;
+                        }
                     }
                 }
             } else {
-                let fixed = diagnostics
-                    .fixed
-                    .values()
-                    .flat_map(std::collections::HashMap::values)
-                    .sum::<usize>();
-                if fixed > 0 {
-                    let s = if fixed == 1 { "" } else { "s" };
-                    if self.autofix_level.is_apply() {
-                        writeln!(writer, "Fixed {fixed} error{s}.")?;
+                // Check if there are unapplied fixes
+                let unapplied = {
+                    if let Some(fixables) = fixables {
+                        fixables.unapplicable_unsafe
                     } else {
-                        writeln!(writer, "Would fix {fixed} error{s}.")?;
+                        0
+                    }
+                };
+
+                if unapplied > 0 {
+                    let es = if unapplied == 1 { "" } else { "es" };
+                    if fixed > 0 {
+                        let s = if fixed == 1 { "" } else { "s" };
+                        if self.fix_mode.is_apply() {
+                            writeln!(writer, "Fixed {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`).")?;
+                        } else {
+                            writeln!(writer, "Would fix {fixed} error{s} ({unapplied} additional fix{es} available with `--unsafe-fixes`).")?;
+                        }
+                    } else {
+                        if self.fix_mode.is_apply() {
+                            writeln!(writer, "No errors fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
+                        } else {
+                            writeln!(writer, "No errors would be fixed ({unapplied} fix{es} available with `--unsafe-fixes`).")?;
+                        }
+                    }
+                } else {
+                    if fixed > 0 {
+                        let s = if fixed == 1 { "" } else { "s" };
+                        if self.fix_mode.is_apply() {
+                            writeln!(writer, "Fixed {fixed} error{s}.")?;
+                        } else {
+                            writeln!(writer, "Would fix {fixed} error{s}.")?;
+                        }
                     }
                 }
             }
@@ -178,6 +233,7 @@ impl Printer {
         }
 
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
+        let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
         match self.format {
             SerializationFormat::Json => {
@@ -191,9 +247,10 @@ impl Printer {
             }
             SerializationFormat::Text => {
                 TextEmitter::default()
-                    .with_show_fix_status(show_fix_status(self.autofix_level))
+                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                     .with_show_fix_diff(self.flags.intersects(Flags::SHOW_FIX_DIFF))
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
+                    .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
@@ -209,7 +266,8 @@ impl Printer {
             SerializationFormat::Grouped => {
                 GroupedEmitter::default()
                     .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
-                    .with_show_fix_status(show_fix_status(self.autofix_level))
+                    .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
+                    .with_unsafe_fixes(self.unsafe_fixes)
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.intersects(Flags::SHOW_FIX_SUMMARY) {
@@ -359,6 +417,8 @@ impl Printer {
             );
         }
 
+        let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
+
         if !diagnostics.messages.is_empty() {
             if self.log_level >= LogLevel::Default {
                 writeln!(writer)?;
@@ -366,8 +426,9 @@ impl Printer {
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             TextEmitter::default()
-                .with_show_fix_status(show_fix_status(self.autofix_level))
+                .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_show_source(self.flags.intersects(Flags::SHOW_SOURCE))
+                .with_unsafe_fixes(self.unsafe_fixes)
                 .emit(writer, &diagnostics.messages, &context)?;
         }
         writer.flush()?;
@@ -390,16 +451,16 @@ fn num_digits(n: usize) -> usize {
 }
 
 /// Return `true` if the [`Printer`] should indicate that a rule is fixable.
-const fn show_fix_status(autofix_level: flags::FixMode) -> bool {
+fn show_fix_status(fix_mode: flags::FixMode, fixables: Option<&FixableStatistics>) -> bool {
     // If we're in application mode, avoid indicating that a rule is fixable.
     // If the specific violation were truly fixable, it would've been fixed in
     // this pass! (We're occasionally unable to determine whether a specific
-    // violation is fixable without trying to fix it, so if autofix is not
+    // violation is fixable without trying to fix it, so if fix is not
     // enabled, we may inadvertently indicate that a rule is fixable.)
-    !autofix_level.is_apply()
+    (!fix_mode.is_apply()) && fixables.is_some_and(FixableStatistics::any_applicable_fixes)
 }
 
-fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
+fn print_fix_summary(writer: &mut dyn Write, fixed: &FixMap) -> Result<()> {
     let total = fixed
         .values()
         .map(|table| table.values().sum::<usize>())
@@ -438,4 +499,44 @@ fn print_fix_summary(writer: &mut dyn Write, fixed: &FxHashMap<String, FixTable>
         }
     }
     Ok(())
+}
+
+/// Statistics for [applicable][ruff_diagnostics::Applicability] fixes.
+#[derive(Debug)]
+struct FixableStatistics {
+    applicable: u32,
+    unapplicable_unsafe: u32,
+}
+
+impl FixableStatistics {
+    fn try_from(diagnostics: &Diagnostics, unsafe_fixes: UnsafeFixes) -> Option<Self> {
+        let mut applicable = 0;
+        let mut unapplicable_unsafe = 0;
+
+        for message in &diagnostics.messages {
+            if let Some(fix) = &message.fix {
+                if fix.applies(unsafe_fixes.required_applicability()) {
+                    applicable += 1;
+                } else {
+                    // Do not include unapplicable fixes at other levels that do not provide an opt-in
+                    if fix.applicability().is_unsafe() {
+                        unapplicable_unsafe += 1;
+                    }
+                }
+            }
+        }
+
+        if applicable == 0 && unapplicable_unsafe == 0 {
+            None
+        } else {
+            Some(Self {
+                applicable,
+                unapplicable_unsafe,
+            })
+        }
+    }
+
+    fn any_applicable_fixes(&self) -> bool {
+        self.applicable > 0
+    }
 }

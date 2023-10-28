@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{self as ast, Expr};
@@ -7,7 +7,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for generator expressions, list and set comprehensions that can
@@ -17,7 +16,14 @@ use crate::registry::AsRule;
 /// When unpacking values from iterators to pass them directly to
 /// a function, prefer `itertools.starmap`.
 ///
-/// Using `itertools.starmap` is more concise and readable.
+/// Using `itertools.starmap` is more concise and readable. Furthermore, it is
+/// more efficient than generator expressions, and in some versions of Python,
+/// it is more efficient than comprehensions.
+///
+/// ## Known problems
+/// Since Python 3.12, `itertools.starmap` is less efficient than
+/// comprehensions ([#7771]). This is due to [PEP 709], which made
+/// comprehensions faster.
 ///
 /// ## Example
 /// ```python
@@ -53,18 +59,21 @@ use crate::registry::AsRule;
 ///
 /// ## References
 /// - [Python documentation: `itertools.starmap`](https://docs.python.org/3/library/itertools.html#itertools.starmap)
+///
+/// [PEP 709]: https://peps.python.org/pep-0709/
+/// [#7771]: https://github.com/astral-sh/ruff/issues/7771
 #[violation]
 pub struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `itertools.starmap` instead of the generator")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Replace with `itertools.starmap`"))
     }
 }
@@ -82,7 +91,7 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
     // ```
     //
     // `x, y, z, ...` are what we call `elts` for short.
-    let Some((elts, iter)) = match_comprehension(comprehension) else {
+    let Some(value) = match_comprehension_target(comprehension) else {
         return;
     };
 
@@ -99,40 +108,55 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
         return;
     };
 
-    // Here we want to check that `args` and `elts` are the same (same length, same elements,
-    // same order).
-    if elts.len() != args.len()
-        || !std::iter::zip(elts, args)
-            .all(|(x, y)| ComparableExpr::from(x) == ComparableExpr::from(y))
-    {
-        return;
+    match value {
+        // Ex) `f(*x) for x in iter`
+        ComprehensionTarget::Name(name) => {
+            let [arg] = args else {
+                return;
+            };
+
+            let Expr::Starred(ast::ExprStarred { value, .. }) = arg else {
+                return;
+            };
+
+            if ComparableExpr::from(value.as_ref()) != ComparableExpr::from(name) {
+                return;
+            }
+        }
+        // Ex) `f(x, y, z) for x, y, z in iter`
+        ComprehensionTarget::Tuple(tuple) => {
+            if tuple.elts.len() != args.len()
+                || !std::iter::zip(&tuple.elts, args)
+                    .all(|(x, y)| ComparableExpr::from(x) == ComparableExpr::from(y))
+            {
+                return;
+            }
+        }
     }
 
     let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            // Try importing `starmap` from `itertools`.
-            //
-            // It is not required to be `itertools.starmap`, though. The user might've already
-            // imported it. Maybe even under a different name. So, we should use that name
-            // for fix construction.
-            let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from("itertools", "starmap"),
-                target.start(),
-                checker.semantic(),
-            )?;
-            // The actual fix suggestion depends on what type of expression we were looking at.
-            //
-            // - For generator expressions, we use `starmap` call directly.
-            // - For list and set comprehensions, we'd want to wrap it with `list` and `set`
-            //   correspondingly.
-            let main_edit = Edit::range_replacement(
-                target.try_make_suggestion(starmap_name, iter, func, checker)?,
-                target.range(),
-            );
-            Ok(Fix::suggested_edits(import_edit, [main_edit]))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        // Try importing `starmap` from `itertools`.
+        //
+        // It is not required to be `itertools.starmap`, though. The user might've already
+        // imported it. Maybe even under a different name. So, we should use that name
+        // for fix construction.
+        let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import_from("itertools", "starmap"),
+            target.start(),
+            checker.semantic(),
+        )?;
+        // The actual fix suggestion depends on what type of expression we were looking at.
+        //
+        // - For generator expressions, we use `starmap` call directly.
+        // - For list and set comprehensions, we'd want to wrap it with `list` and `set`
+        //   correspondingly.
+        let main_edit = Edit::range_replacement(
+            target.try_make_suggestion(starmap_name, &comprehension.iter, func, checker)?,
+            target.range(),
+        );
+        Ok(Fix::safe_edits(import_edit, [main_edit]))
+    });
     checker.diagnostics.push(diagnostic);
 }
 
@@ -252,7 +276,7 @@ fn try_construct_call(
     // We can only do our fix if `builtin` identifier is still bound to
     // the built-in type.
     if !checker.semantic().is_builtin(builtin) {
-        bail!(format!("Can't use built-in `{builtin}` constructor"))
+        bail!("Can't use built-in `{builtin}` constructor")
     }
 
     // In general, we replace:
@@ -306,14 +330,24 @@ fn wrap_with_call_to(call: ast::ExprCall, func_name: &str) -> ast::ExprCall {
     }
 }
 
-/// Match that the given comprehension is `(x, y, z, ...) in iter`.
-fn match_comprehension(comprehension: &ast::Comprehension) -> Option<(&[Expr], &Expr)> {
+#[derive(Debug)]
+enum ComprehensionTarget<'a> {
+    /// E.g., `(x, y, z, ...)` in `(x, y, z, ...) in iter`.
+    Tuple(&'a ast::ExprTuple),
+    /// E.g., `x` in `x in iter`.
+    Name(&'a ast::ExprName),
+}
+
+/// Extract the target from the comprehension (e.g., `(x, y, z)` in `(x, y, z, ...) in iter`).
+fn match_comprehension_target(comprehension: &ast::Comprehension) -> Option<ComprehensionTarget> {
     if comprehension.is_async || !comprehension.ifs.is_empty() {
         return None;
     }
-
-    let ast::ExprTuple { elts, .. } = comprehension.target.as_tuple_expr()?;
-    Some((elts, &comprehension.iter))
+    match &comprehension.target {
+        Expr::Tuple(tuple) => Some(ComprehensionTarget::Tuple(tuple)),
+        Expr::Name(name) => Some(ComprehensionTarget::Name(name)),
+        _ => None,
+    }
 }
 
 /// Match that the given expression is `func(x, y, z, ...)`.

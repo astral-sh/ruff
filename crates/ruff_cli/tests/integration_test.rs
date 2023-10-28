@@ -1,6 +1,5 @@
 #![cfg(not(target_family = "wasm"))]
 
-#[cfg(unix)]
 use std::fs;
 #[cfg(unix)]
 use std::fs::Permissions;
@@ -19,7 +18,6 @@ use clap::Parser;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
 #[cfg(unix)]
 use path_absolutize::path_dedot;
-#[cfg(unix)]
 use tempfile::TempDir;
 
 #[cfg(unix)]
@@ -47,16 +45,16 @@ fn stdin_success() {
 fn stdin_error() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .pass_stdin("import os\n"), @r#"
+        .pass_stdin("import os\n"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
     -:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "#);
+    "###);
 }
 
 #[test]
@@ -70,14 +68,14 @@ fn stdin_filename() {
     ----- stdout -----
     F401.py:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
 }
 
-#[test]
 /// Raise `TCH` errors in `.py` files ...
+#[test]
 fn stdin_source_type_py() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -88,7 +86,7 @@ fn stdin_source_type_py() {
     ----- stdout -----
     TCH.py:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 potentially fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -137,7 +135,7 @@ fn stdin_json() {
 }
 
 #[test]
-fn stdin_autofix() {
+fn stdin_fix_py() {
     let args = ["--fix"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -151,11 +149,180 @@ fn stdin_autofix() {
     print(sys.version)
 
     ----- stderr -----
+    Found 1 error (1 fixed, 0 remaining).
     "###);
 }
 
 #[test]
-fn stdin_autofix_when_not_fixable_should_still_print_contents() {
+fn stdin_fix_jupyter() {
+    let args = ["--fix", "--stdin-filename", "Jupyter.ipynb"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin(r#"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "dccc687c-96e2-4604-b957-a8a89b5bec06",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "19e1b029-f516-4662-a9b9-623b93edac1a",
+   "metadata": {},
+   "source": [
+    "Foo"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "cdce7b92-b0fb-4c02-86f6-e233b26fa84f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "e40b33d2-7fe4-46c5-bdf0-8802f3052565",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "1\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a1899bc8-d46f-4ec0-b1d1-e1ca0f04bf60",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.2"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    {
+     "cells": [
+      {
+       "cell_type": "code",
+       "execution_count": 1,
+       "id": "dccc687c-96e2-4604-b957-a8a89b5bec06",
+       "metadata": {},
+       "outputs": [],
+       "source": []
+      },
+      {
+       "cell_type": "markdown",
+       "id": "19e1b029-f516-4662-a9b9-623b93edac1a",
+       "metadata": {},
+       "source": [
+        "Foo"
+       ]
+      },
+      {
+       "cell_type": "code",
+       "execution_count": 2,
+       "id": "cdce7b92-b0fb-4c02-86f6-e233b26fa84f",
+       "metadata": {},
+       "outputs": [],
+       "source": []
+      },
+      {
+       "cell_type": "code",
+       "execution_count": 3,
+       "id": "e40b33d2-7fe4-46c5-bdf0-8802f3052565",
+       "metadata": {},
+       "outputs": [
+        {
+         "name": "stdout",
+         "output_type": "stream",
+         "text": [
+          "1\n"
+         ]
+        }
+       ],
+       "source": [
+        "print(1)"
+       ]
+      },
+      {
+       "cell_type": "code",
+       "execution_count": null,
+       "id": "a1899bc8-d46f-4ec0-b1d1-e1ca0f04bf60",
+       "metadata": {},
+       "outputs": [],
+       "source": []
+      }
+     ],
+     "metadata": {
+      "kernelspec": {
+       "display_name": "Python 3 (ipykernel)",
+       "language": "python",
+       "name": "python3"
+      },
+      "language_info": {
+       "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+       },
+       "file_extension": ".py",
+       "mimetype": "text/x-python",
+       "name": "python",
+       "nbconvert_exporter": "python",
+       "pygments_lexer": "ipython3",
+       "version": "3.11.2"
+      }
+     },
+     "nbformat": 4,
+     "nbformat_minor": 5
+    }
+    ----- stderr -----
+    Found 2 errors (2 fixed, 0 remaining).
+    "###);
+}
+
+#[test]
+fn stdin_fix_when_not_fixable_should_still_print_contents() {
     let args = ["--fix"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -170,11 +337,13 @@ fn stdin_autofix_when_not_fixable_should_still_print_contents() {
          print(sys.version)
 
     ----- stderr -----
+    -:3:4: F634 If test is a tuple, which is always `True`
+    Found 2 errors (1 fixed, 1 remaining).
     "###);
 }
 
 #[test]
-fn stdin_autofix_when_no_issues_should_still_print_contents() {
+fn stdin_fix_when_no_issues_should_still_print_contents() {
     let args = ["--fix"];
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
@@ -186,6 +355,134 @@ fn stdin_autofix_when_no_issues_should_still_print_contents() {
     import sys
 
     print(sys.version)
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn stdin_format_jupyter() {
+    let args = ["format", "--stdin-filename", "Jupyter.ipynb", "--isolated"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(args)
+        .pass_stdin(r#"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "dccc687c-96e2-4604-b957-a8a89b5bec06",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "x=1"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "19e1b029-f516-4662-a9b9-623b93edac1a",
+   "metadata": {},
+   "source": [
+    "Foo"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "cdce7b92-b0fb-4c02-86f6-e233b26fa84f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def func():\n",
+    "  pass\n",
+    "print(1)\n",
+    "import os"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.13"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    {
+     "cells": [
+      {
+       "cell_type": "code",
+       "execution_count": null,
+       "id": "dccc687c-96e2-4604-b957-a8a89b5bec06",
+       "metadata": {},
+       "outputs": [],
+       "source": [
+        "x = 1"
+       ]
+      },
+      {
+       "cell_type": "markdown",
+       "id": "19e1b029-f516-4662-a9b9-623b93edac1a",
+       "metadata": {},
+       "source": [
+        "Foo"
+       ]
+      },
+      {
+       "cell_type": "code",
+       "execution_count": null,
+       "id": "cdce7b92-b0fb-4c02-86f6-e233b26fa84f",
+       "metadata": {},
+       "outputs": [],
+       "source": [
+        "def func():\n",
+        "    pass\n",
+        "\n",
+        "\n",
+        "print(1)\n",
+        "import os"
+       ]
+      }
+     ],
+     "metadata": {
+      "kernelspec": {
+       "display_name": "Python 3 (ipykernel)",
+       "language": "python",
+       "name": "python3"
+      },
+      "language_info": {
+       "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+       },
+       "file_extension": ".py",
+       "mimetype": "text/x-python",
+       "name": "python",
+       "nbconvert_exporter": "python",
+       "pygments_lexer": "ipython3",
+       "version": "3.10.13"
+      }
+     },
+     "nbformat": 4,
+     "nbformat_minor": 5
+    }
 
     ----- stderr -----
     "###);
@@ -337,8 +634,9 @@ fn nursery_group_selector_preview_enabled() {
     exit_code: 1
     ----- stdout -----
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     warning: The `NURSERY` selector has been deprecated.
@@ -357,8 +655,9 @@ fn preview_enabled_prefix() {
     exit_code: 1
     ----- stdout -----
     -:1:1: E741 Ambiguous variable name: `I`
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -377,8 +676,9 @@ fn preview_enabled_all() {
     -:1:1: E741 Ambiguous variable name: `I`
     -:1:1: D100 Missing docstring in public module
     -:1:1: CPY001 Missing copyright notice at top of file
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 4 errors.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
@@ -397,8 +697,9 @@ fn preview_enabled_direct() {
     success: false
     exit_code: 1
     ----- stdout -----
-    -:1:2: E225 Missing whitespace around operator
+    -:1:2: E225 [*] Missing whitespace around operator
     Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);
@@ -435,6 +736,42 @@ fn preview_disabled_prefix_empty() {
 
     ----- stderr -----
     warning: Selection `CPY` has no effect because the `--preview` flag was not included.
+    "###);
+}
+
+#[test]
+fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
+    // Does not warn that the selection is empty since the user is not trying to enable the rule
+    let args = ["--ignore", "CPY"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
+    // Does not warn that the selection is empty since the user is not trying to enable the rule
+    let args = ["--fixable", "CPY"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin("I=42\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:1: E741 Ambiguous variable name: `I`
+    Found 1 error.
+
+    ----- stderr -----
     "###);
 }
 
@@ -566,11 +903,507 @@ fn check_input_from_argfile() -> Result<()> {
         ----- stdout -----
         /path/to/a.py:1:8: F401 [*] `os` imported but unused
         Found 1 error.
-        [*] 1 potentially fixable with the --fix option.
+        [*] 1 fixable with the `--fix` option.
 
         ----- stderr -----
         "###);
     });
+
+    Ok(())
+}
+
+#[test]
+fn check_hints_hidden_unsafe_fixes() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format=text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--no-cache",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["-", "--output-format", "text", "--no-cache", "--isolated", "--select", "F601"])
+        .pass_stdin("x = {'a': 1, 'a': 1}\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn check_shows_unsafe_fixes_with_opt_in() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format=text",
+            "--isolated",
+            "--select",
+            "F601,UP034",
+            "--no-cache",
+            "--unsafe-fixes",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 2 fixable with the --fix option.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn fix_applies_safe_fixes_by_default() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "F601,UP034",
+                "--fix",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    Found 2 errors (1 fixed, 1 remaining).
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    "###);
+}
+
+#[test]
+fn fix_applies_unsafe_fixes_with_opt_in() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "F601,UP034",
+                "--fix",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    x = {'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    Found 2 errors (2 fixed, 0 remaining).
+    "###);
+}
+
+#[test]
+fn fix_does_not_apply_display_only_fixes() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "B006",
+                "--fix",
+            ])
+            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    def add_to_list(item, some_list=[]): ...
+    ----- stderr -----
+    -:1:33: B006 Do not use mutable data structures for argument defaults
+    Found 1 error.
+    "###);
+}
+
+#[test]
+fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "B006",
+                "--fix",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    def add_to_list(item, some_list=[]): ...
+    ----- stderr -----
+    -:1:33: B006 Do not use mutable data structures for argument defaults
+    Found 1 error.
+    "###);
+}
+
+#[test]
+fn fix_only_unsafe_fixes_available() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "F601",
+                "--fix",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}
+    print(('foo'))
+
+    ----- stderr -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    Found 1 error.
+    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    "###);
+}
+
+#[test]
+fn fix_only_flag_applies_safe_fixes_by_default() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "F601,UP034",
+                "--fix-only",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    x = {'a': 1, 'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    Fixed 1 error (1 additional fix available with `--unsafe-fixes`).
+    "###);
+}
+
+#[test]
+fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "F601,UP034",
+                "--fix-only",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    x = {'a': 1}
+    print('foo')
+
+    ----- stderr -----
+    Fixed 2 errors.
+    "###);
+}
+
+#[test]
+fn diff_shows_safe_fixes_by_default() {
+    assert_cmd_snapshot!(
+    Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format",
+            "text",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+            "--diff",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+     x = {'a': 1, 'a': 1}
+    -print(('foo'))
+    +print('foo')
+
+
+    ----- stderr -----
+    Would fix 1 error (1 additional fix available with `--unsafe-fixes`).
+    "###
+    );
+}
+
+#[test]
+fn diff_shows_unsafe_fixes_with_opt_in() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "F601,UP034",
+                "--diff",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    @@ -1,2 +1,2 @@
+    -x = {'a': 1, 'a': 1}
+    -print(('foo'))
+    +x = {'a': 1}
+    +print('foo')
+
+
+    ----- stderr -----
+    Would fix 2 errors.
+    "###
+    );
+}
+
+#[test]
+fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args([
+                "-",
+                "--output-format",
+                "text",
+                "--isolated",
+                "--no-cache",
+                "--select",
+                "B006",
+                "--diff",
+                "--unsafe-fixes",
+            ])
+            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+            @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn diff_only_unsafe_fixes_available() {
+    assert_cmd_snapshot!(
+    Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "-",
+            "--output-format",
+            "text",
+            "--isolated",
+            "--no-cache",
+            "--select",
+            "F601",
+            "--diff",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    No errors would be fixed (1 fix available with `--unsafe-fixes`).
+    "###
+    );
+}
+
+#[test]
+fn check_extend_unsafe_fixes() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-unsafe-fixes = ["UP034"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 Avoid extraneous parentheses
+    Found 2 errors.
+    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn check_extend_safe_fixes() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-safe-fixes = ["F601"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 [*] Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn check_extend_unsafe_fixes_conflict_with_extend_safe_fixes() -> Result<()> {
+    // Adding a rule to both options should result in it being treated as unsafe
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+extend-unsafe-fixes = ["UP034"]
+extend-safe-fixes = ["UP034"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP034",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 Avoid extraneous parentheses
+    Found 2 errors.
+    No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
 
     Ok(())
 }

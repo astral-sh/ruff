@@ -8,10 +8,10 @@ use anyhow::Result;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::AutofixKind;
+use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_workspace::options::Options;
-use ruff_workspace::options_base::OptionsMetadata;
+use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 
 use crate::ROOT_DIR;
 
@@ -37,22 +37,29 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            let autofix = rule.autofixable();
-            if matches!(autofix, AutofixKind::Always | AutofixKind::Sometimes) {
-                output.push_str(&autofix.to_string());
+            let fix_availability = rule.fixable();
+            if matches!(
+                fix_availability,
+                FixAvailability::Always | FixAvailability::Sometimes
+            ) {
+                output.push_str(&fix_availability.to_string());
                 output.push('\n');
                 output.push('\n');
             }
 
-            if rule.is_preview() {
+            if rule.is_preview() || rule.is_nursery() {
                 output.push_str(
-                    r#"This rule is in preview and is not stable. The `--preview` flag is required for use."#,
+                    r#"This rule is unstable and in [preview](../preview.md). The `--preview` flag is required for use."#,
                 );
                 output.push('\n');
                 output.push('\n');
             }
 
-            process_documentation(explanation.trim(), &mut output);
+            process_documentation(
+                explanation.trim(),
+                &mut output,
+                &rule.noqa_code().to_string(),
+            );
 
             let filename = PathBuf::from(ROOT_DIR)
                 .join("docs")
@@ -71,7 +78,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
     Ok(())
 }
 
-fn process_documentation(documentation: &str, out: &mut String) {
+fn process_documentation(documentation: &str, out: &mut String, rule_name: &str) {
     let mut in_options = false;
     let mut after = String::new();
 
@@ -97,7 +104,17 @@ fn process_documentation(documentation: &str, out: &mut String) {
             if let Some(rest) = line.strip_prefix("- `") {
                 let option = rest.trim_end().trim_end_matches('`');
 
-                assert!(Options::metadata().has(option), "unknown option {option}");
+                match Options::metadata().find(option) {
+                    Some(OptionEntry::Field(field)) => {
+                        if field.deprecated.is_some() {
+                            eprintln!("Rule {rule_name} references deprecated option {option}.");
+                        }
+                    }
+                    Some(_) => {}
+                    None => {
+                        panic!("Unknown option {option} referenced by rule {rule_name}");
+                    }
+                }
 
                 let anchor = option.replace('.', "-");
                 out.push_str(&format!("- [`{option}`][{option}]\n"));
@@ -135,6 +152,7 @@ Something [`else`][other].
 
 [other]: http://example.com.",
             &mut output,
+            "example",
         );
         assert_eq!(
             output,

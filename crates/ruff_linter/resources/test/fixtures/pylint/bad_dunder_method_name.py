@@ -49,6 +49,13 @@ class Apples:
     def __doc__(self):
         return "Docstring"
 
+    # Added in Python 3.12
+    def __buffer__(self):  
+        return memoryview(b'')
+
+    def __release_buffer__(self, buf):
+        pass
+
     # Allow dunder methods recommended by attrs.
     def __attrs_post_init__(self):
         pass
@@ -61,6 +68,19 @@ class Apples:
 
     # Allow __html__, used by Jinja2 and Django.
     def __html__(self):
+        pass
+
+    # Allow Python's __index__
+    def __index__(self):
+        pass
+
+    # Allow _missing_, used by enum.Enum.
+    @classmethod
+    def _missing_(cls, value):
+        pass
+
+    # Allow anonymous functions.
+    def _(self):
         pass
 
 

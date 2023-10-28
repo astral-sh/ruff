@@ -38,7 +38,7 @@ tracing = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]
-ruff_formatter = { path = "../ruff_formatter", features = ["serde"] }
+ruff_formatter = { path = "../ruff_formatter" }
 
 insta = { workspace = true, features = ["glob"] }
 serde = { workspace = true }
@@ -52,6 +52,6 @@ test = true
 required-features = ["serde"]
 
 [features]
+default = ["serde"]
 serde = ["dep:serde", "ruff_formatter/serde", "ruff_source_file/serde", "ruff_python_ast/serde"]
 schemars = ["dep:schemars", "ruff_formatter/schemars"]
-default = []

@@ -337,3 +337,11 @@ pub fn is_builtin(name: &str) -> bool {
             | "zip"
     )
 }
+
+/// Returns `true` if the given name is that of a Python builtin iterator.
+pub fn is_iterator(name: &str) -> bool {
+    matches!(
+        name,
+        "enumerate" | "filter" | "map" | "reversed" | "zip" | "iter"
+    )
+}

@@ -1,12 +1,12 @@
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{Binding, Imported};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::renamer::Renamer;
 
 /// ## What it does
@@ -30,6 +30,10 @@ use crate::renamer::Renamer;
 /// ```python
 /// import pandas as pd
 /// ```
+///
+/// ## Options
+/// - `flake8-import-conventions.aliases`
+/// - `flake8-import-conventions.extend-aliases`
 #[violation]
 pub struct UnconventionalImportAlias {
     name: String,
@@ -37,7 +41,7 @@ pub struct UnconventionalImportAlias {
 }
 
 impl Violation for UnconventionalImportAlias {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -45,7 +49,7 @@ impl Violation for UnconventionalImportAlias {
         format!("`{name}` should be imported as `{asname}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let UnconventionalImportAlias { name, asname } = self;
         Some(format!("Alias `{name}` to `{asname}`"))
     }
@@ -79,16 +83,14 @@ pub(crate) fn unconventional_import_alias(
         },
         binding.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if !import.is_submodule_import() {
-            if checker.semantic().is_available(expected_alias) {
-                diagnostic.try_set_fix(|| {
-                    let scope = &checker.semantic().scopes[binding.scope];
-                    let (edit, rest) =
-                        Renamer::rename(name, expected_alias, scope, checker.semantic())?;
-                    Ok(Fix::suggested_edits(edit, rest))
-                });
-            }
+    if !import.is_submodule_import() {
+        if checker.semantic().is_available(expected_alias) {
+            diagnostic.try_set_fix(|| {
+                let scope = &checker.semantic().scopes[binding.scope];
+                let (edit, rest) =
+                    Renamer::rename(name, expected_alias, scope, checker.semantic())?;
+                Ok(Fix::unsafe_edits(edit, rest))
+            });
         }
     }
     Some(diagnostic)

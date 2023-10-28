@@ -1,0 +1,119 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:3:1: E122 Continuation line missing indentation or outdented.
+  |
+1 | #: E122
+2 | print("E122", (
+3 | "dent"))
+  | ^^^^^^ E122
+4 | 
+5 | #: E122:6:5 E122:7:5 E122:8:1
+  |
+
+E12.py:11:5: E122 Continuation line missing indentation or outdented.
+   |
+ 9 |         mv ./build/ ./{build}/%(revision)s/
+10 |     '''.format(
+11 |     build='build',
+   |     ^^^^^ E122
+12 |     # more stuff
+13 | )
+   |
+
+E12.py:12:5: E122 Continuation line missing indentation or outdented.
+   |
+10 |     '''.format(
+11 |     build='build',
+12 |     # more stuff
+   |     ^^^^^^^^^^^^ E122
+13 | )
+14 | ))
+   |
+
+E12.py:13:1: E122 Continuation line missing indentation or outdented.
+   |
+11 |     build='build',
+12 |     # more stuff
+13 | )
+   | ^ E122
+14 | ))
+   |
+
+E12.py:21:1: E122 Continuation line missing indentation or outdented.
+   |
+19 |         'a', 'b', 'c',
+20 |         'd', 'e', 'f',
+21 | )
+   | ^ E122
+22 | 
+23 | #: E122
+   |
+
+E12.py:25:1: E122 Continuation line missing indentation or outdented.
+   |
+23 | #: E122
+24 | if some_very_very_very_long_variable_name or var \
+25 | or another_very_long_variable_name:
+   | ^^ E122
+26 |     raise Exception()
+   |
+
+E12.py:30:1: E122 Continuation line missing indentation or outdented.
+   |
+28 | #: E122
+29 | if some_very_very_very_long_variable_name or var[0] \
+30 | or another_very_long_variable_name:
+   | ^^ E122
+31 |     raise Exception()
+   |
+
+E12.py:36:5: E122 Continuation line missing indentation or outdented.
+   |
+34 | if True:
+35 |     if some_very_very_very_long_variable_name or var \
+36 |     or another_very_long_variable_name:
+   |     ^^ E122
+37 |         raise Exception()
+   |
+
+E12.py:42:5: E122 Continuation line missing indentation or outdented.
+   |
+40 | if True:
+41 |     if some_very_very_very_long_variable_name or var[0] \
+42 |     or another_very_long_variable_name:
+   |     ^^ E122
+43 |         raise Exception()
+   |
+
+E12.py:48:5: E122 Continuation line missing indentation or outdented.
+   |
+46 | dictionary = {
+47 |     "is": {
+48 |     "nested": yes(),
+   |     ^^^^^^^^ E122
+49 |     },
+50 | }
+   |
+
+E12.py:56:7: E122 Continuation line missing indentation or outdented.
+   |
+54 |       scripts=[''],
+55 |       classifiers=[
+56 |       'Development Status :: 4 - Beta',
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E122
+57 |           'Environment :: Console',
+58 |           'Intended Audience :: Developers',
+   |
+
+E12.py:63:1: E122 Continuation line missing indentation or outdented.
+   |
+61 | #: E701:1:8 E122:2:1 E203:4:8 E128:5:1
+62 | if True:\
+63 | print(True)
+   | ^^^^^ E122
+64 | 
+65 | print(a
+   |
+
+

@@ -1,16 +1,16 @@
 with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
-    ...
+    pass
     # trailing
 
 with a, a:  # after colon
-    ...
+    pass
     # trailing
 
 with (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
 ):
-    ...
+    pass
     # trailing
 
 
@@ -19,7 +19,7 @@ with (
         ,  # comma
         b  # c
         ): # colon
-    ...
+    pass
 
 
 with (
@@ -30,7 +30,7 @@ with (
         ,  # comma
         c  # c
         ): # colon
-    ...  # body
+    pass  # body
     # body trailing own
 
 with (
@@ -42,14 +42,14 @@ with (
 
 
 with (a,):  # magic trailing comma
-    ...
+    pass
 
 
 with (a):  # should remove brackets
-    ...
+    pass
 
 with aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb as c:
-    ...
+    pass
 
 
 # currently unparsable by black: https://github.com/psf/black/issues/3678
@@ -60,45 +60,41 @@ with (a, *b):
 
 with (
     # leading comment
-    a) as b: ...
+    a) as b: pass
 
 with (
     # leading comment
     a as b
-): ...
+): pass
 
 with (
     a as b
     # trailing comment
-): ...
+): pass
 
 with (
     a as (
         # leading comment
         b
     )
-): ...
+): pass
 
 with (
     a as (
         b
         # trailing comment
     )
-): ...
-
-with (a # trailing same line comment
-    # trailing own line comment
-    ) as b: ...
+): pass
 
 with (
     a # trailing same line comment
     # trailing own line comment
     as b
-): ...
+): pass
 
 with (a # trailing same line comment
     # trailing own line comment
-) as b: ...
+) as b: pass
 
 with (
     (a
@@ -106,7 +102,41 @@ with (
     )
     as # trailing as same line comment
     b # trailing b same line comment
-): ...
+): pass
+
+with (
+    # comment
+    a
+):
+    pass
+
+with (
+    a  # comment
+):
+    pass
+
+with (
+    a
+    # comment
+):
+    pass
+
+with (
+    # comment
+    a as b
+):
+    pass
+
+with (
+    a as b  # comment
+):
+    pass
+
+with (
+    a as b
+    # comment
+):
+    pass
 
 with (
     [
@@ -123,7 +153,7 @@ with (
     CtxManager2() as example2,
     CtxManager2() as example2,
 ):
-    ...
+    pass
 
 with [
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -131,7 +161,7 @@ with [
     "cccccccccccccccccccccccccccccccccccccccccc",
     dddddddddddddddddddddddddddddddd,
 ] as example1, aaaaaaaaaaaaaaaaaaaaaaaaaa * bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb * cccccccccccccccccccccccccccc + ddddddddddddddddd as example2, CtxManager222222222222222() as example2:
-    ...
+    pass
 
 # Comments on open parentheses
 with (  # comment
@@ -139,7 +169,7 @@ with (  # comment
     CtxManager2() as example2,
     CtxManager3() as example3,
 ):
-    ...
+    pass
 
 with (  # outer comment
     (  # inner comment
@@ -148,25 +178,25 @@ with (  # outer comment
     CtxManager2() as example2,
     CtxManager3() as example3,
 ):
-    ...
+    pass
 
 with (  # outer comment
     CtxManager()
 ) as example:
-    ...
+    pass
 
 with (  # outer comment
     CtxManager()
 ) as example, (  # inner comment
     CtxManager2()
 ) as example2:
-    ...
+    pass
 
 with (  # outer comment
     CtxManager1(),
     CtxManager2(),
 ) as example:
-    ...
+    pass
 
 with (  # outer comment
     (  # inner comment
@@ -174,7 +204,7 @@ with (  # outer comment
     ),
     CtxManager2(),
 ) as example:
-    ...
+    pass
 
 # Breaking of with items.
 with (test  # bar
@@ -254,3 +284,22 @@ with (
 
 with (foo() as bar, baz() as bop):
     pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        if get_running_loop()
+        else contextlib.nullcontext()
+    ):
+        pass
+
+if True:
+    with (
+        anyio.CancelScope(shield=True)
+        and B and [aaaaaaaa, bbbbbbbbbbbbb, cccccccccc, dddddddddddd, eeeeeeeeeeeee]
+    ):
+        pass
+
+if True:
+    with anyio.CancelScope(shield=True) if get_running_loop() else contextlib.nullcontext():
+        pass

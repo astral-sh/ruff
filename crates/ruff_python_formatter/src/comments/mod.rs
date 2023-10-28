@@ -96,8 +96,8 @@ pub(crate) use format::{
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Mod;
 use ruff_python_trivia::{CommentRanges, PythonWhitespace};
 use ruff_source_file::Locator;
@@ -548,10 +548,10 @@ mod tests {
     use insta::assert_debug_snapshot;
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::Mod;
-    use ruff_python_index::CommentRangesBuilder;
-    use ruff_python_parser::lexer::lex;
-    use ruff_python_parser::{parse_tokens, Mode};
+    use ruff_python_ast::{Mod, PySourceType};
+    use ruff_python_index::tokens_and_ranges;
+
+    use ruff_python_parser::{parse_ok_tokens, AsMode};
     use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
@@ -563,19 +563,12 @@ mod tests {
     }
 
     impl<'a> CommentsTestCase<'a> {
-        fn from_code(code: &'a str) -> Self {
-            let source_code = SourceCode::new(code);
-            let tokens: Vec<_> = lex(code, Mode::Module).collect();
-
-            let mut comment_ranges = CommentRangesBuilder::default();
-
-            for (token, range) in tokens.iter().flatten() {
-                comment_ranges.visit_token(token, *range);
-            }
-
-            let comment_ranges = comment_ranges.finish();
-
-            let parsed = parse_tokens(tokens, Mode::Module, "test.py")
+        fn from_code(source: &'a str) -> Self {
+            let source_code = SourceCode::new(source);
+            let source_type = PySourceType::Python;
+            let (tokens, comment_ranges) =
+                tokens_and_ranges(source, source_type).expect("Expect source to be valid Python");
+            let parsed = parse_ok_tokens(tokens, source, source_type.as_mode(), "test.py")
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {

@@ -5,17 +5,16 @@ use itertools::Either::{Left, Right};
 use itertools::Itertools;
 use ruff_python_ast::{self as ast, Arguments, BoolOp, CmpOp, Expr, ExprContext, UnaryOp};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{contains_effect, Truthiness};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_codegen::Generator;
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for multiple `isinstance` calls on the same target.
@@ -49,7 +48,7 @@ pub struct DuplicateIsinstanceCall {
 }
 
 impl Violation for DuplicateIsinstanceCall {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -61,7 +60,7 @@ impl Violation for DuplicateIsinstanceCall {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let DuplicateIsinstanceCall { name } = self;
 
         Some(if let Some(name) = name {
@@ -99,14 +98,14 @@ pub struct CompareWithTuple {
     replacement: String,
 }
 
-impl AlwaysAutofixableViolation for CompareWithTuple {
+impl AlwaysFixableViolation for CompareWithTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
         let CompareWithTuple { replacement } = self;
         format!("Use `{replacement}` instead of multiple equality comparisons")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let CompareWithTuple { replacement } = self;
         format!("Replace with `{replacement}`")
     }
@@ -132,14 +131,14 @@ pub struct ExprAndNotExpr {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for ExprAndNotExpr {
+impl AlwaysFixableViolation for ExprAndNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprAndNotExpr { name } = self;
         format!("Use `False` instead of `{name} and not {name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `False`".to_string()
     }
 }
@@ -164,14 +163,14 @@ pub struct ExprOrNotExpr {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for ExprOrNotExpr {
+impl AlwaysFixableViolation for ExprOrNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprOrNotExpr { name } = self;
         format!("Use `True` instead of `{name} or not {name}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace with `True`".to_string()
     }
 }
@@ -217,7 +216,7 @@ pub struct ExprOrTrue {
     remove: ContentAround,
 }
 
-impl AlwaysAutofixableViolation for ExprOrTrue {
+impl AlwaysFixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprOrTrue { expr, remove } = self;
@@ -229,7 +228,7 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
         format!("Use `{expr}` instead of `{replaced}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let ExprOrTrue { expr, .. } = self;
         format!("Replace with `{expr}`")
     }
@@ -269,7 +268,7 @@ pub struct ExprAndFalse {
     remove: ContentAround,
 }
 
-impl AlwaysAutofixableViolation for ExprAndFalse {
+impl AlwaysFixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprAndFalse { expr, remove } = self;
@@ -281,7 +280,7 @@ impl AlwaysAutofixableViolation for ExprAndFalse {
         format!("Use `{expr}` instead of `{replaced}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let ExprAndFalse { expr, .. } = self;
         format!("Replace with `{expr}`")
     }
@@ -299,6 +298,42 @@ fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {
     None
 }
 
+/// If `call` is an `isinstance()` call, return its target.
+fn isinstance_target<'a>(call: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
+    // Verify that this is an `isinstance` call.
+    let Expr::Call(ast::ExprCall {
+        func,
+        arguments:
+            Arguments {
+                args,
+                keywords,
+                range: _,
+            },
+        range: _,
+    }) = &call
+    else {
+        return None;
+    };
+    if args.len() != 2 {
+        return None;
+    }
+    if !keywords.is_empty() {
+        return None;
+    }
+    let Expr::Name(ast::ExprName { id: func_name, .. }) = func.as_ref() else {
+        return None;
+    };
+    if func_name != "isinstance" {
+        return None;
+    }
+    if !semantic.is_builtin("isinstance") {
+        return None;
+    }
+
+    // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
+    Some(&args[0])
+}
+
 /// SIM101
 pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
     let Expr::BoolOp(ast::ExprBoolOp {
@@ -310,50 +345,32 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    // Locate duplicate `isinstance` calls, represented as a map from `ComparableExpr`
-    // to indices of the relevant `Expr` instances in `values`.
-    let mut duplicates: FxHashMap<ComparableExpr, Vec<usize>> = FxHashMap::default();
+    // Locate duplicate `isinstance` calls, represented as a vector of vectors
+    // of indices of the relevant `Expr` instances in `values`.
+    let mut duplicates: Vec<Vec<usize>> = Vec::new();
+    let mut last_target_option: Option<ComparableExpr> = None;
     for (index, call) in values.iter().enumerate() {
-        // Verify that this is an `isinstance` call.
-        let Expr::Call(ast::ExprCall {
-            func,
-            arguments:
-                Arguments {
-                    args,
-                    keywords,
-                    range: _,
-                },
-            range: _,
-        }) = &call
-        else {
+        let Some(target) = isinstance_target(call, checker.semantic()) else {
+            last_target_option = None;
             continue;
         };
-        if args.len() != 2 {
-            continue;
-        }
-        if !keywords.is_empty() {
-            continue;
-        }
-        let Expr::Name(ast::ExprName { id: func_name, .. }) = func.as_ref() else {
-            continue;
-        };
-        if func_name != "isinstance" {
-            continue;
-        }
-        if !checker.semantic().is_builtin("isinstance") {
-            continue;
-        }
 
-        // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
-        let target = &args[0];
-        duplicates
-            .entry(target.into())
-            .or_insert_with(Vec::new)
-            .push(index);
+        if last_target_option
+            .as_ref()
+            .is_some_and(|last_target| *last_target == ComparableExpr::from(target))
+        {
+            duplicates
+                .last_mut()
+                .expect("last_target should have a corresponding entry")
+                .push(index);
+        } else {
+            last_target_option = Some(target.into());
+            duplicates.push(vec![index]);
+        }
     }
 
     // Generate a `Diagnostic` for each duplicate.
-    for indices in duplicates.values() {
+    for indices in duplicates {
         if indices.len() > 1 {
             // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
             // `isinstance(obj, int)`).
@@ -376,81 +393,76 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 },
                 expr.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                if !contains_effect(target, |id| checker.semantic().is_builtin(id)) {
-                    // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
-                    // in `isinstance(obj, int) or isinstance(obj, str)`).
-                    let types: Vec<&Expr> = indices
+            if !contains_effect(target, |id| checker.semantic().is_builtin(id)) {
+                // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
+                // in `isinstance(obj, int) or isinstance(obj, str)`).
+                let types: Vec<&Expr> = indices
+                    .iter()
+                    .map(|index| &values[*index])
+                    .map(|expr| {
+                        let Expr::Call(ast::ExprCall {
+                            arguments: Arguments { args, .. },
+                            ..
+                        }) = expr
+                        else {
+                            unreachable!("Indices should only contain `isinstance` calls")
+                        };
+                        args.get(1).expect("`isinstance` should have two arguments")
+                    })
+                    .collect();
+
+                // Generate a single `isinstance` call.
+                let node = ast::ExprTuple {
+                    // Flatten all the types used across the `isinstance` calls.
+                    elts: types
                         .iter()
-                        .map(|index| &values[*index])
-                        .map(|expr| {
-                            let Expr::Call(ast::ExprCall {
-                                arguments: Arguments { args, .. },
-                                ..
-                            }) = expr
-                            else {
-                                unreachable!("Indices should only contain `isinstance` calls")
-                            };
-                            args.get(1).expect("`isinstance` should have two arguments")
+                        .flat_map(|value| {
+                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
+                                Left(elts.iter())
+                            } else {
+                                Right(iter::once(*value))
+                            }
                         })
-                        .collect();
+                        .map(Clone::clone)
+                        .collect(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                };
+                let node1 = ast::ExprName {
+                    id: "isinstance".into(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                };
+                let node2 = ast::ExprCall {
+                    func: Box::new(node1.into()),
+                    arguments: Arguments {
+                        args: vec![target.clone(), node.into()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
+                    range: TextRange::default(),
+                };
+                let call = node2.into();
 
-                    // Generate a single `isinstance` call.
-                    let node = ast::ExprTuple {
-                        // Flatten all the types used across the `isinstance` calls.
-                        elts: types
-                            .iter()
-                            .flat_map(|value| {
-                                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
-                                    Left(elts.iter())
-                                } else {
-                                    Right(iter::once(*value))
-                                }
-                            })
-                            .map(Clone::clone)
-                            .collect(),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                    };
-                    let node1 = ast::ExprName {
-                        id: "isinstance".into(),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                    };
-                    let node2 = ast::ExprCall {
-                        func: Box::new(node1.into()),
-                        arguments: Arguments {
-                            args: vec![target.clone(), node.into()],
-                            keywords: vec![],
-                            range: TextRange::default(),
-                        },
-                        range: TextRange::default(),
-                    };
-                    let call = node2.into();
+                // Generate the combined `BoolOp`.
+                let [first, .., last] = indices.as_slice() else {
+                    unreachable!("Indices should have at least two elements")
+                };
+                let before = values.iter().take(*first).cloned();
+                let after = values.iter().skip(last + 1).cloned();
+                let node = ast::ExprBoolOp {
+                    op: BoolOp::Or,
+                    values: before.chain(iter::once(call)).chain(after).collect(),
+                    range: TextRange::default(),
+                };
+                let bool_op = node.into();
 
-                    // Generate the combined `BoolOp`.
-                    let node = ast::ExprBoolOp {
-                        op: BoolOp::Or,
-                        values: iter::once(call)
-                            .chain(
-                                values
-                                    .iter()
-                                    .enumerate()
-                                    .filter(|(index, _)| !indices.contains(index))
-                                    .map(|(_, elt)| elt.clone()),
-                            )
-                            .collect(),
-                        range: TextRange::default(),
-                    };
-                    let bool_op = node.into();
-
-                    // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
-                    // multiple duplicates, the fixes will conflict.
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        checker.generator().expr(&bool_op),
-                        expr.range(),
-                    )));
-                }
+                // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
+                // multiple duplicates, the fixes will conflict.
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    checker.generator().expr(&bool_op),
+                    expr.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -476,7 +488,7 @@ fn match_eq_target(expr: &Expr) -> Option<(&str, &Expr)> {
     let [comparator] = comparators.as_slice() else {
         return None;
     };
-    if !matches!(&comparator, Expr::Name(_)) {
+    if !comparator.is_name_expr() {
         return None;
     }
     Some((id, comparator))
@@ -549,29 +561,27 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            let unmatched: Vec<Expr> = values
-                .iter()
-                .enumerate()
-                .filter(|(index, _)| !indices.contains(index))
-                .map(|(_, elt)| elt.clone())
-                .collect();
-            let in_expr = if unmatched.is_empty() {
-                in_expr
-            } else {
-                // Wrap in a `x in (a, b) or ...` boolean operation.
-                let node = ast::ExprBoolOp {
-                    op: BoolOp::Or,
-                    values: iter::once(in_expr).chain(unmatched).collect(),
-                    range: TextRange::default(),
-                };
-                node.into()
+        let unmatched: Vec<Expr> = values
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !indices.contains(index))
+            .map(|(_, elt)| elt.clone())
+            .collect();
+        let in_expr = if unmatched.is_empty() {
+            in_expr
+        } else {
+            // Wrap in a `x in (a, b) or ...` boolean operation.
+            let node = ast::ExprBoolOp {
+                op: BoolOp::Or,
+                values: iter::once(in_expr).chain(unmatched).collect(),
+                range: TextRange::default(),
             };
-            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                checker.generator().expr(&in_expr),
-                expr.range(),
-            )));
-        }
+            node.into()
+        };
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker.generator().expr(&in_expr),
+            expr.range(),
+        )));
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -623,12 +633,10 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     },
                     expr.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        "False".to_string(),
-                        expr.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    "False".to_string(),
+                    expr.range(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -682,12 +690,10 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     },
                     expr.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        "True".to_string(),
-                        expr.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    "True".to_string(),
+                    expr.range(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -835,9 +841,7 @@ pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
             },
             edit.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::suggested(edit));
-        }
+        diagnostic.set_fix(Fix::unsafe_edit(edit));
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -852,9 +856,7 @@ pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
             },
             edit.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::suggested(edit));
-        }
+        diagnostic.set_fix(Fix::unsafe_edit(edit));
         checker.diagnostics.push(diagnostic);
     }
 }

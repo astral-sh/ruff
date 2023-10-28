@@ -84,3 +84,8 @@ spam[ ~ham]
 x = [  #
     'some value',
 ]
+
+# F-strings
+f"{ {'a': 1} }"
+f"{[ { {'a': 1} } ]}"
+f"normal { {f"{ { [1, 2] } }" } } normal"

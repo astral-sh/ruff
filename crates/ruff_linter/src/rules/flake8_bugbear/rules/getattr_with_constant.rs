@@ -1,12 +1,11 @@
-use crate::autofix::edits::pad;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use crate::fix::edits::pad;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `getattr` that take a constant attribute value as an
@@ -34,7 +33,7 @@ use crate::registry::AsRule;
 #[violation]
 pub struct GetAttrWithConstant;
 
-impl AlwaysAutofixableViolation for GetAttrWithConstant {
+impl AlwaysFixableViolation for GetAttrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -43,7 +42,7 @@ impl AlwaysAutofixableViolation for GetAttrWithConstant {
         )
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace `getattr` with attribute access".to_string()
     }
 }
@@ -85,25 +84,24 @@ pub(crate) fn getattr_with_constant(
     }
 
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            pad(
-                if matches!(
-                    obj,
-                    Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
-                ) {
-                    format!("{}.{}", checker.locator().slice(obj), value)
-                } else {
-                    // Defensively parenthesize any other expressions. For example, attribute accesses
-                    // on `int` literals must be parenthesized, e.g., `getattr(1, "real")` becomes
-                    // `(1).real`. The same is true for named expressions and others.
-                    format!("({}).{}", checker.locator().slice(obj), value)
-                },
-                expr.range(),
-                checker.locator(),
-            ),
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        pad(
+            if matches!(
+                obj,
+                Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_)
+            ) && !checker.locator().contains_line_break(obj.range())
+            {
+                format!("{}.{}", checker.locator().slice(obj), value)
+            } else {
+                // Defensively parenthesize any other expressions. For example, attribute accesses
+                // on `int` literals must be parenthesized, e.g., `getattr(1, "real")` becomes
+                // `(1).real`. The same is true for named expressions and others.
+                format!("({}).{}", checker.locator().slice(obj), value)
+            },
             expr.range(),
-        )));
-    }
+            checker.locator(),
+        ),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

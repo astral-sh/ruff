@@ -1,14 +1,13 @@
 use ruff_python_ast::{self as ast, Constant, Expr, Stmt};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_none, ReturnStatementVisitor};
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_text_size::Ranged;
 
-use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix;
 
 /// ## What it does
 /// Checks for functions that end with an unnecessary `return` or
@@ -33,13 +32,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UselessReturn;
 
-impl AlwaysAutofixableViolation for UselessReturn {
+impl AlwaysFixableViolation for UselessReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Useless `return` statement at end of function")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove useless `return` statement")
     }
 }
@@ -103,16 +102,9 @@ pub(crate) fn useless_return(
     }
 
     let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let edit = autofix::edits::delete_stmt(
-            last_stmt,
-            Some(stmt),
-            checker.locator(),
-            checker.indexer(),
-        );
-        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(Some(
-            checker.semantic().current_statement_id(),
-        ))));
-    }
+    let edit = fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
+    diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
+        checker.semantic().current_statement_id(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

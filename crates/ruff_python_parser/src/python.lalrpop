@@ -3,20 +3,20 @@
 // See also: file:///usr/share/doc/python/html/reference/compound_stmts.html#function-definitions
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
-use num_bigint::BigInt;
-use ruff_text_size::{Ranged, TextSize};
-use ruff_python_ast::{self as ast, IpyEscapeKind};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
+    FStringErrorType,
     Mode,
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::parse_strings,
+    string::{StringType, concatenate_strings, parse_fstring_middle, parse_string_literal},
     token::{self, StringKind},
 };
 use lalrpop_util::ParseError;
 
-grammar(mode: Mode);
+grammar(source_code: &str, mode: Mode);
 
 // This is a hack to reduce the amount of lalrpop tables generated:
 // For each public entry point, a full parse table is generated.
@@ -466,7 +466,7 @@ MatchStatement: ast::Stmt = {
             }
         )
     },
-    <location:@L> "match" <subject:TestOrStarNamedExpr> "," ":" "\n" Indent <cases:MatchCase+> Dedent => {
+    <location:@L> "match" <tuple_location:@L> <subject:TestOrStarNamedExpr> "," <tuple_end_location:@R> ":" "\n" Indent <cases:MatchCase+> Dedent => {
        let end_location = cases
             .last()
             .unwrap()
@@ -476,13 +476,19 @@ MatchStatement: ast::Stmt = {
             .end();
         ast::Stmt::Match(
             ast::StmtMatch {
-                subject: Box::new(subject.into()),
+                subject: Box::new(ast::Expr::Tuple(
+                    ast::ExprTuple {
+                        elts: vec![subject.into()],
+                        ctx: ast::ExprContext::Load,
+                        range: (tuple_location..tuple_end_location).into()
+                    },
+                )),
                 cases,
                 range: (location..end_location).into()
             }
         )
     },
-    <location:@L> "match" <elts:TwoOrMore<TestOrStarNamedExpr, ",">> ","? ":" "\n" Indent <cases:MatchCase+> Dedent => {
+    <location:@L> "match" <tuple_location:@L> <elts:TwoOrMore<TestOrStarNamedExpr, ",">> ","? <tuple_end_location:@R> ":" "\n" Indent <cases:MatchCase+> Dedent => {
         let end_location = cases
             .last()
             .unwrap()
@@ -497,7 +503,7 @@ MatchStatement: ast::Stmt = {
                     ast::ExprTuple {
                         elts,
                         ctx: ast::ExprContext::Load,
-                        range: (location..end_location).into()
+                        range: (tuple_location..tuple_end_location).into()
                     },
                 )),
                 cases,
@@ -668,8 +674,8 @@ LiteralPattern: ast::Pattern = {
         value: Box::new(value.into()),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <s:(@L string @R)+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
-        value: Box::new(parse_strings(s)?),
+    <location:@L> <strings:StringLiteral+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
+        value: Box::new(concatenate_strings(strings, (location..end_location).into())?),
         range: (location..end_location).into()
     }.into()),
 }
@@ -726,7 +732,7 @@ MappingKey: ast::Expr = {
         value: false.into(),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
 }
 
 MatchMappingEntry: (ast::Expr, ast::Pattern) = {
@@ -1350,7 +1356,13 @@ NamedExpression: ast::ParenthesizedExpr = {
 };
 
 LambdaDef: ast::ParenthesizedExpr = {
-    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <body:Test<"all">> <end_location:@R> =>? {
+    <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
+        if fstring_middle.is_some() {
+            return Err(LexicalError {
+                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+                location,
+            })?;
+        }
         parameters.as_ref().map(validate_arguments).transpose()?;
 
         Ok(ast::ExprLambda {
@@ -1573,8 +1585,105 @@ SliceOp: Option<ast::ParenthesizedExpr> = {
     <location:@L> ":" <e:Test<"all">?> => e,
 }
 
+StringLiteralOrFString: StringType = {
+    StringLiteral,
+    FStringExpr,
+};
+
+StringLiteral: StringType = {
+    <start_location:@L> <string:string> =>? {
+        let (source, kind, triple_quoted) = string;
+        Ok(parse_string_literal(&source, kind, triple_quoted, start_location)?)
+    }
+};
+
+FStringExpr: StringType = {
+    <location:@L> FStringStart <values:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
+        StringType::FString(ast::ExprFString {
+            values,
+            implicit_concatenated: false,
+            range: (location..end_location).into()
+        })
+    }
+};
+
+FStringMiddlePattern: ast::Expr = {
+    FStringReplacementField,
+    <start_location:@L> <fstring_middle:fstring_middle> =>? {
+        let (source, is_raw) = fstring_middle;
+        Ok(parse_fstring_middle(&source, is_raw, start_location)?)
+    }
+};
+
+FStringReplacementField: ast::Expr = {
+    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> =>? {
+        if value.expr.is_lambda_expr() && !value.is_parenthesized() {
+            return Err(LexicalError {
+                error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
+                location: value.start(),
+            })?;
+        }
+        let debug_text = debug.map(|_| {
+            let start_offset = location + "{".text_len();
+            let end_offset = if let Some((conversion_start, _)) = conversion {
+                conversion_start
+            } else {
+                format_spec.as_ref().map_or_else(
+                    || end_location - "}".text_len(),
+                    |spec| spec.range().start() - ":".text_len(),
+                )
+            };
+            ast::DebugText {
+                leading: source_code[TextRange::new(start_offset, value.range().start())].to_string(),
+                trailing: source_code[TextRange::new(value.range().end(), end_offset)].to_string(),
+            }
+        });
+        Ok(
+            ast::ExprFormattedValue {
+                value: Box::new(value.into()),
+                debug_text,
+                conversion: conversion.map_or(ast::ConversionFlag::None, |(_, conversion_flag)| {
+                    conversion_flag
+                }),
+                format_spec: format_spec.map(Box::new),
+                range: (location..end_location).into(),
+            }
+            .into()
+        )
+    }
+};
+
+FStringFormatSpecSuffix: ast::Expr = {
+    ":" <format_spec:FStringFormatSpec> => format_spec
+};
+
+FStringFormatSpec: ast::Expr = {
+    <location:@L> <values:FStringMiddlePattern*> <end_location:@R> => {
+        ast::ExprFString {
+            values,
+            implicit_concatenated: false,
+            range: (location..end_location).into()
+        }.into()
+    },
+};
+
+FStringConversion: (TextSize, ast::ConversionFlag) = {
+    <location:@L> "!" <name_location:@L> <s:name> =>? {
+        let conversion = match s.as_str() {
+            "s" => ast::ConversionFlag::Str,
+            "r" => ast::ConversionFlag::Repr,
+            "a" => ast::ConversionFlag::Ascii,
+            _ => Err(LexicalError {
+                error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
+                location: name_location,
+            })?
+        };
+        Ok((location, conversion))
+    }
+};
+
 Atom<Goal>: ast::ParenthesizedExpr = {
-    <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?.into()),
+    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
     <location:@L> <value:Constant> <end_location:@R> => ast::ExprConstant {
         value,
         range: (location..end_location).into(),
@@ -1843,6 +1952,9 @@ extern {
         Dedent => token::Tok::Dedent,
         StartModule => token::Tok::StartModule,
         StartExpression => token::Tok::StartExpression,
+        FStringStart => token::Tok::FStringStart,
+        FStringEnd => token::Tok::FStringEnd,
+        "!" => token::Tok::Exclamation,
         "?" => token::Tok::Question,
         "+" => token::Tok::Plus,
         "-" => token::Tok::Minus,
@@ -1928,13 +2040,17 @@ extern {
         "True" => token::Tok::True,
         "False" => token::Tok::False,
         "None" => token::Tok::None,
-        int => token::Tok::Int { value: <BigInt> },
+        int => token::Tok::Int { value: <Int> },
         float => token::Tok::Float { value: <f64> },
         complex => token::Tok::Complex { real: <f64>, imag: <f64> },
         string => token::Tok::String {
             value: <String>,
             kind: <StringKind>,
             triple_quoted: <bool>
+        },
+        fstring_middle => token::Tok::FStringMiddle {
+            value: <String>,
+            is_raw: <bool>
         },
         name => token::Tok::Name { name: <String> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {

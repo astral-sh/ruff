@@ -1,5 +1,5 @@
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextSize};
@@ -39,26 +39,22 @@ impl MissingWhitespace {
     }
 }
 
-impl AlwaysAutofixableViolation for MissingWhitespace {
+impl AlwaysFixableViolation for MissingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
         let token = self.token_text();
         format!("Missing whitespace after '{token}'")
     }
 
-    fn autofix_title(&self) -> String {
-        let token = self.token_text();
-        format!("Added missing whitespace after '{token}'")
+    fn fix_title(&self) -> String {
+        format!("Add missing whitespace")
     }
 }
 
 /// E231
-pub(crate) fn missing_whitespace(
-    line: &LogicalLine,
-    autofix: bool,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut open_parentheses = 0u32;
+    let mut fstrings = 0u32;
     let mut prev_lsqb = TextSize::default();
     let mut prev_lbrace = TextSize::default();
     let mut iter = line.tokens().iter().peekable();
@@ -66,6 +62,8 @@ pub(crate) fn missing_whitespace(
     while let Some(token) = iter.next() {
         let kind = token.kind();
         match kind {
+            TokenKind::FStringStart => fstrings += 1,
+            TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
             TokenKind::Lsqb => {
                 open_parentheses = open_parentheses.saturating_add(1);
                 prev_lsqb = token.start();
@@ -75,6 +73,17 @@ pub(crate) fn missing_whitespace(
             }
             TokenKind::Lbrace => {
                 prev_lbrace = token.start();
+            }
+            TokenKind::Colon if fstrings > 0 => {
+                // Colon in f-string, no space required. This will yield false
+                // negatives for cases like the following as it's hard to
+                // differentiate between the usage of a colon in a f-string.
+                //
+                // ```python
+                // f'{ {'x':1} }'
+                // f'{(lambda x:x)}'
+                // ```
+                continue;
             }
 
             TokenKind::Comma | TokenKind::Semi | TokenKind::Colon => {
@@ -102,15 +111,12 @@ pub(crate) fn missing_whitespace(
                         }
                     }
 
-                    let kind = MissingWhitespace { token: kind };
-                    let mut diagnostic = Diagnostic::new(kind, token.range());
-
-                    if autofix {
-                        diagnostic.set_fix(Fix::automatic(Edit::insertion(
-                            " ".to_string(),
-                            token.end(),
-                        )));
-                    }
+                    let mut diagnostic =
+                        Diagnostic::new(MissingWhitespace { token: kind }, token.range());
+                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                        " ".to_string(),
+                        token.end(),
+                    )));
                     context.push_diagnostic(diagnostic);
                 }
             }

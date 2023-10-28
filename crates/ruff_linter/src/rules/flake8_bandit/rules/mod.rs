@@ -22,6 +22,7 @@ pub(crate) use suspicious_function_call::*;
 pub(crate) use try_except_continue::*;
 pub(crate) use try_except_pass::*;
 pub(crate) use unsafe_yaml_load::*;
+pub(crate) use weak_cryptographic_key::*;
 
 mod assert_used;
 mod bad_file_permissions;
@@ -47,3 +48,4 @@ mod suspicious_function_call;
 mod try_except_continue;
 mod try_except_pass;
 mod unsafe_yaml_load;
+mod weak_cryptographic_key;

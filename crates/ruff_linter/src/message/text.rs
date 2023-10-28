@@ -12,26 +12,28 @@ use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::fs::relativize_path;
-use crate::line_width::{LineWidthBuilder, TabSize};
+use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
+use crate::settings::types::UnsafeFixes;
 
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
         /// Whether to show the fix status of a diagnostic.
-        const SHOW_FIX_STATUS = 0b0000_0001;
+        const SHOW_FIX_STATUS    = 0b0000_0001;
         /// Whether to show the diff of a fix, for diagnostics that have a fix.
-        const SHOW_FIX_DIFF   = 0b0000_0010;
+        const SHOW_FIX_DIFF      = 0b0000_0010;
         /// Whether to show the source code of a diagnostic.
-        const SHOW_SOURCE     = 0b0000_0100;
+        const SHOW_SOURCE        = 0b0000_0100;
     }
 }
 
 #[derive(Default)]
 pub struct TextEmitter {
     flags: EmitterFlags,
+    unsafe_fixes: UnsafeFixes,
 }
 
 impl TextEmitter {
@@ -51,6 +53,12 @@ impl TextEmitter {
     #[must_use]
     pub fn with_show_source(mut self, show_source: bool) -> Self {
         self.flags.set(EmitterFlags::SHOW_SOURCE, show_source);
+        self
+    }
+
+    #[must_use]
+    pub fn with_unsafe_fixes(mut self, unsafe_fixes: UnsafeFixes) -> Self {
+        self.unsafe_fixes = unsafe_fixes;
         self
     }
 }
@@ -79,18 +87,15 @@ impl Emitter for TextEmitter {
                     writer,
                     "cell {cell}{sep}",
                     cell = notebook_index
-                        .cell(start_location.row.get())
-                        .unwrap_or_default(),
+                        .cell(start_location.row)
+                        .unwrap_or(OneIndexed::MIN),
                     sep = ":".cyan(),
                 )?;
 
                 SourceLocation {
-                    row: OneIndexed::new(
-                        notebook_index
-                            .cell_row(start_location.row.get())
-                            .unwrap_or(1) as usize,
-                    )
-                    .unwrap(),
+                    row: notebook_index
+                        .cell_row(start_location.row)
+                        .unwrap_or(OneIndexed::MIN),
                     column: start_location.column,
                 }
             } else {
@@ -105,7 +110,8 @@ impl Emitter for TextEmitter {
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
                     message,
-                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS)
+                    show_fix_status: self.flags.intersects(EmitterFlags::SHOW_FIX_STATUS),
+                    unsafe_fixes: self.unsafe_fixes,
                 }
             )?;
 
@@ -134,28 +140,33 @@ impl Emitter for TextEmitter {
 pub(super) struct RuleCodeAndBody<'a> {
     pub(crate) message: &'a Message,
     pub(crate) show_fix_status: bool,
+    pub(crate) unsafe_fixes: UnsafeFixes,
 }
 
 impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let kind = &self.message.kind;
+        if self.show_fix_status {
+            if let Some(fix) = self.message.fix.as_ref() {
+                // Do not display an indicator for unapplicable fixes
+                if fix.applies(self.unsafe_fixes.required_applicability()) {
+                    return write!(
+                        f,
+                        "{code} {fix}{body}",
+                        code = kind.rule().noqa_code().to_string().red().bold(),
+                        fix = format_args!("[{}] ", "*".cyan()),
+                        body = kind.body,
+                    );
+                }
+            }
+        };
 
-        if self.show_fix_status && self.message.fix.is_some() {
-            write!(
-                f,
-                "{code} {autofix}{body}",
-                code = kind.rule().noqa_code().to_string().red().bold(),
-                autofix = format_args!("[{}] ", "*".cyan()),
-                body = kind.body,
-            )
-        } else {
-            write!(
-                f,
-                "{code} {body}",
-                code = kind.rule().noqa_code().to_string().red().bold(),
-                body = kind.body,
-            )
-        }
+        write!(
+            f,
+            "{code} {body}",
+            code = kind.rule().noqa_code().to_string().red().bold(),
+            body = kind.body,
+        )
     }
 }
 
@@ -189,9 +200,9 @@ impl Display for MessageCodeFrame<'_> {
         // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
         if let Some(index) = self.notebook_index {
-            let content_start_cell = index.cell(content_start_index.get()).unwrap_or_default();
+            let content_start_cell = index.cell(content_start_index).unwrap_or(OneIndexed::MIN);
             while start_index < content_start_index {
-                if index.cell(start_index.get()).unwrap_or_default() == content_start_cell {
+                if index.cell(start_index).unwrap_or(OneIndexed::MIN) == content_start_cell {
                     break;
                 }
                 start_index = start_index.saturating_add(1);
@@ -214,9 +225,9 @@ impl Display for MessageCodeFrame<'_> {
         // If we're working with a Jupyter Notebook, skip the lines which are
         // outside of the cell containing the diagnostic.
         if let Some(index) = self.notebook_index {
-            let content_end_cell = index.cell(content_end_index.get()).unwrap_or_default();
+            let content_end_cell = index.cell(content_end_index).unwrap_or(OneIndexed::MIN);
             while end_index > content_end_index {
-                if index.cell(end_index.get()).unwrap_or_default() == content_end_cell {
+                if index.cell(end_index).unwrap_or(OneIndexed::MIN) == content_end_cell {
                     break;
                 }
                 end_index = end_index.saturating_sub(1);
@@ -256,8 +267,9 @@ impl Display for MessageCodeFrame<'_> {
                     || start_index.get(),
                     |notebook_index| {
                         notebook_index
-                            .cell_row(start_index.get())
-                            .unwrap_or_default() as usize
+                            .cell_row(start_index)
+                            .unwrap_or(OneIndexed::MIN)
+                            .get()
                     },
                 ),
                 annotations: vec![SourceAnnotation {
@@ -288,7 +300,7 @@ fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut result = String::new();
     let mut last_end = 0;
     let mut range = annotation_range;
-    let mut line_width = LineWidthBuilder::new(TabSize::default());
+    let mut line_width = LineWidthBuilder::new(IndentWidth::default());
 
     for (index, c) in source.char_indices() {
         let old_width = line_width.get();
@@ -339,8 +351,12 @@ struct SourceCode<'a> {
 mod tests {
     use insta::assert_snapshot;
 
-    use crate::message::tests::{capture_emitter_output, create_messages};
+    use crate::message::tests::{
+        capture_emitter_notebook_output, capture_emitter_output, create_messages,
+        create_notebook_messages,
+    };
     use crate::message::TextEmitter;
+    use crate::settings::types::UnsafeFixes;
 
     #[test]
     fn default() {
@@ -356,6 +372,29 @@ mod tests {
             .with_show_fix_status(true)
             .with_show_source(true);
         let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn fix_status_unsafe() {
+        let mut emitter = TextEmitter::default()
+            .with_show_fix_status(true)
+            .with_show_source(true)
+            .with_unsafe_fixes(UnsafeFixes::Enabled);
+        let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn notebook_output() {
+        let mut emitter = TextEmitter::default()
+            .with_show_fix_status(true)
+            .with_show_source(true)
+            .with_unsafe_fixes(UnsafeFixes::Enabled);
+        let (messages, notebook_indexes) = create_notebook_messages();
+        let content = capture_emitter_notebook_output(&mut emitter, &messages, &notebook_indexes);
 
         assert_snapshot!(content);
     }

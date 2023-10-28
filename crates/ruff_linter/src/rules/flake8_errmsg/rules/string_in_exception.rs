@@ -1,13 +1,13 @@
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace;
 use ruff_python_codegen::{Generator, Stylist};
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for the use of string literals in exception constructors.
@@ -50,14 +50,14 @@ use crate::registry::{AsRule, Rule};
 pub struct RawStringInException;
 
 impl Violation for RawStringInException {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Exception must not use a string literal, assign to variable first")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Assign to variable; remove string literal".to_string())
     }
 }
@@ -104,14 +104,14 @@ impl Violation for RawStringInException {
 pub struct FStringInException;
 
 impl Violation for FStringInException {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Exception must not use an f-string literal, assign to variable first")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Assign to variable; remove f-string literal".to_string())
     }
 }
@@ -160,14 +160,14 @@ impl Violation for FStringInException {
 pub struct DotFormatInException;
 
 impl Violation for DotFormatInException {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Exception must not use a `.format()` string directly, assign to variable first")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Assign to variable; remove `.format()` string".to_string())
     }
 }
@@ -190,30 +190,6 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                         if string.len() >= checker.settings.flake8_errmsg.max_string_length {
                             let mut diagnostic =
                                 Diagnostic::new(RawStringInException, first.range());
-                            if checker.patch(diagnostic.kind.rule()) {
-                                if let Some(indentation) =
-                                    whitespace::indentation(checker.locator(), stmt)
-                                {
-                                    if checker.semantic().is_available("msg") {
-                                        diagnostic.set_fix(generate_fix(
-                                            stmt,
-                                            first,
-                                            indentation,
-                                            checker.stylist(),
-                                            checker.generator(),
-                                        ));
-                                    }
-                                }
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
-                    }
-                }
-                // Check for f-strings.
-                Expr::FString(_) => {
-                    if checker.enabled(Rule::FStringInException) {
-                        let mut diagnostic = Diagnostic::new(FStringInException, first.range());
-                        if checker.patch(diagnostic.kind.rule()) {
                             if let Some(indentation) =
                                 whitespace::indentation(checker.locator(), stmt)
                             {
@@ -226,6 +202,25 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                         checker.generator(),
                                     ));
                                 }
+                            }
+                            checker.diagnostics.push(diagnostic);
+                        }
+                    }
+                }
+                // Check for f-strings.
+                Expr::FString(_) => {
+                    if checker.enabled(Rule::FStringInException) {
+                        let mut diagnostic = Diagnostic::new(FStringInException, first.range());
+                        if let Some(indentation) = whitespace::indentation(checker.locator(), stmt)
+                        {
+                            if checker.semantic().is_available("msg") {
+                                diagnostic.set_fix(generate_fix(
+                                    stmt,
+                                    first,
+                                    indentation,
+                                    checker.stylist(),
+                                    checker.generator(),
+                                ));
                             }
                         }
                         checker.diagnostics.push(diagnostic);
@@ -240,19 +235,17 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                             if attr == "format" && value.is_constant_expr() {
                                 let mut diagnostic =
                                     Diagnostic::new(DotFormatInException, first.range());
-                                if checker.patch(diagnostic.kind.rule()) {
-                                    if let Some(indentation) =
-                                        whitespace::indentation(checker.locator(), stmt)
-                                    {
-                                        if checker.semantic().is_available("msg") {
-                                            diagnostic.set_fix(generate_fix(
-                                                stmt,
-                                                first,
-                                                indentation,
-                                                checker.stylist(),
-                                                checker.generator(),
-                                            ));
-                                        }
+                                if let Some(indentation) =
+                                    whitespace::indentation(checker.locator(), stmt)
+                                {
+                                    if checker.semantic().is_available("msg") {
+                                        diagnostic.set_fix(generate_fix(
+                                            stmt,
+                                            first,
+                                            indentation,
+                                            checker.stylist(),
+                                            checker.generator(),
+                                        ));
                                     }
                                 }
                                 checker.diagnostics.push(diagnostic);
@@ -293,7 +286,7 @@ fn generate_fix(
         range: TextRange::default(),
     });
 
-    Fix::suggested_edits(
+    Fix::unsafe_edits(
         Edit::insertion(
             format!(
                 "{}{}{}",

@@ -8,7 +8,7 @@ use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Applicability, Diagnostic};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
@@ -18,7 +18,6 @@ use ruff_python_parser::{AsMode, ParseError};
 use ruff_source_file::{Locator, SourceFileBuilder};
 use ruff_text_size::Ranged;
 
-use crate::autofix::{fix_file, FixResult};
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
@@ -27,11 +26,13 @@ use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
+use crate::fix::{fix_file, FixResult};
 use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
+use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs};
@@ -143,6 +144,7 @@ pub fn check_path(
     if use_ast || use_imports || use_doc_lines {
         match ruff_python_parser::parse_program_tokens(
             tokens,
+            source_kind.source_code(),
             &path.to_string_lossy(),
             source_type.is_ipynb(),
         ) {
@@ -255,6 +257,36 @@ pub fn check_path(
         // If the syntax error _diagnostic_ is disabled, discard the _diagnostic_.
         if !settings.rules.enabled(Rule::SyntaxError) {
             diagnostics.retain(|diagnostic| diagnostic.kind.rule() != Rule::SyntaxError);
+        }
+    }
+
+    // Remove fixes for any rules marked as unfixable.
+    for diagnostic in &mut diagnostics {
+        if !settings.rules.should_fix(diagnostic.kind.rule()) {
+            diagnostic.fix = None;
+        }
+    }
+
+    // Update fix applicability to account for overrides
+    if !settings.extend_safe_fixes.is_empty() || !settings.extend_unsafe_fixes.is_empty() {
+        for diagnostic in &mut diagnostics {
+            if let Some(fix) = diagnostic.fix.take() {
+                // Enforce demotions over promotions so if someone puts a rule in both we are conservative
+                if fix.applicability().is_safe()
+                    && settings
+                        .extend_unsafe_fixes
+                        .contains(diagnostic.kind.rule())
+                {
+                    diagnostic.set_fix(fix.with_applicability(Applicability::Unsafe));
+                } else if fix.applicability().is_unsafe()
+                    && settings.extend_safe_fixes.contains(diagnostic.kind.rule())
+                {
+                    diagnostic.set_fix(fix.with_applicability(Applicability::Safe));
+                } else {
+                    // Retain the existing fix (will be dropped from `.take()` otherwise)
+                    diagnostic.set_fix(fix);
+                }
+            }
         }
     }
 
@@ -412,12 +444,14 @@ fn diagnostics_to_messages(
         .collect()
 }
 
-/// Generate `Diagnostic`s from source code content, iteratively autofixing
+/// Generate `Diagnostic`s from source code content, iteratively fixing
 /// until stable.
+#[allow(clippy::too_many_arguments)]
 pub fn lint_fix<'a>(
     path: &Path,
     package: Option<&Path>,
     noqa: flags::Noqa,
+    unsafe_fixes: UnsafeFixes,
     settings: &LinterSettings,
     source_kind: &'a SourceKind,
     source_type: PySourceType,
@@ -433,7 +467,7 @@ pub fn lint_fix<'a>(
     // Track whether the _initial_ source code was parseable.
     let mut parseable = false;
 
-    // Continuously autofix until the source code stabilizes.
+    // Continuously fix until the source code stabilizes.
     loop {
         // Tokenize once.
         let tokens: Vec<LexResult> =
@@ -467,7 +501,7 @@ pub fn lint_fix<'a>(
             &directives,
             settings,
             noqa,
-            source_kind,
+            &transformed,
             source_type,
         );
 
@@ -478,22 +512,22 @@ pub fn lint_fix<'a>(
             // longer parseable on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
             if parseable && result.error.is_some() {
-                report_autofix_syntax_error(
+                report_fix_syntax_error(
                     path,
                     transformed.source_code(),
                     &result.error.unwrap(),
                     fixed.keys().copied(),
                 );
-                return Err(anyhow!("Autofix introduced a syntax error"));
+                return Err(anyhow!("Fix introduced a syntax error"));
             }
         }
 
-        // Apply autofix.
+        // Apply fix.
         if let Some(FixResult {
             code: fixed_contents,
             fixes: applied,
             source_map,
-        }) = fix_file(&result.data.0, &locator)
+        }) = fix_file(&result.data.0, &locator, unsafe_fixes)
         {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
@@ -569,7 +603,7 @@ This indicates a bug in Ruff. If you could open an issue at:
 }
 
 #[allow(clippy::print_stderr)]
-fn report_autofix_syntax_error(
+fn report_fix_syntax_error(
     path: &Path,
     transformed: &str,
     error: &ParseError,
@@ -578,7 +612,7 @@ fn report_autofix_syntax_error(
     let codes = collect_rule_codes(rules);
     if cfg!(debug_assertions) {
         eprintln!(
-            "{}{} Autofix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
+            "{}{} Fix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
             "error".red().bold(),
             ":".bold(),
             fs::relativize_path(path),
@@ -589,11 +623,11 @@ fn report_autofix_syntax_error(
     } else {
         eprintln!(
             r#"
-{}{} Autofix introduced a syntax error. Reverting all changes.
+{}{} Fix introduced a syntax error. Reverting all changes.
 
 This indicates a bug in Ruff. If you could open an issue at:
 
-    https://github.com/astral-sh/ruff/issues/new?title=%5BAutofix%20error%5D
+    https://github.com/astral-sh/ruff/issues/new?title=%5BFix%20error%5D
 
 ...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,

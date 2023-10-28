@@ -1,11 +1,17 @@
 # Tutorial
 
-This tutorial will walk you through the process of integrating Ruff into your project. For a more
-detailed overview, see [_Configuration_](configuration.md).
+This tutorial will walk you through the process of integrating Ruff's linter and formatter into
+your project. For a more detailed overview, see [_Configuring Ruff_](configuration.md).
 
 ## Getting Started
 
-Let's assume that our project structure looks like:
+To start, we'll install Ruff through PyPI (or with your [preferred package manager](installation.md)):
+
+```shell
+pip install ruff
+```
+
+Let's then assume that our project structure looks like:
 
 ```text
 numbers
@@ -13,36 +19,33 @@ numbers
   └── numbers.py
 ```
 
-Where `numbers.py` contains the following code:
+...where `numbers.py` contains the following code:
 
 ```py
-from typing import List
+from typing import Iterable
 
 import os
 
 
-def sum_even_numbers(numbers: List[int]) -> int:
-    """Given a list of integers, return the sum of all even numbers in the list."""
-    return sum(num for num in numbers if num % 2 == 0)
+def sum_even_numbers(numbers: Iterable[int]) -> int:
+    """Given an iterable of integers, return the sum of all even numbers in the iterable."""
+    return sum(
+        num for num in numbers
+        if num % 2 == 0
+    )
 ```
 
-To start, we'll install Ruff through PyPI (or with your [preferred package manager](installation.md)):
-
-```shell
-> pip install ruff
-```
-
-We can then run Ruff over our project via:
+We can run the Ruff linter over our project via `ruff check`:
 
 ```shell
 ❯ ruff check .
 numbers/numbers.py:3:8: F401 [*] `os` imported but unused
 Found 1 error.
-[*] 1 potentially fixable with the --fix option.
+[*] 1 fixable with the `--fix` option.
 ```
 
 Ruff identified an unused import, which is a common error in Python code. Ruff considers this a
-"fixable" error, so we can resolve the issue automatically by running:
+"fixable" error, so we can resolve the issue automatically by running `ruff check --fix`:
 
 ```shell
 ❯ ruff check --fix .
@@ -55,14 +58,41 @@ Running `git diff` shows the following:
 --- a/numbers/numbers.py
 +++ b/numbers/numbers.py
 @@ -1,7 +1,5 @@
- from typing import List
+ from typing import Iterable
 
 -import os
 -
 
-def sum_even_numbers(numbers: List[int]) -> int:
-    """Given a list of integers, return the sum of all even numbers in the list."""
-    return sum(num for num in numbers if num % 2 == 0)
+def sum_even_numbers(numbers: Iterable[int]) -> int:
+    """Given an iterable of integers, return the sum of all even numbers in the iterable."""
+    return sum(
+        num for num in numbers
+        if num % 2 == 0
+    )
+```
+
+Now that our project is passing `ruff check`, we can run the Ruff formatter via `ruff format`:
+
+```shell
+❯ ruff format .
+1 file reformatted
+```
+
+Running `git diff` shows that the `sum` call was reformatted to fit within the default 88-character
+line length limit:
+
+```diff
+--- a/numbers.py
++++ b/numbers.py
+@@ -3,7 +3,4 @@ from typing import Iterable
+
+ def sum_even_numbers(numbers: Iterable[int]) -> int:
+     """Given an iterable of integers, return the sum of all even numbers in the iterable."""
+-    return sum(
+-        num for num in numbers
+-        if num % 2 == 0
+-    )
++    return sum(num for num in numbers if num % 2 == 0)
 ```
 
 Thus far, we've been using Ruff's default configuration. Let's take a look at how we can customize
@@ -73,19 +103,25 @@ Ruff's behavior.
 To determine the appropriate settings for each Python file, Ruff looks for the first
 `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file in the file's directory or any parent directory.
 
-Let's create a `pyproject.toml` file in our project's root directory:
+To configure Ruff, let's create a `pyproject.toml` file in our project's root directory:
 
 ```toml
 [tool.ruff]
-# Decrease the maximum line length to 79 characters.
+# Set the maximum line length to 79.
 line-length = 79
+
+[tool.ruff.lint]
+# Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
+# overlap with the use of a formatter, like Black, but we can override this behavior by
+# explicitly adding the rule.
+extend-select = ["E501"]
 ```
 
-Running Ruff again, we can see that it now enforces a line length of 79 characters:
+Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79:
 
 ```shell
 ❯ ruff check .
-numbers/numbers.py:6:80: E501 Line too long (83 > 79 characters)
+numbers/numbers.py:5:80: E501 Line too long (90 > 79)
 Found 1 error.
 ```
 
@@ -98,9 +134,12 @@ specifically, we'll want to make note of the minimum supported Python version:
 requires-python = ">=3.10"
 
 [tool.ruff]
-# Decrease the maximum line length to 79 characters.
+# Set the maximum line length to 79.
 line-length = 79
-src = ["src"]
+
+[tool.ruff.lint]
+# Add the `line-too-long` rule to the enforced rule set.
+extend-select = ["E501"]
 ```
 
 ### Rule Selection
@@ -109,8 +148,9 @@ Ruff supports [over 700 lint rules](rules.md) split across over 50 built-in plug
 determining the right set of rules will depend on your project's needs: some rules may be too
 strict, some are framework-specific, and so on.
 
-By default, Ruff enforces the `E`- and `F`-prefixed rules, which correspond to those derived from
-pycodestyle and Pyflakes, respectively.
+By default, Ruff enables Flake8's `F` rules, along with a subset of the `E` rules, omitting any
+stylistic rules that overlap with the use of a formatter, like `ruff format` or
+[Black](https://github.com/psf/black).
 
 If you're introducing a linter for the first time, **the default rule set is a great place to
 start**: it's narrow and focused while catching a wide variety of common errors (like unused
@@ -118,41 +158,42 @@ imports) with zero configuration.
 
 If you're migrating to Ruff from another linter, you can enable rules that are equivalent to
 those enforced in your previous configuration. For example, if we want to enforce the pyupgrade
-rules, we can add the following to our `pyproject.toml`:
+rules, we can set our `pyproject.toml` to the following:
 
 ```toml
-[tool.ruff]
-select = [
-  "E",   # pycodestyle
-  "F",   # pyflakes
+[project]
+requires-python = ">=3.10"
+
+[tool.ruff.lint]
+extend-select = [
   "UP",  # pyupgrade
 ]
 ```
 
 If we run Ruff again, we'll see that it now enforces the pyupgrade rules. In particular, Ruff flags
-the use of `List` instead of its standard-library variant:
+the use of the deprecated `typing.Iterable` instead of `collections.abc.Iterable`:
 
 ```shell
 ❯ ruff check .
-numbers/numbers.py:5:31: UP006 [*] Use `list` instead of `List` for type annotations
-numbers/numbers.py:6:80: E501 Line too long (83 > 79 characters)
-Found 2 errors.
-[*] 1 potentially fixable with the --fix option.
+numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
+Found 1 error.
+[*] 1 fixable with the `--fix` option.
 ```
 
 Over time, we may choose to enforce additional rules. For example, we may want to enforce that
 all functions have docstrings:
 
 ```toml
-[tool.ruff]
-select = [
-  "E",   # pycodestyle
-  "F",   # pyflakes
+[project]
+requires-python = ">=3.10"
+
+[tool.ruff.lint]
+extend-select = [
   "UP",  # pyupgrade
   "D",   # pydocstyle
 ]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 ```
 
@@ -161,34 +202,32 @@ If we run Ruff again, we'll see that it now enforces the pydocstyle rules:
 ```shell
 ❯ ruff check .
 numbers/__init__.py:1:1: D104 Missing docstring in public package
+numbers/numbers.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 numbers/numbers.py:1:1: D100 Missing docstring in public module
-numbers/numbers.py:5:31: UP006 [*] Use `list` instead of `List` for type annotations
-numbers/numbers.py:5:80: E501 Line too long (83 > 79 characters)
 Found 3 errors.
-[*] 1 potentially fixable with the --fix option.
+[*] 1 fixable with the `--fix` option.
 ```
 
 ### Ignoring Errors
 
 Any lint rule can be ignored by adding a `# noqa` comment to the line in question. For example,
-let's ignore the `UP006` rule for the `List` import:
+let's ignore the `UP035` rule for the `Iterable` import:
 
 ```py
-from typing import List
+from typing import Iterable  # noqa: UP035
 
 
-def sum_even_numbers(numbers: List[int]) -> int:  # noqa: UP006
-    """Given a list of integers, return the sum of all even numbers in the list."""
+def sum_even_numbers(numbers: Iterable[int]) -> int:
+    """Given an iterable of integers, return the sum of all even numbers in the iterable."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-Running Ruff again, we'll see that it no longer flags the `List` import:
+Running `ruff check` again, we'll see that it no longer flags the `Iterable` import:
 
 ```shell
 ❯ ruff check .
 numbers/__init__.py:1:1: D104 Missing docstring in public package
 numbers/numbers.py:1:1: D100 Missing docstring in public module
-numbers/numbers.py:5:80: E501 Line too long (83 > 79 characters)
 Found 3 errors.
 ```
 
@@ -196,17 +235,16 @@ If we want to ignore a rule for an entire file, we can add a `# ruff: noqa` comm
 the file:
 
 ```py
-# ruff: noqa: UP006
-from typing import List
+# ruff: noqa: UP035
+from typing import Iterable
 
 
-def sum_even_numbers(numbers: List[int]) -> int:
-    """Given a list of integers, return the sum of all even numbers in the list."""
+def sum_even_numbers(numbers: Iterable[int]) -> int:
+    """Given an iterable of integers, return the sum of all even numbers in the iterable."""
     return sum(num for num in numbers if num % 2 == 0)
 ```
 
-For more in-depth instructions on ignoring errors,
-please see [_Configuration_](configuration.md#error-suppression).
+For more in-depth instructions on ignoring errors, please see [_Error suppression_](linter.md#error-suppression).
 
 ### Adding Rules
 
@@ -215,10 +253,10 @@ violations of that rule and instead focus on enforcing it going forward.
 
 Ruff enables this workflow via the `--add-noqa` flag, which will adds a `# noqa` directive to each
 line based on its existing violations. We can combine `--add-noqa` with the `--select` command-line
-flag to add `# noqa` directives to all existing `UP006` violations:
+flag to add `# noqa` directives to all existing `UP035` violations:
 
 ```shell
-❯ ruff check --select UP006 --add-noqa .
+❯ ruff check --select UP035 --add-noqa .
 Added 1 noqa directive.
 ```
 
@@ -229,34 +267,35 @@ diff --git a/tutorial/src/main.py b/tutorial/src/main.py
 index b9291c5ca..b9f15b8c1 100644
 --- a/numbers/numbers.py
 +++ b/numbers/numbers.py
-@@ -1,6 +1,6 @@
- from typing import List
+@@ -1,4 +1,4 @@
+-from typing import Iterable
++from typing import Iterable  # noqa: UP035
 
 
--def sum_even_numbers(numbers: List[int]) -> int:
-+def sum_even_numbers(numbers: List[int]) -> int:  # noqa: UP006
-     """Given a list of integers, return the sum of all even numbers in the list."""
-     return sum(num for num in numbers if num % 2 == 0)
+ def sum_even_numbers(numbers: Iterable[int]) -> int:
 ```
 
-## Continuous Integration
+## Integrations
 
 This tutorial has focused on Ruff's command-line interface, but Ruff can also be used as a
-[pre-commit](https://pre-commit.com) hook:
+[pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
 
 ```yaml
+# Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.291
+  rev: v0.1.3
   hooks:
     - id: ruff
+# Run the Ruff formatter.
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.1.3
+  hooks:
+    - id: ruff-format
 ```
-
-See [_Usage_](usage.md) for more.
-
-## Editor Integrations
 
 Ruff can also be used as a [VS Code extension](https://github.com/astral-sh/ruff-vscode) or
 alongside any other editor through the [Ruff LSP](https://github.com/astral-sh/ruff-lsp).
 
-See [_Editor Integrations_](editor-integrations.md).
+For more, see [_Integrations_](integrations.md).

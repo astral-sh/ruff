@@ -1,14 +1,13 @@
 use log::error;
 use ruff_python_ast::{CmpOp, Expr};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_parser::locate_cmp_ops;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `is` and `is not` comparisons against constant literals, like
@@ -50,7 +49,7 @@ pub struct IsLiteral {
     cmp_op: IsCmpOp,
 }
 
-impl AlwaysAutofixableViolation for IsLiteral {
+impl AlwaysFixableViolation for IsLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
         let IsLiteral { cmp_op } = self;
@@ -60,7 +59,7 @@ impl AlwaysAutofixableViolation for IsLiteral {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let IsLiteral { cmp_op } = self;
         match cmp_op {
             IsCmpOp::Is => "Replace `is` with `==`".to_string(),
@@ -85,30 +84,26 @@ pub(crate) fn invalid_literal_comparison(
                 || helpers::is_constant_non_singleton(right))
         {
             let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                if lazy_located.is_none() {
-                    lazy_located = Some(locate_cmp_ops(expr, checker.locator().contents()));
-                }
-                if let Some(located_op) =
-                    lazy_located.as_ref().and_then(|located| located.get(index))
-                {
-                    assert_eq!(located_op.op, *op);
-                    if let Some(content) = match located_op.op {
-                        CmpOp::Is => Some("==".to_string()),
-                        CmpOp::IsNot => Some("!=".to_string()),
-                        node => {
-                            error!("Failed to fix invalid comparison: {node:?}");
-                            None
-                        }
-                    } {
-                        diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                            content,
-                            located_op.range + expr.start(),
-                        )));
+            if lazy_located.is_none() {
+                lazy_located = Some(locate_cmp_ops(expr, checker.locator().contents()));
+            }
+            if let Some(located_op) = lazy_located.as_ref().and_then(|located| located.get(index)) {
+                assert_eq!(located_op.op, *op);
+                if let Some(content) = match located_op.op {
+                    CmpOp::Is => Some("==".to_string()),
+                    CmpOp::IsNot => Some("!=".to_string()),
+                    node => {
+                        error!("Failed to fix invalid comparison: {node:?}");
+                        None
                     }
-                } else {
-                    error!("Failed to fix invalid comparison due to missing op");
+                } {
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        content,
+                        located_op.range + expr.start(),
+                    )));
                 }
+            } else {
+                error!("Failed to fix invalid comparison due to missing op");
             }
             checker.diagnostics.push(diagnostic);
         }

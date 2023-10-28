@@ -1,5 +1,18 @@
 ---
 source: crates/ruff_python_parser/src/string.rs
-expression: "parse_fstring(\"\").unwrap()"
+expression: "parse_suite(r#\"f\"\"\"#, \"<test>\").unwrap()"
 ---
-[]
+[
+    Expr(
+        StmtExpr {
+            range: 0..3,
+            value: FString(
+                ExprFString {
+                    range: 0..3,
+                    values: [],
+                    implicit_concatenated: false,
+                },
+            ),
+        },
+    ),
+]

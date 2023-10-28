@@ -150,7 +150,8 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix};
-    use ruff_source_file::SourceFileBuilder;
+    use ruff_notebook::NotebookIndex;
+    use ruff_source_file::{OneIndexed, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextRange, TextSize};
 
     use crate::message::{Emitter, EmitterContext, Message};
@@ -178,7 +179,7 @@ def fibonacci(n):
             },
             TextRange::new(TextSize::from(7), TextSize::from(9)),
         )
-        .with_fix(Fix::suggested(Edit::range_deletion(TextRange::new(
+        .with_fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
             TextSize::from(0),
             TextSize::from(10),
         ))));
@@ -193,7 +194,7 @@ def fibonacci(n):
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
         )
-        .with_fix(Fix::suggested(Edit::deletion(
+        .with_fix(Fix::unsafe_edit(Edit::deletion(
             TextSize::from(94),
             TextSize::from(99),
         )));
@@ -221,12 +222,131 @@ def fibonacci(n):
         ]
     }
 
+    pub(super) fn create_notebook_messages() -> (Vec<Message>, FxHashMap<String, NotebookIndex>) {
+        let notebook = r"# cell 1
+import os
+# cell 2
+import math
+
+print('hello world')
+# cell 3
+def foo():
+    print()
+    x = 1
+";
+
+        let unused_import_os = Diagnostic::new(
+            DiagnosticKind {
+                name: "UnusedImport".to_string(),
+                body: "`os` imported but unused".to_string(),
+                suggestion: Some("Remove unused import: `os`".to_string()),
+            },
+            TextRange::new(TextSize::from(16), TextSize::from(18)),
+        )
+        .with_fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
+            TextSize::from(9),
+            TextSize::from(19),
+        ))));
+
+        let unused_import_math = Diagnostic::new(
+            DiagnosticKind {
+                name: "UnusedImport".to_string(),
+                body: "`math` imported but unused".to_string(),
+                suggestion: Some("Remove unused import: `math`".to_string()),
+            },
+            TextRange::new(TextSize::from(35), TextSize::from(39)),
+        )
+        .with_fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
+            TextSize::from(28),
+            TextSize::from(40),
+        ))));
+
+        let unused_variable = Diagnostic::new(
+            DiagnosticKind {
+                name: "UnusedVariable".to_string(),
+                body: "Local variable `x` is assigned to but never used".to_string(),
+                suggestion: Some("Remove assignment to unused variable `x`".to_string()),
+            },
+            TextRange::new(TextSize::from(98), TextSize::from(99)),
+        )
+        .with_fix(Fix::unsafe_edit(Edit::deletion(
+            TextSize::from(94),
+            TextSize::from(104),
+        )));
+
+        let notebook_source = SourceFileBuilder::new("notebook.ipynb", notebook).finish();
+
+        let mut notebook_indexes = FxHashMap::default();
+        notebook_indexes.insert(
+            "notebook.ipynb".to_string(),
+            NotebookIndex::new(
+                vec![
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                ],
+                vec![
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(3),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(3),
+                ],
+            ),
+        );
+
+        let unused_import_os_start = unused_import_os.start();
+        let unused_import_math_start = unused_import_math.start();
+        let unused_variable_start = unused_variable.start();
+
+        (
+            vec![
+                Message::from_diagnostic(
+                    unused_import_os,
+                    notebook_source.clone(),
+                    unused_import_os_start,
+                ),
+                Message::from_diagnostic(
+                    unused_import_math,
+                    notebook_source.clone(),
+                    unused_import_math_start,
+                ),
+                Message::from_diagnostic(unused_variable, notebook_source, unused_variable_start),
+            ],
+            notebook_indexes,
+        )
+    }
+
     pub(super) fn capture_emitter_output(
         emitter: &mut dyn Emitter,
         messages: &[Message],
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
+        let mut output: Vec<u8> = Vec::new();
+        emitter.emit(&mut output, messages, &context).unwrap();
+
+        String::from_utf8(output).expect("Output to be valid UTF-8")
+    }
+
+    pub(super) fn capture_emitter_notebook_output(
+        emitter: &mut dyn Emitter,
+        messages: &[Message],
+        notebook_indexes: &FxHashMap<String, NotebookIndex>,
+    ) -> String {
+        let context = EmitterContext::new(notebook_indexes);
         let mut output: Vec<u8> = Vec::new();
         emitter.emit(&mut output, messages, &context).unwrap();
 

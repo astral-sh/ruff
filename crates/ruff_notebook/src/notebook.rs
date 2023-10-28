@@ -13,7 +13,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
-use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
 use ruff_text_size::TextSize;
 
 use crate::index::NotebookIndex;
@@ -149,7 +149,7 @@ impl Notebook {
     {
         let trailing_newline = reader.seek(SeekFrom::End(-1)).is_ok_and(|_| {
             let mut buf = [0; 1];
-            reader.read_exact(&mut buf).is_ok_and(|_| buf[0] == b'\n')
+            reader.read_exact(&mut buf).is_ok_and(|()| buf[0] == b'\n')
         });
         reader.rewind()?;
         let mut raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
@@ -179,7 +179,7 @@ impl Notebook {
             .iter()
             .enumerate()
             .filter(|(_, cell)| cell.is_valid_code_cell())
-            .map(|(idx, _)| u32::try_from(idx).unwrap())
+            .map(|(cell_index, _)| u32::try_from(cell_index).unwrap())
             .collect::<Vec<_>>();
 
         let mut contents = Vec::with_capacity(valid_code_cells.len());
@@ -321,16 +321,16 @@ impl Notebook {
     /// The index building is expensive as it needs to go through the content of
     /// every valid code cell.
     fn build_index(&self) -> NotebookIndex {
-        let mut row_to_cell = vec![0];
-        let mut row_to_row_in_cell = vec![0];
+        let mut row_to_cell = Vec::new();
+        let mut row_to_row_in_cell = Vec::new();
 
-        for &idx in &self.valid_code_cells {
-            let line_count = match &self.raw.cells[idx as usize].source() {
+        for &cell_index in &self.valid_code_cells {
+            let line_count = match &self.raw.cells[cell_index as usize].source() {
                 SourceValue::String(string) => {
                     if string.is_empty() {
                         1
                     } else {
-                        u32::try_from(NewlineWithTrailingNewline::from(string).count()).unwrap()
+                        NewlineWithTrailingNewline::from(string).count()
                     }
                 }
                 SourceValue::StringArray(string_array) => {
@@ -339,12 +339,14 @@ impl Notebook {
                     } else {
                         let trailing_newline =
                             usize::from(string_array.last().is_some_and(|s| s.ends_with('\n')));
-                        u32::try_from(string_array.len() + trailing_newline).unwrap()
+                        string_array.len() + trailing_newline
                     }
                 }
             };
-            row_to_cell.extend(iter::repeat(idx + 1).take(line_count as usize));
-            row_to_row_in_cell.extend(1..=line_count);
+            row_to_cell.extend(
+                iter::repeat(OneIndexed::from_zero_indexed(cell_index as usize)).take(line_count),
+            );
+            row_to_row_in_cell.extend((0..line_count).map(OneIndexed::from_zero_indexed));
         }
 
         NotebookIndex {
@@ -363,10 +365,19 @@ impl Notebook {
     /// Return the Jupyter notebook index.
     ///
     /// The index is built only once when required. This is only used to
-    /// report diagnostics, so by that time all of the autofixes must have
+    /// report diagnostics, so by that time all of the fixes must have
     /// been applied if `--fix` was passed.
     pub fn index(&self) -> &NotebookIndex {
         self.index.get_or_init(|| self.build_index())
+    }
+
+    /// Return the Jupyter notebook index, consuming the notebook.
+    ///
+    /// The index is built only once when required. This is only used to
+    /// report diagnostics, so by that time all of the fixes must have
+    /// been applied if `--fix` was passed.
+    pub fn into_index(mut self) -> NotebookIndex {
+        self.index.take().unwrap_or_else(|| self.build_index())
     }
 
     /// Return the cell offsets for the concatenated source code corresponding
@@ -405,11 +416,13 @@ impl Notebook {
     }
 
     /// Write the notebook back to the given [`Write`] implementor.
-    pub fn write(&self, writer: &mut dyn Write) -> anyhow::Result<()> {
+    pub fn write(&self, writer: &mut dyn Write) -> Result<(), NotebookError> {
         // https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#LL1041
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b" ");
         let mut serializer = serde_json::Serializer::with_formatter(writer, formatter);
-        SortAlphabetically(&self.raw).serialize(&mut serializer)?;
+        SortAlphabetically(&self.raw)
+            .serialize(&mut serializer)
+            .map_err(NotebookError::Json)?;
         if self.trailing_newline {
             writeln!(serializer.into_inner())?;
         }
@@ -423,6 +436,8 @@ mod tests {
 
     use anyhow::Result;
     use test_case::test_case;
+
+    use ruff_source_file::OneIndexed;
 
     use crate::{Cell, Notebook, NotebookError, NotebookIndex};
 
@@ -503,8 +518,40 @@ print("after empty cells")
         assert_eq!(
             notebook.index(),
             &NotebookIndex {
-                row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 5, 7, 7, 8],
-                row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 1, 1, 2, 1],
+                row_to_cell: vec![
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(4),
+                    OneIndexed::from_zero_indexed(6),
+                    OneIndexed::from_zero_indexed(6),
+                    OneIndexed::from_zero_indexed(7)
+                ],
+                row_to_row_in_cell: vec![
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(3),
+                    OneIndexed::from_zero_indexed(4),
+                    OneIndexed::from_zero_indexed(5),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(3),
+                    OneIndexed::from_zero_indexed(4),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(0)
+                ],
             }
         );
         assert_eq!(

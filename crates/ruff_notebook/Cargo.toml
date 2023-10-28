@@ -14,7 +14,7 @@ license = { workspace = true }
 
 [dependencies]
 ruff_diagnostics = { path = "../ruff_diagnostics" }
-ruff_source_file = { path = "../ruff_source_file" }
+ruff_source_file = { path = "../ruff_source_file", features = ["serde"] }
 ruff_text_size = { path = "../ruff_text_size" }
 
 anyhow = { workspace = true }
@@ -22,7 +22,7 @@ itertools = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_with = { version = "3.0.0", default-features = false, features = ["macros"] }
+serde_with = { version = "3.4.0", default-features = false, features = ["macros"] }
 thiserror = { workspace = true }
 uuid = { workspace = true }
 

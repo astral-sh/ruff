@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::fs::{self, File};
 use std::hash::Hasher;
 use std::io::{self, BufReader, BufWriter, Write};
@@ -8,6 +9,11 @@ use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result};
+use filetime::FileTime;
+use itertools::Itertools;
+use log::{debug, error};
+use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelIterator, ParallelBridge};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -15,21 +21,49 @@ use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_linter::message::Message;
 use ruff_linter::warn_user;
+use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
+use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy, Resolver};
 use ruff_workspace::Settings;
 
+use crate::cache;
 use crate::diagnostics::Diagnostics;
-
-/// Maximum duration for which we keep a file in cache that hasn't been seen.
-const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
 
 /// [`Path`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePath = Path;
 /// [`PathBuf`] that is relative to the package root in [`PackageCache`].
 pub(crate) type RelativePathBuf = PathBuf;
+
+#[derive(CacheKey)]
+pub(crate) struct FileCacheKey {
+    /// Timestamp when the file was last modified before the (cached) check.
+    file_last_modified: FileTime,
+    /// Permissions of the file before the (cached) check.
+    file_permissions_mode: u32,
+}
+
+impl FileCacheKey {
+    pub(crate) fn from_path(path: &Path) -> io::Result<FileCacheKey> {
+        // Construct a cache key for the file
+        let metadata = path.metadata()?;
+
+        #[cfg(unix)]
+        let permissions = {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode()
+        };
+        #[cfg(windows)]
+        let permissions: u32 = metadata.permissions().readonly().into();
+
+        Ok(FileCacheKey {
+            file_last_modified: FileTime::from_last_modification_time(&metadata),
+            file_permissions_mode: permissions,
+        })
+    }
+}
 
 /// Cache.
 ///
@@ -50,7 +84,7 @@ pub(crate) struct Cache {
     /// Files that are linted, but are not in `package.files` or are in
     /// `package.files` but are outdated. This gets merged with `package.files`
     /// when the cache is written back to disk in [`Cache::store`].
-    new_files: Mutex<HashMap<RelativePathBuf, FileCache>>,
+    changes: Mutex<Vec<Change>>,
     /// The "current" timestamp used as cache for the updates of
     /// [`FileCache::last_seen`]
     last_seen_cache: u64,
@@ -65,7 +99,7 @@ impl Cache {
     ///
     /// Finally `settings` is used to ensure we don't open a cache for different
     /// settings. It also defines the directory where to store the cache.
-    pub(crate) fn open(package_root: PathBuf, settings: &Settings) -> Cache {
+    pub(crate) fn open(package_root: PathBuf, settings: &Settings) -> Self {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
         let mut buf = itoa::Buffer::new();
@@ -105,7 +139,7 @@ impl Cache {
     }
 
     /// Create an empty `Cache`.
-    fn empty(path: PathBuf, package_root: PathBuf) -> Cache {
+    fn empty(path: PathBuf, package_root: PathBuf) -> Self {
         let package = PackageCache {
             package_root,
             files: HashMap::new(),
@@ -114,36 +148,24 @@ impl Cache {
     }
 
     #[allow(clippy::cast_possible_truncation)]
-    fn new(path: PathBuf, package: PackageCache) -> Cache {
+    fn new(path: PathBuf, package: PackageCache) -> Self {
         Cache {
             path,
             package,
-            new_files: Mutex::new(HashMap::new()),
+            changes: Mutex::new(Vec::new()),
             // SAFETY: this will be truncated to the year ~2554 (so don't use
             // this code after that!).
             last_seen_cache: SystemTime::UNIX_EPOCH.elapsed().unwrap().as_millis() as u64,
         }
     }
 
-    /// Store the cache to disk, if it has been changed.
-    #[allow(clippy::cast_possible_truncation)]
-    pub(crate) fn store(mut self) -> Result<()> {
-        let new_files = self.new_files.into_inner().unwrap();
-        if new_files.is_empty() {
+    /// Applies the pending changes and persists the cache to disk, if it has been changed.
+    pub(crate) fn persist(mut self) -> Result<()> {
+        if !self.save() {
             // No changes made, no need to write the same cache file back to
             // disk.
             return Ok(());
         }
-
-        // Remove cached files that we haven't seen in a while.
-        let now = self.last_seen_cache;
-        self.package.files.retain(|_, file| {
-            // SAFETY: this will be truncated to the year ~2554.
-            (now - *file.last_seen.get_mut()) <= MAX_LAST_SEEN.as_millis() as u64
-        });
-
-        // Apply any changes made and keep track of when we last saw files.
-        self.package.files.extend(new_files);
 
         let file = File::create(&self.path)
             .with_context(|| format!("Failed to create cache file '{}'", self.path.display()))?;
@@ -154,6 +176,53 @@ impl Cache {
                 self.path.display()
             )
         })
+    }
+
+    /// Applies the pending changes without storing the cache to disk.
+    #[allow(clippy::cast_possible_truncation)]
+    pub(crate) fn save(&mut self) -> bool {
+        /// Maximum duration for which we keep a file in cache that hasn't been seen.
+        const MAX_LAST_SEEN: Duration = Duration::from_secs(30 * 24 * 60 * 60); // 30 days.
+
+        let changes = std::mem::take(self.changes.get_mut().unwrap());
+        if changes.is_empty() {
+            return false;
+        }
+
+        // Remove cached files that we haven't seen in a while.
+        let now = self.last_seen_cache;
+        self.package.files.retain(|_, file| {
+            // SAFETY: this will be truncated to the year ~2554.
+            (now - *file.last_seen.get_mut()) <= MAX_LAST_SEEN.as_millis() as u64
+        });
+
+        // Apply any changes made and keep track of when we last saw files.
+        for change in changes {
+            let entry = self
+                .package
+                .files
+                .entry(change.path)
+                .and_modify(|existing| {
+                    if existing.key != change.new_key {
+                        // Reset the data if the key change.
+                        existing.data = FileCacheData::default();
+                    }
+
+                    existing.key = change.new_key;
+                    existing
+                        .last_seen
+                        .store(self.last_seen_cache, Ordering::Relaxed);
+                })
+                .or_insert_with(|| FileCache {
+                    key: change.new_key,
+                    last_seen: AtomicU64::new(self.last_seen_cache),
+                    data: FileCacheData::default(),
+                });
+
+            change.new_data.apply(&mut entry.data);
+        }
+
+        true
     }
 
     /// Returns the relative path based on `path` and the package root.
@@ -169,7 +238,7 @@ impl Cache {
     ///
     /// This returns `None` if `key` differs from the cached key or if the
     /// cache doesn't contain results for the file.
-    pub(crate) fn get<T: CacheKey>(&self, path: &RelativePath, key: &T) -> Option<&FileCache> {
+    pub(crate) fn get(&self, path: &RelativePath, key: &FileCacheKey) -> Option<&FileCache> {
         let file = self.package.files.get(path)?;
 
         let mut hasher = CacheKeyHasher::new();
@@ -185,50 +254,34 @@ impl Cache {
         Some(file)
     }
 
+    pub(crate) fn is_formatted(&self, path: &RelativePath, key: &FileCacheKey) -> bool {
+        self.get(path, key)
+            .is_some_and(|entry| entry.data.formatted)
+    }
+
     /// Add or update a file cache at `path` relative to the package root.
-    pub(crate) fn update<T: CacheKey>(
-        &self,
-        path: RelativePathBuf,
-        key: T,
-        messages: &[Message],
-        imports: &ImportMap,
-        notebook_index: Option<&NotebookIndex>,
-    ) {
-        let source = if let Some(msg) = messages.first() {
-            msg.file.source_text().to_owned()
-        } else {
-            String::new() // No messages, no need to keep the source!
-        };
-
-        let messages = messages
-            .iter()
-            .map(|msg| {
-                // Make sure that all message use the same source file.
-                assert!(
-                    msg.file == messages.first().unwrap().file,
-                    "message uses a different source file"
-                );
-                CacheMessage {
-                    kind: msg.kind.clone(),
-                    range: msg.range,
-                    fix: msg.fix.clone(),
-                    noqa_offset: msg.noqa_offset,
-                }
-            })
-            .collect();
-
+    fn update(&self, path: RelativePathBuf, key: &FileCacheKey, data: ChangeData) {
         let mut hasher = CacheKeyHasher::new();
         key.cache_key(&mut hasher);
 
-        let file = FileCache {
-            key: hasher.finish(),
-            last_seen: AtomicU64::new(self.last_seen_cache),
-            imports: imports.clone(),
-            messages,
-            source,
-            notebook_index: notebook_index.cloned(),
-        };
-        self.new_files.lock().unwrap().insert(path, file);
+        self.changes.lock().unwrap().push(Change {
+            path,
+            new_key: hasher.finish(),
+            new_data: data,
+        });
+    }
+
+    pub(crate) fn update_lint(
+        &self,
+        path: RelativePathBuf,
+        key: &FileCacheKey,
+        data: LintCacheData,
+    ) {
+        self.update(path, key, ChangeData::Lint(data));
+    }
+
+    pub(crate) fn set_formatted(&self, path: RelativePathBuf, key: &FileCacheKey) {
+        self.update(path, key, ChangeData::Formatted);
     }
 }
 
@@ -254,55 +307,43 @@ pub(crate) struct FileCache {
     /// Represented as the number of milliseconds since Unix epoch. This will
     /// break in 1970 + ~584 years (~2554).
     last_seen: AtomicU64,
-    /// Imports made.
-    imports: ImportMap,
-    /// Diagnostic messages.
-    messages: Vec<CacheMessage>,
-    /// Source code of the file.
-    ///
-    /// # Notes
-    ///
-    /// This will be empty if `messages` is empty.
-    source: String,
-    /// Notebook index if this file is a Jupyter Notebook.
-    notebook_index: Option<NotebookIndex>,
+
+    data: FileCacheData,
 }
 
 impl FileCache {
     /// Convert the file cache into `Diagnostics`, using `path` as file name.
-    pub(crate) fn as_diagnostics(&self, path: &Path) -> Diagnostics {
-        let messages = if self.messages.is_empty() {
-            Vec::new()
-        } else {
-            let file = SourceFileBuilder::new(path.to_string_lossy(), &*self.source).finish();
-            self.messages
-                .iter()
-                .map(|msg| Message {
-                    kind: msg.kind.clone(),
-                    range: msg.range,
-                    fix: msg.fix.clone(),
-                    file: file.clone(),
-                    noqa_offset: msg.noqa_offset,
-                })
-                .collect()
-        };
-        let notebook_indexes = if let Some(notebook_index) = self.notebook_index.as_ref() {
-            FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook_index.clone())])
-        } else {
-            FxHashMap::default()
-        };
-        Diagnostics::new(messages, self.imports.clone(), notebook_indexes)
+    pub(crate) fn to_diagnostics(&self, path: &Path) -> Option<Diagnostics> {
+        self.data.lint.as_ref().map(|lint| {
+            let messages = if lint.messages.is_empty() {
+                Vec::new()
+            } else {
+                let file = SourceFileBuilder::new(path.to_string_lossy(), &*lint.source).finish();
+                lint.messages
+                    .iter()
+                    .map(|msg| Message {
+                        kind: msg.kind.clone(),
+                        range: msg.range,
+                        fix: msg.fix.clone(),
+                        file: file.clone(),
+                        noqa_offset: msg.noqa_offset,
+                    })
+                    .collect()
+            };
+            let notebook_indexes = if let Some(notebook_index) = lint.notebook_index.as_ref() {
+                FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook_index.clone())])
+            } else {
+                FxHashMap::default()
+            };
+            Diagnostics::new(messages, lint.imports.clone(), notebook_indexes)
+        })
     }
 }
 
-/// On disk representation of a diagnostic message.
-#[derive(Deserialize, Debug, Serialize)]
-struct CacheMessage {
-    kind: DiagnosticKind,
-    /// Range into the message's [`FileCache::source`].
-    range: TextRange,
-    fix: Option<Fix>,
-    noqa_offset: TextSize,
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct FileCacheData {
+    lint: Option<LintCacheData>,
+    formatted: bool,
 }
 
 /// Returns a hash key based on the `package_root`, `settings` and the crate
@@ -335,31 +376,208 @@ pub(crate) fn init(path: &Path) -> Result<()> {
     Ok(())
 }
 
+#[derive(Deserialize, Debug, Serialize, PartialEq)]
+pub(crate) struct LintCacheData {
+    /// Imports made.
+    pub(super) imports: ImportMap,
+    /// Diagnostic messages.
+    pub(super) messages: Vec<CacheMessage>,
+    /// Source code of the file.
+    ///
+    /// # Notes
+    ///
+    /// This will be empty if `messages` is empty.
+    pub(super) source: String,
+    /// Notebook index if this file is a Jupyter Notebook.
+    pub(super) notebook_index: Option<NotebookIndex>,
+}
+
+impl LintCacheData {
+    pub(crate) fn from_messages(
+        messages: &[Message],
+        imports: ImportMap,
+        notebook_index: Option<NotebookIndex>,
+    ) -> Self {
+        let source = if let Some(msg) = messages.first() {
+            msg.file.source_text().to_owned()
+        } else {
+            String::new() // No messages, no need to keep the source!
+        };
+
+        let messages = messages
+            .iter()
+            .map(|msg| {
+                // Make sure that all message use the same source file.
+                assert_eq!(
+                    msg.file,
+                    messages.first().unwrap().file,
+                    "message uses a different source file"
+                );
+                CacheMessage {
+                    kind: msg.kind.clone(),
+                    range: msg.range,
+                    fix: msg.fix.clone(),
+                    noqa_offset: msg.noqa_offset,
+                }
+            })
+            .collect();
+
+        Self {
+            imports,
+            messages,
+            source,
+            notebook_index,
+        }
+    }
+}
+
+/// On disk representation of a diagnostic message.
+#[derive(Deserialize, Debug, Serialize, PartialEq)]
+pub(super) struct CacheMessage {
+    kind: DiagnosticKind,
+    /// Range into the message's [`FileCache::source`].
+    range: TextRange,
+    fix: Option<Fix>,
+    noqa_offset: TextSize,
+}
+
+pub(crate) trait PackageCaches {
+    fn get(&self, package_root: &Path) -> Option<&Cache>;
+
+    fn persist(self) -> anyhow::Result<()>;
+}
+
+impl<T> PackageCaches for Option<T>
+where
+    T: PackageCaches,
+{
+    fn get(&self, package_root: &Path) -> Option<&Cache> {
+        match self {
+            None => None,
+            Some(caches) => caches.get(package_root),
+        }
+    }
+
+    fn persist(self) -> Result<()> {
+        match self {
+            None => Ok(()),
+            Some(caches) => caches.persist(),
+        }
+    }
+}
+
+pub(crate) struct PackageCacheMap<'a>(FxHashMap<&'a Path, Cache>);
+
+impl<'a> PackageCacheMap<'a> {
+    pub(crate) fn init(
+        pyproject_config: &PyprojectConfig,
+        package_roots: &FxHashMap<&'a Path, Option<&'a Path>>,
+        resolver: &Resolver,
+    ) -> Self {
+        fn init_cache(path: &Path) {
+            if let Err(e) = cache::init(path) {
+                error!("Failed to initialize cache at {}: {e:?}", path.display());
+            }
+        }
+
+        match pyproject_config.strategy {
+            PyprojectDiscoveryStrategy::Fixed => {
+                init_cache(&pyproject_config.settings.cache_dir);
+            }
+            PyprojectDiscoveryStrategy::Hierarchical => {
+                for settings in
+                    std::iter::once(&pyproject_config.settings).chain(resolver.settings())
+                {
+                    init_cache(&settings.cache_dir);
+                }
+            }
+        }
+
+        Self(
+            package_roots
+                .iter()
+                .map(|(package, package_root)| package_root.unwrap_or(package))
+                .unique()
+                .par_bridge()
+                .map(|cache_root| {
+                    let settings = resolver.resolve(cache_root, pyproject_config);
+                    let cache = Cache::open(cache_root.to_path_buf(), settings);
+                    (cache_root, cache)
+                })
+                .collect(),
+        )
+    }
+}
+
+impl PackageCaches for PackageCacheMap<'_> {
+    fn get(&self, package_root: &Path) -> Option<&Cache> {
+        let cache = self.0.get(package_root);
+
+        if cache.is_none() {
+            debug!("No cache found for {}", package_root.display());
+        }
+
+        cache
+    }
+
+    fn persist(self) -> Result<()> {
+        self.0
+            .into_par_iter()
+            .try_for_each(|(_, cache)| cache.persist())
+    }
+}
+
+#[derive(Debug)]
+struct Change {
+    path: PathBuf,
+    new_key: u64,
+    new_data: ChangeData,
+}
+
+#[derive(Debug)]
+enum ChangeData {
+    Lint(LintCacheData),
+    Formatted,
+}
+
+impl ChangeData {
+    fn apply(self, data: &mut FileCacheData) {
+        match self {
+            ChangeData::Lint(new_lint) => {
+                data.lint = Some(new_lint);
+            }
+            ChangeData::Formatted => {
+                data.formatted = true;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use filetime::{set_file_mtime, FileTime};
     use std::env::temp_dir;
     use std::fs;
     use std::io;
     use std::io::Write;
     use std::path::{Path, PathBuf};
+    use std::sync::atomic::AtomicU64;
     use std::time::SystemTime;
 
+    use anyhow::Result;
+    use filetime::{set_file_mtime, FileTime};
     use itertools::Itertools;
+    use test_case::test_case;
+
     use ruff_cache::CACHE_DIR_NAME;
     use ruff_linter::settings::flags;
-
-    use crate::cache::RelativePathBuf;
-    use crate::cache::{self, Cache, FileCache};
-    use crate::diagnostics::{lint_path, Diagnostics};
-
-    use std::sync::atomic::AtomicU64;
-
-    use anyhow::Result;
-    use ruff_python_ast::imports::ImportMap;
-
+    use ruff_linter::settings::types::UnsafeFixes;
+    use ruff_python_ast::PySourceType;
     use ruff_workspace::Settings;
-    use test_case::test_case;
+
+    use crate::cache::{self, FileCache, FileCacheData, FileCacheKey};
+    use crate::cache::{Cache, RelativePathBuf};
+    use crate::commands::format::{format_path, FormatCommandError, FormatMode, FormatResult};
+    use crate::diagnostics::{lint_path, Diagnostics};
 
     #[test_case("../ruff_linter/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_linter"; "ruff_linter_fixtures")]
     #[test_case("../ruff_notebook/resources/test/fixtures", "ruff_tests/cache_same_results_ruff_notebook"; "ruff_notebook_fixtures")]
@@ -376,7 +594,7 @@ mod tests {
 
         let package_root = fs::canonicalize(package_root).unwrap();
         let cache = Cache::open(package_root.clone(), &settings);
-        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let mut paths = Vec::new();
         let mut parse_errors = Vec::new();
@@ -410,6 +628,7 @@ mod tests {
                     Some(&cache),
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
+                    UnsafeFixes::Enabled,
                 )
                 .unwrap();
                 if diagnostics
@@ -425,7 +644,7 @@ mod tests {
         }
         assert_ne!(paths, &[] as &[std::path::PathBuf], "no files checked");
 
-        cache.store().unwrap();
+        cache.persist().unwrap();
 
         let cache = Cache::open(package_root.clone(), &settings);
         assert_ne!(cache.package.files.len(), 0);
@@ -455,6 +674,7 @@ mod tests {
                 Some(&cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
+                UnsafeFixes::Enabled,
             )
             .unwrap();
         }
@@ -469,21 +689,21 @@ mod tests {
         let test_cache = TestCache::new("cache_adds_file_on_lint");
         let cache = test_cache.open();
         test_cache.write_source_file("source.py", source);
-        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
-        cache.store().unwrap();
+        cache.persist().unwrap();
         let cache = test_cache.open();
 
         test_cache
             .lint_file_with_cache("source.py", &cache)
             .expect("Failed to lint test file");
         assert_eq!(
-            cache.new_files.lock().unwrap().len(),
+            cache.changes.lock().unwrap().len(),
             1,
             "A single new file should be added to the cache"
         );
 
-        cache.store().unwrap();
+        cache.persist().unwrap();
     }
 
     #[test]
@@ -494,9 +714,9 @@ mod tests {
         let cache = test_cache.open();
         test_cache.write_source_file("source_1.py", source);
         test_cache.write_source_file("source_2.py", source);
-        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
-        cache.store().unwrap();
+        cache.persist().unwrap();
         let cache = test_cache.open();
 
         test_cache
@@ -506,12 +726,39 @@ mod tests {
             .lint_file_with_cache("source_2.py", &cache)
             .expect("Failed to lint test file");
         assert_eq!(
-            cache.new_files.lock().unwrap().len(),
+            cache.changes.lock().unwrap().len(),
+            2,
+            "Both files should be added to the cache"
+        );
+        cache.persist().unwrap();
+    }
+
+    #[test]
+    fn cache_adds_files_on_format() {
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+
+        let test_cache = TestCache::new("cache_adds_files_on_format");
+        let cache = test_cache.open();
+        test_cache.write_source_file("source_1.py", source);
+        test_cache.write_source_file("source_2.py", source);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
+
+        cache.persist().unwrap();
+        let cache = test_cache.open();
+
+        test_cache
+            .format_file_with_cache("source_1.py", &cache)
+            .expect("Failed to format test file");
+        test_cache
+            .format_file_with_cache("source_2.py", &cache)
+            .expect("Failed to format test file");
+        assert_eq!(
+            cache.changes.lock().unwrap().len(),
             2,
             "Both files should be added to the cache"
         );
 
-        cache.store().unwrap();
+        cache.persist().unwrap();
     }
 
     #[test]
@@ -521,13 +768,13 @@ mod tests {
         let test_cache = TestCache::new("cache_invalidated_on_file_modified_time");
         let cache = test_cache.open();
         let source_path = test_cache.write_source_file("source.py", source);
-        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let expected_diagnostics = test_cache
             .lint_file_with_cache("source.py", &cache)
             .expect("Failed to lint test file");
 
-        cache.store().unwrap();
+        cache.persist().unwrap();
         let cache = test_cache.open();
 
         // Update the modified time of the file to a time in the future
@@ -542,7 +789,7 @@ mod tests {
             .expect("Failed to lint test file");
 
         assert_eq!(
-            cache.new_files.lock().unwrap().len(),
+            cache.changes.lock().unwrap().len(),
             1,
             "Cache should not be used, the file should be treated as new and added to the cache"
         );
@@ -580,13 +827,13 @@ mod tests {
         let test_cache = TestCache::new("cache_invalidated_on_permission_change");
         let cache = test_cache.open();
         let path = test_cache.write_source_file("source.py", source);
-        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         let expected_diagnostics = test_cache
             .lint_file_with_cache("source.py", &cache)
             .unwrap();
 
-        cache.store().unwrap();
+        cache.persist().unwrap();
         let cache = test_cache.open();
 
         // Flip the permissions on the file
@@ -600,7 +847,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            cache.new_files.lock().unwrap().len(),
+            cache.changes.lock().unwrap().len(),
             1,
             "Cache should not be used, the file should be treated as new and added to the cache"
         );
@@ -612,8 +859,8 @@ mod tests {
     }
 
     #[test]
-    fn cache_removes_stale_files_on_store() {
-        let test_cache = TestCache::new("cache_removes_stale_files_on_store");
+    fn cache_removes_stale_files_on_persist() {
+        let test_cache = TestCache::new("cache_removes_stale_files_on_persist");
         let mut cache = test_cache.open();
 
         // Add a file to the cache that hasn't been linted or seen since the '70s!
@@ -623,10 +870,7 @@ mod tests {
             FileCache {
                 key: 123,
                 last_seen: AtomicU64::new(123),
-                imports: ImportMap::new(),
-                messages: Vec::new(),
-                source: String::new(),
-                notebook_index: None,
+                data: FileCacheData::default(),
             },
         );
 
@@ -634,21 +878,112 @@ mod tests {
         let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
         test_cache.write_source_file("new.py", source);
         let new_path_key = RelativePathBuf::from("new.py");
-        assert_eq!(cache.new_files.lock().unwrap().len(), 0);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
 
         test_cache
             .lint_file_with_cache("new.py", &cache)
             .expect("Failed to lint test file");
 
         // Storing the cache should remove the old (`old.py`) file.
-        cache.store().unwrap();
+        cache.persist().unwrap();
         // So we when we open the cache again it shouldn't contain `old.py`.
         let cache = test_cache.open();
 
-        assert!(
-            cache.package.files.keys().collect_vec() == vec![&new_path_key],
+        assert_eq!(
+            cache.package.files.keys().collect_vec(),
+            vec![&new_path_key],
             "Only the new file should be present"
         );
+    }
+
+    #[test]
+    fn format_updates_cache_entry() {
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+
+        let test_cache = TestCache::new("format_updates_cache_entry");
+        let cache = test_cache.open();
+        test_cache.write_source_file("source.py", source);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
+
+        cache.persist().unwrap();
+        let cache = test_cache.open();
+
+        // Cache the lint results
+        test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+        cache.persist().unwrap();
+
+        let mut cache = test_cache.open();
+
+        // Now lint the file
+        test_cache
+            .format_file_with_cache("source.py", &cache)
+            .expect("Failed to format test file");
+
+        cache.save();
+
+        assert_eq!(cache.package.files.len(), 1);
+
+        let Some(file_cache) = cache.get(
+            Path::new("source.py"),
+            &FileCacheKey::from_path(&test_cache.package_root.join("source.py")).unwrap(),
+        ) else {
+            panic!("Cache entry for `source.py` is missing.");
+        };
+
+        assert!(file_cache.data.lint.is_some());
+        assert!(file_cache.data.formatted);
+    }
+
+    #[test]
+    fn file_changes_invalidate_file_cache() {
+        let source: &[u8] = b"a = 1\n\n__all__ = list([\"a\", \"b\"])\n";
+
+        let test_cache = TestCache::new("file_changes_invalidate_file_cache");
+        let cache = test_cache.open();
+        let source_path = test_cache.write_source_file("source.py", source);
+        assert_eq!(cache.changes.lock().unwrap().len(), 0);
+
+        cache.persist().unwrap();
+        let cache = test_cache.open();
+
+        // Cache the format and lint results
+        test_cache
+            .lint_file_with_cache("source.py", &cache)
+            .expect("Failed to lint test file");
+        test_cache
+            .format_file_with_cache("source.py", &cache)
+            .expect("Failed to format test file");
+
+        cache.persist().unwrap();
+
+        let mut cache = test_cache.open();
+        assert_eq!(cache.package.files.len(), 1);
+
+        set_file_mtime(
+            &source_path,
+            FileTime::from_system_time(SystemTime::now() + std::time::Duration::from_secs(1)),
+        )
+        .unwrap();
+
+        test_cache
+            .format_file_with_cache("source.py", &cache)
+            .expect("Failed to format test file");
+
+        cache.save();
+
+        assert_eq!(cache.package.files.len(), 1);
+
+        let Some(file_cache) = cache.get(
+            Path::new("source.py"),
+            &FileCacheKey::from_path(&source_path).unwrap(),
+        ) else {
+            panic!("Cache entry for `source.py` is missing.");
+        };
+
+        assert_eq!(file_cache.data.lint, None);
+        assert!(file_cache.data.formatted);
     }
 
     struct TestCache {
@@ -657,11 +992,11 @@ mod tests {
     }
 
     impl TestCache {
-        fn new(name: &str) -> Self {
+        fn new(test_case: &str) -> Self {
             // Build a new cache directory and clear it
             let mut test_dir = temp_dir();
             test_dir.push("ruff_tests/cache");
-            test_dir.push(name);
+            test_dir.push(test_case);
 
             let _ = fs::remove_dir_all(&test_dir);
 
@@ -712,6 +1047,22 @@ mod tests {
                 Some(cache),
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
+                UnsafeFixes::Enabled,
+            )
+        }
+
+        fn format_file_with_cache(
+            &self,
+            path: &str,
+            cache: &Cache,
+        ) -> Result<FormatResult, FormatCommandError> {
+            let file_path = self.package_root.join(path);
+            format_path(
+                &file_path,
+                &self.settings.formatter,
+                PySourceType::Python,
+                FormatMode::Write,
+                Some(cache),
             )
         }
     }

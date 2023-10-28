@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 
 use ast::traversal;
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
@@ -9,9 +9,8 @@ use ruff_python_semantic::analyze::typing::is_list;
 use ruff_python_semantic::{Binding, BindingId, DefinitionId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::snippet::SourceCodeSnippet;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for consecutive calls to `append`.
@@ -60,7 +59,7 @@ impl RepeatedAppend {
 }
 
 impl Violation for RepeatedAppend {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -69,7 +68,7 @@ impl Violation for RepeatedAppend {
         format!("Use `{suggestion}` instead of repeatedly calling `{name}.append()`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let suggestion = self.suggestion();
         Some(format!("Replace with `{suggestion}`"))
     }
@@ -107,8 +106,8 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
 
             // We only suggest a fix when all appends in a group are clumped together. If they're
             // non-consecutive, fixing them is much more difficult.
-            if checker.patch(diagnostic.kind.rule()) && group.is_consecutive {
-                diagnostic.set_fix(Fix::suggested(Edit::replacement(
+            if group.is_consecutive {
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     replacement,
                     group.start(),
                     group.end(),

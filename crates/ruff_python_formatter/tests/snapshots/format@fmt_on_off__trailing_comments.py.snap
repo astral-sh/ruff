@@ -93,4 +93,21 @@ def test3  ():
 ```
 
 
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -21,8 +21,7 @@
+ 
+ 
+ # formatted
+-def test2():
+-    ...
++def test2(): ...
+ 
+ 
+ a = 10
+```
+
+
 

@@ -1,11 +1,10 @@
 use ruff_python_ast::{self as ast, Constant, Expr};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `hasattr` to test if an object is callable (e.g.,
@@ -37,7 +36,7 @@ use crate::registry::AsRule;
 pub struct UnreliableCallableCheck;
 
 impl Violation for UnreliableCallableCheck {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,7 +46,7 @@ impl Violation for UnreliableCallableCheck {
         )
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some(format!("Replace with `callable()`"))
     }
 }
@@ -80,14 +79,12 @@ pub(crate) fn unreliable_callable_check(
     }
 
     let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        if id == "hasattr" {
-            if checker.semantic().is_builtin("callable") {
-                diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                    format!("callable({})", checker.locator().slice(obj)),
-                    expr.range(),
-                )));
-            }
+    if id == "hasattr" {
+        if checker.semantic().is_builtin("callable") {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                format!("callable({})", checker.locator().slice(obj)),
+                expr.range(),
+            )));
         }
     }
     checker.diagnostics.push(diagnostic);

@@ -9,7 +9,7 @@ E23.py:2:7: E231 [*] Missing whitespace after ','
 3 | #: E231
 4 | a[b1,:]
   |
-  = help: Added missing whitespace after ','
+  = help: Add missing whitespace
 
 ℹ Fix
 1 1 | #: E231
@@ -28,7 +28,7 @@ E23.py:4:5: E231 [*] Missing whitespace after ','
 5 | #: E231
 6 | a = [{'a':''}]
   |
-  = help: Added missing whitespace after ','
+  = help: Add missing whitespace
 
 ℹ Fix
 1 1 | #: E231
@@ -49,7 +49,7 @@ E23.py:6:10: E231 [*] Missing whitespace after ':'
 7 | #: Okay
 8 | a = (4,)
   |
-  = help: Added missing whitespace after ':'
+  = help: Add missing whitespace
 
 ℹ Fix
 3 3 | #: E231
@@ -69,7 +69,7 @@ E23.py:19:10: E231 [*] Missing whitespace after ','
    |          ^ E231
 20 |         pass
    |
-   = help: Added missing whitespace after ','
+   = help: Add missing whitespace
 
 ℹ Fix
 16 16 | 
@@ -89,7 +89,7 @@ E23.py:29:20: E231 [*] Missing whitespace after ':'
    |                    ^ E231
 30 | }
    |
-   = help: Added missing whitespace after ':'
+   = help: Add missing whitespace
 
 ℹ Fix
 26 26 | #: E231:2:20
@@ -99,6 +99,26 @@ E23.py:29:20: E231 [*] Missing whitespace after ':'
    29 |+    'tag_smalldata': [('byte_count_mdtype', 'u4'), ('data', 'S4')],
 30 30 | }
 31 31 | 
-32 32 | #: Okay
+32 32 | # E231
+
+E23.py:33:6: E231 [*] Missing whitespace after ','
+   |
+32 | # E231
+33 | f"{(a,b)}"
+   |      ^ E231
+34 | 
+35 | # Okay because it's hard to differentiate between the usages of a colon in a f-string
+   |
+   = help: Add missing whitespace
+
+ℹ Fix
+30 30 | }
+31 31 | 
+32 32 | # E231
+33    |-f"{(a,b)}"
+   33 |+f"{(a, b)}"
+34 34 | 
+35 35 | # Okay because it's hard to differentiate between the usages of a colon in a f-string
+36 36 | f"{a:=1}"
 
 

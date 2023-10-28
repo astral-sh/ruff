@@ -11,7 +11,7 @@ B009_B010.py:19:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 16 16 | getattr(foo, "__123abc")
 17 17 | 
 18 18 | # Invalid usage
@@ -32,7 +32,7 @@ B009_B010.py:20:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 17 17 | 
 18 18 | # Invalid usage
 19 19 | getattr(foo, "bar")
@@ -53,7 +53,7 @@ B009_B010.py:21:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 18 18 | # Invalid usage
 19 19 | getattr(foo, "bar")
 20 20 | getattr(foo, "_123abc")
@@ -74,7 +74,7 @@ B009_B010.py:22:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 19 19 | getattr(foo, "bar")
 20 20 | getattr(foo, "_123abc")
 21 21 | getattr(foo, "__123abc__")
@@ -95,7 +95,7 @@ B009_B010.py:23:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 20 20 | getattr(foo, "_123abc")
 21 21 | getattr(foo, "__123abc__")
 22 22 | getattr(foo, "abc123")
@@ -116,7 +116,7 @@ B009_B010.py:24:15: B009 [*] Do not call `getattr` with a constant attribute val
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 21 21 | getattr(foo, "__123abc__")
 22 22 | getattr(foo, "abc123")
 23 23 | getattr(foo, r"abc123")
@@ -137,7 +137,7 @@ B009_B010.py:25:4: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 22 22 | getattr(foo, "abc123")
 23 23 | getattr(foo, r"abc123")
 24 24 | _ = lambda x: getattr(x, "bar")
@@ -158,7 +158,7 @@ B009_B010.py:27:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 24 24 | _ = lambda x: getattr(x, "bar")
 25 25 | if getattr(x, "bar"):
 26 26 |     pass
@@ -179,7 +179,7 @@ B009_B010.py:28:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 25 25 | if getattr(x, "bar"):
 26 26 |     pass
 27 27 | getattr(1, "real")
@@ -200,7 +200,7 @@ B009_B010.py:29:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 26 26 |     pass
 27 27 | getattr(1, "real")
 28 28 | getattr(1., "real")
@@ -221,7 +221,7 @@ B009_B010.py:30:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 27 27 | getattr(1, "real")
 28 28 | getattr(1., "real")
 29 29 | getattr(1.0, "real")
@@ -242,7 +242,7 @@ B009_B010.py:31:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 28 28 | getattr(1., "real")
 29 29 | getattr(1.0, "real")
 30 30 | getattr(1j, "real")
@@ -263,7 +263,7 @@ B009_B010.py:32:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 29 29 | getattr(1.0, "real")
 30 30 | getattr(1j, "real")
 31 31 | getattr(True, "real")
@@ -284,7 +284,7 @@ B009_B010.py:33:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 30 30 | getattr(1j, "real")
 31 31 | getattr(True, "real")
 32 32 | getattr(x := 1, "real")
@@ -304,7 +304,7 @@ B009_B010.py:34:1: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 31 31 | getattr(True, "real")
 32 32 | getattr(x := 1, "real")
 33 33 | getattr(x + y, "real")
@@ -326,7 +326,7 @@ B009_B010.py:58:8: B009 [*] Do not call `getattr` with a constant attribute valu
    |
    = help: Replace `getattr` with attribute access
 
-ℹ Suggested fix
+ℹ Fix
 55 55 | setattr(foo.bar, r"baz", None)
 56 56 | 
 57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
@@ -335,5 +335,23 @@ B009_B010.py:58:8: B009 [*] Do not call `getattr` with a constant attribute valu
 59 59 | 
 60 60 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1732387247
 61 61 | getattr(*foo, "bar")
+
+B009_B010.py:65:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+64 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739800901
+65 | / getattr(self.
+66 | |    registration.registry, '__name__')
+   | |_____________________________________^ B009
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Fix
+62 62 | setattr(*foo, "bar", None)
+63 63 | 
+64 64 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1739800901
+65    |-getattr(self.
+66    |-   registration.registry, '__name__')
+   65 |+(self.
+   66 |+   registration.registry).__name__
 
 

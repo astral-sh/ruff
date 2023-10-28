@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::{
@@ -11,52 +11,152 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::settings::types::PythonVersion;
 
+/// ## What it does
+/// Checks for typed function arguments in stubs with default values that
+/// are not "simple" /// (i.e., `int`, `float`, `complex`, `bytes`, `str`,
+/// `bool`, `None`, `...`, or simple container literals).
+///
+/// ## Why is this bad?
+/// Stub (`.pyi`) files exist to define type hints, and are not evaluated at
+/// runtime. As such, function arguments in stub files should not have default
+/// values, as they are ignored by type checkers.
+///
+/// However, the use of default values may be useful for IDEs and other
+/// consumers of stub files, and so "simple" values may be worth including and
+/// are permitted by this rule.
+///
+/// Instead of including and reproducing a complex value, use `...` to indicate
+/// that the assignment has a default value, but that the value is non-simple
+/// or varies according to the current platform or Python version.
+///
+/// ## Example
+/// ```python
+/// def foo(arg: List[int] = []) -> None:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(arg: List[int] = ...) -> None:
+///     ...
+/// ```
+///
+/// ## References
+/// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[violation]
 pub struct TypedArgumentDefaultInStub;
 
-impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
+impl AlwaysFixableViolation for TypedArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for typed arguments")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace default value with `...`".to_string()
     }
 }
 
+/// ## What it does
+/// Checks for untyped function arguments in stubs with default values that
+/// are not "simple" /// (i.e., `int`, `float`, `complex`, `bytes`, `str`,
+/// `bool`, `None`, `...`, or simple container literals).
+///
+/// ## Why is this bad?
+/// Stub (`.pyi`) files exist to define type hints, and are not evaluated at
+/// runtime. As such, function arguments in stub files should not have default
+/// values, as they are ignored by type checkers.
+///
+/// However, the use of default values may be useful for IDEs and other
+/// consumers of stub files, and so "simple" values may be worth including and
+/// are permitted by this rule.
+///
+/// Instead of including and reproducing a complex value, use `...` to indicate
+/// that the assignment has a default value, but that the value is non-simple
+/// or varies according to the current platform or Python version.
+///
+/// ## Example
+/// ```python
+/// def foo(arg=[]) -> None:
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(arg=...) -> None:
+///     ...
+/// ```
+///
+/// ## References
+/// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[violation]
 pub struct ArgumentDefaultInStub;
 
-impl AlwaysAutofixableViolation for ArgumentDefaultInStub {
+impl AlwaysFixableViolation for ArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for arguments")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace default value with `...`".to_string()
     }
 }
 
+/// ## What it does
+/// Checks for assignments in stubs with default values that are not "simple"
+/// (i.e., `int`, `float`, `complex`, `bytes`, `str`, `bool`, `None`, `...`, or
+/// simple container literals).
+///
+/// ## Why is this bad?
+/// Stub (`.pyi`) files exist to define type hints, and are not evaluated at
+/// runtime. As such, assignments in stub files should not include values,
+/// as they are ignored by type checkers.
+///
+/// However, the use of such values may be useful for IDEs and other consumers
+/// of stub files, and so "simple" values may be worth including and are
+/// permitted by this rule.
+///
+/// Instead of including and reproducing a complex value, use `...` to indicate
+/// that the assignment has a default value, but that the value is non-simple
+/// or varies according to the current platform or Python version.
+///
+/// ## Example
+/// ```python
+/// foo: str = "..."
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo: str = ...
+/// ```
+///
+/// ## References
+/// - [`flake8-pyi`](https://github.com/PyCQA/flake8-pyi/blob/main/ERRORCODES.md)
 #[violation]
 pub struct AssignmentDefaultInStub;
 
-impl AlwaysAutofixableViolation for AssignmentDefaultInStub {
+impl AlwaysFixableViolation for AssignmentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for assignments")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Replace default value with `...`".to_string()
     }
 }
 
+/// ## What it does?
+/// Checks for unannotated assignments in stub (`.pyi`) files.
+///
+/// ## Why is this bad?
+/// Stub files exist to provide type hints, and are never executed. As such,
+/// all assignments in stub files should be annotated with a type.
 #[violation]
 pub struct UnannotatedAssignmentInStub {
     name: String,
@@ -68,11 +168,6 @@ impl Violation for UnannotatedAssignmentInStub {
         let UnannotatedAssignmentInStub { name } = self;
         format!("Need type annotation for `{name}`")
     }
-}
-
-#[violation]
-pub struct UnassignedSpecialVariableInStub {
-    name: String,
 }
 
 /// ## What it does
@@ -93,6 +188,11 @@ pub struct UnassignedSpecialVariableInStub {
 /// ```python
 /// __all__: list[str] = ["foo", "bar"]
 /// ```
+#[violation]
+pub struct UnassignedSpecialVariableInStub {
+    name: String,
+}
+
 impl Violation for UnassignedSpecialVariableInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -131,7 +231,7 @@ pub struct TypeAliasWithoutAnnotation {
     value: String,
 }
 
-impl AlwaysAutofixableViolation for TypeAliasWithoutAnnotation {
+impl AlwaysFixableViolation for TypeAliasWithoutAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TypeAliasWithoutAnnotation {
@@ -142,7 +242,7 @@ impl AlwaysAutofixableViolation for TypeAliasWithoutAnnotation {
         format!("Use `{module}.TypeAlias` for type alias, e.g., `{name}: TypeAlias = {value}`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Add `TypeAlias` annotation".to_string()
     }
 }
@@ -434,12 +534,10 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
             ) {
                 let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        "...".to_string(),
-                        default.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "...".to_string(),
+                    default.range(),
+                )));
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -471,12 +569,10 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Param
             ) {
                 let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
 
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                        "...".to_string(),
-                        default.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "...".to_string(),
+                    default.range(),
+                )));
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -506,12 +602,10 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
     }
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            "...".to_string(),
-            value.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "...".to_string(),
+        value.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -542,12 +636,10 @@ pub(crate) fn annotated_assignment_default_in_stub(
     }
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-            "...".to_string(),
-            value.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "...".to_string(),
+        value.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -641,18 +733,16 @@ pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr,
         },
         target.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import(module.as_str(), "TypeAlias"),
-                target.start(),
-                checker.semantic(),
-            )?;
-            Ok(Fix::suggested_edits(
-                Edit::range_replacement(format!("{id}: {binding}"), target.range()),
-                [import_edit],
-            ))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import(module.as_str(), "TypeAlias"),
+            target.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::safe_edits(
+            Edit::range_replacement(format!("{id}: {binding}"), target.range()),
+            [import_edit],
+        ))
+    });
     checker.diagnostics.push(diagnostic);
 }

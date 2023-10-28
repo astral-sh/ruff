@@ -284,4 +284,37 @@ SIM117.py:106:5: SIM117 Use a single `with` statement with multiple contexts ins
     |
     = help: Combine `with` statements
 
+SIM117.py:126:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+    |
+125 |   # SIM117
+126 | / with A() as a:
+127 | |     with B() as b:
+    | |__________________^ SIM117
+128 |           type ListOrSet[T] = list[T] | set[T]
+    |
+    = help: Combine `with` statements
+
+ℹ Suggested fix
+123 123 |             f(b2, c2, d2)
+124 124 | 
+125 125 | # SIM117
+126     |-with A() as a:
+127     |-    with B() as b:
+128     |-        type ListOrSet[T] = list[T] | set[T]
+    126 |+with A() as a, B() as b:
+    127 |+    type ListOrSet[T] = list[T] | set[T]
+129 128 | 
+130     |-        class ClassA[T: str]:
+131     |-            def method1(self) -> T:
+132     |-                ...
+    129 |+    class ClassA[T: str]:
+    130 |+        def method1(self) -> T:
+    131 |+            ...
+133 132 | 
+134     |-        f" something { my_dict["key"] } something else "
+    133 |+    f" something { my_dict["key"] } something else "
+135 134 | 
+136     |-        f"foo {f"bar {x}"} baz"
+    135 |+    f"foo {f"bar {x}"} baz"
+
 

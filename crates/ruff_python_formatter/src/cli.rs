@@ -2,17 +2,17 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{format_err, Context, Result};
 use clap::{command, Parser, ValueEnum};
 
 use ruff_formatter::SourceCode;
-use ruff_python_index::CommentRangesBuilder;
-use ruff_python_parser::lexer::lex;
-use ruff_python_parser::{parse_tokens, Mode};
+use ruff_python_ast::PySourceType;
+use ruff_python_index::tokens_and_ranges;
+use ruff_python_parser::{parse_ok_tokens, AsMode};
 use ruff_text_size::Ranged;
 
 use crate::comments::collect_comments;
-use crate::{format_node, PyFormatOptions};
+use crate::{format_module_ast, PreviewMode, PyFormatOptions};
 
 #[derive(ValueEnum, Clone, Debug)]
 pub enum Emit {
@@ -24,6 +24,7 @@ pub enum Emit {
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
+#[allow(clippy::struct_excessive_bools)] // It's only the dev cli anyways
 pub struct Cli {
     /// Python files to format. If there are none, stdin will be used. `-` as stdin is not supported
     pub files: Vec<PathBuf>,
@@ -34,41 +35,37 @@ pub struct Cli {
     #[clap(long)]
     pub check: bool,
     #[clap(long)]
+    pub preview: bool,
+    #[clap(long)]
     pub print_ir: bool,
     #[clap(long)]
     pub print_comments: bool,
 }
 
-pub fn format_and_debug_print(input: &str, cli: &Cli, source_type: &Path) -> Result<String> {
-    let mut tokens = Vec::new();
-    let mut comment_ranges = CommentRangesBuilder::default();
-
-    for result in lex(input, Mode::Module) {
-        let (token, range) = match result {
-            Ok((token, range)) => (token, range),
-            Err(err) => bail!("Source contains syntax errors {err:?}"),
-        };
-
-        comment_ranges.visit_token(&token, range);
-        tokens.push(Ok((token, range)));
-    }
-
-    let comment_ranges = comment_ranges.finish();
+pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Result<String> {
+    let source_type = PySourceType::from(source_path);
+    let (tokens, comment_ranges) = tokens_and_ranges(source, source_type)
+        .map_err(|err| format_err!("Source contains syntax errors {err:?}"))?;
 
     // Parse the AST.
-    let python_ast =
-        parse_tokens(tokens, Mode::Module, "<filename>").context("Syntax error in input")?;
+    let module = parse_ok_tokens(tokens, source, source_type.as_mode(), "<filename>")
+        .context("Syntax error in input")?;
 
-    let options = PyFormatOptions::from_extension(source_type);
-    let formatted = format_node(&python_ast, &comment_ranges, input, options)
+    let options = PyFormatOptions::from_extension(source_path).with_preview(if cli.preview {
+        PreviewMode::Enabled
+    } else {
+        PreviewMode::Disabled
+    });
+
+    let source_code = SourceCode::new(source);
+    let formatted = format_module_ast(&module, &comment_ranges, source, options)
         .context("Failed to format node")?;
     if cli.print_ir {
-        println!("{}", formatted.document().display(SourceCode::new(input)));
+        println!("{}", formatted.document().display(source_code));
     }
     if cli.print_comments {
         // Print preceding, following and enclosing nodes
-        let source_code = SourceCode::new(input);
-        let decorated_comments = collect_comments(&python_ast, source_code, &comment_ranges);
+        let decorated_comments = collect_comments(&module, source_code, &comment_ranges);
         if !decorated_comments.is_empty() {
             println!("# Comment decoration: Range, Preceding, Following, Enclosing, Comment");
         }
@@ -86,13 +83,10 @@ pub fn format_and_debug_print(input: &str, cli: &Cli, source_type: &Path) -> Res
                     comment.enclosing_node().kind(),
                     comment.enclosing_node().range()
                 ),
-                comment.slice().text(SourceCode::new(input)),
+                comment.slice().text(source_code),
             );
         }
-        println!(
-            "{:#?}",
-            formatted.context().comments().debug(SourceCode::new(input))
-        );
+        println!("{:#?}", formatted.context().comments().debug(source_code));
     }
     Ok(formatted
         .print()

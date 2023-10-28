@@ -65,7 +65,7 @@ d3 = "d"[
 
 # Spacing around the colon(s)
 def a():
-    ...
+    pass
 
 e00 = "e"[:]
 e01 = "e"[:1]

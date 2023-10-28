@@ -2,7 +2,7 @@ use std::fmt;
 
 use anyhow::Result;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::{self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters};
@@ -11,7 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
+
 use crate::settings::types::PythonVersion;
 
 use super::super::typing::type_hint_explicitly_allows_none;
@@ -80,14 +80,14 @@ pub struct ImplicitOptional {
 }
 
 impl Violation for ImplicitOptional {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("PEP 484 prohibits implicit `Optional`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let ImplicitOptional { conversion_type } = self;
         Some(format!("Convert to `{conversion_type}`"))
     }
@@ -134,7 +134,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 range: TextRange::default(),
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::suggested(Edit::range_replacement(
+            Ok(Fix::unsafe_edit(Edit::range_replacement(
                 content,
                 expr.range(),
             )))
@@ -156,7 +156,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 ctx: ast::ExprContext::Load,
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::suggested_edits(
+            Ok(Fix::unsafe_edits(
                 Edit::range_replacement(content, expr.range()),
                 [import_edit],
             ))
@@ -205,10 +205,8 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    if kind.is_simple() {
-                        diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-                    }
+                if kind.is_simple() {
+                    diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -226,9 +224,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-            }
+            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
             checker.diagnostics.push(diagnostic);
         }
     }

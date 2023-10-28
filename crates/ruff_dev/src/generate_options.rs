@@ -14,7 +14,11 @@ pub(crate) fn generate() -> String {
 }
 
 fn generate_set(output: &mut String, set: &Set) {
-    writeln!(output, "### {title}\n", title = set.title()).unwrap();
+    if set.level() < 2 {
+        writeln!(output, "### {title}\n", title = set.title()).unwrap();
+    } else {
+        writeln!(output, "#### {title}\n", title = set.title()).unwrap();
+    }
 
     if let Some(documentation) = set.metadata().documentation() {
         output.push_str(documentation);
@@ -32,58 +36,89 @@ fn generate_set(output: &mut String, set: &Set) {
 
     // Generate the fields.
     for (name, field) in &fields {
-        emit_field(output, name, field, set.name());
+        emit_field(output, name, field, set);
         output.push_str("---\n\n");
     }
 
     // Generate all the sub-sets.
     for (set_name, sub_set) in &sets {
-        generate_set(output, &Set::Named(set_name, *sub_set));
+        generate_set(output, &Set::Named(set_name, *sub_set, set.level() + 1));
     }
 }
 
 enum Set<'a> {
     Toplevel(OptionSet),
-    Named(&'a str, OptionSet),
+    Named(&'a str, OptionSet, u32),
 }
 
 impl<'a> Set<'a> {
     fn name(&self) -> Option<&'a str> {
         match self {
             Set::Toplevel(_) => None,
-            Set::Named(name, _) => Some(name),
+            Set::Named(name, _, _) => Some(name),
         }
     }
 
     fn title(&self) -> &'a str {
         match self {
             Set::Toplevel(_) => "Top-level",
-            Set::Named(name, _) => name,
+            Set::Named(name, _, _) => name,
         }
     }
 
     fn metadata(&self) -> &OptionSet {
         match self {
             Set::Toplevel(set) => set,
-            Set::Named(_, set) => set,
+            Set::Named(_, set, _) => set,
+        }
+    }
+
+    fn level(&self) -> u32 {
+        match self {
+            Set::Toplevel(_) => 0,
+            Set::Named(_, _, level) => *level,
         }
     }
 }
 
-fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
-    // if there's a group name, we need to add it to the anchor
-    if let Some(group_name) = group_name {
+fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: &Set) {
+    let header_level = if parent_set.level() < 2 {
+        "####"
+    } else {
+        "#####"
+    };
+
+    // if there's a set name, we need to add it to the anchor
+    if let Some(set_name) = parent_set.name() {
         // the anchor used to just be the name, but now it's the group name
         // for backwards compatibility, we need to keep the old anchor
         output.push_str(&format!("<span id=\"{name}\"></span>\n"));
 
         output.push_str(&format!(
-            "#### [`{name}`](#{group_name}-{name}) {{: #{group_name}-{name} }}\n"
+            "{header_level} [`{name}`](#{set_name}-{name}) {{: #{set_name}-{name} }}\n"
         ));
     } else {
-        output.push_str(&format!("#### [`{name}`](#{name})\n"));
+        output.push_str(&format!("{header_level} [`{name}`](#{name})\n"));
     }
     output.push('\n');
+
+    if let Some(deprecated) = &field.deprecated {
+        output.push_str("!!! warning \"Deprecated\"\n");
+        output.push_str("    This option has been deprecated");
+
+        if let Some(since) = deprecated.since {
+            write!(output, " in {since}").unwrap();
+        }
+
+        output.push('.');
+
+        if let Some(message) = deprecated.message {
+            writeln!(output, " {message}").unwrap();
+        }
+
+        output.push('\n');
+    }
+
     output.push_str(field.doc);
     output.push_str("\n\n");
     output.push_str(&format!("**Default value**: `{}`\n", field.default));
@@ -92,8 +127,8 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: 
     output.push('\n');
     output.push_str(&format!(
         "**Example usage**:\n\n```toml\n[tool.ruff{}]\n{}\n```\n",
-        if group_name.is_some() {
-            format!(".{}", group_name.unwrap())
+        if let Some(set_name) = parent_set.name() {
+            format!(".{set_name}")
         } else {
             String::new()
         },

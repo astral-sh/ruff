@@ -1,4 +1,4 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::Ranged;
@@ -29,10 +29,14 @@ use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 #[violation]
 pub struct MissingWhitespaceAfterKeyword;
 
-impl Violation for MissingWhitespaceAfterKeyword {
+impl AlwaysFixableViolation for MissingWhitespaceAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing whitespace after keyword")
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Added missing whitespace after keyword")
     }
 }
 
@@ -59,7 +63,9 @@ pub(crate) fn missing_whitespace_after_keyword(
                 ))
             && tok0.end() == tok1.start()
         {
-            context.push(MissingWhitespaceAfterKeyword, tok0.range());
+            let mut diagnostic = Diagnostic::new(MissingWhitespaceAfterKeyword, tok0.range());
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(" ".to_string(), tok0.end())));
+            context.push_diagnostic(diagnostic);
         }
     }
 }

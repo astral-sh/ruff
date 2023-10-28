@@ -11,7 +11,7 @@ B009_B010.py:50:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Suggested fix
+ℹ Fix
 47 47 |     pass
 48 48 | 
 49 49 | # Invalid usage
@@ -32,7 +32,7 @@ B009_B010.py:51:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Suggested fix
+ℹ Fix
 48 48 | 
 49 49 | # Invalid usage
 50 50 | setattr(foo, "bar", None)
@@ -53,7 +53,7 @@ B009_B010.py:52:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Suggested fix
+ℹ Fix
 49 49 | # Invalid usage
 50 50 | setattr(foo, "bar", None)
 51 51 | setattr(foo, "_123abc", None)
@@ -74,7 +74,7 @@ B009_B010.py:53:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Suggested fix
+ℹ Fix
 50 50 | setattr(foo, "bar", None)
 51 51 | setattr(foo, "_123abc", None)
 52 52 | setattr(foo, "__123abc__", None)
@@ -94,7 +94,7 @@ B009_B010.py:54:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Suggested fix
+ℹ Fix
 51 51 | setattr(foo, "_123abc", None)
 52 52 | setattr(foo, "__123abc__", None)
 53 53 | setattr(foo, "abc123", None)
@@ -115,7 +115,7 @@ B009_B010.py:55:1: B010 [*] Do not call `setattr` with a constant attribute valu
    |
    = help: Replace `setattr` with assignment
 
-ℹ Suggested fix
+ℹ Fix
 52 52 | setattr(foo, "__123abc__", None)
 53 53 | setattr(foo, "abc123", None)
 54 54 | setattr(foo, r"abc123", None)

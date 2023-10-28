@@ -1,23 +1,25 @@
 //! Discover Python files, and their corresponding [`Settings`], from the
 //! filesystem.
 
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
 use anyhow::Result;
 use anyhow::{anyhow, bail};
-use ignore::{DirEntry, WalkBuilder, WalkState};
+use globset::{Candidate, GlobSet};
+use ignore::{WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use ruff_linter::fs;
 use ruff_linter::packaging::is_package;
-use ruff_linter::{fs, warn_user_once};
 
 use crate::configuration::Configuration;
-use crate::options::FormatOrOutputFormat;
 use crate::pyproject;
 use crate::pyproject::settings_toml;
 use crate::settings::Settings;
@@ -221,10 +223,6 @@ fn resolve_configuration(
         let options = pyproject::load_options(&path)
             .map_err(|err| anyhow!("Failed to parse `{}`: {}", path.display(), err))?;
 
-        if matches!(options.format, Some(FormatOrOutputFormat::OutputFormat(_))) {
-            warn_user_once!("The option `format` has been deprecated to avoid ambiguity with Ruff's upcoming formatter. Use `output-format` instead.");
-        }
-
         let project_root = relativity.resolve(&path);
         let configuration = Configuration::from_options(options, &project_root)?;
 
@@ -281,7 +279,7 @@ pub fn python_files_in_path(
     paths: &[PathBuf],
     pyproject_config: &PyprojectConfig,
     transformer: &dyn ConfigurationTransformer,
-) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
+) -> Result<(Vec<Result<ResolvedFile, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
     let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
 
@@ -310,13 +308,12 @@ pub fn python_files_in_path(
         }
     }
 
+    let (first_path, rest_paths) = paths
+        .split_first()
+        .ok_or_else(|| anyhow!("Expected at least one path to search for Python files"))?;
     // Create the `WalkBuilder`.
-    let mut builder = WalkBuilder::new(
-        paths
-            .get(0)
-            .ok_or_else(|| anyhow!("Expected at least one path to search for Python files"))?,
-    );
-    for path in &paths[1..] {
+    let mut builder = WalkBuilder::new(first_path);
+    for path in rest_paths {
         builder.add(path);
     }
     builder.standard_filters(pyproject_config.settings.file_resolver.respect_gitignore);
@@ -326,7 +323,7 @@ pub fn python_files_in_path(
     // Run the `WalkParallel` to collect all Python files.
     let error: std::sync::Mutex<Result<()>> = std::sync::Mutex::new(Ok(()));
     let resolver: RwLock<Resolver> = RwLock::new(resolver);
-    let files: std::sync::Mutex<Vec<Result<DirEntry, ignore::Error>>> =
+    let files: std::sync::Mutex<Vec<Result<ResolvedFile, ignore::Error>>> =
         std::sync::Mutex::new(vec![]);
     walker.run(|| {
         Box::new(|result| {
@@ -337,18 +334,20 @@ pub fn python_files_in_path(
                     let resolver = resolver.read().unwrap();
                     let settings = resolver.resolve(path, pyproject_config);
                     if let Some(file_name) = path.file_name() {
-                        if !settings.file_resolver.exclude.is_empty()
-                            && match_exclusion(path, file_name, &settings.file_resolver.exclude)
-                        {
+                        let file_path = Candidate::new(path);
+                        let file_basename = Candidate::new(file_name);
+                        if match_candidate_exclusion(
+                            &file_path,
+                            &file_basename,
+                            &settings.file_resolver.exclude,
+                        ) {
                             debug!("Ignored path via `exclude`: {:?}", path);
                             return WalkState::Skip;
-                        } else if !settings.file_resolver.extend_exclude.is_empty()
-                            && match_exclusion(
-                                path,
-                                file_name,
-                                &settings.file_resolver.extend_exclude,
-                            )
-                        {
+                        } else if match_candidate_exclusion(
+                            &file_path,
+                            &file_basename,
+                            &settings.file_resolver.extend_exclude,
+                        ) {
                             debug!("Ignored path via `extend-exclude`: {:?}", path);
                             return WalkState::Skip;
                         }
@@ -391,30 +390,37 @@ pub fn python_files_in_path(
                 }
             }
 
-            if result.as_ref().map_or(true, |entry| {
-                // Ignore directories
-                if entry.file_type().map_or(true, |ft| ft.is_dir()) {
-                    false
-                } else if entry.depth() == 0 {
-                    // Accept all files that are passed-in directly.
-                    true
-                } else {
-                    // Otherwise, check if the file is included.
-                    let path = entry.path();
-                    let resolver = resolver.read().unwrap();
-                    let settings = resolver.resolve(path, pyproject_config);
-                    if settings.file_resolver.include.is_match(path) {
-                        debug!("Included path via `include`: {:?}", path);
-                        true
-                    } else if settings.file_resolver.extend_include.is_match(path) {
-                        debug!("Included path via `extend-include`: {:?}", path);
-                        true
+            match result {
+                Ok(entry) => {
+                    // Ignore directories
+                    let resolved = if entry.file_type().map_or(true, |ft| ft.is_dir()) {
+                        None
+                    } else if entry.depth() == 0 {
+                        // Accept all files that are passed-in directly.
+                        Some(ResolvedFile::Root(entry.into_path()))
                     } else {
-                        false
+                        // Otherwise, check if the file is included.
+                        let path = entry.path();
+                        let resolver = resolver.read().unwrap();
+                        let settings = resolver.resolve(path, pyproject_config);
+                        if settings.file_resolver.include.is_match(path) {
+                            debug!("Included path via `include`: {:?}", path);
+                            Some(ResolvedFile::Nested(entry.into_path()))
+                        } else if settings.file_resolver.extend_include.is_match(path) {
+                            debug!("Included path via `extend-include`: {:?}", path);
+                            Some(ResolvedFile::Nested(entry.into_path()))
+                        } else {
+                            None
+                        }
+                    };
+
+                    if let Some(resolved) = resolved {
+                        files.lock().unwrap().push(Ok(resolved));
                     }
                 }
-            }) {
-                files.lock().unwrap().push(result);
+                Err(err) => {
+                    files.lock().unwrap().push(Err(err));
+                }
             }
 
             WalkState::Continue
@@ -424,6 +430,51 @@ pub fn python_files_in_path(
     error.into_inner().unwrap()?;
 
     Ok((files.into_inner().unwrap(), resolver.into_inner().unwrap()))
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ResolvedFile {
+    /// File explicitly passed to the CLI
+    Root(PathBuf),
+    /// File in a sub-directory
+    Nested(PathBuf),
+}
+
+impl ResolvedFile {
+    pub fn into_path(self) -> PathBuf {
+        match self {
+            ResolvedFile::Root(path) => path,
+            ResolvedFile::Nested(path) => path,
+        }
+    }
+
+    pub fn path(&self) -> &Path {
+        match self {
+            ResolvedFile::Root(root) => root.as_path(),
+            ResolvedFile::Nested(root) => root.as_path(),
+        }
+    }
+
+    pub fn file_name(&self) -> &OsStr {
+        let path = self.path();
+        path.file_name().unwrap_or(path.as_os_str())
+    }
+
+    pub fn is_root(&self) -> bool {
+        matches!(self, ResolvedFile::Root(_))
+    }
+}
+
+impl PartialOrd for ResolvedFile {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ResolvedFile {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.path().cmp(other.path())
+    }
 }
 
 /// Return `true` if the Python file at [`Path`] is _not_ excluded.
@@ -463,25 +514,27 @@ fn is_file_excluded(
 ) -> bool {
     // TODO(charlie): Respect gitignore.
     for path in path.ancestors() {
-        if path.file_name().is_none() {
-            break;
-        }
         let settings = resolver.resolve(path, pyproject_strategy);
         if let Some(file_name) = path.file_name() {
-            if !settings.file_resolver.exclude.is_empty()
-                && match_exclusion(path, file_name, &settings.file_resolver.exclude)
-            {
+            let file_path = Candidate::new(path);
+            let file_basename = Candidate::new(file_name);
+            if match_candidate_exclusion(
+                &file_path,
+                &file_basename,
+                &settings.file_resolver.exclude,
+            ) {
                 debug!("Ignored path via `exclude`: {:?}", path);
                 return true;
-            } else if !settings.file_resolver.extend_exclude.is_empty()
-                && match_exclusion(path, file_name, &settings.file_resolver.extend_exclude)
-            {
+            } else if match_candidate_exclusion(
+                &file_path,
+                &file_basename,
+                &settings.file_resolver.extend_exclude,
+            ) {
                 debug!("Ignored path via `extend-exclude`: {:?}", path);
                 return true;
             }
         } else {
-            debug!("Ignored path due to error in parsing: {:?}", path);
-            return true;
+            break;
         }
         if path == settings.file_resolver.project_root {
             // Bail out; we'd end up past the project root on the next iteration
@@ -494,12 +547,28 @@ fn is_file_excluded(
 
 /// Return `true` if the given file should be ignored based on the exclusion
 /// criteria.
-fn match_exclusion<P: AsRef<Path>, R: AsRef<Path>>(
+pub fn match_exclusion<P: AsRef<Path>, R: AsRef<Path>>(
     file_path: P,
     file_basename: R,
-    exclusion: &globset::GlobSet,
+    exclusion: &GlobSet,
 ) -> bool {
+    if exclusion.is_empty() {
+        return false;
+    }
     exclusion.is_match(file_path) || exclusion.is_match(file_basename)
+}
+
+/// Return `true` if the given candidates should be ignored based on the exclusion
+/// criteria.
+pub fn match_candidate_exclusion(
+    file_path: &Candidate,
+    file_basename: &Candidate,
+    exclusion: &GlobSet,
+) -> bool {
+    if exclusion.is_empty() {
+        return false;
+    }
+    exclusion.is_match_candidate(file_path) || exclusion.is_match_candidate(file_basename)
 }
 
 #[cfg(test)]
@@ -520,7 +589,7 @@ mod tests {
     use crate::resolver::{
         is_file_excluded, match_exclusion, python_files_in_path, resolve_root_settings,
         ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy, Relativity,
-        Resolver,
+        ResolvedFile, Resolver,
     };
     use crate::settings::Settings;
     use crate::tests::test_resource_path;
@@ -589,12 +658,12 @@ mod tests {
             &NoOpTransformer,
         )?;
         let paths = paths
-            .iter()
+            .into_iter()
             .flatten()
-            .map(ignore::DirEntry::path)
+            .map(ResolvedFile::into_path)
             .sorted()
             .collect::<Vec<_>>();
-        assert_eq!(paths, &[file2, file1]);
+        assert_eq!(paths, [file2, file1]);
 
         Ok(())
     }

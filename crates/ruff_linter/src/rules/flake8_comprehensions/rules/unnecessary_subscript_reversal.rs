@@ -1,5 +1,3 @@
-use num_bigint::BigInt;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr, UnaryOp};
@@ -17,16 +15,16 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Examples
 /// ```python
-/// reversed(iterable[::-1])
+/// sorted(iterable[::-1])
 /// set(iterable[::-1])
-/// sorted(iterable)[::-1]
+/// reversed(iterable[::-1])
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// reversed(iterable)
+/// sorted(iterable)
 /// set(iterable)
-/// sorted(iterable, reverse=True)
+/// iterable
 /// ```
 #[violation]
 pub struct UnnecessarySubscriptReversal {
@@ -42,16 +40,11 @@ impl Violation for UnnecessarySubscriptReversal {
 }
 
 /// C415
-pub(crate) fn unnecessary_subscript_reversal(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
-    let Some(first_arg) = args.first() else {
+pub(crate) fn unnecessary_subscript_reversal(checker: &mut Checker, call: &ast::ExprCall) {
+    let Some(first_arg) = call.arguments.args.first() else {
         return;
     };
-    let Some(func) = func.as_name_expr() else {
+    let Some(func) = call.func.as_name_expr() else {
         return;
     };
     if !matches!(func.id.as_str(), "reversed" | "set" | "sorted") {
@@ -93,13 +86,13 @@ pub(crate) fn unnecessary_subscript_reversal(
     else {
         return;
     };
-    if *val != BigInt::from(1) {
+    if *val != 1 {
         return;
     };
     checker.diagnostics.push(Diagnostic::new(
         UnnecessarySubscriptReversal {
             func: func.id.to_string(),
         },
-        expr.range(),
+        call.range(),
     ));
 }

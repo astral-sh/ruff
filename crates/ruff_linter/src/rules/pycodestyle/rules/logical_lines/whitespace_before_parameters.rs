@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -40,25 +40,21 @@ impl WhitespaceBeforeParameters {
     }
 }
 
-impl AlwaysAutofixableViolation for WhitespaceBeforeParameters {
+impl AlwaysFixableViolation for WhitespaceBeforeParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
         let bracket = self.bracket_text();
         format!("Whitespace before '{bracket}'")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let bracket = self.bracket_text();
         format!("Removed whitespace before '{bracket}'")
     }
 }
 
 /// E211
-pub(crate) fn whitespace_before_parameters(
-    line: &LogicalLine,
-    autofix: bool,
-    context: &mut LogicalLinesContext,
-) {
+pub(crate) fn whitespace_before_parameters(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let previous = line.tokens().first().unwrap();
 
     let mut pre_pre_kind: Option<TokenKind> = None;
@@ -81,10 +77,7 @@ pub(crate) fn whitespace_before_parameters(
             let kind: WhitespaceBeforeParameters = WhitespaceBeforeParameters { bracket: kind };
 
             let mut diagnostic = Diagnostic::new(kind, TextRange::new(start, end));
-
-            if autofix {
-                diagnostic.set_fix(Fix::automatic(Edit::deletion(start, end)));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
             context.push_diagnostic(diagnostic);
         }
         pre_pre_kind = Some(prev_token);

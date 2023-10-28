@@ -1,11 +1,10 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix::edits::{remove_argument, Parentheses};
 
 /// ## What it does
 /// Checks for classes that inherit from `object`.
@@ -33,14 +32,14 @@ pub struct UselessObjectInheritance {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for UselessObjectInheritance {
+impl AlwaysFixableViolation for UselessObjectInheritance {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UselessObjectInheritance { name } = self;
         format!("Class `{name}` inherits from `object`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove `object` inheritance".to_string()
     }
 }
@@ -68,17 +67,15 @@ pub(crate) fn useless_object_inheritance(checker: &mut Checker, class_def: &ast:
             },
             base.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                remove_argument(
-                    base,
-                    arguments,
-                    Parentheses::Remove,
-                    checker.locator().contents(),
-                )
-                .map(Fix::automatic)
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            remove_argument(
+                base,
+                arguments,
+                Parentheses::Remove,
+                checker.locator().contents(),
+            )
+            .map(Fix::safe_edit)
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

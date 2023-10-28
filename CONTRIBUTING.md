@@ -170,7 +170,8 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
+1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). New rules
+    should be added in `RuleGroup::Preview`.
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
@@ -204,7 +205,7 @@ As such, rule names should...
     For example, `AssertFalse` guards against `assert False` statements.
 
 - _Not_ contain instructions on how to fix the violation, which instead belong in the rule
-    documentation and the `autofix_title`.
+    documentation and the `fix_title`.
 
 - _Not_ contain a redundant prefix, like `Disallow` or `Banned`, which are already implied by the
     convention.

@@ -2,14 +2,11 @@ use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
-
-use crate::registry::Rule;
-use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for compound statements (multiple statements on the same line).
@@ -87,13 +84,13 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 #[violation]
 pub struct UselessSemicolon;
 
-impl AlwaysAutofixableViolation for UselessSemicolon {
+impl AlwaysFixableViolation for UselessSemicolon {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Statement ends with an unnecessary semicolon")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove unnecessary semicolon")
     }
 }
@@ -104,7 +101,6 @@ pub(crate) fn compound_statements(
     lxr: &[LexResult],
     locator: &Locator,
     indexer: &Indexer,
-    settings: &LinterSettings,
 ) {
     // Track the last seen instance of a variety of tokens.
     let mut colon = None;
@@ -169,14 +165,12 @@ pub(crate) fn compound_statements(
                 if let Some((start, end)) = semi {
                     let mut diagnostic =
                         Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
-                    if settings.rules.should_fix(Rule::UselessSemicolon) {
-                        diagnostic.set_fix(Fix::automatic(Edit::deletion(
-                            indexer
-                                .preceded_by_continuations(start, locator)
-                                .unwrap_or(start),
-                            end,
-                        )));
-                    };
+                    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                        indexer
+                            .preceded_by_continuations(start, locator)
+                            .unwrap_or(start),
+                        end,
+                    )));
                     diagnostics.push(diagnostic);
                 }
 

@@ -2,6 +2,15 @@ from a import aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjf
 from a import aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa, aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
 from a import aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa as dfgsdfgsd, aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa as sdkjflsdjlahlfd
 
+# Continuations.
+import foo\
+    .bar
+
+from foo\
+    .bar import baz
+
+import tqdm  . tqdm
+
 # At the top-level, force one empty line after an import, but allow up to two empty
 # lines.
 import os
@@ -65,3 +74,14 @@ import os
 
 
 logger = logging.getLogger("FastProject")
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7604
+import os
+# comment
+
+# comment
+
+
+# comment
+x = 1
+

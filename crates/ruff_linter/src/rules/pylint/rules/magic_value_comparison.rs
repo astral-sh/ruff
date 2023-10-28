@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Constant, Expr, UnaryOp};
+use ruff_python_ast::{self as ast, Constant, Expr, Int, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -22,17 +22,23 @@ use crate::rules::pylint::settings::ConstantType;
 ///
 /// ## Example
 /// ```python
-/// def calculate_discount(price: float) -> float:
-///     return price * (1 - 0.2)
+/// def apply_discount(price: float) -> float:
+///     if price <= 100:
+///         return price / 2
+///     else:
+///         return price
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// DISCOUNT_RATE = 0.2
+/// MAX_DISCOUNT = 100
 ///
 ///
-/// def calculate_discount(price: float) -> float:
-///     return price * (1 - DISCOUNT_RATE)
+/// def apply_discount(price: float) -> float:
+///     if price <= MAX_DISCOUNT:
+///         return price / 2
+///     else:
+///         return price
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#constants
@@ -83,7 +89,7 @@ fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
         Constant::Str(ast::StringConstant { value, .. }) => {
             !matches!(value.as_str(), "" | "__main__")
         }
-        Constant::Int(value) => !matches!(value.try_into(), Ok(0 | 1)),
+        Constant::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
         Constant::Bytes(_) => true,
         Constant::Float(_) => true,
         Constant::Complex { .. } => true,

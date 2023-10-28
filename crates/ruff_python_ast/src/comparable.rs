@@ -15,8 +15,6 @@
 //! an implicit concatenation of string literals, as these expressions are considered to
 //! have the same shape in that they evaluate to the same value.
 
-use num_bigint::BigInt;
-
 use crate as ast;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
@@ -334,8 +332,7 @@ pub enum ComparableConstant<'a> {
     Bool(&'a bool),
     Str { value: &'a str, unicode: bool },
     Bytes(&'a [u8]),
-    Int(&'a BigInt),
-    Tuple(Vec<ComparableConstant<'a>>),
+    Int(&'a ast::Int),
     Float(u64),
     Complex { real: u64, imag: u64 },
     Ellipsis,
@@ -929,11 +926,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }) => Self::Starred(ExprStarred {
                 value: value.into(),
             }),
-            ast::Expr::Name(ast::ExprName {
-                id,
-                ctx: _,
-                range: _,
-            }) => Self::Name(ExprName { id: id.as_str() }),
+            ast::Expr::Name(name) => name.into(),
             ast::Expr::List(ast::ExprList {
                 elts,
                 ctx: _,
@@ -967,6 +960,14 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 value: value.as_str(),
             }),
         }
+    }
+}
+
+impl<'a> From<&'a ast::ExprName> for ComparableExpr<'a> {
+    fn from(expr: &'a ast::ExprName) -> Self {
+        Self::Name(ExprName {
+            id: expr.id.as_str(),
+        })
     }
 }
 

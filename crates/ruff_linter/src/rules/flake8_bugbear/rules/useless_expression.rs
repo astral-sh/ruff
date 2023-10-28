@@ -1,8 +1,7 @@
-use ruff_python_ast::{self as ast, Constant, Expr};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,7 +47,7 @@ impl Violation for UselessExpression {
 /// B018
 pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     // Ignore comparisons, as they're handled by `useless_comparison`.
-    if matches!(value, Expr::Compare(_)) {
+    if value.is_compare_expr() {
         return;
     }
 
@@ -68,7 +67,7 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     if contains_effect(value, |id| checker.semantic().is_builtin(id)) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
-        if matches!(value, Expr::Attribute(_)) {
+        if value.is_attribute_expr() {
             checker.diagnostics.push(Diagnostic::new(
                 UselessExpression {
                     kind: Kind::Attribute,

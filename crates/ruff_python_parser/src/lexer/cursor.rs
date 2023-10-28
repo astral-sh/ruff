@@ -96,6 +96,18 @@ impl<'a> Cursor<'a> {
         }
     }
 
+    pub(super) fn eat_char3(&mut self, c1: char, c2: char, c3: char) -> bool {
+        let mut chars = self.chars.clone();
+        if chars.next() == Some(c1) && chars.next() == Some(c2) && chars.next() == Some(c3) {
+            self.bump();
+            self.bump();
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+
     pub(super) fn eat_if<F>(&mut self, mut predicate: F) -> Option<char>
     where
         F: FnMut(char) -> bool,
@@ -114,5 +126,22 @@ impl<'a> Cursor<'a> {
         while predicate(self.first()) && !self.is_eof() {
             self.bump();
         }
+    }
+
+    /// Skips the next `count` bytes.
+    ///
+    /// ## Panics
+    ///  - If `count` is larger than the remaining bytes in the input stream.
+    ///  - If `count` indexes into a multi-byte character.
+    pub(super) fn skip_bytes(&mut self, count: usize) {
+        #[cfg(debug_assertions)]
+        {
+            self.prev_char = self.chars.as_str()[..count]
+                .chars()
+                .next_back()
+                .unwrap_or('\0');
+        }
+
+        self.chars = self.chars.as_str()[count..].chars();
     }
 }

@@ -1,19 +1,12 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, PySourceType};
 use ruff_python_parser::{lexer, AsMode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::autofix::edits::{pad, remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
-
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Reason {
-    BytesLiteral,
-    DefaultArgument,
-}
+use crate::fix::edits::{pad, remove_argument, Parentheses};
 
 /// ## What it does
 /// Checks for unnecessary calls to `encode` as UTF-8.
@@ -39,7 +32,7 @@ pub struct UnnecessaryEncodeUTF8 {
     reason: Reason,
 }
 
-impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
+impl AlwaysFixableViolation for UnnecessaryEncodeUTF8 {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.reason {
@@ -48,12 +41,18 @@ impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
         }
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         match self.reason {
             Reason::BytesLiteral => "Rewrite as bytes literal".to_string(),
             Reason::DefaultArgument => "Remove unnecessary `encoding` argument".to_string(),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Reason {
+    BytesLiteral,
+    DefaultArgument,
 }
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
@@ -151,7 +150,7 @@ fn replace_with_bytes_literal(
         prev = range.end();
     }
 
-    Fix::automatic(Edit::range_replacement(
+    Fix::safe_edit(Edit::range_replacement(
         pad(replacement, call.range(), locator),
         call.range(),
     ))
@@ -177,13 +176,11 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.set_fix(replace_with_bytes_literal(
-                            checker.locator(),
-                            call,
-                            checker.source_type,
-                        ));
-                    }
+                    diagnostic.set_fix(replace_with_bytes_literal(
+                        checker.locator(),
+                        call,
+                        checker.source_type,
+                    ));
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Keyword(kwarg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode(encoding="utf-8")` to
@@ -194,17 +191,15 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
-                            remove_argument(
-                                kwarg,
-                                &call.arguments,
-                                Parentheses::Preserve,
-                                checker.locator().contents(),
-                            )
-                            .map(Fix::automatic)
-                        });
-                    }
+                    diagnostic.try_set_fix(|| {
+                        remove_argument(
+                            kwarg,
+                            &call.arguments,
+                            Parentheses::Preserve,
+                            checker.locator().contents(),
+                        )
+                        .map(Fix::safe_edit)
+                    });
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `"unicode text©".encode("utf-8")` to `"unicode text©".encode()`.
@@ -214,17 +209,15 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
-                            remove_argument(
-                                arg,
-                                &call.arguments,
-                                Parentheses::Preserve,
-                                checker.locator().contents(),
-                            )
-                            .map(Fix::automatic)
-                        });
-                    }
+                    diagnostic.try_set_fix(|| {
+                        remove_argument(
+                            arg,
+                            &call.arguments,
+                            Parentheses::Preserve,
+                            checker.locator().contents(),
+                        )
+                        .map(Fix::safe_edit)
+                    });
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -241,17 +234,15 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
-                            remove_argument(
-                                kwarg,
-                                &call.arguments,
-                                Parentheses::Preserve,
-                                checker.locator().contents(),
-                            )
-                            .map(Fix::automatic)
-                        });
-                    }
+                    diagnostic.try_set_fix(|| {
+                        remove_argument(
+                            kwarg,
+                            &call.arguments,
+                            Parentheses::Preserve,
+                            checker.locator().contents(),
+                        )
+                        .map(Fix::safe_edit)
+                    });
                     checker.diagnostics.push(diagnostic);
                 } else if let EncodingArg::Positional(arg) = encoding_arg {
                     // Ex) Convert `f"unicode text©".encode("utf-8")` to `f"unicode text©".encode()`.
@@ -261,17 +252,15 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
                         },
                         call.range(),
                     );
-                    if checker.patch(Rule::UnnecessaryEncodeUTF8) {
-                        diagnostic.try_set_fix(|| {
-                            remove_argument(
-                                arg,
-                                &call.arguments,
-                                Parentheses::Preserve,
-                                checker.locator().contents(),
-                            )
-                            .map(Fix::automatic)
-                        });
-                    }
+                    diagnostic.try_set_fix(|| {
+                        remove_argument(
+                            arg,
+                            &call.arguments,
+                            Parentheses::Preserve,
+                            checker.locator().contents(),
+                        )
+                        .map(Fix::safe_edit)
+                    });
                     checker.diagnostics.push(diagnostic);
                 }
             }

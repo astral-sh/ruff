@@ -7,7 +7,7 @@ use libcst_native::{
     SimpleWhitespace, SmallStatement, Statement, TrailingWhitespace,
 };
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -20,13 +20,12 @@ use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
-use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
 use crate::cst::helpers::negate;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
+use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 use super::unittest_assert::UnittestAssert;
 
@@ -62,14 +61,14 @@ use super::unittest_assert::UnittestAssert;
 pub struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Assertion should be broken down into multiple parts")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Break down assertion into multiple parts".to_string())
     }
 }
@@ -192,7 +191,7 @@ pub struct PytestUnittestAssertion {
 }
 
 impl Violation for PytestUnittestAssertion {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -200,7 +199,7 @@ impl Violation for PytestUnittestAssertion {
         format!("Use a regular `assert` instead of unittest-style `{assertion}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let PytestUnittestAssertion { assertion } = self;
         Some(format!("Replace `{assertion}(...)` with `assert ...`"))
     }
@@ -284,25 +283,23 @@ pub(crate) fn unittest_assertion(
                     },
                     func.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // We're converting an expression to a statement, so avoid applying the fix if
-                    // the assertion is part of a larger expression.
-                    if checker.semantic().current_statement().is_expr_stmt()
-                        && checker.semantic().current_expression_parent().is_none()
-                        && !checker.indexer().comment_ranges().intersects(expr.range())
-                    {
-                        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                            diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                                checker.generator().stmt(&stmt),
-                                parenthesized_range(
-                                    expr.into(),
-                                    checker.semantic().current_statement().into(),
-                                    checker.indexer().comment_ranges(),
-                                    checker.locator().contents(),
-                                )
-                                .unwrap_or(expr.range()),
-                            )));
-                        }
+                // We're converting an expression to a statement, so avoid applying the fix if
+                // the assertion is part of a larger expression.
+                if checker.semantic().current_statement().is_expr_stmt()
+                    && checker.semantic().current_expression_parent().is_none()
+                    && !checker.indexer().comment_ranges().intersects(expr.range())
+                {
+                    if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            checker.generator().stmt(&stmt),
+                            parenthesized_range(
+                                expr.into(),
+                                checker.semantic().current_statement().into(),
+                                checker.indexer().comment_ranges(),
+                                checker.locator().contents(),
+                            )
+                            .unwrap_or(expr.range()),
+                        )));
                     }
                 }
                 Some(diagnostic)
@@ -354,7 +351,7 @@ pub struct PytestUnittestRaisesAssertion {
 }
 
 impl Violation for PytestUnittestRaisesAssertion {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -362,7 +359,7 @@ impl Violation for PytestUnittestRaisesAssertion {
         format!("Use `pytest.raises` instead of unittest-style `{assertion}`")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let PytestUnittestRaisesAssertion { assertion } = self;
         Some(format!("Replace `{assertion}` with `pytest.raises`"))
     }
@@ -390,9 +387,7 @@ pub(crate) fn unittest_raises_assertion(
         },
         call.func.range(),
     );
-    if checker.patch(diagnostic.kind.rule())
-        && !checker.indexer().has_comments(call, checker.locator())
-    {
+    if !checker.indexer().has_comments(call, checker.locator()) {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -401,7 +396,7 @@ pub(crate) fn unittest_raises_assertion(
                     checker.semantic(),
                 )?;
                 let edit = Edit::range_replacement(format!("{binding}({args})"), call.range());
-                Ok(Fix::suggested_edits(import_edit, [edit]))
+                Ok(Fix::unsafe_edits(import_edit, [edit]))
             });
         }
     }
@@ -746,19 +741,17 @@ pub(crate) fn composite_condition(
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if matches!(composite, CompositionKind::Simple)
-                && msg.is_none()
-                && !checker.indexer().comment_ranges().intersects(stmt.range())
-                && !checker
-                    .indexer()
-                    .in_multi_statement_line(stmt, checker.locator())
-            {
-                diagnostic.try_set_fix(|| {
-                    fix_composite_condition(stmt, checker.locator(), checker.stylist())
-                        .map(Fix::suggested)
-                });
-            }
+        if matches!(composite, CompositionKind::Simple)
+            && msg.is_none()
+            && !checker.indexer().comment_ranges().intersects(stmt.range())
+            && !checker
+                .indexer()
+                .in_multi_statement_line(stmt, checker.locator())
+        {
+            diagnostic.try_set_fix(|| {
+                fix_composite_condition(stmt, checker.locator(), checker.stylist())
+                    .map(Fix::unsafe_edit)
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

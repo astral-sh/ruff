@@ -1,14 +1,11 @@
-use num_bigint::BigInt;
-
 use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Constant, Expr};
 use ruff_text_size::Ranged;
 
-use crate::autofix::edits::{remove_argument, Parentheses};
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix::edits::{remove_argument, Parentheses};
 
 /// ## What it does
 /// Checks for `range` calls with an unnecessary `start` argument.
@@ -33,13 +30,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnnecessaryRangeStart;
 
-impl AlwaysAutofixableViolation for UnnecessaryRangeStart {
+impl AlwaysFixableViolation for UnnecessaryRangeStart {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary `start` argument in `range`")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         format!("Remove `start` argument")
     }
 }
@@ -75,21 +72,19 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     else {
         return;
     };
-    if *value != BigInt::from(0) {
+    if *value != 0 {
         return;
     };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart, start.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            remove_argument(
-                &start,
-                &call.arguments,
-                Parentheses::Preserve,
-                checker.locator().contents(),
-            )
-            .map(Fix::automatic)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        remove_argument(
+            &start,
+            &call.arguments,
+            Parentheses::Preserve,
+            checker.locator().contents(),
+        )
+        .map(Fix::safe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }

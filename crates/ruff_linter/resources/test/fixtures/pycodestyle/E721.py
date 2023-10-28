@@ -4,18 +4,18 @@ if type(res) == type(42):
 #: E721
 if type(res) != type(""):
     pass
-#: E721
+#: Okay
 import types
 
 if res == types.IntType:
     pass
-#: E721
+#: Okay
 import types
 
 if type(res) is not types.ListType:
     pass
 #: E721
-assert type(res) == type(False)
+assert type(res) == type(False) or type(res) == type(None)
 #: E721
 assert type(res) == type([])
 #: E721
@@ -25,21 +25,18 @@ assert type(res) == type((0,))
 #: E721
 assert type(res) == type((0))
 #: E721
-assert type(res) != type((1,))
-#: E721
-assert type(res) is type((1,))
-#: E721
-assert type(res) is not type((1,))
+assert type(res) != type((1, ))
+#: Okay
+assert type(res) is type((1, ))
+#: Okay
+assert type(res) is not type((1, ))
 #: E211 E721
-assert type(res) == type(
-    [
-        2,
-    ]
-)
+assert type(res) == type ([2, ])
 #: E201 E201 E202 E721
-assert type(res) == type(())
+assert type(res) == type( ( ) )
 #: E201 E202 E721
-assert type(res) == type((0,))
+assert type(res) == type( (0, ) )
+#:
 
 #: Okay
 import types
@@ -50,17 +47,47 @@ if isinstance(res, str):
     pass
 if isinstance(res, types.MethodType):
     pass
-if type(a) != type(b) or type(a) == type(ccc):
+#: Okay
+def func_histype(a, b, c):
     pass
-
-assert type(res) == type(None)
-
-types = StrEnum
-if x == types.X:
+#: E722
+try:
     pass
+except:
+    pass
+#: E722
+try:
+    pass
+except Exception:
+    pass
+except:
+    pass
+#: E722 E203 E271
+try:
+    pass
+except  :
+    pass
+#: Okay
+fake_code = """"
+try:
+    do_something()
+except:
+    pass
+"""
+try:
+    pass
+except Exception:
+    pass
+#: Okay
+from . import custom_types as types
 
-#: E721
-assert type(res) is int
+red = types.ColorTypeRED
+red is types.ColorType.RED
+#: Okay
+from . import compute_type
+
+if compute_type(foo) == 5:
+    pass
 
 
 class Foo:

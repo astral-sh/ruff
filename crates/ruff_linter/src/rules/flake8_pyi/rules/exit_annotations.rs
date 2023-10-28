@@ -6,14 +6,13 @@ use ruff_python_ast::{
 };
 use smallvec::SmallVec;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for incorrect function signatures on `__exit__` and `__aexit__`
@@ -49,7 +48,7 @@ pub struct BadExitAnnotation {
 }
 
 impl Violation for BadExitAnnotation {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -65,7 +64,7 @@ impl Violation for BadExitAnnotation {
         }
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         if matches!(self.error_kind, ErrorKind::StarArgsNotAnnotated) {
             Some("Annotate star-args with `object`".to_string())
         } else {
@@ -175,13 +174,11 @@ fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_ki
                 annotation.range(),
             );
 
-            if checker.patch(diagnostic.kind.rule()) {
-                if checker.semantic().is_builtin("object") {
-                    diagnostic.set_fix(Fix::automatic(Edit::range_replacement(
-                        "object".to_string(),
-                        annotation.range(),
-                    )));
-                }
+            if checker.semantic().is_builtin("object") {
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "object".to_string(),
+                    annotation.range(),
+                )));
             }
 
             checker.diagnostics.push(diagnostic);

@@ -3,19 +3,19 @@ use libcst_native::{Arg, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
-use crate::autofix::codemods::CodegenStylist;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{
     match_attribute, match_call_mut, match_expression, transform_expression_text,
 };
-use crate::registry::AsRule;
+use crate::fix::codemods::CodegenStylist;
+
 use crate::rules::pyflakes::format::FormatSummary;
 
 /// ## What it does
@@ -46,14 +46,14 @@ use crate::rules::pyflakes::format::FormatSummary;
 pub struct FormatLiterals;
 
 impl Violation for FormatLiterals {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use implicit references for positional format fields")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         Some("Remove explicit positional indices".to_string())
     }
 }
@@ -113,12 +113,10 @@ pub(crate) fn format_literals(
     };
 
     let mut diagnostic = Diagnostic::new(FormatLiterals, call.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            generate_call(call, arguments, checker.locator(), checker.stylist())
-                .map(|suggestion| Fix::suggested(Edit::range_replacement(suggestion, call.range())))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        generate_call(call, arguments, checker.locator(), checker.stylist())
+            .map(|suggestion| Fix::unsafe_edit(Edit::range_replacement(suggestion, call.range())))
+    });
     checker.diagnostics.push(diagnostic);
 }
 

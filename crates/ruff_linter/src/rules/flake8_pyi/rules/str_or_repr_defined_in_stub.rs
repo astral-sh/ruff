@@ -1,14 +1,13 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_abstract;
 
-use crate::autofix::edits::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+use crate::fix::edits::delete_stmt;
 
 /// ## What it does
 /// Checks for redundant definitions of `__str__` or `__repr__` in stubs.
@@ -29,14 +28,14 @@ pub struct StrOrReprDefinedInStub {
     name: String,
 }
 
-impl AlwaysAutofixableViolation for StrOrReprDefinedInStub {
+impl AlwaysFixableViolation for StrOrReprDefinedInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         let StrOrReprDefinedInStub { name } = self;
         format!("Defining `{name}` in a stub is almost always redundant")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         let StrOrReprDefinedInStub { name } = self;
         format!("Remove definition of `{name}`")
     }
@@ -95,13 +94,11 @@ pub(crate) fn str_or_repr_defined_in_stub(checker: &mut Checker, stmt: &Stmt) {
         },
         stmt.identifier(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let stmt = checker.semantic().current_statement();
-        let parent = checker.semantic().current_statement_parent();
-        let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
-        diagnostic.set_fix(Fix::automatic(edit).isolate(Checker::isolation(
-            checker.semantic().current_statement_parent_id(),
-        )));
-    }
+    let stmt = checker.semantic().current_statement();
+    let parent = checker.semantic().current_statement_parent();
+    let edit = delete_stmt(stmt, parent, checker.locator(), checker.indexer());
+    diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
+        checker.semantic().current_statement_parent_id(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

@@ -1,10 +1,9 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for deprecated NumPy type aliases.
@@ -34,7 +33,7 @@ pub struct NumpyDeprecatedTypeAlias {
 }
 
 impl Violation for NumpyDeprecatedTypeAlias {
-    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -42,7 +41,7 @@ impl Violation for NumpyDeprecatedTypeAlias {
         format!("Type alias `np.{type_name}` is deprecated, replace with builtin type")
     }
 
-    fn autofix_title(&self) -> Option<String> {
+    fn fix_title(&self) -> Option<String> {
         let NumpyDeprecatedTypeAlias { type_name } = self;
         Some(format!("Replace `np.{type_name}` with builtin type"))
     }
@@ -73,18 +72,16 @@ pub(crate) fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            let type_name = match type_name {
-                "unicode" => "str",
-                "long" => "int",
-                _ => type_name,
-            };
-            if checker.semantic().is_builtin(type_name) {
-                diagnostic.set_fix(Fix::suggested(Edit::range_replacement(
-                    type_name.to_string(),
-                    expr.range(),
-                )));
-            }
+        let type_name = match type_name {
+            "unicode" => "str",
+            "long" => "int",
+            _ => type_name,
+        };
+        if checker.semantic().is_builtin(type_name) {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                type_name.to_string(),
+                expr.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

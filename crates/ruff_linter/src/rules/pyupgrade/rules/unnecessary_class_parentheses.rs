@@ -1,10 +1,9 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for class definitions that include unnecessary parentheses after
@@ -28,13 +27,13 @@ use crate::registry::AsRule;
 #[violation]
 pub struct UnnecessaryClassParentheses;
 
-impl AlwaysAutofixableViolation for UnnecessaryClassParentheses {
+impl AlwaysFixableViolation for UnnecessaryClassParentheses {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary parentheses after class definition")
     }
 
-    fn autofix_title(&self) -> String {
+    fn fix_title(&self) -> String {
         "Remove parentheses".to_string()
     }
 }
@@ -50,11 +49,9 @@ pub(crate) fn unnecessary_class_parentheses(checker: &mut Checker, class_def: &a
     }
 
     let mut diagnostic = Diagnostic::new(UnnecessaryClassParentheses, arguments.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::automatic(Edit::deletion(
-            arguments.start(),
-            arguments.end(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+        arguments.start(),
+        arguments.end(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
