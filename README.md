@@ -80,7 +80,7 @@ of [Conda](https://docs.conda.io/en/latest/):
 
 > Ruff is ~150-200x faster than flake8 on my machine, scanning the whole repo takes ~0.2s instead of
 > ~20s. This is an enormous quality of life improvement for local dev. It's fast enough that I added
-> it as an actual commit hook, which is terrific.
+> it is an actual commit hook, which is terrific.
 
 [**Timothy Crosley**](https://twitter.com/timothycrosley/status/1606420868514877440),
 creator of [isort](https://github.com/PyCQA/isort):
