@@ -261,7 +261,7 @@ them. You can find the supported settings in the [API reference](settings.md#iso
 For example, you can set `known-first-party` like so:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     # Pyflakes
     "F",
@@ -275,7 +275,7 @@ select = [
 # Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
 src = ["src", "tests"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["my_module1", "my_module2"]
 ```
 
@@ -375,7 +375,7 @@ Found 3 errors.
 Yes! To enforce a docstring convention, add the following to your `pyproject.toml`:
 
 ```toml
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"  # Accepts: "google", "numpy", or "pep257".
 ```
 
@@ -387,12 +387,12 @@ Alongside `convention`, you'll want to explicitly enable the `D` rule code prefi
 rules are not enabled by default:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     "D",
 ]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 ```
 
@@ -423,7 +423,7 @@ For example, given this `pyproject.toml`:
 [tool.ruff]
 line-length = 88
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 ```
 

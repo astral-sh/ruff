@@ -5,4 +5,6 @@ extend-exclude = [
   "migrations",
   "with_excluded_file/other_excluded_file.py",
 ]
+
+[tool.ruff.lint]
 per-file-ignores = { "__init__.py" = ["F401"] }
