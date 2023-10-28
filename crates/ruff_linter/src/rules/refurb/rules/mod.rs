@@ -1,6 +1,7 @@
 pub(crate) use check_and_remove_from_set::*;
 pub(crate) use delete_full_slice::*;
 pub(crate) use implicit_cwd::*;
+pub(crate) use isinstance_type_none::*;
 pub(crate) use print_empty_string::*;
 pub(crate) use read_whole_file::*;
 pub(crate) use reimplemented_starmap::*;
@@ -12,6 +13,7 @@ pub(crate) use unnecessary_enumerate::*;
 mod check_and_remove_from_set;
 mod delete_full_slice;
 mod implicit_cwd;
+mod isinstance_type_none;
 mod print_empty_string;
 mod read_whole_file;
 mod reimplemented_starmap;
