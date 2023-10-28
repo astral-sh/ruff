@@ -1106,6 +1106,7 @@ mod tests {
         Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
         Rule::MissingWhitespaceAroundModuloOperator,
         Rule::MissingWhitespace,
+        Rule::MissingOrOutdentedIndentation,
         Rule::MultipleSpacesAfterComma,
         Rule::TabAfterComma,
         Rule::UnexpectedSpacesAroundKeywordParameterEquals,
