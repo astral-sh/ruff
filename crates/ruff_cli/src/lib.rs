@@ -103,10 +103,7 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
 
 /// Get the actual value of the `format` desired from either `output_format`
 /// or `format`, and warn the user if they're using the deprecated form.
-fn warn_about_deprecated_help_format(
-    output_format: HelpFormat,
-    format: Option<HelpFormat>,
-) -> HelpFormat {
+fn resolve_help_output_format(output_format: HelpFormat, format: Option<HelpFormat>) -> HelpFormat {
     if format.is_some() {
         warn_user!("The `--format` argument is deprecated. Use `--output-format` instead.");
     }
@@ -159,7 +156,7 @@ pub fn run(
             format,
             mut output_format,
         } => {
-            output_format = warn_about_deprecated_help_format(output_format, format);
+            output_format = resolve_help_output_format(output_format, format);
             if all {
                 commands::rule::rules(output_format)?;
             }
@@ -176,7 +173,7 @@ pub fn run(
             format,
             mut output_format,
         } => {
-            output_format = warn_about_deprecated_help_format(output_format, format);
+            output_format = resolve_help_output_format(output_format, format);
             commands::linter::linter(output_format)?;
             Ok(ExitStatus::Success)
         }
