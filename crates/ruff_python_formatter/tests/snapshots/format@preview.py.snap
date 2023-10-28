@@ -166,6 +166,7 @@ preview                 = Enabled
 """
 Black's `Preview.module_docstring_newlines`
 """
+
 first_stmt_after_module_level_docstring = 1
 
 
