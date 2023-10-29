@@ -744,7 +744,7 @@ pub(super) fn warn_incompatible_formatter_settings(
                 .map(|rule| format!("`{}`", rule.noqa_code()))
                 .collect();
             rule_names.sort();
-            warn!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.", rule_names.join(", "));
+            warn!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.", rule_names.join(", "));
         }
 
         // Rules with different quote styles.
