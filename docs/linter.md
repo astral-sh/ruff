@@ -46,7 +46,7 @@ formats. Ruff will automatically disable any conflicting rules when `ALL` is ena
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
-- Prefer `select` over `extend-select` to make your rule set explicit.
+- Prefer [`select`](settings.md#select) over [`extend-select`](settings.md#extend-select) to make your rule set explicit.
 - Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
 - Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
     you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
@@ -73,14 +73,15 @@ select = [
 ]
 ```
 
-To resolve the enabled rule set, Ruff may need to reconcile `select` and `ignore` from a variety
-of sources, including the current `pyproject.toml`, any inherited `pyproject.toml` files, and the
-CLI (e.g., `--select`).
+To resolve the enabled rule set, Ruff may need to reconcile [`select`](settings.md#select) and
+[`ignore`](settings.md#ignore) from a variety of sources, including the current `pyproject.toml`,
+any inherited `pyproject.toml` files, and the CLI (e.g., [`--select`](settings.md#select)).
 
-In those scenarios, Ruff uses the "highest-priority" `select` as the basis for the rule set, and
-then applies `extend-select` and `ignore` adjustments. CLI options are given
-higher priority than `pyproject.toml` options, and the current `pyproject.toml` file is given higher
-priority than any inherited `pyproject.toml` files.
+In those scenarios, Ruff uses the "highest-priority" [`select`](settings.md#select) as the basis for
+the rule set, and then applies [`extend-select`](settings.md#extend-select) and
+[`ignore`](settings.md#ignore) adjustments. CLI options are given higher priority than
+`pyproject.toml` options, and the current `pyproject.toml` file is given higher priority than any
+inherited `pyproject.toml` files.
 
 For example, given the following `pyproject.toml` file:
 
@@ -111,9 +112,12 @@ whether a rule supports fixing, see [_Rules_](rules.md).
 
 ### Fix safety
 
-Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when applying safe fixes, but the meaning could be changed when applying unsafe fixes.
+Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when
+applying safe fixes, but the meaning could be changed when applying unsafe fixes.
 
-For example, [`unnecessary-iterable-allocation-for-first-element`](rules/unnecessary-iterable-allocation-for-first-element.md) (`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
+For example, [`unnecessary-iterable-allocation-for-first-element`](rules/unnecessary-iterable-allocation-for-first-element.md)
+(`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix
+replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
 
 ```shell
 $ python -m timeit "head = list(range(99999999))[0]"
@@ -170,8 +174,9 @@ You may use prefixes to select rules as well, e.g., `F` can be used to promote f
 
 ### Disabling fixes
 
-To limit the set of rules that Ruff should fix, use the [`fixable`](settings.md#fixable) and [`unfixable`](settings.md#unfixable) settings, along with their [`extend-fixable`](settings.md#extend-fixable) and [`extend-unfixable`](settings.md#extend-unfixable)
-variants.
+To limit the set of rules that Ruff should fix, use the [`fixable`](settings.md#fixable) and
+[`unfixable`](settings.md#unfixable) settings, along with their [`extend-fixable`](settings.md#extend-fixable)
+and [`extend-unfixable`](settings.md#extend-unfixable) variants.
 
 For example, the following configuration would enable fixes for all rules except
 [`unused-imports`](rules/unused-import.md) (`F401`):

@@ -260,7 +260,8 @@ Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
 them. You can find the supported settings in the [API reference](settings.md#isort).
-For example, you can set `known-first-party` like so:
+For example, you can set [`known-first-party`](settings.md#known-first-party--isort-known-first-party-)
+like so:
 
 ```toml
 [tool.ruff.lint]
@@ -374,7 +375,8 @@ Found 3 errors.
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enforce a docstring convention, add the following to your `pyproject.toml`:
+Yes! To enforce a docstring convention, add a [`convention`](settings.md#convention--pydocstyle-convention-)
+setting following to your `pyproject.toml`:
 
 ```toml
 [tool.ruff.lint.pydocstyle]
@@ -385,8 +387,8 @@ For example, if you're coming from flake8-docstrings, and your originating confi
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Alongside `convention`, you'll want to explicitly enable the `D` rule code prefix, since the `D`
-rules are not enabled by default:
+Alongside [`convention`](settings.md#convention--pydocstyle-convention-), you'll want to
+explicitly enable the `D` rule code prefix, since the `D` rules are not enabled by default:
 
 ```toml
 [tool.ruff.lint]
@@ -398,10 +400,10 @@ select = [
 convention = "google"
 ```
 
-Setting a `convention` force-disables any rules that are incompatible with that convention, no
-matter how they're provided, which avoids accidental incompatibilities and simplifies configuration.
-By default, no `convention` is set, and so the enabled rules are determined by the `select` setting
-alone.
+Setting a [`convention`](settings.md#convention--pydocstyle-convention-) force-disables any rules
+that are incompatible with that convention, no matter how they're provided, which avoids accidental
+incompatibilities and simplifies configuration. By default, no [`convention`](settings.md#convention--pydocstyle-convention-)
+is set, and so the enabled rules are determined by the [`select`](settings.md#select) setting alone.
 
 ## What is "preview"?
 
@@ -457,7 +459,8 @@ For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) c
 
 Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
 fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
-setting, or passing the `--unsafe-fixes` flag to `ruff check`. For more, see [the fix documentation](configuration.md#fixes).
+setting, or passing the [`--unsafe-fixes`](settings.md#unsafe-fixes) flag to `ruff check`. For
+more, see [the fix documentation](configuration.md#fixes).
 
 Even still, given the dynamic nature of Python, it's difficult to have _complete_ certainty when
 making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks your code, please
