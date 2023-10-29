@@ -49,10 +49,7 @@ pub struct UselessWithLock;
 impl Violation for UselessWithLock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "Useless lock object. Create a variable to store the lock object \
-             and use it in `with` statement."
-        )
+        format!("Useless threading lock. An existing lock instance should be used to acquire lock.")
     }
 }
 

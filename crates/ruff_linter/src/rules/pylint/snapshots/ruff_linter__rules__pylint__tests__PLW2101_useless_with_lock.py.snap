@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-useless_with_lock.py:5:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:5:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
   |
 5 | with threading.Lock():  # [useless-with-lock]
   |      ^^^^^^^^^^^^^^^^ PLW2101
 6 |     ...
   |
 
-useless_with_lock.py:8:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:8:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
   |
 6 |     ...
 7 | 
@@ -17,7 +17,7 @@ useless_with_lock.py:8:6: PLW2101 Useless lock object. Create a variable to stor
 9 |     ...
   |
 
-useless_with_lock.py:11:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:11:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
    |
  9 |     ...
 10 | 
@@ -26,7 +26,7 @@ useless_with_lock.py:11:6: PLW2101 Useless lock object. Create a variable to sto
 12 |     ...
    |
 
-useless_with_lock.py:14:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:14:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
    |
 12 |     ...
 13 | 
@@ -35,7 +35,7 @@ useless_with_lock.py:14:6: PLW2101 Useless lock object. Create a variable to sto
 15 |     ...
    |
 
-useless_with_lock.py:17:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:17:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
    |
 15 |     ...
 16 | 
@@ -44,7 +44,7 @@ useless_with_lock.py:17:6: PLW2101 Useless lock object. Create a variable to sto
 18 |     ...
    |
 
-useless_with_lock.py:20:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:20:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
    |
 18 |     ...
 19 | 
@@ -53,7 +53,7 @@ useless_with_lock.py:20:6: PLW2101 Useless lock object. Create a variable to sto
 21 |     ...
    |
 
-useless_with_lock.py:23:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:23:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
    |
 21 |     ...
 22 | 
@@ -62,7 +62,7 @@ useless_with_lock.py:23:6: PLW2101 Useless lock object. Create a variable to sto
 24 |     ...
    |
 
-useless_with_lock.py:26:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:26:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
    |
 24 |     ...
 25 | 
@@ -71,7 +71,7 @@ useless_with_lock.py:26:6: PLW2101 Useless lock object. Create a variable to sto
 27 |     ...
    |
 
-useless_with_lock.py:29:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:29:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
    |
 27 |     ...
 28 | 
@@ -80,7 +80,7 @@ useless_with_lock.py:29:6: PLW2101 Useless lock object. Create a variable to sto
 30 |     ...
    |
 
-useless_with_lock.py:32:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:32:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
    |
 30 |     ...
 31 | 
@@ -89,7 +89,7 @@ useless_with_lock.py:32:6: PLW2101 Useless lock object. Create a variable to sto
 33 |     ...
    |
 
-useless_with_lock.py:35:6: PLW2101 Useless lock object. Create a variable to store the lock object and use it in `with` statement.
+useless_with_lock.py:35:6: PLW2101 Useless threading lock. An existing lock instance should be used to acquire lock.
    |
 33 |     ...
 34 | 
