@@ -67,7 +67,7 @@ quote-style = "double"
 indent-style = "space"
 
 # Like Black, respect magic trailing commas.
-magic-trailing-comma = "respect"
+skip-magic-trailing-comma = false
 
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
@@ -78,7 +78,7 @@ As an example, the following would configure Ruff to:
 ```toml
 [tool.ruff.lint]
 # 1. Enable flake8-bugbear (`B`) rules, in addition to the defaults.
-select = ["E", "F", "B"]
+select = ["E4", "E7", "E9", "F", "B"]
 
 # 2. Avoid enforcing line-length violations (`E501`)
 ignore = ["E501"]
@@ -101,7 +101,7 @@ Linter plugin configurations are expressed as subsections, e.g.:
 ```toml
 [tool.ruff.lint]
 # Add "Q" to the list of enabled codes.
-select = ["E", "F", "Q"]
+select = ["E4", "E7", "E9", "F", "Q"]
 
 [tool.ruff.lint.flake8-quotes]
 docstring-quotes = "double"
@@ -121,7 +121,7 @@ For example, the `pyproject.toml` described above would be represented via the f
 ```toml
 [lint]
 # Enable flake8-bugbear (`B`) rules.
-select = ["E", "F", "B"]
+select = ["E4", "E7", "E9", "F", "B"]
 
 # Never enforce `E501` (line length violations).
 ignore = ["E501"]
@@ -189,13 +189,13 @@ When passed a path on the command-line, Ruff will automatically discover all Pyt
 path, taking into account the [`exclude`](settings.md#exclude) and [`extend-exclude`](settings.md#extend-exclude)
 settings in each directory's `pyproject.toml` file.
 
-Files can also be selectively excluded from linting or formatting by scoping the `exclude` and
-`extend-exclude` settings to the tool-specific configuration tables. For example, the following
-would prevent `ruff` from formatting `.pyi` files, but would continue to include them in linting:
+Files can also be selectively excluded from linting or formatting by scoping the `exclude` setting
+to the tool-specific configuration tables. For example, the following would prevent `ruff` from
+formatting `.pyi` files, but would continue to include them in linting:
 
 ```toml
 [tool.ruff.format]
-extend-exclude = ["*.pyi"]
+exclude = ["*.pyi"]
 ```
 
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
@@ -251,6 +251,7 @@ Commands:
   config   List or describe the available configuration options
   linter   List all supported upstream linters
   clean    Clear any caches in the current directory and any subdirectories
+  format   Run the Ruff formatter on the given files or directories
   version  Display Ruff's version
   help     Print this message or the help of the given subcommand(s)
 
@@ -390,14 +391,16 @@ Options:
   -h, --help
           Print help
 
+Miscellaneous:
+  -n, --no-cache                         Disable cache reads
+      --cache-dir <CACHE_DIR>            Path to the cache directory [env: RUFF_CACHE_DIR=]
+      --isolated                         Ignore all configuration files
+      --stdin-filename <STDIN_FILENAME>  The name of the file when passing it through stdin
+
 File selection:
       --respect-gitignore       Respect file exclusions via `.gitignore` and other standard ignore files. Use `--no-respect-gitignore` to disable
       --exclude <FILE_PATTERN>  List of paths, used to omit files and/or directories from analysis
       --force-exclude           Enforce exclusions, even for paths passed to Ruff directly on the command-line. Use `--no-force-exclude` to disable
-
-Miscellaneous:
-      --isolated                         Ignore all configuration files
-      --stdin-filename <STDIN_FILENAME>  The name of the file when passing it through stdin
 
 Log levels:
   -v, --verbose  Enable verbose logging

@@ -14,7 +14,7 @@ use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::fix::codemods;
-use crate::line_width::{LineLength, LineWidthBuilder, TabSize};
+use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
 
 /// Return the `Fix` to use when deleting a `Stmt`.
 ///
@@ -293,7 +293,7 @@ pub(crate) fn fits(
     node: AnyNodeRef,
     locator: &Locator,
     line_length: LineLength,
-    tab_size: TabSize,
+    tab_size: IndentWidth,
 ) -> bool {
     all_lines_fit(fix, node, locator, line_length.value() as usize, tab_size)
 }
@@ -305,7 +305,7 @@ pub(crate) fn fits_or_shrinks(
     node: AnyNodeRef,
     locator: &Locator,
     line_length: LineLength,
-    tab_size: TabSize,
+    tab_size: IndentWidth,
 ) -> bool {
     // Use the larger of the line length limit, or the longest line in the existing AST node.
     let line_length = std::iter::once(line_length.value() as usize)
@@ -327,7 +327,7 @@ fn all_lines_fit(
     node: AnyNodeRef,
     locator: &Locator,
     line_length: usize,
-    tab_size: TabSize,
+    tab_size: IndentWidth,
 ) -> bool {
     let prefix = locator.slice(TextRange::new(
         locator.line_start(node.start()),

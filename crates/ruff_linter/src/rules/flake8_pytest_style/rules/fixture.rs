@@ -28,7 +28,7 @@ use super::helpers::{
 /// setting.
 ///
 /// ## Why is this bad?
-/// If a `@pytext.fixture()` doesn't take any arguments, the parentheses are
+/// If a `@pytest.fixture()` doesn't take any arguments, the parentheses are
 /// optional.
 ///
 /// Either removing those unnecessary parentheses _or_ requiring them for all
@@ -900,10 +900,9 @@ fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, bo
 
 /// PT024, PT025
 fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
-    for (expr, call_path) in get_mark_decorators(decorators) {
-        let name = call_path.last().expect("Expected a mark name");
+    for (expr, marker) in get_mark_decorators(decorators) {
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
-            if *name == "asyncio" {
+            if marker == "asyncio" {
                 let mut diagnostic =
                     Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
                 let range = checker.locator().full_lines_range(expr.range());
@@ -913,7 +912,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
         }
 
         if checker.enabled(Rule::PytestErroneousUseFixturesOnFixture) {
-            if *name == "usefixtures" {
+            if marker == "usefixtures" {
                 let mut diagnostic =
                     Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
                 let line_range = checker.locator().full_lines_range(expr.range());

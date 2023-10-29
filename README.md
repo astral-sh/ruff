@@ -33,7 +33,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
 - 📏 Over [700 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
-- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/integrations/) for
+- ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/editor-integrations/) for
     [VS Code](https://github.com/astral-sh/ruff-vscode) and [more](https://github.com/astral-sh/ruff-lsp)
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#pyprojecttoml-discovery)
 
@@ -151,7 +151,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 # Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.1
+  rev: v0.1.3
   hooks:
     # Run the Ruff linter.
     - id: ruff
@@ -238,7 +238,7 @@ quote-style = "double"
 indent-style = "space"
 
 # Like Black, respect magic trailing commas.
-magic-trailing-comma = "respect"
+skip-magic-trailing-comma = false
 
 # Like Black, automatically detect the appropriate line ending.
 line-ending = "auto"
@@ -409,6 +409,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Mypy](https://github.com/python/mypy)
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
+- [NoneBot](https://github.com/nonebot/nonebot2)
 - [ONNX](https://github.com/onnx/onnx)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
 - [PDM](https://github.com/pdm-project/pdm)

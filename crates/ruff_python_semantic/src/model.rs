@@ -1159,7 +1159,7 @@ impl<'a> SemanticModel<'a> {
     pub fn add_delayed_annotation(&mut self, binding_id: BindingId, annotation_id: BindingId) {
         self.delayed_annotations
             .entry(binding_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(annotation_id);
     }
 
@@ -1173,7 +1173,7 @@ impl<'a> SemanticModel<'a> {
     pub fn add_rebinding_scope(&mut self, binding_id: BindingId, scope_id: ScopeId) {
         self.rebinding_scopes
             .entry(binding_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(scope_id);
     }
 

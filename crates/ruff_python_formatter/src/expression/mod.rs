@@ -14,6 +14,8 @@ use ruff_text_size::Ranged;
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::expr_generator_exp::is_generator_parenthesized;
+use crate::expression::expr_tuple::is_tuple_parenthesized;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, NeedsParentheses,
     OptionalParentheses, Parentheses, Parenthesize,
@@ -474,7 +476,7 @@ impl NeedsParentheses for Expr {
             Expr::List(expr) => expr.needs_parentheses(parent, context),
             Expr::Tuple(expr) => expr.needs_parentheses(parent, context),
             Expr::Slice(expr) => expr.needs_parentheses(parent, context),
-            Expr::IpyEscapeCommand(_) => todo!(),
+            Expr::IpyEscapeCommand(expr) => expr.needs_parentheses(parent, context),
         }
     }
 }
@@ -510,7 +512,7 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
 
     if visitor.max_precedence == OperatorPrecedence::None {
         true
-    } else if visitor.pax_precedence_count > 1 {
+    } else if visitor.max_precedence_count > 1 {
         false
     } else if visitor.max_precedence == OperatorPrecedence::Attribute {
         true
@@ -524,26 +526,30 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
                 && has_parentheses(expr, context).is_some_and(OwnParentheses::is_non_empty)
         }
 
-        // Only use the layout if the first or last expression has parentheses of some sort, and
+        // Only use the layout if the first expression starts with parentheses
+        // or the last expression ends with parentheses of some sort, and
         // those parentheses are non-empty.
-        let first_parenthesized = visitor
-            .first
-            .is_some_and(|first| is_parenthesized(first, context));
-        let last_parenthesized = visitor
+        if visitor
             .last
-            .is_some_and(|last| is_parenthesized(last, context));
-
-        first_parenthesized || last_parenthesized
+            .is_some_and(|last| is_parenthesized(last, context))
+        {
+            true
+        } else {
+            visitor
+                .first
+                .expression()
+                .is_some_and(|first| is_parenthesized(first, context))
+        }
     }
 }
 
 #[derive(Clone, Debug)]
 struct CanOmitOptionalParenthesesVisitor<'input> {
     max_precedence: OperatorPrecedence,
-    pax_precedence_count: u32,
+    max_precedence_count: u32,
     any_parenthesized_expressions: bool,
     last: Option<&'input Expr>,
-    first: Option<&'input Expr>,
+    first: First<'input>,
     context: &'input PyFormatContext<'input>,
 }
 
@@ -552,10 +558,10 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
         Self {
             context,
             max_precedence: OperatorPrecedence::None,
-            pax_precedence_count: 0,
+            max_precedence_count: 0,
             any_parenthesized_expressions: false,
             last: None,
-            first: None,
+            first: First::None,
         }
     }
 
@@ -566,11 +572,11 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
     fn update_max_precedence_with_count(&mut self, precedence: OperatorPrecedence, count: u32) {
         match self.max_precedence.cmp(&precedence) {
             Ordering::Less => {
-                self.pax_precedence_count = count;
+                self.max_precedence_count = count;
                 self.max_precedence = precedence;
             }
             Ordering::Equal => {
-                self.pax_precedence_count += count;
+                self.max_precedence_count += count;
             }
             Ordering::Greater => {}
         }
@@ -581,7 +587,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
         match expr {
             Expr::Dict(_)
             | Expr::List(_)
-            | Expr::Tuple(_)
             | Expr::Set(_)
             | Expr::ListComp(_)
             | Expr::SetComp(_)
@@ -590,6 +595,21 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 // The values are always parenthesized, don't visit.
                 return;
             }
+
+            Expr::Tuple(tuple) if is_tuple_parenthesized(tuple, self.context.source()) => {
+                self.any_parenthesized_expressions = true;
+                // The values are always parenthesized, don't visit.
+                return;
+            }
+
+            Expr::GeneratorExp(generator)
+                if is_generator_parenthesized(generator, self.context.source()) =>
+            {
+                self.any_parenthesized_expressions = true;
+                // The values are always parenthesized, don't visit.
+                return;
+            }
+
             // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
             // because each comparison requires a left operand, and `n` `operands` and right sides.
             #[allow(clippy::cast_possible_truncation)]
@@ -654,6 +674,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 if op.is_invert() {
                     self.update_max_precedence(OperatorPrecedence::BitwiseInversion);
                 }
+                self.first.set_if_none(First::Token);
             }
 
             // `[a, b].test.test[300].dot`
@@ -690,19 +711,25 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 self.update_max_precedence(OperatorPrecedence::String);
             }
 
-            Expr::NamedExpr(_)
-            | Expr::GeneratorExp(_)
-            | Expr::Lambda(_)
+            // Expressions with sub expressions but a preceding token
+            // Mark this expression as first expression and not the sub expression.
+            Expr::Lambda(_)
             | Expr::Await(_)
             | Expr::Yield(_)
             | Expr::YieldFrom(_)
+            | Expr::Starred(_) => {
+                self.first.set_if_none(First::Token);
+            }
+
+            Expr::Tuple(_)
+            | Expr::NamedExpr(_)
+            | Expr::GeneratorExp(_)
             | Expr::FormattedValue(_)
             | Expr::FString(_)
             | Expr::Constant(_)
-            | Expr::Starred(_)
             | Expr::Name(_)
-            | Expr::Slice(_) => {}
-            Expr::IpyEscapeCommand(_) => todo!(),
+            | Expr::Slice(_)
+            | Expr::IpyEscapeCommand(_) => {}
         };
 
         walk_expr(self, expr);
@@ -724,8 +751,32 @@ impl<'input> PreorderVisitor<'input> for CanOmitOptionalParenthesesVisitor<'inpu
             self.visit_subexpression(expr);
         }
 
-        if self.first.is_none() {
-            self.first = Some(expr);
+        self.first.set_if_none(First::Expression(expr));
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum First<'a> {
+    None,
+
+    /// Expression starts with a non-parentheses token. E.g. `not a`
+    Token,
+
+    Expression(&'a Expr),
+}
+
+impl<'a> First<'a> {
+    #[inline]
+    fn set_if_none(&mut self, first: First<'a>) {
+        if matches!(self, First::None) {
+            *self = first;
+        }
+    }
+
+    fn expression(self) -> Option<&'a Expr> {
+        match self {
+            First::None | First::Token => None,
+            First::Expression(expr) => Some(expr),
         }
     }
 }
@@ -914,11 +965,23 @@ pub(crate) fn has_own_parentheses(
             Some(OwnParentheses::NonEmpty)
         }
 
+        Expr::GeneratorExp(generator)
+            if is_generator_parenthesized(generator, context.source()) =>
+        {
+            Some(OwnParentheses::NonEmpty)
+        }
+
         // These expressions must contain _some_ child or trivia token in order to be non-empty.
-        Expr::List(ast::ExprList { elts, .. })
-        | Expr::Set(ast::ExprSet { elts, .. })
-        | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+        Expr::List(ast::ExprList { elts, .. }) | Expr::Set(ast::ExprSet { elts, .. }) => {
             if !elts.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
+                Some(OwnParentheses::NonEmpty)
+            } else {
+                Some(OwnParentheses::Empty)
+            }
+        }
+
+        Expr::Tuple(tuple) if is_tuple_parenthesized(tuple, context.source()) => {
+            if !tuple.elts.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {
                 Some(OwnParentheses::Empty)

@@ -137,7 +137,7 @@ if not \
     a:
     pass
 
-# Regression: https://github.com/astral-sh/ruff/issues/5338
+# Regression test for: https://github.com/astral-sh/ruff/issues/5338
 if a and not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
     pass
 
@@ -162,7 +162,7 @@ if True:
             ):
                 pass
 
-# https://github.com/astral-sh/ruff/issues/7448
+# Regression test for: https://github.com/astral-sh/ruff/issues/7448
 x = (
     # a
     not # b
@@ -172,3 +172,24 @@ x = (
         True
     )
 )
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/8090
+if "root" not in (
+    long_tree_name_tree.split("/")[0]
+    for long_tree_name_tree in really_really_long_variable_name
+):
+    msg = "Could not find root. Please try a different forest."
+    raise ValueError(msg)
+
+# Regression for https://github.com/astral-sh/ruff/issues/8183
+def foo():
+    while (
+        not (aaaaaaaaaaaaaaaaaaaaa(bbbbbbbb, ccccccc)) and dddddddddd < eeeeeeeeeeeeeee
+    ):
+        pass
+
+def foo():
+    while (
+        not (aaaaaaaaaaaaaaaaaaaaa[bbbbbbbb, ccccccc]) and dddddddddd < eeeeeeeeeeeeeee
+    ):
+        pass

@@ -286,11 +286,11 @@ impl<'fmt, 'buf> DisplayVisitor<'fmt, 'buf> {
 
 impl Visit for DisplayVisitor<'_, '_> {
     fn record_set(&mut self, name: &str, _: OptionSet) {
-        self.result = self.result.and_then(|_| writeln!(self.f, "{name}"));
+        self.result = self.result.and_then(|()| writeln!(self.f, "{name}"));
     }
 
     fn record_field(&mut self, name: &str, field: OptionField) {
-        self.result = self.result.and_then(|_| {
+        self.result = self.result.and_then(|()| {
             write!(self.f, "{name}")?;
 
             if field.deprecated.is_some() {

@@ -164,10 +164,10 @@ elif False: # fmt: skip
     pass
 
 @Test
-@Test2 # fmt: off
+@Test2 # fmt: skip
 def test(): ...
 
-a = [1, 2, 3, 4, 5] # fmt: off
+a = [1, 2, 3, 4, 5] # fmt: skip
 
 def test(a, b, c, d, e, f) -> int: # fmt: skip
     pass
@@ -180,9 +180,10 @@ comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respec
 
 Ruff's formatter is designed to be used alongside the linter. However, the linter includes
 some rules that, when enabled, can cause conflicts with the formatter, leading to unexpected
-behavior.
+behavior. When configured appropriately, the goal of Ruff's formatter-linter compatibility is
+such that running the formatter should never introduce new lint errors.
 
-When using Ruff as a formatter, we recommend disabling the following rules:
+When using Ruff as a formatter, we recommend avoiding the following lint rules:
 
 - [`tab-indentation`](rules/tab-indentation.md) (`W191`)
 - [`indentation-with-invalid-multiple`](rules/indentation-with-invalid-multiple.md) (`E111`)
@@ -199,7 +200,16 @@ When using Ruff as a formatter, we recommend disabling the following rules:
 - [`single-line-implicit-string-concatenation`](rules/single-line-implicit-string-concatenation.md) (`ISC001`)
 - [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`)
 
-Similarly, we recommend disabling the following isort settings, which are incompatible with the
+While the [`line-too-long`](rules/line-too-long.md) (`E501`) rule _can_ be used alongside the
+formatter, the formatter only makes a best-effort attempt to wrap lines at the configured
+[`line-length`](settings.md#line-length). As such, formatted code _may_ exceed the line length,
+leading to [`line-too-long`](rules/line-too-long.md) (`E501`) errors.
+
+None of the above are included in Ruff's default configuration. However, if you've enabled
+any of these rules or their parent categories (like `Q`), we recommend disabling them via the
+linter's [`ignore`](settings.md#ignore) setting.
+
+Similarly, we recommend avoiding the following isort settings, which are incompatible with the
 formatter's treatment of import statements when set to non-default values:
 
 - [`force-single-line`](settings.md#isort-force-single-line)
@@ -207,6 +217,12 @@ formatter's treatment of import statements when set to non-default values:
 - [`lines-after-imports`](settings.md#isort-lines-after-imports)
 - [`lines-between-types`](settings.md#isort-lines-between-types)
 - [`split-on-trailing-comma`](settings.md#isort-split-on-trailing-comma)
+
+If you've configured any of these settings to take on non-default values, we recommend removing
+them from your Ruff configuration.
+
+When an incompatible lint rule or setting is enabled, `ruff format` will emit a warning. If your
+`ruff format` is free of warnings, you're good to go!
 
 ## Exit codes
 

@@ -115,4 +115,57 @@ def quuz():
 ```
 
 
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -12,25 +12,20 @@
+     pass
+ 
+ 
+-class Del(expr_context):
+-    ...
++class Del(expr_context): ...
+ 
+ 
+-class Load(expr_context):
+-    ...
++class Load(expr_context): ...
+ 
+ 
+ # Some comment.
+-class Other(expr_context):
+-    ...
++class Other(expr_context): ...
+ 
+ 
+-class Store(expr_context):
+-    ...
++class Store(expr_context): ...
+ 
+ 
+-class Foo(Bar):
+-    ...
++class Foo(Bar): ...
+ 
+ 
+ class Baz(Qux):
+@@ -49,12 +44,10 @@
+         pass
+ 
+ 
+-def bar():
+-    ...
++def bar(): ...
+ 
+ 
+-def baz():
+-    ...
++def baz(): ...
+ 
+ 
+ def quux():
+```
+
+
 

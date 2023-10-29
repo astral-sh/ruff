@@ -47,6 +47,7 @@ use crate::settings::LinterSettings;
 ///
 /// ## Options
 /// - `line-length`
+/// - `pycodestyle.max-line-length`
 /// - `task-tags`
 /// - `pycodestyle.ignore-overlong-task-comments`
 ///
@@ -58,7 +59,7 @@ impl Violation for LineTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         let LineTooLong(width, limit) = self;
-        format!("Line too long ({width} > {limit} characters)")
+        format!("Line too long ({width} > {limit})")
     }
 }
 
@@ -68,7 +69,7 @@ pub(crate) fn line_too_long(
     indexer: &Indexer,
     settings: &LinterSettings,
 ) -> Option<Diagnostic> {
-    let limit = settings.line_length;
+    let limit = settings.pycodestyle.max_line_length;
 
     Overlong::try_from_line(
         line,

@@ -6,6 +6,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 
 ```py
 ''''''
+
 '\''
 '"'
 "'"
@@ -69,7 +70,7 @@ f"\"{a}\"{'hello' * b}\"{c}\""
 ```diff
 --- Black
 +++ Ruff
-@@ -24,7 +24,12 @@
+@@ -25,7 +25,12 @@
  r'Tricky "quote'
  r"Not-so-tricky \"quote"
  rf"{yay}"
@@ -89,6 +90,7 @@ f"\"{a}\"{'hello' * b}\"{c}\""
 
 ```py
 """"""
+
 "'"
 '"'
 "'"
@@ -151,6 +153,7 @@ f"\"{a}\"{'hello' * b}\"{c}\""
 
 ```py
 """"""
+
 "'"
 '"'
 "'"

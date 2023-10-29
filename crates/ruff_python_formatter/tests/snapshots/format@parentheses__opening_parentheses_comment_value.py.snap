@@ -327,7 +327,9 @@ f3 = {  # f3
 
 
 # Non-empty parentheses: These are not allowed without a value
-def f1[T]():  # f1
+def f1[  # f1
+    T
+]():
     pass
 
 

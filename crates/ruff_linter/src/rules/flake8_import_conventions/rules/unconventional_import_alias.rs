@@ -30,6 +30,10 @@ use crate::renamer::Renamer;
 /// ```python
 /// import pandas as pd
 /// ```
+///
+/// ## Options
+/// - `flake8-import-conventions.aliases`
+/// - `flake8-import-conventions.extend-aliases`
 #[violation]
 pub struct UnconventionalImportAlias {
     name: String,

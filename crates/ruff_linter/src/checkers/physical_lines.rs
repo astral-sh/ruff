@@ -95,6 +95,7 @@ mod tests {
 
     use crate::line_width::LineLength;
     use crate::registry::Rule;
+    use crate::rules::pycodestyle;
     use crate::settings::LinterSettings;
 
     use super::check_physical_lines;
@@ -114,7 +115,10 @@ mod tests {
                 &indexer,
                 &[],
                 &LinterSettings {
-                    line_length,
+                    pycodestyle: pycodestyle::settings::Settings {
+                        max_line_length: line_length,
+                        ..pycodestyle::settings::Settings::default()
+                    },
                     ..LinterSettings::for_rule(Rule::LineTooLong)
                 },
             )

@@ -1,5 +1,5 @@
 use ruff_formatter::FormatOptions;
-use ruff_python_formatter::{format_module_source, PyFormatOptions};
+use ruff_python_formatter::{format_module_source, PreviewMode, PyFormatOptions};
 use similar::TextDiff;
 use std::fmt::{Formatter, Write};
 use std::io::BufReader;
@@ -142,16 +142,40 @@ fn format() {
         } else {
             let printed =
                 format_module_source(&content, options.clone()).expect("Formatting to succeed");
-            let formatted_code = printed.as_code();
+            let formatted = printed.as_code();
 
-            ensure_stability_when_formatting_twice(formatted_code, options, input_path);
+            ensure_stability_when_formatting_twice(formatted, options.clone(), input_path);
 
-            writeln!(
-                snapshot,
-                "## Output\n{}",
-                CodeFrame::new("py", &formatted_code)
-            )
-            .unwrap();
+            // We want to capture the differences in the preview style in our fixtures
+            let options_preview = options.with_preview(PreviewMode::Enabled);
+            let printed_preview = format_module_source(&content, options_preview.clone())
+                .expect("Formatting to succeed");
+            let formatted_preview = printed_preview.as_code();
+
+            ensure_stability_when_formatting_twice(
+                formatted_preview,
+                options_preview.clone(),
+                input_path,
+            );
+
+            if formatted == formatted_preview {
+                writeln!(snapshot, "## Output\n{}", CodeFrame::new("py", &formatted)).unwrap();
+            } else {
+                // Having both snapshots makes it hard to see the difference, so we're keeping only
+                // diff.
+                writeln!(
+                    snapshot,
+                    "## Output\n{}\n## Preview changes\n{}",
+                    CodeFrame::new("py", &formatted),
+                    CodeFrame::new(
+                        "diff",
+                        TextDiff::from_lines(formatted, formatted_preview)
+                            .unified_diff()
+                            .header("Stable", "Preview")
+                    )
+                )
+                .unwrap();
+            }
         }
 
         insta::with_settings!({

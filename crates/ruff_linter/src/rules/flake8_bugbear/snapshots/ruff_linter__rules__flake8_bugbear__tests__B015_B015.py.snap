@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B015.py:3:1: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+B015.py:3:1: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
   |
 1 | assert 1 == 1
 2 | 
@@ -11,7 +11,7 @@ B015.py:3:1: B015 Pointless comparison. This comparison does nothing but waste C
 5 | assert 1 in (1, 2)
   |
 
-B015.py:7:1: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+B015.py:7:1: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
   |
 5 | assert 1 in (1, 2)
 6 | 
@@ -19,7 +19,7 @@ B015.py:7:1: B015 Pointless comparison. This comparison does nothing but waste C
   | ^^^^^^^^^^^ B015
   |
 
-B015.py:17:5: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+B015.py:17:5: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
    |
 15 |     assert 1 in (1, 2)
 16 | 
@@ -27,7 +27,7 @@ B015.py:17:5: B015 Pointless comparison. This comparison does nothing but waste 
    |     ^^^^^^^^^^^ B015
    |
 
-B015.py:24:5: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+B015.py:24:5: B015 Pointless comparison. Did you mean to assign a value? Otherwise, prepend `assert` or remove it.
    |
 23 | class TestClass:
 24 |     1 == 1

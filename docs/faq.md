@@ -3,16 +3,18 @@
 ## Is the Ruff linter compatible with Black?
 
 Yes. The Ruff linter is compatible with [Black](https://github.com/psf/black) out-of-the-box, as
-long as the `line-length` setting is consistent between the two.
+long as the [`line-length`](settings.md#line-length) setting is consistent between the two.
 
 Ruff is designed to be used alongside a formatter (like Ruff's own formatter, or Black) and, as
 such, will defer implementing stylistic rules that are obviated by automated formatting.
 
-Note that Ruff and Black treat line-length enforcement a little differently. Black makes a
-best-effort attempt to adhere to the `line-length`, but avoids automatic line-wrapping in some cases
-(e.g., within comments). Ruff, on the other hand, will flag rule `E501` for any line that exceeds
-the `line-length` setting. As such, if `E501` is enabled, Ruff can still trigger line-length
-violations even when Black is enabled.
+Note that Ruff's linter and Black treat line-length enforcement a little differently. Black, like
+Ruff's formatter, makes a best-effort attempt to adhere to the
+[`line-length`](settings.md#line-length), but avoids automatic line-wrapping in some cases (e.g.,
+within comments). Ruff, on the other hand, will flag [`line-too-long`](rules/line-too-long.md)
+(`E501`) for any line that exceeds the [`line-length`](settings.md#line-length) setting. As such, if
+[`line-too-long`](rules/line-too-long.md) (`E501`) is enabled, Ruff can still trigger line-length
+violations even when Black or `ruff format` is enabled.
 
 ## How does Ruff's formatter compare to Black?
 
@@ -261,7 +263,7 @@ them. You can find the supported settings in the [API reference](settings.md#iso
 For example, you can set `known-first-party` like so:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     # Pyflakes
     "F",
@@ -275,7 +277,7 @@ select = [
 # Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
 src = ["src", "tests"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["my_module1", "my_module2"]
 ```
 
@@ -375,7 +377,7 @@ Found 3 errors.
 Yes! To enforce a docstring convention, add the following to your `pyproject.toml`:
 
 ```toml
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"  # Accepts: "google", "numpy", or "pep257".
 ```
 
@@ -387,12 +389,12 @@ Alongside `convention`, you'll want to explicitly enable the `D` rule code prefi
 rules are not enabled by default:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     "D",
 ]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 ```
 
@@ -423,7 +425,7 @@ For example, given this `pyproject.toml`:
 [tool.ruff]
 line-length = 88
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 ```
 

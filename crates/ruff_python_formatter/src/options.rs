@@ -250,6 +250,10 @@ impl MagicTrailingComma {
     pub const fn is_respect(self) -> bool {
         matches!(self, Self::Respect)
     }
+
+    pub const fn is_ignore(self) -> bool {
+        matches!(self, Self::Ignore)
+    }
 }
 
 impl FromStr for MagicTrailingComma {

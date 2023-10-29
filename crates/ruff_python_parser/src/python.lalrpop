@@ -466,7 +466,7 @@ MatchStatement: ast::Stmt = {
             }
         )
     },
-    <location:@L> "match" <subject:TestOrStarNamedExpr> "," ":" "\n" Indent <cases:MatchCase+> Dedent => {
+    <location:@L> "match" <tuple_location:@L> <subject:TestOrStarNamedExpr> "," <tuple_end_location:@R> ":" "\n" Indent <cases:MatchCase+> Dedent => {
        let end_location = cases
             .last()
             .unwrap()
@@ -476,13 +476,19 @@ MatchStatement: ast::Stmt = {
             .end();
         ast::Stmt::Match(
             ast::StmtMatch {
-                subject: Box::new(subject.into()),
+                subject: Box::new(ast::Expr::Tuple(
+                    ast::ExprTuple {
+                        elts: vec![subject.into()],
+                        ctx: ast::ExprContext::Load,
+                        range: (tuple_location..tuple_end_location).into()
+                    },
+                )),
                 cases,
                 range: (location..end_location).into()
             }
         )
     },
-    <location:@L> "match" <elts:TwoOrMore<TestOrStarNamedExpr, ",">> ","? ":" "\n" Indent <cases:MatchCase+> Dedent => {
+    <location:@L> "match" <tuple_location:@L> <elts:TwoOrMore<TestOrStarNamedExpr, ",">> ","? <tuple_end_location:@R> ":" "\n" Indent <cases:MatchCase+> Dedent => {
         let end_location = cases
             .last()
             .unwrap()
@@ -497,7 +503,7 @@ MatchStatement: ast::Stmt = {
                     ast::ExprTuple {
                         elts,
                         ctx: ast::ExprContext::Load,
-                        range: (location..end_location).into()
+                        range: (tuple_location..tuple_end_location).into()
                     },
                 )),
                 cases,

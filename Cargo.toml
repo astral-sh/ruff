@@ -41,12 +41,12 @@ similar = { version = "2.3.0", features = ["inline"] }
 smallvec = { version = "1.11.1" }
 static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
-strum_macros = { version = "0.25.2" }
+strum_macros = { version = "0.25.3" }
 syn = { version = "2.0.38" }
 test-case = { version = "3.2.1" }
-thiserror = { version = "1.0.49" }
+thiserror = { version = "1.0.50" }
 toml = { version = "0.7.8" }
-tracing = { version = "0.1.39" }
+tracing = { version = "0.1.40" }
 tracing-indicatif = { version = "0.3.4" }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 unicode-ident = { version = "1.0.12" }

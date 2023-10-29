@@ -40,7 +40,6 @@ if condition:
         print('Hy "Micha"')  # Should not change quotes
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
 }
 
@@ -51,7 +50,7 @@ fn format_options() -> Result<()> {
     fs::write(
         &ruff_toml,
         r#"
-tab-size = 8
+indent-width = 8
 line-length = 84
 
 [format]
@@ -89,7 +88,6 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
     Ok(())
 }
@@ -110,14 +108,13 @@ fn mixed_line_endings() -> Result<()> {
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--diff", "--isolated"])
+        .args(["format", "--no-cache", "--diff", "--isolated"])
         .arg("."), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     2 files left unchanged
     "###);
     Ok(())
@@ -173,7 +170,7 @@ OTHER = "OTHER"
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
-        .args(["format", "--check", "--config"])
+        .args(["format", "--no-cache", "--check", "--config"])
         .arg(ruff_toml.file_name().unwrap())
         // Explicitly pass test.py, should be formatted regardless of it being excluded by format.exclude
         .arg(test_path.file_name().unwrap())
@@ -187,7 +184,6 @@ OTHER = "OTHER"
     2 files would be reformatted
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
     Ok(())
 }
@@ -200,6 +196,7 @@ fn exclude_stdin() -> Result<()> {
         &ruff_toml,
         r#"
 extend-select = ["B", "Q"]
+ignore = ["Q000", "Q001", "Q002", "Q003"]
 
 [format]
 exclude = ["generated.py"]
@@ -220,7 +217,6 @@ if __name__ == '__main__':
     ----- stdout -----
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
     Ok(())
 }
@@ -234,6 +230,9 @@ fn format_option_inheritance() -> Result<()> {
         &ruff_toml,
         r#"
 extend = "base.toml"
+
+[lint]
+extend-select = ["COM812"]
 
 [format]
 quote-style = "single"
@@ -276,8 +275,43 @@ if condition:
     	print('Should change quotes')
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
+    warning: The following rules may cause conflicts when used with the formatter: `COM812`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
     "###);
+    Ok(())
+}
+
+#[test]
+fn deprecated_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+tab-size = 2
+"#,
+    )?;
+
+    insta::with_settings!({filters => vec![
+        (&*regex::escape(ruff_toml.to_str().unwrap()), "[RUFF-TOML-PATH]"),
+    ]}, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["format", "--config"])
+            .arg(&ruff_toml)
+            .arg("-")
+            .pass_stdin(r#"
+if True:
+    pass
+    "#), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        if True:
+          pass
+
+        ----- stderr -----
+        warning: The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead.
+        "###);
+    });
     Ok(())
 }
 
@@ -321,8 +355,215 @@ format = "json"
 }
 
 #[test]
+fn conflicting_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+indent-width = 2
+
+[lint]
+select = ["ALL"]
+ignore = ["D203", "D212"]
+
+[lint.isort]
+lines-after-imports = 3
+lines-between-types = 2
+force-wrap-aliases = true
+combine-as-imports = true
+split-on-trailing-comma = true
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "single"
+multiline-quotes = "single"
+
+[format]
+skip-magic-trailing-comma = true
+indent-style = "tab"
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("test.py");
+    fs::write(
+        &test_path,
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--no-cache", "--config"])
+        .arg(&ruff_toml)
+        .arg(test_path), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    warning: The following rules may cause conflicts when used with the formatter: `COM812`, `D206`, `ISC001`, `W191`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
+    warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
+    warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
+    warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
+    warning: The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.
+    "###);
+    Ok(())
+}
+
+#[test]
+fn conflicting_options_stdin() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+indent-width = 2
+
+[lint]
+select = ["ALL"]
+ignore = ["D203", "D212"]
+
+[lint.isort]
+lines-after-imports = 3
+lines-between-types = 2
+force-wrap-aliases = true
+combine-as-imports = true
+split-on-trailing-comma = true
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "single"
+multiline-quotes = "single"
+
+[format]
+skip-magic-trailing-comma = true
+indent-style = "tab"
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    def say_hy(name: str):
+    	print(f"Hy {name}")
+
+    ----- stderr -----
+    warning: The following rules may cause conflicts when used with the formatter: `COM812`, `D206`, `ISC001`, `W191`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    warning: The `flake8-quotes.inline-quotes="single"` option is incompatible with the formatter's `format.quote-style="double"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `"single"` or `"double"`.
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `"double"`.`
+    warning: The `flake8-quotes.multiline-quotes="single"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `"double"`.`
+    warning: The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).
+    warning: The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).
+    warning: The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.
+    warning: The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.
+    "###);
+    Ok(())
+}
+
+#[test]
+fn valid_linter_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["ALL"]
+ignore = ["D203", "D212", "COM812", "ISC001"]
+
+[lint.isort]
+lines-after-imports = 2
+lines-between-types = 1
+force-wrap-aliases = true
+combine-as-imports = true
+split-on-trailing-comma = true
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "double"
+multiline-quotes = "double"
+
+[format]
+skip-magic-trailing-comma = false
+quote-style = "single"
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("test.py");
+    fs::write(
+        &test_path,
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--no-cache", "--config"])
+        .arg(&ruff_toml)
+        .arg(test_path), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn all_rules_default_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint]
+select = ["ALL"]
+"#,
+    )?;
+
+    let test_path = tempdir.path().join("test.py");
+    fs::write(
+        &test_path,
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--no-cache", "--config"])
+        .arg(&ruff_toml)
+        .arg(test_path), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    warning: `one-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are incompatible. Ignoring `one-blank-line-before-class`.
+    warning: `multi-line-summary-first-line` (D212) and `multi-line-summary-second-line` (D213) are incompatible. Ignoring `multi-line-summary-second-line`.
+    warning: The following rules may cause conflicts when used with the formatter: `COM812`, `ISC001`. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.
+    "###);
+    Ok(())
+}
+
+#[test]
 fn test_diff() {
-    let args = ["format", "--isolated", "--diff"];
+    let args = ["format", "--no-cache", "--isolated", "--diff"];
     let fixtures = Path::new("resources").join("test").join("fixtures");
     let paths = [
         fixtures.join("unformatted.py"),
@@ -339,8 +580,8 @@ fn test_diff() {
         success: false
         exit_code: 1
         ----- stdout -----
-        --- resources/test/fixtures/unformatted.ipynb
-        +++ resources/test/fixtures/unformatted.ipynb
+        --- resources/test/fixtures/unformatted.ipynb:cell 1
+        +++ resources/test/fixtures/unformatted.ipynb:cell 1
         @@ -1,3 +1,4 @@
          import numpy
         -maths = (numpy.arange(100)**2).sum()
@@ -348,6 +589,30 @@ fn test_diff() {
         +
         +maths = (numpy.arange(100) ** 2).sum()
         +stats = numpy.asarray([1, 2, 3, 4]).median()
+        --- resources/test/fixtures/unformatted.ipynb:cell 3
+        +++ resources/test/fixtures/unformatted.ipynb:cell 3
+        @@ -1,4 +1,6 @@
+         # A cell with IPython escape command
+         def some_function(foo, bar):
+             pass
+        +
+        +
+         %matplotlib inline
+        --- resources/test/fixtures/unformatted.ipynb:cell 4
+        +++ resources/test/fixtures/unformatted.ipynb:cell 4
+        @@ -1,5 +1,10 @@
+         foo = %pwd
+        -def some_function(foo,bar,):
+        +
+        +
+        +def some_function(
+        +    foo,
+        +    bar,
+        +):
+             # Another cell with IPython escape command
+             foo = %pwd
+             print(foo)
+
         --- resources/test/fixtures/unformatted.py
         +++ resources/test/fixtures/unformatted.py
         @@ -1,3 +1,3 @@
@@ -356,8 +621,8 @@ fn test_diff() {
         +y = 2
          z = 3
 
+
         ----- stderr -----
-        warning: `ruff format` is not yet stable, and subject to change in future versions.
         2 files would be reformatted, 1 file left unchanged
         "###);
     });
@@ -365,7 +630,7 @@ fn test_diff() {
 
 #[test]
 fn test_diff_no_change() {
-    let args = ["format", "--isolated", "--diff"];
+    let args = ["format", "--no-cache", "--isolated", "--diff"];
     let fixtures = Path::new("resources").join("test").join("fixtures");
     let paths = [fixtures.join("unformatted.py")];
     insta::with_settings!({filters => vec![
@@ -386,8 +651,8 @@ fn test_diff_no_change() {
         +y = 2
          z = 3
 
+
         ----- stderr -----
-        warning: `ruff format` is not yet stable, and subject to change in future versions.
         1 file would be reformatted
         "###
         );
@@ -420,8 +685,8 @@ fn test_diff_stdin_unformatted() {
     +y = 2
      z = 3
 
+
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
 }
 
@@ -438,6 +703,5 @@ fn test_diff_stdin_formatted() {
     ----- stdout -----
 
     ----- stderr -----
-    warning: `ruff format` is not yet stable, and subject to change in future versions.
     "###);
 }

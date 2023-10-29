@@ -13,6 +13,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
+use ruff_workspace::options::PycodestyleOptions;
 use ruff_workspace::resolver::ConfigurationTransformer;
 
 #[derive(Debug, Parser)]
@@ -49,7 +50,11 @@ pub enum Command {
 
         /// Output format
         #[arg(long, value_enum, default_value = "pretty")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// List or describe the available configuration options.
     Config { option: Option<String> },
@@ -57,7 +62,11 @@ pub enum Command {
     Linter {
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
@@ -66,8 +75,6 @@ pub enum Command {
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
-    #[doc(hidden)]
-    #[clap(hide = true)]
     Format(FormatCommand),
     /// Display Ruff's version
     Version {
@@ -365,6 +372,14 @@ pub struct FormatCommand {
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
+
+    /// Disable cache reads.
+    #[arg(short, long, help_heading = "Miscellaneous")]
+    pub no_cache: bool,
+    /// Path to the cache directory.
+    #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
+    pub cache_dir: Option<PathBuf>,
+
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -394,9 +409,6 @@ pub struct FormatCommand {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
-    /// Set the line-length.
-    #[arg(long, help_heading = "Rule configuration", hide = true)]
-    pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
     pub isolated: bool,
@@ -536,10 +548,10 @@ impl FormatCommand {
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
+                no_cache: self.no_cache,
                 stdin_filename: self.stdin_filename,
             },
             CliOverrides {
-                line_length: self.line_length,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,
@@ -548,6 +560,8 @@ impl FormatCommand {
                 preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 target_version: self.target_version,
+                cache_dir: self.cache_dir,
+
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..CliOverrides::default()
             },
@@ -591,6 +605,7 @@ pub struct CheckArguments {
 #[allow(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
+    pub no_cache: bool,
     pub diff: bool,
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
@@ -678,8 +693,12 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
         }
-        if let Some(line_length) = &self.line_length {
-            config.line_length = Some(*line_length);
+        if let Some(line_length) = self.line_length {
+            config.line_length = Some(line_length);
+            config.lint.pycodestyle = Some(PycodestyleOptions {
+                max_line_length: Some(line_length),
+                ..config.lint.pycodestyle.unwrap_or_default()
+            });
         }
         if let Some(preview) = &self.preview {
             config.preview = Some(*preview);
@@ -712,7 +731,7 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pair.prefix);
     }
     per_file_ignores
