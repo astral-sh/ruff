@@ -20,10 +20,10 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// def increment():
-///   global counter
+///     global counter
 ///
-///   with threading.Lock():
-///       counter += 1
+///     with threading.Lock():
+///         counter += 1
 /// ```
 ///
 /// Use instead:
