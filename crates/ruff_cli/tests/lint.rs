@@ -308,3 +308,87 @@ _ = "---------------------------------------------------------------------------
     "###);
     Ok(())
 }
+
+#[test]
+fn per_file_ignores_stdin() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend-select = ["B", "Q"]
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .arg("check")
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--stdin-filename", "generated.py"])
+        .args(["--per-file-ignores", "generated.py:Q"])
+        .arg("-")
+        .pass_stdin(r#"
+import os
+
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    generated.py:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn extend_per_file_ignores_stdin() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend-select = ["B", "Q"]
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .arg("check")
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--stdin-filename", "generated.py"])
+        .args(["--extend-per-file-ignores", "generated.py:Q"])
+        .arg("-")
+        .pass_stdin(r#"
+import os
+
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    generated.py:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
