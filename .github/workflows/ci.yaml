@@ -349,8 +349,8 @@ jobs:
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
         run: mkdocs build --strict -f mkdocs.generated.yml
 
-  check-formatter-ecosystem:
-    name: "Formatter ecosystem and progress checks"
+  check-formatter-instability-and-black-similarity:
+    name: "formatter instabilities and black similarity"
     runs-on: ubuntu-latest
     needs: determine_changes
     if: needs.determine_changes.outputs.formatter == 'true' || github.ref == 'refs/heads/main'
