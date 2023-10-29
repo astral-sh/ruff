@@ -129,7 +129,7 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
         "**Example usage**:\n\n```toml\n[tool.ruff{}]\n{}\n```\n",
         if let Some(set_name) = parent_set.name() {
             if set_name == "format" {
-                ".format"
+                String::from(".format")
             } else {
                 format!(".lint.{set_name}")
             }
