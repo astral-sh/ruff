@@ -64,6 +64,7 @@ pub(crate) use unspecified_encoding::*;
 pub(crate) use useless_else_on_loop::*;
 pub(crate) use useless_import_alias::*;
 pub(crate) use useless_return::*;
+pub(crate) use useless_with_lock::*;
 pub(crate) use yield_from_in_async_function::*;
 pub(crate) use yield_in_init::*;
 
@@ -133,5 +134,6 @@ mod unspecified_encoding;
 mod useless_else_on_loop;
 mod useless_import_alias;
 mod useless_return;
+mod useless_with_lock;
 mod yield_from_in_async_function;
 mod yield_in_init;

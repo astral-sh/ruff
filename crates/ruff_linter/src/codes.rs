@@ -277,6 +277,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W1514") => (RuleGroup::Preview, rules::pylint::rules::UnspecifiedEncoding),
         #[allow(deprecated)]
         (Pylint, "W1641") => (RuleGroup::Nursery, rules::pylint::rules::EqWithoutHash),
+        (Pylint, "W2101") => (RuleGroup::Preview, rules::pylint::rules::UselessWithLock),
         (Pylint, "R0904") => (RuleGroup::Preview, rules::pylint::rules::TooManyPublicMethods),
         (Pylint, "W2901") => (RuleGroup::Stable, rules::pylint::rules::RedefinedLoopName),
         #[allow(deprecated)]
