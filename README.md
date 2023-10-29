@@ -10,7 +10,7 @@
 
 [**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://docs.astral.sh/ruff/) | [**Playground**](https://play.ruff.rs/)
 
-An extremely fast Python linter and code formatter, written in Rust.
+An extremely fast Python linter and code formattermade and written in Rust.
 
 <p align="center">
   <picture align="center">
@@ -30,7 +30,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - 🤝 Python 3.12 compatibility
 - ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8), isort, and Black
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
-- 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
+- 🔧 Fix support, for automatic error correction (e.g, automatically remove unused imports)
 - 📏 Over [700 built-in rules](https://docs.astral.sh/ruff/rules/), with native re-implementations
     of popular Flake8 plugins, like flake8-bugbear
 - ⌨️ First-party [editor integrations](https://docs.astral.sh/ruff/editor-integrations/) for
@@ -38,7 +38,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - 🌎 Monorepo-friendly, with [hierarchical and cascading configuration](https://docs.astral.sh/ruff/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
-functionality behind a single, common interface.
+functionality behind a single and  common interface.
 
 Ruff can be used to replace [Flake8](https://pypi.org/project/flake8/) (plus dozens of plugins),
 [Black](https://github.com/psf/black), [isort](https://pypi.org/project/isort/),
