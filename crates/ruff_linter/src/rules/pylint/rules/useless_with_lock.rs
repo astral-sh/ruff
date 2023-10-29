@@ -6,11 +6,14 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for useless lock objects in `with` statements.
+/// Checks for direct uses of lock objects in `with` statements.
 ///
 /// ## Why is this bad?
-/// Lock objects must be stored in a variable to be shared between threads.
-/// Otherwise, each thread will have its own lock object and the lock will be useless.
+/// Creating a lock (via `threading.Lock` or similar) in a `with` statement
+/// has no effect, as locks are only relevant when shared between threads.
+///
+/// Instead, assign the lock to a variable outside the `with` statement,
+/// and share that variable between threads.
 ///
 /// ## Example
 /// ```python
@@ -49,33 +52,35 @@ pub struct UselessWithLock;
 impl Violation for UselessWithLock {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Useless threading lock. An existing lock instance should be used to acquire lock.")
+        format!("Threading lock directly created in `with` statement has no effect")
     }
 }
 
 /// PLW2101
-pub(crate) fn useless_with_lock(checker: &mut Checker, call: &ast::ExprCall) {
-    if !checker.semantic().current_statement().is_with_stmt() {
-        return;
-    }
+pub(crate) fn useless_with_lock(checker: &mut Checker, with: &ast::StmtWith) {
+    for item in &with.items {
+        let Some(call) = item.context_expr.as_call_expr() else {
+            continue;
+        };
 
-    if !checker
-        .semantic()
-        .resolve_call_path(call.func.as_ref())
-        .is_some_and(|call_path| {
-            matches!(
-                call_path.as_slice(),
-                [
-                    "threading",
-                    "Lock" | "RLock" | "Condition" | "Semaphore" | "BoundedSemaphore"
-                ]
-            )
-        })
-    {
-        return;
-    }
+        if !checker
+            .semantic()
+            .resolve_call_path(call.func.as_ref())
+            .is_some_and(|call_path| {
+                matches!(
+                    call_path.as_slice(),
+                    [
+                        "threading",
+                        "Lock" | "RLock" | "Condition" | "Semaphore" | "BoundedSemaphore"
+                    ]
+                )
+            })
+        {
+            return;
+        }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(UselessWithLock {}, call.range()));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(UselessWithLock, call.range()));
+    }
 }

@@ -764,9 +764,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::NestedMinMax) {
                 pylint::rules::nested_min_max(checker, expr, func, args, keywords);
             }
-            if checker.enabled(Rule::UselessWithLock) {
-                pylint::rules::useless_with_lock(checker, call);
-            }
             if checker.enabled(Rule::PytestPatchWithLambda) {
                 if let Some(diagnostic) = flake8_pytest_style::rules::patch_with_lambda(call) {
                     checker.diagnostics.push(diagnostic);
