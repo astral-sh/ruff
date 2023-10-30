@@ -2060,6 +2060,16 @@ pub struct IsortOptions {
         "#
     )]
     pub sections: Option<FxHashMap<ImportSection, Vec<String>>>,
+
+    /// Sort imports by their string length.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            length-sort = true
+        "#
+    )]
+    pub length_sort: Option<bool>,
 }
 
 impl IsortOptions {
@@ -2234,6 +2244,7 @@ impl IsortOptions {
             section_order,
             no_sections,
             from_first,
+            length_sort: self.length_sort.unwrap_or(false),
         })
     }
 }

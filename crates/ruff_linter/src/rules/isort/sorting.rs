@@ -76,6 +76,7 @@ pub(crate) enum Distance {
 pub(crate) struct ModuleKey<'a> {
     distance: Distance,
     force_to_top: Option<bool>,
+    maybe_length: Option<usize>,
     maybe_lowercase_name: Option<NatOrdStr<'a>>,
     module_name: Option<NatOrdStr<'a>>,
     first_alias: Option<MemberKey<'a>>,
@@ -97,6 +98,9 @@ impl<'a> ModuleKey<'a> {
             }
         };
         let force_to_top = name.map(|name| !settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
+        let maybe_length = settings
+            .length_sort
+            .then_some(name.map(str::len).unwrap_or_default());
         let maybe_lowercase_name = name.and_then(|name| {
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
         });
@@ -108,6 +112,7 @@ impl<'a> ModuleKey<'a> {
         Self {
             distance,
             force_to_top,
+            maybe_length,
             maybe_lowercase_name,
             module_name,
             first_alias,
@@ -122,6 +127,7 @@ impl<'a> ModuleKey<'a> {
 pub(crate) struct MemberKey<'a> {
     not_star_import: bool,
     member_type: Option<MemberType>,
+    maybe_length: Option<usize>,
     maybe_lowercase_name: Option<NatOrdStr<'a>>,
     module_name: NatOrdStr<'a>,
     asname: Option<NatOrdStr<'a>>,
@@ -133,6 +139,7 @@ impl<'a> MemberKey<'a> {
         let member_type = settings
             .order_by_type
             .then_some(member_type(name, settings));
+        let maybe_length = settings.length_sort.then_some(name.len());
         let maybe_lowercase_name =
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
         let module_name = NatOrdStr::from(name);
@@ -141,6 +148,7 @@ impl<'a> MemberKey<'a> {
         Self {
             not_star_import,
             member_type,
+            maybe_length,
             maybe_lowercase_name,
             module_name,
             asname,

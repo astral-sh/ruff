@@ -1477,6 +1477,13 @@
             "type": "string"
           }
         },
+        "length-sort": {
+          "description": "Sort imports by their string length.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "lines-after-imports": {
           "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
           "type": [

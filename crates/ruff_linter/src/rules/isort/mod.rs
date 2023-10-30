@@ -1138,4 +1138,24 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test_case(Path::new("length_sort_straight_imports.py"))]
+    #[test_case(Path::new("length_sort_from_imports.py"))]
+    #[test_case(Path::new("length_sort_straight_and_from_imports.py"))]
+    fn length_sort(path: &Path) -> Result<()> {
+        let snapshot = format!("{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    length_sort: true,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
 }
