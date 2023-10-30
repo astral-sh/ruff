@@ -507,6 +507,7 @@ impl CheckCommand {
                 extend_exclude: self.extend_exclude,
                 extend_fixable: self.extend_fixable,
                 extend_ignore: self.extend_ignore,
+                extend_per_file_ignores: self.extend_per_file_ignores,
                 extend_select: self.extend_select,
                 extend_unfixable: self.extend_unfixable,
                 fixable: self.fixable,
@@ -627,6 +628,7 @@ pub struct CliOverrides {
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub preview: Option<PreviewMode>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
@@ -656,6 +658,12 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(extend_exclude) = &self.extend_exclude {
             config.extend_exclude.extend(extend_exclude.clone());
+        }
+        if let Some(extend_per_file_ignores) = &self.extend_per_file_ignores {
+            config
+                .lint
+                .extend_per_file_ignores
+                .extend(collect_per_file_ignores(extend_per_file_ignores.clone()));
         }
         if let Some(fix) = &self.fix {
             config.fix = Some(*fix);
