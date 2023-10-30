@@ -587,8 +587,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                 ]
             )?;
 
-            // Comments after docstrings need a newline between the docstring and the comment, so we attach
-            // it as leading on the first statement after the docstring.
+            // Comments after docstrings need a newline between the docstring and the comment.
             // (https://github.com/astral-sh/ruff/issues/7948)
             // ```python
             // class ModuleBrowser:
