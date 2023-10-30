@@ -30,6 +30,7 @@ def excepthook(type, value, tb):
 
 
 def entrypoint():
+    sys.exit(1)
     args = parse_args()
 
     if args.pdb:
