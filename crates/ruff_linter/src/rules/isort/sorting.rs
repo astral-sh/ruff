@@ -1,5 +1,6 @@
 /// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
 use natord;
+use std::cmp::Reverse;
 use std::{borrow::Cow, cmp::Ordering};
 
 use ruff_python_stdlib::str;
@@ -62,8 +63,14 @@ impl<'a> From<String> for NatOrdStr<'a> {
     }
 }
 
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
+pub(crate) enum Distance {
+    Nearest(u32),
+    Furthest(Reverse<u32>),
+}
+
 type ModuleKey<'a> = (
-    i64,
+    Distance,
     Option<bool>,
     Option<NatOrdStr<'a>>,
     Option<NatOrdStr<'a>>,
@@ -80,13 +87,12 @@ pub(crate) fn module_key<'a>(
     first_alias: Option<(&'a str, Option<&'a str>)>,
     settings: &Settings,
 ) -> ModuleKey<'a> {
-    let level = level
-        .map(i64::from)
-        .map(|l| match settings.relative_imports_order {
-            RelativeImportsOrder::ClosestToFurthest => l,
-            RelativeImportsOrder::FurthestToClosest => -l,
-        })
-        .unwrap_or_default();
+    let distance = match settings.relative_imports_order {
+        RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level.unwrap_or_default()),
+        RelativeImportsOrder::FurthestToClosest => {
+            Distance::Furthest(Reverse(level.unwrap_or_default()))
+        }
+    };
     let force_to_top = name.map(|name| !settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
     let maybe_lowercase_name = name
         .and_then(|name| (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name))));
@@ -95,7 +101,7 @@ pub(crate) fn module_key<'a>(
     let first_alias = first_alias.map(|(name, asname)| member_key(name, asname, settings));
 
     (
-        level,
+        distance,
         force_to_top,
         maybe_lowercase_name,
         module_name,
