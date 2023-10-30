@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, ModModule, Parameters};
+use ruff_python_ast::{
+    self as ast, AnyNodeRef, Comprehension, Expr, MatchCase, ModModule, Parameters,
+};
 use ruff_python_trivia::{
     find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, CommentRanges,
     SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -541,6 +542,10 @@ fn handle_own_line_comment_between_statements<'a>(
     // y = 2
     // ```
     if !preceding.is_statement() || !following.is_statement() {
+        return CommentPlacement::Default(comment);
+    }
+
+    if comment.line_position().is_end_of_line() {
         return CommentPlacement::Default(comment);
     }
 

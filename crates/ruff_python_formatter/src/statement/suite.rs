@@ -584,9 +584,30 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                     string_literal
                         .format()
                         .with_options(StringLayout::DocString),
-                    trailing_comments(node_comments.trailing),
                 ]
-            )
+            )?;
+
+            // Comments after docstrings need a newline between the docstring and the comment.
+            // (https://github.com/astral-sh/ruff/issues/7948)
+            // ```python
+            // class ModuleBrowser:
+            //     """Browse module classes and functions in IDLE."""
+            //     # ^ Insert a newline above here
+            //
+            //     def __init__(self, master, path, *, _htest=False, _utest=False):
+            //         pass
+            // ```
+            if let Some(own_line) = node_comments
+                .trailing
+                .iter()
+                .find(|comment| comment.line_position().is_own_line())
+            {
+                if lines_before(own_line.start(), f.context().source()) < 2 {
+                    empty_line().fmt(f)?;
+                }
+            }
+
+            trailing_comments(node_comments.trailing).fmt(f)
         }
     }
 }
