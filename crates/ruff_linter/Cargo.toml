@@ -53,7 +53,7 @@ path-absolutize = { workspace = true, features = [
 ] }
 pathdiff = { version = "0.2.1" }
 pep440_rs = { version = "0.3.12", features = ["serde"] }
-pyproject-toml = { version = "0.7.0" }
+pyproject-toml = { version = "0.8.0" }
 quick-junit = { version = "0.3.2" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
