@@ -71,6 +71,8 @@ type ModuleKey<'a> = (
     Option<MemberKey<'a>>,
 );
 
+/// Returns a comparable key to capture the desired sorting order for an imported module (e.g.,
+/// `foo` in `from foo import bar`).
 pub(crate) fn module_key<'a>(
     name: Option<&'a str>,
     asname: Option<&'a str>,
@@ -110,6 +112,8 @@ type MemberKey<'a> = (
     Option<NatOrdStr<'a>>,
 );
 
+/// Returns a comparable key to capture the desired sorting order for an imported member (e.g.,
+/// `bar` in `from foo import bar`).
 pub(crate) fn member_key<'a>(
     name: &'a str,
     asname: Option<&'a str>,
@@ -133,6 +137,7 @@ pub(crate) fn member_key<'a>(
     )
 }
 
+/// Lowercase the given string, if it contains any uppercase characters.
 fn maybe_lowercase(name: &str) -> Cow<'_, str> {
     if name.chars().all(char::is_lowercase) {
         Cow::Borrowed(name)
