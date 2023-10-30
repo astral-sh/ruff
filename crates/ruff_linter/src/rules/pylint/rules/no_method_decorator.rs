@@ -14,6 +14,22 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// When it comes to consistency and readability, it's preferred to use the decorator.
 ///
+/// ## Example
+/// ```python
+/// class Foo:
+///     def bar(cls):
+///         ...
+///
+///     bar = classmethod(bar)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     @classmethod
+///     def bar(cls):
+///         ...
+/// ```
 #[violation]
 pub struct NoClassmethodDecorator;
 
@@ -34,6 +50,22 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 /// ## Why is this bad?
 /// When it comes to consistency and readability, it's preferred to use the decorator.
 ///
+/// ## Example
+/// ```python
+/// class Foo:
+///     def bar(cls):
+///         ...
+///
+///     bar = staticmethod(bar)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo:
+///     @staticmethod
+///     def bar(cls):
+///         ...
+/// ```
 #[violation]
 pub struct NoStaticmethodDecorator;
 
