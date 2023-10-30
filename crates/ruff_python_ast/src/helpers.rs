@@ -1037,53 +1037,74 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
 
 #[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Truthiness {
-    // An expression evaluates to `False`.
+    /// The expression is `True`.
+    True,
+    /// The expression is `False`.
+    False,
+    /// The expression evaluates to a `False`-like value (e.g., `None`, `0`, `[]`, `""`).
     Falsey,
-    // An expression evaluates to `True`.
+    /// The expression evaluates to a `True`-like value (e.g., `1`, `"foo"`).
     Truthy,
-    // An expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
+    /// The expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
     Unknown,
 }
 
-impl From<Option<bool>> for Truthiness {
-    fn from(value: Option<bool>) -> Self {
-        match value {
-            Some(true) => Truthiness::Truthy,
-            Some(false) => Truthiness::Falsey,
-            None => Truthiness::Unknown,
-        }
-    }
-}
-
-impl From<Truthiness> for Option<bool> {
-    fn from(truthiness: Truthiness) -> Self {
-        match truthiness {
-            Truthiness::Truthy => Some(true),
-            Truthiness::Falsey => Some(false),
-            Truthiness::Unknown => None,
-        }
-    }
-}
-
 impl Truthiness {
+    /// Return the truthiness of an expression.
     pub fn from_expr<F>(expr: &Expr, is_builtin: F) -> Self
     where
         F: Fn(&str) -> bool,
     {
         match expr {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => Some(!value.is_empty()),
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => Some(!value.is_empty()),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                if value.is_empty() {
+                    Self::Falsey
+                } else {
+                    Self::Truthy
+                }
+            }
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+                if value.is_empty() {
+                    Self::Falsey
+                } else {
+                    Self::Truthy
+                }
+            }
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
-                ast::Number::Int(int) => Some(*int != 0),
-                ast::Number::Float(float) => Some(*float != 0.0),
-                ast::Number::Complex { real, imag, .. } => Some(*real != 0.0 || *imag != 0.0),
+                ast::Number::Int(int) => {
+                    if *int == 0 {
+                        Self::Falsey
+                    } else {
+                        Self::Truthy
+                    }
+                }
+                ast::Number::Float(float) => {
+                    if *float == 0.0 {
+                        Self::Falsey
+                    } else {
+                        Self::Truthy
+                    }
+                }
+                ast::Number::Complex { real, imag, .. } => {
+                    if *real == 0.0 && *imag == 0.0 {
+                        Self::Falsey
+                    } else {
+                        Self::Truthy
+                    }
+                }
             },
-            Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
-            Expr::NoneLiteral(_) => Some(false),
-            Expr::EllipsisLiteral(_) => Some(true),
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                if *value {
+                    Self::True
+                } else {
+                    Self::False
+                }
+            }
+            Expr::NoneLiteral(_) => Self::Falsey,
+            Expr::EllipsisLiteral(_) => Self::Truthy,
             Expr::FString(ast::ExprFString { values, .. }) => {
                 if values.is_empty() {
-                    Some(false)
+                    Self::Falsey
                 } else if values.iter().any(|value| {
                     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &value {
                         !value.is_empty()
@@ -1091,15 +1112,27 @@ impl Truthiness {
                         false
                     }
                 }) {
-                    Some(true)
+                    Self::Truthy
                 } else {
-                    None
+                    Self::Unknown
                 }
             }
             Expr::List(ast::ExprList { elts, .. })
             | Expr::Set(ast::ExprSet { elts, .. })
-            | Expr::Tuple(ast::ExprTuple { elts, .. }) => Some(!elts.is_empty()),
-            Expr::Dict(ast::ExprDict { keys, .. }) => Some(!keys.is_empty()),
+            | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                if elts.is_empty() {
+                    Self::Falsey
+                } else {
+                    Self::Truthy
+                }
+            }
+            Expr::Dict(ast::ExprDict { keys, .. }) => {
+                if keys.is_empty() {
+                    Self::Falsey
+                } else {
+                    Self::Truthy
+                }
+            }
             Expr::Call(ast::ExprCall {
                 func,
                 arguments: Arguments { args, keywords, .. },
@@ -1109,23 +1142,30 @@ impl Truthiness {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         if args.is_empty() && keywords.is_empty() {
                             // Ex) `list()`
-                            Some(false)
+                            Self::Falsey
                         } else if args.len() == 1 && keywords.is_empty() {
                             // Ex) `list([1, 2, 3])`
-                            Self::from_expr(&args[0], is_builtin).into()
+                            Self::from_expr(&args[0], is_builtin)
                         } else {
-                            None
+                            Self::Unknown
                         }
                     } else {
-                        None
+                        Self::Unknown
                     }
                 } else {
-                    None
+                    Self::Unknown
                 }
             }
-            _ => None,
+            _ => Self::Unknown,
         }
-        .into()
+    }
+
+    pub fn into_bool(self) -> Option<bool> {
+        match self {
+            Self::True | Self::Truthy => Some(true),
+            Self::False | Self::Falsey => Some(false),
+            Self::Unknown => None,
+        }
     }
 }
 
