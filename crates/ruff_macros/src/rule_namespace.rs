@@ -111,6 +111,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
     }
 
     Ok(quote! {
+        #[automatically_derived]
         impl crate::registry::RuleNamespace for #ident {
             fn parse_code(code: &str) -> Option<(Self, &str)> {
                 #if_statements

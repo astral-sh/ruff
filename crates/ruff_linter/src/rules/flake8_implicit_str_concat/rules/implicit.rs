@@ -20,7 +20,7 @@ use crate::settings::LinterSettings;
 /// negatively affects code readability.
 ///
 /// In some cases, the implicit concatenation may also be unintentional, as
-/// autoformatters are capable of introducing single-line implicit
+/// code formatters are capable of introducing single-line implicit
 /// concatenations when collapsing long lines.
 ///
 /// ## Example
@@ -110,18 +110,27 @@ pub(crate) fn implicit(
     {
         let (a_range, b_range) = match (a_tok, b_tok) {
             (Tok::String { .. }, Tok::String { .. }) => (*a_range, *b_range),
-            (Tok::String { .. }, Tok::FStringStart) => (
-                *a_range,
-                indexer.fstring_ranges().innermost(b_range.start()).unwrap(),
-            ),
-            (Tok::FStringEnd, Tok::String { .. }) => (
-                indexer.fstring_ranges().innermost(a_range.start()).unwrap(),
-                *b_range,
-            ),
-            (Tok::FStringEnd, Tok::FStringStart) => (
-                indexer.fstring_ranges().innermost(a_range.start()).unwrap(),
-                indexer.fstring_ranges().innermost(b_range.start()).unwrap(),
-            ),
+            (Tok::String { .. }, Tok::FStringStart) => {
+                match indexer.fstring_ranges().innermost(b_range.start()) {
+                    Some(b_range) => (*a_range, b_range),
+                    None => continue,
+                }
+            }
+            (Tok::FStringEnd, Tok::String { .. }) => {
+                match indexer.fstring_ranges().innermost(a_range.start()) {
+                    Some(a_range) => (a_range, *b_range),
+                    None => continue,
+                }
+            }
+            (Tok::FStringEnd, Tok::FStringStart) => {
+                match (
+                    indexer.fstring_ranges().innermost(a_range.start()),
+                    indexer.fstring_ranges().innermost(b_range.start()),
+                ) {
+                    (Some(a_range), Some(b_range)) => (a_range, b_range),
+                    _ => continue,
+                }
+            }
             _ => continue,
         };
 

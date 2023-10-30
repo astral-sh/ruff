@@ -16,7 +16,7 @@ if (
     and self._returncode
     and self._proc.poll()
 ):
-    ...
+    pass
 
 if (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -26,14 +26,14 @@ if (
     and aaaaaaaaaaaaaaaaaaaaaaaaaa
     and aaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ):
-    ...
+    pass
 
 
 if (
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaas
     and aaaaaaaaaaaaaaaaa
 ):
-    ...
+    pass
 
 
 if [2222, 333] and [
@@ -43,7 +43,7 @@ if [2222, 333] and [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ]:
-    ...
+    pass
 
 if [
     aaaaaaaaaaaaa,

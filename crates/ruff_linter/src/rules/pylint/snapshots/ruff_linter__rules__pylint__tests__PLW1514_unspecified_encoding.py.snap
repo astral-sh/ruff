@@ -1,0 +1,72 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+unspecified_encoding.py:8:1: PLW1514 `open` in text mode without explicit `encoding` argument
+   |
+ 7 | # Errors.
+ 8 | open("test.txt")
+   | ^^^^ PLW1514
+ 9 | io.TextIOWrapper(io.FileIO("test.txt"))
+10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+   |
+
+unspecified_encoding.py:9:1: PLW1514 `io.TextIOWrapper` without explicit `encoding` argument
+   |
+ 7 | # Errors.
+ 8 | open("test.txt")
+ 9 | io.TextIOWrapper(io.FileIO("test.txt"))
+   | ^^^^^^^^^^^^^^^^ PLW1514
+10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+11 | tempfile.NamedTemporaryFile("w")
+   |
+
+unspecified_encoding.py:10:1: PLW1514 `io.TextIOWrapper` without explicit `encoding` argument
+   |
+ 8 | open("test.txt")
+ 9 | io.TextIOWrapper(io.FileIO("test.txt"))
+10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+   | ^^^^^^^^^^^^^^^^^^ PLW1514
+11 | tempfile.NamedTemporaryFile("w")
+12 | tempfile.TemporaryFile("w")
+   |
+
+unspecified_encoding.py:11:1: PLW1514 `tempfile.NamedTemporaryFile` in text mode without explicit `encoding` argument
+   |
+ 9 | io.TextIOWrapper(io.FileIO("test.txt"))
+10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+11 | tempfile.NamedTemporaryFile("w")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW1514
+12 | tempfile.TemporaryFile("w")
+13 | codecs.open("test.txt")
+   |
+
+unspecified_encoding.py:12:1: PLW1514 `tempfile.TemporaryFile` in text mode without explicit `encoding` argument
+   |
+10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+11 | tempfile.NamedTemporaryFile("w")
+12 | tempfile.TemporaryFile("w")
+   | ^^^^^^^^^^^^^^^^^^^^^^ PLW1514
+13 | codecs.open("test.txt")
+14 | tempfile.SpooledTemporaryFile(0, "w")
+   |
+
+unspecified_encoding.py:13:1: PLW1514 `codecs.open` in text mode without explicit `encoding` argument
+   |
+11 | tempfile.NamedTemporaryFile("w")
+12 | tempfile.TemporaryFile("w")
+13 | codecs.open("test.txt")
+   | ^^^^^^^^^^^ PLW1514
+14 | tempfile.SpooledTemporaryFile(0, "w")
+   |
+
+unspecified_encoding.py:14:1: PLW1514 `tempfile.SpooledTemporaryFile` in text mode without explicit `encoding` argument
+   |
+12 | tempfile.TemporaryFile("w")
+13 | codecs.open("test.txt")
+14 | tempfile.SpooledTemporaryFile(0, "w")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW1514
+15 | 
+16 | # Non-errors.
+   |
+
+

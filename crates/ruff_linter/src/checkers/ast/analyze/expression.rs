@@ -749,6 +749,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SysExitAlias) {
                 pylint::rules::sys_exit_alias(checker, func);
             }
+            if checker.enabled(Rule::BadOpenMode) {
+                pylint::rules::bad_open_mode(checker, call);
+            }
             if checker.enabled(Rule::BadStrStripCall) {
                 pylint::rules::bad_str_strip_call(checker, func, args);
             }
@@ -785,6 +788,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::SubprocessRunWithoutCheck) {
                 pylint::rules::subprocess_run_without_check(checker, call);
+            }
+            if checker.enabled(Rule::UnspecifiedEncoding) {
+                pylint::rules::unspecified_encoding(checker, call);
             }
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
@@ -904,6 +910,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ExceptionWithoutExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
+            }
+            if checker.enabled(Rule::IsinstanceTypeNone) {
+                refurb::rules::isinstance_type_none(checker, call);
             }
             if checker.enabled(Rule::ImplicitCwd) {
                 refurb::rules::no_implicit_cwd(checker, call);
@@ -1194,6 +1203,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ComparisonWithItself) {
                 pylint::rules::comparison_with_itself(checker, left, ops, comparators);
             }
+            if checker.enabled(Rule::LiteralMembership) {
+                pylint::rules::literal_membership(checker, compare);
+            }
             if checker.enabled(Rule::ComparisonOfConstant) {
                 pylint::rules::comparison_of_constant(checker, left, ops, comparators);
             }
@@ -1261,23 +1273,17 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
         }
-        Expr::Lambda(
-            lambda @ ast::ExprLambda {
-                parameters: _,
-                body: _,
-                range: _,
-            },
-        ) => {
-            if checker.enabled(Rule::ReimplementedListBuiltin) {
-                flake8_pie::rules::reimplemented_list_builtin(checker, lambda);
-            }
-        }
         Expr::IfExp(ast::ExprIfExp {
             test,
             body,
             orelse,
             range: _,
         }) => {
+            if checker.enabled(Rule::IfElseBlockInsteadOfDictGet) {
+                flake8_simplify::rules::if_exp_instead_of_dict_get(
+                    checker, expr, test, body, orelse,
+                );
+            }
             if checker.enabled(Rule::IfExprWithTrueFalse) {
                 flake8_simplify::rules::if_expr_with_true_false(checker, expr, test, body, orelse);
             }

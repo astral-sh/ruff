@@ -101,6 +101,24 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
         output.push_str(&format!("{header_level} [`{name}`](#{name})\n"));
     }
     output.push('\n');
+
+    if let Some(deprecated) = &field.deprecated {
+        output.push_str("!!! warning \"Deprecated\"\n");
+        output.push_str("    This option has been deprecated");
+
+        if let Some(since) = deprecated.since {
+            write!(output, " in {since}").unwrap();
+        }
+
+        output.push('.');
+
+        if let Some(message) = deprecated.message {
+            writeln!(output, " {message}").unwrap();
+        }
+
+        output.push('\n');
+    }
+
     output.push_str(field.doc);
     output.push_str("\n\n");
     output.push_str(&format!("**Default value**: `{}`\n", field.default));
@@ -110,7 +128,11 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
     output.push_str(&format!(
         "**Example usage**:\n\n```toml\n[tool.ruff{}]\n{}\n```\n",
         if let Some(set_name) = parent_set.name() {
-            format!(".{set_name}")
+            if set_name == "format" {
+                String::from(".format")
+            } else {
+                format!(".lint.{set_name}")
+            }
         } else {
             String::new()
         },

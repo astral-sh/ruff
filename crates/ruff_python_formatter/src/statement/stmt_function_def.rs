@@ -1,7 +1,9 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtFunctionDef;
 
-use crate::comments::format::empty_lines_before_trailing_comments;
+use crate::comments::format::{
+    empty_lines_after_leading_comments, empty_lines_before_trailing_comments,
+};
 use crate::comments::SourceComment;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::{Parentheses, Parenthesize};
@@ -29,6 +31,29 @@ impl FormatNodeRule<StmtFunctionDef> for FormatStmtFunctionDef {
 
         let (leading_definition_comments, trailing_definition_comments) =
             dangling_comments.split_at(trailing_definition_comments_start);
+
+        // If the class contains leading comments, insert newlines before them.
+        // For example, given:
+        // ```python
+        // # comment
+        //
+        // def func():
+        //     ...
+        // ```
+        //
+        // At the top-level in a non-stub file, reformat as:
+        // ```python
+        // # comment
+        //
+        //
+        // def func():
+        //     ...
+        // ```
+        // Note that this is only really relevant for the specific case in which there's a single
+        // newline between the comment and the node, but we _require_ two newlines. If there are
+        // _no_ newlines between the comment and the node, we don't insert _any_ newlines; if there
+        // are more than two, then `leading_comments` will preserve the correct number of newlines.
+        empty_lines_after_leading_comments(f, comments.leading(item)).fmt(f)?;
 
         write!(
             f,

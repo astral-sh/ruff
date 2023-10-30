@@ -149,7 +149,7 @@ impl Notebook {
     {
         let trailing_newline = reader.seek(SeekFrom::End(-1)).is_ok_and(|_| {
             let mut buf = [0; 1];
-            reader.read_exact(&mut buf).is_ok_and(|_| buf[0] == b'\n')
+            reader.read_exact(&mut buf).is_ok_and(|()| buf[0] == b'\n')
         });
         reader.rewind()?;
         let mut raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {

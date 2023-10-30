@@ -7,12 +7,16 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `print` calls with an empty string as the only positional
-/// argument.
+/// Checks for `print` calls with unnecessary empty strings as positional
+/// arguments and unnecessary `sep` keyword arguments.
 ///
 /// ## Why is this bad?
 /// Prefer calling `print` without any positional arguments, which is
 /// equivalent and more concise.
+///
+/// Similarly, when printing one or fewer items, the `sep` keyword argument,
+/// (used to define the string that separates the `print` arguments) can be
+/// omitted, as it's redundant when there are no items to separate.
 ///
 /// ## Example
 /// ```python
@@ -93,6 +97,10 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
             )));
 
             checker.diagnostics.push(diagnostic);
+        }
+
+        [arg] if arg.is_starred_expr() => {
+            // If there's a starred argument, we can't remove the empty string.
         }
 
         // Ex) `print(sep="\t")` or `print(obj, sep="\t")`

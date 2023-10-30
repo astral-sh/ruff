@@ -15,7 +15,7 @@ while aVeryLongConditionThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGo
     pass
 
 else:
-    ...
+    pass
 
 while (
     some_condition(unformatted, args) and anotherCondition or aThirdCondition

@@ -1,23 +1,36 @@
 # FAQ
 
-## Is Ruff compatible with Black?
+## Is the Ruff linter compatible with Black?
 
-Yes. Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
-the `line-length` setting is consistent between the two.
+Yes. The Ruff linter is compatible with [Black](https://github.com/psf/black) out-of-the-box, as
+long as the [`line-length`](settings.md#line-length) setting is consistent between the two.
 
-As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
-stylistic lint rules that are obviated by automated formatting.
+Ruff is designed to be used alongside a formatter (like Ruff's own formatter, or Black) and, as
+such, will defer implementing stylistic rules that are obviated by automated formatting.
 
-Note that Ruff and Black treat line-length enforcement a little differently. Black makes a
-best-effort attempt to adhere to the `line-length`, but avoids automatic line-wrapping in some cases
-(e.g., within comments). Ruff, on the other hand, will flag rule `E501` for any line that exceeds
-the `line-length` setting. As such, if `E501` is enabled, Ruff can still trigger line-length
-violations even when Black is enabled.
+Note that Ruff's linter and Black treat line-length enforcement a little differently. Black, like
+Ruff's formatter, makes a best-effort attempt to adhere to the
+[`line-length`](settings.md#line-length), but avoids automatic line-wrapping in some cases (e.g.,
+within comments). Ruff, on the other hand, will flag [`line-too-long`](rules/line-too-long.md)
+(`E501`) for any line that exceeds the [`line-length`](settings.md#line-length) setting. As such, if
+[`line-too-long`](rules/line-too-long.md) (`E501`) is enabled, Ruff can still trigger line-length
+violations even when Black or `ruff format` is enabled.
 
-## How does Ruff compare to Flake8?
+## How does Ruff's formatter compare to Black?
 
-(Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
-automatically convert your existing configuration.)
+The Ruff formatter is designed to be a drop-in replacement for [Black](https://github.com/psf/black).
+
+Specifically, the formatter is intended to emit near-identical output when run over Black-formatted
+code. When run over extensive Black-formatted projects like Django and Zulip, > 99.9% of lines
+are formatted identically. When migrating an existing project from Black to Ruff, you should expect
+to see a few differences on the margins, but the vast majority of your code should be unchanged.
+
+When run over _non_-Black-formatted code, the formatter makes some different decisions than Black,
+and so more deviations should be expected, especially around the treatment of end-of-line comments.
+
+See [_Black compatibility_](formatter.md#black-compatibility) for more.
+
+## How does Ruff's linter compare to Flake8?
 
 Ruff can be used as a drop-in replacement for Flake8 when used (1) without or with a small number of
 plugins, (2) alongside Black, and (3) on Python 3 code.
@@ -98,10 +111,10 @@ There are a few other minor incompatibilities between Ruff and the originating F
     code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
     code is nested in a `src` directory.)
 
-## How does Ruff compare to Pylint?
+## How does Ruff's linter compare to Pylint?
 
-At time of writing, Pylint implements ~409 total rules, while Ruff implements 440, of which at least
-89 overlap with the Pylint rule set (you can find the mapping in [#970](https://github.com/astral-sh/ruff/issues/970)).
+At time of writing, Pylint implements ~409 total rules, while Ruff implements over 700, of which at
+least 172 overlap with the Pylint rule set (see: [#970](https://github.com/astral-sh/ruff/issues/970)).
 
 Pylint implements many rules that Ruff does not, and vice versa. For example, Pylint does more type
 inference than Ruff (e.g., Pylint can validate the number of arguments in a function call). As such,
@@ -182,12 +195,17 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
 - [tryceratops](https://pypi.org/project/tryceratops/)
 
-Ruff can also replace [isort](https://pypi.org/project/isort/),
+Ruff can also replace [Black](https://pypi.org/project/black/), [isort](https://pypi.org/project/isort/),
 [yesqa](https://github.com/asottile/yesqa), [eradicate](https://pypi.org/project/eradicate/), and
 most of the rules implemented in [pyupgrade](https://pypi.org/project/pyupgrade/).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an
 [issue](https://github.com/astral-sh/ruff/issues/new).
+
+## Do I have to use Ruff's linter and formatter together?
+
+Nope! Ruff's linter and formatter can be used independently of one another -- you can use
+Ruff as a formatter, but not a linter, or vice versa.
 
 ## What versions of Python does Ruff support?
 
@@ -209,7 +227,7 @@ pip install ruff
 Ruff ships with wheels for all major platforms, which enables `pip` to install Ruff without relying
 on Rust at all.
 
-## Can I write my own plugins for Ruff?
+## Can I write my own linter plugins for Ruff?
 
 Ruff does not yet support third-party plugins, though a plugin system is within-scope for the
 project. See [#283](https://github.com/astral-sh/ruff/issues/283) for more.
@@ -242,10 +260,11 @@ Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
 them. You can find the supported settings in the [API reference](settings.md#isort).
-For example, you can set `known-first-party` like so:
+For example, you can set [`known-first-party`](settings.md#known-first-party--isort-known-first-party-)
+like so:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     # Pyflakes
     "F",
@@ -259,7 +278,7 @@ select = [
 # Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
 src = ["src", "tests"]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["my_module1", "my_module2"]
 ```
 
@@ -326,18 +345,19 @@ For a detailed explanation, see the [contributing guide](contributing.md).
 Ruff has built-in support for linting [Jupyter Notebooks](https://jupyter.org/).
 
 To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
-[`include`](settings.md#include) setting, like so:
+[`extend-include`](settings.md#extend-include) setting, like so:
 
 ```toml
 [tool.ruff]
-include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
+extend-include = ["*.ipynb"]
 ```
 
 This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
-directories, and lint them accordingly.
+directories, then lint and format them accordingly.
 
 Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
-`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`.
+`ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`. Similarly,
+`ruff format /path/to/notebook.ipynb` will always format `notebook.ipynb`.
 
 Ruff also integrates with [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
 code formatters over Jupyter Notebooks.
@@ -355,10 +375,11 @@ Found 3 errors.
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enforce a docstring convention, add the following to your `pyproject.toml`:
+Yes! To enforce a docstring convention, add a [`convention`](settings.md#convention--pydocstyle-convention-)
+setting following to your `pyproject.toml`:
 
 ```toml
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"  # Accepts: "google", "numpy", or "pep257".
 ```
 
@@ -366,25 +387,25 @@ For example, if you're coming from flake8-docstrings, and your originating confi
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Alongside `convention`, you'll want to explicitly enable the `D` rule code prefix, since the `D`
-rules are not enabled by default:
+Alongside [`convention`](settings.md#convention--pydocstyle-convention-), you'll want to
+explicitly enable the `D` rule code prefix, since the `D` rules are not enabled by default:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     "D",
 ]
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 ```
 
-Setting a `convention` force-disables any rules that are incompatible with that convention, no
-matter how they're provided, which avoids accidental incompatibilities and simplifies configuration.
-By default, no `convention` is set, and so the enabled rules are determined by the `select` setting
-alone.
+Setting a [`convention`](settings.md#convention--pydocstyle-convention-) force-disables any rules
+that are incompatible with that convention, no matter how they're provided, which avoids accidental
+incompatibilities and simplifies configuration. By default, no [`convention`](settings.md#convention--pydocstyle-convention-)
+is set, and so the enabled rules are determined by the [`select`](settings.md#select) setting alone.
 
-## What is preview?
+## What is "preview"?
 
 Preview enables a collection of newer rules and fixes that are considered experimental or unstable.
 See the [preview documentation](preview.md) for more details; or, to see which rules are currently
@@ -394,7 +415,7 @@ in preview, visit the [rules reference](rules.md).
 
 Run `ruff check /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
-## I want to use Ruff, but I don't want to use `pyproject.toml`. Is that possible?
+## I want to use Ruff, but I don't want to use `pyproject.toml`. What are my options?
 
 Yes! In lieu of a `pyproject.toml` file, you can use a `ruff.toml` file for configuration. The two
 files are functionally equivalent and have an identical schema, with the exception that a `ruff.toml`
@@ -406,7 +427,7 @@ For example, given this `pyproject.toml`:
 [tool.ruff]
 line-length = 88
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 ```
 
@@ -434,24 +455,16 @@ On Windows, Ruff expects that file to be located at `C:\Users\Alice\AppData\Roam
 
 For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate.
 
-## Ruff tried to fix something — but it broke my code?
+## Ruff tried to fix something — but it broke my code. What's going on?
 
-Ruff's fixes are a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
-have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.
+Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
+fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
+setting, or passing the [`--unsafe-fixes`](settings.md#unsafe-fixes) flag to `ruff check`. For
+more, see [the fix documentation](configuration.md#fixes).
 
-In the future, Ruff will support enabling fix behavior based on the safety of the patch.
-
-In the meantime, if you find that the fixes are too aggressive, you can disable it on a per-rule or
-per-category basis using the [`unfixable`](settings.md#unfixable) mechanic.
-For example, to disable the fix for some possibly-unsafe rules, you could add the following to your
-`pyproject.toml`:
-
-```toml
-[tool.ruff]
-unfixable = ["B", "SIM", "TRY", "RUF"]
-```
-
-If you find a case where Ruff's fix breaks your code, please file an Issue!
+Even still, given the dynamic nature of Python, it's difficult to have _complete_ certainty when
+making changes to code, even for seemingly trivial fixes. If a "safe" fix breaks your code, please
+[file an Issue](https://github.com/astral-sh/ruff/issues/new).
 
 ## How can I disable Ruff's color output?
 

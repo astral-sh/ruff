@@ -1,5 +1,5 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
 use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
 use ruff_text_size::{Ranged, TextRange};
@@ -38,14 +38,13 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             let parenthesize_value =
-                // If the value is an integer, we need to parenthesize it to avoid a syntax error.
-                matches!(
-                    value.as_ref(),
-                    Expr::Constant(ExprConstant {
-                        value: Constant::Int(_) | Constant::Float(_),
-                        ..
-                    })
-                ) || is_expression_parenthesized(value.into(), f.context().comments().ranges(), f.context().source());
+                is_base_ten_number_literal(value.as_ref(), f.context().source()) || {
+                    is_expression_parenthesized(
+                        value.into(),
+                        f.context().comments().ranges(),
+                        f.context().source(),
+                    )
+                };
 
             if call_chain_layout == CallChainLayout::Fluent {
                 if parenthesize_value {
@@ -162,5 +161,25 @@ impl NeedsParentheses for ExprAttribute {
         } else {
             self.value.needs_parentheses(self.into(), context)
         }
+    }
+}
+
+// Non Hex, octal or binary number literals need parentheses to disambiguate the attribute `.` from
+// a decimal point. Floating point numbers don't strictly need parentheses but it reads better (rather than 0.0.test()).
+fn is_base_ten_number_literal(expr: &Expr, source: &str) -> bool {
+    if let Some(ExprConstant { value, range }) = expr.as_constant_expr() {
+        match value {
+            Constant::Float(_) => true,
+            Constant::Int(_) => {
+                let text = &source[*range];
+                !matches!(
+                    text.as_bytes().get(0..2),
+                    Some([b'0', b'x' | b'X' | b'o' | b'O' | b'b' | b'B'])
+                )
+            }
+            _ => false,
+        }
+    } else {
+        false
     }
 }

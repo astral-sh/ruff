@@ -1,4 +1,4 @@
-# Editor Integrations
+# Integrations
 
 ## VS Code (Official)
 
@@ -6,6 +6,58 @@ Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items
 which supports fix actions, import sorting, and more.
 
 ![Ruff VS Code extension](https://user-images.githubusercontent.com/1309177/205175763-cf34871d-5c05-4abf-9916-440afc82dbf8.gif)
+
+## pre-commit
+
+Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
+
+```yaml
+# Run the Ruff formatter.
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.0.291
+  hooks:
+    - id: ruff-format
+# Run the Ruff linter.
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.0.291
+  hooks:
+    - id: ruff
+```
+
+To enable fixes, add the `--fix` argument to the linter:
+
+```yaml
+# Run the Ruff linter.
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.0.291
+  hooks:
+    - id: ruff
+      args: [ --fix, --exit-non-zero-on-fix ]
+```
+
+To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowed filetypes:
+
+```yaml
+# Run the Ruff linter.
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.0.291
+  hooks:
+    - id: ruff
+      types_or: [python, pyi, jupyter]
+```
+
+Ruff's lint hook should be placed after other formatting tools, such as Ruff's format hook, Black,
+or isort, _unless_ you enable autofix, in which case, Ruff's pre-commit hook should run _before_
+Black, isort, and other formatting tools, as Ruff's autofix behavior can output code changes that
+require reformatting.
+
+As long as your Ruff configuration avoids any [linter-formatter incompatibilities](formatter.md#conflicting-lint-rules),
+`ruff format` should never introduce new lint errors, so it's safe to run Ruff's format hook _after_
+`ruff check --fix`.
 
 ## Language Server Protocol (Official)
 
@@ -292,7 +344,53 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install ruff
-      # Include `--format=github` to enable automatic inline annotations.
+      # Update output format to enable automatic inline annotations.
       - name: Run Ruff
-        run: ruff check --format=github .
+        run: ruff check --output-format=github .
+```
+
+Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
+
+By default, `ruff-action` runs as a pass-fail test to ensure that a given repository doesn't contain
+any lint rule violations as per its [configuration](https://github.com/astral-sh/ruff/blob/main/docs/configuration.md).
+However, under-the-hood, `ruff-action` installs and runs `ruff` directly, so it can be used to
+execute any supported `ruff` command (e.g., `ruff check --fix`).
+
+`ruff-action` supports all GitHub-hosted runners, and can be used with any published Ruff version
+(i.e., any version available on [PyPI](https://pypi.org/project/ruff/)).
+
+To use `ruff-action`, create a file (e.g., `.github/workflows/ruff.yml`) inside your repository
+with:
+
+```yaml
+name: Ruff
+on: [ push, pull_request ]
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: chartboost/ruff-action@v1
+```
+
+Alternatively, you can include `ruff-action` as a step in any other workflow file:
+
+```yaml
+      - uses: chartboost/ruff-action@v1
+```
+
+`ruff-action` accepts optional configuration parameters via `with:`, including:
+
+- `version`: The Ruff version to install (default: latest).
+- `options`: The command-line arguments to pass to Ruff (default: `"check"`).
+- `src`: The source paths to pass to Ruff (default: `"."`).
+
+For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
+
+```yaml
+- uses: chartboost/ruff-action@v1
+  with:
+    src: "./src"
+    version: 0.0.259
+    args: --select B
 ```

@@ -3,12 +3,27 @@
 Ruff includes an opt-in preview mode to provide an opportunity for community feedback and increase confidence that
 changes are a net-benefit before enabling them for everyone.
 
-Preview mode enables a collection of newer rules and fixes that are considered experimental or unstable.
+Preview mode enables a collection of newer lint rules, fixes, and formatter style changes that are
+considered experimental or unstable,.
 
 ## Enabling preview mode
 
 Preview mode can be enabled with the `--preview` flag on the CLI or by setting `preview = true` in your Ruff
 configuration file (e.g. `pyproject.toml`).
+
+Preview mode can be configured separately for linting and formatting (requires Ruff v0.1.1+). To enable preview lint rules without preview style formatting:
+
+```toml
+[lint]
+preview = true
+```
+
+To enable preview style formatting without enabling any preview lint rules:
+
+```toml
+[format]
+preview = true
+```
 
 ## Using rules that are in preview
 
@@ -17,28 +32,28 @@ hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enab
 `pyproject.toml`:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["HYP001"]
 ```
 
 It also would _not_ be enabled by selecting the `HYP` category, like so:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["HYP"]
 ```
 
 Similarly, it would _not_ be enabled via the `ALL` selector:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 select = ["ALL"]
 ```
 
-However, it would be enabled in any of the above cases if you you enabled preview in your configuration file:
+However, it would be enabled in any of the above cases if you enabled preview in your configuration file:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["HYP"]
 preview = true
 ```
@@ -50,11 +65,11 @@ To see which rules are currently in preview, visit the [rules reference](rules.m
 ## Selecting single preview rules
 
 When preview mode is enabled, selecting rule categories or prefixes will include all preview rules that match.
-If you would prefer to opt-in to each preview rule individually, you can toggle the `explicit-preview-rules`
+If you'd prefer to opt-in to each preview rule individually, you can toggle the `explicit-preview-rules`
 setting in your `pyproject.toml`:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 preview = true
 explicit-preview-rules = true
 ```

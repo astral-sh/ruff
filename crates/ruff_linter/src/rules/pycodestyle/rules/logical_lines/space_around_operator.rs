@@ -1,4 +1,4 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
@@ -28,10 +28,14 @@ use super::{LogicalLine, Whitespace};
 #[violation]
 pub struct TabBeforeOperator;
 
-impl Violation for TabBeforeOperator {
+impl AlwaysFixableViolation for TabBeforeOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Tab before operator")
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Replace with single space")
     }
 }
 
@@ -84,10 +88,14 @@ impl Violation for MultipleSpacesBeforeOperator {
 #[violation]
 pub struct TabAfterOperator;
 
-impl Violation for TabAfterOperator {
+impl AlwaysFixableViolation for TabAfterOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Tab after operator")
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Replace with single space")
     }
 }
 
@@ -138,10 +146,14 @@ impl Violation for MultipleSpacesAfterOperator {
 #[violation]
 pub struct TabAfterComma;
 
-impl Violation for TabAfterComma {
+impl AlwaysFixableViolation for TabAfterComma {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Tab after comma")
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Replace with single space")
     }
 }
 
@@ -181,10 +193,15 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
             if !after_operator {
                 match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
-                        context.push(
+                        let mut diagnostic = Diagnostic::new(
                             TabBeforeOperator,
                             TextRange::at(token.start() - offset, offset),
                         );
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            " ".to_string(),
+                            TextRange::at(token.start() - offset, offset),
+                        )));
+                        context.push_diagnostic(diagnostic);
                     }
                     (Whitespace::Many, offset) => {
                         context.push(
@@ -198,7 +215,13 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
 
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
-                    context.push(TabAfterOperator, TextRange::at(token.end(), len));
+                    let mut diagnostic =
+                        Diagnostic::new(TabAfterOperator, TextRange::at(token.end(), len));
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        " ".to_string(),
+                        TextRange::at(token.end(), len),
+                    )));
+                    context.push_diagnostic(diagnostic);
                 }
                 (Whitespace::Many, len) => {
                     context.push(MultipleSpacesAfterOperator, TextRange::at(token.end(), len));
@@ -217,7 +240,13 @@ pub(crate) fn space_after_comma(line: &LogicalLine, context: &mut LogicalLinesCo
         if matches!(token.kind(), TokenKind::Comma) {
             match line.trailing_whitespace(token) {
                 (Whitespace::Tab, len) => {
-                    context.push(TabAfterComma, TextRange::at(token.end(), len));
+                    let mut diagnostic =
+                        Diagnostic::new(TabAfterComma, TextRange::at(token.end(), len));
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        " ".to_string(),
+                        TextRange::at(token.end(), len),
+                    )));
+                    context.push_diagnostic(diagnostic);
                 }
                 (Whitespace::Many, len) => {
                     context.push(MultipleSpacesAfterComma, TextRange::at(token.end(), len));

@@ -101,6 +101,7 @@ pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
     let (impl_generics, ty_generics, where_clause) = &item.generics.split_for_impl();
 
     Ok(quote!(
+        #[automatically_derived]
         impl #impl_generics ruff_cache::CacheKey for #name #ty_generics #where_clause {
             fn cache_key(&self, key: &mut ruff_cache::CacheKeyHasher) {
                 use std::hash::Hasher;

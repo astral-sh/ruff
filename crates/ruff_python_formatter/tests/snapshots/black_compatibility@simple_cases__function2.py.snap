@@ -73,7 +73,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
  elif os.name == "nt":
      try:
          import msvcrt
-@@ -54,12 +53,10 @@
+@@ -54,7 +53,6 @@
      class IHopeYouAreHavingALovelyDay:
          def __call__(self):
              print("i_should_be_followed_by_only_one_newline")
@@ -81,11 +81,6 @@ with hmm_but_this_should_get_two_preceding_newlines():
  else:
  
      def foo():
-         pass
--
- 
- with hmm_but_this_should_get_two_preceding_newlines():
-     pass
 ```
 
 ## Ruff Output
@@ -150,6 +145,7 @@ else:
 
     def foo():
         pass
+
 
 with hmm_but_this_should_get_two_preceding_newlines():
     pass

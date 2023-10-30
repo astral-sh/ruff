@@ -1,3 +1,4 @@
+# flags: --pyi
 from typing import Union
 
 @bird

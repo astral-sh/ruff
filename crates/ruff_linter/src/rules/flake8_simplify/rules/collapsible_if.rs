@@ -6,9 +6,10 @@ use log::error;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, whitespace, Constant, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -96,6 +97,16 @@ pub(crate) fn nested_if_statements(
         return;
     };
 
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
+    if is_sys_version_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
+    if is_type_checking_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf,
         TextRange::new(nested_if.start(), colon.end()),
@@ -117,7 +128,7 @@ pub(crate) fn nested_if_statements(
                         content,
                         (&nested_if).into(),
                         checker.locator(),
-                        checker.settings.line_length,
+                        checker.settings.pycodestyle.max_line_length,
                         checker.settings.tab_size,
                     )
                 }) {

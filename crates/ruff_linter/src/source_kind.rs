@@ -2,7 +2,7 @@ use std::io;
 use std::io::Write;
 use std::path::Path;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use similar::TextDiff;
 use thiserror::Error;
 
@@ -88,7 +88,12 @@ impl SourceKind {
     }
 
     /// Write a diff of the transformed source file to `stdout`.
-    pub fn diff(&self, other: &Self, path: Option<&Path>, writer: &mut dyn Write) -> Result<()> {
+    pub fn diff(
+        &self,
+        other: &Self,
+        path: Option<&Path>,
+        writer: &mut dyn Write,
+    ) -> io::Result<()> {
         match (self, other) {
             (SourceKind::Python(src), SourceKind::Python(dst)) => {
                 let text_diff = TextDiff::from_lines(src, dst);
@@ -154,7 +159,7 @@ impl SourceKind {
 
                 Ok(())
             }
-            _ => bail!("cannot diff Python source code with Jupyter notebook source code"),
+            _ => panic!("cannot diff Python source code with Jupyter notebook source code"),
         }
     }
 }

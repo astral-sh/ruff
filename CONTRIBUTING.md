@@ -114,7 +114,7 @@ such that all crates are contained in a flat `crates` directory.
 The vast majority of the code, including all lint rules, lives in the `ruff` crate (located at
 `crates/ruff_linter`). As a contributor, that's the crate that'll be most relevant to you.
 
-At time of writing, the repository includes the following crates:
+At the time of writing, the repository includes the following crates:
 
 - `crates/ruff_linter`: library crate containing all lint rules and the core logic for running them.
     If you're working on a rule, this is the crate for you.
@@ -170,7 +170,8 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
+1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). New rules
+    should be added in `RuleGroup::Preview`.
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
@@ -876,5 +877,5 @@ By default, `src` is set to the project root. In the above example, we'd want to
 `src = ["./src"]` to ensure that we locate `./my_project/src/foo` and thus categorize `import foo`
 as first-party in `baz.py`. In practice, for this limited example, setting `src = ["./src"]` is
 unnecessary, as all imports within `./my_project/src/foo` would be categorized as first-party via
-the same-package heuristic; but your project contains multiple packages, you'll want to set `src`
+the same-package heuristic; but if your project contains multiple packages, you'll want to set `src`
 explicitly.

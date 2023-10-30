@@ -1,0 +1,69 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+literal_membership.py:2:6: PLR6201 [*] Use a `set` literal when testing for membership
+  |
+1 | # Errors
+2 | 1 in [1, 2, 3]
+  |      ^^^^^^^^^ PLR6201
+3 | 1 in (1, 2, 3)
+4 | 1 in (
+  |
+  = help: Convert to `set`
+
+ℹ Suggested fix
+1 1 | # Errors
+2   |-1 in [1, 2, 3]
+  2 |+1 in {1, 2, 3}
+3 3 | 1 in (1, 2, 3)
+4 4 | 1 in (
+5 5 |     1, 2, 3
+
+literal_membership.py:3:6: PLR6201 [*] Use a `set` literal when testing for membership
+  |
+1 | # Errors
+2 | 1 in [1, 2, 3]
+3 | 1 in (1, 2, 3)
+  |      ^^^^^^^^^ PLR6201
+4 | 1 in (
+5 |     1, 2, 3
+  |
+  = help: Convert to `set`
+
+ℹ Suggested fix
+1 1 | # Errors
+2 2 | 1 in [1, 2, 3]
+3   |-1 in (1, 2, 3)
+  3 |+1 in {1, 2, 3}
+4 4 | 1 in (
+5 5 |     1, 2, 3
+6 6 | )
+
+literal_membership.py:4:6: PLR6201 [*] Use a `set` literal when testing for membership
+  |
+2 |   1 in [1, 2, 3]
+3 |   1 in (1, 2, 3)
+4 |   1 in (
+  |  ______^
+5 | |     1, 2, 3
+6 | | )
+  | |_^ PLR6201
+7 |   
+8 |   # OK
+  |
+  = help: Convert to `set`
+
+ℹ Suggested fix
+1 1 | # Errors
+2 2 | 1 in [1, 2, 3]
+3 3 | 1 in (1, 2, 3)
+4   |-1 in (
+  4 |+1 in {
+5 5 |     1, 2, 3
+6   |-)
+  6 |+}
+7 7 | 
+8 8 | # OK
+9 9 | fruits = ["cherry", "grapes"]
+
+

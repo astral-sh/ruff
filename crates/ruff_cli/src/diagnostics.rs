@@ -2,28 +2,25 @@
 
 use std::fs::File;
 use std::io;
-use std::ops::AddAssign;
-#[cfg(unix)]
-use std::os::unix::fs::PermissionsExt;
+use std::ops::{Add, AddAssign};
 use std::path::Path;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
-use filetime::FileTime;
 use log::{debug, error, warn};
-use ruff_linter::settings::types::UnsafeFixes;
 use rustc_hash::FxHashMap;
 
+use crate::cache::{Cache, FileCacheKey, LintCacheData};
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
+use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
-use ruff_macros::CacheKey;
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{SourceType, TomlSourceType};
@@ -31,37 +28,10 @@ use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
 
-use crate::cache::Cache;
-
-#[derive(CacheKey)]
-pub(crate) struct FileCacheKey {
-    /// Timestamp when the file was last modified before the (cached) check.
-    file_last_modified: FileTime,
-    /// Permissions of the file before the (cached) check.
-    file_permissions_mode: u32,
-}
-
-impl FileCacheKey {
-    fn from_path(path: &Path) -> io::Result<FileCacheKey> {
-        // Construct a cache key for the file
-        let metadata = path.metadata()?;
-
-        #[cfg(unix)]
-        let permissions = metadata.permissions().mode();
-        #[cfg(windows)]
-        let permissions: u32 = metadata.permissions().readonly().into();
-
-        Ok(FileCacheKey {
-            file_last_modified: FileTime::from_last_modification_time(&metadata),
-            file_permissions_mode: permissions,
-        })
-    }
-}
-
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
     pub(crate) messages: Vec<Message>,
-    pub(crate) fixed: FxHashMap<String, FixTable>,
+    pub(crate) fixed: FixMap,
     pub(crate) imports: ImportMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
@@ -74,7 +44,7 @@ impl Diagnostics {
     ) -> Self {
         Self {
             messages,
-            fixed: FxHashMap::default(),
+            fixed: FixMap::default(),
             imports,
             notebook_indexes,
         }
@@ -142,22 +112,68 @@ impl Diagnostics {
     }
 }
 
+impl Add for Diagnostics {
+    type Output = Diagnostics;
+
+    fn add(mut self, other: Self) -> Self::Output {
+        self += other;
+        self
+    }
+}
+
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
         self.messages.extend(other.messages);
         self.imports.extend(other.imports);
-        for (filename, fixed) in other.fixed {
+        self.fixed += other.fixed;
+        self.notebook_indexes.extend(other.notebook_indexes);
+    }
+}
+
+/// A collection of fixes indexed by file path.
+#[derive(Debug, Default, PartialEq)]
+pub(crate) struct FixMap(FxHashMap<String, FixTable>);
+
+impl FixMap {
+    /// Returns `true` if there are no fixes in the map.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns an iterator over the fixes in the map, along with the file path.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&String, &FixTable)> {
+        self.0.iter()
+    }
+
+    /// Returns an iterator over the fixes in the map.
+    pub(crate) fn values(&self) -> impl Iterator<Item = &FixTable> {
+        self.0.values()
+    }
+}
+
+impl FromIterator<(String, FixTable)> for FixMap {
+    fn from_iter<T: IntoIterator<Item = (String, FixTable)>>(iter: T) -> Self {
+        Self(
+            iter.into_iter()
+                .filter(|(_, fixes)| !fixes.is_empty())
+                .collect(),
+        )
+    }
+}
+
+impl AddAssign for FixMap {
+    fn add_assign(&mut self, rhs: Self) {
+        for (filename, fixed) in rhs.0 {
             if fixed.is_empty() {
                 continue;
             }
-            let fixed_in_file = self.fixed.entry(filename).or_default();
+            let fixed_in_file = self.0.entry(filename).or_default();
             for (rule, count) in fixed {
                 if count > 0 {
                     *fixed_in_file.entry(rule).or_default() += count;
                 }
             }
         }
-        self.notebook_indexes.extend(other.notebook_indexes);
     }
 }
 
@@ -172,21 +188,28 @@ pub(crate) fn lint_path(
     unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     // Check the cache.
-    // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
-    // side-effects that aren't captured in the cache. (In practice, it's fine
-    // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
-    // write the fixes to disk, thus invalidating the cache. But it's a bit hard
-    // to reason about. We need to come up with a better solution here.)
     let caching = match cache {
-        Some(cache) if noqa.into() && fix_mode.is_generate() => {
+        Some(cache) if noqa.into() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
 
             let cache_key = FileCacheKey::from_path(path).context("Failed to create cache key")?;
-
-            if let Some(cache) = cache.get(relative_path, &cache_key) {
-                return Ok(cache.as_diagnostics(path));
+            let cached_diagnostics = cache
+                .get(relative_path, &cache_key)
+                .and_then(|entry| entry.to_diagnostics(path));
+            if let Some(diagnostics) = cached_diagnostics {
+                // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
+                // and writing the diff to stdout, respectively). If a file has diagnostics, we
+                // need to avoid reading from and writing to the cache in these modes.
+                if match fix_mode {
+                    flags::FixMode::Generate => true,
+                    flags::FixMode::Apply | flags::FixMode::Diff => {
+                        diagnostics.messages.is_empty() && diagnostics.fixed.is_empty()
+                    }
+                } {
+                    return Ok(diagnostics);
+                }
             }
 
             // Stash the file metadata for later so when we update the cache it reflects the prerun
@@ -286,13 +309,25 @@ pub(crate) fn lint_path(
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
         if parse_error.is_none() {
-            cache.update(
-                relative_path.to_owned(),
-                key,
-                &messages,
-                &imports,
-                source_kind.as_ipy_notebook().map(Notebook::index),
-            );
+            // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
+            // and writing the diff to stdout, respectively). If a file has diagnostics, we
+            // need to avoid reading from and writing to the cache in these modes.
+            if match fix_mode {
+                flags::FixMode::Generate => true,
+                flags::FixMode::Apply | flags::FixMode::Diff => {
+                    messages.is_empty() && fixed.is_empty()
+                }
+            } {
+                cache.update_lint(
+                    relative_path.to_owned(),
+                    &key,
+                    LintCacheData::from_messages(
+                        &messages,
+                        imports.clone(),
+                        source_kind.as_ipy_notebook().map(Notebook::index).cloned(),
+                    ),
+                );
+            }
         }
     }
 
@@ -318,7 +353,7 @@ pub(crate) fn lint_path(
 
     Ok(Diagnostics {
         messages,
-        fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
+        fixed: FixMap::from_iter([(fs::relativize_path(path), fixed)]),
         imports,
         notebook_indexes,
     })
@@ -436,7 +471,7 @@ pub(crate) fn lint_stdin(
 
     Ok(Diagnostics {
         messages,
-        fixed: FxHashMap::from_iter([(
+        fixed: FixMap::from_iter([(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
         )]),

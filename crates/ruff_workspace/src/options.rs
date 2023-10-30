@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
 use ruff_formatter::IndentStyle;
-use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
@@ -29,7 +29,6 @@ use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
 use ruff_python_formatter::QuoteStyle;
 
-use crate::options_base::{OptionsMetadata, Visit};
 use crate::settings::LineEnding;
 
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
@@ -61,7 +60,7 @@ pub struct Options {
     /// this base configuration file, then merge in any properties defined
     /// in the current configuration file.
     #[option(
-        default = r#"None"#,
+        default = r#"null"#,
         value_type = "str",
         example = r#"
             # Extend the `pyproject.toml` file in the parent directory.
@@ -133,7 +132,7 @@ pub struct Options {
     /// results across many environments, e.g., with a `pyproject.toml`
     /// file).
     #[option(
-        default = "None",
+        default = "null",
         value_type = "str",
         example = r#"
             required-version = "0.0.193"
@@ -142,7 +141,7 @@ pub struct Options {
     pub required_version: Option<Version>,
 
     /// Whether to enable preview mode. When preview mode is enabled, Ruff will
-    /// use unstable rules and fixes.
+    /// use unstable rules, fixes, and formatting.
     #[option(
         default = "false",
         value_type = "bool",
@@ -154,7 +153,7 @@ pub struct Options {
     pub preview: Option<bool>,
 
     // File resolver options
-    /// A list of file patterns to exclude from linting.
+    /// A list of file patterns to exclude from formatting and linting.
     ///
     /// Exclusions are based on globs, and can be either:
     ///
@@ -179,7 +178,7 @@ pub struct Options {
     )]
     pub exclude: Option<Vec<String>>,
 
-    /// A list of file patterns to omit from linting, in addition to those
+    /// A list of file patterns to omit from formatting and linting, in addition to those
     /// specified by `exclude`.
     ///
     /// Exclusions are based on globs, and can be either:
@@ -352,47 +351,74 @@ pub struct Options {
     pub src: Option<Vec<String>>,
 
     // Global Formatting options
-    /// The line length to use when enforcing long-lines violations (like
-    /// `E501`). Must be greater than `0` and less than or equal to `320`.
+    /// The line length to use when enforcing long-lines violations (like `E501`)
+    /// and at which `isort` and the formatter prefers to wrap lines.
+    ///
+    /// The length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.
+    /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
+    ///
+    /// The value must be greater than `0` and less than or equal to `320`.
+    ///
+    /// Note: While the formatter will attempt to format lines such that they remain
+    /// within the `line-length`, it isn't a hard upper bound, and formatted lines may
+    /// exceed the `line-length`.
+    ///
+    /// See [`pycodestyle.max-line-length`](#pycodestyle-max-line-length) to configure different lengths for `E501` and the formatter.
     #[option(
         default = "88",
         value_type = "int",
         example = r#"
-        # Allow lines to be as long as 120 characters.
+        # Allow lines to be as long as 120.
         line-length = 120
         "#
     )]
     pub line_length: Option<LineLength>,
 
-    /// The tabulation size to calculate line length.
+    /// The number of spaces per indentation level (tab).
+    ///
+    /// Used by the formatter and when enforcing long-line violations (like `E501`) to determine the visual
+    /// width of a tab.
+    ///
+    /// This option changes the number of spaces the formatter inserts when
+    /// using soft-tabs (`indent-style = space`).
+    ///
+    /// PEP 8 recommends using 4 spaces per [indentation level](https://peps.python.org/pep-0008/#indentation).
     #[option(
         default = "4",
         value_type = "int",
         example = r#"
-            tab-size = 8
+            indent-width = 2
         "#
     )]
-    pub tab_size: Option<TabSize>,
+    pub indent_width: Option<IndentWidth>,
+
+    /// The number of spaces a tab is equal to when enforcing long-line violations (like `E501`)
+    /// or formatting code with the formatter.
+    ///
+    /// This option changes the number of spaces inserted by the formatter when
+    /// using soft-tabs (`indent-style = space`).
+    #[option(
+        default = "4",
+        value_type = "int",
+        example = r#"
+            tab-size = 2
+        "#
+    )]
+    #[deprecated(
+        since = "0.1.2",
+        note = "The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead."
+    )]
+    pub tab_size: Option<IndentWidth>,
 
     pub lint: Option<LintOptions>,
 
     /// The lint sections specified at the top level.
     #[serde(flatten)]
-    pub lint_top_level: LintOptions,
+    pub lint_top_level: LintCommonOptions,
 
-    /// Options to configure the code formatting.
-    ///
-    /// Previously:
-    /// The style in which violation messages should be formatted: `"text"`
-    /// (default), `"grouped"` (group messages by file), `"json"`
-    /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
-    /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
-    /// `"pylint"` (Pylint text format) or `"azure"` (Azure Pipeline logging commands).
-    ///
-    /// This option has been **deprecated** in favor of `output-format`
-    /// to avoid ambiguity with Ruff's upcoming formatter.
+    /// Options to configure code formatting.
     #[option_group]
-    pub format: Option<FormatOrOutputFormat>,
+    pub format: Option<FormatOptions>,
 }
 
 /// Experimental section to configure Ruff's linting. This new section will eventually
@@ -400,11 +426,56 @@ pub struct Options {
 ///
 /// Options specified in the `lint` section take precedence over the top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "kebab-case")]
+pub struct LintOptions {
+    #[serde(flatten)]
+    pub common: LintCommonOptions,
+
+    /// A list of file patterns to exclude from linting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+
+    /// Whether to enable preview mode. When preview mode is enabled, Ruff will
+    /// use unstable rules and fixes.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable preview features.
+            preview = true
+        "#
+    )]
+    pub preview: Option<bool>,
+}
+
+// Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
+// is removed.
+
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
     Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-pub struct LintOptions {
+pub struct LintCommonOptions {
     /// A list of allowed "confusable" Unicode characters to ignore when
     /// enforcing `RUF001`, `RUF002`, and `RUF003`.
     #[option(
@@ -433,9 +504,6 @@ pub struct LintOptions {
 
     /// A list of rule codes or prefixes to ignore, in addition to those
     /// specified by `ignore`.
-    ///
-    /// This option has been **deprecated** in favor of `ignore`
-    /// since its usage is now interchangeable with `ignore`.
     #[option(
         default = "[]",
         value_type = "list[RuleSelector]",
@@ -444,7 +512,9 @@ pub struct LintOptions {
             extend-ignore = ["F841"]
         "#
     )]
-    #[cfg_attr(feature = "schemars", schemars(skip))]
+    #[deprecated(
+        note = "The `extend-ignore` option is now interchangeable with `ignore`. Please update your configuration to use the `ignore` option instead."
+    )]
     pub extend_ignore: Option<Vec<RuleSelector>>,
 
     /// A list of rule codes or prefixes to enable, in addition to those
@@ -473,13 +543,12 @@ pub struct LintOptions {
 
     /// A list of rule codes or prefixes to consider non-auto-fixable, in addition to those
     /// specified by `unfixable`.
-    ///
-    /// This option has been **deprecated** in favor of `unfixable` since its usage is now
-    /// interchangeable with `unfixable`.
-    #[cfg_attr(feature = "schemars", schemars(skip))]
+    #[deprecated(
+        note = "The `extend-unfixable` option is now interchangeable with `unfixable`. Please update your configuration to use the `unfixable` option instead."
+    )]
     pub extend_unfixable: Option<Vec<RuleSelector>>,
 
-    /// A list of rule codes that are unsupported by Ruff, but should be
+    /// A list of rule codes or prefixes that are unsupported by Ruff, but should be
     /// preserved when (e.g.) validating `# noqa` directives. Useful for
     /// retaining `# noqa` directives that cover plugins not yet implemented
     /// by Ruff.
@@ -487,9 +556,9 @@ pub struct LintOptions {
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            # Avoiding flagging (and removing) `V101` from any `# noqa`
-            # directives, despite Ruff's lack of support for `vulture`.
-            external = ["V101"]
+            # Avoiding flagging (and removing) any codes starting with `V` from any
+            # `# noqa` directives, despite Ruff's lack of support for `vulture`.
+            external = ["V"]
         "#
     )]
     pub external: Option<Vec<String>>,
@@ -530,7 +599,7 @@ pub struct LintOptions {
         value_type = "list[RuleSelector]",
         example = r#"
             # Allow applying all unsafe fixes in the `E` rules and `F401` without the `--unsafe-fixes` flag
-            extend_safe_fixes = ["E", "F401"]
+            extend-safe-fixes = ["E", "F401"]
         "#
     )]
     pub extend_safe_fixes: Option<Vec<RuleSelector>>,
@@ -542,7 +611,7 @@ pub struct LintOptions {
         value_type = "list[RuleSelector]",
         example = r#"
             # Require the `--unsafe-fixes` flag when fixing the `E` rules and `F401`
-            extend_unsafe_fixes = ["E", "F401"]
+            extend-unsafe-fixes = ["E", "F401"]
         "#
     )]
     pub extend_unsafe_fixes: Option<Vec<RuleSelector>>,
@@ -759,7 +828,7 @@ pub struct LintOptions {
         value_type = "dict[str, list[RuleSelector]]",
         example = r#"
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-            [tool.ruff.per-file-ignores]
+            [tool.ruff.lint.per-file-ignores]
             "__init__.py" = ["E402"]
             "path/to/file.py" = ["E402"]
         "#
@@ -773,7 +842,7 @@ pub struct LintOptions {
         value_type = "dict[str, list[RuleSelector]]",
         example = r#"
             # Also ignore `E402` in all `__init__.py` files.
-            [tool.ruff.extend-per-file-ignores]
+            [tool.ruff.lint.extend-per-file-ignores]
             "__init__.py" = ["E402"]
         "#
     )]
@@ -998,7 +1067,7 @@ pub struct Flake8CopyrightOptions {
 
     /// Author to enforce within the copyright notice. If provided, the
     /// author must be present immediately following the copyright notice.
-    #[option(default = "None", value_type = "str", example = r#"author = "Ruff""#)]
+    #[option(default = "null", value_type = "str", example = r#"author = "Ruff""#)]
     pub author: Option<String>,
 
     /// A minimum file size (in bytes) required for a copyright notice to
@@ -1129,7 +1198,7 @@ pub struct Flake8ImportConventionsOptions {
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
         value_type = "dict[str, str]",
         example = r#"
-            [tool.ruff.flake8-import-conventions.aliases]
+            [tool.ruff.lint.flake8-import-conventions.aliases]
             # Declare the default aliases.
             altair = "alt"
             "matplotlib.pyplot" = "plt"
@@ -1147,7 +1216,7 @@ pub struct Flake8ImportConventionsOptions {
         default = r#"{}"#,
         value_type = "dict[str, str]",
         example = r#"
-            [tool.ruff.flake8-import-conventions.extend-aliases]
+            [tool.ruff.lint.flake8-import-conventions.extend-aliases]
             # Declare a custom alias for the `matplotlib` module.
             "dask.dataframe" = "dd"
         "#
@@ -1159,7 +1228,7 @@ pub struct Flake8ImportConventionsOptions {
         default = r#"{}"#,
         value_type = "dict[str, list[str]]",
         example = r#"
-            [tool.ruff.flake8-import-conventions.banned-aliases]
+            [tool.ruff.lint.flake8-import-conventions.banned-aliases]
             # Declare the banned aliases.
             "tensorflow.keras.backend" = ["K"]
     "#
@@ -1343,6 +1412,9 @@ impl Flake8PytestStyleOptions {
 pub struct Flake8QuotesOptions {
     /// Quote style to prefer for inline strings (either "single" or
     /// "double").
+    ///
+    /// When using the formatter, ensure that `format.quote-style` is set to
+    /// the same preferred quote style.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,
@@ -1354,6 +1426,9 @@ pub struct Flake8QuotesOptions {
 
     /// Quote style to prefer for multiline strings (either "single" or
     /// "double").
+    ///
+    /// When using the formatter, only "double" is compatible, as the formatter
+    /// enforces double quotes for multiline strings.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,
@@ -1364,6 +1439,9 @@ pub struct Flake8QuotesOptions {
     pub multiline_quotes: Option<Quote>,
 
     /// Quote style to prefer for docstrings (either "single" or "double").
+    ///
+    /// When using the formatter, only "double" is compatible, as the formatter
+    /// enforces double quotes for docstrings strings.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,
@@ -1463,7 +1541,7 @@ pub struct Flake8TidyImportsOptions {
         default = r#"{}"#,
         value_type = r#"dict[str, { "msg": str }]"#,
         example = r#"
-            [tool.ruff.flake8-tidy-imports.banned-api]
+            [tool.ruff.lint.flake8-tidy-imports.banned-api]
             "cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
             "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
         "#
@@ -1614,6 +1692,9 @@ pub struct IsortOptions {
     /// `combine-as-imports = true`. When `combine-as-imports` isn't
     /// enabled, every aliased `import from` will be given its own line, in
     /// which case, wrapping is not necessary.
+    ///
+    /// When using the formatter, ensure that `format.skip-magic-trailing-comma` is set to `false` (default)
+    /// when enabling `force-wrap-aliases` to avoid that the formatter collapses members if they all fit on a single line.
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -1657,6 +1738,9 @@ pub struct IsortOptions {
     /// the imports will never be folded into one line.
     ///
     /// See isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.
+    ///
+    /// When using the formatter, ensure that `format.skip-magic-trailing-comma` is set to `false` (default) when enabling `split-on-trailing-comma`
+    /// to avoid that the formatter removes the trailing commas.
     #[option(
         default = r#"true"#,
         value_type = "bool",
@@ -1838,6 +1922,9 @@ pub struct IsortOptions {
 
     /// The number of blank lines to place after imports.
     /// Use `-1` for automatic determination.
+    ///
+    /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
+    /// it enforces at least one empty and at most two empty lines after imports.
     #[option(
         default = r#"-1"#,
         value_type = "int",
@@ -1849,6 +1936,9 @@ pub struct IsortOptions {
     pub lines_after_imports: Option<isize>,
 
     /// The number of lines to place between "direct" and `import from` imports.
+    ///
+    /// When using the formatter, only the values `0` and `1` are compatible because
+    /// it preserves up to one empty line after imports in nested blocks.
     #[option(
         default = r#"0"#,
         value_type = "int",
@@ -1904,7 +1994,7 @@ pub struct IsortOptions {
         value_type = "dict[str, list[str]]",
         example = r#"
             # Group all Django imports into a separate section.
-            [tool.ruff.isort.sections]
+            [tool.ruff.lint.isort.sections]
             "django" = ["django"]
         "#
     )]
@@ -2202,13 +2292,42 @@ impl Pep8NamingOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PycodestyleOptions {
-    /// The maximum line length to allow for line-length violations within
+    /// The maximum line length to allow for [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) violations. By default,
+    /// this is set to the value of the [`line-length`](#line-length) option.
+    ///
+    /// Use this option when you want to detect extra-long lines that the formatter can't automatically split by setting
+    /// `pycodestyle.line-length` to a value larger than [`line-length`](#line-length).
+    ///
+    /// ```toml
+    /// line-length = 88 # The formatter wraps lines at a length of 88
+    ///
+    /// [pycodestyle]
+    /// max-line-length = 100 # E501 reports lines that exceed the length of 100.
+    /// ```
+    ///
+    /// The length is determined by the number of characters per line, except for lines containing East Asian characters or emojis.
+    /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
+    ///
+    /// See the [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) rule for more information.
+    #[option(
+        default = "null",
+        value_type = "int",
+        example = r#"
+            max-line-length = 100
+        "#
+    )]
+    pub max_line_length: Option<LineLength>,
+
+    /// The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within
     /// documentation (`W505`), including standalone comments. By default,
     /// this is set to null which disables reporting violations.
     ///
+    /// The length is determined by the number of characters per line, except for lines containing Asian characters or emojis.
+    /// For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.
+    ///
     /// See the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.
     #[option(
-        default = "None",
+        default = "null",
         value_type = "int",
         example = r#"
             max-doc-length = 88
@@ -2230,9 +2349,10 @@ pub struct PycodestyleOptions {
 }
 
 impl PycodestyleOptions {
-    pub fn into_settings(self) -> pycodestyle::settings::Settings {
+    pub fn into_settings(self, global_line_length: LineLength) -> pycodestyle::settings::Settings {
         pycodestyle::settings::Settings {
             max_doc_length: self.max_doc_length,
+            max_line_length: self.max_line_length.unwrap_or(global_line_length),
             ignore_overlong_task_comments: self.ignore_overlong_task_comments.unwrap_or_default(),
         }
     }
@@ -2244,7 +2364,7 @@ impl PycodestyleOptions {
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct PydocstyleOptions {
-    /// Whether to use Google-style or NumPy-style conventions or the PEP257
+    /// Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/)
     /// defaults when analyzing docstring sections.
     ///
     /// Enabling a convention will force-disable any rules that are not
@@ -2256,7 +2376,7 @@ pub struct PydocstyleOptions {
     /// documentation for every function parameter:
     ///
     /// ```toml
-    /// [tool.ruff]
+    /// [tool.ruff.lint]
     /// # Enable all `pydocstyle` rules, limiting to those that adhere to the
     /// # Google convention via `convention = "google"`, below.
     /// select = ["D"]
@@ -2265,7 +2385,7 @@ pub struct PydocstyleOptions {
     /// # documentation for every function parameter.
     /// ignore = ["D417"]
     ///
-    /// [tool.ruff.pydocstyle]
+    /// [tool.ruff.lint.pydocstyle]
     /// convention = "google"
     /// ```
     ///
@@ -2273,7 +2393,7 @@ pub struct PydocstyleOptions {
     /// enabling _additional_ rules on top of a convention is currently
     /// unsupported.
     #[option(
-        default = r#"None"#,
+        default = r#"null"#,
         value_type = r#""google" | "numpy" | "pep257""#,
         example = r#"
             # Use Google-style docstrings.
@@ -2356,7 +2476,7 @@ pub struct PylintOptions {
     /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
     #[option(
         default = r#"["str", "bytes"]"#,
-        value_type = r#"list["str" | "bytes" | "complex" | "float" | "int" | "tuple"]"#,
+        value_type = r#"list["str" | "bytes" | "complex" | "float" | "int"]"#,
         example = r#"
             allow-magic-value-types = ["int"]
         "#
@@ -2390,6 +2510,11 @@ pub struct PylintOptions {
         example = r"max-public-methods = 20"
     )]
     pub max_public_methods: Option<usize>,
+
+    /// Maximum number of Boolean expressions allowed within a single `if` statement
+    /// (see: `PLR0916`).
+    #[option(default = r"5", value_type = "int", example = r"max-bool-expr = 5")]
+    pub max_bool_expr: Option<usize>,
 }
 
 impl PylintOptions {
@@ -2400,6 +2525,7 @@ impl PylintOptions {
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
             max_args: self.max_args.unwrap_or(defaults.max_args),
+            max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
             max_statements: self.max_statements.unwrap_or(defaults.max_statements),
@@ -2465,42 +2591,37 @@ impl PyUpgradeOptions {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum FormatOrOutputFormat {
-    Format(FormatOptions),
-    OutputFormat(SerializationFormat),
-}
-
-impl FormatOrOutputFormat {
-    pub const fn as_output_format(&self) -> Option<SerializationFormat> {
-        match self {
-            FormatOrOutputFormat::Format(_) => None,
-            FormatOrOutputFormat::OutputFormat(format) => Some(*format),
-        }
-    }
-}
-
-impl OptionsMetadata for FormatOrOutputFormat {
-    fn record(visit: &mut dyn Visit) {
-        FormatOptions::record(visit);
-    }
-
-    fn documentation() -> Option<&'static str> {
-        FormatOptions::documentation()
-    }
-}
-
 /// Experimental: Configures how `ruff format` formats your code.
 ///
 /// Please provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).
 #[derive(
-    Debug, PartialEq, Eq, Default, Serialize, Deserialize, OptionsMetadata, CombineOptions,
+    Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct FormatOptions {
+    /// A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).
+    ///
+    /// Exclusions are based on globs, and can be either:
+    ///
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
+    ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
+    ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
+    ///   file) or `directory/*.py` (to exclude any Python files in
+    ///   `directory`). Note that these paths are relative to the project root
+    ///   (e.g., the directory containing your `pyproject.toml`).
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            exclude = ["generated"]
+        "#
+    )]
+    pub exclude: Option<Vec<String>>,
+
     /// Whether to enable the unstable preview style formatting.
     #[option(
         default = "false",
@@ -2512,10 +2633,26 @@ pub struct FormatOptions {
     )]
     pub preview: Option<bool>,
 
-    /// Whether to use 4 spaces or hard tabs for indenting code.
+    /// Whether to use spaces or tabs for indentation.
     ///
-    /// Defaults to 4 spaces. We care about accessibility; if you do not need tabs for
-    /// accessibility, we do not recommend you use them.
+    /// `indent-style = "space"` (default):
+    ///
+    /// ```python
+    /// def f():
+    ///     print("Hello") #  Spaces indent the `print` statement.
+    /// ```
+    ///
+    /// `indent-style = "tab""`:
+    ///
+    /// ```python
+    /// def f():
+    ///     print("Hello") #  A tab `\t` indents the `print` statement.
+    /// ```
+    ///
+    /// PEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation).
+    /// We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.
+    ///
+    /// See [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.
     #[option(
         default = "space",
         value_type = r#""space" | "tab""#,
@@ -2541,7 +2678,7 @@ pub struct FormatOptions {
     /// ```
     ///
     /// Ruff will change `a` to use single quotes when using `quote-style = "single"`. However,
-    /// `a` will be unchanged, as converting to single quotes would require the inner `'` to be
+    /// `b` will be unchanged, as converting to single quotes would require the inner `'` to be
     /// escaped, which leads to less readable code: `'It\'s monday morning'`.
     #[option(
         default = r#"double"#,
@@ -2557,7 +2694,7 @@ pub struct FormatOptions {
     /// If this option is set to `true`, the magic trailing comma is ignored.
     ///
     /// For example, Ruff leaves the arguments separate even though
-    /// collapsing the arguments to a single line doesn't exceed the line width if `skip-magic-trailing-comma = false`:
+    /// collapsing the arguments to a single line doesn't exceed the line length if `skip-magic-trailing-comma = false`:
     ///
     /// ```python
     ///  # The arguments remain on separate lines because of the trailing comma after `b`
@@ -2583,16 +2720,16 @@ pub struct FormatOptions {
 
     /// The character Ruff uses at the end of a line.
     ///
+    /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.
     /// * `lf`: Line endings will be converted to `\n`. The default line ending on Unix.
     /// * `cr-lf`: Line endings will be converted to `\r\n`. The default line ending on Windows.
-    /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.
     /// * `native`: Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     #[option(
-        default = r#"lf"#,
-        value_type = r#""lf" | "cr-lf" | "auto" | "native""#,
+        default = r#"auto"#,
+        value_type = r#""auto" | "lf" | "cr-lf" | "native""#,
         example = r#"
-            # Automatically detect the line ending on a file per file basis.
-            line-ending = "auto"
+            # Use `\n` line endings for all files
+            line-ending = "lf"
         "#
     )]
     pub line_ending: Option<LineEnding>,
