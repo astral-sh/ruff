@@ -177,7 +177,7 @@ fn is_base_ten_number_literal(expr: &Expr, source: &str) -> bool {
                     Some([b'0', b'x' | b'X' | b'o' | b'O' | b'b' | b'B'])
                 )
             }
-            _ => false,
+            Number::Complex { .. } => false,
         }
     } else {
         false
