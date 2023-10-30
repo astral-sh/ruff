@@ -554,7 +554,6 @@ impl<'a> DocstringStmt<'a> {
 
         match value.as_ref() {
             Expr::StringLiteral(value) if !value.implicit_concatenated => Some(DocstringStmt(stmt)),
-            Expr::BytesLiteral(value) if !value.implicit_concatenated => Some(DocstringStmt(stmt)),
             _ => None,
         }
     }
