@@ -152,8 +152,8 @@ async def ruff_format(
     diff: bool = False,
 ) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
-    logger.debug(f"Formatting {name} with {executable}")
     ruff_args = options.to_cli_args()
+    logger.debug(f"Formatting {name} with {executable} " + " ".join(ruff_args))
 
     if diff:
         ruff_args.append("--diff")
