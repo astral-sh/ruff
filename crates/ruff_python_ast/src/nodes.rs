@@ -987,7 +987,7 @@ impl From<ExprFString> for Expr {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprStringLiteral {
     pub range: TextRange,
     pub value: String,
@@ -1015,7 +1015,7 @@ impl Deref for ExprStringLiteral {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprBytesLiteral {
     pub range: TextRange,
     pub value: Vec<u8>,
@@ -1059,7 +1059,7 @@ pub enum Number {
     Complex { real: f64, imag: f64 },
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprBooleanLiteral {
     pub range: TextRange,
     pub value: bool,
@@ -1077,7 +1077,7 @@ impl Ranged for ExprBooleanLiteral {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprNoneLiteral {
     pub range: TextRange,
 }
@@ -1094,7 +1094,7 @@ impl Ranged for ExprNoneLiteral {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExprEllipsisLiteral {
     pub range: TextRange,
 }

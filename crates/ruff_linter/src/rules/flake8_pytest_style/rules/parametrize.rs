@@ -326,9 +326,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 .map(|name| {
                                     Expr::StringLiteral(ast::ExprStringLiteral {
                                         value: (*name).to_string(),
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                        range: TextRange::default(),
+                                        ..ast::ExprStringLiteral::default()
                                     })
                                 })
                                 .collect(),
@@ -361,9 +359,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 .map(|name| {
                                     Expr::StringLiteral(ast::ExprStringLiteral {
                                         value: (*name).to_string(),
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                        range: TextRange::default(),
+                                        ..ast::ExprStringLiteral::default()
                                     })
                                 })
                                 .collect(),

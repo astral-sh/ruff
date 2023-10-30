@@ -1,5 +1,5 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -219,8 +219,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     let node = ast::ExprStringLiteral {
         value: capital_env_var,
         unicode: *unicode,
-        implicit_concatenated: false,
-        range: TextRange::default(),
+        ..ast::ExprStringLiteral::default()
     };
     let new_env_var = node.into();
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

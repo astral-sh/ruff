@@ -130,9 +130,7 @@ fn generate_replacement(name: &str, generator: Generator) -> String {
     let compare = ast::ExprCompare {
         left: Box::new(var.into()),
         ops: vec![ast::CmpOp::Is],
-        comparators: vec![ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
-            range: TextRange::default(),
-        })],
+        comparators: vec![ast::Expr::NoneLiteral(ast::ExprNoneLiteral::default())],
         range: TextRange::default(),
     };
     generator.expr(&compare.into())
