@@ -410,7 +410,7 @@ pub struct FormatCommand {
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
     /// Set the line-length.
-    #[arg(long, help_heading = "Rule configuration", hide = true)]
+    #[arg(long, help_heading = "Format configuration")]
     pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
