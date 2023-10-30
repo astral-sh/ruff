@@ -121,4 +121,24 @@ E23.py:33:6: E231 [*] Missing whitespace after ','
 35 35 | # Okay because it's hard to differentiate between the usages of a colon in a f-string
 36 36 | f"{a:=1}"
 
+E23.py:47:37: E231 [*] Missing whitespace after ':'
+   |
+46 | #: E231
+47 | {len(f's3://{self.s3_bucket_name}/'):1}
+   |                                     ^ E231
+48 | 
+49 | #: Okay
+   |
+   = help: Add missing whitespace
+
+ℹ Fix
+44 44 | snapshot.file_uri[len(f's3://{self.s3_bucket_name}/'):]
+45 45 | 
+46 46 | #: E231
+47    |-{len(f's3://{self.s3_bucket_name}/'):1}
+   47 |+{len(f's3://{self.s3_bucket_name}/'): 1}
+48 48 | 
+49 49 | #: Okay
+50 50 | a = (1,
+
 
