@@ -114,7 +114,7 @@ impl<'a> StringParser<'a> {
         let mut len = 1;
 
         while len < 3 {
-            let Some(b'0'..=b'8') = self.peek_byte() else {
+            let Some(b'0'..=b'7') = self.peek_byte() else {
                 break;
             };
 
@@ -880,6 +880,15 @@ mod tests {
     #[test]
     fn test_parse_fstring_nested_concatenation_string_spec() {
         let source = r#"f"{foo:{'' ''}}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
+
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    /// <https://github.com/astral-sh/ruff/issues/8355>
+    #[test]
+    fn test_dont_panic_on_8_in_octal_escape() {
+        let source = r"bold = '\038[1m'";
         let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
