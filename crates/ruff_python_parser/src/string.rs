@@ -885,10 +885,10 @@ mod tests {
         insta::assert_debug_snapshot!(parse_ast);
     }
 
-    /// https://github.com/astral-sh/ruff/issues/8355
+    /// <https://github.com/astral-sh/ruff/issues/8355>
     #[test]
     fn test_dont_panic_on_8_in_octal_escape() {
-        let source = r#"bold = '\038[1m'"#;
+        let source = r"bold = '\038[1m'";
         let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
