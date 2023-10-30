@@ -409,6 +409,9 @@ pub struct FormatCommand {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
+    /// Set the line-length.
+    #[arg(long, help_heading = "Rule configuration", hide = true)]
+    pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
     pub isolated: bool,
@@ -552,6 +555,7 @@ impl FormatCommand {
                 stdin_filename: self.stdin_filename,
             },
             CliOverrides {
+                line_length: self.line_length,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,
