@@ -500,7 +500,7 @@ pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> b
             let [node] = body else {
                 return false;
             };
-            matches!(value.as_ref(), Expr::EllipsisLiteral(_)) && !comments.has_leading(node)
+            value.is_ellipsis_literal_expr() && !comments.has_leading(node)
         }
         _ => false,
     }

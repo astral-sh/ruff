@@ -69,11 +69,15 @@ struct StringLinesVisitor<'a> {
 
 impl StatementVisitor<'_> for StringLinesVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
-            if value.is_string_literal_expr() {
+        if let Stmt::Expr(ast::StmtExpr {
+            value: expr,
+            range: _,
+        }) = stmt
+        {
+            if expr.is_string_literal_expr() {
                 for line in UniversalNewlineIterator::with_offset(
-                    self.locator.slice(value.as_ref()),
-                    value.start(),
+                    self.locator.slice(expr.as_ref()),
+                    expr.start(),
                 ) {
                     self.string_lines.push(line.start());
                 }

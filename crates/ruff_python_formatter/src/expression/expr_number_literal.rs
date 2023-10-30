@@ -1,7 +1,6 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{ExprNumberLiteral, Number};
 
-use crate::comments::SourceComment;
 use crate::expression::number::{FormatComplex, FormatFloat, FormatInt};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -16,14 +15,6 @@ impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
             Number::Float(_) => FormatFloat::new(item).fmt(f),
             Number::Complex { .. } => FormatComplex::new(item).fmt(f),
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        Ok(())
     }
 }
 

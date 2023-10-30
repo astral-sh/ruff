@@ -149,7 +149,7 @@ pub(crate) fn invalid_index_type(checker: &mut Checker, expr: &ExprSubscript) {
 /// These are generally "literal" type expressions in that we know their concrete type
 /// without additional analysis; opposed to expressions like a function call where we
 /// cannot determine what type it may return.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum CheckableExprType {
     FString,
     StringLiteral,
@@ -220,7 +220,7 @@ impl CheckableExprType {
         }
     }
 
-    fn is_literal(&self) -> bool {
+    fn is_literal(self) -> bool {
         matches!(
             self,
             Self::StringLiteral

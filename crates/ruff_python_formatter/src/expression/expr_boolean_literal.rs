@@ -1,7 +1,6 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprBooleanLiteral;
 
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
@@ -15,14 +14,6 @@ impl FormatNodeRule<ExprBooleanLiteral> for FormatExprBooleanLiteral {
         } else {
             token("False").fmt(f)
         }
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        Ok(())
     }
 }
 

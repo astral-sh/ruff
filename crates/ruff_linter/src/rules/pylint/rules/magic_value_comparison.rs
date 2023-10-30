@@ -71,13 +71,15 @@ fn as_literal(expr: &Expr) -> Option<&Expr> {
 }
 
 fn is_magic_value(expr: &Expr, allowed_types: &[ConstantType]) -> bool {
-    if let Ok(constant_type) = ConstantType::try_from(expr) {
+    if let Some(constant_type) = ConstantType::try_from_expr(expr) {
         if allowed_types.contains(&constant_type) {
             return false;
         }
     }
 
     match expr {
+        // Ignore `None`, `Bool`, and `Ellipsis` constants.
+        Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_) => false,
         // Special-case some common string and integer types.
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             !matches!(value.as_str(), "" | "__main__")

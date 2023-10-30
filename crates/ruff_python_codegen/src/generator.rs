@@ -1094,8 +1094,8 @@ impl<'a> Generator<'a> {
                 self.p_bytes_repr(value);
             }
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+                static INF_STR: &str = "1e309";
                 assert_eq!(f64::MAX_10_EXP, 308);
-                let inf_str = "1e309";
 
                 match value {
                     ast::Number::Int(i) => {
@@ -1103,7 +1103,7 @@ impl<'a> Generator<'a> {
                     }
                     ast::Number::Float(fp) => {
                         if fp.is_infinite() {
-                            self.p(inf_str);
+                            self.p(INF_STR);
                         } else {
                             self.p(&ruff_python_literal::float::to_string(*fp));
                         }
@@ -1115,7 +1115,7 @@ impl<'a> Generator<'a> {
                             format!("({real}{imag:+}j)")
                         };
                         if real.is_infinite() || imag.is_infinite() {
-                            self.p(&value.replace("inf", inf_str));
+                            self.p(&value.replace("inf", INF_STR));
                         } else {
                             self.p(&value);
                         }

@@ -16,19 +16,17 @@ pub enum ConstantType {
     Str,
 }
 
-impl TryFrom<&Expr> for ConstantType {
-    type Error = ();
-
-    fn try_from(value: &Expr) -> Result<Self, Self::Error> {
-        match value {
-            Expr::StringLiteral(_) => Ok(Self::Str),
-            Expr::BytesLiteral(_) => Ok(Self::Bytes),
+impl ConstantType {
+    pub fn try_from_expr(expr: &Expr) -> Option<Self> {
+        match expr {
+            Expr::StringLiteral(_) => Some(Self::Str),
+            Expr::BytesLiteral(_) => Some(Self::Bytes),
             Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
-                Number::Int(_) => Ok(Self::Int),
-                Number::Float(_) => Ok(Self::Float),
-                Number::Complex { .. } => Ok(Self::Complex),
+                Number::Int(_) => Some(Self::Int),
+                Number::Float(_) => Some(Self::Float),
+                Number::Complex { .. } => Some(Self::Complex),
             },
-            _ => Err(()),
+            _ => None,
         }
     }
 }

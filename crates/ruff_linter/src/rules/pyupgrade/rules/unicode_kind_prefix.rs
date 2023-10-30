@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
+use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -39,11 +39,11 @@ impl AlwaysFixableViolation for UnicodeKindPrefix {
 }
 
 /// UP025
-pub(crate) fn unicode_kind_prefix(checker: &mut Checker, expr: &Expr, is_unicode: bool) {
-    if is_unicode {
-        let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, expr.range());
+pub(crate) fn unicode_kind_prefix(checker: &mut Checker, string: &ExprStringLiteral) {
+    if string.unicode {
+        let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, string.range);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
-            expr.start(),
+            string.start(),
             TextSize::from(1),
         ))));
         checker.diagnostics.push(diagnostic);

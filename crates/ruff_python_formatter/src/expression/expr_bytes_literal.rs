@@ -1,32 +1,18 @@
-use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprBytesLiteral;
 
 use crate::comments::SourceComment;
 use crate::expression::expr_string_literal::is_multiline_string;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::expression::string::{AnyString, FormatString, StringLayout};
+use crate::expression::string::{AnyString, FormatString};
 use crate::prelude::*;
 
 #[derive(Default)]
-pub struct FormatExprBytesLiteral {
-    layout: StringLayout,
-}
-
-impl FormatRuleWithOptions<ExprBytesLiteral, PyFormatContext<'_>> for FormatExprBytesLiteral {
-    type Options = StringLayout;
-
-    fn with_options(mut self, options: Self::Options) -> Self {
-        self.layout = options;
-        self
-    }
-}
+pub struct FormatExprBytesLiteral;
 
 impl FormatNodeRule<ExprBytesLiteral> for FormatExprBytesLiteral {
     fn fmt_fields(&self, item: &ExprBytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatString::new(&AnyString::Bytes(item))
-            .with_layout(self.layout)
-            .fmt(f)
+        FormatString::new(&AnyString::Bytes(item)).fmt(f)
     }
 
     fn fmt_dangling_comments(
@@ -34,6 +20,7 @@ impl FormatNodeRule<ExprBytesLiteral> for FormatExprBytesLiteral {
         _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
         Ok(())
     }
 }

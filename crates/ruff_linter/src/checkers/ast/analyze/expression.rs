@@ -1238,19 +1238,19 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
             }
         }
-        Expr::StringLiteral(ast::ExprStringLiteral { value, unicode, .. }) => {
+        Expr::StringLiteral(string) => {
             if checker.enabled(Rule::HardcodedBindAllInterfaces) {
                 if let Some(diagnostic) =
-                    flake8_bandit::rules::hardcoded_bind_all_interfaces(value, expr.range())
+                    flake8_bandit::rules::hardcoded_bind_all_interfaces(string)
                 {
                     checker.diagnostics.push(diagnostic);
                 }
             }
             if checker.enabled(Rule::HardcodedTempFile) {
-                flake8_bandit::rules::hardcoded_tmp_directory(checker, expr, value);
+                flake8_bandit::rules::hardcoded_tmp_directory(checker, string);
             }
             if checker.enabled(Rule::UnicodeKindPrefix) {
-                pyupgrade::rules::unicode_kind_prefix(checker, expr, *unicode);
+                pyupgrade::rules::unicode_kind_prefix(checker, string);
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StringOrBytesTooLong) {

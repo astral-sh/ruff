@@ -1,7 +1,6 @@
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprEllipsisLiteral;
 
-use crate::comments::SourceComment;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
@@ -11,14 +10,6 @@ pub struct FormatExprEllipsisLiteral;
 impl FormatNodeRule<ExprEllipsisLiteral> for FormatExprEllipsisLiteral {
     fn fmt_fields(&self, _item: &ExprEllipsisLiteral, f: &mut PyFormatter) -> FormatResult<()> {
         token("...").fmt(f)
-    }
-
-    fn fmt_dangling_comments(
-        &self,
-        _dangling_comments: &[SourceComment],
-        _f: &mut PyFormatter,
-    ) -> FormatResult<()> {
-        Ok(())
     }
 }
 
