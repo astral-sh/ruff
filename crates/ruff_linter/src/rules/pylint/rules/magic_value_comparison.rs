@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Expr, Int, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,39 +57,39 @@ impl Violation for MagicValueComparison {
     }
 }
 
-/// If an [`Expr`] is a literal (or unary operation on a literal), return the literal [`Expr`].
-fn as_literal(expr: &Expr) -> Option<&Expr> {
+/// If an [`Expr`] is a literal (or unary operation on a literal), return the [`LiteralExpressionRef`].
+fn as_literal(expr: &Expr) -> Option<LiteralExpressionRef<'_>> {
     match expr {
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
             operand,
             ..
-        }) if operand.is_literal_expr() => Some(operand.as_ref()),
-        expr if expr.is_literal_expr() => Some(expr),
-        _ => None,
+        }) => operand.as_literal_expr(),
+        _ => expr.as_literal_expr(),
     }
 }
 
-fn is_magic_value(expr: &Expr, allowed_types: &[ConstantType]) -> bool {
-    if let Some(constant_type) = ConstantType::try_from_expr(expr) {
+fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantType]) -> bool {
+    if let Some(constant_type) = ConstantType::try_from_literal_expr(literal_expr) {
         if allowed_types.contains(&constant_type) {
             return false;
         }
     }
 
-    match expr {
+    match literal_expr {
         // Ignore `None`, `Bool`, and `Ellipsis` constants.
-        Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_) => false,
+        LiteralExpressionRef::NoneLiteral(_)
+        | LiteralExpressionRef::BooleanLiteral(_)
+        | LiteralExpressionRef::EllipsisLiteral(_) => false,
         // Special-case some common string and integer types.
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+        LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             !matches!(value.as_str(), "" | "__main__")
         }
-        Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+        LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
             ast::Number::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
             _ => true,
         },
-        Expr::BytesLiteral(_) => true,
-        _ => false,
+        LiteralExpressionRef::BytesLiteral(_) => true,
     }
 }
 

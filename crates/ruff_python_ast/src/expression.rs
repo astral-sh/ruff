@@ -336,3 +336,28 @@ impl Ranged for ExpressionRef<'_> {
         }
     }
 }
+
+/// Unowned pendant to all the literal variants of [`ast::Expr`] that stores a
+/// reference instead of an owned value.
+#[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
+pub enum LiteralExpressionRef<'a> {
+    StringLiteral(&'a ast::ExprStringLiteral),
+    BytesLiteral(&'a ast::ExprBytesLiteral),
+    NumberLiteral(&'a ast::ExprNumberLiteral),
+    BooleanLiteral(&'a ast::ExprBooleanLiteral),
+    NoneLiteral(&'a ast::ExprNoneLiteral),
+    EllipsisLiteral(&'a ast::ExprEllipsisLiteral),
+}
+
+impl Ranged for LiteralExpressionRef<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            LiteralExpressionRef::StringLiteral(expression) => expression.range(),
+            LiteralExpressionRef::BytesLiteral(expression) => expression.range(),
+            LiteralExpressionRef::NumberLiteral(expression) => expression.range(),
+            LiteralExpressionRef::BooleanLiteral(expression) => expression.range(),
+            LiteralExpressionRef::NoneLiteral(expression) => expression.range(),
+            LiteralExpressionRef::EllipsisLiteral(expression) => expression.range(),
+        }
+    }
+}

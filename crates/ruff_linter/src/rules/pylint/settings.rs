@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::CacheKey;
-use ruff_python_ast::{Expr, ExprNumberLiteral, Number};
+use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -17,16 +17,18 @@ pub enum ConstantType {
 }
 
 impl ConstantType {
-    pub fn try_from_expr(expr: &Expr) -> Option<Self> {
-        match expr {
-            Expr::StringLiteral(_) => Some(Self::Str),
-            Expr::BytesLiteral(_) => Some(Self::Bytes),
-            Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
+    pub fn try_from_literal_expr(literal_expr: LiteralExpressionRef<'_>) -> Option<Self> {
+        match literal_expr {
+            LiteralExpressionRef::StringLiteral(_) => Some(Self::Str),
+            LiteralExpressionRef::BytesLiteral(_) => Some(Self::Bytes),
+            LiteralExpressionRef::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
                 Number::Int(_) => Some(Self::Int),
                 Number::Float(_) => Some(Self::Float),
                 Number::Complex { .. } => Some(Self::Complex),
             },
-            _ => None,
+            LiteralExpressionRef::BooleanLiteral(_)
+            | LiteralExpressionRef::NoneLiteral(_)
+            | LiteralExpressionRef::EllipsisLiteral(_) => None,
         }
     }
 }
