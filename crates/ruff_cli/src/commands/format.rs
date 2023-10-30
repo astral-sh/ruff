@@ -11,6 +11,7 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::debug;
 
@@ -695,11 +696,11 @@ pub(super) fn warn_incompatible_formatter_settings(
     pyproject_config: &PyprojectConfig,
     resolver: Option<&Resolver>,
 ) {
+    // First, collect all rules that are incompatible regardless of the linter-specific settings.
+    let mut incompatible_rules = FxHashSet::default();
     for setting in std::iter::once(&pyproject_config.settings)
         .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
     {
-        let mut incompatible_rules = Vec::new();
-
         for rule in [
             // The formatter might collapse implicit string concatenation on a single line.
             Rule::SingleLineImplicitStringConcatenation,
@@ -713,41 +714,48 @@ pub(super) fn warn_incompatible_formatter_settings(
             Rule::MissingTrailingComma,
         ] {
             if setting.linter.rules.enabled(rule) {
-                incompatible_rules.push(rule);
+                incompatible_rules.insert(rule);
             }
         }
+    }
 
-        // Rules asserting for space indentation
-        if setting.formatter.indent_style.is_tab() {
-            for rule in [Rule::TabIndentation, Rule::IndentWithSpaces] {
-                if setting.linter.rules.enabled(rule) {
-                    incompatible_rules.push(rule);
-                }
-            }
+    if !incompatible_rules.is_empty() {
+        let mut rule_names: Vec<_> = incompatible_rules
+            .into_iter()
+            .map(|rule| format!("`{}`", rule.noqa_code()))
+            .collect();
+        rule_names.sort();
+        warn_user_once!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.", rule_names.join(", "));
+    }
+
+    // Next, validate settings-specific incompatibilities.
+    for setting in std::iter::once(&pyproject_config.settings)
+        .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
+    {
+        // Validate all rules that rely on tab styles.
+        if setting.linter.rules.enabled(Rule::TabIndentation)
+            && setting.formatter.indent_style.is_tab()
+        {
+            warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
         }
 
-        // Rules asserting for indent-width=4
-        if setting.formatter.indent_width.value() != 4 {
-            for rule in [
-                Rule::IndentationWithInvalidMultiple,
-                Rule::IndentationWithInvalidMultipleComment,
-            ] {
-                if setting.linter.rules.enabled(rule) {
-                    incompatible_rules.push(rule);
-                }
-            }
+        // Validate all rules that rely on tab styles.
+        if setting.linter.rules.enabled(Rule::IndentWithSpaces)
+            && setting.formatter.indent_style.is_tab()
+        {
+            warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
         }
 
-        if !incompatible_rules.is_empty() {
-            let mut rule_names: Vec<_> = incompatible_rules
-                .into_iter()
-                .map(|rule| format!("`{}`", rule.noqa_code()))
-                .collect();
-            rule_names.sort();
-            warn!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.", rule_names.join(", "));
+        // Validate all rules that rely on custom indent widths.
+        if setting.linter.rules.any_enabled(&[
+            Rule::IndentationWithInvalidMultiple,
+            Rule::IndentationWithInvalidMultipleComment,
+        ]) && setting.formatter.indent_width.value() != 4
+        {
+            warn_user_once!("The `format.indent-width` option with a value other than 4 is incompatible with `E111` and `E114`. We recommend disabling these rules when using the formatter, which enforces a consistent indentation width. Alternatively, set the `format.indent-width` option to `4`.");
         }
 
-        // Rules with different quote styles.
+        // Validate all rules that rely on quote styles.
         if setting
             .linter
             .rules
@@ -758,10 +766,10 @@ pub(super) fn warn_incompatible_formatter_settings(
                 setting.formatter.quote_style,
             ) {
                 (Quote::Double, QuoteStyle::Single) => {
-                    warn!("The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
+                    warn_user_once!("The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
                 }
                 (Quote::Single, QuoteStyle::Double) => {
-                    warn!("The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
+                    warn_user_once!("The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
                 }
                 _ => {}
             }
@@ -770,25 +778,26 @@ pub(super) fn warn_incompatible_formatter_settings(
         if setting.linter.rules.enabled(Rule::BadQuotesMultilineString)
             && setting.linter.flake8_quotes.multiline_quotes == Quote::Single
         {
-            warn!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`");
+            warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`");
         }
 
         if setting.linter.rules.enabled(Rule::BadQuotesDocstring)
             && setting.linter.flake8_quotes.docstring_quotes == Quote::Single
         {
-            warn!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
+            warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
         }
 
+        // Validate all isort settings.
         if setting.linter.rules.enabled(Rule::UnsortedImports) {
             // The formatter removes empty lines if the value is larger than 2 but always inserts a empty line after imports.
             // Two empty lines are okay because `isort` only uses this setting for top-level imports (not in nested blocks).
             if !matches!(setting.linter.isort.lines_after_imports, 1 | 2 | -1) {
-                warn!("The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).");
+                warn_user_once!("The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).");
             }
 
             // Values larger than two get reduced to one line by the formatter if the import is in a nested block.
             if setting.linter.isort.lines_between_types > 1 {
-                warn!("The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).");
+                warn_user_once!("The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).");
             }
 
             // isort inserts a trailing comma which the formatter preserves, but only if `skip-magic-trailing-comma` isn't false.
@@ -797,11 +806,11 @@ pub(super) fn warn_incompatible_formatter_settings(
                 && !setting.linter.isort.force_single_line
             {
                 if setting.linter.isort.force_wrap_aliases {
-                    warn!("The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.");
+                    warn_user_once!("The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.");
                 }
 
                 if setting.linter.isort.split_on_trailing_comma {
-                    warn!("The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.");
+                    warn_user_once!("The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.");
                 }
             }
         }
