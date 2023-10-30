@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -55,10 +55,7 @@ fn password_target(target: &Expr) -> Option<&str> {
         Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
         // d["password"] = "s3cr3t"
         Expr::Subscript(ast::ExprSubscript { slice, .. }) => match slice.as_ref() {
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(string),
-                ..
-            }) => string,
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value,
             _ => return None,
         },
         // obj.password = "s3cr3t"

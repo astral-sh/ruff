@@ -113,16 +113,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         annotation: None,
                                     },
                                     default: Some(
-                                        Constant(
-                                            ExprConstant {
+                                        StringLiteral(
+                                            ExprStringLiteral {
                                                 range: 80..89,
-                                                value: Str(
-                                                    StringConstant {
-                                                        value: "default",
-                                                        unicode: false,
-                                                        implicit_concatenated: false,
-                                                    },
-                                                ),
+                                                value: "default",
+                                                unicode: false,
+                                                implicit_concatenated: false,
                                             },
                                         ),
                                     ),

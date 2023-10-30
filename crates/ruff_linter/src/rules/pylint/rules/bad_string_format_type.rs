@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use ruff_python_parser::{lexer, AsMode};
 use ruff_text_size::{Ranged, TextRange};
@@ -186,12 +186,8 @@ fn is_valid_dict(
         let Some(key) = key else {
             return true;
         };
-        if let Expr::Constant(ast::ExprConstant {
-            value:
-                Constant::Str(ast::StringConstant {
-                    value: mapping_key, ..
-                }),
-            ..
+        if let Expr::StringLiteral(ast::ExprStringLiteral {
+            value: mapping_key, ..
         }) = key
         {
             let Some(format) = formats_hash.get(mapping_key.as_str()) else {

@@ -86,7 +86,7 @@ fn is_none(expr: &Expr) -> bool {
             // Ex) `None`
             // Note: `isinstance` only accepts `None` as a type when used with
             // the union operator, so we need to check if we're in a union.
-            Expr::Constant(ast::ExprConstant { value, .. }) if in_union_context => value.is_none(),
+            Expr::NoneLiteral(_) if in_union_context => true,
 
             // Ex) `type(None)`
             Expr::Call(ast::ExprCall {
@@ -94,11 +94,7 @@ fn is_none(expr: &Expr) -> bool {
             }) if arguments.len() == 1 => {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if id.as_str() == "type" {
-                        if let Some(Expr::Constant(ast::ExprConstant { value, .. })) =
-                            arguments.args.get(0)
-                        {
-                            return value.is_none();
-                        }
+                        return matches!(arguments.args.get(0), Some(Expr::NoneLiteral(_)));
                     }
                 }
                 false
@@ -134,8 +130,7 @@ fn generate_replacement(name: &str, generator: Generator) -> String {
     let compare = ast::ExprCompare {
         left: Box::new(var.into()),
         ops: vec![ast::CmpOp::Is],
-        comparators: vec![ast::Expr::Constant(ast::ExprConstant {
-            value: ast::Constant::None,
+        comparators: vec![ast::Expr::NoneLiteral(ast::ExprNoneLiteral {
             range: TextRange::default(),
         })],
         range: TextRange::default(),

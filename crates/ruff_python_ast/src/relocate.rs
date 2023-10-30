@@ -146,7 +146,22 @@ pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
                 relocate_expr(expr, location);
             }
         }
-        Expr::Constant(nodes::ExprConstant { range, .. }) => {
+        Expr::StringLiteral(nodes::ExprStringLiteral { range, .. }) => {
+            *range = location;
+        }
+        Expr::BytesLiteral(nodes::ExprBytesLiteral { range, .. }) => {
+            *range = location;
+        }
+        Expr::NumberLiteral(nodes::ExprNumberLiteral { range, .. }) => {
+            *range = location;
+        }
+        Expr::BooleanLiteral(nodes::ExprBooleanLiteral { range, .. }) => {
+            *range = location;
+        }
+        Expr::NoneLiteral(nodes::ExprNoneLiteral { range }) => {
+            *range = location;
+        }
+        Expr::EllipsisLiteral(nodes::ExprEllipsisLiteral { range }) => {
             *range = location;
         }
         Expr::Attribute(nodes::ExprAttribute { value, range, .. }) => {

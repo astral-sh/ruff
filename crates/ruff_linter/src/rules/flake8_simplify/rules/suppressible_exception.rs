@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
-use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, Stmt};
+use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -64,13 +64,7 @@ impl Violation for SuppressibleException {
 fn is_empty(body: &[Stmt]) -> bool {
     match body {
         [Stmt::Pass(_)] => true,
-        [Stmt::Expr(ast::StmtExpr { value, range: _ })] => matches!(
-            value.as_ref(),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Ellipsis,
-                ..
-            })
-        ),
+        [Stmt::Expr(ast::StmtExpr { value, range: _ })] => value.is_ellipsis_literal_expr(),
         _ => false,
     }
 }

@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, Constant, Expr, Int, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, Int, UnaryOp};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,42 +57,39 @@ impl Violation for MagicValueComparison {
     }
 }
 
-/// If an [`Expr`] is a constant (or unary operation on a constant), return the [`Constant`].
-fn as_constant(expr: &Expr) -> Option<&Constant> {
+/// If an [`Expr`] is a literal (or unary operation on a literal), return the literal [`Expr`].
+fn as_literal(expr: &Expr) -> Option<&Expr> {
     match expr {
-        Expr::Constant(ast::ExprConstant { value, .. }) => Some(value),
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
             operand,
-            range: _,
-        }) => match operand.as_ref() {
-            Expr::Constant(ast::ExprConstant { value, .. }) => Some(value),
-            _ => None,
-        },
+            ..
+        }) if operand.is_literal_expr() => Some(operand.as_ref()),
+        expr if expr.is_literal_expr() => Some(expr),
         _ => None,
     }
 }
 
-/// Return `true` if a [`Constant`] is a magic value.
-fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
-    if let Ok(constant_type) = ConstantType::try_from(constant) {
+fn is_magic_value(expr: &Expr, allowed_types: &[ConstantType]) -> bool {
+    if let Some(constant_type) = ConstantType::try_from_expr(expr) {
         if allowed_types.contains(&constant_type) {
             return false;
         }
     }
-    match constant {
+
+    match expr {
         // Ignore `None`, `Bool`, and `Ellipsis` constants.
-        Constant::None => false,
-        Constant::Bool(_) => false,
-        Constant::Ellipsis => false,
-        // Otherwise, special-case some common string and integer types.
-        Constant::Str(ast::StringConstant { value, .. }) => {
+        Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_) => false,
+        // Special-case some common string and integer types.
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             !matches!(value.as_str(), "" | "__main__")
         }
-        Constant::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
-        Constant::Bytes(_) => true,
-        Constant::Float(_) => true,
-        Constant::Complex { .. } => true,
+        Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+            ast::Number::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),
+            _ => true,
+        },
+        Expr::BytesLiteral(_) => true,
+        _ => false,
     }
 }
 
@@ -102,15 +99,15 @@ pub(crate) fn magic_value_comparison(checker: &mut Checker, left: &Expr, compara
         .chain(comparators.iter())
         .tuple_windows()
     {
-        // If both of the comparators are constant, skip rule for the whole expression.
+        // If both of the comparators are literals, skip rule for the whole expression.
         // R0133: comparison-of-constants
-        if as_constant(left).is_some() && as_constant(right).is_some() {
+        if as_literal(left).is_some() && as_literal(right).is_some() {
             return;
         }
     }
 
     for comparison_expr in std::iter::once(left).chain(comparators.iter()) {
-        if let Some(value) = as_constant(comparison_expr) {
+        if let Some(value) = as_literal(comparison_expr) {
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(
                     MagicValueComparison {

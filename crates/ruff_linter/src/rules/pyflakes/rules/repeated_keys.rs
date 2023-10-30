@@ -149,7 +149,14 @@ pub(crate) fn repeated_keys(checker: &mut Checker, dict: &ast::ExprDict) {
         };
 
         match key {
-            Expr::Constant(_) | Expr::Tuple(_) | Expr::FString(_) => {
+            Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
+            | Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+            | Expr::Tuple(_)
+            | Expr::FString(_) => {
                 if checker.enabled(Rule::MultiValueRepeatedKeyLiteral) {
                     let mut diagnostic = Diagnostic::new(
                         MultiValueRepeatedKeyLiteral {

@@ -26,8 +26,8 @@ GeneratorExp(
                             },
                         ),
                         op: Add,
-                        right: Constant(
-                            ExprConstant {
+                        right: NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 10..11,
                                 value: Int(
                                     1,

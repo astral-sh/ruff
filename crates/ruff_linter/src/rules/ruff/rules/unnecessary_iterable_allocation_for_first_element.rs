@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Int};
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins::is_iterator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -108,8 +108,8 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
 fn is_head_slice(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(Int::ZERO),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(Int::ZERO),
             ..
         })
     )

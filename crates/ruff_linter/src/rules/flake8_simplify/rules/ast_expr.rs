@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::snippet::SourceCodeSnippet;
@@ -139,11 +139,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     let Some(arg) = args.get(0) else {
         return;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(ast::StringConstant { value: env_var, .. }),
-        ..
-    }) = arg
-    else {
+    let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = arg else {
         return;
     };
     if !checker
@@ -195,14 +191,10 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     if id != "os" || attr != "environ" {
         return;
     }
-    let Expr::Constant(ast::ExprConstant {
-        value:
-            Constant::Str(ast::StringConstant {
-                value: env_var,
-                unicode,
-                ..
-            }),
-        range: _,
+    let Expr::StringLiteral(ast::ExprStringLiteral {
+        value: env_var,
+        unicode,
+        ..
     }) = slice.as_ref()
     else {
         return;
@@ -224,12 +216,10 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         },
         slice.range(),
     );
-    let node = ast::ExprConstant {
-        value: ast::Constant::Str(ast::StringConstant {
-            value: capital_env_var,
-            unicode: *unicode,
-            implicit_concatenated: false,
-        }),
+    let node = ast::ExprStringLiteral {
+        value: capital_env_var,
+        unicode: *unicode,
+        implicit_concatenated: false,
         range: TextRange::default(),
     };
     let new_env_var = node.into();
@@ -265,7 +255,7 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Some(key) = args.get(0) else {
         return;
     };
-    if !matches!(key, Expr::Constant(_) | Expr::Name(_)) {
+    if !(key.is_literal_expr() || key.is_name_expr()) {
         return;
     }
     let Some(default) = args.get(1) else {

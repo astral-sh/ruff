@@ -9,8 +9,8 @@ use ruff_python_ast::visitor::preorder::{
 };
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
-    Alias, BoolOp, CmpOp, Comprehension, Constant, ExceptHandler, Expr, Keyword, MatchCase, Mod,
-    Operator, Parameter, Parameters, Pattern, Singleton, Stmt, TypeParam, UnaryOp, WithItem,
+    Alias, BoolOp, CmpOp, Comprehension, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator,
+    Parameter, Parameters, Pattern, Singleton, Stmt, TypeParam, UnaryOp, WithItem,
 };
 use ruff_python_parser::lexer::lex;
 use ruff_python_parser::{parse_tokens, Mode};
@@ -191,10 +191,6 @@ impl PreorderVisitor<'_> for RecordVisitor {
         self.enter_node(expr);
         walk_expr(self, expr);
         self.exit_node();
-    }
-
-    fn visit_constant(&mut self, constant: &Constant) {
-        self.emit(&constant);
     }
 
     fn visit_singleton(&mut self, singleton: &Singleton) {

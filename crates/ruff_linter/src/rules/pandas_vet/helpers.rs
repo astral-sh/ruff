@@ -16,7 +16,12 @@ pub(super) enum Resolution {
 /// Test an [`Expr`] for relevance to Pandas-related operations.
 pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resolution {
     match expr {
-        Expr::Constant(_)
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
         | Expr::Tuple(_)
         | Expr::List(_)
         | Expr::Set(_)

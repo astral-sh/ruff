@@ -1,6 +1,6 @@
 use anyhow::bail;
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -83,41 +83,37 @@ pub(crate) fn compare_to_empty_string(
         if let Ok(op) = EmptyStringCmpOp::try_from(op) {
             if std::mem::take(&mut first) {
                 // Check the left-most expression.
-                if let Expr::Constant(ast::ExprConstant { value, .. }) = &lhs {
-                    if let Constant::Str(s) = value {
-                        if s.is_empty() {
-                            let constant = checker.generator().constant(value);
-                            let expr = checker.generator().expr(rhs);
-                            let existing = format!("{constant} {op} {expr}");
-                            let replacement = format!("{}{expr}", op.into_unary());
-                            checker.diagnostics.push(Diagnostic::new(
-                                CompareToEmptyString {
-                                    existing,
-                                    replacement,
-                                },
-                                lhs.range(),
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // Check all right-hand expressions.
-            if let Expr::Constant(ast::ExprConstant { value, .. }) = &rhs {
-                if let Constant::Str(s) = value {
-                    if s.is_empty() {
-                        let expr = checker.generator().expr(lhs);
-                        let constant = checker.generator().constant(value);
-                        let existing = format!("{expr} {op} {constant}");
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &lhs {
+                    if value.is_empty() {
+                        let literal = checker.generator().expr(lhs);
+                        let expr = checker.generator().expr(rhs);
+                        let existing = format!("{literal} {op} {expr}");
                         let replacement = format!("{}{expr}", op.into_unary());
                         checker.diagnostics.push(Diagnostic::new(
                             CompareToEmptyString {
                                 existing,
                                 replacement,
                             },
-                            rhs.range(),
+                            lhs.range(),
                         ));
                     }
+                }
+            }
+
+            // Check all right-hand expressions.
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &rhs {
+                if value.is_empty() {
+                    let expr = checker.generator().expr(lhs);
+                    let literal = checker.generator().expr(rhs);
+                    let existing = format!("{expr} {op} {literal}");
+                    let replacement = format!("{}{expr}", op.into_unary());
+                    checker.diagnostics.push(Diagnostic::new(
+                        CompareToEmptyString {
+                            existing,
+                            replacement,
+                        },
+                        rhs.range(),
+                    ));
                 }
             }
         }

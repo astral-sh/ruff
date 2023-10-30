@@ -1,5 +1,5 @@
 use ruff_python_ast as ast;
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_source_file::{Locator, UniversalNewlines};
@@ -8,12 +8,9 @@ use ruff_source_file::{Locator, UniversalNewlines};
 /// non-`None` value.
 pub(super) fn result_exists(returns: &[&ast::StmtReturn]) -> bool {
     returns.iter().any(|stmt| {
-        stmt.value.as_deref().is_some_and(|value| {
-            !matches!(
-                value,
-                Expr::Constant(constant) if constant.value.is_none()
-            )
-        })
+        stmt.value
+            .as_deref()
+            .is_some_and(|value| !value.is_none_literal_expr())
     })
 }
 

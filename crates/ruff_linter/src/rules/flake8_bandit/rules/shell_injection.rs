@@ -3,7 +3,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -456,13 +456,7 @@ fn find_shell_keyword<'a>(
 /// Return `true` if the value provided to the `shell` call seems safe. This is based on Bandit's
 /// definition: string literals are considered okay, but dynamically-computed values are not.
 fn shell_call_seems_safe(arg: &Expr) -> bool {
-    matches!(
-        arg,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(_),
-            ..
-        })
-    )
+    arg.is_string_literal_expr()
 }
 
 /// Return `true` if the string appears to be a full file path.

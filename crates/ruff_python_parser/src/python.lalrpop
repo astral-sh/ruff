@@ -377,9 +377,9 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                     buffer.push_str(id.as_str());
                 },
                 ast::Expr::Subscript(ast::ExprSubscript { value, slice, range, .. }) => {
-                    let ast::Expr::Constant(ast::ExprConstant { value: ast::Constant::Int(integer), .. }) = slice.as_ref() else {
+                    let ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: ast::Number::Int(integer), .. }) = slice.as_ref() else {
                         return Err(LexicalError {
-                            error: LexicalErrorType::OtherError("only integer constants are allowed in Subscript expressions in help end escape command".to_string()),
+                            error: LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string()),
                             location: range.start(),
                         });
                     };
@@ -627,15 +627,15 @@ StarPattern: ast::Pattern = {
     }.into(),
 }
 
-ConstantAtom: ast::ParenthesizedExpr = {
-    <location:@L> <value:Constant> <end_location:@R> => ast::Expr::Constant(
-        ast::ExprConstant { value, range: (location..end_location).into() }
+NumberAtom: ast::ParenthesizedExpr = {
+    <location:@L> <value:Number> <end_location:@R> => ast::Expr::NumberLiteral(
+        ast::ExprNumberLiteral { value, range: (location..end_location).into() }
     ).into(),
 }
 
-ConstantExpr: ast::ParenthesizedExpr = {
-    ConstantAtom,
-    <location:@L> "-" <operand:ConstantAtom> <end_location:@R> => ast::Expr::UnaryOp(
+NumberExpr: ast::ParenthesizedExpr = {
+    NumberAtom,
+    <location:@L> "-" <operand:NumberAtom> <end_location:@R> => ast::Expr::UnaryOp(
         ast::ExprUnaryOp {
             op: ast::UnaryOp::USub,
             operand: Box::new(operand.into()),
@@ -645,7 +645,7 @@ ConstantExpr: ast::ParenthesizedExpr = {
 }
 
 AddOpExpr: ast::ParenthesizedExpr = {
-    <location:@L> <left:ConstantExpr> <op:AddOp> <right:ConstantAtom> <end_location:@R> => ast::ExprBinOp {
+    <location:@L> <left:NumberExpr> <op:AddOp> <right:NumberAtom> <end_location:@R> => ast::ExprBinOp {
         left: Box::new(left.into()),
         op,
         right: Box::new(right.into()),
@@ -666,7 +666,7 @@ LiteralPattern: ast::Pattern = {
         value: false.into(),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <value:ConstantExpr> <end_location:@R> => ast::PatternMatchValue {
+    <location:@L> <value:NumberExpr> <end_location:@R> => ast::PatternMatchValue {
         value: Box::new(value.into()),
         range: (location..end_location).into()
     }.into(),
@@ -718,18 +718,17 @@ ValuePattern: ast::Pattern = {
 
 MappingKey: ast::Expr = {
     MatchNameOrAttr,
-    <e:ConstantExpr> => e.into(),
+    <e:NumberExpr> => e.into(),
     <e:AddOpExpr> => e.into(),
-    <location:@L> "None" <end_location:@R> => ast::ExprConstant {
-        value: ast::Constant::None,
+    <location:@L> "None" <end_location:@R> => ast::ExprNoneLiteral {
         range: (location..end_location).into()
     }.into(),
-    <location:@L> "True" <end_location:@R> => ast::ExprConstant {
-        value: true.into(),
+    <location:@L> "True" <end_location:@R> => ast::ExprBooleanLiteral {
+        value: true,
         range: (location..end_location).into()
     }.into(),
-    <location:@L> "False" <end_location:@R> => ast::ExprConstant {
-        value: false.into(),
+    <location:@L> "False" <end_location:@R> => ast::ExprBooleanLiteral {
+        value: false,
         range: (location..end_location).into()
     }.into(),
     <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
@@ -1684,7 +1683,7 @@ FStringConversion: (TextSize, ast::ConversionFlag) = {
 
 Atom<Goal>: ast::ParenthesizedExpr = {
     <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
-    <location:@L> <value:Constant> <end_location:@R> => ast::ExprConstant {
+    <location:@L> <value:Number> <end_location:@R> => ast::ExprNumberLiteral {
         value,
         range: (location..end_location).into(),
     }.into(),
@@ -1776,10 +1775,10 @@ Atom<Goal>: ast::ParenthesizedExpr = {
         generators,
         range: (location..end_location).into(),
     }.into(),
-    <location:@L> "True" <end_location:@R> => ast::ExprConstant { value: true.into(), range: (location..end_location).into() }.into(),
-    <location:@L> "False" <end_location:@R> => ast::ExprConstant { value: false.into(), range: (location..end_location).into() }.into(),
-    <location:@L> "None" <end_location:@R> => ast::ExprConstant { value: ast::Constant::None, range: (location..end_location).into() }.into(),
-    <location:@L> "..." <end_location:@R> => ast::ExprConstant { value: ast::Constant::Ellipsis, range: (location..end_location).into() }.into(),
+    <location:@L> "True" <end_location:@R> => ast::ExprBooleanLiteral { value: true, range: (location..end_location).into() }.into(),
+    <location:@L> "False" <end_location:@R> => ast::ExprBooleanLiteral { value: false, range: (location..end_location).into() }.into(),
+    <location:@L> "None" <end_location:@R> => ast::ExprNoneLiteral { range: (location..end_location).into() }.into(),
+    <location:@L> "..." <end_location:@R> => ast::ExprEllipsisLiteral { range: (location..end_location).into() }.into(),
 };
 
 ListLiteralValues: Vec<ast::ParenthesizedExpr> = {
@@ -1932,10 +1931,10 @@ TwoOrMore<T, Sep>: Vec<T> = {
     }
 };
 
-Constant: ast::Constant = {
-    <value:int> => ast::Constant::Int(value),
-    <value:float> => ast::Constant::Float(value),
-    <s:complex> => ast::Constant::Complex { real: s.0, imag: s.1 },
+Number: ast::Number = {
+    <value:int> => ast::Number::Int(value),
+    <value:float> => ast::Number::Float(value),
+    <s:complex> => ast::Number::Complex { real: s.0, imag: s.1 },
 };
 
 Identifier: ast::Identifier = {

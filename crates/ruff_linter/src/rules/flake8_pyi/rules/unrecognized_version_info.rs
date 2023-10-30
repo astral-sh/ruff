@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr, Int};
+use ruff_python_ast::{self as ast, CmpOp, Expr, Int};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -241,8 +241,8 @@ impl ExpectedComparator {
                 step: None,
                 ..
             }) => {
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(upper),
+                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(upper),
                     ..
                 }) = upper.as_ref()
                 {
@@ -254,8 +254,8 @@ impl ExpectedComparator {
                     }
                 }
             }
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(Int::ZERO),
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(Int::ZERO),
                 ..
             }) => {
                 return Some(ExpectedComparator::MajorDigit);
@@ -271,8 +271,8 @@ impl ExpectedComparator {
 fn is_int_constant(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: ast::Constant::Int(_),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(_),
             ..
         })
     )

@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Comprehension, Constant, Expr, ExprContext, Stmt, UnaryOp,
+    self as ast, Arguments, CmpOp, Comprehension, Expr, ExprContext, Stmt, UnaryOp,
 };
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
@@ -280,11 +280,7 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
     let Some(value) = value else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Bool(value),
-        ..
-    }) = value.as_ref()
-    else {
+    let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = value.as_ref() else {
         return None;
     };
 
@@ -319,9 +315,8 @@ fn match_else_return(stmt: &Stmt) -> Option<Terminal> {
     else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Bool(next_value),
-        ..
+    let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+        value: next_value, ..
     }) = next_value.as_ref()
     else {
         return None;
@@ -362,9 +357,8 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
     else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Bool(next_value),
-        ..
+    let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+        value: next_value, ..
     }) = next_value.as_ref()
     else {
         return None;

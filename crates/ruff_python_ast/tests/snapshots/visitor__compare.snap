@@ -4,9 +4,9 @@ expression: trace
 ---
 - StmtExpr
   - ExprCompare
-    - ExprConstant
+    - ExprNumberLiteral
     - Lt
     - Lt
     - ExprName
-    - ExprConstant
+    - ExprNumberLiteral
 

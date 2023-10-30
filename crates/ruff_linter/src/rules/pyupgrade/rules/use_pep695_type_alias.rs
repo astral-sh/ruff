@@ -1,11 +1,10 @@
-use ast::{Constant, ExprCall, ExprConstant};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
-    Expr, ExprName, ExprSubscript, Identifier, Stmt, StmtAnnAssign, StmtAssign, StmtTypeAlias,
-    TypeParam, TypeParamTypeVar,
+    Expr, ExprCall, ExprName, ExprSubscript, Identifier, Stmt, StmtAnnAssign, StmtAssign,
+    StmtTypeAlias, TypeParam, TypeParamTypeVar,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -204,15 +203,10 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                         func, arguments, ..
                     }) => {
                         if self.semantic.match_typing_expr(func, "TypeVar")
-                            && arguments.args.first().is_some_and(|arg| {
-                                matches!(
-                                    arg,
-                                    Expr::Constant(ExprConstant {
-                                        value: Constant::Str(_),
-                                        ..
-                                    })
-                                )
-                            })
+                            && arguments
+                                .args
+                                .first()
+                                .is_some_and(Expr::is_string_literal_expr)
                         {
                             let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                                 Some(TypeVarRestriction::Bound(&bound.value))

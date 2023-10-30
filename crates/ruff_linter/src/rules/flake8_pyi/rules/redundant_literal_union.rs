@@ -1,7 +1,6 @@
 use rustc_hash::FxHashSet;
 use std::fmt;
 
-use ast::Constant;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
@@ -147,14 +146,15 @@ fn match_builtin_type(expr: &Expr, semantic: &SemanticModel) -> Option<ExprType>
 /// Return the [`ExprType`] of an [`Expr]` if it is a constant (e.g., an `int`, like `1`, or a
 /// `bool`, like `True`).
 fn match_constant_type(expr: &Expr) -> Option<ExprType> {
-    let constant = expr.as_constant_expr()?;
-    let result = match constant.value {
-        Constant::Bool(_) => ExprType::Bool,
-        Constant::Str(_) => ExprType::Str,
-        Constant::Bytes(_) => ExprType::Bytes,
-        Constant::Int(_) => ExprType::Int,
-        Constant::Float(_) => ExprType::Float,
-        Constant::Complex { .. } => ExprType::Complex,
+    let result = match expr {
+        Expr::BooleanLiteral(_) => ExprType::Bool,
+        Expr::StringLiteral(_) => ExprType::Str,
+        Expr::BytesLiteral(_) => ExprType::Bytes,
+        Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+            ast::Number::Int(_) => ExprType::Int,
+            ast::Number::Float(_) => ExprType::Float,
+            ast::Number::Complex { .. } => ExprType::Complex,
+        },
         _ => return None,
     };
     Some(result)

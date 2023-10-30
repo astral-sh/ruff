@@ -1,24 +1,24 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::ExprConstant;
+use ruff_python_ast::ExprNumberLiteral;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::prelude::*;
 
 pub(super) struct FormatInt<'a> {
-    constant: &'a ExprConstant,
+    number: &'a ExprNumberLiteral,
 }
 
 impl<'a> FormatInt<'a> {
-    pub(super) fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_int());
-        Self { constant }
+    pub(super) fn new(number: &'a ExprNumberLiteral) -> Self {
+        debug_assert!(number.value.is_int());
+        Self { number }
     }
 }
 
 impl Format<PyFormatContext<'_>> for FormatInt<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let range = self.constant.range();
+        let range = self.number.range();
         let content = f.context().locator().slice(range);
 
         let normalized = normalize_integer(content);
@@ -31,19 +31,19 @@ impl Format<PyFormatContext<'_>> for FormatInt<'_> {
 }
 
 pub(super) struct FormatFloat<'a> {
-    constant: &'a ExprConstant,
+    number: &'a ExprNumberLiteral,
 }
 
 impl<'a> FormatFloat<'a> {
-    pub(super) fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_float());
-        Self { constant }
+    pub(super) fn new(number: &'a ExprNumberLiteral) -> Self {
+        debug_assert!(number.value.is_float());
+        Self { number }
     }
 }
 
 impl Format<PyFormatContext<'_>> for FormatFloat<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let range = self.constant.range();
+        let range = self.number.range();
         let content = f.context().locator().slice(range);
 
         let normalized = normalize_floating_number(content);
@@ -56,19 +56,19 @@ impl Format<PyFormatContext<'_>> for FormatFloat<'_> {
 }
 
 pub(super) struct FormatComplex<'a> {
-    constant: &'a ExprConstant,
+    number: &'a ExprNumberLiteral,
 }
 
 impl<'a> FormatComplex<'a> {
-    pub(super) fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_complex());
-        Self { constant }
+    pub(super) fn new(number: &'a ExprNumberLiteral) -> Self {
+        debug_assert!(number.value.is_complex());
+        Self { number }
     }
 }
 
 impl Format<PyFormatContext<'_>> for FormatComplex<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let range = self.constant.range();
+        let range = self.number.range();
         let content = f.context().locator().slice(range);
 
         let normalized = normalize_floating_number(content.trim_end_matches(['j', 'J']));

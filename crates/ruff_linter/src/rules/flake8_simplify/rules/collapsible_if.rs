@@ -7,7 +7,7 @@ use log::error;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{self as ast, whitespace, Constant, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::{self as ast, whitespace, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -212,13 +212,7 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf> {
     }
 
     // Allow `if True:` and `if False:` statements.
-    if matches!(
-        test,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bool(..),
-            ..
-        })
-    ) {
+    if test.is_boolean_literal_expr() {
         return None;
     }
 
@@ -259,10 +253,8 @@ fn is_main_check(expr: &Expr) -> bool {
     {
         if let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() {
             if id == "__name__" {
-                if let [Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(ast::StringConstant { value, .. }),
-                    ..
-                })] = comparators.as_slice()
+                if let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] =
+                    comparators.as_slice()
                 {
                     if value == "__main__" {
                         return true;

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -72,13 +72,7 @@ pub(crate) fn useless_return(
     // Skip functions that consist of a docstring and a return statement.
     if body.len() == 2 {
         if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = &body[0] {
-            if matches!(
-                value.as_ref(),
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(_),
-                    ..
-                })
-            ) {
+            if value.is_string_literal_expr() {
                 return;
             }
         }

@@ -4,7 +4,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::{generate_comparison, is_const_none};
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -164,11 +164,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             }
 
             if checker.enabled(Rule::TrueFalseComparison) {
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bool(value),
-                    range: _,
-                }) = comparator
-                {
+                if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
                     match op {
                         EqCmpOp::Eq => {
                             let diagnostic = Diagnostic::new(
@@ -224,11 +220,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
         }
 
         if checker.enabled(Rule::TrueFalseComparison) {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Bool(value),
-                range: _,
-            }) = next
-            {
+            if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
                 match op {
                     EqCmpOp::Eq => {
                         let diagnostic =
