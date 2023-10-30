@@ -8,13 +8,14 @@ pub(crate) use categorize::categorize;
 use categorize::categorize_imports;
 pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
+use itertools::Itertools;
 use normalize::normalize_imports;
 use order::order_imports;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use settings::Settings;
-use sorting::cmp_either_import;
+use sorting::module_key;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, EitherImport, ImportBlock, TrailingComma};
 
@@ -173,17 +174,28 @@ fn format_import_block(
 
         let imports = order_imports(import_block, settings);
 
-        let imports = {
-            let mut imports = imports
-                .import
-                .into_iter()
-                .map(Import)
-                .chain(imports.import_from.into_iter().map(ImportFrom))
-                .collect::<Vec<EitherImport>>();
-            if settings.force_sort_within_sections {
-                imports.sort_by(|import1, import2| cmp_either_import(import1, import2, settings));
-            };
+        let imports = imports
+            .import
+            .into_iter()
+            .map(Import)
+            .chain(imports.import_from.into_iter().map(ImportFrom));
+        let imports: Vec<EitherImport> = if settings.force_sort_within_sections {
             imports
+                .sorted_by_cached_key(|import| match import {
+                    Import((alias, _)) => {
+                        module_key(Some(alias.name), alias.asname, None, None, settings)
+                    }
+                    ImportFrom((import_from, _, _, aliases)) => module_key(
+                        import_from.module,
+                        None,
+                        import_from.level,
+                        aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                        settings,
+                    ),
+                })
+                .collect()
+        } else {
+            imports.collect()
         };
 
         // Add a blank line between every section.
