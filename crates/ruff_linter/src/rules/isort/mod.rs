@@ -2,20 +2,21 @@
 
 use std::path::{Path, PathBuf};
 
+use itertools::Itertools;
+
 use annotate::annotate_imports;
 use block::{Block, Trailer};
 pub(crate) use categorize::categorize;
 use categorize::categorize_imports;
 pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
-use itertools::Itertools;
 use normalize::normalize_imports;
 use order::order_imports;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use settings::Settings;
-use sorting::module_key;
+use sorting::ModuleKey;
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, EitherImport, ImportBlock, TrailingComma};
 
@@ -183,9 +184,9 @@ fn format_import_block(
             imports
                 .sorted_by_cached_key(|import| match import {
                     Import((alias, _)) => {
-                        module_key(Some(alias.name), alias.asname, None, None, settings)
+                        ModuleKey::from_module(Some(alias.name), alias.asname, None, None, settings)
                     }
-                    ImportFrom((import_from, _, _, aliases)) => module_key(
+                    ImportFrom((import_from, _, _, aliases)) => ModuleKey::from_module(
                         import_from.module,
                         None,
                         import_from.level,
@@ -260,9 +261,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_text_size::Ranged;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
+
+    use ruff_text_size::Ranged;
 
     use crate::assert_messages;
     use crate::registry::Rule;

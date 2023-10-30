@@ -1,7 +1,8 @@
-/// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
+//! See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
+
+use std::{borrow::Cow, cmp::Ordering, cmp::Reverse};
+
 use natord;
-use std::cmp::Reverse;
-use std::{borrow::Cow, cmp::Ordering};
 
 use ruff_python_stdlib::str;
 
@@ -63,84 +64,88 @@ impl<'a> From<String> for NatOrdStr<'a> {
     }
 }
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) enum Distance {
     Nearest(u32),
     Furthest(Reverse<u32>),
 }
 
-type ModuleKey<'a> = (
-    Distance,
-    Option<bool>,
-    Option<NatOrdStr<'a>>,
-    Option<NatOrdStr<'a>>,
-    Option<NatOrdStr<'a>>,
-    Option<MemberKey<'a>>,
-);
-
-/// Returns a comparable key to capture the desired sorting order for an imported module (e.g.,
+/// A comparable key to capture the desired sorting order for an imported module (e.g.,
 /// `foo` in `from foo import bar`).
-pub(crate) fn module_key<'a>(
-    name: Option<&'a str>,
-    asname: Option<&'a str>,
-    level: Option<u32>,
-    first_alias: Option<(&'a str, Option<&'a str>)>,
-    settings: &Settings,
-) -> ModuleKey<'a> {
-    let distance = match settings.relative_imports_order {
-        RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level.unwrap_or_default()),
-        RelativeImportsOrder::FurthestToClosest => {
-            Distance::Furthest(Reverse(level.unwrap_or_default()))
-        }
-    };
-    let force_to_top = name.map(|name| !settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
-    let maybe_lowercase_name = name
-        .and_then(|name| (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name))));
-    let module_name = name.map(NatOrdStr::from);
-    let asname = asname.map(NatOrdStr::from);
-    let first_alias = first_alias.map(|(name, asname)| member_key(name, asname, settings));
-
-    (
-        distance,
-        force_to_top,
-        maybe_lowercase_name,
-        module_name,
-        asname,
-        first_alias,
-    )
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) struct ModuleKey<'a> {
+    distance: Distance,
+    force_to_top: Option<bool>,
+    maybe_lowercase_name: Option<NatOrdStr<'a>>,
+    module_name: Option<NatOrdStr<'a>>,
+    asname: Option<NatOrdStr<'a>>,
+    first_alias: Option<MemberKey<'a>>,
 }
 
-type MemberKey<'a> = (
-    bool,
-    Option<MemberType>,
-    Option<NatOrdStr<'a>>,
-    NatOrdStr<'a>,
-    Option<NatOrdStr<'a>>,
-);
+impl<'a> ModuleKey<'a> {
+    pub(crate) fn from_module(
+        name: Option<&'a str>,
+        asname: Option<&'a str>,
+        level: Option<u32>,
+        first_alias: Option<(&'a str, Option<&'a str>)>,
+        settings: &Settings,
+    ) -> Self {
+        let distance = match settings.relative_imports_order {
+            RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level.unwrap_or_default()),
+            RelativeImportsOrder::FurthestToClosest => {
+                Distance::Furthest(Reverse(level.unwrap_or_default()))
+            }
+        };
+        let force_to_top = name.map(|name| !settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
+        let maybe_lowercase_name = name.and_then(|name| {
+            (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
+        });
+        let module_name = name.map(NatOrdStr::from);
+        let asname = asname.map(NatOrdStr::from);
+        let first_alias =
+            first_alias.map(|(name, asname)| MemberKey::from_member(name, asname, settings));
 
-/// Returns a comparable key to capture the desired sorting order for an imported member (e.g.,
-/// `bar` in `from foo import bar`).
-pub(crate) fn member_key<'a>(
-    name: &'a str,
-    asname: Option<&'a str>,
-    settings: &Settings,
-) -> MemberKey<'a> {
-    let not_star_import = name != "*"; // `false` < `true` so we get star imports first
-    let member_type = settings
-        .order_by_type
-        .then_some(member_type(name, settings));
-    let maybe_lowercase_name =
-        (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
-    let module_name = NatOrdStr::from(name);
-    let asname = asname.map(NatOrdStr::from);
+        Self {
+            distance,
+            force_to_top,
+            maybe_lowercase_name,
+            module_name,
+            asname,
+            first_alias,
+        }
+    }
+}
 
-    (
-        not_star_import,
-        member_type,
-        maybe_lowercase_name,
-        module_name,
-        asname,
-    )
+/// A comparable key to capture the desired sorting order for an imported member (e.g., `bar` in
+/// `from foo import bar`).
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) struct MemberKey<'a> {
+    not_star_import: bool,
+    member_type: Option<MemberType>,
+    maybe_lowercase_name: Option<NatOrdStr<'a>>,
+    module_name: NatOrdStr<'a>,
+    asname: Option<NatOrdStr<'a>>,
+}
+
+impl<'a> MemberKey<'a> {
+    pub(crate) fn from_member(name: &'a str, asname: Option<&'a str>, settings: &Settings) -> Self {
+        let not_star_import = name != "*"; // `false` < `true` so we get star imports first
+        let member_type = settings
+            .order_by_type
+            .then_some(member_type(name, settings));
+        let maybe_lowercase_name =
+            (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
+        let module_name = NatOrdStr::from(name);
+        let asname = asname.map(NatOrdStr::from);
+
+        Self {
+            not_star_import,
+            member_type,
+            maybe_lowercase_name,
+            module_name,
+            asname,
+        }
+    }
 }
 
 /// Lowercase the given string, if it contains any uppercase characters.
