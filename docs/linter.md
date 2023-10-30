@@ -226,14 +226,15 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 """  # noqa: E501
 ```
 
-To ignore all violations across an entire file, add `# ruff: noqa` to any line in the file, like so:
+To ignore all violations across an entire file, add a `# ruff: noqa` comment on its own line
+anywhere in the file preferably towards the top, like so:
 
 ```python
 # ruff: noqa
 ```
 
-To ignore a specific rule across an entire file, add `# ruff: noqa: {code}` to any line in the file,
-like so:
+To ignore a specific rule across an entire file, add a `# ruff: noqa: {code}` comment on its own
+line anywhere in the file preferably towards the top, like so:
 
 ```python
 # ruff: noqa: F841
