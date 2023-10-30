@@ -127,9 +127,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let new_expr = Expr::BinOp(ast::ExprBinOp {
                 left: Box::new(expr.clone()),
                 op: Operator::BitOr,
-                right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral {
-                    range: TextRange::default(),
-                })),
+                right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
                 range: TextRange::default(),
             });
             let content = checker.generator().expr(&new_expr);

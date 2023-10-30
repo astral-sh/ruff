@@ -131,9 +131,7 @@ fn optional(expr: &Expr) -> Expr {
     ast::ExprBinOp {
         left: Box::new(expr.clone()),
         op: Operator::BitOr,
-        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral {
-            range: TextRange::default(),
-        })),
+        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
         range: TextRange::default(),
     }
     .into()

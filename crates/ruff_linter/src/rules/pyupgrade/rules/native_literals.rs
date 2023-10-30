@@ -35,19 +35,8 @@ impl FromStr for LiteralType {
 impl LiteralType {
     fn as_zero_value_expr(self) -> Expr {
         match self {
-            LiteralType::Str => ast::ExprStringLiteral {
-                value: String::new(),
-                unicode: false,
-                implicit_concatenated: false,
-                range: TextRange::default(),
-            }
-            .into(),
-            LiteralType::Bytes => ast::ExprBytesLiteral {
-                value: Vec::new(),
-                implicit_concatenated: false,
-                range: TextRange::default(),
-            }
-            .into(),
+            LiteralType::Str => ast::ExprStringLiteral::default().into(),
+            LiteralType::Bytes => ast::ExprBytesLiteral::default().into(),
             LiteralType::Int => ast::ExprNumberLiteral {
                 value: ast::Number::Int(0.into()),
                 range: TextRange::default(),
@@ -58,11 +47,7 @@ impl LiteralType {
                 range: TextRange::default(),
             }
             .into(),
-            LiteralType::Bool => ast::ExprBooleanLiteral {
-                value: false,
-                range: TextRange::default(),
-            }
-            .into(),
+            LiteralType::Bool => ast::ExprBooleanLiteral::default().into(),
         }
     }
 }
