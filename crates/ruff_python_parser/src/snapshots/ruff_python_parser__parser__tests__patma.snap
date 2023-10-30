@@ -719,9 +719,7 @@ expression: parse_ast
                                                         MatchSingleton(
                                                             PatternMatchSingleton {
                                                                 range: 621..625,
-                                                                value: Bool(
-                                                                    true,
-                                                                ),
+                                                                value: True,
                                                             },
                                                         ),
                                                     ],
@@ -2402,9 +2400,7 @@ expression: parse_ast
                     pattern: MatchSingleton(
                         PatternMatchSingleton {
                             range: 1947..1952,
-                            value: Bool(
-                                false,
-                            ),
+                            value: False,
                         },
                     ),
                     guard: None,
@@ -3051,9 +3047,7 @@ expression: parse_ast
                                                         MatchSingleton(
                                                             PatternMatchSingleton {
                                                                 range: 2405..2410,
-                                                                value: Bool(
-                                                                    false,
-                                                                ),
+                                                                value: False,
                                                             },
                                                         ),
                                                     ],

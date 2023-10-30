@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 01c7c57ce067fcf07c9a5450511cc48a2dd08cf821a5ff3b0f649e87d3c67022
+// sha3: 5c061590e81d6c0a6b543c9e8d8d30e7d7a44ed6b20f2ac72ca61a0e33d0e647
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -34346,7 +34346,7 @@ fn __action115<
 ) -> ast::Pattern
 {
     ast::PatternMatchSingleton {
-        value: ast::Constant::None,
+        value: ast::Singleton::None,
         range: (location..end_location).into()
     }.into()
 }

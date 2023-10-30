@@ -185,8 +185,8 @@ pub struct PatternMatchValue<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchSingleton<'a> {
-    value: ComparableConstant<'a>,
+pub struct PatternMatchSingleton {
+    value: ComparableSingleton,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -227,7 +227,7 @@ pub struct PatternMatchOr<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparablePattern<'a> {
     MatchValue(PatternMatchValue<'a>),
-    MatchSingleton(PatternMatchSingleton<'a>),
+    MatchSingleton(PatternMatchSingleton),
     MatchSequence(PatternMatchSequence<'a>),
     MatchMapping(PatternMatchMapping<'a>),
     MatchClass(PatternMatchClass<'a>),
@@ -322,6 +322,23 @@ impl<'a> From<&'a ast::Decorator> for ComparableDecorator<'a> {
     fn from(decorator: &'a ast::Decorator) -> Self {
         Self {
             expression: (&decorator.expression).into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ComparableSingleton {
+    None,
+    True,
+    False,
+}
+
+impl From<&ast::Singleton> for ComparableSingleton {
+    fn from(singleton: &ast::Singleton) -> Self {
+        match singleton {
+            ast::Singleton::None => Self::None,
+            ast::Singleton::True => Self::True,
+            ast::Singleton::False => Self::False,
         }
     }
 }
