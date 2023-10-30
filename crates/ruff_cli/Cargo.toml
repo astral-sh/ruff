@@ -44,7 +44,6 @@ glob = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
-itoa = { version = "1.0.6" }
 log = { workspace = true }
 notify = { version = "6.1.1" }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }

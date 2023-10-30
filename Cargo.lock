@@ -2072,7 +2072,6 @@ dependencies = [
  "insta-cmd",
  "is-macro",
  "itertools 0.11.0",
- "itoa",
  "log",
  "mimalloc",
  "notify",
