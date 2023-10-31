@@ -136,6 +136,13 @@ class CommentAfterDocstring5:
     # This class is also the base class for pathbrowser.PathBrowser.
 
 
+def f():
+    """Browse module classes and functions in IDLE."""
+    # ^ Do not insert a newline above here
+
+    pass
+
+
 class TabbedIndent:
 	def tabbed_indent(self):
 		"""check for correct tabbed formatting
