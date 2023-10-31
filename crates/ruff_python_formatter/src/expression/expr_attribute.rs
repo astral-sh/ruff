@@ -150,8 +150,6 @@ impl NeedsParentheses for ExprAttribute {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
-        } else if self.value.is_name_expr() {
-            OptionalParentheses::BestFit
         } else if is_expression_parenthesized(
             self.value.as_ref().into(),
             context.comments().ranges(),
