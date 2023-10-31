@@ -89,7 +89,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             }
 
             SuiteKind::Function => {
-                if let Some(docstring) = DocstringStmt::try_from_statement(first) {
+                if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
                     SuiteChildStatement::Docstring(docstring)
                 } else {
                     SuiteChildStatement::Other(first)
@@ -97,7 +97,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             }
 
             SuiteKind::Class => {
-                if let Some(docstring) = DocstringStmt::try_from_statement(first) {
+                if let Some(docstring) = DocstringStmt::try_from_statement(first, self.kind) {
                     if !comments.has_leading(first)
                         && lines_before(first.start(), source) > 1
                         && !source_type.is_stub()
@@ -150,7 +150,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 true
             } else if f.options().preview().is_enabled()
                 && self.kind == SuiteKind::TopLevel
-                && DocstringStmt::try_from_statement(first.statement()).is_some()
+                && DocstringStmt::try_from_statement(first.statement(), self.kind).is_some()
             {
                 // Only in preview mode, insert a newline after a module level docstring, but treat
                 // it as a docstring otherwise. See: https://github.com/psf/black/pull/3932.
@@ -543,17 +543,25 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Suite {
 
 /// A statement representing a docstring.
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct DocstringStmt<'a>(&'a Stmt);
+pub(crate) struct DocstringStmt<'a> {
+    /// The [`Stmt::Expr`]
+    docstring: &'a Stmt,
+    /// The parent suite kind
+    suite_kind: SuiteKind,
+}
 
 impl<'a> DocstringStmt<'a> {
     /// Checks if the statement is a simple string that can be formatted as a docstring
-    fn try_from_statement(stmt: &'a Stmt) -> Option<DocstringStmt<'a>> {
+    fn try_from_statement(stmt: &'a Stmt, suite_kind: SuiteKind) -> Option<DocstringStmt<'a>> {
         let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
             return None;
         };
 
         match value.as_ref() {
-            Expr::StringLiteral(value) if !value.implicit_concatenated => Some(DocstringStmt(stmt)),
+            Expr::StringLiteral(value) if !value.implicit_concatenated => Some(DocstringStmt {
+                docstring: stmt,
+                suite_kind,
+            }),
             _ => None,
         }
     }
@@ -562,14 +570,14 @@ impl<'a> DocstringStmt<'a> {
 impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let node_comments = comments.leading_dangling_trailing(self.0);
+        let node_comments = comments.leading_dangling_trailing(self.docstring);
 
         if FormatStmtExpr.is_suppressed(node_comments.trailing, f.context()) {
-            suppressed_node(self.0).fmt(f)
+            suppressed_node(self.docstring).fmt(f)
         } else {
             // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ExprStringLiteral`.
             let string_literal = self
-                .0
+                .docstring
                 .as_expr_stmt()
                 .unwrap()
                 .value
@@ -587,23 +595,25 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                 ]
             )?;
 
-            // Comments after docstrings need a newline between the docstring and the comment.
-            // (https://github.com/astral-sh/ruff/issues/7948)
-            // ```python
-            // class ModuleBrowser:
-            //     """Browse module classes and functions in IDLE."""
-            //     # ^ Insert a newline above here
-            //
-            //     def __init__(self, master, path, *, _htest=False, _utest=False):
-            //         pass
-            // ```
-            if let Some(own_line) = node_comments
-                .trailing
-                .iter()
-                .find(|comment| comment.line_position().is_own_line())
-            {
-                if lines_before(own_line.start(), f.context().source()) < 2 {
-                    empty_line().fmt(f)?;
+            if self.suite_kind == SuiteKind::Class {
+                // Comments after class docstrings need a newline between the docstring and the
+                // comment (https://github.com/astral-sh/ruff/issues/7948).
+                // ```python
+                // class ModuleBrowser:
+                //     """Browse module classes and functions in IDLE."""
+                //     # ^ Insert a newline above here
+                //
+                //     def __init__(self, master, path, *, _htest=False, _utest=False):
+                //         pass
+                // ```
+                if let Some(own_line) = node_comments
+                    .trailing
+                    .iter()
+                    .find(|comment| comment.line_position().is_own_line())
+                {
+                    if lines_before(own_line.start(), f.context().source()) < 2 {
+                        empty_line().fmt(f)?;
+                    }
                 }
             }
 
@@ -625,7 +635,7 @@ pub(crate) enum SuiteChildStatement<'a> {
 impl<'a> SuiteChildStatement<'a> {
     pub(crate) const fn statement(self) -> &'a Stmt {
         match self {
-            SuiteChildStatement::Docstring(docstring) => docstring.0,
+            SuiteChildStatement::Docstring(docstring) => docstring.docstring,
             SuiteChildStatement::Other(statement) => statement,
         }
     }
