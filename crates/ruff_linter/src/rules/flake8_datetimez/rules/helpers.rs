@@ -1,4 +1,3 @@
-use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::{Arguments, Expr, ExprAttribute};
 
 use crate::checkers::ast::Checker;
@@ -15,5 +14,5 @@ pub(super) fn parent_expr_is_astimezone(checker: &Checker) -> bool {
 pub(super) fn has_non_none_keyword(arguments: &Arguments, keyword: &str) -> bool {
     arguments
         .find_keyword(keyword)
-        .is_some_and(|keyword| !is_const_none(&keyword.value))
+        .is_some_and(|keyword| !keyword.value.is_none_literal_expr())
 }

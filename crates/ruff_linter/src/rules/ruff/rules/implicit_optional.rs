@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_ast::{self as ast, Expr, Operator, ParameterWithDefault, Parameters};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_text_size::{Ranged, TextRange};
@@ -174,7 +174,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
         .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else { continue };
-        if !is_const_none(default) {
+        if !default.is_none_literal_expr() {
             continue;
         }
         let Some(annotation) = &parameter.annotation else {

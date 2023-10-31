@@ -576,17 +576,12 @@ pub const fn is_singleton(expr: &Expr) -> bool {
     )
 }
 
-/// Return `true` if the [`Expr`] is a constant or tuple of constants.
+/// Return `true` if the [`Expr`] is a literal or tuple of literals.
 pub fn is_constant(expr: &Expr) -> bool {
-    match expr {
-        Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
-        | Expr::BooleanLiteral(_)
-        | Expr::NoneLiteral(_)
-        | Expr::EllipsisLiteral(_) => true,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant),
-        _ => false,
+    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = expr {
+        elts.iter().all(is_constant)
+    } else {
+        expr.is_literal_expr()
     }
 }
 
@@ -595,12 +590,7 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
-/// Return `true` if an [`Expr`] is `None`.
-pub const fn is_const_none(expr: &Expr) -> bool {
-    expr.is_none_literal_expr()
-}
-
-/// Return `true` if an [`Expr`] is `True`.
+/// Return `true` if an [`Expr`] is a literal `True`.
 pub const fn is_const_true(expr: &Expr) -> bool {
     matches!(
         expr,
@@ -608,7 +598,7 @@ pub const fn is_const_true(expr: &Expr) -> bool {
     )
 }
 
-/// Return `true` if an [`Expr`] is `False`.
+/// Return `true` if an [`Expr`] is a literal `False`.
 pub const fn is_const_false(expr: &Expr) -> bool {
     matches!(
         expr,

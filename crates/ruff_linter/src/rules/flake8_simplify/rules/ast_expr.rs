@@ -4,7 +4,6 @@ use ruff_text_size::Ranged;
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 
@@ -260,7 +259,7 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Some(default) = args.get(1) else {
         return;
     };
-    if !is_const_none(default) {
+    if !default.is_none_literal_expr() {
         return;
     }
 
