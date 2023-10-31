@@ -117,14 +117,14 @@ pub(crate) fn format(
                         return None;
                     };
 
-                    let resolved_settings = resolver.resolve(path, &pyproject_config);
+                    let settings = resolver.resolve(path, &pyproject_config);
 
                     // Ignore files that are excluded from formatting
-                    if !resolved_file.is_root()
+                    if (settings.file_resolver.force_exclude || !resolved_file.is_root())
                         && match_exclusion(
                             path,
                             resolved_file.file_name(),
-                            &resolved_settings.formatter.exclude,
+                            &settings.formatter.exclude,
                         )
                     {
                         return None;
@@ -139,13 +139,7 @@ pub(crate) fn format(
 
                     Some(
                         match catch_unwind(|| {
-                            format_path(
-                                path,
-                                &resolved_settings.formatter,
-                                source_type,
-                                mode,
-                                cache,
-                            )
+                            format_path(path, &settings.formatter, source_type, mode, cache)
                         }) {
                             Ok(inner) => inner.map(|result| FormatPathResult {
                                 path: resolved_file.path().to_path_buf(),

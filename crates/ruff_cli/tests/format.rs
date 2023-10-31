@@ -189,6 +189,73 @@ OTHER = "OTHER"
 }
 
 #[test]
+fn force_exclude() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend-exclude = ["out"]
+
+[format]
+exclude = ["test.py", "generated.py"]
+"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#,
+    )?;
+
+    // Excluded file but passed to the CLI directly, should be formatted
+    let test_path = tempdir.path().join("test.py");
+    fs::write(
+        &test_path,
+        r#"
+def say_hy(name: str):
+        print(f"Hy {name}")"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("generated.py"),
+        r#"NUMBERS = [
+     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+]
+OTHER = "OTHER"
+"#,
+    )?;
+
+    let out_dir = tempdir.path().join("out");
+    fs::create_dir(&out_dir)?;
+
+    fs::write(out_dir.join("a.py"), "a = a")?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--no-cache", "--force-exclude", "--check", "--config"])
+        .arg(ruff_toml.file_name().unwrap())
+        // Explicitly pass test.py, should be respect the `format.exclude` when `--force-exclude` is present
+        .arg(test_path.file_name().unwrap())
+        // Format all other files in the directory, should respect the `exclude` and `format.exclude` options
+        .arg("."), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    1 file would be reformatted
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
 fn exclude_stdin() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
@@ -206,6 +273,43 @@ exclude = ["generated.py"]
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .current_dir(tempdir.path())
         .args(["format", "--config", &ruff_toml.file_name().unwrap().to_string_lossy(), "--stdin-filename", "generated.py", "-"])
+        .pass_stdin(r#"
+from test import say_hy
+
+if __name__ == '__main__':
+    say_hy("dear Ruff contributor")
+"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    from test import say_hy
+
+    if __name__ == "__main__":
+        say_hy("dear Ruff contributor")
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn force_exclude_stdin() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend-select = ["B", "Q"]
+ignore = ["Q000", "Q001", "Q002", "Q003"]
+
+[format]
+exclude = ["generated.py"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--config", &ruff_toml.file_name().unwrap().to_string_lossy(), "--stdin-filename", "generated.py", "--force-exclude", "-"])
         .pass_stdin(r#"
 from test import say_hy
 
