@@ -232,7 +232,7 @@ Found 3 errors.
 ```
 
 If we want to ignore a rule for an entire file, we can add the line `# ruff: noqa: {code}` anywhere
-in the file preferably towards the top, like so:
+in the file, preferably towards the top, like so:
 
 ```py
 # ruff: noqa: UP035
