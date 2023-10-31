@@ -226,14 +226,15 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 """  # noqa: E501
 ```
 
-To ignore all violations across an entire file, add `# ruff: noqa` to any line in the file, like so:
+To ignore all violations across an entire file, add the line `# ruff: noqa` anywhere in the file,
+preferably towards the top, like so:
 
 ```python
 # ruff: noqa
 ```
 
-To ignore a specific rule across an entire file, add `# ruff: noqa: {code}` to any line in the file,
-like so:
+To ignore a specific rule across an entire file, add the line `# ruff: noqa: {code}` anywhere in the
+file, preferably towards the top, like so:
 
 ```python
 # ruff: noqa: F841
@@ -241,6 +242,9 @@ like so:
 
 Or see the [`per-file-ignores`](settings.md#per-file-ignores) setting, which enables the same
 functionality from within your `pyproject.toml` or `ruff.toml` file.
+
+Global `noqa` comments must be on their own line to disambiguate from comments which ignore
+violations on a single line.
 
 Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
 equivalent to `# ruff: noqa`.

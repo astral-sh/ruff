@@ -231,8 +231,8 @@ numbers/numbers.py:1:1: D100 Missing docstring in public module
 Found 3 errors.
 ```
 
-If we want to ignore a rule for an entire file, we can add a `# ruff: noqa` comment to the top of
-the file:
+If we want to ignore a rule for an entire file, we can add the line `# ruff: noqa: {code}` anywhere
+in the file, preferably towards the top, like so:
 
 ```py
 # ruff: noqa: UP035
