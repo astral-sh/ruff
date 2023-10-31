@@ -1,9 +1,7 @@
-use std::cmp::Ordering;
-
 use itertools::Itertools;
 
 use super::settings::Settings;
-use super::sorting::{cmp_import_from, cmp_members, cmp_modules};
+use super::sorting::{MemberKey, ModuleKey};
 use super::types::{AliasData, CommentSet, ImportBlock, ImportFromStatement, OrderedImportBlock};
 
 pub(crate) fn order_imports<'a>(
@@ -13,12 +11,11 @@ pub(crate) fn order_imports<'a>(
     let mut ordered = OrderedImportBlock::default();
 
     // Sort `Stmt::Import`.
-    ordered.import.extend(
-        block
-            .import
-            .into_iter()
-            .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2, settings)),
-    );
+    ordered
+        .import
+        .extend(block.import.into_iter().sorted_by_cached_key(|(alias, _)| {
+            ModuleKey::from_module(Some(alias.name), alias.asname, None, None, settings)
+        }));
 
     // Sort `Stmt::ImportFrom`.
     ordered.import_from.extend(
@@ -53,27 +50,22 @@ pub(crate) fn order_imports<'a>(
                         trailing_comma,
                         aliases
                             .into_iter()
-                            .sorted_by(|(alias1, _), (alias2, _)| {
-                                cmp_members(alias1, alias2, settings)
+                            .sorted_by_cached_key(|(alias, _)| {
+                                MemberKey::from_member(alias.name, alias.asname, settings)
                             })
                             .collect::<Vec<(AliasData, CommentSet)>>(),
                     )
                 },
             )
-            .sorted_by(
-                |(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
-                    cmp_import_from(import_from1, import_from2, settings).then_with(|| {
-                        match (aliases1.first(), aliases2.first()) {
-                            (None, None) => Ordering::Equal,
-                            (None, Some(_)) => Ordering::Less,
-                            (Some(_), None) => Ordering::Greater,
-                            (Some((alias1, _)), Some((alias2, _))) => {
-                                cmp_members(alias1, alias2, settings)
-                            }
-                        }
-                    })
-                },
-            ),
+            .sorted_by_cached_key(|(import_from, _, _, aliases)| {
+                ModuleKey::from_module(
+                    import_from.module,
+                    None,
+                    import_from.level,
+                    aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    settings,
+                )
+            }),
     );
     ordered
 }

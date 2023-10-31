@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Check two versions of ruff against a corpus of open-source code.
+"""
+**DEPRECATED** This script is being replaced by the ruff-ecosystem package.
+
+
+Check two versions of ruff against a corpus of open-source code.
 
 Example usage:
 

@@ -11,8 +11,8 @@ Ok(
                     ExprLambda {
                         range: 0..9,
                         parameters: None,
-                        body: Constant(
-                            ExprConstant {
+                        body: NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 8..9,
                                 value: Int(
                                     1,

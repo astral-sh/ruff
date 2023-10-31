@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Constant, Expr, Int};
+use ruff_python_ast::{Arguments, Expr, Int};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
 use ruff_python_semantic::Binding;
@@ -186,8 +186,8 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 if start.map_or(true, |start| {
                     matches!(
                         start,
-                        Expr::Constant(ast::ExprConstant {
-                            value: Constant::Int(Int::ZERO),
+                        Expr::NumberLiteral(ast::ExprNumberLiteral {
+                            value: ast::Number::Int(Int::ZERO),
                             ..
                         })
                     )

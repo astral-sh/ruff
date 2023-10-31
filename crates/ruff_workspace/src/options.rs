@@ -828,7 +828,7 @@ pub struct LintCommonOptions {
         value_type = "dict[str, list[RuleSelector]]",
         example = r#"
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-            [tool.ruff.per-file-ignores]
+            [tool.ruff.lint.per-file-ignores]
             "__init__.py" = ["E402"]
             "path/to/file.py" = ["E402"]
         "#
@@ -842,7 +842,7 @@ pub struct LintCommonOptions {
         value_type = "dict[str, list[RuleSelector]]",
         example = r#"
             # Also ignore `E402` in all `__init__.py` files.
-            [tool.ruff.extend-per-file-ignores]
+            [tool.ruff.lint.extend-per-file-ignores]
             "__init__.py" = ["E402"]
         "#
     )]
@@ -1198,7 +1198,7 @@ pub struct Flake8ImportConventionsOptions {
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
         value_type = "dict[str, str]",
         example = r#"
-            [tool.ruff.flake8-import-conventions.aliases]
+            [tool.ruff.lint.flake8-import-conventions.aliases]
             # Declare the default aliases.
             altair = "alt"
             "matplotlib.pyplot" = "plt"
@@ -1216,7 +1216,7 @@ pub struct Flake8ImportConventionsOptions {
         default = r#"{}"#,
         value_type = "dict[str, str]",
         example = r#"
-            [tool.ruff.flake8-import-conventions.extend-aliases]
+            [tool.ruff.lint.flake8-import-conventions.extend-aliases]
             # Declare a custom alias for the `matplotlib` module.
             "dask.dataframe" = "dd"
         "#
@@ -1228,7 +1228,7 @@ pub struct Flake8ImportConventionsOptions {
         default = r#"{}"#,
         value_type = "dict[str, list[str]]",
         example = r#"
-            [tool.ruff.flake8-import-conventions.banned-aliases]
+            [tool.ruff.lint.flake8-import-conventions.banned-aliases]
             # Declare the banned aliases.
             "tensorflow.keras.backend" = ["K"]
     "#
@@ -1412,6 +1412,9 @@ impl Flake8PytestStyleOptions {
 pub struct Flake8QuotesOptions {
     /// Quote style to prefer for inline strings (either "single" or
     /// "double").
+    ///
+    /// When using the formatter, ensure that `format.quote-style` is set to
+    /// the same preferred quote style.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,
@@ -1423,6 +1426,9 @@ pub struct Flake8QuotesOptions {
 
     /// Quote style to prefer for multiline strings (either "single" or
     /// "double").
+    ///
+    /// When using the formatter, only "double" is compatible, as the formatter
+    /// enforces double quotes for multiline strings.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,
@@ -1433,6 +1439,9 @@ pub struct Flake8QuotesOptions {
     pub multiline_quotes: Option<Quote>,
 
     /// Quote style to prefer for docstrings (either "single" or "double").
+    ///
+    /// When using the formatter, only "double" is compatible, as the formatter
+    /// enforces double quotes for docstrings strings.
     #[option(
         default = r#""double""#,
         value_type = r#""single" | "double""#,
@@ -1532,7 +1541,7 @@ pub struct Flake8TidyImportsOptions {
         default = r#"{}"#,
         value_type = r#"dict[str, { "msg": str }]"#,
         example = r#"
-            [tool.ruff.flake8-tidy-imports.banned-api]
+            [tool.ruff.lint.flake8-tidy-imports.banned-api]
             "cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
             "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
         "#
@@ -1985,7 +1994,7 @@ pub struct IsortOptions {
         value_type = "dict[str, list[str]]",
         example = r#"
             # Group all Django imports into a separate section.
-            [tool.ruff.isort.sections]
+            [tool.ruff.lint.isort.sections]
             "django" = ["django"]
         "#
     )]
@@ -2367,7 +2376,7 @@ pub struct PydocstyleOptions {
     /// documentation for every function parameter:
     ///
     /// ```toml
-    /// [tool.ruff]
+    /// [tool.ruff.lint]
     /// # Enable all `pydocstyle` rules, limiting to those that adhere to the
     /// # Google convention via `convention = "google"`, below.
     /// select = ["D"]
@@ -2376,7 +2385,7 @@ pub struct PydocstyleOptions {
     /// # documentation for every function parameter.
     /// ignore = ["D417"]
     ///
-    /// [tool.ruff.pydocstyle]
+    /// [tool.ruff.lint.pydocstyle]
     /// convention = "google"
     /// ```
     ///
@@ -2604,9 +2613,6 @@ pub struct FormatOptions {
     ///   (e.g., the directory containing your `pyproject.toml`).
     ///
     /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
-    ///
-    /// Note that you'll typically want to use
-    /// [`extend-exclude`](#extend-exclude) to modify the excluded paths.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",

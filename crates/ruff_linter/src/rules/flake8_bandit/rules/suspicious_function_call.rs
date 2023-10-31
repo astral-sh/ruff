@@ -854,7 +854,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" | "Request"] => {
                 // If the `url` argument is a string literal, allow `http` and `https` schemes.
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
-                    if let Some(Expr::Constant(ast::ExprConstant { value: ast::Constant::Str(url), .. })) = &call.arguments.find_argument("url", 0) {
+                    if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value: url, .. })) = &call.arguments.find_argument("url", 0) {
                             let url = url.trim_start();
                             if url.starts_with("http://") || url.starts_with("https://") {
                                 return None;

@@ -4,7 +4,9 @@ use bitflags::bitflags;
 
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{self as ast, Constant, ExprConstant, ExprFString, ExpressionRef};
+use ruff_python_ast::{
+    self as ast, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExpressionRef,
+};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
 use ruff_source_file::Locator;
@@ -26,19 +28,16 @@ enum Quoting {
 
 #[derive(Clone, Debug)]
 pub(super) enum AnyString<'a> {
-    Constant(&'a ExprConstant),
+    String(&'a ExprStringLiteral),
+    Bytes(&'a ExprBytesLiteral),
     FString(&'a ExprFString),
 }
 
 impl<'a> AnyString<'a> {
     pub(crate) fn from_expression(expression: &'a Expr) -> Option<AnyString<'a>> {
         match expression {
-            Expr::Constant(
-                constant @ ExprConstant {
-                    value: Constant::Str(_) | Constant::Bytes(_),
-                    ..
-                },
-            ) => Some(AnyString::Constant(constant)),
+            Expr::StringLiteral(string) => Some(AnyString::String(string)),
+            Expr::BytesLiteral(bytes) => Some(AnyString::Bytes(bytes)),
             Expr::FString(fstring) => Some(AnyString::FString(fstring)),
             _ => None,
         }
@@ -46,7 +45,7 @@ impl<'a> AnyString<'a> {
 
     fn quoting(&self, locator: &Locator) -> Quoting {
         match self {
-            Self::Constant(_) => Quoting::CanChange,
+            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
             Self::FString(f_string) => {
                 let unprefixed = locator
                     .slice(f_string.range)
@@ -75,7 +74,14 @@ impl<'a> AnyString<'a> {
     /// Returns `true` if the string is implicitly concatenated.
     pub(super) fn is_implicit_concatenated(&self) -> bool {
         match self {
-            Self::Constant(ExprConstant { value, .. }) => value.is_implicit_concatenated(),
+            Self::String(ExprStringLiteral {
+                implicit_concatenated,
+                ..
+            }) => *implicit_concatenated,
+            Self::Bytes(ExprBytesLiteral {
+                implicit_concatenated,
+                ..
+            }) => *implicit_concatenated,
             Self::FString(ExprFString {
                 implicit_concatenated,
                 ..
@@ -87,7 +93,8 @@ impl<'a> AnyString<'a> {
 impl Ranged for AnyString<'_> {
     fn range(&self) -> TextRange {
         match self {
-            Self::Constant(expr) => expr.range(),
+            Self::String(expr) => expr.range(),
+            Self::Bytes(expr) => expr.range(),
             Self::FString(expr) => expr.range(),
         }
     }
@@ -96,7 +103,8 @@ impl Ranged for AnyString<'_> {
 impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
     fn from(value: &AnyString<'a>) -> Self {
         match value {
-            AnyString::Constant(expr) => AnyNodeRef::ExprConstant(expr),
+            AnyString::String(expr) => AnyNodeRef::ExprStringLiteral(expr),
+            AnyString::Bytes(expr) => AnyNodeRef::ExprBytesLiteral(expr),
             AnyString::FString(expr) => AnyNodeRef::ExprFString(expr),
         }
     }
@@ -105,7 +113,8 @@ impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
 impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
     fn from(value: &AnyString<'a>) -> Self {
         match value {
-            AnyString::Constant(expr) => ExpressionRef::Constant(expr),
+            AnyString::String(expr) => ExpressionRef::StringLiteral(expr),
+            AnyString::Bytes(expr) => ExpressionRef::BytesLiteral(expr),
             AnyString::FString(expr) => ExpressionRef::FString(expr),
         }
     }
@@ -130,9 +139,6 @@ pub enum StringLayout {
 
 impl<'a> FormatString<'a> {
     pub(super) fn new(string: &'a AnyString<'a>) -> Self {
-        if let AnyString::Constant(constant) = string {
-            debug_assert!(constant.value.is_str() || constant.value.is_bytes());
-        }
         Self {
             string,
             layout: StringLayout::Default,
@@ -247,9 +253,6 @@ struct FormatStringContinuation<'a> {
 
 impl<'a> FormatStringContinuation<'a> {
     fn new(string: &'a AnyString<'a>) -> Self {
-        if let AnyString::Constant(constant) = string {
-            debug_assert!(constant.value.is_str() || constant.value.is_bytes());
-        }
         Self { string }
     }
 }

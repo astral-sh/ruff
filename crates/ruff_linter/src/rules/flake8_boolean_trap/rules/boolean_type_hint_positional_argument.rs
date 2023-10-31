@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Decorator, Expr, ParameterWithDefault, Parameters};
+use ruff_python_ast::{self as ast, Decorator, Expr, ParameterWithDefault, Parameters};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
@@ -126,10 +126,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         // check for both bool (python class) and 'bool' (string annotation)
         let hint = match annotation.as_ref() {
             Expr::Name(name) => &name.id == "bool",
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(ast::StringConstant { value, .. }),
-                ..
-            }) => value == "bool",
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
             _ => false,
         };
         if !hint || !checker.semantic().is_builtin("bool") {

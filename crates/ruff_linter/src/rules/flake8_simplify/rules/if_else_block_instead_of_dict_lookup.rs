@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::comparable::ComparableConstant;
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
@@ -67,12 +67,12 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
     if ops != &[CmpOp::Eq] {
         return;
     }
-    let [Expr::Constant(ast::ExprConstant {
-        value: constant, ..
-    })] = comparators.as_slice()
-    else {
+    let [expr] = comparators.as_slice() else {
         return;
     };
+    if !expr.is_literal_expr() {
+        return;
+    }
     let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
         return;
     };
@@ -94,8 +94,9 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
         return;
     }
 
-    let mut constants: FxHashSet<ComparableConstant> = FxHashSet::default();
-    constants.insert(constant.into());
+    // The `expr` was checked to be a literal above, so this is safe.
+    let mut literals: FxHashSet<ComparableExpr> = FxHashSet::default();
+    literals.insert(expr.into());
 
     for clause in elif_else_clauses {
         let ElifElseClause { test, body, .. } = clause;
@@ -129,12 +130,12 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
                 if id != target || ops != &[CmpOp::Eq] {
                     return;
                 }
-                let [Expr::Constant(ast::ExprConstant {
-                    value: constant, ..
-                })] = comparators.as_slice()
-                else {
+                let [expr] = comparators.as_slice() else {
                     return;
                 };
+                if !expr.is_literal_expr() {
+                    return;
+                }
 
                 if value.as_ref().is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().is_builtin(id))
@@ -142,7 +143,8 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
                     return;
                 };
 
-                constants.insert(constant.into());
+                // The `expr` was checked to be a literal above, so this is safe.
+                literals.insert(expr.into());
             }
             // Different `elif`
             _ => {
@@ -151,7 +153,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
         }
     }
 
-    if constants.len() < 3 {
+    if literals.len() < 3 {
         return;
     }
 

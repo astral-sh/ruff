@@ -1,7 +1,7 @@
 use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{self as ast, Constant, Expr, ExprConstant, PySourceType, Stmt, Suite};
+use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -9,7 +9,6 @@ use crate::comments::{
     leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::expr_constant::ExprConstantLayout;
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
 use crate::statement::stmt_expr::FormatStmtExpr;
@@ -19,7 +18,7 @@ use crate::verbatim::{
 };
 
 /// Level at which the [`Suite`] appears in the source code.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum SuiteKind {
     /// Statements at the module level / top level
     TopLevel,
@@ -123,7 +122,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let first_comments = comments.leading_dangling_trailing(first);
 
-        let (mut preceding, mut after_class_docstring) = if first_comments
+        let (mut preceding, mut empty_line_after_docstring) = if first_comments
             .leading
             .iter()
             .any(|comment| comment.is_suppression_off_comment(source))
@@ -143,11 +142,24 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             )
         } else {
             first.fmt(f)?;
-            (
-                first.statement(),
-                matches!(first, SuiteChildStatement::Docstring(_))
-                    && matches!(self.kind, SuiteKind::Class),
-            )
+
+            #[allow(clippy::if_same_then_else)]
+            let empty_line_after_docstring = if matches!(first, SuiteChildStatement::Docstring(_))
+                && self.kind == SuiteKind::Class
+            {
+                true
+            } else if f.options().preview().is_enabled()
+                && self.kind == SuiteKind::TopLevel
+                && DocstringStmt::try_from_statement(first.statement()).is_some()
+            {
+                // Only in preview mode, insert a newline after a module level docstring, but treat
+                // it as a docstring otherwise. See: https://github.com/psf/black/pull/3932.
+                true
+            } else {
+                false
+            };
+
+            (first.statement(), empty_line_after_docstring)
         };
 
         let mut preceding_comments = comments.leading_dangling_trailing(preceding);
@@ -303,7 +315,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         }
                     },
                 }
-            } else if after_class_docstring {
+            } else if empty_line_after_docstring {
                 // Enforce an empty line after a class docstring, e.g., these are both stable
                 // formatting:
                 // ```python
@@ -389,7 +401,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 preceding_comments = following_comments;
             }
 
-            after_class_docstring = false;
+            empty_line_after_docstring = false;
         }
 
         Ok(())
@@ -488,13 +500,7 @@ pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> b
             let [node] = body else {
                 return false;
             };
-            matches!(
-                value.as_ref(),
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Ellipsis,
-                    ..
-                })
-            ) && !comments.has_leading(node)
+            value.is_ellipsis_literal_expr() && !comments.has_leading(node)
         }
         _ => false,
     }
@@ -546,13 +552,10 @@ impl<'a> DocstringStmt<'a> {
             return None;
         };
 
-        if let Expr::Constant(ExprConstant { value, .. }) = value.as_ref() {
-            if !value.is_implicit_concatenated() {
-                return Some(DocstringStmt(stmt));
-            }
+        match value.as_ref() {
+            Expr::StringLiteral(value) if !value.implicit_concatenated => Some(DocstringStmt(stmt)),
+            _ => None,
         }
-
-        None
     }
 }
 
@@ -564,13 +567,13 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
         if FormatStmtExpr.is_suppressed(node_comments.trailing, f.context()) {
             suppressed_node(self.0).fmt(f)
         } else {
-            // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ConstantExpr`.
-            let constant = self
+            // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ExprStringLiteral`.
+            let string_literal = self
                 .0
                 .as_expr_stmt()
                 .unwrap()
                 .value
-                .as_constant_expr()
+                .as_string_literal_expr()
                 .unwrap();
 
             // We format the expression, but the statement carries the comments
@@ -578,12 +581,33 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                 f,
                 [
                     leading_comments(node_comments.leading),
-                    constant
+                    string_literal
                         .format()
-                        .with_options(ExprConstantLayout::String(StringLayout::DocString)),
-                    trailing_comments(node_comments.trailing),
+                        .with_options(StringLayout::DocString),
                 ]
-            )
+            )?;
+
+            // Comments after docstrings need a newline between the docstring and the comment.
+            // (https://github.com/astral-sh/ruff/issues/7948)
+            // ```python
+            // class ModuleBrowser:
+            //     """Browse module classes and functions in IDLE."""
+            //     # ^ Insert a newline above here
+            //
+            //     def __init__(self, master, path, *, _htest=False, _utest=False):
+            //         pass
+            // ```
+            if let Some(own_line) = node_comments
+                .trailing
+                .iter()
+                .find(|comment| comment.line_position().is_own_line())
+            {
+                if lines_before(own_line.start(), f.context().source()) < 2 {
+                    empty_line().fmt(f)?;
+                }
+            }
+
+            trailing_comments(node_comments.trailing).fmt(f)
         }
     }
 }

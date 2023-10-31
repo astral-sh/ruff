@@ -170,7 +170,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 expr.start(),
             ));
 
-            if pydocstyle::helpers::should_ignore_docstring(expr) {
+            if expr.implicit_concatenated {
                 #[allow(deprecated)]
                 let location = checker.locator.compute_source_location(expr.start());
                 warn_user!(

@@ -81,7 +81,7 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
 
 /// Returns `true` if the given expression is a string literal containing a `b` character.
 fn is_binary_mode(expr: &ast::Expr) -> Option<bool> {
-    Some(expr.as_constant_expr()?.value.as_str()?.value.contains('b'))
+    Some(expr.as_string_literal_expr()?.value.contains('b'))
 }
 
 /// Returns `true` if the given call lacks an explicit `encoding`.

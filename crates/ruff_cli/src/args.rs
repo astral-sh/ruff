@@ -50,7 +50,11 @@ pub enum Command {
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// List or describe the available configuration options.
     Config { option: Option<String> },
@@ -58,7 +62,11 @@ pub enum Command {
     Linter {
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
@@ -503,6 +511,7 @@ impl CheckCommand {
                 extend_exclude: self.extend_exclude,
                 extend_fixable: self.extend_fixable,
                 extend_ignore: self.extend_ignore,
+                extend_per_file_ignores: self.extend_per_file_ignores,
                 extend_select: self.extend_select,
                 extend_unfixable: self.extend_unfixable,
                 fixable: self.fixable,
@@ -624,6 +633,7 @@ pub struct CliOverrides {
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub preview: Option<PreviewMode>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
@@ -653,6 +663,12 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(extend_exclude) = &self.extend_exclude {
             config.extend_exclude.extend(extend_exclude.clone());
+        }
+        if let Some(extend_per_file_ignores) = &self.extend_per_file_ignores {
+            config
+                .lint
+                .extend_per_file_ignores
+                .extend(collect_per_file_ignores(extend_per_file_ignores.clone()));
         }
         if let Some(fix) = &self.fix {
             config.fix = Some(*fix);

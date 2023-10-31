@@ -547,15 +547,17 @@ fn is_file_excluded(
 
 /// Return `true` if the given file should be ignored based on the exclusion
 /// criteria.
+#[inline]
 pub fn match_exclusion<P: AsRef<Path>, R: AsRef<Path>>(
     file_path: P,
     file_basename: R,
     exclusion: &GlobSet,
 ) -> bool {
-    if exclusion.is_empty() {
-        return false;
-    }
-    exclusion.is_match(file_path) || exclusion.is_match(file_basename)
+    match_candidate_exclusion(
+        &Candidate::new(file_path.as_ref()),
+        &Candidate::new(file_basename.as_ref()),
+        exclusion,
+    )
 }
 
 /// Return `true` if the given candidates should be ignored based on the exclusion

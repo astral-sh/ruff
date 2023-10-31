@@ -41,6 +41,7 @@ jobs:
           workflow: ci.yaml
           pr: ${{ steps.pr-number.outputs.pr-number }}
           path: pr/ecosystem
+          workflow_conclusion: completed
           if_no_artifact_found: ignore
 
       - name: Generate Comment

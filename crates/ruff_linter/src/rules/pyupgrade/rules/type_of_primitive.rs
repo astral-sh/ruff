@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
 
 use crate::fix::edits::pad;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -65,10 +65,7 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     {
         return;
     }
-    let Expr::Constant(ast::ExprConstant { value, .. }) = &arg else {
-        return;
-    };
-    let Some(primitive) = Primitive::from_constant(value) else {
+    let Some(primitive) = Primitive::from_expr(arg) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());

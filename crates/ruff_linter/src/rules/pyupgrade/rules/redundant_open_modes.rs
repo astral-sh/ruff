@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, PySourceType};
+use ruff_python_ast::{self as ast, Expr, PySourceType};
 use ruff_python_parser::{lexer, AsMode};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
@@ -71,12 +71,8 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
         None => {
             if !call.arguments.is_empty() {
                 if let Some(keyword) = call.arguments.find_keyword(MODE_KEYWORD_ARGUMENT) {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value:
-                            Constant::Str(ast::StringConstant {
-                                value: mode_param_value,
-                                ..
-                            }),
+                    if let Expr::StringLiteral(ast::ExprStringLiteral {
+                        value: mode_param_value,
                         ..
                     }) = &keyword.value
                     {
@@ -94,11 +90,7 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
             }
         }
         Some(mode_param) => {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
-                ..
-            }) = &mode_param
-            {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param {
                 if let Ok(mode) = OpenMode::from_str(value) {
                     checker.diagnostics.push(create_check(
                         call,

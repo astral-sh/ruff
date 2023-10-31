@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fs::{self, File};
 use std::hash::Hasher;
@@ -20,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_linter::message::Message;
-use ruff_linter::warn_user;
+use ruff_linter::{warn_user, VERSION};
 use ruff_macros::CacheKey;
 use ruff_notebook::NotebookIndex;
 use ruff_python_ast::imports::ImportMap;
@@ -102,9 +101,8 @@ impl Cache {
     pub(crate) fn open(package_root: PathBuf, settings: &Settings) -> Self {
         debug_assert!(package_root.is_absolute(), "package root not canonicalized");
 
-        let mut buf = itoa::Buffer::new();
-        let key = Path::new(buf.format(cache_key(&package_root, settings)));
-        let path = PathBuf::from_iter([&settings.cache_dir, Path::new("content"), key]);
+        let key = format!("{}", cache_key(&package_root, settings));
+        let path = PathBuf::from_iter([&settings.cache_dir, Path::new(VERSION), Path::new(&key)]);
 
         let file = match File::open(&path) {
             Ok(file) => file,
@@ -142,7 +140,7 @@ impl Cache {
     fn empty(path: PathBuf, package_root: PathBuf) -> Self {
         let package = PackageCache {
             package_root,
-            files: HashMap::new(),
+            files: FxHashMap::default(),
         };
         Cache::new(path, package)
     }
@@ -294,7 +292,7 @@ struct PackageCache {
     /// single file "packages", e.g. scripts.
     package_root: PathBuf,
     /// Mapping of source file path to it's cached data.
-    files: HashMap<RelativePathBuf, FileCache>,
+    files: FxHashMap<RelativePathBuf, FileCache>,
 }
 
 /// On disk representation of the cache per source file.
@@ -350,16 +348,16 @@ struct FileCacheData {
 /// version.
 fn cache_key(package_root: &Path, settings: &Settings) -> u64 {
     let mut hasher = CacheKeyHasher::new();
-    env!("CARGO_PKG_VERSION").cache_key(&mut hasher);
     package_root.cache_key(&mut hasher);
     settings.cache_key(&mut hasher);
+
     hasher.finish()
 }
 
 /// Initialize the cache at the specified `Path`.
 pub(crate) fn init(path: &Path) -> Result<()> {
     // Create the cache directories.
-    fs::create_dir_all(path.join("content"))?;
+    fs::create_dir_all(path.join(VERSION))?;
 
     // Add the CACHEDIR.TAG.
     if !cachedir::is_tagged(path)? {

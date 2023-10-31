@@ -530,6 +530,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ModuleImportNotAtTopOfFile) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
             }
+            if checker.enabled(Rule::ImportOutsideTopLevel) {
+                pylint::rules::import_outside_top_level(checker, stmt);
+            }
             if checker.enabled(Rule::GlobalStatement) {
                 for name in names {
                     if let Some(asname) = name.asname.as_ref() {
@@ -705,6 +708,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             let module = module.as_deref();
             if checker.enabled(Rule::ModuleImportNotAtTopOfFile) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
+            }
+            if checker.enabled(Rule::ImportOutsideTopLevel) {
+                pylint::rules::import_outside_top_level(checker, stmt);
             }
             if checker.enabled(Rule::GlobalStatement) {
                 for name in names {
@@ -1185,6 +1191,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ReadWholeFile) {
                 refurb::rules::read_whole_file(checker, with_stmt);
+            }
+            if checker.enabled(Rule::UselessWithLock) {
+                pylint::rules::useless_with_lock(checker, with_stmt);
             }
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {

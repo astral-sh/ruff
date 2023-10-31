@@ -205,13 +205,8 @@ pub(crate) fn lint_path(
     extension_override: &FxHashMap<String, Language>,
 ) -> Result<Diagnostics> {
     // Check the cache.
-    // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
-    // side-effects that aren't captured in the cache. (In practice, it's fine
-    // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
-    // write the fixes to disk, thus invalidating the cache. But it's a bit hard
-    // to reason about. We need to come up with a better solution here.)
     let caching = match cache {
-        Some(cache) if noqa.into() && fix_mode.is_generate() => {
+        Some(cache) if noqa.into() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
@@ -221,7 +216,17 @@ pub(crate) fn lint_path(
                 .get(relative_path, &cache_key)
                 .and_then(|entry| entry.to_diagnostics(path));
             if let Some(diagnostics) = cached_diagnostics {
-                return Ok(diagnostics);
+                // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
+                // and writing the diff to stdout, respectively). If a file has diagnostics, we
+                // need to avoid reading from and writing to the cache in these modes.
+                if match fix_mode {
+                    flags::FixMode::Generate => true,
+                    flags::FixMode::Apply | flags::FixMode::Diff => {
+                        diagnostics.messages.is_empty() && diagnostics.fixed.is_empty()
+                    }
+                } {
+                    return Ok(diagnostics);
+                }
             }
 
             // Stash the file metadata for later so when we update the cache it reflects the prerun
@@ -324,15 +329,25 @@ pub(crate) fn lint_path(
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
         if parse_error.is_none() {
-            cache.update_lint(
-                relative_path.to_owned(),
-                &key,
-                LintCacheData::from_messages(
-                    &messages,
-                    imports.clone(),
-                    source_kind.as_ipy_notebook().map(Notebook::index).cloned(),
-                ),
-            );
+            // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
+            // and writing the diff to stdout, respectively). If a file has diagnostics, we
+            // need to avoid reading from and writing to the cache in these modes.
+            if match fix_mode {
+                flags::FixMode::Generate => true,
+                flags::FixMode::Apply | flags::FixMode::Diff => {
+                    messages.is_empty() && fixed.is_empty()
+                }
+            } {
+                cache.update_lint(
+                    relative_path.to_owned(),
+                    &key,
+                    LintCacheData::from_messages(
+                        &messages,
+                        imports.clone(),
+                        source_kind.as_ipy_notebook().map(Notebook::index).cloned(),
+                    ),
+                );
+            }
         }
     }
 

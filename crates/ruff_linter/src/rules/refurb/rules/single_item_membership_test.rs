@@ -1,8 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::generate_comparison;
-use ruff_python_ast::ExprConstant;
-use ruff_python_ast::{CmpOp, Constant, Expr};
+use ruff_python_ast::ExprStringLiteral;
+use ruff_python_ast::{CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -102,10 +102,11 @@ fn single_item(expr: &Expr) -> Option<&Expr> {
         Expr::List(list) if list.elts.len() == 1 => Some(&list.elts[0]),
         Expr::Tuple(tuple) if tuple.elts.len() == 1 => Some(&tuple.elts[0]),
         Expr::Set(set) if set.elts.len() == 1 => Some(&set.elts[0]),
-        string_expr @ Expr::Constant(ExprConstant {
-            value: Constant::Str(string),
-            ..
-        }) if string.chars().count() == 1 => Some(string_expr),
+        string_expr @ Expr::StringLiteral(ExprStringLiteral { value: string, .. })
+            if string.chars().count() == 1 =>
+        {
+            Some(string_expr)
+        }
         _ => None,
     }
 }

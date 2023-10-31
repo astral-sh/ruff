@@ -1083,7 +1083,7 @@
           ]
         },
         "docstring-quotes": {
-          "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").",
+          "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").\n\nWhen using the formatter, only \"double\" is compatible, as the formatter enforces double quotes for docstrings strings.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1094,7 +1094,7 @@
           ]
         },
         "inline-quotes": {
-          "description": "Quote style to prefer for inline strings (either \"single\" or \"double\").",
+          "description": "Quote style to prefer for inline strings (either \"single\" or \"double\").\n\nWhen using the formatter, ensure that `format.quote-style` is set to the same preferred quote style.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1105,7 +1105,7 @@
           ]
         },
         "multiline-quotes": {
-          "description": "Quote style to prefer for multiline strings (either \"single\" or \"double\").",
+          "description": "Quote style to prefer for multiline strings (either \"single\" or \"double\").\n\nWhen using the formatter, only \"double\" is compatible, as the formatter enforces double quotes for multiline strings.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1242,7 +1242,7 @@
       "type": "object",
       "properties": {
         "exclude": {
-          "description": "A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
+          "description": "A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -2241,7 +2241,7 @@
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will force-disable any rules that are not included in the specified convention. As such, the intended use is to enable a convention and then selectively disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.pydocstyle] convention = \"google\" ```\n\nAs conventions force-disable all rules not included in the convention, enabling _additional_ rules on top of a convention is currently unsupported.",
+          "description": "Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will force-disable any rules that are not included in the specified convention. As such, the intended use is to enable a convention and then selectively disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff.lint] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle] convention = \"google\" ```\n\nAs conventions force-disable all rules not included in the convention, enabling _additional_ rules on top of a convention is currently unsupported.",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"
@@ -2820,6 +2820,8 @@
         "FURB140",
         "FURB145",
         "FURB148",
+        "FURB16",
+        "FURB168",
         "FURB17",
         "FURB171",
         "FURB177",
@@ -2974,6 +2976,7 @@
         "PLC04",
         "PLC041",
         "PLC0414",
+        "PLC0415",
         "PLC1",
         "PLC19",
         "PLC190",
@@ -3113,6 +3116,7 @@
         "PLW1",
         "PLW15",
         "PLW150",
+        "PLW1501",
         "PLW1508",
         "PLW1509",
         "PLW151",
@@ -3122,6 +3126,9 @@
         "PLW164",
         "PLW1641",
         "PLW2",
+        "PLW21",
+        "PLW210",
+        "PLW2101",
         "PLW29",
         "PLW290",
         "PLW2901",

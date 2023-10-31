@@ -1,5 +1,5 @@
 use crate::helpers::map_subscript;
-use crate::{self as ast, Constant, Expr, Stmt};
+use crate::{self as ast, Expr, Stmt};
 use bitflags::bitflags;
 
 bitflags! {
@@ -23,11 +23,7 @@ where
 {
     fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut DunderAllFlags) {
         for elt in elts {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(ast::StringConstant { value, .. }),
-                ..
-            }) = elt
-            {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
                 names.push(value);
             } else {
                 *flags |= DunderAllFlags::INVALID_OBJECT;

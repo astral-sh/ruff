@@ -42,7 +42,7 @@ strum = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.6.0"
+tempfile = "3.8.1"
 
 
 [features]

@@ -251,7 +251,7 @@ For more in-depth instructions on ignoring errors, please see [_Error suppressio
 When enabling a new rule on an existing codebase, you may want to ignore all _existing_
 violations of that rule and instead focus on enforcing it going forward.
 
-Ruff enables this workflow via the `--add-noqa` flag, which will adds a `# noqa` directive to each
+Ruff enables this workflow via the `--add-noqa` flag, which will add a `# noqa` directive to each
 line based on its existing violations. We can combine `--add-noqa` with the `--select` command-line
 flag to add `# noqa` directives to all existing `UP035` violations:
 
@@ -284,13 +284,13 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 # Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.2
+  rev: v0.1.3
   hooks:
     - id: ruff
 # Run the Ruff formatter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.291
+  rev: v0.1.3
   hooks:
     - id: ruff-format
 ```

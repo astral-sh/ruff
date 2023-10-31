@@ -32,28 +32,28 @@ hypothetical rule, `HYP001`. If `HYP001` were in preview, it would _not_ be enab
 `pyproject.toml`:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["HYP001"]
 ```
 
 It also would _not_ be enabled by selecting the `HYP` category, like so:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["HYP"]
 ```
 
 Similarly, it would _not_ be enabled via the `ALL` selector:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 select = ["ALL"]
 ```
 
-However, it would be enabled in any of the above cases if you you enabled preview in your configuration file:
+However, it would be enabled in any of the above cases if you enabled preview in your configuration file:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["HYP"]
 preview = true
 ```
@@ -69,7 +69,7 @@ If you'd prefer to opt-in to each preview rule individually, you can toggle the 
 setting in your `pyproject.toml`:
 
 ```toml
-[tool.ruff]
+[tool.ruff.lint]
 preview = true
 explicit-preview-rules = true
 ```

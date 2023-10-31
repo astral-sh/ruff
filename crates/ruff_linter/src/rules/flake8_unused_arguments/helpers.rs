@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_python_ast::helpers::is_docstring_stmt;
 
@@ -7,15 +7,7 @@ use ruff_python_ast::helpers::is_docstring_stmt;
 fn is_empty_stmt(stmt: &Stmt) -> bool {
     match stmt {
         Stmt::Pass(_) => return true,
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
-            return matches!(
-                value.as_ref(),
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Ellipsis,
-                    ..
-                })
-            )
-        }
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => return value.is_ellipsis_literal_expr(),
         Stmt::Raise(ast::StmtRaise { exc, cause, .. }) => {
             if cause.is_none() {
                 if let Some(exc) = exc {
