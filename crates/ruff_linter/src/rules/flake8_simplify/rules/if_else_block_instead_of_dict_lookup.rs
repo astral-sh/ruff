@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::comparable::ComparableLiteral;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
@@ -70,9 +70,9 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
     let [expr] = comparators.as_slice() else {
         return;
     };
-    if !expr.is_literal_expr() {
+    let Some(literal_expr) = expr.as_literal_expr() else {
         return;
-    }
+    };
     let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
         return;
     };
@@ -95,8 +95,8 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
     }
 
     // The `expr` was checked to be a literal above, so this is safe.
-    let mut literals: FxHashSet<ComparableExpr> = FxHashSet::default();
-    literals.insert(expr.into());
+    let mut literals: FxHashSet<ComparableLiteral> = FxHashSet::default();
+    literals.insert(literal_expr.into());
 
     for clause in elif_else_clauses {
         let ElifElseClause { test, body, .. } = clause;
@@ -133,9 +133,9 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
                 let [expr] = comparators.as_slice() else {
                     return;
                 };
-                if !expr.is_literal_expr() {
+                let Some(literal_expr) = expr.as_literal_expr() else {
                     return;
-                }
+                };
 
                 if value.as_ref().is_some_and(|value| {
                     contains_effect(value, |id| checker.semantic().is_builtin(id))
@@ -144,7 +144,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_i
                 };
 
                 // The `expr` was checked to be a literal above, so this is safe.
-                literals.insert(expr.into());
+                literals.insert(literal_expr.into());
             }
             // Different `elif`
             _ => {

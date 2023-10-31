@@ -6,7 +6,7 @@ use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use crate::int;
+use crate::{int, LiteralExpressionRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
@@ -638,6 +638,18 @@ impl Expr {
                 | Expr::NoneLiteral(_)
                 | Expr::EllipsisLiteral(_)
         )
+    }
+
+    pub fn as_literal_expr(&self) -> Option<LiteralExpressionRef<'_>> {
+        match self {
+            Expr::StringLiteral(expr) => Some(LiteralExpressionRef::StringLiteral(expr)),
+            Expr::BytesLiteral(expr) => Some(LiteralExpressionRef::BytesLiteral(expr)),
+            Expr::NumberLiteral(expr) => Some(LiteralExpressionRef::NumberLiteral(expr)),
+            Expr::BooleanLiteral(expr) => Some(LiteralExpressionRef::BooleanLiteral(expr)),
+            Expr::NoneLiteral(expr) => Some(LiteralExpressionRef::NoneLiteral(expr)),
+            Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
+            _ => None,
+        }
     }
 
     pub fn is_implicit_concatenated_string(&self) -> bool {
