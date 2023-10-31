@@ -649,8 +649,8 @@ pub enum ComparableLiteral<'a> {
     None,
     Ellipsis,
     Bool(&'a bool),
-    Str { value: &'a str, unicode: &'a bool },
-    Bytes { value: &'a [u8] },
+    Str(&'a str),
+    Bytes(&'a [u8]),
     Number(ComparableNumber<'a>),
 }
 
@@ -662,13 +662,11 @@ impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
             ast::LiteralExpressionRef::BooleanLiteral(ast::ExprBooleanLiteral {
                 value, ..
             }) => Self::Bool(value),
-            ast::LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral {
-                value,
-                unicode,
-                ..
-            }) => Self::Str { value, unicode },
+            ast::LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                Self::Str(value)
+            }
             ast::LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-                Self::Bytes { value }
+                Self::Bytes(value)
             }
             ast::LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
                 Self::Number(value.into())
@@ -680,7 +678,6 @@ impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprStringLiteral<'a> {
     value: &'a str,
-    unicode: &'a bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -948,9 +945,9 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 // Compare strings based on resolved value, not representation (i.e., ignore whether
                 // the string was implicitly concatenated).
                 implicit_concatenated: _,
-                unicode,
+                unicode: _,
                 range: _,
-            }) => Self::StringLiteral(ExprStringLiteral { value, unicode }),
+            }) => Self::StringLiteral(ExprStringLiteral { value }),
             ast::Expr::BytesLiteral(ast::ExprBytesLiteral {
                 value,
                 // Compare bytes based on resolved value, not representation (i.e., ignore whether
