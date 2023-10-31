@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{is_const_none, ReturnStatementVisitor};
+use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_text_size::Ranged;
 
@@ -51,7 +51,7 @@ pub(crate) fn useless_return(
     returns: Option<&Expr>,
 ) {
     // Skip functions that have a return annotation that is not `None`.
-    if !returns.map_or(true, is_const_none) {
+    if !returns.map_or(true, Expr::is_none_literal_expr) {
         return;
     }
 
@@ -84,7 +84,10 @@ pub(crate) fn useless_return(
     };
 
     // Verify that the return statement is either bare or returns `None`.
-    if !value.as_ref().map_or(true, |expr| is_const_none(expr)) {
+    if !value
+        .as_ref()
+        .map_or(true, |expr| expr.is_none_literal_expr())
+    {
         return;
     };
 
