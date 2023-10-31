@@ -215,6 +215,9 @@ jobs:
           # Make executable, since artifact download doesn't preserve this
           chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
 
+          # Set pipefail to avoid hiding errors with tee
+          set -eo pipefail
+
           ruff-ecosystem check ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check
 
           cat ecosystem-result-check > $GITHUB_STEP_SUMMARY
@@ -226,6 +229,9 @@ jobs:
         run: |
           # Make executable, since artifact download doesn't preserve this
           chmod +x ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+
+          # Set pipefail to avoid hiding errors with tee
+          set -eo pipefail
 
           ruff-ecosystem format ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
 
