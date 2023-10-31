@@ -483,10 +483,6 @@ pub fn python_file_at_path(
     pyproject_config: &PyprojectConfig,
     transformer: &dyn ConfigurationTransformer,
 ) -> Result<bool> {
-    if !pyproject_config.settings.file_resolver.force_exclude {
-        return Ok(true);
-    }
-
     // Normalize the path (e.g., convert from relative to absolute).
     let path = fs::normalize_path(path);
 

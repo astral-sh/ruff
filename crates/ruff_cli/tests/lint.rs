@@ -262,9 +262,13 @@ from test import say_hy
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
 "#), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
+    generated.py:4:16: Q000 [*] Double quotes found but single quotes preferred
+    generated.py:5:12: Q000 [*] Double quotes found but single quotes preferred
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);

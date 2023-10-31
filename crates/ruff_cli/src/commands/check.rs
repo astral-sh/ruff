@@ -82,7 +82,7 @@ pub(crate) fn check(
 
                 let settings = resolver.resolve(path, pyproject_config);
 
-                if !resolved_file.is_root()
+                if (settings.file_resolver.force_exclude || !resolved_file.is_root())
                     && match_exclusion(
                         resolved_file.path(),
                         resolved_file.file_name(),
