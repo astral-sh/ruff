@@ -48,7 +48,7 @@ jobs:
           args: --out dist
       - name: "Test sdist"
         run: |
-          rustup default $(cat rust-toolchain)
+          rustup default $(grep -oP 'channel = "\K[^"]+' rust-toolchain.toml)
           pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
           ruff --help
           python -m ruff --help
