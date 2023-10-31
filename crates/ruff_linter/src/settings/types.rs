@@ -5,7 +5,6 @@ use std::str::FromStr;
 use std::string::ToString;
 
 use anyhow::{bail, Result};
-use clap::ValueEnum;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
 use ruff_diagnostics::Applicability;
@@ -314,6 +313,21 @@ pub enum Language {
     Ipynb,
 }
 
+impl FromStr for Language {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "python" => Ok(Self::Python),
+            "pyi" => Ok(Self::Pyi),
+            "ipynb" => Ok(Self::Ipynb),
+            _ => bail!(
+                "Unrecognised language {}. Must be one of python,pyi,ipynb",
+                s
+            ),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExtensionPair {
     pub extension: String,
@@ -336,12 +350,7 @@ impl FromStr for ExtensionPair {
             (tokens[0].trim(), tokens[1].trim())
         };
         let extension = extension_str.into();
-        let Ok(language) = Language::from_str(language_str, true) else {
-            bail!(
-                "Unrecognised language {}. Must be one of python,pyi,ipynb",
-                language_str
-            )
-        };
+        let language = Language::from_str(language_str)?;
         Ok(Self {
             extension,
             language,
