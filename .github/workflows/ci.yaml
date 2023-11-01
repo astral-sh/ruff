@@ -191,12 +191,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Configure Git
-        run: |
-          # We need a valid Git user to commit changes in the `ruff format` checks
-          git config --global user.name "$GITHUB_ACTOR"
-          git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
       - uses: actions/download-artifact@v3
         name: Download comparison Ruff binary
         id: ruff-target
