@@ -186,7 +186,7 @@ class Repository(Serializable):
         # Configure git user — needed for `self.commit` to work
         await (
             await create_subprocess_exec(
-                ["git", "config", "user.email", "ecosystem@astral.sh"],
+                *["git", "config", "user.email", "ecosystem@astral.sh"],
                 cwd=checkout_dir,
                 env={"GIT_TERMINAL_PROMPT": "0"},
                 stdout=DEVNULL,
@@ -196,7 +196,7 @@ class Repository(Serializable):
 
         await (
             await create_subprocess_exec(
-                ["git", "config", "user.name", "Ecosystem Bot"],
+                *["git", "config", "user.name", "Ecosystem Bot"],
                 cwd=checkout_dir,
                 env={"GIT_TERMINAL_PROMPT": "0"},
                 stdout=DEVNULL,
