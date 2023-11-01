@@ -73,6 +73,10 @@ def entrypoint():
             ruff_comparison,
         )
 
+    targets = DEFAULT_TARGETS
+    if args.force_preview:
+        targets = [target.with_preview_enabled() for target in targets]
+
     with cache_context as cache:
         loop = asyncio.get_event_loop()
         main_task = asyncio.ensure_future(
@@ -80,7 +84,7 @@ def entrypoint():
                 command=RuffCommand(args.ruff_command),
                 ruff_baseline_executable=ruff_baseline,
                 ruff_comparison_executable=ruff_comparison,
-                targets=DEFAULT_TARGETS,
+                targets=targets,
                 format=OutputFormat(args.output_format),
                 project_dir=Path(cache),
                 raise_on_failure=args.pdb,
@@ -130,6 +134,11 @@ def parse_args() -> argparse.Namespace:
         "--pdb",
         action="store_true",
         help="Enable debugging on failure",
+    )
+    parser.add_argument(
+        "--force-preview",
+        action="store_true",
+        help="Force preview mode to be enabled for all projects",
     )
     parser.add_argument(
         "ruff_command",

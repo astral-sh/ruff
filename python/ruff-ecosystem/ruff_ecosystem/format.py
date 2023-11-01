@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import time
 from asyncio import create_subprocess_exec
-from dataclasses import dataclass
 from pathlib import Path
 from subprocess import PIPE
 from typing import TYPE_CHECKING, Sequence
@@ -18,7 +17,7 @@ from ruff_ecosystem.markdown import markdown_project_section
 from ruff_ecosystem.types import Comparison, Diff, Result, RuffError
 
 if TYPE_CHECKING:
-    from ruff_ecosystem.projects import ClonedRepository
+    from ruff_ecosystem.projects import ClonedRepository, FormatOptions
 
 
 def markdown_format_result(result: Result) -> str:
@@ -178,18 +177,3 @@ async def ruff_format(
 
     lines = result.decode("utf8").splitlines()
     return lines
-
-
-@dataclass(frozen=True)
-class FormatOptions:
-    """
-    Ruff format options.
-    """
-
-    exclude: str = ""
-
-    def to_cli_args(self) -> list[str]:
-        args = ["format"]
-        if self.exclude:
-            args.extend(["--exclude", self.exclude])
-        return args

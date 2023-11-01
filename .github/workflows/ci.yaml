@@ -218,7 +218,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem check ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-check
+          ruff-ecosystem check ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-check
 
           cat ecosystem-result-check > $GITHUB_STEP_SUMMARY
           cat ecosystem-result-check > ecosystem-result
@@ -233,7 +233,7 @@ jobs:
           # Set pipefail to avoid hiding errors with tee
           set -eo pipefail
 
-          ruff-ecosystem format ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown | tee ecosystem-result-format
+          ruff-ecosystem format ./ruff ${{ steps.ruff-target.outputs.download-path }}/ruff --cache ./checkouts --output-format markdown --force-preview | tee ecosystem-result-format
 
           cat ecosystem-result-format > $GITHUB_STEP_SUMMARY
           cat ecosystem-result-format >> ecosystem-result
