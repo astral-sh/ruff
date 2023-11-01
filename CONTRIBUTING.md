@@ -345,7 +345,7 @@ ruff-ecosystem check ruff "./target/debug/ruff"
 ruff-ecosystem format ruff "./target/debug/ruff"
 ```
 
-See the [ruff-ecosystem README](./python/ruff-ecosystem/README.md) for more details.
+See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
 
 ## Benchmarking and Profiling
 
