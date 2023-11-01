@@ -59,7 +59,10 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
                     OptionalParentheses::Never
                 } else {
                     // Ex) `x = yield f(1, 2, 3)`
-                    value.needs_parentheses(self.into(), context)
+                    match value.needs_parentheses(self.into(), context) {
+                        OptionalParentheses::BestFit => OptionalParentheses::Never,
+                        parentheses => parentheses,
+                    }
                 }
             } else {
                 // Ex) `x = yield`
