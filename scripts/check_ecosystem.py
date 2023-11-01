@@ -159,7 +159,7 @@ REPOSITORIES: list[Repository] = [
 SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.*potentially fixable with.*)$")
 
 
-class ToolError(Exception):
+class RuffError(Exception):
     """An error reported by ruff."""
 
 
@@ -200,7 +200,7 @@ async def check(
     logger.debug(f"Finished checking {name} with {ruff} in {end - start:.2f}")
 
     if proc.returncode != 0:
-        raise ToolError(err.decode("utf8"))
+        raise RuffError(err.decode("utf8"))
 
     lines = [
         line
