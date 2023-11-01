@@ -31,6 +31,9 @@ Run `ruff format` ecosystem checks comparing your debug build to your system Ruf
 ruff-ecosystem format ruff "./target/debug/ruff"
 ```
 
+The default output format is markdown, but you can use `--output-format json` to get raw data — this is
+particularly useful when developing.
+
 ## Development
 
 When developing, it can be useful to set the `--pdb` flag to drop into a debugger on failure:

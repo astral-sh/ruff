@@ -121,7 +121,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-format",
         choices=[option.name for option in OutputFormat],
-        default="json",
+        default="markdown",
         help="Location for caching cloned repositories",
     )
     parser.add_argument(
