@@ -130,7 +130,7 @@ class Repository(Serializable):
         Shallow clone this repository
         """
         if checkout_dir.exists():
-            logger.debug(f"Reusing {self.owner}:{self.name}")
+            logger.debug(f"Reusing cached {self.fullname}")
 
             if self.ref:
                 logger.debug(f"Checking out {self.fullname} @ {self.ref}")
@@ -150,6 +150,10 @@ class Repository(Serializable):
 
             cloned_repo = await ClonedRepository.from_path(checkout_dir, self)
             await cloned_repo.reset()
+
+            logger.debug(f"Pulling latest changes for {self.fullname} @ {self.ref}")
+            await cloned_repo.pull()
+
             return cloned_repo
 
         logger.debug(f"Cloning {self.owner}:{self.name} to {checkout_dir}")
@@ -276,6 +280,23 @@ class ClonedRepository(Repository, Serializable):
         _, stderr = await process.communicate()
         if await process.wait() != 0:
             raise RuntimeError(f"Failed to reset: {stderr.decode()}")
+
+    async def pull(self: Self) -> None:
+        """
+        Pull the latest changes.
+
+        Typically `reset` should be run first.
+        """
+        process = await create_subprocess_exec(
+            *["git", "pull"],
+            cwd=self.path,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        _, stderr = await process.communicate()
+        if await process.wait() != 0:
+            raise RuntimeError(f"Failed to pull: {stderr.decode()}")
 
     async def commit(self: Self, message: str) -> str:
         """
