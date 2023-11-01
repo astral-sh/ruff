@@ -59,6 +59,7 @@ pub struct Settings {
     pub no_sections: bool,
     pub from_first: bool,
     pub length_sort: bool,
+    pub length_sort_straight: bool,
 }
 
 impl Default for Settings {
@@ -88,6 +89,7 @@ impl Default for Settings {
             no_sections: false,
             from_first: false,
             length_sort: false,
+            length_sort_straight: false,
         }
     }
 }

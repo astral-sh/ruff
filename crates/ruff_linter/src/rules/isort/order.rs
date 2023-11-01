@@ -56,21 +56,27 @@ pub(crate) fn order_imports<'a>(
             .map(Import)
             .chain(from_imports.map(ImportFrom))
             .sorted_by_cached_key(|import| match import {
-                Import((alias, _)) => {
-                    ModuleKey::from_module(Some(alias.name), alias.asname, None, None, settings)
-                }
+                Import((alias, _)) => ModuleKey::from_module(
+                    Some(alias.name),
+                    alias.asname,
+                    None,
+                    None,
+                    settings,
+                    true,
+                ),
                 ImportFrom((import_from, _, _, aliases)) => ModuleKey::from_module(
                     import_from.module,
                     None,
                     import_from.level,
                     aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
                     settings,
+                    false,
                 ),
             })
             .collect()
     } else {
         let ordered_straight_imports = straight_imports.sorted_by_cached_key(|(alias, _)| {
-            ModuleKey::from_module(Some(alias.name), alias.asname, None, None, settings)
+            ModuleKey::from_module(Some(alias.name), alias.asname, None, None, settings, true)
         });
         let ordered_from_imports =
             from_imports.sorted_by_cached_key(|(import_from, _, _, aliases)| {
@@ -80,6 +86,7 @@ pub(crate) fn order_imports<'a>(
                     import_from.level,
                     aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
                     settings,
+                    false,
                 )
             });
         if settings.from_first {

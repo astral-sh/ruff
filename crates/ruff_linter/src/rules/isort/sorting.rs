@@ -90,6 +90,7 @@ impl<'a> ModuleKey<'a> {
         level: Option<u32>,
         first_alias: Option<(&'a str, Option<&'a str>)>,
         settings: &Settings,
+        straight_import: bool,
     ) -> Self {
         let distance = match settings.relative_imports_order {
             RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level.unwrap_or_default()),
@@ -97,15 +98,21 @@ impl<'a> ModuleKey<'a> {
                 Distance::Furthest(Reverse(level.unwrap_or_default()))
             }
         };
+
         let force_to_top = name.map(|name| !settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
-        let maybe_length = settings
-            .length_sort
+
+        let maybe_length = (settings.length_sort
+            || (settings.length_sort_straight && straight_import))
             .then_some(name.map(str::len).unwrap_or_default());
+
         let maybe_lowercase_name = name.and_then(|name| {
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
         });
+
         let module_name = name.map(NatOrdStr::from);
+
         let asname = asname.map(NatOrdStr::from);
+
         let first_alias =
             first_alias.map(|(name, asname)| MemberKey::from_member(name, asname, settings));
 

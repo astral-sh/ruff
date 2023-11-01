@@ -2070,6 +2070,16 @@ pub struct IsortOptions {
         "#
     )]
     pub length_sort: Option<bool>,
+
+    /// Sort straight imports by their string length. Does not affect from imports.
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            length-sort-straight = true
+        "#
+    )]
+    pub length_sort_straight: Option<bool>,
 }
 
 impl IsortOptions {
@@ -2245,6 +2255,7 @@ impl IsortOptions {
             no_sections,
             from_first,
             length_sort: self.length_sort.unwrap_or(false),
+            length_sort_straight: self.length_sort_straight.unwrap_or(false),
         })
     }
 }
