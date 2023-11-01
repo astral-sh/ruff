@@ -337,16 +337,15 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 ## Ecosystem CI
 
 GitHub Actions will run your changes against a number of real-world projects from GitHub and
-report on any diagnostic differences. You can also run those checks locally via:
+report on any linter or formatter differences. You can also run those checks locally via:
 
 ```shell
-python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
+pip install -e ./python/ruff-ecosystem
+ruff-ecosystem check ruff "./target/debug/ruff"
+ruff-ecosystem format ruff "./target/debug/ruff"
 ```
 
-You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
-downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
-as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/astral-sh/ruff/blob/main/scripts/Dockerfile.ecosystem).
-Note that this check will take a while to run.
+See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
 
 ## Benchmarking and Profiling
 
