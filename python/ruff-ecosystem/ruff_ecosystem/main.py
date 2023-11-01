@@ -7,7 +7,11 @@ from typing import Awaitable, TypeVar
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.check import compare_check, markdown_check_result
-from ruff_ecosystem.format import compare_format, markdown_format_result
+from ruff_ecosystem.format import (
+    FormatComparison,
+    compare_format,
+    markdown_format_result,
+)
 from ruff_ecosystem.projects import (
     Project,
     RuffCommand,
@@ -30,6 +34,7 @@ async def main(
     targets: list[Project],
     project_dir: Path,
     format: OutputFormat,
+    format_comparison: FormatComparison | None,
     max_parallelism: int = 50,
     raise_on_failure: bool = False,
 ) -> None:
@@ -55,6 +60,7 @@ async def main(
                     ruff_comparison_executable,
                     target,
                     project_dir,
+                    format_comparison,
                 )
             )
             for target in targets
@@ -96,6 +102,7 @@ async def clone_and_compare(
     ruff_comparison_executable: Path,
     target: Project,
     project_dir: Path,
+    format_comparison: FormatComparison | None,
 ) -> Comparison:
     """Check a specific repository against two versions of ruff."""
     assert ":" not in target.repo.owner
@@ -103,14 +110,12 @@ async def clone_and_compare(
 
     match command:
         case RuffCommand.check:
-            compare, options = (
-                compare_check,
-                target.check_options,
-            )
+            compare, options, kwargs = (compare_check, target.check_options, {})
         case RuffCommand.format:
-            compare, options = (
+            compare, options, kwargs = (
                 compare_format,
                 target.format_options,
+                {"format_comparison": format_comparison},
             )
         case _:
             raise ValueError(f"Unknown target Ruff command {command}")
@@ -124,6 +129,7 @@ async def clone_and_compare(
             ruff_comparison_executable,
             options,
             cloned_repo,
+            **kwargs,
         )
     except ExceptionGroup as e:
         raise e.exceptions[0] from e

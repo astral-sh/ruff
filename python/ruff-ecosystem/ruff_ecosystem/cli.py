@@ -12,6 +12,7 @@ from signal import SIGINT, SIGTERM
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.defaults import DEFAULT_TARGETS
+from ruff_ecosystem.format import FormatComparison
 from ruff_ecosystem.main import OutputFormat, main
 from ruff_ecosystem.projects import RuffCommand
 
@@ -77,6 +78,12 @@ def entrypoint():
     if args.force_preview:
         targets = [target.with_preview_enabled() for target in targets]
 
+    format_comparison = (
+        FormatComparison(args.format_comparison)
+        if args.ruff_command == RuffCommand.format.value
+        else None
+    )
+
     with cache_context as cache:
         loop = asyncio.get_event_loop()
         main_task = asyncio.ensure_future(
@@ -88,6 +95,7 @@ def entrypoint():
                 format=OutputFormat(args.output_format),
                 project_dir=Path(cache),
                 raise_on_failure=args.pdb,
+                format_comparison=format_comparison,
             )
         )
         # https://stackoverflow.com/a/58840987/3549270
@@ -139,6 +147,12 @@ def parse_args() -> argparse.Namespace:
         "--force-preview",
         action="store_true",
         help="Force preview mode to be enabled for all projects",
+    )
+    parser.add_argument(
+        "--format-comparison",
+        choices=[option.name for option in FormatComparison],
+        default=FormatComparison.ruff_and_ruff,
+        help="Type of comparison to make when checking formatting.",
     )
     parser.add_argument(
         "ruff_command",

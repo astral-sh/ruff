@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import time
 from asyncio import create_subprocess_exec
+from enum import Enum
 from pathlib import Path
 from subprocess import PIPE
 from typing import TYPE_CHECKING, Sequence
@@ -123,8 +124,33 @@ async def compare_format(
     ruff_comparison_executable: Path,
     options: FormatOptions,
     cloned_repo: ClonedRepository,
+    format_comparison: FormatComparison,
 ):
-    # Run format without diff to get the baseline
+    args = (ruff_baseline_executable, ruff_comparison_executable, options, cloned_repo)
+    match format_comparison:
+        case FormatComparison.ruff_then_ruff:
+            coro = format_then_format(Formatter.ruff, *args)
+        case FormatComparison.ruff_and_ruff:
+            coro = format_and_format(Formatter.ruff, *args)
+        case FormatComparison.black_then_ruff:
+            coro = format_then_format(Formatter.black, *args)
+        case FormatComparison.black_and_ruff:
+            coro = format_and_format(Formatter.black, *args)
+        case _:
+            raise ValueError(f"Unknown format comparison type {format_comparison!r}.")
+
+    diff = await coro
+    return Comparison(diff=Diff(diff), repo=cloned_repo)
+
+
+async def format_then_format(
+    baseline_formatter: Formatter,
+    ruff_baseline_executable: Path,
+    ruff_comparison_executable: Path,
+    options: FormatOptions,
+    cloned_repo: ClonedRepository,
+) -> Sequence[str]:
+    # Run format to get the baseline
     await ruff_format(
         executable=ruff_baseline_executable.resolve(),
         path=cloned_repo.path,
@@ -139,8 +165,39 @@ async def compare_format(
         options=options,
         diff=True,
     )
+    return diff
 
-    return Comparison(diff=Diff(diff), repo=cloned_repo)
+
+async def format_and_format(
+    baseline_formatter: Formatter,
+    ruff_baseline_executable: Path,
+    ruff_comparison_executable: Path,
+    options: FormatOptions,
+    cloned_repo: ClonedRepository,
+) -> Sequence[str]:
+    # Run format without diff to get the baseline
+    await ruff_format(
+        executable=ruff_baseline_executable.resolve(),
+        path=cloned_repo.path,
+        name=cloned_repo.fullname,
+        options=options,
+    )
+    # Commit the changes
+    commit = await cloned_repo.commit(
+        message=f"Formatted with baseline {ruff_baseline_executable}"
+    )
+    # Then reset
+    await cloned_repo.reset()
+    # Then run format again
+    await ruff_format(
+        executable=ruff_comparison_executable.resolve(),
+        path=cloned_repo.path,
+        name=cloned_repo.fullname,
+        options=options,
+    )
+    # Then get the diff from the commit
+    diff = await cloned_repo.diff(commit)
+    return diff
 
 
 async def ruff_format(
@@ -177,3 +234,19 @@ async def ruff_format(
 
     lines = result.decode("utf8").splitlines()
     return lines
+
+
+class FormatComparison(Enum):
+    # Run Ruff baseline then Ruff comparison; checks for changes in behavior when formatting previously "formatted" code
+    ruff_then_ruff = "ruff-then-ruff"
+    # Run Ruff baseline then reset and run Ruff comparison; checks changes in behavior when formatting "unformatted" code
+    ruff_and_ruff = "ruff-and-ruff"
+    # Run Black baseline then Ruff comparison; checks for changes in behavior when formatting previously "formatted" code
+    black_then_ruff = "black-then-ruff"
+    # Run Black baseline then reset and run Ruff comparison; checks changes in behavior when formatting "unformatted" code
+    black_and_ruff = "black-then-ruff"
+
+
+class Formatter(Enum):
+    black = "black"
+    ruff = "ruff"
