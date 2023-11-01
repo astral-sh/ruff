@@ -26,7 +26,9 @@ VALUES_TO_FORMAT = (1, "2", 3.0)
 "%d %s %f" % VALUES_TO_FORMAT
 "%s" % "1"
 "%s %s %s" % ("1", 2, 3.5)
-print("%d %d" % (1, 1.1))
+print("%d %d"
+      %
+(1, 1.1))
 "%s" % 1
 "%d" % 1
 "%f" % 1
@@ -47,18 +49,13 @@ print("%s" % ("%d" % (5,),))
 "%d %d" % "1"
 "%d" "%d" % "1"
 "-%f" % time.time()
-"%r" % (object["dn"],)
-r"\%03o" % (ord(c),)
-("%02X" % int(_) for _ in o)
+"%r" % (object['dn'],)
+r'\%03o' % (ord(c),)
+('%02X' % int(_) for _ in o)
 "%s;range=%d-*" % (attr, upper + 1)
 "%d" % (len(foo),)
-"(%r, %r, %r, %r)" % (hostname, address, username, "$PASSWORD")
-"%r" % (
-    {
-        "server_school_roles": server_school_roles,
-        "is_school_multiserver_domain": is_school_multiserver_domain,
-    },
-)
+'(%r, %r, %r, %r)' % (hostname, address, username, '$PASSWORD')
+'%r' % ({'server_school_roles': server_school_roles, 'is_school_multiserver_domain': is_school_multiserver_domain}, )
 "%d" % (1 if x > 0 else 2)
 
 # Special cases for %c allowing single character strings
