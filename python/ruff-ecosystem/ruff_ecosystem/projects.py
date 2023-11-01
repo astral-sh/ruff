@@ -10,7 +10,7 @@ from asyncio import create_subprocess_exec
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from subprocess import PIPE
+from subprocess import DEVNULL, PIPE
 from typing import Self
 
 from ruff_ecosystem import logger
@@ -182,6 +182,28 @@ class Repository(Serializable):
         logger.debug(
             f"Finished cloning {self.fullname} with status {status_code}",
         )
+
+        # Configure git user — needed for `self.commit` to work
+        await (
+            await create_subprocess_exec(
+                ["git", "config", "user.email", "ecosystem@astral.sh"],
+                cwd=checkout_dir,
+                env={"GIT_TERMINAL_PROMPT": "0"},
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+            )
+        ).wait()
+
+        await (
+            await create_subprocess_exec(
+                ["git", "config", "user.name", "Ecosystem Bot"],
+                cwd=checkout_dir,
+                env={"GIT_TERMINAL_PROMPT": "0"},
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+            )
+        ).wait()
+
         return await ClonedRepository.from_path(checkout_dir, self)
 
 
