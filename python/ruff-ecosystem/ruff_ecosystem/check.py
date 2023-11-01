@@ -25,11 +25,10 @@ from ruff_ecosystem.types import (
     Diff,
     Result,
     RuffError,
-    Serializable,
 )
 
 if TYPE_CHECKING:
-    from ruff_ecosystem.projects import ClonedRepository, Project
+    from ruff_ecosystem.projects import CheckOptions, ClonedRepository, Project
 
 
 # Matches lines that are summaries rather than diagnostics
@@ -501,8 +500,8 @@ async def ruff_check(
     *, executable: Path, path: Path, name: str, options: CheckOptions
 ) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
-    logger.debug(f"Checking {name} with {executable}")
     ruff_args = options.to_cli_args()
+    logger.debug(f"Checking {name} with {executable} " + " ".join(ruff_args))
 
     start = time.time()
     proc = await create_subprocess_exec(
@@ -529,35 +528,3 @@ async def ruff_check(
     ]
 
     return lines
-
-
-@dataclass(frozen=True)
-class CheckOptions(Serializable):
-    """
-    Ruff check options
-    """
-
-    select: str = ""
-    ignore: str = ""
-    exclude: str = ""
-
-    # Generating fixes is slow and verbose
-    show_fixes: bool = False
-
-    # Limit the number of reported lines per rule
-    max_lines_per_rule: int | None = 50
-
-    def markdown(self) -> str:
-        return f"select {self.select} ignore {self.ignore} exclude {self.exclude}"
-
-    def to_cli_args(self) -> list[str]:
-        args = ["check", "--no-cache", "--exit-zero"]
-        if self.select:
-            args.extend(["--select", self.select])
-        if self.ignore:
-            args.extend(["--ignore", self.ignore])
-        if self.exclude:
-            args.extend(["--exclude", self.exclude])
-        if self.show_fixes:
-            args.extend(["--show-fixes", "--ecosystem-ci"])
-        return args

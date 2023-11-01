@@ -4,6 +4,8 @@ Abstractions and utilities for working with projects to run ecosystem checks on.
 
 from __future__ import annotations
 
+import abc
+import dataclasses
 from asyncio import create_subprocess_exec
 from dataclasses import dataclass, field
 from enum import Enum
@@ -12,8 +14,6 @@ from subprocess import PIPE
 from typing import Self
 
 from ruff_ecosystem import logger
-from ruff_ecosystem.check import CheckOptions
-from ruff_ecosystem.format import FormatOptions
 from ruff_ecosystem.types import Serializable
 
 
@@ -27,10 +27,80 @@ class Project(Serializable):
     check_options: CheckOptions = field(default_factory=lambda: CheckOptions())
     format_options: FormatOptions = field(default_factory=lambda: FormatOptions())
 
+    def with_preview_enabled(self: Self) -> Self:
+        return type(self)(
+            repo=self.repo,
+            check_options=self.check_options.with_options(preview=True),
+            format_options=self.format_options.with_options(preview=True),
+        )
+
 
 class RuffCommand(Enum):
     check = "check"
     format = "format"
+
+
+@dataclass(frozen=True)
+class CommandOptions(Serializable, abc.ABC):
+    def with_options(self: Self, **kwargs) -> Self:
+        """
+        Return a copy of self with the given options set.
+        """
+        return type(self)(**{**dataclasses.asdict(self), **kwargs})
+
+    @abc.abstractmethod
+    def to_cli_args(self) -> list[str]:
+        pass
+
+
+@dataclass(frozen=True)
+class CheckOptions(CommandOptions):
+    """
+    Ruff check options
+    """
+
+    select: str = ""
+    ignore: str = ""
+    exclude: str = ""
+    preview: bool = False
+
+    # Generating fixes is slow and verbose
+    show_fixes: bool = False
+
+    # Limit the number of reported lines per rule
+    max_lines_per_rule: int | None = 50
+
+    def to_cli_args(self) -> list[str]:
+        args = ["check", "--no-cache", "--exit-zero"]
+        if self.select:
+            args.extend(["--select", self.select])
+        if self.ignore:
+            args.extend(["--ignore", self.ignore])
+        if self.exclude:
+            args.extend(["--exclude", self.exclude])
+        if self.show_fixes:
+            args.extend(["--show-fixes", "--ecosystem-ci"])
+        if self.preview:
+            args.append("--preview")
+        return args
+
+
+@dataclass(frozen=True)
+class FormatOptions(CommandOptions):
+    """
+    Ruff format options.
+    """
+
+    preview: bool = False
+    exclude: str = ""
+
+    def to_cli_args(self) -> list[str]:
+        args = ["format"]
+        if self.exclude:
+            args.extend(["--exclude", self.exclude])
+        if self.preview:
+            args.append("--preview")
+        return args
 
 
 class ProjectSetupError(Exception):
