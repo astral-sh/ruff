@@ -63,7 +63,7 @@ jobs:
         with:
           issue-number: ${{ steps.pr-number.outputs.pr-number }}
           comment-author: "github-actions[bot]"
-          body-includes: PR Check Results
+          body-includes: "## `ruff-ecosystem` results"
 
       - name: Create or update comment
         if: steps.find-comment.outcome == 'success'
