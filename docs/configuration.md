@@ -402,6 +402,9 @@ File selection:
       --exclude <FILE_PATTERN>  List of paths, used to omit files and/or directories from analysis
       --force-exclude           Enforce exclusions, even for paths passed to Ruff directly on the command-line. Use `--no-force-exclude` to disable
 
+Format configuration:
+      --line-length <LINE_LENGTH>  Set the line-length
+
 Log levels:
   -v, --verbose  Enable verbose logging
   -q, --quiet    Print diagnostics, but nothing else
