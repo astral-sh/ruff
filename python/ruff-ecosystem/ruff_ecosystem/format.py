@@ -237,14 +237,25 @@ async def ruff_format(
 
 
 class FormatComparison(Enum):
-    # Run Ruff baseline then Ruff comparison; checks for changes in behavior when formatting previously "formatted" code
     ruff_then_ruff = "ruff-then-ruff"
-    # Run Ruff baseline then reset and run Ruff comparison; checks changes in behavior when formatting "unformatted" code
+    """
+    Run Ruff baseline then Ruff comparison; checks for changes in behavior when formatting previously "formatted" code
+    """
+
     ruff_and_ruff = "ruff-and-ruff"
-    # Run Black baseline then Ruff comparison; checks for changes in behavior when formatting previously "formatted" code
+    """
+    Run Ruff baseline then reset and run Ruff comparison; checks changes in behavior when formatting "unformatted" code
+    """
+
     black_then_ruff = "black-then-ruff"
-    # Run Black baseline then reset and run Ruff comparison; checks changes in behavior when formatting "unformatted" code
+    """
+    Run Black baseline then Ruff comparison; checks for changes in behavior when formatting previously "formatted" code
+    """
+
     black_and_ruff = "black-and-ruff"
+    """"
+    Run Black baseline then reset and run Ruff comparison; checks changes in behavior when formatting "unformatted" code
+    """
 
 
 class Formatter(Enum):
