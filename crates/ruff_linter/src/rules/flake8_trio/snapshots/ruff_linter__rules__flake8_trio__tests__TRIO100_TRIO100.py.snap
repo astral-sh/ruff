@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_trio/mod.rs
 ---
-TRIO100.py:5:5: TRIO100 The `await` statement should be included in the timeout context manager
+TRIO100.py:5:5: TRIO100 trio.fail_after context contains no checkpoints, remove the context or add `await trio.lowlevel.checkpoint()`
   |
 4 |   async def foo():
 5 |       with trio.fail_after():
@@ -12,7 +12,7 @@ TRIO100.py:5:5: TRIO100 The `await` statement should be included in the timeout 
 8 |   async def foo():
   |
 
-TRIO100.py:13:5: TRIO100 The `await` statement should be included in the timeout context manager
+TRIO100.py:13:5: TRIO100 trio.move_on_after context contains no checkpoints, remove the context or add `await trio.lowlevel.checkpoint()`
    |
 12 |   async def foo():
 13 |       with trio.move_on_after():

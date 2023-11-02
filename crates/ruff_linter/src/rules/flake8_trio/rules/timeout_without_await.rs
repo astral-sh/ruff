@@ -29,12 +29,14 @@ use crate::checkers::ast::Checker;
 ///         await awaitable()
 /// ```
 #[violation]
-pub struct TimeoutWithoutAwait;
+pub struct TimeoutWithoutAwait {
+    method_name: String,
+}
 
 impl Violation for TimeoutWithoutAwait {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("The `await` statement should be included in the timeout context manager")
+        format!("{} context contains no checkpoints, remove the context or add `await trio.lowlevel.checkpoint()`", self.method_name)
     }
 }
 
@@ -69,12 +71,12 @@ pub(crate) fn timeout_without_await(
             arguments: _,
         }) = &item.context_expr
         {
-            if checker
+            if let Some(method_name) = checker
                 .semantic()
                 .resolve_call_path(func.as_ref())
-                .is_some_and(|mut path| {
-                    matches!(
-                        path.as_mut_slice(),
+                .and_then(|path| {
+                    if matches!(
+                        path.as_slice(),
                         [
                             "trio",
                             "move_on_after"
@@ -83,7 +85,11 @@ pub(crate) fn timeout_without_await(
                                 | "fail_at"
                                 | "CancelScope"
                         ]
-                    )
+                    ) {
+                        Some(path.join("."))
+                    } else {
+                        None
+                    }
                 })
             {
                 for stmt in &with_stmt.body {
@@ -91,9 +97,10 @@ pub(crate) fn timeout_without_await(
                 }
 
                 if !visitor.await_visited {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(TimeoutWithoutAwait, with_stmt.range));
+                    checker.diagnostics.push(Diagnostic::new(
+                        TimeoutWithoutAwait { method_name },
+                        with_stmt.range,
+                    ));
                 }
             }
         }
