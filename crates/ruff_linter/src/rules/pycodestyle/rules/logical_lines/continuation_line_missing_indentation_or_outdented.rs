@@ -196,13 +196,10 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
     // Visual indents
     let mut indent_chances: Vec<i64> = Vec::new();
     let mut last_indent = start_indent_level;
-    let mut visual_indent = false;
+    let mut visual_indent;
     let mut last_token_multiline = false;
     // For each depth, memorize the visual indent column.
     let mut indent = vec![start_indent_level];
-
-    // TODO: config option: hang closing bracket instead of matching indentation of opening bracket's line.
-    let hang_closing = false;
 
     for (token, token_info) in zip(logical_line.tokens(), token_infos) {
         let mut is_newline = row < token_info.start_physical_line_idx;
@@ -244,28 +241,13 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
                 && hang > 0
                 && indent_chances.contains(&token_info.token_start_within_physical_line);
 
-            if is_closing_bracket && indent[depth] != 0 {
-                // Closing bracket for visual indent.
-                if token_info.token_start_within_physical_line != indent[depth] {
-                    // TODO: Raise E124.
-                }
-            } else if is_closing_bracket && hang == 0 {
-                // Closing bracket matches indentation of opening bracket's line
-                if hang_closing {
-                    // TODO: Raise E133.
-                }
-            } else if indent[depth] != 0
-                && token_info.token_start_within_physical_line < indent[depth]
+            if (hang == 0 || indent[depth] != 0) && is_closing_bracket
+                || (indent[depth] != 0
+                    && token_info.token_start_within_physical_line < indent[depth])
             {
                 // visual indent is broken
-                if !visual_indent {
-                    // TODO: Raise E128.
-                }
             } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size)) {
                 // hanging indent is verified
-                if is_closing_bracket && !hang_closing {
-                    // TODO: Raise E123.
-                }
                 hangs[depth] = Some(hang);
             } else if visual_indent {
                 // Visual indent is verified.
@@ -280,17 +262,11 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
                     //         .set_fix(Fix::automatic(Edit::range_deletion(diagnostic.range())));
                     // }
                     context.push_diagnostic(diagnostic);
-                } else if indent[depth] != 0 {
-                    // TODO: Raise E127.
-                } else if !is_closing_bracket && hangs[depth].is_some_and(|hang| hang > 0) {
-                    // TODO: Raise 131.
+                } else if indent[depth] != 0
+                    || !is_closing_bracket && hangs[depth].is_some_and(|hang| hang > 0)
+                {
                 } else {
                     hangs[depth] = Some(hang);
-                    if hang > indent_size {
-                        // TODO: Raise 126.
-                    } else {
-                        // TODO: Raise E121.
-                    }
                 }
             }
         }
@@ -317,14 +293,13 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
                 token.kind,
                 TokenKind::Assert | TokenKind::Raise | TokenKind::With
             )
-        {
-            indent_chances.push(token_info.token_end_within_physical_line + 1);
-        }
         // Special case for the "if" statement because "if (".len() == 4
-        else if indent_chances.is_empty()
-            && row == 0
-            && depth == 0
-            && matches!(token.kind, TokenKind::If)
+            || (
+                indent_chances.is_empty()
+                    && row == 0
+                    && depth == 0
+                    && matches!(token.kind, TokenKind::If)
+            )
         {
             indent_chances.push(token_info.token_end_within_physical_line + 1);
         } else if matches!(token.kind, TokenKind::Colon)
@@ -392,14 +367,6 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
             token_info.start_physical_line_idx != token_info.end_physical_line_idx;
         if last_token_multiline {
             rel_indent[token_info.end_physical_line_idx] = rel_indent[row];
-        }
-
-        if indent_next && expand_indent(token_info.line) == start_indent_level + indent_size {
-            if visual_indent {
-                // TODO: Raise 129.
-            } else {
-                // TODO: Raise 125.
-            }
         }
     }
 }
