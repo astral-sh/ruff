@@ -277,6 +277,8 @@ Ruff will also respect variants of these action comments with a `# ruff:` prefix
 convey that the action comment is intended for Ruff, but are functionally equivalent to the
 isort variants.
 
+Unlike isort, Ruff does not respect action comments within docstrings.
+
 See the [isort documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
 
