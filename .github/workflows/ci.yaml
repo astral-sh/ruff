@@ -222,7 +222,7 @@ jobs:
 
           cat ecosystem-result-check-stable > $GITHUB_STEP_SUMMARY
           echo "### Linter (stable)"  > ecosystem-result
-          cat ecosystem-result-check-stable > ecosystem-result
+          cat ecosystem-result-check-stable >> ecosystem-result
           echo "" >> ecosystem-result
 
       - name: Run `ruff check` preview ecosystem check
