@@ -10,7 +10,7 @@ from asyncio import create_subprocess_exec
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from subprocess import PIPE
+from subprocess import DEVNULL, PIPE
 from typing import Self
 
 from ruff_ecosystem import logger
@@ -133,7 +133,8 @@ class Repository(Serializable):
             logger.debug(f"Reusing {self.owner}:{self.name}")
 
             if self.ref:
-                logger.debug(f"Checking out ref {self.ref}")
+                logger.debug(f"Checking out {self.fullname} @ {self.ref}")
+
                 process = await create_subprocess_exec(
                     *["git", "checkout", "-f", self.ref],
                     cwd=checkout_dir,
@@ -147,7 +148,9 @@ class Repository(Serializable):
                         f"Failed to checkout {self.ref}: {stderr.decode()}"
                     )
 
-            return await ClonedRepository.from_path(checkout_dir, self)
+            cloned_repo = await ClonedRepository.from_path(checkout_dir, self)
+            await cloned_repo.reset()
+            return cloned_repo
 
         logger.debug(f"Cloning {self.owner}:{self.name} to {checkout_dir}")
         command = [
@@ -179,6 +182,28 @@ class Repository(Serializable):
         logger.debug(
             f"Finished cloning {self.fullname} with status {status_code}",
         )
+
+        # Configure git user — needed for `self.commit` to work
+        await (
+            await create_subprocess_exec(
+                *["git", "config", "user.email", "ecosystem@astral.sh"],
+                cwd=checkout_dir,
+                env={"GIT_TERMINAL_PROMPT": "0"},
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+            )
+        ).wait()
+
+        await (
+            await create_subprocess_exec(
+                *["git", "config", "user.name", "Ecosystem Bot"],
+                cwd=checkout_dir,
+                env={"GIT_TERMINAL_PROMPT": "0"},
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+            )
+        ).wait()
+
         return await ClonedRepository.from_path(checkout_dir, self)
 
 
@@ -236,3 +261,56 @@ class ClonedRepository(Repository, Serializable):
             raise ProjectSetupError(f"Failed to retrieve commit sha at {checkout_dir}")
 
         return stdout.decode().strip()
+
+    async def reset(self: Self) -> None:
+        """
+        Reset the cloned repository to the ref it started at.
+        """
+        process = await create_subprocess_exec(
+            *["git", "reset", "--hard", "origin/" + self.ref] if self.ref else [],
+            cwd=self.path,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        _, stderr = await process.communicate()
+        if await process.wait() != 0:
+            raise RuntimeError(f"Failed to reset: {stderr.decode()}")
+
+    async def commit(self: Self, message: str) -> str:
+        """
+        Commit all current changes.
+
+        Empty commits are allowed.
+        """
+        process = await create_subprocess_exec(
+            *["git", "commit", "--allow-empty", "-a", "-m", message],
+            cwd=self.path,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        _, stderr = await process.communicate()
+        if await process.wait() != 0:
+            raise RuntimeError(f"Failed to commit: {stderr.decode()}")
+
+        return await self._get_head_commit(self.path)
+
+    async def diff(self: Self, *args: str) -> list[str]:
+        """
+        Get the current diff from git.
+
+        Arguments are passed to `git diff ...`
+        """
+        process = await create_subprocess_exec(
+            *["git", "diff", *args],
+            cwd=self.path,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        if await process.wait() != 0:
+            raise RuntimeError(f"Failed to commit: {stderr.decode()}")
+
+        return stdout.decode().splitlines()
