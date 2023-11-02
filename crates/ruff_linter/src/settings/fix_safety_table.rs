@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
 use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
@@ -18,21 +19,24 @@ pub struct FixSafetyTable {
     forced_unsafe: RuleSet,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FixSafety {
-    ForcedSafe,
-    ForcedUnsafe,
-    Default,
-}
-
 impl FixSafetyTable {
-    pub const fn resolve_rule(&self, rule: Rule) -> FixSafety {
-        if self.forced_safe.contains(rule) {
-            FixSafety::ForcedSafe
-        } else if self.forced_unsafe.contains(rule) {
-            FixSafety::ForcedUnsafe
-        } else {
-            FixSafety::Default
+    pub const fn resolve_applicability(
+        &self,
+        rule: Rule,
+        applicability: Applicability,
+    ) -> Applicability {
+        match applicability {
+            // If applicability is display-only we don't change it
+            Applicability::Display => applicability,
+            Applicability::Safe | Applicability::Unsafe => {
+                if self.forced_unsafe.contains(rule) {
+                    Applicability::Unsafe
+                } else if self.forced_safe.contains(rule) {
+                    Applicability::Safe
+                } else {
+                    applicability
+                }
+            }
         }
     }
 
@@ -97,21 +101,41 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_resolve_rule() {
+    fn test_resolve_applicability() {
         let table = FixSafetyTable {
             forced_safe: RuleSet::from_iter([Rule::RedefinedWhileUnused]),
             forced_unsafe: RuleSet::from_iter([Rule::UnusedImport]),
         };
 
-        assert_eq!(
-            table.resolve_rule(Rule::RedefinedWhileUnused),
-            FixSafety::ForcedSafe
-        );
-        assert_eq!(
-            table.resolve_rule(Rule::UnusedImport),
-            FixSafety::ForcedUnsafe
-        );
-        assert_eq!(table.resolve_rule(Rule::UndefinedName), FixSafety::Default);
+        for applicability in &[Applicability::Safe, Applicability::Unsafe] {
+            assert_eq!(
+                table.resolve_applicability(Rule::RedefinedWhileUnused, *applicability),
+                Applicability::Safe // It is forced to Safe
+            );
+        }
+        for applicability in &[Applicability::Safe, Applicability::Unsafe] {
+            assert_eq!(
+                table.resolve_applicability(Rule::UnusedImport, *applicability),
+                Applicability::Unsafe // It is forced to Unsafe
+            );
+        }
+        for applicability in &[Applicability::Safe, Applicability::Unsafe] {
+            assert_eq!(
+                table.resolve_applicability(Rule::UndefinedName, *applicability),
+                *applicability // Remains unchanged
+            );
+        }
+
+        for rule in &[
+            Rule::RedefinedWhileUnused,
+            Rule::UnusedImport,
+            Rule::UndefinedName,
+        ] {
+            assert_eq!(
+                table.resolve_applicability(*rule, Applicability::Display),
+                Applicability::Display // Display is never changed
+            );
+        }
     }
 
     fn mk_table(safe_fixes: &[&str], unsafe_fixes: &[&str]) -> FixSafetyTable {
@@ -128,10 +152,13 @@ mod tests {
         )
     }
 
-    fn assert_rules_safety(table: &FixSafetyTable, assertions: &[(&str, FixSafety)]) {
-        for (code, expected) in assertions {
+    fn assert_rules_safety(
+        table: &FixSafetyTable,
+        assertions: &[(&str, Applicability, Applicability)],
+    ) {
+        for (code, applicability, expected) in assertions {
             assert_eq!(
-                table.resolve_rule(Rule::from_code(code).unwrap()),
+                table.resolve_applicability(Rule::from_code(code).unwrap(), *applicability),
                 *expected
             );
         }
@@ -139,28 +166,24 @@ mod tests {
 
     #[test]
     fn test_from_rule_selectors_specificity() {
+        use Applicability::{Safe, Unsafe};
         let table = mk_table(&["UP"], &["ALL", "UP001"]);
 
         assert_rules_safety(
             &table,
             &[
-                ("E101", FixSafety::ForcedUnsafe),
-                ("UP001", FixSafety::ForcedUnsafe),
-                ("UP003", FixSafety::ForcedSafe),
+                ("E101", Safe, Unsafe),
+                ("UP001", Safe, Unsafe),
+                ("UP003", Unsafe, Safe),
             ],
         );
     }
 
     #[test]
     fn test_from_rule_selectors_unsafe_over_safe() {
+        use Applicability::{Safe, Unsafe};
         let table = mk_table(&["UP"], &["UP"]);
 
-        assert_rules_safety(
-            &table,
-            &[
-                ("E101", FixSafety::Default),
-                ("UP001", FixSafety::ForcedUnsafe),
-            ],
-        );
+        assert_rules_safety(&table, &[("E101", Safe, Safe), ("UP001", Safe, Unsafe)]);
     }
 }

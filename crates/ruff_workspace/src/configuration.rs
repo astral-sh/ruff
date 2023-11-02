@@ -240,7 +240,7 @@ impl Configuration {
                         .collect(),
                 )?,
 
-                fix_safety_table: FixSafetyTable::from_rule_selectors(
+                fix_safety: FixSafetyTable::from_rule_selectors(
                     &lint.extend_safe_fixes,
                     &lint.extend_unsafe_fixes,
                     &PreviewOptions {

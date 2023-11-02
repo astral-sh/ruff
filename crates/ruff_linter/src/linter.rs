@@ -8,7 +8,7 @@ use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Applicability, Diagnostic};
+use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
@@ -32,7 +32,6 @@ use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
-use crate::settings::fix_safety_table::FixSafety;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
 use crate::source_kind::SourceKind;
@@ -269,31 +268,13 @@ pub fn check_path(
     }
 
     // Update fix applicability to account for overrides
-    if !settings.fix_safety_table.is_empty() {
+    if !settings.fix_safety.is_empty() {
         for diagnostic in &mut diagnostics {
             if let Some(fix) = diagnostic.fix.take() {
-                match fix.applicability() {
-                    Applicability::Display => {
-                        // If the fix is display-only, we don't need to do anything
-                        // Retain the existing fix (will be dropped from `.take()` otherwise)
-                        diagnostic.set_fix(fix);
-                    }
-                    Applicability::Safe | Applicability::Unsafe => match settings
-                        .fix_safety_table
-                        .resolve_rule(diagnostic.kind.rule())
-                    {
-                        FixSafety::ForcedSafe => {
-                            diagnostic.set_fix(fix.with_applicability(Applicability::Safe));
-                        }
-                        FixSafety::ForcedUnsafe => {
-                            diagnostic.set_fix(fix.with_applicability(Applicability::Unsafe));
-                        }
-                        FixSafety::Default => {
-                            // Retain the existing fix (will be dropped from `.take()` otherwise)
-                            diagnostic.set_fix(fix);
-                        }
-                    },
-                }
+                let fixed_applicability = settings
+                    .fix_safety
+                    .resolve_applicability(diagnostic.kind.rule(), fix.applicability());
+                diagnostic.set_fix(fix.with_applicability(fixed_applicability));
             }
         }
     }
