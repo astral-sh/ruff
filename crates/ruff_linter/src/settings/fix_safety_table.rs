@@ -49,26 +49,20 @@ impl FixSafetyTable {
         extend_unsafe_fixes: &[RuleSelector],
         preview_options: &PreviewOptions,
     ) -> Self {
-        enum Override {
-            Safe,
-            Unsafe,
-        }
-        use Override::{Safe, Unsafe};
-
-        let safety_override_map: FxHashMap<Rule, Override> = {
+        let safety_override_map: FxHashMap<Rule, bool> = {
             Specificity::iter()
                 .flat_map(|spec| {
                     let safe_overrides = extend_safe_fixes
                         .iter()
                         .filter(|selector| selector.specificity() == spec)
                         .flat_map(|selector| selector.rules(preview_options))
-                        .map(|rule| (rule, Safe));
+                        .map(|rule| (rule, true));
 
                     let unsafe_overrides = extend_unsafe_fixes
                         .iter()
                         .filter(|selector| selector.specificity() == spec)
                         .flat_map(|selector| selector.rules(preview_options))
-                        .map(|rule| (rule, Unsafe));
+                        .map(|rule| (rule, false));
 
                     // Unsafe overrides take precedence over safe overrides
                     safe_overrides.chain(unsafe_overrides).collect::<Vec<_>>()
@@ -81,15 +75,15 @@ impl FixSafetyTable {
             forced_safe: safety_override_map
                 .iter()
                 .filter_map(|(rule, o)| match o {
-                    Safe => Some(*rule),
-                    Unsafe => None,
+                    true => Some(*rule),
+                    false => None,
                 })
                 .collect(),
             forced_unsafe: safety_override_map
                 .iter()
                 .filter_map(|(rule, o)| match o {
-                    Unsafe => Some(*rule),
-                    Safe => None,
+                    false => Some(*rule),
+                    true => None,
                 })
                 .collect(),
         }
