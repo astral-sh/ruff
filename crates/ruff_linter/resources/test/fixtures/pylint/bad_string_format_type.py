@@ -62,4 +62,4 @@ r'\%03o' % (ord(c),)
 # https://github.com/astral-sh/ruff/issues/8406
 "%c" % ("x",)
 "%c" % "x"
-"%c" & "œ"
+"%c" % "œ"
