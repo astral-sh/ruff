@@ -11,9 +11,13 @@ def markdown_project_section(
 ) -> list[str]:
     return markdown_details(
         summary=f'<a href="{project.repo.url}">{project.repo.fullname}</a> ({title})',
-        # Show the command used for the check
-        preface="<pre>ruff " + " ".join(options.to_ruff_args()) + "</pre>",
         content=content,
+        preface=(
+            # Show the command used for the check if the options are non-default
+            "<pre>ruff " + " ".join(options.to_ruff_args()) + "</pre>"
+            if options != type(options)()
+            else None
+        ),
     )
 
 
@@ -24,12 +28,13 @@ def markdown_plus_minus(added: int, removed: int) -> str:
     return f"+{added} -{removed}"
 
 
-def markdown_details(summary: str, preface: str, content: str | list[str]):
+def markdown_details(summary: str, content: str | list[str], preface: str):
     lines = []
     lines.append(f"<details><summary>{summary}</summary>")
-    lines.append("<p>")
-    lines.append(preface)
-    lines.append("</p>")
+    if preface:
+        lines.append("<p>")
+        lines.append(preface)
+        lines.append("</p>")
     lines.append("<p>")
     lines.append("")
 
