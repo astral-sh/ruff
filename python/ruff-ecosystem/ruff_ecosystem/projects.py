@@ -162,38 +162,39 @@ class Repository(Serializable):
             logger.debug(f"Pulling latest changes for {self.fullname} @ {self.ref}")
             await cloned_repo.pull()
 
-            return cloned_repo
+        else:
+            logger.debug(f"Cloning {self.owner}:{self.name} to {checkout_dir}")
+            command = [
+                "git",
+                "clone",
+                "--config",
+                "advice.detachedHead=false",
+                "--quiet",
+                "--depth",
+                "1",
+                "--no-tags",
+            ]
+            if self.ref:
+                command.extend(["--branch", self.ref])
 
-        logger.debug(f"Cloning {self.owner}:{self.name} to {checkout_dir}")
-        command = [
-            "git",
-            "clone",
-            "--config",
-            "advice.detachedHead=false",
-            "--quiet",
-            "--depth",
-            "1",
-            "--no-tags",
-        ]
-        if self.ref:
-            command.extend(["--branch", self.ref])
+            command.extend(
+                [
+                    f"https://github.com/{self.owner}/{self.name}",
+                    str(checkout_dir),
+                ],
+            )
 
-        command.extend(
-            [
-                f"https://github.com/{self.owner}/{self.name}",
-                str(checkout_dir),
-            ],
-        )
+            process = await create_subprocess_exec(
+                *command, env={"GIT_TERMINAL_PROMPT": "0"}
+            )
 
-        process = await create_subprocess_exec(
-            *command, env={"GIT_TERMINAL_PROMPT": "0"}
-        )
+            status_code = await process.wait()
 
-        status_code = await process.wait()
+            logger.debug(
+                f"Finished cloning {self.fullname} with status {status_code}",
+            )
 
-        logger.debug(
-            f"Finished cloning {self.fullname} with status {status_code}",
-        )
+            cloned_repo = await ClonedRepository.from_path(checkout_dir, self)
 
         # Configure git user — needed for `self.commit` to work
         await (
@@ -216,7 +217,7 @@ class Repository(Serializable):
             )
         ).wait()
 
-        return await ClonedRepository.from_path(checkout_dir, self)
+        return cloned_repo
 
 
 @dataclass(frozen=True)
