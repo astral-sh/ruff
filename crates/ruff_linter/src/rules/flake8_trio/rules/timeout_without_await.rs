@@ -72,17 +72,22 @@ pub(crate) fn timeout_without_await(
             if checker
                 .semantic()
                 .resolve_call_path(func.as_ref())
-                .is_some_and(|mut path| match path.as_mut_slice() {
-                    ["trio", "move_on_after"] => true,
-                    ["trio", "move_on_at"] => true,
-                    ["trio", "fail_after"] => true,
-                    ["trio", "fail_at"] => true,
-                    ["trio", "CancelScope"] => true,
-                    _ => false,
+                .is_some_and(|mut path| {
+                    matches!(
+                        path.as_mut_slice(),
+                        [
+                            "trio",
+                            "move_on_after"
+                                | "move_on_at"
+                                | "fail_after"
+                                | "fail_at"
+                                | "CancelScope"
+                        ]
+                    )
                 })
             {
                 for stmt in &with_stmt.body {
-                    visitor.visit_stmt(&stmt);
+                    visitor.visit_stmt(stmt);
                 }
 
                 if !visitor.await_visited {
