@@ -24,7 +24,7 @@ from ruff_ecosystem.types import (
     Comparison,
     Diff,
     Result,
-    RuffError,
+    ToolError,
 )
 
 if TYPE_CHECKING:
@@ -500,7 +500,7 @@ async def ruff_check(
     *, executable: Path, path: Path, name: str, options: CheckOptions
 ) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
-    ruff_args = options.to_cli_args()
+    ruff_args = options.to_ruff_args()
     logger.debug(f"Checking {name} with {executable} " + " ".join(ruff_args))
 
     start = time.time()
@@ -518,7 +518,7 @@ async def ruff_check(
     logger.debug(f"Finished checking {name} with {executable} in {end - start:.2f}s")
 
     if proc.returncode != 0:
-        raise RuffError(err.decode("utf8"))
+        raise ToolError(err.decode("utf8"))
 
     # Strip summary lines so the diff is only diagnostic lines
     lines = [

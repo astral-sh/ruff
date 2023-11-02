@@ -15,7 +15,7 @@ from unidiff import PatchSet
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.markdown import markdown_project_section
-from ruff_ecosystem.types import Comparison, Diff, Result, RuffError
+from ruff_ecosystem.types import Comparison, Diff, Result, ToolError
 
 if TYPE_CHECKING:
     from ruff_ecosystem.projects import ClonedRepository, FormatOptions
@@ -151,14 +151,16 @@ async def format_then_format(
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
     # Run format to get the baseline
-    await ruff_format(
+    await format(
+        formatter=baseline_formatter,
         executable=ruff_baseline_executable.resolve(),
         path=cloned_repo.path,
         name=cloned_repo.fullname,
         options=options,
     )
     # Then get the diff from stdout
-    diff = await ruff_format(
+    diff = await format(
+        formatter=Formatter.ruff,
         executable=ruff_comparison_executable.resolve(),
         path=cloned_repo.path,
         name=cloned_repo.fullname,
@@ -176,7 +178,8 @@ async def format_and_format(
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
     # Run format without diff to get the baseline
-    await ruff_format(
+    await format(
+        formatter=baseline_formatter,
         executable=ruff_baseline_executable.resolve(),
         path=cloned_repo.path,
         name=cloned_repo.fullname,
@@ -189,7 +192,8 @@ async def format_and_format(
     # Then reset
     await cloned_repo.reset()
     # Then run format again
-    await ruff_format(
+    await format(
+        formatter=Formatter.ruff,
         executable=ruff_comparison_executable.resolve(),
         path=cloned_repo.path,
         name=cloned_repo.fullname,
@@ -200,8 +204,9 @@ async def format_and_format(
     return diff
 
 
-async def ruff_format(
+async def format(
     *,
+    formatter: Formatter,
     executable: Path,
     path: Path,
     name: str,
@@ -209,16 +214,20 @@ async def ruff_format(
     diff: bool = False,
 ) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
-    ruff_args = options.to_cli_args()
-    logger.debug(f"Formatting {name} with {executable} " + " ".join(ruff_args))
+    args = (
+        options.to_ruff_args()
+        if formatter == Formatter.ruff
+        else options.to_black_args()
+    )
+    logger.debug(f"Formatting {name} with {executable} " + " ".join(args))
 
     if diff:
-        ruff_args.append("--diff")
+        args.append("--diff")
 
     start = time.time()
     proc = await create_subprocess_exec(
         executable.absolute(),
-        *ruff_args,
+        *args,
         ".",
         stdout=PIPE,
         stderr=PIPE,
@@ -230,7 +239,7 @@ async def ruff_format(
     logger.debug(f"Finished formatting {name} with {executable} in {end - start:.2f}s")
 
     if proc.returncode not in [0, 1]:
-        raise RuffError(err.decode("utf8"))
+        raise ToolError(err.decode("utf8"))
 
     lines = result.decode("utf8").splitlines()
     return lines
