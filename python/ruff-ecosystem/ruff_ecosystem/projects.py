@@ -49,7 +49,7 @@ class CommandOptions(Serializable, abc.ABC):
         return type(self)(**{**dataclasses.asdict(self), **kwargs})
 
     @abc.abstractmethod
-    def to_cli_args(self) -> list[str]:
+    def to_ruff_args(self) -> list[str]:
         pass
 
 
@@ -70,7 +70,7 @@ class CheckOptions(CommandOptions):
     # Limit the number of reported lines per rule
     max_lines_per_rule: int | None = 50
 
-    def to_cli_args(self) -> list[str]:
+    def to_ruff_args(self) -> list[str]:
         args = ["check", "--no-cache", "--exit-zero"]
         if self.select:
             args.extend(["--select", self.select])
@@ -88,14 +88,22 @@ class CheckOptions(CommandOptions):
 @dataclass(frozen=True)
 class FormatOptions(CommandOptions):
     """
-    Ruff format options.
+    Format ecosystem check options.
     """
 
     preview: bool = False
     exclude: str = ""
 
-    def to_cli_args(self) -> list[str]:
+    def to_ruff_args(self) -> list[str]:
         args = ["format"]
+        if self.exclude:
+            args.extend(["--exclude", self.exclude])
+        if self.preview:
+            args.append("--preview")
+        return args
+
+    def to_black_args(self) -> list[str]:
+        args = []
         if self.exclude:
             args.extend(["--exclude", self.exclude])
         if self.preview:

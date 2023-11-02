@@ -12,7 +12,7 @@ def markdown_project_section(
     return markdown_details(
         summary=f'<a href="{project.repo.url}">{project.repo.fullname}</a> ({title})',
         # Show the command used for the check
-        preface="<pre>ruff " + " ".join(options.to_cli_args()) + "</pre>",
+        preface="<pre>ruff " + " ".join(options.to_ruff_args()) + "</pre>",
         content=content,
     )
 

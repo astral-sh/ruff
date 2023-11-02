@@ -29,8 +29,8 @@ class OutputFormat(Enum):
 
 async def main(
     command: RuffCommand,
-    ruff_baseline_executable: Path,
-    ruff_comparison_executable: Path,
+    baseline_executable: Path,
+    comparison_executable: Path,
     targets: list[Project],
     project_dir: Path,
     format: OutputFormat,
@@ -39,9 +39,11 @@ async def main(
     raise_on_failure: bool = False,
 ) -> None:
     logger.debug("Using command %s", command.value)
-    logger.debug("Using baseline executable at %s", ruff_baseline_executable)
-    logger.debug("Using comparison executable at %s", ruff_comparison_executable)
+    logger.debug("Using baseline executable at %s", baseline_executable)
+    logger.debug("Using comparison executable at %s", comparison_executable)
     logger.debug("Using checkout_dir directory %s", project_dir)
+    if format_comparison:
+        logger.debug("Using format comparison type %s", format_comparison.value)
     logger.debug("Checking %s targets", len(targets))
 
     # Limit parallelism to avoid high memory consumption
@@ -56,8 +58,8 @@ async def main(
             limited_parallelism(
                 clone_and_compare(
                     command,
-                    ruff_baseline_executable,
-                    ruff_comparison_executable,
+                    baseline_executable,
+                    comparison_executable,
                     target,
                     project_dir,
                     format_comparison,
@@ -98,8 +100,8 @@ async def main(
 
 async def clone_and_compare(
     command: RuffCommand,
-    ruff_baseline_executable: Path,
-    ruff_comparison_executable: Path,
+    baseline_executable: Path,
+    comparison_executable: Path,
     target: Project,
     project_dir: Path,
     format_comparison: FormatComparison | None,
@@ -125,8 +127,8 @@ async def clone_and_compare(
 
     try:
         return await compare(
-            ruff_baseline_executable,
-            ruff_comparison_executable,
+            baseline_executable,
+            comparison_executable,
             options,
             cloned_repo,
             **kwargs,
