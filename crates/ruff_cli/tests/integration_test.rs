@@ -1407,3 +1407,47 @@ extend-safe-fixes = ["UP034"]
 
     Ok(())
 }
+
+#[test]
+fn check_extend_unsafe_fixes_conflict_with_extend_safe_fixes_by_specificity() -> Result<()> {
+    // Adding a rule to one option with a more specific selector should override the other option
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+target-version = "py310"
+[lint]
+extend-unsafe-fixes = ["UP", "UP034"]
+extend-safe-fixes = ["UP03"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP018,UP034,UP038",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\nprint(str('foo'))\nisinstance(x, (int, str))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 Avoid extraneous parentheses
+    -:3:7: UP018 Unnecessary `str` call (rewrite as a literal)
+    -:4:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
+    Found 4 errors.
+    [*] 1 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
