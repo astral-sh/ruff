@@ -9,6 +9,39 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
+/// Checks for lines less indented than they should be for hanging indents.
+///
+/// ## Why is this bad?
+/// This makes reading continuation line harder.
+///
+/// ## Example
+/// ```python
+/// result = {
+///    'key1': 'value',
+///    'key2': 'value',
+/// }
+/// ```
+///
+/// Use instead:
+/// ```python
+/// result = {
+///     'key1': 'value',
+///     'key2': 'value',
+/// }
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct UnderIndentedHangingIndent;
+
+impl Violation for UnderIndentedHangingIndent {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Hanging indent under-indented.")
+    }
+}
+
+/// ## What it does
 /// Checks for continuation lines not indented as far as they should be or indented too far.
 ///
 /// ## Why is this bad?
@@ -34,6 +67,162 @@ impl Violation for MissingOrOutdentedIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Continuation line missing indentation or outdented.")
+    }
+}
+
+/// ## What it does
+/// Checks for brackets that do not match the indentation level of the line that their opening bracket started on.
+///
+/// ## Why is this bad?
+/// This makes identifying brakets pair harder.
+///
+/// ## Example
+/// ```python
+/// result = function_that_takes_arguments(
+///     'a', 'b', 'c',
+///     'd', 'e', 'f',
+///     )
+/// ```
+///
+/// Use instead:
+/// ```python
+/// result = function_that_takes_arguments(
+///     'a', 'b', 'c',
+///     'd', 'e', 'f',
+/// )
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct ClosingBracketNotMatchingOpeningBracketIndentation;
+
+impl Violation for ClosingBracketNotMatchingOpeningBracketIndentation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Closing bracket not matching its corresponding opening bracket's indentation.")
+    }
+}
+
+/// ## What it does
+/// Checks for closing brackets that do not match the indentation of the opening bracket.
+///
+/// ## Why is this bad?
+/// This makes identifying brakets pair harder.
+///
+/// ## Example
+/// ```python
+/// result = function_that_takes_arguments('a', 'b', 'c',
+///                                        'd', 'e', 'f',
+/// )
+/// ```
+///
+/// Use instead:
+/// ```python
+/// result = function_that_takes_arguments('a', 'b', 'c',
+///                                        'd', 'e', 'f',
+///                                       )
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct ClosingBracketNotMatchingOpeningBracketVisualIndentation;
+
+impl Violation for ClosingBracketNotMatchingOpeningBracketVisualIndentation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!(
+            "Closing bracket not matching its corresponding opening bracket's visual indentation."
+        )
+    }
+}
+
+/// ## What it does
+/// Checks for continuation lines with the same indent as the next logical line.
+///
+/// ## Why is this bad?
+/// Continuation lines should not be indented at the same level as the next logical line.
+/// Instead, they should be indented to one more level so as to distinguish them from the next line.
+///
+/// ## Example
+/// ```python
+/// if user is not None and user.is_admin or \
+///     user.name == 'Grant':
+///     blah = 'yeahnah'
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if user is not None and user.is_admin or \
+///         user.name == 'Grant':
+///     blah = 'yeahnah'
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct ContinuationLineIndentSameAsNextLogicalLine;
+
+impl Violation for ContinuationLineIndentSameAsNextLogicalLine {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Continuation line with same indent as next logical line.")
+    }
+}
+
+/// ## What it does
+/// Checks for continuation line over-indented for hanging indent.
+///
+/// ## Why is this bad?
+/// This makes distinguishing continuation lines harder.
+///
+/// ## Example
+/// ```python
+/// print("Python", (
+///         "Rules"))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Python", (
+///     "Rules"))
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct ContinuationLineOverIndentedForHangingIndent;
+
+impl Violation for ContinuationLineOverIndentedForHangingIndent {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Continuation line over indented for hanging indent.")
+    }
+}
+
+/// ## What it does
+/// Checks for continuation line over-indented for visual indent.
+///
+/// ## Why is this bad?
+/// This makes distinguishing continuation lines harder.
+///
+/// ## Example
+/// ```python
+/// print("Python", ("Hello",
+///                    "World"))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Python", ("Hello",
+///                  "World"))
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct ContinuationLineOverIndentedForVisualIndent;
+
+impl Violation for ContinuationLineOverIndentedForVisualIndent {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Continuation line over indented for visual indent.")
     }
 }
 
@@ -138,7 +327,7 @@ fn expand_indent(line: &str) -> i64 {
     indent
 }
 
-/// E122
+/// E121 E122 E123 E124 E125 E126 E127 E128 E129 E133
 pub(crate) fn continuation_line_missing_indentation_or_outdented(
     context: &mut LogicalLinesContext,
     logical_line: &LogicalLine,
@@ -247,7 +436,12 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
             if is_closing_bracket && indent[depth] != 0 {
                 // Closing bracket for visual indent.
                 if token_info.token_start_within_physical_line != indent[depth] {
-                    // TODO: Raise E124.
+                    // E124.
+                    let diagnostic = Diagnostic::new(
+                        ClosingBracketNotMatchingOpeningBracketVisualIndentation,
+                        token.range,
+                    );
+                    context.push_diagnostic(diagnostic);
                 }
             } else if is_closing_bracket && hang == 0 {
                 // Closing bracket matches indentation of opening bracket's line
@@ -264,7 +458,12 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
             } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size)) {
                 // hanging indent is verified
                 if is_closing_bracket && !hang_closing {
-                    // TODO: Raise E123.
+                    // E123.
+                    let diagnostic = Diagnostic::new(
+                        ClosingBracketNotMatchingOpeningBracketIndentation,
+                        token.range,
+                    );
+                    context.push_diagnostic(diagnostic);
                 }
                 hangs[depth] = Some(hang);
             } else if visual_indent {
@@ -275,21 +474,27 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
                 if hang <= 0 {
                     // E122.
                     let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
-                    // if autofix_after_open_bracket {
-                    //     diagnostic
-                    //         .set_fix(Fix::automatic(Edit::range_deletion(diagnostic.range())));
-                    // }
                     context.push_diagnostic(diagnostic);
                 } else if indent[depth] != 0 {
-                    // TODO: Raise E127.
+                    // E127
+                    let diagnostic =
+                        Diagnostic::new(ContinuationLineOverIndentedForVisualIndent, token.range);
+                    context.push_diagnostic(diagnostic);
                 } else if !is_closing_bracket && hangs[depth].is_some_and(|hang| hang > 0) {
                     // TODO: Raise 131.
                 } else {
                     hangs[depth] = Some(hang);
                     if hang > indent_size {
-                        // TODO: Raise 126.
+                        // E126
+                        let diagnostic = Diagnostic::new(
+                            ContinuationLineOverIndentedForHangingIndent,
+                            token.range,
+                        );
+                        context.push_diagnostic(diagnostic);
                     } else {
-                        // TODO: Raise E121.
+                        // E121.
+                        let diagnostic = Diagnostic::new(UnderIndentedHangingIndent, token.range);
+                        context.push_diagnostic(diagnostic);
                     }
                 }
             }
@@ -398,7 +603,10 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
             if visual_indent {
                 // TODO: Raise 129.
             } else {
-                // TODO: Raise 125.
+                // E125.
+                let diagnostic =
+                    Diagnostic::new(ContinuationLineIndentSameAsNextLogicalLine, token.range);
+                context.push_diagnostic(diagnostic);
             }
         }
     }

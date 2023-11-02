@@ -1,3 +1,13 @@
+#: E121
+print "E121", (
+  "dent")
+
+#: E121
+result = {
+   'key1': 'value',
+   'key2': 'value',
+}
+
 #: E122
 print("E122", (
 "dent"))
@@ -58,12 +68,52 @@ setup('',
           'Intended Audience :: Developers',
       ])
 
-#: E701:1:8 E122:2:1 E203:4:8 E128:5:1
+#: E122:2:1 E128:5:1
 if True:\
 print(True)
 
 print(a
 , end=' ')
+
+#: E123
+my_list = [
+    1, 2, 3,
+    4, 5, 6,
+    ]
+
+#: E123
+print "E123", (
+    "bad", "hanging", "close"
+    )
+
+#: E123
+result = {
+    'foo': [
+        'bar', {
+            'baz': 'frop',
+            }
+        ]
+    }
+
+#: E123
+result = some_function_that_takes_arguments(
+    'a', 'b', 'c',
+    'd', 'e', 'f',
+    )
+
+#: E123
+if True:
+    def example_issue254():
+        return [node.copy(
+            (
+                replacement
+                # First, look at all the node's current children.
+                for child in node.children
+                # Replace them.
+                for replacement in replace(child)
+                ),
+            dict(name=token.undefined)
+        )]
 
 #: E124
 print ("E124", ("visual",
@@ -158,6 +208,82 @@ for foo in """
     123
     """.strip().split():
     print(foo)
+
+#: E126
+print "E126", (
+            "dent")
+
+#: E126
+print "E126", (
+        "dent")
+
+#: E126
+my_list = [
+    1, 2, 3,
+    4, 5, 6,
+     ]
+
+#: E126
+rv.update(dict.fromkeys((
+    'qualif_nr', 'reasonComment_en', 'reasonComment_fr',
+    'reasonComment_de', 'reasonComment_it'),
+          '?'),
+          "foo")
+
+#: E126
+abricot = 3 + \
+          4 + \
+          5 + 6
+#: E126
+part = set_mimetype((
+    a.get('mime_type', 'text')),
+                       'default')
+
+#: E126
+my_list = [
+    1, 2, 3,
+    4, 5, 6,
+        ]
+
+#: E126
+abris = 3 + \
+        4 + \
+        5 + 6
+
+#: E126
+fixed = re.sub(r'\t+', ' ', target[c::-1], 1)[::-1] + \
+        target[c + 1:]
+
+#: E126
+rv.update(dict.fromkeys((
+            'qualif_nr', 'reasonComment_en', 'reasonComment_fr',
+            'reasonComment_de', 'reasonComment_it'),
+        '?'),
+    "foo")
+
+#: E126
+eat_a_dict_a_day({
+        "foo": "bar",
+})
+
+#: E126
+if (
+    x == (
+            3
+    )
+        or y == 4):
+    pass
+
+#: E126
+if (
+    x == (
+        3
+    )
+    or x == (
+            3)
+        or y == 4):
+    pass
+
 
 #: E127
 print ("E127", ("over-",
