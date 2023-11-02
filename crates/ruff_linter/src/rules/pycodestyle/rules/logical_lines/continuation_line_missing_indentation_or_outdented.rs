@@ -6,7 +6,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 /// ## What it does
 /// Checks for continuation lines not indented as far as they should be or indented too far.
@@ -41,8 +41,8 @@ impl Violation for MissingOrOutdentedIndentation {
 struct TokenInfo<'a> {
     start_physical_line_idx: usize,
     end_physical_line_idx: usize,
-    token_start_within_physical_line: usize,
-    token_end_within_physical_line: usize,
+    token_start_within_physical_line: i64,
+    token_end_within_physical_line: i64,
     line: &'a str,
 }
 
@@ -51,12 +51,13 @@ fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<
     let mut token_infos = Vec::new();
     let mut current_line_idx: usize = 0;
     // The first physical line occupied by the token, since a token can span multiple physical lines.
-    let mut first_physical_line_start = if let Some(first_token) = logical_line.first_token() {
-        first_token.range.start()
+    let mut first_physical_line_start: usize = if let Some(first_token) = logical_line.first_token()
+    {
+        first_token.range.start().into()
     } else {
         return token_infos;
     };
-    let mut current_physical_line_start: TextSize;
+    let mut current_physical_line_start: usize;
     let mut prev_token: Option<&LogicalLineToken> = None;
     for token in logical_line.tokens() {
         let mut start_physical_line_idx = current_line_idx;
@@ -68,8 +69,7 @@ fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<
             for (index, _text) in trivia.match_indices('\n') {
                 start_physical_line_idx += 1;
                 current_line_idx = start_physical_line_idx;
-                first_physical_line_start =
-                    prev_token.range.end() + TextSize::try_from(index + 1).unwrap();
+                first_physical_line_start = usize::from(prev_token.range.end()) + index + 1;
                 current_physical_line_start = first_physical_line_start;
             }
         }
@@ -82,18 +82,21 @@ fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<
             let trivia = locator.slice(token.range);
             for (index, _text) in trivia.match_indices('\n') {
                 current_line_idx += 1;
-                current_physical_line_start =
-                    token.range.start() + TextSize::try_from(index + 1).unwrap();
+                current_physical_line_start = usize::from(token.range.start()) + index + 1;
             }
         }
 
         token_infos.push(TokenInfo {
             start_physical_line_idx,
             end_physical_line_idx: current_line_idx,
-            token_start_within_physical_line: (token.range.start() - first_physical_line_start)
-                .into(),
-            token_end_within_physical_line: (token.range.end() - current_physical_line_start)
-                .into(),
+            token_start_within_physical_line: i64::try_from(
+                usize::from(token.range.start()) - first_physical_line_start,
+            )
+            .expect("Lines are expected to be relatively short."),
+            token_end_within_physical_line: i64::try_from(
+                usize::from(token.range.end()) - current_physical_line_start,
+            )
+            .expect("Lines are expected to be relatively short."),
             line: locator.full_lines(token.range),
         });
 
@@ -102,7 +105,7 @@ fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<
             TokenKind::NonLogicalNewline | TokenKind::Newline
         ) {
             current_line_idx += 1;
-            first_physical_line_start = token.range.end();
+            first_physical_line_start = token.range.end().into();
         } else {
             first_physical_line_start = current_physical_line_start;
         }
@@ -114,10 +117,11 @@ fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<
 
 /// Return the amount of indentation of the given line.
 /// Tabs are expanded to the next multiple of 8.
-fn expand_indent(line: &str) -> usize {
+fn expand_indent(line: &str) -> i64 {
     if !line.contains('\t') {
         // If there are no tabs in the line, return the leading space count
-        return line.len() - line.trim_start().len();
+        return i64::try_from(line.len() - line.trim_start().len())
+            .expect("Line length to be relatively small.");
     }
     let mut indent = 0;
 
@@ -142,6 +146,9 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
     indent_char: char,
     indent_size: usize,
 ) {
+    // The pycodestyle implementation makes use of negative values,
+    // converting the indent_size type at the start avoids converting it multiple times later.
+    let indent_size = i64::try_from(indent_size).expect("Indent size to be relatively small.");
     let token_infos = get_token_infos(logical_line, locator);
     let nb_physical_lines = if let Some(last_token_info) = token_infos.last() {
         1 + last_token_info.start_physical_line_idx
@@ -172,9 +179,9 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
     let mut row = 0;
     let mut depth = 0;
     let valid_hangs = if indent_char == '\t' {
-        vec![indent_size as i64, indent_size as i64 * 2]
+        vec![indent_size, indent_size * 2]
     } else {
-        vec![indent_size as i64]
+        vec![indent_size]
     };
     // Remember how many brackets were opened on each line.
     let mut parens = vec![0; nb_physical_lines];
@@ -187,7 +194,7 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
     let mut hang: i64 = 0;
     let mut hanging_indent: bool = false;
     // Visual indents
-    let mut indent_chances: Vec<usize> = Vec::new();
+    let mut indent_chances: Vec<i64> = Vec::new();
     let mut last_indent = start_indent_level;
     let mut visual_indent = false;
     let mut last_token_multiline = false;
@@ -218,7 +225,7 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
             last_indent = token_info.token_start_within_physical_line;
 
             // Record the initial indent.
-            rel_indent[row] = expand_indent(token_info.line) as i64 - start_indent_level as i64;
+            rel_indent[row] = expand_indent(token_info.line) - start_indent_level;
 
             // Is the indent relative to an opening bracket line ?
             for open_row in open_rows[depth].iter().rev() {
@@ -254,8 +261,7 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
                 if !visual_indent {
                     // TODO: Raise E128.
                 }
-            } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size) as i64)
-            {
+            } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size)) {
                 // hanging indent is verified
                 if is_closing_bracket && !hang_closing {
                     // TODO: Raise E123.
@@ -280,7 +286,7 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
                     // TODO: Raise 131.
                 } else {
                     hangs[depth] = Some(hang);
-                    if hang > indent_size as i64 {
+                    if hang > indent_size {
                         // TODO: Raise 126.
                     } else {
                         // TODO: Raise E121.
@@ -322,7 +328,8 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
         {
             indent_chances.push(token_info.token_end_within_physical_line + 1);
         } else if matches!(token.kind, TokenKind::Colon)
-            && token_info.line[token_info.token_end_within_physical_line..]
+            && token_info.line[usize::try_from(token_info.token_end_within_physical_line)
+                .expect("Line to be relatively short.")..]
                 .trim()
                 .is_empty()
         {
