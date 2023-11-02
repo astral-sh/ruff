@@ -128,7 +128,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-format",
-        choices=[option.name for option in OutputFormat],
+        choices=[option.value for option in OutputFormat],
         default="markdown",
         help="Location for caching cloned repositories",
     )
@@ -150,13 +150,13 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--format-comparison",
-        choices=[option.name for option in FormatComparison],
+        choices=[option.value for option in FormatComparison],
         default=FormatComparison.ruff_and_ruff,
         help="Type of comparison to make when checking formatting.",
     )
     parser.add_argument(
         "ruff_command",
-        choices=[option.name for option in RuffCommand],
+        choices=[option.value for option in RuffCommand],
         help="The Ruff command to test",
     )
     parser.add_argument(

@@ -244,7 +244,7 @@ class FormatComparison(Enum):
     # Run Black baseline then Ruff comparison; checks for changes in behavior when formatting previously "formatted" code
     black_then_ruff = "black-then-ruff"
     # Run Black baseline then reset and run Ruff comparison; checks changes in behavior when formatting "unformatted" code
-    black_and_ruff = "black-then-ruff"
+    black_and_ruff = "black-and-ruff"
 
 
 class Formatter(Enum):
