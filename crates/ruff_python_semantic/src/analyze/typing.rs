@@ -315,10 +315,12 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     }
 
     // Ex) `if typing.TYPE_CHECKING:`
-    if semantic
-        .resolve_call_path(test)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "TYPE_CHECKING"]))
-    {
+    if semantic.resolve_call_path(test).is_some_and(|call_path| {
+        matches!(
+            call_path.as_slice(),
+            ["typing", "TYPE_CHECKING"] | ["typing_extensions" | "TYPE_CHECKING"]
+        )
+    }) {
         return true;
     }
 
