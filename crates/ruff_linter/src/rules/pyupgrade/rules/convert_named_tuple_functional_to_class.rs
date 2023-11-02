@@ -181,6 +181,9 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Vec<Stmt>> {
                 let [field, annotation] = elts.as_slice() else {
                     return None;
                 };
+                if annotation.is_starred_expr() {
+                    return None;
+                }
                 let ast::ExprStringLiteral { value: field, .. } = field.as_string_literal_expr()?;
                 if !is_identifier(field) {
                     return None;
