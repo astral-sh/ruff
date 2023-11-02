@@ -48,9 +48,7 @@ jobs:
         id: generate-comment
         if: steps.download-ecosystem-result.outputs.found_artifact == 'true'
         run: |
-          echo '## PR Check Results' >> comment.txt
-
-          echo "### Ecosystem" >> comment.txt
+          echo '## `ruff-ecosystem` results' >> comment.txt
           cat pr/ecosystem/ecosystem-result >> comment.txt
           echo "" >> comment.txt
 
