@@ -89,5 +89,5 @@ class Comparison(Serializable):
     repo: ClonedRepository
 
 
-class RuffError(Exception):
-    """An error reported by Ruff."""
+class ToolError(Exception):
+    """An error reported by the checked executable."""
