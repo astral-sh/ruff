@@ -80,22 +80,16 @@ impl Cell {
         // Ignore cells containing cell magic as they act on the entire cell
         // as compared to line magic which acts on a single line.
         !match source {
-            SourceValue::String(string) => string.lines().any(Self::is_magic_cell),
-            SourceValue::StringArray(string_array) => string_array
-                .iter()
-                .map(String::as_str)
-                .any(Self::is_magic_cell),
+            SourceValue::String(string) => Self::is_magic_cell(string.lines()),
+            SourceValue::StringArray(string_array) => {
+                Self::is_magic_cell(string_array.iter().map(String::as_str))
+            }
         }
     }
 
     /// Returns `true` if a cell should be ignored due to the use of cell magics.
-    fn is_magic_cell(line: &str) -> bool {
-        let line = line.trim_start();
-
-        // Detect cell magics (which operate on multiple lines).
-        if line.starts_with("%%") {
-            return true;
-        }
+    fn is_magic_cell<'a>(lines: impl Iterator<Item = &'a str>) -> bool {
+        let mut lines = lines.peekable();
 
         // Detect automatic line magics (automagic), which aren't supported by the parser. If a line
         // magic uses automagic, Jupyter doesn't allow following it with non-magic lines anyway, so
@@ -114,92 +108,97 @@ impl Cell {
         // ```
         //
         // See: https://ipython.readthedocs.io/en/stable/interactive/magics.html
-        if line.split_whitespace().next().is_some_and(|token| {
-            matches!(
-                token,
-                "alias"
-                    | "alias_magic"
-                    | "autoawait"
-                    | "autocall"
-                    | "automagic"
-                    | "bookmark"
-                    | "cd"
-                    | "code_wrap"
-                    | "colors"
-                    | "conda"
-                    | "config"
-                    | "debug"
-                    | "dhist"
-                    | "dirs"
-                    | "doctest_mode"
-                    | "edit"
-                    | "env"
-                    | "gui"
-                    | "history"
-                    | "killbgscripts"
-                    | "load"
-                    | "load_ext"
-                    | "loadpy"
-                    | "logoff"
-                    | "logon"
-                    | "logstart"
-                    | "logstate"
-                    | "logstop"
-                    | "lsmagic"
-                    | "macro"
-                    | "magic"
-                    | "mamba"
-                    | "matplotlib"
-                    | "micromamba"
-                    | "notebook"
-                    | "page"
-                    | "pastebin"
-                    | "pdb"
-                    | "pdef"
-                    | "pdoc"
-                    | "pfile"
-                    | "pinfo"
-                    | "pinfo2"
-                    | "pip"
-                    | "popd"
-                    | "pprint"
-                    | "precision"
-                    | "prun"
-                    | "psearch"
-                    | "psource"
-                    | "pushd"
-                    | "pwd"
-                    | "pycat"
-                    | "pylab"
-                    | "quickref"
-                    | "recall"
-                    | "rehashx"
-                    | "reload_ext"
-                    | "rerun"
-                    | "reset"
-                    | "reset_selective"
-                    | "run"
-                    | "save"
-                    | "sc"
-                    | "set_env"
-                    | "sx"
-                    | "system"
-                    | "tb"
-                    | "time"
-                    | "timeit"
-                    | "unalias"
-                    | "unload_ext"
-                    | "who"
-                    | "who_ls"
-                    | "whos"
-                    | "xdel"
-                    | "xmode"
-            )
-        }) {
+        if lines
+            .peek()
+            .and_then(|line| line.split_whitespace().next())
+            .is_some_and(|token| {
+                matches!(
+                    token,
+                    "alias"
+                        | "alias_magic"
+                        | "autoawait"
+                        | "autocall"
+                        | "automagic"
+                        | "bookmark"
+                        | "cd"
+                        | "code_wrap"
+                        | "colors"
+                        | "conda"
+                        | "config"
+                        | "debug"
+                        | "dhist"
+                        | "dirs"
+                        | "doctest_mode"
+                        | "edit"
+                        | "env"
+                        | "gui"
+                        | "history"
+                        | "killbgscripts"
+                        | "load"
+                        | "load_ext"
+                        | "loadpy"
+                        | "logoff"
+                        | "logon"
+                        | "logstart"
+                        | "logstate"
+                        | "logstop"
+                        | "lsmagic"
+                        | "macro"
+                        | "magic"
+                        | "mamba"
+                        | "matplotlib"
+                        | "micromamba"
+                        | "notebook"
+                        | "page"
+                        | "pastebin"
+                        | "pdb"
+                        | "pdef"
+                        | "pdoc"
+                        | "pfile"
+                        | "pinfo"
+                        | "pinfo2"
+                        | "pip"
+                        | "popd"
+                        | "pprint"
+                        | "precision"
+                        | "prun"
+                        | "psearch"
+                        | "psource"
+                        | "pushd"
+                        | "pwd"
+                        | "pycat"
+                        | "pylab"
+                        | "quickref"
+                        | "recall"
+                        | "rehashx"
+                        | "reload_ext"
+                        | "rerun"
+                        | "reset"
+                        | "reset_selective"
+                        | "run"
+                        | "save"
+                        | "sc"
+                        | "set_env"
+                        | "sx"
+                        | "system"
+                        | "tb"
+                        | "time"
+                        | "timeit"
+                        | "unalias"
+                        | "unload_ext"
+                        | "who"
+                        | "who_ls"
+                        | "whos"
+                        | "xdel"
+                        | "xmode"
+                )
+            })
+        {
             return true;
         }
 
-        false
+        // Detect cell magics (which operate on multiple lines).
+        lines.any(|line| line.trim_start().starts_with("%%"))
     }
 }
 
@@ -595,6 +594,9 @@ mod tests {
     #[test_case(Path::new("only_code.json"), true; "only_code")]
     #[test_case(Path::new("cell_magic.json"), false; "cell_magic")]
     #[test_case(Path::new("automagic.json"), false; "automagic")]
+    #[test_case(Path::new("automagics.json"), false; "automagics")]
+    #[test_case(Path::new("automagic_before_code.json"), false; "automagic_before_code")]
+    #[test_case(Path::new("automagic_after_code.json"), true; "automagic_after_code")]
     fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
         /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
         fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
