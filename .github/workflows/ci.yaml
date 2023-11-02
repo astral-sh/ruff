@@ -209,6 +209,12 @@ jobs:
         run: |
           pip install ./python/ruff-ecosystem
 
+      - name: Restore cached checkouts
+        uses: actions/cache/restore@v3
+        with:
+          path: ./checkouts
+          key: ecosystem-checkouts
+
       - name: Run `ruff check` stable ecosystem check
         if: ${{ needs.determine_changes.outputs.linter == 'true' }}
         run: |
@@ -272,6 +278,12 @@ jobs:
           echo "### Formatter (preview)" >> ecosystem-result
           cat ecosystem-result-format-preview >> ecosystem-result
           echo "" >> ecosystem-result
+
+      - name: Save cached checkouts
+        uses: actions/cache/save@v3
+        with:
+          path: ./checkouts
+          key: ecosystem-checkouts
 
       - name: Export pull request number
         run: |
