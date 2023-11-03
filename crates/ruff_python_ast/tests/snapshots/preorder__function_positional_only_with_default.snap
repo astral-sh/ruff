@@ -7,11 +7,9 @@ expression: trace
     - Parameters
       - Parameter
       - Parameter
-      - ExprConstant
-        - Int(34)
+      - ExprNumberLiteral
       - Parameter
-      - ExprConstant
-        - Int(20)
+      - ExprNumberLiteral
       - Parameter
     - StmtPass
 

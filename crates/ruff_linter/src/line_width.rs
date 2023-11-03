@@ -129,12 +129,12 @@ pub struct LineWidthBuilder {
     /// This is used to calculate the width of tabs.
     column: usize,
     /// The tab size to use when calculating the width of tabs.
-    tab_size: TabSize,
+    tab_size: IndentWidth,
 }
 
 impl Default for LineWidthBuilder {
     fn default() -> Self {
-        Self::new(TabSize::default())
+        Self::new(IndentWidth::default())
     }
 }
 
@@ -164,7 +164,7 @@ impl LineWidthBuilder {
     }
 
     /// Creates a new `LineWidth` with the given tab size.
-    pub fn new(tab_size: TabSize) -> Self {
+    pub fn new(tab_size: IndentWidth) -> Self {
         LineWidthBuilder {
             width: 0,
             column: 0,
@@ -234,28 +234,28 @@ impl PartialOrd<LineLength> for LineWidthBuilder {
 /// The size of a tab.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct TabSize(NonZeroU8);
+pub struct IndentWidth(NonZeroU8);
 
-impl TabSize {
+impl IndentWidth {
     pub(crate) fn as_usize(self) -> usize {
         self.0.get() as usize
     }
 }
 
-impl Default for TabSize {
+impl Default for IndentWidth {
     fn default() -> Self {
         Self(NonZeroU8::new(4).unwrap())
     }
 }
 
-impl From<NonZeroU8> for TabSize {
+impl From<NonZeroU8> for IndentWidth {
     fn from(tab_size: NonZeroU8) -> Self {
         Self(tab_size)
     }
 }
 
-impl From<TabSize> for NonZeroU8 {
-    fn from(value: TabSize) -> Self {
+impl From<IndentWidth> for NonZeroU8 {
+    fn from(value: IndentWidth) -> Self {
         value.0
     }
 }

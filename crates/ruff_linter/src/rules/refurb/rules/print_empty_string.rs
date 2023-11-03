@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Generator;
 use ruff_text_size::Ranged;
 
@@ -192,8 +192,8 @@ pub(crate) fn print_empty_string(checker: &mut Checker, call: &ast::ExprCall) {
 fn is_empty_string(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(value),
+        Expr::StringLiteral(ast::ExprStringLiteral {
+            value,
             ..
         }) if value.is_empty()
     )

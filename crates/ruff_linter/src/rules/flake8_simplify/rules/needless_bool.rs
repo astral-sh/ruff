@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, ElifElseClause, Expr, ExprContext, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -176,10 +176,7 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
     let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt else {
         return None;
     };
-    let Some(Expr::Constant(ast::ExprConstant { value, .. })) = value.as_deref() else {
-        return None;
-    };
-    let Constant::Bool(value) = value else {
+    let Some(Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. })) = value.as_deref() else {
         return None;
     };
     Some((*value).into())

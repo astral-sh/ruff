@@ -114,7 +114,7 @@ such that all crates are contained in a flat `crates` directory.
 The vast majority of the code, including all lint rules, lives in the `ruff` crate (located at
 `crates/ruff_linter`). As a contributor, that's the crate that'll be most relevant to you.
 
-At time of writing, the repository includes the following crates:
+At the time of writing, the repository includes the following crates:
 
 - `crates/ruff_linter`: library crate containing all lint rules and the core logic for running them.
     If you're working on a rule, this is the crate for you.
@@ -337,16 +337,15 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 ## Ecosystem CI
 
 GitHub Actions will run your changes against a number of real-world projects from GitHub and
-report on any diagnostic differences. You can also run those checks locally via:
+report on any linter or formatter differences. You can also run those checks locally via:
 
 ```shell
-python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
+pip install -e ./python/ruff-ecosystem
+ruff-ecosystem check ruff "./target/debug/ruff"
+ruff-ecosystem format ruff "./target/debug/ruff"
 ```
 
-You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
-downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
-as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/astral-sh/ruff/blob/main/scripts/Dockerfile.ecosystem).
-Note that this check will take a while to run.
+See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
 
 ## Benchmarking and Profiling
 
@@ -877,5 +876,5 @@ By default, `src` is set to the project root. In the above example, we'd want to
 `src = ["./src"]` to ensure that we locate `./my_project/src/foo` and thus categorize `import foo`
 as first-party in `baz.py`. In practice, for this limited example, setting `src = ["./src"]` is
 unnecessary, as all imports within `./my_project/src/foo` would be categorized as first-party via
-the same-package heuristic; but your project contains multiple packages, you'll want to set `src`
+the same-package heuristic; but if your project contains multiple packages, you'll want to set `src`
 explicitly.

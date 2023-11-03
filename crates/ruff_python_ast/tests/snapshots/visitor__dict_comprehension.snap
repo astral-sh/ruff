@@ -11,5 +11,5 @@ expression: trace
     - ExprBinOp
       - ExprName
       - Pow
-      - ExprConstant
+      - ExprNumberLiteral
 

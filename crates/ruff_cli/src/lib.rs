@@ -18,7 +18,7 @@ use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
-use crate::args::{Args, CheckCommand, Command, FormatCommand};
+use crate::args::{Args, CheckCommand, Command, FormatCommand, HelpFormat};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -101,6 +101,15 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     file == Path::new("-")
 }
 
+/// Get the actual value of the `format` desired from either `output_format`
+/// or `format`, and warn the user if they're using the deprecated form.
+fn resolve_help_output_format(output_format: HelpFormat, format: Option<HelpFormat>) -> HelpFormat {
+    if format.is_some() {
+        warn_user!("The `--format` argument is deprecated. Use `--output-format` instead.");
+    }
+    format.unwrap_or(output_format)
+}
+
 pub fn run(
     Args {
         command,
@@ -141,12 +150,18 @@ pub fn run(
             commands::version::version(output_format)?;
             Ok(ExitStatus::Success)
         }
-        Command::Rule { rule, all, format } => {
+        Command::Rule {
+            rule,
+            all,
+            format,
+            mut output_format,
+        } => {
+            output_format = resolve_help_output_format(output_format, format);
             if all {
-                commands::rule::rules(format)?;
+                commands::rule::rules(output_format)?;
             }
             if let Some(rule) = rule {
-                commands::rule::rule(rule, format)?;
+                commands::rule::rule(rule, output_format)?;
             }
             Ok(ExitStatus::Success)
         }
@@ -154,8 +169,12 @@ pub fn run(
             commands::config::config(option.as_deref())?;
             Ok(ExitStatus::Success)
         }
-        Command::Linter { format } => {
-            commands::linter::linter(format)?;
+        Command::Linter {
+            format,
+            mut output_format,
+        } => {
+            output_format = resolve_help_output_format(output_format, format);
+            commands::linter::linter(output_format)?;
             Ok(ExitStatus::Success)
         }
         Command::Clean => {
@@ -172,8 +191,6 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    warn_user_once!("`ruff format` is not yet stable, and subject to change in future versions.");
-
     let (cli, overrides) = args.partition();
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {

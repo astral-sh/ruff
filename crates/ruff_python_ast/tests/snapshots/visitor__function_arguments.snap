@@ -4,9 +4,9 @@ expression: trace
 ---
 - StmtFunctionDef
   - Parameters
-    - ExprConstant
-    - ExprConstant
-    - ExprConstant
+    - ExprNumberLiteral
+    - ExprNumberLiteral
+    - ExprNumberLiteral
     - Parameter
     - Parameter
     - Parameter

@@ -139,7 +139,7 @@ pub(crate) fn multiple_with_statements(
                             content,
                             with_stmt.into(),
                             checker.locator(),
-                            checker.settings.line_length,
+                            checker.settings.pycodestyle.max_line_length,
                             checker.settings.tab_size,
                         )
                     }) {

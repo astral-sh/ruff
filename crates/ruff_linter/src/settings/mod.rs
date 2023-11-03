@@ -2,7 +2,6 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -15,6 +14,7 @@ use rustc_hash::FxHashSet;
 use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
 
+use crate::line_width::LineLength;
 use crate::registry::{Linter, Rule, RuleSet};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
@@ -26,7 +26,7 @@ use crate::rules::{
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion};
 use crate::{codes, RuleSelector};
 
-use super::line_width::{LineLength, TabSize};
+use super::line_width::IndentWidth;
 
 use self::rule_table::RuleTable;
 use self::types::PreviewMode;
@@ -54,13 +54,13 @@ pub struct LinterSettings {
     pub allowed_confusables: FxHashSet<char>,
     pub builtins: Vec<String>,
     pub dummy_variable_rgx: Regex,
-    pub external: FxHashSet<String>,
+    pub external: Vec<String>,
     pub ignore_init_module_imports: bool,
-    pub line_length: LineLength,
     pub logger_objects: Vec<String>,
     pub namespace_packages: Vec<PathBuf>,
     pub src: Vec<PathBuf>,
-    pub tab_size: TabSize,
+    pub tab_size: IndentWidth,
+    pub line_length: LineLength,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
 
@@ -145,9 +145,8 @@ impl LinterSettings {
             builtins: vec![],
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
 
-            external: HashSet::default(),
+            external: vec![],
             ignore_init_module_imports: false,
-            line_length: LineLength::default(),
             logger_objects: vec![],
             namespace_packages: vec![],
 
@@ -157,7 +156,8 @@ impl LinterSettings {
 
             src: vec![path_dedot::CWD.clone()],
             // Needs duplicating
-            tab_size: TabSize::default(),
+            tab_size: IndentWidth::default(),
+            line_length: LineLength::default(),
 
             task_tags: TASK_TAGS.iter().map(ToString::to_string).collect(),
             typing_modules: vec![],

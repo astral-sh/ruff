@@ -13,6 +13,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
+use ruff_workspace::options::PycodestyleOptions;
 use ruff_workspace::resolver::ConfigurationTransformer;
 
 #[derive(Debug, Parser)]
@@ -49,7 +50,11 @@ pub enum Command {
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// List or describe the available configuration options.
     Config { option: Option<String> },
@@ -57,7 +62,11 @@ pub enum Command {
     Linter {
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
@@ -66,8 +75,6 @@ pub enum Command {
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
-    #[doc(hidden)]
-    #[clap(hide = true)]
     Format(FormatCommand),
     /// Display Ruff's version
     Version {
@@ -403,7 +410,7 @@ pub struct FormatCommand {
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
     /// Set the line-length.
-    #[arg(long, help_heading = "Rule configuration", hide = true)]
+    #[arg(long, help_heading = "Format configuration")]
     pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
@@ -503,6 +510,7 @@ impl CheckCommand {
                 extend_exclude: self.extend_exclude,
                 extend_fixable: self.extend_fixable,
                 extend_ignore: self.extend_ignore,
+                extend_per_file_ignores: self.extend_per_file_ignores,
                 extend_select: self.extend_select,
                 extend_unfixable: self.extend_unfixable,
                 fixable: self.fixable,
@@ -624,6 +632,7 @@ pub struct CliOverrides {
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub preview: Option<PreviewMode>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
@@ -653,6 +662,12 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(extend_exclude) = &self.extend_exclude {
             config.extend_exclude.extend(extend_exclude.clone());
+        }
+        if let Some(extend_per_file_ignores) = &self.extend_per_file_ignores {
+            config
+                .lint
+                .extend_per_file_ignores
+                .extend(collect_per_file_ignores(extend_per_file_ignores.clone()));
         }
         if let Some(fix) = &self.fix {
             config.fix = Some(*fix);
@@ -689,8 +704,12 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
         }
-        if let Some(line_length) = &self.line_length {
-            config.line_length = Some(*line_length);
+        if let Some(line_length) = self.line_length {
+            config.line_length = Some(line_length);
+            config.lint.pycodestyle = Some(PycodestyleOptions {
+                max_line_length: Some(line_length),
+                ..config.lint.pycodestyle.unwrap_or_default()
+            });
         }
         if let Some(preview) = &self.preview {
             config.preview = Some(*preview);

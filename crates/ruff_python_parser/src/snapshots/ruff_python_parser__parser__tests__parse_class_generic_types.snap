@@ -39,10 +39,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 Expr(
                     StmtExpr {
                         range: 26..29,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 26..29,
-                                value: Ellipsis,
                             },
                         ),
                     },
@@ -94,10 +93,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 Expr(
                     StmtExpr {
                         range: 73..76,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 73..76,
-                                value: Ellipsis,
                             },
                         ),
                     },
@@ -164,10 +162,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 Expr(
                     StmtExpr {
                         range: 135..138,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 135..138,
-                                value: Ellipsis,
                             },
                         ),
                     },
@@ -221,10 +218,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 Expr(
                     StmtExpr {
                         range: 178..181,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 178..181,
-                                value: Ellipsis,
                             },
                         ),
                     },
@@ -278,10 +274,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 Expr(
                     StmtExpr {
                         range: 220..223,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 220..223,
-                                value: Ellipsis,
                             },
                         ),
                     },
@@ -324,10 +319,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 Expr(
                     StmtExpr {
                         range: 258..261,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 258..261,
-                                value: Ellipsis,
                             },
                         ),
                     },
@@ -370,10 +364,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 Expr(
                     StmtExpr {
                         range: 293..296,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 293..296,
-                                value: Ellipsis,
                             },
                         ),
                     },

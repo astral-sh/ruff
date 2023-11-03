@@ -5,8 +5,11 @@ use ruff_text_size::{TextRange, TextSize};
 
 /// Stores the ranges of all f-strings in a file sorted by [`TextRange::start`].
 /// There can be multiple overlapping ranges for nested f-strings.
+///
+/// Note that the ranges for all unterminated f-strings are not stored.
 #[derive(Debug)]
 pub struct FStringRanges {
+    // Mapping from the f-string start location to its range.
     raw: BTreeMap<TextSize, TextRange>,
 }
 
@@ -89,7 +92,6 @@ impl FStringRangesBuilder {
     }
 
     pub(crate) fn finish(self) -> FStringRanges {
-        debug_assert!(self.start_locations.is_empty());
         FStringRanges { raw: self.raw }
     }
 }

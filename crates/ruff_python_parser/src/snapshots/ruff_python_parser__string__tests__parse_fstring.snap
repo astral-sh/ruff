@@ -40,16 +40,12 @@ expression: parse_ast
                                 format_spec: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 10..17,
-                                value: Str(
-                                    StringConstant {
-                                        value: "{foo}",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "{foo}",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                     ],

@@ -161,7 +161,7 @@ mod tests {
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
 
-    use crate::options::{LintCommonOptions, Options};
+    use crate::options::{LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
     use crate::tests::test_resource_path;
 
@@ -228,7 +228,7 @@ exclude = ["foo.py"]
         let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
-[tool.ruff]
+[tool.ruff.lint]
 select = ["E501"]
 "#,
         )?;
@@ -236,10 +236,13 @@ select = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    lint_top_level: LintCommonOptions {
-                        select: Some(vec![codes::Pycodestyle::E501.into()]),
-                        ..LintCommonOptions::default()
-                    },
+                    lint: Some(LintOptions {
+                        common: LintCommonOptions {
+                            select: Some(vec![codes::Pycodestyle::E501.into()]),
+                            ..LintCommonOptions::default()
+                        },
+                        ..LintOptions::default()
+                    }),
                     ..Options::default()
                 })
             })
@@ -248,7 +251,7 @@ select = ["E501"]
         let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["RUF100"]
 ignore = ["E501"]
 "#,
@@ -257,11 +260,14 @@ ignore = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    lint_top_level: LintCommonOptions {
-                        extend_select: Some(vec![codes::Ruff::_100.into()]),
-                        ignore: Some(vec![codes::Pycodestyle::E501.into()]),
-                        ..LintCommonOptions::default()
-                    },
+                    lint: Some(LintOptions {
+                        common: LintCommonOptions {
+                            extend_select: Some(vec![codes::Ruff::_100.into()]),
+                            ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                            ..LintCommonOptions::default()
+                        },
+                        ..LintOptions::default()
+                    }),
                     ..Options::default()
                 })
             })
@@ -279,7 +285,7 @@ line_length = 79
         assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
-[tool.ruff]
+[tool.ruff.lint]
 select = ["E123"]
 "#,
         )
@@ -315,13 +321,16 @@ other-attribute = 1
                     "with_excluded_file/other_excluded_file.py".to_string(),
                 ]),
 
-                lint_top_level: LintCommonOptions {
-                    per_file_ignores: Some(FxHashMap::from_iter([(
-                        "__init__.py".to_string(),
-                        vec![codes::Pyflakes::_401.into()]
-                    )])),
-                    ..LintCommonOptions::default()
-                },
+                lint: Some(LintOptions {
+                    common: LintCommonOptions {
+                        per_file_ignores: Some(FxHashMap::from_iter([(
+                            "__init__.py".to_string(),
+                            vec![codes::Pyflakes::_401.into()]
+                        )])),
+                        ..LintCommonOptions::default()
+                    },
+                    ..LintOptions::default()
+                }),
                 ..Options::default()
             }
         );

@@ -107,21 +107,21 @@ To configure Ruff, let's create a `pyproject.toml` file in our project's root di
 
 ```toml
 [tool.ruff]
-# Set the maximum line length to 79 characters.
+# Set the maximum line length to 79.
 line-length = 79
 
-[tool.ruff.linter]
+[tool.ruff.lint]
 # Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
 # overlap with the use of a formatter, like Black, but we can override this behavior by
 # explicitly adding the rule.
 extend-select = ["E501"]
 ```
 
-Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79 characters:
+Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79:
 
 ```shell
 ❯ ruff check .
-numbers/numbers.py:5:80: E501 Line too long (90 > 79 characters)
+numbers/numbers.py:5:80: E501 Line too long (90 > 79)
 Found 1 error.
 ```
 
@@ -134,10 +134,10 @@ specifically, we'll want to make note of the minimum supported Python version:
 requires-python = ">=3.10"
 
 [tool.ruff]
-# Set the maximum line length to 79 characters.
+# Set the maximum line length to 79.
 line-length = 79
 
-[tool.ruff.linter]
+[tool.ruff.lint]
 # Add the `line-too-long` rule to the enforced rule set.
 extend-select = ["E501"]
 ```
@@ -164,7 +164,7 @@ rules, we can set our `pyproject.toml` to the following:
 [project]
 requires-python = ">=3.10"
 
-[tool.ruff.linter]
+[tool.ruff.lint]
 extend-select = [
   "UP",  # pyupgrade
 ]
@@ -187,13 +187,13 @@ all functions have docstrings:
 [project]
 requires-python = ">=3.10"
 
-[tool.ruff.linter]
+[tool.ruff.lint]
 extend-select = [
   "UP",  # pyupgrade
   "D",   # pydocstyle
 ]
 
-[tool.ruff.linter.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
 ```
 
@@ -231,8 +231,8 @@ numbers/numbers.py:1:1: D100 Missing docstring in public module
 Found 3 errors.
 ```
 
-If we want to ignore a rule for an entire file, we can add a `# ruff: noqa` comment to the top of
-the file:
+If we want to ignore a rule for an entire file, we can add the line `# ruff: noqa: {code}` anywhere
+in the file, preferably towards the top, like so:
 
 ```py
 # ruff: noqa: UP035
@@ -251,7 +251,7 @@ For more in-depth instructions on ignoring errors, please see [_Error suppressio
 When enabling a new rule on an existing codebase, you may want to ignore all _existing_
 violations of that rule and instead focus on enforcing it going forward.
 
-Ruff enables this workflow via the `--add-noqa` flag, which will adds a `# noqa` directive to each
+Ruff enables this workflow via the `--add-noqa` flag, which will add a `# noqa` directive to each
 line based on its existing violations. We can combine `--add-noqa` with the `--select` command-line
 flag to add `# noqa` directives to all existing `UP035` violations:
 
@@ -284,13 +284,13 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 # Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.1
+  rev: v0.1.3
   hooks:
     - id: ruff
 # Run the Ruff formatter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.291
+  rev: v0.1.3
   hooks:
     - id: ruff-format
 ```

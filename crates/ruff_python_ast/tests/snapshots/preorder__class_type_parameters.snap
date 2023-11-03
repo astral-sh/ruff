@@ -10,6 +10,5 @@ expression: trace
     - TypeParamTypeVarTuple
     - TypeParamParamSpec
     - StmtExpr
-      - ExprConstant
-        - Ellipsis
+      - ExprEllipsisLiteral
 

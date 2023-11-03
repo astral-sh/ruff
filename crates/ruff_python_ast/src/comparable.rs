@@ -185,8 +185,8 @@ pub struct PatternMatchValue<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchSingleton<'a> {
-    value: ComparableConstant<'a>,
+pub struct PatternMatchSingleton {
+    value: ComparableSingleton,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -227,7 +227,7 @@ pub struct PatternMatchOr<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparablePattern<'a> {
     MatchValue(PatternMatchValue<'a>),
-    MatchSingleton(PatternMatchSingleton<'a>),
+    MatchSingleton(PatternMatchSingleton),
     MatchSequence(PatternMatchSequence<'a>),
     MatchMapping(PatternMatchMapping<'a>),
     MatchClass(PatternMatchClass<'a>),
@@ -327,45 +327,38 @@ impl<'a> From<&'a ast::Decorator> for ComparableDecorator<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableConstant<'a> {
+pub enum ComparableSingleton {
     None,
-    Bool(&'a bool),
-    Str { value: &'a str, unicode: bool },
-    Bytes(&'a [u8]),
+    True,
+    False,
+}
+
+impl From<&ast::Singleton> for ComparableSingleton {
+    fn from(singleton: &ast::Singleton) -> Self {
+        match singleton {
+            ast::Singleton::None => Self::None,
+            ast::Singleton::True => Self::True,
+            ast::Singleton::False => Self::False,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ComparableNumber<'a> {
     Int(&'a ast::Int),
     Float(u64),
     Complex { real: u64, imag: u64 },
-    Ellipsis,
 }
 
-impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
-    fn from(constant: &'a ast::Constant) -> Self {
-        match constant {
-            ast::Constant::None => Self::None,
-            ast::Constant::Bool(value) => Self::Bool(value),
-            ast::Constant::Str(ast::StringConstant {
-                value,
-                // Compare strings based on resolved value, not representation (i.e., ignore whether
-                // the string was implicitly concatenated).
-                implicit_concatenated: _,
-                unicode,
-            }) => Self::Str {
-                value,
-                unicode: *unicode,
-            },
-            ast::Constant::Bytes(ast::BytesConstant {
-                value,
-                // Compare bytes based on resolved value, not representation (i.e., ignore whether
-                // the bytes were implicitly concatenated).
-                implicit_concatenated: _,
-            }) => Self::Bytes(value),
-            ast::Constant::Int(value) => Self::Int(value),
-            ast::Constant::Float(value) => Self::Float(value.to_bits()),
-            ast::Constant::Complex { real, imag } => Self::Complex {
+impl<'a> From<&'a ast::Number> for ComparableNumber<'a> {
+    fn from(number: &'a ast::Number) -> Self {
+        match number {
+            ast::Number::Int(value) => Self::Int(value),
+            ast::Number::Float(value) => Self::Float(value.to_bits()),
+            ast::Number::Complex { real, imag } => Self::Complex {
                 real: real.to_bits(),
                 imag: imag.to_bits(),
             },
-            ast::Constant::Ellipsis => Self::Ellipsis,
         }
     }
 }
@@ -652,8 +645,54 @@ pub struct ExprFString<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprConstant<'a> {
-    value: ComparableConstant<'a>,
+pub enum ComparableLiteral<'a> {
+    None,
+    Ellipsis,
+    Bool(&'a bool),
+    Str(&'a str),
+    Bytes(&'a [u8]),
+    Number(ComparableNumber<'a>),
+}
+
+impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
+    fn from(literal: ast::LiteralExpressionRef<'a>) -> Self {
+        match literal {
+            ast::LiteralExpressionRef::NoneLiteral(_) => Self::None,
+            ast::LiteralExpressionRef::EllipsisLiteral(_) => Self::Ellipsis,
+            ast::LiteralExpressionRef::BooleanLiteral(ast::ExprBooleanLiteral {
+                value, ..
+            }) => Self::Bool(value),
+            ast::LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                Self::Str(value)
+            }
+            ast::LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+                Self::Bytes(value)
+            }
+            ast::LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+                Self::Number(value.into())
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprStringLiteral<'a> {
+    value: &'a str,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprBytesLiteral<'a> {
+    value: &'a [u8],
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprNumberLiteral<'a> {
+    value: ComparableNumber<'a>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprBoolLiteral<'a> {
+    value: &'a bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -722,7 +761,12 @@ pub enum ComparableExpr<'a> {
     Call(ExprCall<'a>),
     FormattedValue(ExprFormattedValue<'a>),
     FString(ExprFString<'a>),
-    Constant(ExprConstant<'a>),
+    StringLiteral(ExprStringLiteral<'a>),
+    BytesLiteral(ExprBytesLiteral<'a>),
+    NumberLiteral(ExprNumberLiteral<'a>),
+    BoolLiteral(ExprBoolLiteral<'a>),
+    NoneLiteral,
+    EllispsisLiteral,
     Attribute(ExprAttribute<'a>),
     Subscript(ExprSubscript<'a>),
     Starred(ExprStarred<'a>),
@@ -896,11 +940,31 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }) => Self::FString(ExprFString {
                 values: values.iter().map(Into::into).collect(),
             }),
-            ast::Expr::Constant(ast::ExprConstant { value, range: _ }) => {
-                Self::Constant(ExprConstant {
+            ast::Expr::StringLiteral(ast::ExprStringLiteral {
+                value,
+                // Compare strings based on resolved value, not representation (i.e., ignore whether
+                // the string was implicitly concatenated).
+                implicit_concatenated: _,
+                unicode: _,
+                range: _,
+            }) => Self::StringLiteral(ExprStringLiteral { value }),
+            ast::Expr::BytesLiteral(ast::ExprBytesLiteral {
+                value,
+                // Compare bytes based on resolved value, not representation (i.e., ignore whether
+                // the bytes was implicitly concatenated).
+                implicit_concatenated: _,
+                range: _,
+            }) => Self::BytesLiteral(ExprBytesLiteral { value }),
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, range: _ }) => {
+                Self::NumberLiteral(ExprNumberLiteral {
                     value: value.into(),
                 })
             }
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, range: _ }) => {
+                Self::BoolLiteral(ExprBoolLiteral { value })
+            }
+            ast::Expr::NoneLiteral(_) => Self::NoneLiteral,
+            ast::Expr::EllipsisLiteral(_) => Self::EllispsisLiteral,
             ast::Expr::Attribute(ast::ExprAttribute {
                 value,
                 attr,

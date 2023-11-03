@@ -1,14 +1,7 @@
 # Ruff Formatter
 
 The Ruff formatter is an extremely fast Python code formatter that ships as part of the `ruff`
-CLI (as of Ruff v0.0.289).
-
-The formatter is currently in an **Alpha** state. The Alpha is primarily intended for
-experimentation: our focus is on collecting feedback that we can address prior to a production-ready
-Beta release later this year. (While we're using the formatter in production on our own projects,
-the CLI, configuration options, and code style may change arbitrarily between the Alpha and Beta.)
-
-[_We'd love to hear your feedback._](https://github.com/astral-sh/ruff/discussions/7310)
+CLI.
 
 ## Goals
 
@@ -30,7 +23,7 @@ For details, see [Black compatibility](#black-compatibility).
 
 ## Getting started
 
-The Ruff formatter shipped in an Alpha state as part of Ruff v0.0.289.
+The Ruff formatter is available in Beta as of Ruff v0.1.2.
 
 ### CLI
 
@@ -46,17 +39,29 @@ Arguments:
   [FILES]...  List of files or directories to format
 
 Options:
-      --check            Avoid writing any formatted files back; instead, exit with a non-zero status code if any files would have been modified, and zero otherwise
-      --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-  -h, --help             Print help
-
-File selection:
-      --respect-gitignore  Respect file exclusions via `.gitignore` and other standard ignore files
-      --force-exclude      Enforce exclusions, even for paths passed to Ruff directly on the command-line
+      --check
+          Avoid writing any formatted files back; instead, exit with a non-zero status code if any files would have been modified, and zero otherwise
+      --diff
+          Avoid writing any formatted files back; instead, exit with a non-zero status code and the difference between the current file and how the formatted file would look like
+      --config <CONFIG>
+          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --target-version <TARGET_VERSION>
+          The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
+      --preview
+          Enable preview mode; enables unstable formatting. Use `--no-preview` to disable
+  -h, --help
+          Print help
 
 Miscellaneous:
+  -n, --no-cache                         Disable cache reads
+      --cache-dir <CACHE_DIR>            Path to the cache directory [env: RUFF_CACHE_DIR=]
       --isolated                         Ignore all configuration files
       --stdin-filename <STDIN_FILENAME>  The name of the file when passing it through stdin
+
+File selection:
+      --respect-gitignore       Respect file exclusions via `.gitignore` and other standard ignore files. Use `--no-respect-gitignore` to disable
+      --exclude <FILE_PATTERN>  List of paths, used to omit files and/or directories from analysis
+      --force-exclude           Enforce exclusions, even for paths passed to Ruff directly on the command-line. Use `--no-force-exclude` to disable
 
 Log levels:
   -v, --verbose  Enable verbose logging
@@ -64,23 +69,18 @@ Log levels:
   -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
 ```
 
-Note: `ruff format` is currently hidden by default and will not be visible when running
-`ruff --help`.
-
 Similar to Black, running `ruff format /path/to/file.py` will format the given file or directory
 in-place, while `ruff format --check /path/to/file.py` will avoid writing any formatted files back,
 instead exiting with a non-zero status code if any files are not already formatted.
 
 ### VS Code
 
-As of `v2023.36.0`, the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
-ships with support for the Ruff formatter. To enable formatting capabilities, set the
-`ruff.enableExperimentalFormatter` setting to `true` in your `settings.json`, and mark the Ruff
+As of `v2023.44.0`, the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
+ships with full support for the Ruff formatter. To enable formatting capabilities, mark the Ruff
 extension as your default Python formatter:
 
 ```json
 {
-  "ruff.enableExperimentalFormatter": true,
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff"
   }
@@ -92,7 +92,6 @@ on-save by adding `"editor.formatOnSave": true` to your `settings.json`:
 
 ```json
 {
-  "ruff.enableExperimentalFormatter": true,
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true
@@ -110,10 +109,10 @@ as in:
 
 ```toml
 [tool.ruff.format]
-# Use tabs instead of 4 space indentation
+# Use tabs instead of 4 space indentation.
 indent-style = "tab"
 
-# Prefer single quotes over double quotes
+# Prefer single quotes over double quotes.
 quote-style = "single"
 ```
 
@@ -537,28 +536,6 @@ def update_emission_strength():
 # Ruff
 def update_emission_strength():
     value = self.emission_strength * 2
-```
-
-#### Type annotations may be parenthesized when expanded ([#7315](https://github.com/astral-sh/ruff/issues/7315))
-
-Black will avoid parenthesizing type annotations in an annotated assignment, while Ruff will insert
-parentheses in some cases.
-
-For example:
-
-```python
-# Black
-StartElementHandler: Callable[[str, dict[str, str]], Any] | Callable[[str, list[str]], Any] | Callable[
-    [str, dict[str, str], list[str]], Any
-] | None
-
-# Ruff
-StartElementHandler: (
-    Callable[[str, dict[str, str]], Any]
-    | Callable[[str, list[str]], Any]
-    | Callable[[str, dict[str, str], list[str]], Any]
-    | None
-)
 ```
 
 #### Call chain calls break differently ([#7051](https://github.com/astral-sh/ruff/issues/7051))

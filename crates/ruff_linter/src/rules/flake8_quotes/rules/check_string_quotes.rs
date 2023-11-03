@@ -32,6 +32,13 @@ use super::super::settings::Quote;
 ///
 /// ## Options
 /// - `flake8-quotes.inline-quotes`
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent quotes for inline strings, making the rule
+/// redundant.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct BadQuotesInlineString {
     preferred_quote: Quote,
@@ -81,6 +88,13 @@ impl AlwaysFixableViolation for BadQuotesInlineString {
 ///
 /// ## Options
 /// - `flake8-quotes.multiline-quotes`
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces double quotes for multiline strings, making the rule
+/// redundant.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct BadQuotesMultilineString {
     preferred_quote: Quote,
@@ -129,6 +143,13 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 ///
 /// ## Options
 /// - `flake8-quotes.docstring-quotes`
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces double quotes for docstrings, making the rule
+/// redundant.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct BadQuotesDocstring {
     preferred_quote: Quote,

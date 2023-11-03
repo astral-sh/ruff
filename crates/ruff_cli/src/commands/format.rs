@@ -11,7 +11,7 @@ use itertools::Itertools;
 use log::{error, warn};
 use rayon::iter::Either::{Left, Right};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use similar::TextDiff;
+use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::debug;
 
@@ -19,12 +19,11 @@ use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
-use ruff_linter::rules::isort;
-use ruff_linter::settings::rule_table::RuleTable;
+use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_python_formatter::{format_module_source, FormatModuleError};
+use ruff_python_formatter::{format_module_source, FormatModuleError, QuoteStyle};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::{
     match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile, Resolver,
@@ -107,7 +106,7 @@ pub(crate) fn format(
     };
 
     let start = Instant::now();
-    let (mut results, mut errors): (Vec<_>, Vec<_>) = paths
+    let (results, mut errors): (Vec<_>, Vec<_>) = paths
         .par_iter()
         .filter_map(|entry| {
             match entry {
@@ -118,14 +117,14 @@ pub(crate) fn format(
                         return None;
                     };
 
-                    let resolved_settings = resolver.resolve(path, &pyproject_config);
+                    let settings = resolver.resolve(path, &pyproject_config);
 
                     // Ignore files that are excluded from formatting
-                    if !resolved_file.is_root()
+                    if (settings.file_resolver.force_exclude || !resolved_file.is_root())
                         && match_exclusion(
                             path,
                             resolved_file.file_name(),
-                            &resolved_settings.formatter.exclude,
+                            &settings.formatter.exclude,
                         )
                     {
                         return None;
@@ -140,13 +139,7 @@ pub(crate) fn format(
 
                     Some(
                         match catch_unwind(|| {
-                            format_path(
-                                path,
-                                &resolved_settings.formatter,
-                                source_type,
-                                mode,
-                                cache,
-                            )
+                            format_path(path, &settings.formatter, source_type, mode, cache)
                         }) {
                             Ok(inner) => inner.map(|result| FormatPathResult {
                                 path: resolved_file.path().to_path_buf(),
@@ -168,27 +161,6 @@ pub(crate) fn format(
         });
     let duration = start.elapsed();
 
-    // Make output deterministic, at least as long as we have a path
-    results.sort_unstable_by(|x, y| x.path.cmp(&y.path));
-    errors.sort_by(|x, y| {
-        fn get_key(error: &FormatCommandError) -> Option<&PathBuf> {
-            match &error {
-                FormatCommandError::Ignore(ignore) => {
-                    if let ignore::Error::WithPath { path, .. } = ignore {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                }
-                FormatCommandError::Panic(path, _)
-                | FormatCommandError::Read(path, _)
-                | FormatCommandError::Format(path, _)
-                | FormatCommandError::Write(path, _) => path.as_ref(),
-            }
-        }
-        get_key(x).cmp(&get_key(y))
-    });
-
     debug!(
         "Formatted {} files in {:.2?}",
         results.len() + errors.len(),
@@ -198,15 +170,21 @@ pub(crate) fn format(
     caches.persist()?;
 
     // Report on any errors.
+    errors.sort_unstable_by(|a, b| a.path().cmp(&b.path()));
+
     for error in &errors {
         error!("{error}");
     }
 
-    results.sort_unstable_by(|a, b| a.path.cmp(&b.path));
     let results = FormatResults::new(results.as_slice(), mode);
-
-    if mode.is_diff() {
-        results.write_diff(&mut stdout().lock())?;
+    match mode {
+        FormatMode::Write => {}
+        FormatMode::Check => {
+            results.write_changed(&mut stdout().lock())?;
+        }
+        FormatMode::Diff => {
+            results.write_diff(&mut stdout().lock())?;
+        }
     }
 
     // Report on the formatting changes.
@@ -437,7 +415,7 @@ pub(crate) enum FormatResult {
     /// The file was unchanged, as the formatted contents matched the existing contents.
     Unchanged,
 
-    /// Skipped formatting because its an unformatted file format
+    /// Skipped formatting because its an unsupported file format
     Skipped,
 }
 
@@ -470,27 +448,51 @@ impl<'a> FormatResults<'a> {
         })
     }
 
+    /// Write a diff of the formatting changes to the given writer.
     fn write_diff(&self, f: &mut impl Write) -> io::Result<()> {
-        for result in self.results {
-            if let FormatResult::Diff {
-                unformatted,
-                formatted,
-            } = &result.result
-            {
-                let text_diff =
-                    TextDiff::from_lines(unformatted.source_code(), formatted.source_code());
-                let mut unified_diff = text_diff.unified_diff();
-                unified_diff.header(
-                    &fs::relativize_path(&result.path),
-                    &fs::relativize_path(&result.path),
-                );
-                unified_diff.to_writer(&mut *f)?;
-            }
+        for (path, unformatted, formatted) in self
+            .results
+            .iter()
+            .filter_map(|result| {
+                if let FormatResult::Diff {
+                    unformatted,
+                    formatted,
+                } = &result.result
+                {
+                    Some((result.path.as_path(), unformatted, formatted))
+                } else {
+                    None
+                }
+            })
+            .sorted_unstable_by_key(|(path, _, _)| *path)
+        {
+            unformatted.diff(formatted, Some(path), f)?;
         }
 
         Ok(())
     }
 
+    /// Write a list of the files that would be changed to the given writer.
+    fn write_changed(&self, f: &mut impl Write) -> io::Result<()> {
+        for path in self
+            .results
+            .iter()
+            .filter_map(|result| {
+                if result.result.is_formatted() {
+                    Some(result.path.as_path())
+                } else {
+                    None
+                }
+            })
+            .sorted_unstable()
+        {
+            writeln!(f, "Would reformat: {}", fs::relativize_path(path).bold())?;
+        }
+
+        Ok(())
+    }
+
+    /// Write a summary of the formatting results to the given writer.
     fn write_summary(&self, f: &mut impl Write) -> io::Result<()> {
         // Compute the number of changed and unchanged files.
         let mut changed = 0u32;
@@ -498,14 +500,6 @@ impl<'a> FormatResults<'a> {
         for result in self.results {
             match &result.result {
                 FormatResult::Formatted => {
-                    // If we're running in check mode, report on any files that would be formatted.
-                    if self.mode.is_check() {
-                        writeln!(
-                            f,
-                            "Would reformat: {}",
-                            fs::relativize_path(&result.path).bold()
-                        )?;
-                    }
                     changed += 1;
                 }
                 FormatResult::Unchanged => unchanged += 1,
@@ -562,6 +556,26 @@ pub(crate) enum FormatCommandError {
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
+    Diff(Option<PathBuf>, io::Error),
+}
+
+impl FormatCommandError {
+    fn path(&self) -> Option<&Path> {
+        match self {
+            Self::Ignore(err) => {
+                if let ignore::Error::WithPath { path, .. } = err {
+                    Some(path.as_path())
+                } else {
+                    None
+                }
+            }
+            Self::Panic(path, _)
+            | Self::Read(path, _)
+            | Self::Format(path, _)
+            | Self::Write(path, _)
+            | Self::Diff(path, _) => path.as_deref(),
+        }
+    }
 }
 
 impl Display for FormatCommandError {
@@ -627,6 +641,24 @@ impl Display for FormatCommandError {
                     write!(f, "{}{} {err}", "Failed to format".bold(), ":".bold())
                 }
             }
+            Self::Diff(path, err) => {
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{}{}{} {err}",
+                        "Failed to generate diff for ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{}{} {err}",
+                        "Failed to generate diff".bold(),
+                        ":".bold()
+                    )
+                }
+            }
             Self::Panic(path, err) => {
                 let message = r#"This indicates a bug in Ruff. If you could open an issue at:
 
@@ -658,64 +690,123 @@ pub(super) fn warn_incompatible_formatter_settings(
     pyproject_config: &PyprojectConfig,
     resolver: Option<&Resolver>,
 ) {
+    // First, collect all rules that are incompatible regardless of the linter-specific settings.
+    let mut incompatible_rules = FxHashSet::default();
     for setting in std::iter::once(&pyproject_config.settings)
         .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
     {
-        let mut incompatible_rules = Vec::new();
+        for rule in [
+            // The formatter might collapse implicit string concatenation on a single line.
+            Rule::SingleLineImplicitStringConcatenation,
+            // Flags missing trailing commas when all arguments are on its own line:
+            // ```python
+            // def args(
+            //     aaaaaaaa, bbbbbbbbb, cccccccccc, ddddddddd, eeeeeeee, ffffff, gggggggggggg, hhhh
+            // ):
+            //     pass
+            // ```
+            Rule::MissingTrailingComma,
+        ] {
+            if setting.linter.rules.enabled(rule) {
+                incompatible_rules.insert(rule);
+            }
+        }
+    }
 
-        for incompatible_rule in RuleTable::from_iter([
-            Rule::LineTooLong,
-            Rule::TabIndentation,
+    if !incompatible_rules.is_empty() {
+        let mut rule_names: Vec<_> = incompatible_rules
+            .into_iter()
+            .map(|rule| format!("`{}`", rule.noqa_code()))
+            .collect();
+        rule_names.sort();
+        warn_user_once!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding them to the `ignore` configuration.", rule_names.join(", "));
+    }
+
+    // Next, validate settings-specific incompatibilities.
+    for setting in std::iter::once(&pyproject_config.settings)
+        .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
+    {
+        // Validate all rules that rely on tab styles.
+        if setting.linter.rules.enabled(Rule::TabIndentation)
+            && setting.formatter.indent_style.is_tab()
+        {
+            warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `W191`, which lints against all uses of tabs. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
+        }
+
+        // Validate all rules that rely on tab styles.
+        if setting.linter.rules.enabled(Rule::IndentWithSpaces)
+            && setting.formatter.indent_style.is_tab()
+        {
+            warn_user_once!("The `format.indent-style=\"tab\"` option is incompatible with `D206`, with requires space-based indentation. We recommend disabling these rules when using the formatter, which enforces a consistent indentation style. Alternatively, set the `format.indent-style` option to `\"space\"`.");
+        }
+
+        // Validate all rules that rely on custom indent widths.
+        if setting.linter.rules.any_enabled(&[
             Rule::IndentationWithInvalidMultiple,
             Rule::IndentationWithInvalidMultipleComment,
-            Rule::OverIndented,
-            Rule::IndentWithSpaces,
-            Rule::SingleLineImplicitStringConcatenation,
-            Rule::MissingTrailingComma,
-            Rule::ProhibitedTrailingComma,
-            Rule::BadQuotesInlineString,
-            Rule::BadQuotesMultilineString,
-            Rule::BadQuotesDocstring,
-            Rule::AvoidableEscapedQuote,
-        ])
-        .iter_enabled()
+        ]) && setting.formatter.indent_width.value() != 4
         {
-            if setting.linter.rules.enabled(incompatible_rule) {
-                incompatible_rules.push(format!("'{}'", incompatible_rule.noqa_code()));
+            warn_user_once!("The `format.indent-width` option with a value other than 4 is incompatible with `E111` and `E114`. We recommend disabling these rules when using the formatter, which enforces a consistent indentation width. Alternatively, set the `format.indent-width` option to `4`.");
+        }
+
+        // Validate all rules that rely on quote styles.
+        if setting
+            .linter
+            .rules
+            .any_enabled(&[Rule::BadQuotesInlineString, Rule::AvoidableEscapedQuote])
+        {
+            match (
+                setting.linter.flake8_quotes.inline_quotes,
+                setting.formatter.quote_style,
+            ) {
+                (Quote::Double, QuoteStyle::Single) => {
+                    warn_user_once!("The `flake8-quotes.inline-quotes=\"double\"` option is incompatible with the formatter's `format.quote-style=\"single\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
+                }
+                (Quote::Single, QuoteStyle::Double) => {
+                    warn_user_once!("The `flake8-quotes.inline-quotes=\"single\"` option is incompatible with the formatter's `format.quote-style=\"double\"`. We recommend disabling `Q000` and `Q003` when using the formatter, which enforces a consistent quote style. Alternatively, set both options to either `\"single\"` or `\"double\"`.");
+                }
+                _ => {}
             }
         }
 
-        if !incompatible_rules.is_empty() {
-            incompatible_rules.sort();
-            warn!("The following rules may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these rules, either by removing them from the `select` or `extend-select` configuration, or adding then to the `ignore` configuration.", incompatible_rules.join(", "));
+        if setting.linter.rules.enabled(Rule::BadQuotesMultilineString)
+            && setting.linter.flake8_quotes.multiline_quotes == Quote::Single
+        {
+            warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q001` when using the formatter, which enforces double quotes for multiline strings. Alternatively, set the `flake8-quotes.multiline-quotes` option to `\"double\"`.`");
         }
 
-        let mut incompatible_options = Vec::new();
-
-        let isort_defaults = isort::settings::Settings::default();
-
-        if setting.linter.isort.force_single_line != isort_defaults.force_single_line {
-            incompatible_options.push("'isort.force-single-line'");
+        if setting.linter.rules.enabled(Rule::BadQuotesDocstring)
+            && setting.linter.flake8_quotes.docstring_quotes == Quote::Single
+        {
+            warn_user_once!("The `flake8-quotes.multiline-quotes=\"single\"` option is incompatible with the formatter. We recommend disabling `Q002` when using the formatter, which enforces double quotes for docstrings. Alternatively, set the `flake8-quotes.docstring-quotes` option to `\"double\"`.`");
         }
 
-        if setting.linter.isort.force_wrap_aliases != isort_defaults.force_wrap_aliases {
-            incompatible_options.push("'isort.force-wrap-aliases'");
-        }
+        // Validate all isort settings.
+        if setting.linter.rules.enabled(Rule::UnsortedImports) {
+            // The formatter removes empty lines if the value is larger than 2 but always inserts a empty line after imports.
+            // Two empty lines are okay because `isort` only uses this setting for top-level imports (not in nested blocks).
+            if !matches!(setting.linter.isort.lines_after_imports, 1 | 2 | -1) {
+                warn_user_once!("The isort option `isort.lines-after-imports` with a value other than `-1`, `1` or `2` is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `2`, `1`, or `-1` (default).");
+            }
 
-        if setting.linter.isort.lines_after_imports != isort_defaults.lines_after_imports {
-            incompatible_options.push("'isort.lines-after-imports'");
-        }
+            // Values larger than two get reduced to one line by the formatter if the import is in a nested block.
+            if setting.linter.isort.lines_between_types > 1 {
+                warn_user_once!("The isort option `isort.lines-between-types` with a value greater than 1 is incompatible with the formatter. To avoid unexpected behavior, we recommend setting the option to one of: `1` or `0` (default).");
+            }
 
-        if setting.linter.isort.lines_between_types != isort_defaults.lines_between_types {
-            incompatible_options.push("'isort.lines_between_types'");
-        }
+            // isort inserts a trailing comma which the formatter preserves, but only if `skip-magic-trailing-comma` isn't false.
+            // This isn't relevant when using `force-single-line`, since isort will never include a trailing comma in that case.
+            if setting.formatter.magic_trailing_comma.is_ignore()
+                && !setting.linter.isort.force_single_line
+            {
+                if setting.linter.isort.force_wrap_aliases {
+                    warn_user_once!("The isort option `isort.force-wrap-aliases` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.force-wrap-aliases=false` or `format.skip-magic-trailing-comma=false`.");
+                }
 
-        if setting.linter.isort.split_on_trailing_comma != isort_defaults.split_on_trailing_comma {
-            incompatible_options.push("'isort.split_on_trailing_comma'");
-        }
-
-        if !incompatible_options.is_empty() {
-            warn!("The following isort options may cause conflicts when used with the formatter: {}. To avoid unexpected behavior, we recommend disabling these options by removing them from the configuration.", incompatible_options.join(", "));
+                if setting.linter.isort.split_on_trailing_comma {
+                    warn_user_once!("The isort option `isort.split-on-trailing-comma` is incompatible with the formatter `format.skip-magic-trailing-comma=true` option. To avoid unexpected behavior, we recommend either setting `isort.split-on-trailing-comma=false` or `format.skip-magic-trailing-comma=false`.");
+                }
+            }
         }
     }
 }

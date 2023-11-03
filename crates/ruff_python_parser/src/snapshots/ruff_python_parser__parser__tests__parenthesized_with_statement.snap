@@ -319,8 +319,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Store,
                                 },
                             ),
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 169..170,
                                     value: Int(
                                         0,
@@ -358,8 +358,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Store,
                                 },
                             ),
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 189..190,
                                     value: Int(
                                         0,
@@ -431,8 +431,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Store,
                                 },
                             ),
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 232..233,
                                     value: Int(
                                         0,
@@ -489,8 +489,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Store,
                                 },
                             ),
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 262..263,
                                     value: Int(
                                         0,
@@ -539,8 +539,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Store,
                                 },
                             ),
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 287..288,
                                     value: Int(
                                         0,

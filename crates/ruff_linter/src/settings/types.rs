@@ -161,7 +161,7 @@ impl FilePattern {
 
                 // Add basename path.
                 if !pattern.contains(std::path::MAIN_SEPARATOR) {
-                    builder.add(Glob::from_str(&pattern)?);
+                    builder.add(Glob::new(&pattern)?);
                 }
             }
         }

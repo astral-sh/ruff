@@ -2,9 +2,7 @@
 
 use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
-use ruff_python_ast::{
-    self as ast, Constant, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt,
-};
+use ruff_python_ast::{self as ast, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt};
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
@@ -144,10 +142,7 @@ pub fn to_pep604_operator(
     /// Returns `true` if any argument in the slice is a quoted annotation.
     fn quoted_annotation(slice: &Expr) -> bool {
         match slice {
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_),
-                ..
-            }) => true,
+            Expr::StringLiteral(_) => true,
             Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(quoted_annotation),
             _ => false,
         }
@@ -257,10 +252,7 @@ pub fn is_immutable_annotation(
             is_immutable_annotation(left, semantic, extend_immutable_calls)
                 && is_immutable_annotation(right, semantic, extend_immutable_calls)
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            ..
-        }) => true,
+        Expr::NoneLiteral(_) => true,
         _ => false,
     }
 }
@@ -314,8 +306,8 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     // Ex) `if 0:`
     if matches!(
         test.as_ref(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(Int::ZERO),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(Int::ZERO),
             ..
         })
     ) {

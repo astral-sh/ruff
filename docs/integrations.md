@@ -55,6 +55,10 @@ or isort, _unless_ you enable autofix, in which case, Ruff's pre-commit hook sho
 Black, isort, and other formatting tools, as Ruff's autofix behavior can output code changes that
 require reformatting.
 
+As long as your Ruff configuration avoids any [linter-formatter incompatibilities](formatter.md#conflicting-lint-rules),
+`ruff format` should never introduce new lint errors, so it's safe to run Ruff's format hook _after_
+`ruff check --fix`.
+
 ## Language Server Protocol (Official)
 
 Ruff supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
@@ -269,22 +273,34 @@ tools:
 
 <details>
 <summary>
-For neovim users using
-<a href="https://github.com/jose-elias-alvarez/null-ls.nvim">
-  <code>null-ls</code>
-</a>, Ruff is already <a href="https://github.com/jose-elias-alvarez/null-ls.nvim">integrated</a>.
+With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</code></a> plugin for Neovim.
 </summary>
 <br>
 
 ```lua
-local null_ls = require("null-ls")
-
-null_ls.setup({
-    sources = {
-        null_ls.builtins.formatting.ruff,
-        null_ls.builtins.diagnostics.ruff,
-    }
+require("conform").setup({
+    formatters_by_ft = {
+        python = {
+          -- To fix lint errors.
+          "ruff_fix",
+          -- To run the Ruff formatter.
+          "ruff_format",
+        },
+    },
 })
+```
+
+</details>
+
+<details>
+<summary>
+With the <a href="https://github.com/mfussenegger/nvim-lint"><code>nvim-lint</code></a> plugin for Neovim.
+</summary>
+
+```lua
+require("lint").linters_by_ft = {
+  python = { "ruff" },
+}
 ```
 
 </details>

@@ -244,11 +244,11 @@ fn match_open_keywords(
 
 /// Match open mode to see if it is supported.
 fn match_open_mode(mode: &Expr) -> Option<ReadMode> {
-    let ast::StringConstant {
+    let ast::ExprStringLiteral {
         value,
         implicit_concatenated: false,
         ..
-    } = mode.as_constant_expr()?.value.as_str()?
+    } = mode.as_string_literal_expr()?
     else {
         return None;
     };

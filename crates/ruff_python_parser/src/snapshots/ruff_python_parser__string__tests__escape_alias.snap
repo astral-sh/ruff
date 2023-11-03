@@ -6,16 +6,12 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..12,
-            value: Constant(
-                ExprConstant {
+            value: StringLiteral(
+                ExprStringLiteral {
                     range: 0..12,
-                    value: Str(
-                        StringConstant {
-                            value: "\u{1b}",
-                            unicode: false,
-                            implicit_concatenated: false,
-                        },
-                    ),
+                    value: "\u{1b}",
+                    unicode: false,
+                    implicit_concatenated: false,
                 },
             ),
         },

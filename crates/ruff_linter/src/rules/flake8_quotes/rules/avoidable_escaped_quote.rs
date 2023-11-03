@@ -27,6 +27,13 @@ use crate::settings::LinterSettings;
 /// ```python
 /// foo = "bar's"
 /// ```
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter automatically removes unnecessary escapes, making the rule
+/// redundant.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct AvoidableEscapedQuote;
 

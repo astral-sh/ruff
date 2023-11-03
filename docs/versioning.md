@@ -13,6 +13,8 @@ Ruff uses a custom versioning scheme that uses the **minor** version number for 
 - Support for a new file type is promoted to stable
 - Support for an end-of-life Python version is dropped
 - The behavior of a stable rule is changed
+    - The scope of a stable rule is significantly increased
+    - The intent of the rule changes
     - Does not include bug fixes that follow the original intent of the rule
 - Stable rules are added to the default set
 - Stable rules are removed from the default set
@@ -23,6 +25,7 @@ Ruff uses a custom versioning scheme that uses the **minor** version number for 
 - Bugs are fixed, _including behavior changes that fix bugs_
 - An unsafe fix for a rule is added
 - A safe fix for a rule is added in preview
+- The scope of a rule is increased in preview
 - A fix’s applicability is demoted
 - A new configuration option is added
 - A rule is added in preview

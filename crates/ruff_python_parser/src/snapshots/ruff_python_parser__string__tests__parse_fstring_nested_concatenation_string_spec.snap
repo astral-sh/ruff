@@ -30,16 +30,12 @@ expression: parse_ast
                                                 FormattedValue(
                                                     ExprFormattedValue {
                                                         range: 7..14,
-                                                        value: Constant(
-                                                            ExprConstant {
+                                                        value: StringLiteral(
+                                                            ExprStringLiteral {
                                                                 range: 8..13,
-                                                                value: Str(
-                                                                    StringConstant {
-                                                                        value: "",
-                                                                        unicode: false,
-                                                                        implicit_concatenated: true,
-                                                                    },
-                                                                ),
+                                                                value: "",
+                                                                unicode: false,
+                                                                implicit_concatenated: true,
                                                             },
                                                         ),
                                                         debug_text: None,

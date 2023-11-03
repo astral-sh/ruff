@@ -86,7 +86,7 @@ pub(crate) fn capitalized(checker: &mut Checker, docstring: &Docstring) {
             first_word: first_word.to_string(),
             capitalized_word: capitalized_word.to_string(),
         },
-        docstring.expr.range(),
+        docstring.range(),
     );
 
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(

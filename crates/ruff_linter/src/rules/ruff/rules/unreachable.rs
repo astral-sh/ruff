@@ -2,8 +2,8 @@ use std::{fmt, iter, usize};
 
 use log::error;
 use ruff_python_ast::{
-    Expr, Identifier, MatchCase, Pattern, PatternMatchAs, Stmt, StmtFor, StmtMatch, StmtReturn,
-    StmtTry, StmtWhile, StmtWith,
+    Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs, Stmt, StmtFor,
+    StmtMatch, StmtReturn, StmtTry, StmtWhile, StmtWith,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -189,7 +189,7 @@ fn taken(condition: &Condition) -> Option<bool> {
     // statically. For now we only consider constant booleans.
     match condition {
         Condition::Test(expr) => match expr {
-            Expr::Constant(constant) => constant.value.as_bool().copied(),
+            Expr::BooleanLiteral(ExprBooleanLiteral { value, .. }) => Some(*value),
             _ => None,
         },
         Condition::Iterator(_) => None,
@@ -627,7 +627,12 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Call(_)
                         | Expr::FormattedValue(_)
                         | Expr::FString(_)
-                        | Expr::Constant(_)
+                        | Expr::StringLiteral(_)
+                        | Expr::BytesLiteral(_)
+                        | Expr::NumberLiteral(_)
+                        | Expr::BooleanLiteral(_)
+                        | Expr::NoneLiteral(_)
+                        | Expr::EllipsisLiteral(_)
                         | Expr::Attribute(_)
                         | Expr::Subscript(_)
                         | Expr::Starred(_)

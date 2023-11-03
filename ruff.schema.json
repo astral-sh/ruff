@@ -159,7 +159,7 @@
       }
     },
     "external": {
-      "description": "A list of rule codes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
+      "description": "A list of rule codes or prefixes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
       "type": [
         "array",
         "null"
@@ -413,6 +413,17 @@
         "type": "string"
       }
     },
+    "indent-width": {
+      "description": "The number of spaces per indentation level (tab).\n\nUsed by the formatter and when enforcing long-line violations (like `E501`) to determine the visual width of a tab.\n\nThis option changes the number of spaces the formatter inserts when using soft-tabs (`indent-style = space`).\n\nPEP 8 recommends using 4 spaces per [indentation level](https://peps.python.org/pep-0008/#indentation).",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/IndentWidth"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "isort": {
       "description": "Options for the `isort` plugin.",
       "anyOf": [
@@ -425,7 +436,7 @@
       ]
     },
     "line-length": {
-      "description": "The line length to use when enforcing long-lines violations (like `E501`). Must be greater than `0` and less than or equal to `320`.",
+      "description": "The line length to use when enforcing long-lines violations (like `E501`) and at which `isort` and the formatter prefers to wrap lines.\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nThe value must be greater than `0` and less than or equal to `320`.\n\nNote: While the formatter will attempt to format lines such that they remain within the `line-length`, it isn't a hard upper bound, and formatted lines may exceed the `line-length`.\n\nSee [`pycodestyle.max-line-length`](#pycodestyle-max-line-length) to configure different lengths for `E501` and the formatter.",
       "anyOf": [
         {
           "$ref": "#/definitions/LineLength"
@@ -627,9 +638,10 @@
     },
     "tab-size": {
       "description": "The number of spaces a tab is equal to when enforcing long-line violations (like `E501`) or formatting code with the formatter.\n\nThis option changes the number of spaces inserted by the formatter when using soft-tabs (`indent-style = space`).",
+      "deprecated": true,
       "anyOf": [
         {
-          "$ref": "#/definitions/TabSize"
+          "$ref": "#/definitions/IndentWidth"
         },
         {
           "type": "null"
@@ -1071,7 +1083,7 @@
           ]
         },
         "docstring-quotes": {
-          "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").",
+          "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").\n\nWhen using the formatter, only \"double\" is compatible, as the formatter enforces double quotes for docstrings strings.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1082,7 +1094,7 @@
           ]
         },
         "inline-quotes": {
-          "description": "Quote style to prefer for inline strings (either \"single\" or \"double\").",
+          "description": "Quote style to prefer for inline strings (either \"single\" or \"double\").\n\nWhen using the formatter, ensure that `format.quote-style` is set to the same preferred quote style.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1093,7 +1105,7 @@
           ]
         },
         "multiline-quotes": {
-          "description": "Quote style to prefer for multiline strings (either \"single\" or \"double\").",
+          "description": "Quote style to prefer for multiline strings (either \"single\" or \"double\").\n\nWhen using the formatter, only \"double\" is compatible, as the formatter enforces double quotes for multiline strings.",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -1230,7 +1242,7 @@
       "type": "object",
       "properties": {
         "exclude": {
-          "description": "A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
+          "description": "A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "array",
             "null"
@@ -1240,7 +1252,7 @@
           }
         },
         "indent-style": {
-          "description": "Whether to use 4 spaces or hard tabs for indenting code.\n\nDefaults to 4 spaces. We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.",
+          "description": "Whether to use spaces or tabs for indentation.\n\n`indent-style = \"space\"` (default):\n\n```python def f(): print(\"Hello\") #  Spaces indent the `print` statement. ```\n\n`indent-style = \"tab\"\"`:\n\n```python def f(): print(\"Hello\") #  A tab `\\t` indents the `print` statement. ```\n\nPEP 8 recommends using spaces for [indentation](https://peps.python.org/pep-0008/#indentation). We care about accessibility; if you do not need tabs for accessibility, we do not recommend you use them.\n\nSee [`indent-width`](#indent-width) to configure the number of spaces per indentation and the tab width.",
           "anyOf": [
             {
               "$ref": "#/definitions/IndentStyle"
@@ -1280,7 +1292,7 @@
           ]
         },
         "skip-magic-trailing-comma": {
-          "description": "Ruff uses existing trailing commas as an indication that short lines should be left separate. If this option is set to `true`, the magic trailing comma is ignored.\n\nFor example, Ruff leaves the arguments separate even though collapsing the arguments to a single line doesn't exceed the line width if `skip-magic-trailing-comma = false`:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test( a, b, ): pass ```\n\nSetting `skip-magic-trailing-comma = true` changes the formatting to:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test(a, b): pass ```",
+          "description": "Ruff uses existing trailing commas as an indication that short lines should be left separate. If this option is set to `true`, the magic trailing comma is ignored.\n\nFor example, Ruff leaves the arguments separate even though collapsing the arguments to a single line doesn't exceed the line length if `skip-magic-trailing-comma = false`:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test( a, b, ): pass ```\n\nSetting `skip-magic-trailing-comma = true` changes the formatting to:\n\n```python # The arguments remain on separate lines because of the trailing comma after `b` def test(a, b): pass ```",
           "type": [
             "boolean",
             "null"
@@ -1326,6 +1338,12 @@
           ]
         }
       ]
+    },
+    "IndentWidth": {
+      "description": "The size of a tab.",
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 1.0
     },
     "IsortOptions": {
       "type": "object",
@@ -1406,7 +1424,7 @@
           }
         },
         "force-wrap-aliases": {
-          "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```python from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
+          "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```python from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.\n\nWhen using the formatter, ensure that `format.skip-magic-trailing-comma` is set to `false` (default) when enabling `force-wrap-aliases` to avoid that the formatter collapses members if they all fit on a single line.",
           "type": [
             "boolean",
             "null"
@@ -1453,7 +1471,7 @@
           }
         },
         "lines-after-imports": {
-          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.",
+          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
           "type": [
             "integer",
             "null"
@@ -1461,7 +1479,7 @@
           "format": "int"
         },
         "lines-between-types": {
-          "description": "The number of lines to place between \"direct\" and `import from` imports.",
+          "description": "The number of lines to place between \"direct\" and `import from` imports.\n\nWhen using the formatter, only the values `0` and `1` are compatible because it preserves up to one empty line after imports in nested blocks.",
           "type": [
             "integer",
             "null"
@@ -1541,7 +1559,7 @@
           }
         },
         "split-on-trailing-comma": {
-          "description": "If a comma is placed after the last member in a multi-line import, then the imports will never be folded into one line.\n\nSee isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.",
+          "description": "If a comma is placed after the last member in a multi-line import, then the imports will never be folded into one line.\n\nSee isort's [`split-on-trailing-comma`](https://pycqa.github.io/isort/docs/configuration/options.html#split-on-trailing-comma) option.\n\nWhen using the formatter, ensure that `format.skip-magic-trailing-comma` is set to `false` (default) when enabling `split-on-trailing-comma` to avoid that the formatter removes the trailing commas.",
           "type": [
             "boolean",
             "null"
@@ -1715,7 +1733,7 @@
           }
         },
         "external": {
-          "description": "A list of rule codes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
+          "description": "A list of rule codes or prefixes that are unsupported by Ruff, but should be preserved when (e.g.) validating `# noqa` directives. Useful for retaining `# noqa` directives that cover plugins not yet implemented by Ruff.",
           "type": [
             "array",
             "null"
@@ -2195,7 +2213,18 @@
           ]
         },
         "max-doc-length": {
-          "description": "The maximum line length to allow for line-length violations within documentation (`W505`), including standalone comments. By default, this is set to null which disables reporting violations.\n\nSee the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.",
+          "description": "The maximum line length to allow for [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) violations within documentation (`W505`), including standalone comments. By default, this is set to null which disables reporting violations.\n\nThe length is determined by the number of characters per line, except for lines containing Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) rule for more information.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LineLength"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "max-line-length": {
+          "description": "The maximum line length to allow for [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) violations. By default, this is set to the value of the [`line-length`](#line-length) option.\n\nUse this option when you want to detect extra-long lines that the formatter can't automatically split by setting `pycodestyle.line-length` to a value larger than [`line-length`](#line-length).\n\n```toml line-length = 88 # The formatter wraps lines at a length of 88\n\n[pycodestyle] max-line-length = 100 # E501 reports lines that exceed the length of 100. ```\n\nThe length is determined by the number of characters per line, except for lines containing East Asian characters or emojis. For these lines, the [unicode width](https://unicode.org/reports/tr11/) of each character is added up to determine the length.\n\nSee the [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) rule for more information.",
           "anyOf": [
             {
               "$ref": "#/definitions/LineLength"
@@ -2212,7 +2241,7 @@
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style or NumPy-style conventions or the PEP257 defaults when analyzing docstring sections.\n\nEnabling a convention will force-disable any rules that are not included in the specified convention. As such, the intended use is to enable a convention and then selectively disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.pydocstyle] convention = \"google\" ```\n\nAs conventions force-disable all rules not included in the convention, enabling _additional_ rules on top of a convention is currently unsupported.",
+          "description": "Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will force-disable any rules that are not included in the specified convention. As such, the intended use is to enable a convention and then selectively disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff.lint] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle] convention = \"google\" ```\n\nAs conventions force-disable all rules not included in the convention, enabling _additional_ rules on top of a convention is currently unsupported.",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"
@@ -2791,6 +2820,8 @@
         "FURB140",
         "FURB145",
         "FURB148",
+        "FURB16",
+        "FURB168",
         "FURB17",
         "FURB171",
         "FURB177",
@@ -2948,6 +2979,7 @@
         "PLC04",
         "PLC041",
         "PLC0414",
+        "PLC0415",
         "PLC1",
         "PLC19",
         "PLC190",
@@ -3087,6 +3119,7 @@
         "PLW1",
         "PLW15",
         "PLW150",
+        "PLW1501",
         "PLW1508",
         "PLW1509",
         "PLW151",
@@ -3096,6 +3129,9 @@
         "PLW164",
         "PLW1641",
         "PLW2",
+        "PLW21",
+        "PLW210",
+        "PLW2101",
         "PLW29",
         "PLW290",
         "PLW2901",
@@ -3432,6 +3468,10 @@
         "TID251",
         "TID252",
         "TID253",
+        "TRIO",
+        "TRIO1",
+        "TRIO10",
+        "TRIO100",
         "TRY",
         "TRY0",
         "TRY00",
@@ -3561,12 +3601,6 @@
           ]
         }
       ]
-    },
-    "TabSize": {
-      "description": "The size of a tab.",
-      "type": "integer",
-      "format": "uint8",
-      "minimum": 1.0
     },
     "Version": {
       "type": "string"

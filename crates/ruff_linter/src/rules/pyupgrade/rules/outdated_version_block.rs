@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, CmpOp, Constant, ElifElseClause, Expr, Int, StmtIf};
+use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -147,8 +147,8 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                 }
                 _ => {}
             },
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(int),
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(int),
                 ..
             }) => {
                 if op == &CmpOp::Eq {
@@ -409,8 +409,8 @@ fn fix_always_true_branch(
 fn extract_version(elts: &[Expr]) -> Option<Vec<Int>> {
     let mut version: Vec<Int> = vec![];
     for elt in elts {
-        let Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(int),
+        let Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(int),
             ..
         }) = &elt
         else {

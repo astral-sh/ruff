@@ -127,4 +127,21 @@ impl<'a> Cursor<'a> {
             self.bump();
         }
     }
+
+    /// Skips the next `count` bytes.
+    ///
+    /// ## Panics
+    ///  - If `count` is larger than the remaining bytes in the input stream.
+    ///  - If `count` indexes into a multi-byte character.
+    pub(super) fn skip_bytes(&mut self, count: usize) {
+        #[cfg(debug_assertions)]
+        {
+            self.prev_char = self.chars.as_str()[..count]
+                .chars()
+                .next_back()
+                .unwrap_or('\0');
+        }
+
+        self.chars = self.chars.as_str()[count..].chars();
+    }
 }

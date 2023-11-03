@@ -3,8 +3,8 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
-use ruff_python_ast::helpers::{generate_comparison, is_const_none};
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
+use ruff_python_ast::helpers::generate_comparison;
+use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -148,7 +148,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
 
     if !helpers::is_constant_non_singleton(next) {
         if let Some(op) = EqCmpOp::try_from(*op) {
-            if checker.enabled(Rule::NoneComparison) && is_const_none(comparator) {
+            if checker.enabled(Rule::NoneComparison) && comparator.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
                         let diagnostic = Diagnostic::new(NoneComparison(op), comparator.range());
@@ -164,11 +164,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             }
 
             if checker.enabled(Rule::TrueFalseComparison) {
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bool(value),
-                    range: _,
-                }) = comparator
-                {
+                if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
                     match op {
                         EqCmpOp::Eq => {
                             let diagnostic = Diagnostic::new(
@@ -208,7 +204,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
             continue;
         };
 
-        if checker.enabled(Rule::NoneComparison) && is_const_none(next) {
+        if checker.enabled(Rule::NoneComparison) && next.is_none_literal_expr() {
             match op {
                 EqCmpOp::Eq => {
                     let diagnostic = Diagnostic::new(NoneComparison(op), next.range());
@@ -224,11 +220,7 @@ pub(crate) fn literal_comparisons(checker: &mut Checker, compare: &ast::ExprComp
         }
 
         if checker.enabled(Rule::TrueFalseComparison) {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Bool(value),
-                range: _,
-            }) = next
-            {
+            if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
                 match op {
                     EqCmpOp::Eq => {
                         let diagnostic =

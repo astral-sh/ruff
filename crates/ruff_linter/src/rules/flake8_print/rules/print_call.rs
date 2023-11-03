@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -86,7 +86,7 @@ pub(crate) fn print_call(checker: &mut Checker, call: &ast::ExprCall) {
             // If the print call has a `file=` argument (that isn't `None`, `"sys.stdout"`,
             // or `"sys.stderr"`), don't trigger T201.
             if let Some(keyword) = call.arguments.find_keyword("file") {
-                if !is_const_none(&keyword.value) {
+                if !keyword.value.is_none_literal_expr() {
                     if checker.semantic().resolve_call_path(&keyword.value).map_or(
                         true,
                         |call_path| {

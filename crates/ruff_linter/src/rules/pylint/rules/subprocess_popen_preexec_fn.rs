@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -58,7 +58,7 @@ pub(crate) fn subprocess_popen_preexec_fn(checker: &mut Checker, call: &ast::Exp
         if let Some(keyword) = call
             .arguments
             .find_keyword("preexec_fn")
-            .filter(|keyword| !is_const_none(&keyword.value))
+            .filter(|keyword| !keyword.value.is_none_literal_expr())
         {
             checker
                 .diagnostics

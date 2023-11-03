@@ -1,5 +1,5 @@
 use itertools::Either::{Left, Right};
-use ruff_python_ast::{self as ast, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, Operator};
 
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_parser::typing::parse_type_annotation;
@@ -107,13 +107,11 @@ impl<'a> TypingTarget<'a> {
                 right,
                 ..
             }) => Some(TypingTarget::PEP604Union(left, right)),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                ..
-            }) => Some(TypingTarget::None),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(string),
+            Expr::NoneLiteral(_) => Some(TypingTarget::None),
+            Expr::StringLiteral(ast::ExprStringLiteral {
+                value: string,
                 range,
+                ..
             }) => parse_type_annotation(string, *range, locator.contents())
                 .map_or(None, |(expr, _)| Some(TypingTarget::ForwardReference(expr))),
             _ => semantic.resolve_call_path(expr).map_or(
