@@ -43,6 +43,14 @@ impl<'a> PyFormatContext<'a> {
     pub(crate) fn comments(&self) -> &Comments<'a> {
         &self.comments
     }
+
+    pub(crate) const fn is_preview(&self) -> bool {
+        self.options.preview().is_enabled()
+    }
+
+    pub(crate) const fn is_stable(&self) -> bool {
+        !self.is_preview()
+    }
 }
 
 impl FormatContext for PyFormatContext<'_> {

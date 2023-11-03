@@ -2313,6 +2313,14 @@ impl Parameters {
             && self.vararg.is_none()
             && self.kwarg.is_none()
     }
+
+    pub fn len(&self) -> usize {
+        self.posonlyargs.len()
+            + self.args.len()
+            + usize::from(self.vararg.is_some())
+            + self.kwonlyargs.len()
+            + usize::from(self.kwarg.is_some())
+    }
 }
 
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.

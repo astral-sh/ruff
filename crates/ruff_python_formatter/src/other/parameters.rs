@@ -240,14 +240,10 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             Ok(())
         });
 
-        let num_parameters = posonlyargs.len()
-            + args.len()
-            + usize::from(vararg.is_some())
-            + kwonlyargs.len()
-            + usize::from(kwarg.is_some());
+        let num_parameters = item.len();
 
         if self.parentheses == ParametersParentheses::Never {
-            write!(f, [group(&format_inner), dangling_comments(dangling)])
+            write!(f, [format_inner, dangling_comments(dangling)])
         } else if num_parameters == 0 {
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
             // No parameters, format any dangling comments between `()`

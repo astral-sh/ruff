@@ -127,6 +127,13 @@ lambda a, /, c: a
 
 (
     lambda
+    # comment
+    *x,
+    **y: x
+)
+
+(
+    lambda
     # comment 1
     *
     # comment 2
@@ -136,9 +143,28 @@ lambda a, /, c: a
 )
 
 (
+    lambda
+    # comment 1
+    *
+    # comment 2
+    x,
+    **y:
+    # comment 3
+    x
+)
+
+(
     lambda # comment 1
     * # comment 2
     x: # comment 3
+    x
+)
+
+(
+    lambda # comment 1
+        * # comment 2
+        x,
+        y: # comment 3
     x
 )
 
@@ -197,12 +223,88 @@ lambda: ( # comment
 )
 
 (
+    lambda  # 1
+    # 2
+    x,  # 3
+    # 4
+    y
+    :  # 5
+    # 6
+    x
+)
+
+(
     lambda
     x,
     # comment
     y:
     z
 )
+
+
+# Leading
+lambda x: (
+    lambda y: lambda z: x
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + z  # Trailing
+)  # Trailing
+
+
+# Leading
+lambda x: lambda y: lambda z: [
+    x,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    z
+] # Trailing
+# Trailing
 
 lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs), e=1, f=2, g=2: d
 
