@@ -13,7 +13,7 @@ prelude = """
 
 /// Via: <https://github.com/hediet/vscode-unicode-data/blob/main/out/ambiguous.json>
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
-pub(crate) fn confusable(c: u32) -> Option<u8> {
+pub(crate) fn confusable(c: u32) -> Option<char> {
   let result = match c {
 
 """.lstrip()
@@ -49,6 +49,14 @@ def format_number(number: int) -> str:
     return f"{number}u32"
 
 
+def format_char(number: int) -> str:
+    """Format a Python integer as a Rust character literal."""
+    char = chr(number)
+    if char == "\\":
+        return "\\\\"
+    return char
+
+
 def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
     """Format the downloaded data into a Rust source file."""
     # The input data contains duplicate entries.
@@ -59,7 +67,7 @@ def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
             flattened_items.add((items[i], items[i + 1]))
 
     tuples = [
-        f"    {format_number(left)} => {right},\n"
+        f"    {format_number(left)} => '{format_char(right)}',\n"
         for left, right in sorted(flattened_items)
     ]
 
@@ -67,13 +75,13 @@ def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
     # as they're unicode-to-unicode confusables, not unicode-to-ASCII confusables.
     confusable_units = [
         # ANGSTROM SIGN → LATIN CAPITAL LETTER A WITH RING ABOVE
-        ("0x212B", "0x00C5"),
+        ("0x212B", chr(0x00C5)),
         # OHM SIGN → GREEK CAPITAL LETTER OMEGA
-        ("0x2126", "0x03A9"),
+        ("0x2126", chr(0x03A9)),
         # MICRO SIGN → GREEK SMALL LETTER MU
-        ("0x00B5", "0x03BC"),
+        ("0x00B5", chr(0x03BC)),
     ]
-    tuples += [f"    {left} => {right},\n" for left, right in confusable_units]
+    tuples += [f"    {left} => '{right}',\n" for left, right in confusable_units]
 
     print(f"{len(tuples)} confusable tuples.")
 
