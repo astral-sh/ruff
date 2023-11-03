@@ -48,7 +48,7 @@ impl Violation for Numpy2Deprecation {
             existing,
             migration_guide,
         } = self;
-        format!("`np.{existing}` will be removed in the NumPy 2.0. {migration_guide}")
+        format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -116,7 +116,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "asfarray"] => Some(Replacement {
                 existing: "asfarray",
                 details: Details::Manual {
-                    guideline: "Use np.asarray with a float dtype instead.",
+                    guideline: "Use `np.asarray` with a float dtype instead.",
                 },
             }),
             ["numpy", "byte_bounds"] => Some(Replacement {
@@ -129,7 +129,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "cast"] => Some(Replacement {
                 existing: "cast",
                 details: Details::Manual {
-                    guideline: "Use np.asarray(arr, dtype=dtype) instead.",
+                    guideline: "Use `np.asarray(arr, dtype=dtype)` instead.",
                 },
             }),
             ["numpy", "cfloat"] => Some(Replacement {
@@ -216,7 +216,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "geterrobj"] => Some(Replacement {
                 existing: "geterrobj",
                 details: Details::Manual {
-                    guideline: "Use the np.errstate context manager instead.",
+                    guideline: "Use the `np.errstate` context manager instead.",
                 },
             }),
             ["numpy", "INF"] => Some(Replacement {
@@ -289,7 +289,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "nbytes"] => Some(Replacement {
                 existing: "nbytes",
                 details: Details::Manual {
-                    guideline: "Use np.dtype(<dtype>).itemsize instead.",
+                    guideline: "Use `np.dtype(<dtype>).itemsize` instead.",
                 },
             }),
             ["numpy", "NINF"] => Some(Replacement {
@@ -344,13 +344,13 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "recfromcsv"] => Some(Replacement {
                 existing: "recfromcsv",
                 details: Details::Manual {
-                    guideline: "Use np.genfromtxt with comma delimiter instead.",
+                    guideline: "Use `np.genfromtxt` with comma delimiter instead.",
                 },
             }),
             ["numpy", "recfromtxt"] => Some(Replacement {
                 existing: "recfromtxt",
                 details: Details::Manual {
-                    guideline: "Use np.genfromtxt instead.",
+                    guideline: "Use `np.genfromtxt` instead.",
                 },
             }),
             ["numpy", "round_"] => Some(Replacement {
@@ -382,14 +382,13 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "seterrobj"] => Some(Replacement {
                 existing: "seterrobj",
                 details: Details::Manual {
-                    guideline: "Use the np.errstate context manager instead.",
+                    guideline: "Use the `np.errstate` context manager instead.",
                 },
             }),
             ["numpy", "set_string_function"] => Some(Replacement {
                 existing: "set_string_function",
                 details: Details::Manual {
-                    guideline: "Use np.set_printoptions instead with a formatter for \
-                    custom printing of NumPy objects.",
+                    guideline: "Use `np.set_printoptions` instead with a formatter for custom printing of NumPy objects.",
                 },
             }),
             ["numpy", "singlecomplex"] => Some(Replacement {
