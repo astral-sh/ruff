@@ -93,20 +93,13 @@ async def main():
 ```diff
 --- Black
 +++ Ruff
-@@ -21,11 +21,15 @@
+@@ -21,7 +21,9 @@
  
  # Check comments
  async def main():
 -    await asyncio.sleep(1)  # Hello
 +    await (  # Hello
 +        asyncio.sleep(1)
-+    )
- 
- 
- async def main():
--    await asyncio.sleep(1)  # Hello
-+    await (
-+        asyncio.sleep(1)  # Hello
 +    )
  
  
@@ -145,9 +138,7 @@ async def main():
 
 
 async def main():
-    await (
-        asyncio.sleep(1)  # Hello
-    )
+    await asyncio.sleep(1)  # Hello
 
 
 async def main():
