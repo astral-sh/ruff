@@ -36,6 +36,19 @@ def get_mapping_data() -> dict:
     return json.loads(json.loads(content))
 
 
+def format_number(number: int) -> str:
+    """Underscore-separate the digits of a number."""
+    # For unknown historical reasons, numbers greater than 100,000 were
+    # underscore-delimited in the generated file, so we now preserve that property to
+    # avoid unnecessary churn.
+    if number > 100000:
+        number = str(number)
+        number = "_".join(number[i : i + 3] for i in range(0, len(number), 3))
+        return f"{number}_u32"
+
+    return f"{number}u32"
+
+
 def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
     """Format the downloaded data into a Rust source file."""
     # The input data contains duplicate entries
@@ -45,7 +58,10 @@ def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
         for i in range(0, len(items), 2):
             flattened_items.add((items[i], items[i + 1]))
 
-    tuples = [f"    {left}u32 => {right},\n" for left, right in sorted(flattened_items)]
+    tuples = [
+        f"    {format_number(left)} => {right},\n"
+        for left, right in sorted(flattened_items)
+    ]
 
     print(f"{len(tuples)} confusable tuples.")
 
