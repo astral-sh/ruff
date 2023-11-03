@@ -55,6 +55,8 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.highlight:
       anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
 plugins:
   - search
 extra_css:
