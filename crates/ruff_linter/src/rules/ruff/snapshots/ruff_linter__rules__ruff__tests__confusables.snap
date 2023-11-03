@@ -155,4 +155,10 @@ confusables.py:46:62: RUF003 Comment contains ambiguous `᜵` (PHILIPPINE SINGLE
 47 | }"
    |
 
+confusables.py:55:28: RUF001 String contains ambiguous `µ` (MICRO SIGN). Did you mean `μ` (GREEK SMALL LETTER MU)?
+   |
+55 | assert getattr(Labware(), "µL") == 1.5
+   |                            ^ RUF001
+   |
+
 
