@@ -7,14 +7,22 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 
 /// ## What it does
-/// Checks for uses of NumPy's main namespace members removed in 2.0 release.
+/// Checks for uses of NumPy functions and constants that were removed from
+/// the main namespace in NumPy 2.0.
 ///
 /// ## Why is this bad?
-/// NumPy 2.0 release includes an overhaul of Python API. It's meant to remove redundant aliases
-/// and routines, and establish unambiguous ways for accessing constants, dtypes and functions.
+/// NumPy 2.0 includes an overhaul of NumPy's Python API, intended to remove
+/// redundant aliases and routines, and establish unambiguous mechanisms for
+/// accessing constants, dtypes, and functions.
 ///
-/// This rule is meant to provide automatic fixes for NumPy's main namespace changes, that are
-/// expected to be the most disruptive ones.
+/// As part of this overhaul, a variety of deprecated NumPy functions and
+/// constants were removed from the main namespace.
+///
+/// The majority of these functions and constants can be automatically replaced
+/// by other members of the NumPy API, even prior to NumPy 2.0, or by
+/// equivalents from the Python standard library. This rule flags all uses of
+/// removed members, along with automatic fixes for any backwards-compatible
+/// replacements.
 ///
 /// ## Examples
 /// ```python
@@ -36,7 +44,7 @@ use crate::importer::ImportRequest;
 #[violation]
 pub struct Numpy2Deprecation {
     existing: String,
-    migration_guide: String,
+    migration_guide: Option<String>,
 }
 
 impl Violation for Numpy2Deprecation {
@@ -48,14 +56,20 @@ impl Violation for Numpy2Deprecation {
             existing,
             migration_guide,
         } = self;
-        format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}")
+        match migration_guide {
+            Some(migration_guide) => {
+                format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}",)
+            }
+            None => format!("`np.{existing}` will be removed without replacement in NumPy 2.0."),
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
         let Numpy2Deprecation {
-            migration_guide, ..
+            existing: _,
+            migration_guide,
         } = self;
-        Some(format!("{migration_guide}"))
+        migration_guide.clone()
     }
 }
 
@@ -69,19 +83,17 @@ struct Replacement<'a> {
 enum Details<'a> {
     AutoImport { path: &'a str, name: &'a str },
     AutoPurePython { python_expr: &'a str },
-    Manual { guideline: &'a str },
+    Manual { guideline: Option<&'a str> },
 }
 
 impl Details<'_> {
-    fn get_guideline(&self) -> String {
+    fn guideline(&self) -> Option<String> {
         match self {
-            Details::AutoImport { path, name } => {
-                format!("Use `{path}.{name}` instead.")
-            }
+            Details::AutoImport { path, name } => Some(format!("Use `{path}.{name}` instead.")),
             Details::AutoPurePython { python_expr } => {
-                format!("Use `{python_expr}` instead.")
+                Some(format!("Use `{python_expr}` instead."))
             }
-            Details::Manual { guideline } => (*guideline).to_string(),
+            Details::Manual { guideline } => guideline.map(|s| s.to_string()),
         }
     }
 }
@@ -110,13 +122,13 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "add_newdoc_ufunc"] => Some(Replacement {
                 existing: "add_newdoc_ufunc",
                 details: Details::Manual {
-                    guideline: "It’s an internal function and doesn't have a replacement.",
+                    guideline: Some("`add_newdoc_ufunc` is an internal function."),
                 },
             }),
             ["numpy", "asfarray"] => Some(Replacement {
                 existing: "asfarray",
                 details: Details::Manual {
-                    guideline: "Use `np.asarray` with a float dtype instead.",
+                    guideline: Some("Use `np.asarray` with a `float` dtype instead."),
                 },
             }),
             ["numpy", "byte_bounds"] => Some(Replacement {
@@ -129,7 +141,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "cast"] => Some(Replacement {
                 existing: "cast",
                 details: Details::Manual {
-                    guideline: "Use `np.asarray(arr, dtype=dtype)` instead.",
+                    guideline: Some("Use `np.asarray(arr, dtype=dtype)` instead."),
                 },
             }),
             ["numpy", "cfloat"] => Some(Replacement {
@@ -149,7 +161,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "compat"] => Some(Replacement {
                 existing: "compat",
                 details: Details::Manual {
-                    guideline: "There's no replacement, as Python 2 is no longer supported.",
+                    guideline: Some("Python 2 is no longer supported."),
                 },
             }),
             ["numpy", "complex_"] => Some(Replacement {
@@ -169,41 +181,37 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "deprecate"] => Some(Replacement {
                 existing: "deprecate",
                 details: Details::Manual {
-                    guideline: "Emit DeprecationWarning with warnings.warn directly, or use \
-                                typing.deprecated.",
+                    guideline: Some("Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`."),
                 },
             }),
             ["numpy", "deprecate_with_doc"] => Some(Replacement {
                 existing: "deprecate_with_doc",
                 details: Details::Manual {
-                    guideline: "Emit DeprecationWarning with warnings.warn directly, or use \
-                    typing.deprecated.",
+                    guideline: Some("Emit `DeprecationWarning` with `warnings.warn` directly, or use `typing.deprecated`."),
                 },
             }),
             ["numpy", "disp"] => Some(Replacement {
                 existing: "disp",
                 details: Details::Manual {
-                    guideline: "Use your own printing function instead.",
+                    guideline: Some("Use a dedicated print function instead."),
                 },
             }),
             ["numpy", "fastCopyAndTranspose"] => Some(Replacement {
                 existing: "fastCopyAndTranspose",
                 details: Details::Manual {
-                    guideline: "Use arr.T.copy() instead.",
+                    guideline: Some("Use `arr.T.copy()` instead."),
                 },
             }),
             ["numpy", "find_common_type"] => Some(Replacement {
                 existing: "find_common_type",
                 details: Details::Manual {
-                    guideline: "Use numpy.promote_types or numpy.result_type instead. \
-                    To achieve semantics for the scalar_types argument, use \
-                    numpy.result_type and pass the Python values 0, 0.0, or 0j.",
+                    guideline: Some("Use `numpy.promote_types` or `numpy.result_type` instead. To achieve semantics for the `scalar_types` argument, use `numpy.result_type` and pass the Python values `0`, `0.0`, or `0j`."),
                 },
             }),
             ["numpy", "get_array_wrap"] => Some(Replacement {
                 existing: "get_array_wrap",
                 details: Details::Manual {
-                    guideline: "It's a niche function and there's no replacement.",
+                    guideline: None,
                 },
             }),
             ["numpy", "float_"] => Some(Replacement {
@@ -216,7 +224,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "geterrobj"] => Some(Replacement {
                 existing: "geterrobj",
                 details: Details::Manual {
-                    guideline: "Use the `np.errstate` context manager instead.",
+                    guideline: Some("Use the `np.errstate` context manager instead."),
                 },
             }),
             ["numpy", "INF"] => Some(Replacement {
@@ -250,7 +258,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "issctype"] => Some(Replacement {
                 existing: "issctype",
                 details: Details::Manual {
-                    guideline: "It's a niche function and there's no replacement.",
+                    guideline: None,
                 },
             }),
             ["numpy", "issubclass_"] => Some(Replacement {
@@ -276,7 +284,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "maximum_sctype"] => Some(Replacement {
                 existing: "maximum_sctype",
                 details: Details::Manual {
-                    guideline: "It's a niche function and there's no replacement.",
+                    guideline: None,
                 },
             }),
             ["numpy", "NaN"] => Some(Replacement {
@@ -289,7 +297,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "nbytes"] => Some(Replacement {
                 existing: "nbytes",
                 details: Details::Manual {
-                    guideline: "Use `np.dtype(<dtype>).itemsize` instead.",
+                    guideline: Some("Use `np.dtype(<dtype>).itemsize` instead."),
                 },
             }),
             ["numpy", "NINF"] => Some(Replacement {
@@ -321,13 +329,13 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "lookfor"] => Some(Replacement {
                 existing: "lookfor",
                 details: Details::Manual {
-                    guideline: "Search NumPy’s documentation directly.",
+                    guideline: Some("Search NumPy’s documentation directly."),
                 },
             }),
             ["numpy", "obj2sctype"] => Some(Replacement {
                 existing: "obj2sctype",
                 details: Details::Manual {
-                    guideline: "It's a niche function and there's no replacement.",
+                    guideline: None,
                 },
             }),
             ["numpy", "PINF"] => Some(Replacement {
@@ -344,13 +352,13 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "recfromcsv"] => Some(Replacement {
                 existing: "recfromcsv",
                 details: Details::Manual {
-                    guideline: "Use `np.genfromtxt` with comma delimiter instead.",
+                    guideline: Some("Use `np.genfromtxt` with comma delimiter instead."),
                 },
             }),
             ["numpy", "recfromtxt"] => Some(Replacement {
                 existing: "recfromtxt",
                 details: Details::Manual {
-                    guideline: "Use `np.genfromtxt` instead.",
+                    guideline: Some("Use `np.genfromtxt` instead."),
                 },
             }),
             ["numpy", "round_"] => Some(Replacement {
@@ -370,25 +378,25 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "sctype2char"] => Some(Replacement {
                 existing: "sctype2char",
                 details: Details::Manual {
-                    guideline: "It's a niche function and there's no replacement.",
+                    guideline: None,
                 },
             }),
             ["numpy", "sctypes"] => Some(Replacement {
                 existing: "sctypes",
                 details: Details::Manual {
-                    guideline: "It's a niche function and there's no replacement.",
+                    guideline: None,
                 },
             }),
             ["numpy", "seterrobj"] => Some(Replacement {
                 existing: "seterrobj",
                 details: Details::Manual {
-                    guideline: "Use the `np.errstate` context manager instead.",
+                    guideline: Some("Use the `np.errstate` context manager instead."),
                 },
             }),
             ["numpy", "set_string_function"] => Some(Replacement {
                 existing: "set_string_function",
                 details: Details::Manual {
-                    guideline: "Use `np.set_printoptions` instead with a formatter for custom printing of NumPy objects.",
+                    guideline: Some("Use `np.set_printoptions` for custom printing of NumPy objects."),
                 },
             }),
             ["numpy", "singlecomplex"] => Some(Replacement {
@@ -429,7 +437,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             ["numpy", "who"] => Some(Replacement {
                 existing: "who",
                 details: Details::Manual {
-                    guideline: "Use an IDE variable explorer or `locals()` instead.",
+                    guideline: Some("Use an IDE variable explorer or `locals()` instead."),
                 },
             }),
             _ => None,
@@ -439,7 +447,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
         let mut diagnostic = Diagnostic::new(
             Numpy2Deprecation {
                 existing: replacement.existing.to_string(),
-                migration_guide: replacement.details.get_guideline(),
+                migration_guide: replacement.details.guideline(),
             },
             expr.range(),
         );
