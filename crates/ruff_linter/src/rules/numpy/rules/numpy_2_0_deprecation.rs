@@ -48,6 +48,7 @@ use crate::importer::ImportRequest;
 pub struct Numpy2Deprecation {
     existing: String,
     migration_guide: Option<String>,
+    code_action: Option<String>,
 }
 
 impl Violation for Numpy2Deprecation {
@@ -58,21 +59,23 @@ impl Violation for Numpy2Deprecation {
         let Numpy2Deprecation {
             existing,
             migration_guide,
+            code_action: _,
         } = self;
         match migration_guide {
             Some(migration_guide) => {
                 format!("`np.{existing}` will be removed in NumPy 2.0. {migration_guide}",)
             }
-            None => format!("`np.{existing}` will be removed without replacement in NumPy 2.0."),
+            None => format!("`np.{existing}` will be removed without replacement in NumPy 2.0"),
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         let Numpy2Deprecation {
             existing: _,
-            migration_guide,
+            migration_guide: _,
+            code_action,
         } = self;
-        migration_guide.clone()
+        code_action.clone()
     }
 }
 
@@ -115,6 +118,27 @@ impl Details<'_> {
                 Some(format!("Use `{python_expr}` instead."))
             }
             Details::Manual { guideline } => guideline.map(ToString::to_string),
+        }
+    }
+
+    fn code_action(&self) -> Option<String> {
+        match self {
+            Details::AutoImport {
+                path,
+                name,
+                compatibility: Compatibility::BackwardsCompatible,
+            } => Some(format!("Replace with `{path}.{name}`")),
+            Details::AutoImport {
+                path,
+                name,
+                compatibility: Compatibility::Breaking,
+            } => Some(format!(
+                "Replace with `{path}.{name}` (requires NumPy 2.0 or greater)"
+            )),
+            Details::AutoPurePython { python_expr } => {
+                Some(format!("Replace with `{python_expr}`"))
+            }
+            Details::Manual { guideline: _ } => None,
         }
     }
 }
@@ -501,6 +525,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             Numpy2Deprecation {
                 existing: replacement.existing.to_string(),
                 migration_guide: replacement.details.guideline(),
+                code_action: replacement.details.code_action(),
             },
             expr.range(),
         );
