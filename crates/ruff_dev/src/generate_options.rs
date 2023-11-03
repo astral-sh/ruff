@@ -129,18 +129,18 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
     output.push_str("**Example usage**:\n\n");
     output.push_str(&format_tab(
         "pyproject.toml",
-        format_header(parent_set, true),
+        &format_header(parent_set, true),
         field.example,
     ));
     output.push_str(&format_tab(
         "ruff.toml",
-        format_header(parent_set, false),
+        &format_header(parent_set, false),
         field.example,
     ));
     output.push('\n');
 }
 
-fn format_tab(tab_name: &str, header: String, content: &str) -> String {
+fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
     format!(
         "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
         tab_name,
