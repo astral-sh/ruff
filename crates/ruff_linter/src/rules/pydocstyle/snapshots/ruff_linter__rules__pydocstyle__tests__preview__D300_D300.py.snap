@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+assertion_line: 134
 ---
 D300.py:6:5: D300 Use triple double quotes `"""`
   |
@@ -23,5 +24,8 @@ D300.py:10:5: D300 [*] Use triple double quotes `"""`
 9  9  | def contains_quote():
 10    |-    'Sum"\\mary.'
    10 |+    """Sum"\\mary."""
+11 11 | 
+12 12 | 
+13 13 | # OK
 
 
