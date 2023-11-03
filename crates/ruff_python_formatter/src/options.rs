@@ -108,7 +108,7 @@ impl PyFormatOptions {
         self.line_ending
     }
 
-    pub fn preview(&self) -> PreviewMode {
+    pub const fn preview(&self) -> PreviewMode {
         self.preview
     }
 
