@@ -466,6 +466,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::OSErrorAlias) {
                 pyupgrade::rules::os_error_alias_call(checker, func);
             }
+            if checker.enabled(Rule::TimeoutErrorAlias) {
+                if checker.settings.target_version >= PythonVersion::Py310 {
+                    pyupgrade::rules::timeout_error_alias_call(checker, func);
+                }
+            }
             if checker.enabled(Rule::NonPEP604Isinstance) {
                 if checker.settings.target_version >= PythonVersion::Py310 {
                     pyupgrade::rules::use_pep604_isinstance(checker, expr, func, args);
