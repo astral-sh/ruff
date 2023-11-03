@@ -3,6 +3,7 @@
 //! Used for <https://docs.astral.sh/ruff/settings/>.
 use std::fmt::Write;
 
+use ruff_python_trivia::textwrap;
 use ruff_workspace::options::Options;
 use ruff_workspace::options_base::{OptionField, OptionSet, OptionsMetadata, Visit};
 
@@ -125,20 +126,46 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
     output.push('\n');
     output.push_str(&format!("**Type**: `{}`\n", field.value_type));
     output.push('\n');
-    output.push_str(&format!(
-        "**Example usage**:\n\n```toml\n[tool.ruff{}]\n{}\n```\n",
-        if let Some(set_name) = parent_set.name() {
-            if set_name == "format" {
-                String::from(".format")
-            } else {
-                format!(".lint.{set_name}")
-            }
-        } else {
-            String::new()
-        },
-        field.example
+    output.push_str("**Example usage**:\n\n");
+    output.push_str(&format_tab(
+        "pyproject.toml",
+        format_header(parent_set, true),
+        field.example,
+    ));
+    output.push_str(&format_tab(
+        "ruff.toml",
+        format_header(parent_set, false),
+        field.example,
     ));
     output.push('\n');
+}
+
+fn format_tab(tab_name: &str, header: String, content: &str) -> String {
+    format!(
+        "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
+        tab_name,
+        header,
+        textwrap::indent(content, "    ")
+    )
+}
+
+fn format_header(parent_set: &Set, pyproject: bool) -> String {
+    let fmt = if let Some(set_name) = parent_set.name() {
+        if set_name == "format" {
+            String::from(".format")
+        } else {
+            format!(".lint.{set_name}")
+        }
+    } else {
+        String::new()
+    };
+    if pyproject {
+        format!("[tool.ruff{fmt}]")
+    } else if !fmt.is_empty() {
+        format!("[{}]", fmt.strip_prefix('.').unwrap())
+    } else {
+        String::new()
+    }
 }
 
 #[derive(Default)]
