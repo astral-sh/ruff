@@ -45,8 +45,8 @@ def format_number(number: int) -> str:
         number = str(number)
         number = "_".join(number[i : i + 3] for i in range(0, len(number), 3))
         return f"{number}_u32"
-    else:
-        return f"{number}u32"
+
+    return f"{number}u32"
 
 
 def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
