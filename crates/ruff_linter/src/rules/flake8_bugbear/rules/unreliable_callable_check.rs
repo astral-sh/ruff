@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -67,11 +67,7 @@ pub(crate) fn unreliable_callable_check(
     let [obj, attr, ..] = args else {
         return;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(ast::StringConstant { value, .. }),
-        ..
-    }) = attr
-    else {
+    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = attr else {
         return;
     };
     if value != "__call__" {

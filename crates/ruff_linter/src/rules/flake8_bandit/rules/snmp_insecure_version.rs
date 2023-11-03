@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Int};
+use ruff_python_ast::{self as ast, Expr, Int};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -52,8 +52,8 @@ pub(crate) fn snmp_insecure_version(checker: &mut Checker, call: &ast::ExprCall)
         if let Some(keyword) = call.arguments.find_keyword("mpModel") {
             if matches!(
                 keyword.value,
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(Int::ZERO | Int::ONE),
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(Int::ZERO | Int::ONE),
                     ..
                 })
             ) {

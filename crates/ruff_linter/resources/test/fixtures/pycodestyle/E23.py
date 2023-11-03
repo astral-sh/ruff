@@ -41,4 +41,10 @@ f"{(lambda x:x)}"
 f"normal{f"{a:.3f}"}normal"
 
 #: Okay
+snapshot.file_uri[len(f's3://{self.s3_bucket_name}/'):]
+
+#: E231
+{len(f's3://{self.s3_bucket_name}/'):1}
+
+#: Okay
 a = (1,

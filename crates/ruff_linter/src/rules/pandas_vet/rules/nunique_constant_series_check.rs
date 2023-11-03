@@ -1,7 +1,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr, Int};
+use ruff_python_ast::{self as ast, CmpOp, Expr, Int};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -80,8 +80,8 @@ pub(crate) fn nunique_constant_series_check(
     // Right should be the integer 1.
     if !matches!(
         right,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(Int::ONE),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(Int::ONE),
             range: _,
         })
     ) {

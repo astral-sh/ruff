@@ -117,10 +117,11 @@ quote-style = "single"
 ```
 
 The Ruff formatter also respects Ruff's [`line-length`](https://docs.astral.sh/ruff/settings/#line-length)
-setting, which also can be provided via a `pyproject.toml` or `ruff.toml` file.
+setting, which also can be provided via a `pyproject.toml` or `ruff.toml` file, or on the CLI, as
+in:
 
-```toml
-line-length = 80
+```console
+ruff format --line-length 100 /path/to/file.py
 ```
 
 ### Excluding code from formatting

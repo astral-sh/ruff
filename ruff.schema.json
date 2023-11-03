@@ -2241,7 +2241,7 @@
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will force-disable any rules that are not included in the specified convention. As such, the intended use is to enable a convention and then selectively disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.pydocstyle] convention = \"google\" ```\n\nAs conventions force-disable all rules not included in the convention, enabling _additional_ rules on top of a convention is currently unsupported.",
+          "description": "Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will force-disable any rules that are not included in the specified convention. As such, the intended use is to enable a convention and then selectively disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff.lint] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle] convention = \"google\" ```\n\nAs conventions force-disable all rules not included in the convention, enabling _additional_ rules on top of a convention is currently unsupported.",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"
@@ -2822,6 +2822,8 @@
         "FURB140",
         "FURB145",
         "FURB148",
+        "FURB16",
+        "FURB168",
         "FURB17",
         "FURB171",
         "FURB177",
@@ -2976,6 +2978,7 @@
         "PLC04",
         "PLC041",
         "PLC0414",
+        "PLC0415",
         "PLC1",
         "PLC19",
         "PLC190",
@@ -3115,6 +3118,7 @@
         "PLW1",
         "PLW15",
         "PLW150",
+        "PLW1501",
         "PLW1508",
         "PLW1509",
         "PLW151",
@@ -3124,6 +3128,9 @@
         "PLW164",
         "PLW1641",
         "PLW2",
+        "PLW21",
+        "PLW210",
+        "PLW2101",
         "PLW29",
         "PLW290",
         "PLW2901",
@@ -3460,6 +3467,10 @@
         "TID251",
         "TID252",
         "TID253",
+        "TRIO",
+        "TRIO1",
+        "TRIO10",
+        "TRIO100",
         "TRY",
         "TRY0",
         "TRY00",

@@ -473,7 +473,7 @@ pub enum SimpleTokenKind {
 }
 
 impl SimpleTokenKind {
-    const fn is_trivia(self) -> bool {
+    pub const fn is_trivia(self) -> bool {
         matches!(
             self,
             SimpleTokenKind::Whitespace
@@ -481,6 +481,10 @@ impl SimpleTokenKind {
                 | SimpleTokenKind::Comment
                 | SimpleTokenKind::Continuation
         )
+    }
+
+    pub const fn is_comment(self) -> bool {
+        matches!(self, SimpleTokenKind::Comment)
     }
 }
 

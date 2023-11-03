@@ -19,7 +19,7 @@ expression: comments.debug(test_case.source_code)
         "trailing": [],
     },
     Node {
-        kind: ExprConstant,
+        kind: ExprNumberLiteral,
         range: 30..32,
         source: `10`,
     }: {

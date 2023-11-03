@@ -3,7 +3,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
@@ -85,7 +84,7 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                 value,
                 range: _,
             } = &keywords[0];
-            if arg.as_ref().is_some_and(|arg| arg == "maxsize") && is_const_none(value) {
+            if arg.as_ref().is_some_and(|arg| arg == "maxsize") && value.is_none_literal_expr() {
                 let mut diagnostic = Diagnostic::new(
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),

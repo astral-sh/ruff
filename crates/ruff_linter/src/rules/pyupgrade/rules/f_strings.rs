@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -159,8 +159,8 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
         // E.g., `12` should be parenthesized in `f"{(12).real}"`.
         (
             FormatContext::Accessed,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(..),
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(..),
                 ..
             }),
         ) => text.chars().all(|c| c.is_ascii_digit()),
@@ -314,13 +314,7 @@ pub(crate) fn f_strings(
         return;
     };
 
-    if !matches!(
-        value.as_ref(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(..),
-            ..
-        }),
-    ) {
+    if !value.is_string_literal_expr() {
         return;
     };
 

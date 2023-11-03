@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -80,16 +80,13 @@ pub(crate) fn all_with_model_form(
                 if id != "fields" {
                     continue;
                 }
-                let Expr::Constant(ast::ExprConstant { value, .. }) = value.as_ref() else {
-                    continue;
-                };
-                match value {
-                    Constant::Str(ast::StringConstant { value, .. }) => {
+                match value.as_ref() {
+                    Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                         if value == "__all__" {
                             return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
                         }
                     }
-                    Constant::Bytes(ast::BytesConstant { value, .. }) => {
+                    Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
                         if value == "__all__".as_bytes() {
                             return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
                         }

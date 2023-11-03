@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_python_semantic::SemanticModel;
 
@@ -10,10 +10,7 @@ static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> = Lazy::new(|| {
 
 pub(super) fn string_literal(expr: &Expr) -> Option<&str> {
     match expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(string),
-            ..
-        }) => Some(string),
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => Some(value),
         _ => None,
     }
 }

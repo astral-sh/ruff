@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprCall, ExprConstant};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -65,11 +65,7 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
         return;
     }
 
-    let [Expr::Constant(ExprConstant {
-        value: Constant::Str(ast::StringConstant { value, .. }),
-        range,
-    })] = args.as_slice()
-    else {
+    let [Expr::StringLiteral(ast::ExprStringLiteral { value, range, .. })] = args.as_slice() else {
         return;
     };
 

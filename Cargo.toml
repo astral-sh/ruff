@@ -15,7 +15,7 @@ license = "MIT"
 anyhow = { version = "1.0.69" }
 bitflags = { version = "2.3.1" }
 chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
-clap = { version = "4.4.6", features = ["derive"] }
+clap = { version = "4.4.7", features = ["derive"] }
 colored = { version = "2.0.0" }
 filetime = { version = "0.2.20" }
 glob = { version = "0.3.1" }
@@ -34,7 +34,7 @@ quote = { version = "1.0.23" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "1.1.0" }
 schemars = { version = "0.8.15" }
-serde = { version = "1.0.152", features = ["derive"] }
+serde = { version = "1.0.190", features = ["derive"] }
 serde_json = { version = "1.0.107" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.3.0", features = ["inline"] }
@@ -52,7 +52,7 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 unicode-ident = { version = "1.0.12" }
 unicode_names2 = { version = "1.2.0" }
 unicode-width = { version = "0.1.11" }
-uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
+uuid = { version = "1.5.0", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 wsl = { version = "0.1.0" }
 
 [profile.release]

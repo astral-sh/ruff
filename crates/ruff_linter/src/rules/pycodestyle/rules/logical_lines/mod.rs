@@ -434,18 +434,17 @@ impl LogicalLinesBuilder {
         } else if kind.is_operator() {
             line.flags.insert(TokenFlags::OPERATOR);
 
-            line.flags.set(
-                TokenFlags::BRACKET,
-                matches!(
-                    kind,
-                    TokenKind::Lpar
-                        | TokenKind::Lsqb
-                        | TokenKind::Lbrace
-                        | TokenKind::Rpar
-                        | TokenKind::Rsqb
-                        | TokenKind::Rbrace
-                ),
-            );
+            if matches!(
+                kind,
+                TokenKind::Lpar
+                    | TokenKind::Lsqb
+                    | TokenKind::Lbrace
+                    | TokenKind::Rpar
+                    | TokenKind::Rsqb
+                    | TokenKind::Rbrace
+            ) {
+                line.flags.insert(TokenFlags::BRACKET);
+            }
         }
 
         if matches!(kind, TokenKind::Comma | TokenKind::Semi | TokenKind::Colon) {
@@ -454,17 +453,16 @@ impl LogicalLinesBuilder {
             line.flags.insert(TokenFlags::KEYWORD);
         }
 
-        line.flags.set(
-            TokenFlags::NON_TRIVIA,
-            !matches!(
-                kind,
-                TokenKind::Comment
-                    | TokenKind::Newline
-                    | TokenKind::NonLogicalNewline
-                    | TokenKind::Dedent
-                    | TokenKind::Indent
-            ),
-        );
+        if !matches!(
+            kind,
+            TokenKind::Comment
+                | TokenKind::Newline
+                | TokenKind::NonLogicalNewline
+                | TokenKind::Dedent
+                | TokenKind::Indent
+        ) {
+            line.flags.insert(TokenFlags::NON_TRIVIA);
+        }
 
         self.tokens.push(LogicalLineToken { kind, range });
     }

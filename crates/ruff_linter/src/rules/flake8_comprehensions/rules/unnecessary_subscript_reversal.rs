@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, UnaryOp};
+use ruff_python_ast::{self as ast, Expr, UnaryOp};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -79,8 +79,8 @@ pub(crate) fn unnecessary_subscript_reversal(checker: &mut Checker, call: &ast::
     else {
         return;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(val),
+    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: ast::Number::Int(val),
         ..
     }) = operand.as_ref()
     else {

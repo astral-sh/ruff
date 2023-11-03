@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Operator};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Operator};
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
 use ruff_diagnostics::Diagnostic;
@@ -363,20 +363,18 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(val),
-                        ..
-                    }) = value.as_ref()
+                    if let Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) =
+                        value.as_ref()
                     {
                         if attr == "join" {
                             // "...".join(...) call
                             if checker.enabled(Rule::StaticJoinToFString) {
-                                flynt::rules::static_join_to_fstring(checker, expr, val);
+                                flynt::rules::static_join_to_fstring(checker, expr, string);
                             }
                         } else if attr == "format" {
                             // "...".format(...) call
                             let location = expr.range();
-                            match pyflakes::format::FormatSummary::try_from(val.as_ref()) {
+                            match pyflakes::format::FormatSummary::try_from(string.as_ref()) {
                                 Err(e) => {
                                     if checker.enabled(Rule::StringDotFormatInvalidFormat) {
                                         checker.diagnostics.push(Diagnostic::new(
@@ -421,7 +419,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
 
                             if checker.enabled(Rule::BadStringFormatCharacter) {
                                 pylint::rules::bad_string_format_character::call(
-                                    checker, val, location,
+                                    checker, string, location,
                                 );
                             }
                         }
@@ -749,6 +747,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::SysExitAlias) {
                 pylint::rules::sys_exit_alias(checker, func);
             }
+            if checker.enabled(Rule::BadOpenMode) {
+                pylint::rules::bad_open_mode(checker, call);
+            }
             if checker.enabled(Rule::BadStrStripCall) {
                 pylint::rules::bad_str_strip_call(checker, func, args);
             }
@@ -908,6 +909,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ExceptionWithoutExcInfo) {
                 flake8_logging::rules::exception_without_exc_info(checker, call);
             }
+            if checker.enabled(Rule::IsinstanceTypeNone) {
+                refurb::rules::isinstance_type_none(checker, call);
+            }
             if checker.enabled(Rule::ImplicitCwd) {
                 refurb::rules::no_implicit_cwd(checker, call);
             }
@@ -987,11 +991,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             right,
             range: _,
         }) => {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(ast::StringConstant { value, .. }),
-                ..
-            }) = left.as_ref()
-            {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = left.as_ref() {
                 if checker.any_enabled(&[
                     Rule::PercentFormatInvalidFormat,
                     Rule::PercentFormatExpectedMapping,
@@ -1228,38 +1228,29 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
             }
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(_) | Constant::Float(_) | Constant::Complex { .. },
-            range: _,
-        }) => {
+        Expr::NumberLiteral(_) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::NumericLiteralTooLong) {
                 flake8_pyi::rules::numeric_literal_too_long(checker, expr);
             }
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bytes(_),
-            range: _,
-        }) => {
+        Expr::BytesLiteral(_) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::StringOrBytesTooLong) {
                 flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
             }
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(value),
-            range: _,
-        }) => {
+        Expr::StringLiteral(string) => {
             if checker.enabled(Rule::HardcodedBindAllInterfaces) {
                 if let Some(diagnostic) =
-                    flake8_bandit::rules::hardcoded_bind_all_interfaces(value, expr.range())
+                    flake8_bandit::rules::hardcoded_bind_all_interfaces(string)
                 {
                     checker.diagnostics.push(diagnostic);
                 }
             }
             if checker.enabled(Rule::HardcodedTempFile) {
-                flake8_bandit::rules::hardcoded_tmp_directory(checker, expr, value);
+                flake8_bandit::rules::hardcoded_tmp_directory(checker, string);
             }
             if checker.enabled(Rule::UnicodeKindPrefix) {
-                pyupgrade::rules::unicode_kind_prefix(checker, expr, value.unicode);
+                pyupgrade::rules::unicode_kind_prefix(checker, string);
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StringOrBytesTooLong) {
