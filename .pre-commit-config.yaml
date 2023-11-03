@@ -26,13 +26,19 @@ repos:
           - mdformat-admon
         exclude: |
           (?x)^(
-            docs/formatter/black.md
+            docs/formatter/black\.md
+            | docs/\w+\.md
           )$
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.33.0
     hooks:
       - id: markdownlint-fix
+        exclude: |
+          (?x)^(
+            docs/formatter/black\.md
+            | docs/\w+\.md
+          )$
 
   - repo: https://github.com/crate-ci/typos
     rev: v1.14.12
