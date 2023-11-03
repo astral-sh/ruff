@@ -19,10 +19,13 @@ use crate::importer::ImportRequest;
 /// constants were removed from the main namespace.
 ///
 /// The majority of these functions and constants can be automatically replaced
-/// by other members of the NumPy API, even prior to NumPy 2.0, or by
-/// equivalents from the Python standard library. This rule flags all uses of
-/// removed members, along with automatic fixes for any backwards-compatible
-/// replacements.
+/// by other members of the NumPy API or by equivalents from the Python
+/// standard library. With the exception of renaming `numpy.byte_bounds` to
+/// `numpy.lib.array_utils.byte_bounds`, all such replacements are backwards
+/// compatible with earlier versions of NumPy.
+///
+/// This rule flags all uses of removed members, along with automatic fixes for
+/// any backwards-compatible replacements.
 ///
 /// ## Examples
 /// ```python
@@ -82,7 +85,11 @@ struct Replacement<'a> {
 #[derive(Debug)]
 enum Details<'a> {
     /// The deprecated member can be replaced by another member in the NumPy API.
-    AutoImport { path: &'a str, name: &'a str },
+    AutoImport {
+        path: &'a str,
+        name: &'a str,
+        compatibility: Compatibility,
+    },
     /// The deprecated member can be replaced by a member of the Python standard library.
     AutoPurePython { python_expr: &'a str },
     /// The deprecated member can be replaced by a manual migration.
@@ -92,7 +99,18 @@ enum Details<'a> {
 impl Details<'_> {
     fn guideline(&self) -> Option<String> {
         match self {
-            Details::AutoImport { path, name } => Some(format!("Use `{path}.{name}` instead.")),
+            Details::AutoImport {
+                path,
+                name,
+                compatibility: Compatibility::BackwardsCompatible,
+            } => Some(format!("Use `{path}.{name}` instead.")),
+            Details::AutoImport {
+                path,
+                name,
+                compatibility: Compatibility::Breaking,
+            } => Some(format!(
+                "Use `{path}.{name}` on NumPy 2.0, or ignore this warning on earlier versions."
+            )),
             Details::AutoPurePython { python_expr } => {
                 Some(format!("Use `{python_expr}` instead."))
             }
@@ -101,6 +119,13 @@ impl Details<'_> {
     }
 }
 
+#[derive(Debug)]
+enum Compatibility {
+    /// The changes is backwards compatible with earlier versions of NumPy.
+    BackwardsCompatible,
+    /// The change is breaking in NumPy 2.0.
+    Breaking,
+}
 /// NPY201
 pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
     let maybe_replacement = checker
@@ -113,6 +138,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy.lib",
                     name: "add_docstring",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "add_newdoc"] => Some(Replacement {
@@ -120,6 +146,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy.lib",
                     name: "add_newdoc",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "add_newdoc_ufunc"] => Some(Replacement {
@@ -139,6 +166,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy.lib.array_utils",
                     name: "byte_bounds",
+                    compatibility: Compatibility::Breaking,
                 },
             }),
             ["numpy", "cast"] => Some(Replacement {
@@ -152,6 +180,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "complex128",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "clongfloat"] => Some(Replacement {
@@ -159,6 +188,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "clongdouble",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "compat"] => Some(Replacement {
@@ -172,6 +202,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "complex128",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "DataSource"] => Some(Replacement {
@@ -179,6 +210,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy.lib.npyio",
                     name: "DataSource",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "deprecate"] => Some(Replacement {
@@ -222,6 +254,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "float64",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "geterrobj"] => Some(Replacement {
@@ -235,6 +268,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "inf",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "Inf"] => Some(Replacement {
@@ -242,6 +276,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "inf",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "Infinity"] => Some(Replacement {
@@ -249,6 +284,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "inf",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "infty"] => Some(Replacement {
@@ -256,6 +292,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "inf",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "issctype"] => Some(Replacement {
@@ -275,6 +312,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "issubdtype",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "mat"] => Some(Replacement {
@@ -282,6 +320,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "asmatrix",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "maximum_sctype"] => Some(Replacement {
@@ -295,6 +334,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "nan",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "nbytes"] => Some(Replacement {
@@ -320,6 +360,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "clongdouble",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "longfloat"] => Some(Replacement {
@@ -327,6 +368,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "longdouble",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "lookfor"] => Some(Replacement {
@@ -346,6 +388,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "inf",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "PZERO"] => Some(Replacement {
@@ -369,6 +412,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "round",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "safe_eval"] => Some(Replacement {
@@ -376,6 +420,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "ast",
                     name: "literal_eval",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "sctype2char"] => Some(Replacement {
@@ -407,6 +452,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "complex64",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "string_"] => Some(Replacement {
@@ -414,6 +460,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "bytes_",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "source"] => Some(Replacement {
@@ -421,6 +468,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "inspect",
                     name: "getsource",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "tracemalloc_domain"] => Some(Replacement {
@@ -428,6 +476,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy.lib",
                     name: "tracemalloc_domain",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "unicode_"] => Some(Replacement {
@@ -435,6 +484,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                 details: Details::AutoImport {
                     path: "numpy",
                     name: "str_",
+                    compatibility: Compatibility::BackwardsCompatible,
                 },
             }),
             ["numpy", "who"] => Some(Replacement {
@@ -455,7 +505,11 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
             expr.range(),
         );
         match replacement.details {
-            Details::AutoImport { path, name } => {
+            Details::AutoImport {
+                path,
+                name,
+                compatibility,
+            } => {
                 diagnostic.try_set_fix(|| {
                     let (import_edit, binding) = checker.importer().get_or_import_symbol(
                         &ImportRequest::import_from(path, name),
@@ -463,7 +517,14 @@ pub(crate) fn numpy_2_0_deprecation(checker: &mut Checker, expr: &Expr) {
                         checker.semantic(),
                     )?;
                     let replacement_edit = Edit::range_replacement(binding, expr.range());
-                    Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+                    Ok(match compatibility {
+                        Compatibility::BackwardsCompatible => {
+                            Fix::safe_edits(import_edit, [replacement_edit])
+                        }
+                        Compatibility::Breaking => {
+                            Fix::unsafe_edits(import_edit, [replacement_edit])
+                        }
+                    })
                 });
             }
             Details::AutoPurePython { python_expr } => diagnostic.set_fix(Fix::safe_edit(

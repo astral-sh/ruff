@@ -69,7 +69,7 @@ NPY201.py:10:5: NPY201 `np.asfarray` will be removed in NumPy 2.0. Use `np.asarr
    |
    = help: Use `np.asarray` with a `float` dtype instead.
 
-NPY201.py:12:5: NPY201 [*] `np.byte_bounds` will be removed in NumPy 2.0. Use `numpy.lib.array_utils.byte_bounds` instead.
+NPY201.py:12:5: NPY201 [*] `np.byte_bounds` will be removed in NumPy 2.0. Use `numpy.lib.array_utils.byte_bounds` on NumPy 2.0, or ignore this warning on earlier versions.
    |
 10 |     np.asfarray([1,2,3])
 11 | 
@@ -78,9 +78,9 @@ NPY201.py:12:5: NPY201 [*] `np.byte_bounds` will be removed in NumPy 2.0. Use `n
 13 | 
 14 |     np.cast
    |
-   = help: Use `numpy.lib.array_utils.byte_bounds` instead.
+   = help: Use `numpy.lib.array_utils.byte_bounds` on NumPy 2.0, or ignore this warning on earlier versions.
 
-ℹ Fix
+ℹ Suggested fix
    1  |+from numpy.lib.array_utils import byte_bounds
 1  2  | def func():
 2  3  |     import numpy as np
