@@ -1,0 +1,8 @@
+{
+  "execution_count": null,
+  "cell_type": "code",
+  "id": "1",
+  "metadata": {},
+  "outputs": [],
+  "source": ["x = 1\n", "pip install requests"]
+}
