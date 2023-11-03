@@ -20,3 +20,6 @@ foo(**{buzz: True})
 foo(**{"": True})
 foo(**{f"buzz__{bar}": True})
 abc(**{"for": 3})
+
+# Duplicated key names wont be fixed to avoid syntax error.
+abc(**{'a': b}, **{'a': c})  # PIE804

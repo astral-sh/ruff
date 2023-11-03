@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
+assertion_line: 29
 ---
 PIE804.py:1:1: PIE804 [*] Unnecessary `dict` kwargs
   |
@@ -118,5 +119,20 @@ PIE804.py:11:1: PIE804 [*] Unnecessary `dict` kwargs
 12 12 | 
 13 13 | 
 14 14 | foo(**{**data, "foo": "buzz"})
+
+PIE804.py:25:1: PIE804 [*] Unnecessary `dict` kwargs
+   |
+24 | # Duplicated key names wont be fixed to avoid syntax error.
+25 | abc(**{'a': b}, **{'a': c})  # PIE804
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE804
+   |
+   = help: Remove unnecessary kwargs
+
+ℹ Fix
+22 22 | abc(**{"for": 3})
+23 23 | 
+24 24 | # Duplicated key names wont be fixed to avoid syntax error.
+25    |-abc(**{'a': b}, **{'a': c})  # PIE804
+   25 |+abc(a=b, **{'a': c})  # PIE804
 
 

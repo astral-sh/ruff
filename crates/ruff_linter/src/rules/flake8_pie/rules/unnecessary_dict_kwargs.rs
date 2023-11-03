@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use itertools::Itertools;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_python_ast::{self as ast, Expr, Keyword};
@@ -53,9 +55,12 @@ impl AlwaysFixableViolation for UnnecessaryDictKwargs {
 
 /// PIE804
 pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
+    let mut all_kwargs = HashSet::new();
+
     for kw in kwargs {
         // keyword is a spread operator (indicated by None)
-        if kw.arg.is_some() {
+        if let Some(name) = &kw.arg {
+            all_kwargs.insert(name.as_str());
             continue;
         }
 
@@ -81,6 +86,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
         let kwargs = keys
             .iter()
             .filter_map(|key| key.as_ref().and_then(as_kwarg))
+            .filter(|name| all_kwargs.insert(name))
             .collect::<Vec<_>>();
         if kwargs.len() != keys.len() {
             continue;
