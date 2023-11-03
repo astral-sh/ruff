@@ -139,7 +139,7 @@ fn expand_indent(line: &str) -> i64 {
 }
 
 /// E122
-pub(crate) fn continuation_line_missing_indentation_or_outdented(
+pub(crate) fn continuation_lines(
     context: &mut LogicalLinesContext,
     logical_line: &LogicalLine,
     locator: &Locator,
