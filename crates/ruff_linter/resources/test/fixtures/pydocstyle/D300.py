@@ -13,3 +13,7 @@ def contains_quote():
 # OK
 def contains_triples(t):
     """('''|\""")"""
+
+# OK
+def contains_triples(t):
+    '''(\'''|""")'''
