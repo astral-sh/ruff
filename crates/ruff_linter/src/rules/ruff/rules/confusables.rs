@@ -2,7 +2,7 @@
 
 /// Via: <https://github.com/hediet/vscode-unicode-data/blob/main/out/ambiguous.json>
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
-pub(crate) fn confusable(c: u32) -> Option<u8> {
+pub(crate) fn confusable(c: u32) -> Option<u32> {
     let result = match c {
         160u32 => 32,
         180u32 => 96,
@@ -1586,6 +1586,9 @@ pub(crate) fn confusable(c: u32) -> Option<u8> {
         130_039_u32 => 55,
         130_040_u32 => 56,
         130_041_u32 => 57,
+        0x212B => 0x00C5,
+        0x2126 => 0x03A9,
+        0x00B5 => 0x03BC,
         _ => return None,
     };
     Some(result)

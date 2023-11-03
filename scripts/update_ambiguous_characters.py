@@ -51,7 +51,7 @@ def format_number(number: int) -> str:
 
 def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
     """Format the downloaded data into a Rust source file."""
-    # The input data contains duplicate entries
+    # The input data contains duplicate entries.
     flattened_items: set[tuple[int, int]] = set()
     for _category, items in raw_data.items():
         assert len(items) % 2 == 0, "Expected pairs of items"
@@ -62,6 +62,18 @@ def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
         f"    {format_number(left)} => {right},\n"
         for left, right in sorted(flattened_items)
     ]
+
+    # Add some additional confusable pairs that are not included in the VS Code data,
+    # as they're unicode-to-unicode confusables, not unicode-to-ASCII confusables.
+    confusable_units = [
+        # ANGSTROM SIGN → LATIN CAPITAL LETTER A WITH RING ABOVE
+        ("0x212B", "0x00C5"),
+        # OHM SIGN → GREEK CAPITAL LETTER OMEGA
+        ("0x2126", "0x03A9"),
+        # MICRO SIGN → GREEK SMALL LETTER MU
+        ("0x00B5", "0x03BC"),
+    ]
+    tuples += [f"    {left} => {right},\n" for left, right in confusable_units]
 
     print(f"{len(tuples)} confusable tuples.")
 
