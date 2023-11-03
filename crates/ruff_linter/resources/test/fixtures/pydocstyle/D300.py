@@ -8,3 +8,8 @@ def ends_in_quote():
 
 def contains_quote():
     'Sum"\\mary.'
+
+
+# OK
+def contains_triples(t):
+    """('''|\""")"""
