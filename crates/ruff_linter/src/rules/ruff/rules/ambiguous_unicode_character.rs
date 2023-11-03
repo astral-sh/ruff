@@ -163,7 +163,7 @@ pub(crate) fn ambiguous_unicode_character(
                     let candidate = Candidate::new(
                         TextSize::try_from(relative_offset).unwrap() + range.start(),
                         current_char,
-                        char::from_u32(representant).unwrap(),
+                        representant,
                     );
                     if let Some(diagnostic) = candidate.into_diagnostic(context, settings) {
                         diagnostics.push(diagnostic);
@@ -178,7 +178,7 @@ pub(crate) fn ambiguous_unicode_character(
             word_candidates.push(Candidate::new(
                 TextSize::try_from(relative_offset).unwrap() + range.start(),
                 current_char,
-                char::from_u32(representant).unwrap(),
+                representant,
             ));
         } else {
             // The current word contains at least one unambiguous unicode character.
