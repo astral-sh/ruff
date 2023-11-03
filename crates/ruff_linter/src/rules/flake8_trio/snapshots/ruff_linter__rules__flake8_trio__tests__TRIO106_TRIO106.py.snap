@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/flake8_trio/mod.rs
+---
+TRIO106.py:3:8: TRIO106 trio must be imported with import trio for the linter to work
+  |
+1 | import trio
+2 | 
+3 | import trio as asyncio
+  |        ^^^^^^^^^^^^^^^ TRIO106
+4 | 
+5 | from trio import move_on_after
+  |
+
+TRIO106.py:5:1: TRIO106 trio must be imported with import trio for the linter to work
+  |
+3 | import trio as asyncio
+4 | 
+5 | from trio import move_on_after
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRIO106
+  |
+
+

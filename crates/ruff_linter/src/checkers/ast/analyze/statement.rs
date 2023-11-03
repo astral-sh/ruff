@@ -549,6 +549,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::deprecated_mock_import(checker, stmt);
             }
 
+            if checker.enabled(Rule::TrioInvalidImportStyle) {
+                flake8_trio::rules::invalid_trio_import(checker, stmt);
+            }
+
             for alias in names {
                 if checker.enabled(Rule::NonAsciiImportName) {
                     pylint::rules::non_ascii_module_import(checker, alias);
@@ -741,6 +745,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::DeprecatedImport) {
                 pyupgrade::rules::deprecated_import(checker, stmt, names, module, level);
+            }
+            if checker.enabled(Rule::TrioInvalidImportStyle) {
+                flake8_trio::rules::invalid_trio_import(checker, stmt);
             }
             if checker.enabled(Rule::UnnecessaryBuiltinImport) {
                 if let Some(module) = module {
