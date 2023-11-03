@@ -385,13 +385,10 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
     // Visual indents
     let mut indent_chances: Vec<i64> = Vec::new();
     let mut last_indent = start_indent_level;
-    let mut visual_indent = false;
+    let mut visual_indent;
     let mut last_token_multiline = false;
     // For each depth, memorize the visual indent column.
     let mut indent = vec![start_indent_level];
-
-    // TODO: config option: hang closing bracket instead of matching indentation of opening bracket's line.
-    let hang_closing = false;
 
     for (token, token_info) in zip(logical_line.tokens(), token_infos) {
         let mut is_newline = row < token_info.start_physical_line_idx;
@@ -452,9 +449,6 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
                 && token_info.token_start_within_physical_line < indent[depth]
             {
                 // visual indent is broken
-                if !visual_indent {
-                    // TODO: Raise E128.
-                }
             } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size)) {
                 // hanging indent is verified
                 if is_closing_bracket && !hang_closing {
@@ -522,14 +516,13 @@ pub(crate) fn continuation_line_missing_indentation_or_outdented(
                 token.kind,
                 TokenKind::Assert | TokenKind::Raise | TokenKind::With
             )
-        {
-            indent_chances.push(token_info.token_end_within_physical_line + 1);
-        }
         // Special case for the "if" statement because "if (".len() == 4
-        else if indent_chances.is_empty()
-            && row == 0
-            && depth == 0
-            && matches!(token.kind, TokenKind::If)
+            || (
+                indent_chances.is_empty()
+                    && row == 0
+                    && depth == 0
+                    && matches!(token.kind, TokenKind::If)
+            )
         {
             indent_chances.push(token_info.token_end_within_physical_line + 1);
         } else if matches!(token.kind, TokenKind::Colon)
