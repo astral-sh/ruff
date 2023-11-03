@@ -353,7 +353,7 @@ UP032_0.py:37:1: UP032 [*] Use f-string instead of `format` call
 35 35 | "foo{}".format(1)
 36 36 | 
 37    |-r"foo{}".format(1)
-   37 |+fr"foo{1}"
+   37 |+rf"foo{1}"
 38 38 | 
 39 39 | x = "{a}".format(a=1)
 40 40 | 
