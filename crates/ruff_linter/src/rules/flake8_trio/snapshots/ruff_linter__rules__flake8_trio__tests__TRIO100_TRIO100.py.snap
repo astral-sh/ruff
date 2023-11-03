@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_trio/mod.rs
 ---
-TRIO100.py:5:5: TRIO100 trio.fail_after context contains no checkpoints, remove the context or add `await trio.lowlevel.checkpoint()`
+TRIO100.py:5:5: TRIO100 A `with trio.fail_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
   |
 4 |   async def foo():
 5 |       with trio.fail_after():
@@ -12,7 +12,7 @@ TRIO100.py:5:5: TRIO100 trio.fail_after context contains no checkpoints, remove 
 8 |   async def foo():
   |
 
-TRIO100.py:13:5: TRIO100 trio.move_on_after context contains no checkpoints, remove the context or add `await trio.lowlevel.checkpoint()`
+TRIO100.py:13:5: TRIO100 A `with trio.move_on_after(...):` context does not contain any `await` statements. This makes it pointless, as the timeout can only be triggered by a checkpoint.
    |
 12 |   async def foo():
 13 |       with trio.move_on_after():

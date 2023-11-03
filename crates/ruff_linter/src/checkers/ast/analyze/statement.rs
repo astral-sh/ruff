@@ -1195,7 +1195,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UselessWithLock) {
                 pylint::rules::useless_with_lock(checker, with_stmt);
             }
-            if checker.enabled(Rule::TimeoutWithoutAwait) {
+            if checker.enabled(Rule::TrioTimeoutWithoutAwait) {
                 flake8_trio::rules::timeout_without_await(checker, with_stmt, items);
             }
         }
