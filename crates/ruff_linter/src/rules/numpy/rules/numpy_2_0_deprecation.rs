@@ -81,8 +81,11 @@ struct Replacement<'a> {
 
 #[derive(Debug)]
 enum Details<'a> {
+    /// The deprecated member can be replaced by another member in the NumPy API.
     AutoImport { path: &'a str, name: &'a str },
+    /// The deprecated member can be replaced by a member of the Python standard library.
     AutoPurePython { python_expr: &'a str },
+    /// The deprecated member can be replaced by a manual migration.
     Manual { guideline: Option<&'a str> },
 }
 
@@ -93,7 +96,7 @@ impl Details<'_> {
             Details::AutoPurePython { python_expr } => {
                 Some(format!("Use `{python_expr}` instead."))
             }
-            Details::Manual { guideline } => guideline.map(|s| s.to_string()),
+            Details::Manual { guideline } => guideline.map(ToString::to_string),
         }
     }
 }
