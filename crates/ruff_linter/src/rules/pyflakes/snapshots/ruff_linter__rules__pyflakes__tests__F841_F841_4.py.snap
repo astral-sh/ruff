@@ -20,22 +20,4 @@ F841_4.py:12:5: F841 [*] Local variable `a` is assigned to but never used
 14 14 | 
 15 15 | 
 
-F841_4.py:13:5: F841 Local variable `b` is assigned to but never used
-   |
-11 | def bar():
-12 |     a = foo()
-13 |     b, c = foo()
-   |     ^ F841
-   |
-   = help: Remove assignment to unused variable `b`
-
-F841_4.py:13:8: F841 Local variable `c` is assigned to but never used
-   |
-11 | def bar():
-12 |     a = foo()
-13 |     b, c = foo()
-   |        ^ F841
-   |
-   = help: Remove assignment to unused variable `c`
-
 
