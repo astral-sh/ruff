@@ -47,7 +47,7 @@ pub(super) fn generate_none_identity_comparison(
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
-    // Construct `name is None`.
+    // Construct `name is None` or `name is not None`.
     let op = if negate {
         ast::CmpOp::IsNot
     } else {

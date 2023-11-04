@@ -97,7 +97,7 @@ pub(crate) fn type_none_comparison(
         _ => return,
     };
 
-    // Get the name of the other object (or `None` if both are `None`).
+    // Get the name of the other object (or `None` if both were `None`).
     let other_arg_name = match other_arg {
         Expr::Name(ast::ExprName { id, .. }) => id.to_string(),
         Expr::NoneLiteral { .. } => "None".to_string(),
