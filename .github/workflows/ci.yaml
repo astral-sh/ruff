@@ -34,41 +34,44 @@ jobs:
       - uses: tj-actions/changed-files@v40
         id: changed
         with:
+          # The following pattern is used here:
+          #  include all, exclude things that does not matter.
+          # So when this config become outdated, it'll just run more jobs, and won't skip something important.
+          # As result this config will not require immediate maintenance when project files will be changed.
           files_yaml: |
             linter:
-              - Cargo.toml
-              - Cargo.lock
-              - crates/**
+              - "**/*"
               - "!crates/ruff_python_formatter/**"
               - "!crates/ruff_formatter/**"
               - "!crates/ruff_dev/**"
               - "!crates/ruff_shrinking/**"
-              - scripts/**
-              - .github/workflows/ci.yaml
+              - "!**/*.md"
+              - "!docs/**"
+              - "!.devcontainer/**"
+              - "!.assets/**"
+              - "!playground/**"
+              - "!python/**"
+              - "!mkdocs.*.yml"
 
             formatter:
-              - Cargo.toml
-              - Cargo.lock
-              - crates/ruff_python_formatter/**
-              - crates/ruff_formatter/**
-              - crates/ruff_python_trivia/**
-              - crates/ruff_python_ast/**
-              - crates/ruff_source_file/**
-              - crates/ruff_python_index/**
-              - crates/ruff_text_size/**
-              - crates/ruff_python_parser/**
-              - crates/ruff_dev/**
-              - scripts/**
-              - .github/workflows/ci.yaml
+              - "**/*"
+              - "!**/*.md"
+              - "!docs/**"
+              - "!.devcontainer/**"
+              - "!.assets/**"
+              - "!playground/**"
+              - "!python/**"
+              - "!mkdocs.*.yml"
 
             code:
-              - crates/**
-              - scripts/**
-              - Cargo.toml
-              - Cargo.lock
-              - clippy.toml
-              - pyproject.toml
-              - .github/workflows/ci.yaml
+              - "**/*"
+              - "!**/*.md"
+              - "!docs/**"
+              - "!.devcontainer/**"
+              - "!.assets/**"
+              - "!playground/**"
+              - "!python/**"
+              - "!mkdocs.*.yml"
 
   cargo-fmt:
     name: "cargo fmt"
