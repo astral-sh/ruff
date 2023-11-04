@@ -1,7 +1,7 @@
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::CacheKey;
+use ruff_python_ast::call_path_pattern::CallPathPattern;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -25,6 +25,7 @@ pub enum Strictness {
 #[derive(Debug, CacheKey, Default)]
 pub struct Settings {
     pub ban_relative_imports: Strictness,
-    pub banned_api: FxHashMap<String, ApiBan>,
+    // #[cache_key(ignore)] // TODO(akx): definitely shouldn't be ignoring this
+    pub banned_api: Vec<(CallPathPattern, ApiBan)>,
     pub banned_module_level_imports: Vec<String>,
 }

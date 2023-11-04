@@ -1,8 +1,7 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{call_path, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::from_qualified_name;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -40,18 +39,20 @@ impl Violation for BannedApi {
 }
 
 /// TID251
-pub(crate) fn banned_api<T: Ranged>(checker: &mut Checker, policy: &NameMatchPolicy, node: &T) {
+pub(crate) fn banned_api<T: Ranged>(checker: &mut Checker, thing: &str, node: &T, prefix: bool) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
-    if let Some(banned_module) = policy.find(banned_api.keys().map(AsRef::as_ref)) {
-        if let Some(reason) = banned_api.get(&banned_module) {
-            checker.diagnostics.push(Diagnostic::new(
-                BannedApi {
-                    name: banned_module,
-                    message: reason.msg.to_string(),
-                },
-                node.range(),
-            ));
-        }
+    let pth = call_path::from_qualified_name(thing);
+    if let Some((_, ban)) = banned_api
+        .iter()
+        .find(|(banned_path, ..)| banned_path.matches_call_path(&pth, prefix))
+    {
+        checker.diagnostics.push(Diagnostic::new(
+            BannedApi {
+                name: String::from(thing), // TODO: probably incorrect
+                message: ban.msg.to_string(),
+            },
+            node.range(),
+        ));
     }
 }
 
@@ -65,7 +66,7 @@ pub(crate) fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
             .and_then(|call_path| {
                 banned_api
                     .iter()
-                    .find(|(banned_path, ..)| call_path == from_qualified_name(banned_path))
+                    .find(|(banned_path, ..)| banned_path.matches_call_path(&call_path, false))
             })
     {
         checker.diagnostics.push(Diagnostic::new(

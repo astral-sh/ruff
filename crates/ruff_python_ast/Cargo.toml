@@ -13,11 +13,15 @@ license = { workspace = true }
 [lib]
 
 [dependencies]
+ruff_cache = { path = "../ruff_cache" }
+ruff_macros = { path = "../ruff_macros" }
 ruff_python_trivia = { path = "../ruff_python_trivia" }
 ruff_source_file = { path = "../ruff_source_file" }
 ruff_text_size = { path = "../ruff_text_size" }
 
+anyhow = { workspace = true }
 bitflags = { workspace = true }
+glob = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }

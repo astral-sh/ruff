@@ -8,7 +8,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use rustc_hash::FxHashMap;
+    use ruff_python_ast::call_path_pattern;
 
     use crate::assert_messages;
     use crate::registry::Rule;
@@ -23,20 +23,21 @@ mod tests {
             Path::new("flake8_tidy_imports/TID251.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_api: FxHashMap::from_iter([
+                    banned_api: vec![
                         (
-                            "cgi".to_string(),
+                            call_path_pattern::from_qualified_name("cgi")?,
                             ApiBan {
                                 msg: "The cgi module is deprecated.".to_string(),
                             },
                         ),
                         (
-                            "typing.TypedDict".to_string(),
+                            call_path_pattern::from_qualified_name("typing.TypedDict")?,
                             ApiBan {
                                 msg: "Use typing_extensions.TypedDict instead.".to_string(),
                             },
                         ),
-                    ]),
+                    ],
+                    // TODO(akx): add wildcard tests
                     ..Default::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::BannedApi])
@@ -52,20 +53,21 @@ mod tests {
             Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
             &LinterSettings {
                 flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    banned_api: FxHashMap::from_iter([
+                    banned_api: vec![
                         (
-                            "attrs".to_string(),
+                            call_path_pattern::from_qualified_name("attrs")?,
                             ApiBan {
                                 msg: "The attrs module is deprecated.".to_string(),
                             },
                         ),
                         (
-                            "my_package.sublib.protocol".to_string(),
+                            call_path_pattern::from_qualified_name("my_package.sublib.protocol")?,
                             ApiBan {
                                 msg: "The protocol module is deprecated.".to_string(),
                             },
                         ),
-                    ]),
+                    ],
+                    // TODO(akx): add wildcard tests
                     ..Default::default()
                 },
                 namespace_packages: vec![Path::new("my_package").to_path_buf()],
