@@ -3,6 +3,7 @@
 use std::{borrow::Cow, cmp::Ordering, cmp::Reverse};
 
 use natord;
+use unicode_width::UnicodeWidthStr;
 
 use ruff_python_stdlib::str;
 
@@ -103,7 +104,7 @@ impl<'a> ModuleKey<'a> {
 
         let maybe_length = (settings.length_sort
             || (settings.length_sort_straight && straight_import))
-            .then_some(name.map(str::len).unwrap_or_default());
+            .then_some(name.map(str::width).unwrap_or_default());
 
         let maybe_lowercase_name = name.and_then(|name| {
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
@@ -146,7 +147,7 @@ impl<'a> MemberKey<'a> {
         let member_type = settings
             .order_by_type
             .then_some(member_type(name, settings));
-        let maybe_length = settings.length_sort.then_some(name.len());
+        let maybe_length = settings.length_sort.then_some(name.width());
         let maybe_lowercase_name =
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
         let module_name = NatOrdStr::from(name);
