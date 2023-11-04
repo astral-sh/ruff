@@ -197,7 +197,16 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
             // Ex) `type(obj) == int`
             matches!(
                 id.as_str(),
-                "int" | "str" | "float" | "bool" | "complex" | "bytes" | "list" | "dict" | "set"
+                "int"
+                    | "str"
+                    | "float"
+                    | "bool"
+                    | "complex"
+                    | "bytes"
+                    | "list"
+                    | "dict"
+                    | "set"
+                    | "memoryview"
             ) && semantic.is_builtin(id)
         }
         _ => false,
