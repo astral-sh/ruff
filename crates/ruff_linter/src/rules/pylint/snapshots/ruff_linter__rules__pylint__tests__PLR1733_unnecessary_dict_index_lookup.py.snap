@@ -68,7 +68,7 @@ unnecessary_dict_index_lookup.py:9:15: PLR1733 [*] Unnecessary dict index lookup
  9 |         print(FRUITS[fruit_name])  # PLR1733
    |               ^^^^^^^^^^^^^^^^^^ PLR1733
 10 |         blah = FRUITS[fruit_name]  # PLR1733
-11 |         FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
+11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
    |
    = help: Remove unnecessary dict index lookup
 
@@ -79,8 +79,8 @@ unnecessary_dict_index_lookup.py:9:15: PLR1733 [*] Unnecessary dict index lookup
 9     |-        print(FRUITS[fruit_name])  # PLR1733
    9  |+        print(fruit_count)  # PLR1733
 10 10 |         blah = FRUITS[fruit_name]  # PLR1733
-11 11 |         FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-12 12 |         FRUITS[fruit_name] = FRUITS[fruit_name]  # PLR1733 (on the right hand)
+11 11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
+12 12 | 
 
 unnecessary_dict_index_lookup.py:10:16: PLR1733 [*] Unnecessary dict index lookup
    |
@@ -88,8 +88,7 @@ unnecessary_dict_index_lookup.py:10:16: PLR1733 [*] Unnecessary dict index looku
  9 |         print(FRUITS[fruit_name])  # PLR1733
 10 |         blah = FRUITS[fruit_name]  # PLR1733
    |                ^^^^^^^^^^^^^^^^^^ PLR1733
-11 |         FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-12 |         FRUITS[fruit_name] = FRUITS[fruit_name]  # PLR1733 (on the right hand)
+11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
    |
    = help: Remove unnecessary dict index lookup
 
@@ -99,18 +98,16 @@ unnecessary_dict_index_lookup.py:10:16: PLR1733 [*] Unnecessary dict index looku
 9  9  |         print(FRUITS[fruit_name])  # PLR1733
 10    |-        blah = FRUITS[fruit_name]  # PLR1733
    10 |+        blah = fruit_count  # PLR1733
-11 11 |         FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-12 12 |         FRUITS[fruit_name] = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-13 13 |         FRUITS[fruit_name] += FRUITS[fruit_name]  # PLR1733 (on the right hand)
+11 11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
+12 12 | 
+13 13 | 
 
-unnecessary_dict_index_lookup.py:11:35: PLR1733 [*] Unnecessary dict index lookup
+unnecessary_dict_index_lookup.py:11:16: PLR1733 [*] Unnecessary dict index lookup
    |
  9 |         print(FRUITS[fruit_name])  # PLR1733
 10 |         blah = FRUITS[fruit_name]  # PLR1733
-11 |         FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-   |                                   ^^^^^^^^^^^^^^^^^^ PLR1733
-12 |         FRUITS[fruit_name] = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-13 |         FRUITS[fruit_name] += FRUITS[fruit_name]  # PLR1733 (on the right hand)
+11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
+   |                ^^^^^^^^^^^^^^^^^^ PLR1733
    |
    = help: Remove unnecessary dict index lookup
 
@@ -118,49 +115,10 @@ unnecessary_dict_index_lookup.py:11:35: PLR1733 [*] Unnecessary dict index looku
 8  8  |     for fruit_name, fruit_count in FRUITS.items():
 9  9  |         print(FRUITS[fruit_name])  # PLR1733
 10 10 |         blah = FRUITS[fruit_name]  # PLR1733
-11    |-        FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-   11 |+        FRUITS[fruit_name]: int = fruit_count  # PLR1733 (on the right hand)
-12 12 |         FRUITS[fruit_name] = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-13 13 |         FRUITS[fruit_name] += FRUITS[fruit_name]  # PLR1733 (on the right hand)
-14 14 | 
-
-unnecessary_dict_index_lookup.py:12:30: PLR1733 [*] Unnecessary dict index lookup
-   |
-10 |         blah = FRUITS[fruit_name]  # PLR1733
-11 |         FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-12 |         FRUITS[fruit_name] = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-   |                              ^^^^^^^^^^^^^^^^^^ PLR1733
-13 |         FRUITS[fruit_name] += FRUITS[fruit_name]  # PLR1733 (on the right hand)
-   |
-   = help: Remove unnecessary dict index lookup
-
-ℹ Fix
-9  9  |         print(FRUITS[fruit_name])  # PLR1733
-10 10 |         blah = FRUITS[fruit_name]  # PLR1733
-11 11 |         FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-12    |-        FRUITS[fruit_name] = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-   12 |+        FRUITS[fruit_name] = fruit_count  # PLR1733 (on the right hand)
-13 13 |         FRUITS[fruit_name] += FRUITS[fruit_name]  # PLR1733 (on the right hand)
-14 14 | 
-15 15 | 
-
-unnecessary_dict_index_lookup.py:13:31: PLR1733 [*] Unnecessary dict index lookup
-   |
-11 |         FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-12 |         FRUITS[fruit_name] = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-13 |         FRUITS[fruit_name] += FRUITS[fruit_name]  # PLR1733 (on the right hand)
-   |                               ^^^^^^^^^^^^^^^^^^ PLR1733
-   |
-   = help: Remove unnecessary dict index lookup
-
-ℹ Fix
-10 10 |         blah = FRUITS[fruit_name]  # PLR1733
-11 11 |         FRUITS[fruit_name]: int = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-12 12 |         FRUITS[fruit_name] = FRUITS[fruit_name]  # PLR1733 (on the right hand)
-13    |-        FRUITS[fruit_name] += FRUITS[fruit_name]  # PLR1733 (on the right hand)
-   13 |+        FRUITS[fruit_name] += fruit_count  # PLR1733 (on the right hand)
-14 14 | 
-15 15 | 
-16 16 | def dont_fix_these():
+11    |-        assert FRUITS[fruit_name] == "pear"  # PLR1733
+   11 |+        assert fruit_count == "pear"  # PLR1733
+12 12 | 
+13 13 | 
+14 14 | def dont_fix_these():
 
 
