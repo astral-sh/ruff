@@ -292,6 +292,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // flake8-trio
         (Flake8Trio, "100") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioTimeoutWithoutAwait),
+        (Flake8Trio, "105") => (RuleGroup::Preview, rules::flake8_trio::rules::SyncTrioCall),
 
         // flake8-builtins
         (Flake8Builtins, "001") => (RuleGroup::Stable, rules::flake8_builtins::rules::BuiltinVariableShadowing),

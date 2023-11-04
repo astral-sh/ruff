@@ -103,8 +103,8 @@ impl std::fmt::Display for MethodName {
 }
 
 #[derive(Debug, Default)]
-struct AwaitVisitor {
-    seen_await: bool,
+pub(crate) struct AwaitVisitor {
+    pub(crate) seen_await: bool,
 }
 
 impl Visitor<'_> for AwaitVisitor {
