@@ -138,6 +138,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                         | "list"
                         | "dict"
                         | "set"
+                        | "memoryview"
                 ) && checker.semantic().is_builtin(id)
                 {
                     checker.diagnostics.push(Diagnostic::new(

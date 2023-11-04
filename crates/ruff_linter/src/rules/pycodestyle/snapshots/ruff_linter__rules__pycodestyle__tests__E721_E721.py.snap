@@ -20,6 +20,16 @@ E721.py:5:4: E721 Do not compare types, use `isinstance()`
 7 | #: E721
   |
 
+E721.py:8:4: E721 Do not compare types, use `isinstance()`
+   |
+ 6 |     pass
+ 7 | #: E721
+ 8 | if type(res) == memoryview:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^ E721
+ 9 |     pass
+10 | #: Okay
+   |
+
 E721.py:18:4: E721 Do not compare types, use `isinstance()`
    |
 16 | import types
