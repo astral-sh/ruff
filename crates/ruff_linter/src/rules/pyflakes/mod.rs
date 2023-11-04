@@ -30,7 +30,7 @@ mod tests {
     use crate::settings::{flags, LinterSettings};
     use crate::source_kind::SourceKind;
     use crate::test::{test_path, test_snippet};
-    use crate::{assert_messages, directives, settings};
+    use crate::{assert_messages, directives};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
@@ -147,24 +147,6 @@ mod tests {
     #[test_case(Rule::UnusedVariable, Path::new("F841_2.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_3.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
-    #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("pycodestyle").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_messages!(snapshot, diagnostics);
-        Ok(())
-    }
-
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"))]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -172,6 +154,24 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -1153,25 +1153,21 @@ mod tests {
         def f():
             a, *b = range(10)
         "#,
-            &[Rule::UnusedVariable, Rule::UnusedVariable],
+            &[],
         );
         flakes(
             r#"
         def f():
             (*a, b) = range(10)
         "#,
-            &[Rule::UnusedVariable, Rule::UnusedVariable],
+            &[],
         );
         flakes(
             r#"
         def f():
             [a, *b, c] = range(10)
         "#,
-            &[
-                Rule::UnusedVariable,
-                Rule::UnusedVariable,
-                Rule::UnusedVariable,
-            ],
+            &[],
         );
     }
 
