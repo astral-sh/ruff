@@ -68,7 +68,7 @@ unnecessary_list_index_lookup.py:10:15: PLR1736 [*] Unnecessary list index looku
 10 |         print(letters[index])  # PLR1736
    |               ^^^^^^^^^^^^^^ PLR1736
 11 |         blah = letters[index]  # PLR1736
-12 |         letters[index]: str = letters[index]  # PLR1736 (on the right hand)
+12 |         assert letters[index]  == "d"  # PLR1736
    |
    = help: Remove unnecessary list index lookup
 
@@ -79,8 +79,8 @@ unnecessary_list_index_lookup.py:10:15: PLR1736 [*] Unnecessary list index looku
 10    |-        print(letters[index])  # PLR1736
    10 |+        print(letter)  # PLR1736
 11 11 |         blah = letters[index]  # PLR1736
-12 12 |         letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-13 13 |         letters[index] += letters[index]  # PLR1736 (on the right hand)
+12 12 |         assert letters[index]  == "d"  # PLR1736
+13 13 | 
 
 unnecessary_list_index_lookup.py:11:16: PLR1736 [*] Unnecessary list index lookup
    |
@@ -88,8 +88,7 @@ unnecessary_list_index_lookup.py:11:16: PLR1736 [*] Unnecessary list index looku
 10 |         print(letters[index])  # PLR1736
 11 |         blah = letters[index]  # PLR1736
    |                ^^^^^^^^^^^^^^ PLR1736
-12 |         letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-13 |         letters[index] += letters[index]  # PLR1736 (on the right hand)
+12 |         assert letters[index]  == "d"  # PLR1736
    |
    = help: Remove unnecessary list index lookup
 
@@ -99,18 +98,16 @@ unnecessary_list_index_lookup.py:11:16: PLR1736 [*] Unnecessary list index looku
 10 10 |         print(letters[index])  # PLR1736
 11    |-        blah = letters[index]  # PLR1736
    11 |+        blah = letter  # PLR1736
-12 12 |         letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-13 13 |         letters[index] += letters[index]  # PLR1736 (on the right hand)
-14 14 |         letters[index] = letters[index]  # PLR1736 (on the right hand)
+12 12 |         assert letters[index]  == "d"  # PLR1736
+13 13 | 
+14 14 | 
 
-unnecessary_list_index_lookup.py:12:31: PLR1736 [*] Unnecessary list index lookup
+unnecessary_list_index_lookup.py:12:16: PLR1736 [*] Unnecessary list index lookup
    |
 10 |         print(letters[index])  # PLR1736
 11 |         blah = letters[index]  # PLR1736
-12 |         letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-   |                               ^^^^^^^^^^^^^^ PLR1736
-13 |         letters[index] += letters[index]  # PLR1736 (on the right hand)
-14 |         letters[index] = letters[index]  # PLR1736 (on the right hand)
+12 |         assert letters[index]  == "d"  # PLR1736
+   |                ^^^^^^^^^^^^^^ PLR1736
    |
    = help: Remove unnecessary list index lookup
 
@@ -118,49 +115,10 @@ unnecessary_list_index_lookup.py:12:31: PLR1736 [*] Unnecessary list index looku
 9  9  |     for index, letter in enumerate(letters):
 10 10 |         print(letters[index])  # PLR1736
 11 11 |         blah = letters[index]  # PLR1736
-12    |-        letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-   12 |+        letters[index]: str = letter  # PLR1736 (on the right hand)
-13 13 |         letters[index] += letters[index]  # PLR1736 (on the right hand)
-14 14 |         letters[index] = letters[index]  # PLR1736 (on the right hand)
-15 15 | 
-
-unnecessary_list_index_lookup.py:13:27: PLR1736 [*] Unnecessary list index lookup
-   |
-11 |         blah = letters[index]  # PLR1736
-12 |         letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-13 |         letters[index] += letters[index]  # PLR1736 (on the right hand)
-   |                           ^^^^^^^^^^^^^^ PLR1736
-14 |         letters[index] = letters[index]  # PLR1736 (on the right hand)
-   |
-   = help: Remove unnecessary list index lookup
-
-ℹ Fix
-10 10 |         print(letters[index])  # PLR1736
-11 11 |         blah = letters[index]  # PLR1736
-12 12 |         letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-13    |-        letters[index] += letters[index]  # PLR1736 (on the right hand)
-   13 |+        letters[index] += letter  # PLR1736 (on the right hand)
-14 14 |         letters[index] = letters[index]  # PLR1736 (on the right hand)
-15 15 | 
-16 16 | 
-
-unnecessary_list_index_lookup.py:14:26: PLR1736 [*] Unnecessary list index lookup
-   |
-12 |         letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-13 |         letters[index] += letters[index]  # PLR1736 (on the right hand)
-14 |         letters[index] = letters[index]  # PLR1736 (on the right hand)
-   |                          ^^^^^^^^^^^^^^ PLR1736
-   |
-   = help: Remove unnecessary list index lookup
-
-ℹ Fix
-11 11 |         blah = letters[index]  # PLR1736
-12 12 |         letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-13 13 |         letters[index] += letters[index]  # PLR1736 (on the right hand)
-14    |-        letters[index] = letters[index]  # PLR1736 (on the right hand)
-   14 |+        letters[index] = letter  # PLR1736 (on the right hand)
-15 15 | 
-16 16 | 
-17 17 | def dont_fix_these():
+12    |-        assert letters[index]  == "d"  # PLR1736
+   12 |+        assert letter  == "d"  # PLR1736
+13 13 | 
+14 14 | 
+15 15 | def dont_fix_these():
 
 

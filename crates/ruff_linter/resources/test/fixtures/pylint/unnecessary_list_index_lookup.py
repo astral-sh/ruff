@@ -9,14 +9,14 @@ def fix_these():
     for index, letter in enumerate(letters):
         print(letters[index])  # PLR1736
         blah = letters[index]  # PLR1736
-        letters[index]: str = letters[index]  # PLR1736 (on the right hand)
-        letters[index] += letters[index]  # PLR1736 (on the right hand)
-        letters[index] = letters[index]  # PLR1736 (on the right hand)
+        assert letters[index]  == "d"  # PLR1736
 
 
 def dont_fix_these():
+    # once there is an assignment to the sequence[index], we stop emitting diagnostics
     for index, letter in enumerate(letters):
         letters[index] = "d"  # Ok
+        assert letters[index] == "d"  # Ok
 
 
 def value_intentionally_unused():
@@ -27,7 +27,4 @@ def value_intentionally_unused():
     for index, _ in enumerate(letters):
         print(letters[index])  # Ok
         blah = letters[index]  # Ok
-        letters[index]: str = letters[index]  # Ok
-        letters[index] += letters[index]  # Ok
-        letters[index] = letters[index]  # Ok
         letters[index] = "d"  # Ok
