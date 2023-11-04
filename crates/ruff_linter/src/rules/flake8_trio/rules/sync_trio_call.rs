@@ -95,7 +95,6 @@ enum MethodName {
     WaitReadable,
     WaitTaskRescheduled,
     WaitWritable,
-    NurseryStart,
 }
 
 impl MethodName {
@@ -132,7 +131,6 @@ impl MethodName {
             ["trio", "lowlevel", "wait_readable"] => Some(Self::WaitReadable),
             ["trio", "lowlevel", "wait_task_rescheduled"] => Some(Self::WaitTaskRescheduled),
             ["trio", "lowlevel", "wait_writable"] => Some(Self::WaitWritable),
-            ["trio", "Nursery", "start"] => Some(Self::NurseryStart),
             _ => None,
         }
     }
@@ -172,7 +170,6 @@ impl std::fmt::Display for MethodName {
             MethodName::WaitReadable => write!(f, "trio.lowlevel.wait_readable"),
             MethodName::WaitTaskRescheduled => write!(f, "trio.lowlevel.wait_task_rescheduled"),
             MethodName::WaitWritable => write!(f, "trio.lowlevel.wait_writable"),
-            MethodName::NurseryStart => write!(f, "trio.Nursery.start"),
         }
     }
 }
