@@ -1235,6 +1235,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     comparators,
                 );
             }
+            if checker.enabled(Rule::TypeNoneComparison) {
+                refurb::rules::type_none_comparison(checker, expr, left, ops, comparators);
+            }
             if checker.enabled(Rule::SingleItemMembershipTest) {
                 refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
             }
