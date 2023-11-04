@@ -1128,26 +1128,31 @@ mod tests {
     #[test]
     fn used_as_star_unpack() {
         // Star names in unpack are used if RHS is not a tuple/list literal.
+        // EDIT: Behaviour changed to fix issue #8441.
         flakes(
             r#"
         def f():
             a, *b = range(10)
         "#,
-            &[],
+            &[Rule::UnusedVariable, Rule::UnusedVariable],
         );
         flakes(
             r#"
         def f():
             (*a, b) = range(10)
         "#,
-            &[],
+            &[Rule::UnusedVariable, Rule::UnusedVariable],
         );
         flakes(
             r#"
         def f():
             [a, *b, c] = range(10)
         "#,
-            &[],
+            &[
+                Rule::UnusedVariable,
+                Rule::UnusedVariable,
+                Rule::UnusedVariable,
+            ],
         );
     }
 
