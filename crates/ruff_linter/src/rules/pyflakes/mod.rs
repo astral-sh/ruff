@@ -145,6 +145,7 @@ mod tests {
     #[test_case(Rule::UnusedVariable, Path::new("F841_1.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_2.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_3.py"))]
+    #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"))]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
