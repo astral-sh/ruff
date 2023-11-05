@@ -129,12 +129,12 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
     output.push_str("**Example usage**:\n\n");
     output.push_str(&format_tab(
         "pyproject.toml",
-        &format_header(parent_set, true),
+        &format_header(parent_set, ConfigurationFile::PyprojectToml),
         field.example,
     ));
     output.push_str(&format_tab(
         "ruff.toml",
-        &format_header(parent_set, false),
+        &format_header(parent_set, ConfigurationFile::RuffToml),
         field.example,
     ));
     output.push('\n');
@@ -149,7 +149,7 @@ fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
     )
 }
 
-fn format_header(parent_set: &Set, pyproject: bool) -> String {
+fn format_header(parent_set: &Set, configuration: ConfigurationFile) -> String {
     let fmt = if let Some(set_name) = parent_set.name() {
         if set_name == "format" {
             String::from(".format")
@@ -159,13 +159,22 @@ fn format_header(parent_set: &Set, pyproject: bool) -> String {
     } else {
         String::new()
     };
-    if pyproject {
-        format!("[tool.ruff{fmt}]")
-    } else if !fmt.is_empty() {
-        format!("[{}]", fmt.strip_prefix('.').unwrap())
-    } else {
-        String::new()
+    match configuration {
+        ConfigurationFile::PyprojectToml => format!("[tool.ruff{fmt}]", fmt = fmt),
+        ConfigurationFile::RuffToml => {
+            if !fmt.is_empty() {
+                format!("[{}]", fmt.strip_prefix('.').unwrap())
+            } else {
+                String::new()
+            }
+        }
     }
+}
+
+#[derive(Debug)]
+enum ConfigurationFile {
+    PyprojectToml,
+    RuffToml,
 }
 
 #[derive(Default)]
