@@ -107,6 +107,7 @@ export default function SourceEditor({
     <Editor
       beforeMount={handleMount}
       options={{
+        fixedOverflowWidgets: true,
         readOnly: false,
         minimap: { enabled: false },
         fontSize: 14,

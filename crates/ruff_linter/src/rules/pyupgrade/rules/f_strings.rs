@@ -191,14 +191,20 @@ fn try_convert_to_f_string(
     summary: &mut FormatSummaryValues,
     locator: &Locator,
 ) -> Result<Option<String>> {
+    let contents = locator.slice(range);
+
     // Strip the unicode prefix. It's redundant in Python 3, and invalid when used
     // with f-strings.
-    let contents = locator.slice(range);
     let contents = if contents.starts_with('U') || contents.starts_with('u') {
         &contents[1..]
     } else {
         contents
     };
+
+    // Temporarily strip the raw prefix, if present. It will be prepended to the result, before the
+    // 'f', to match the prefix order both the Ruff formatter (and Black) use when formatting code.
+    let raw = contents.starts_with('R') || contents.starts_with('r');
+    let contents = if raw { &contents[1..] } else { contents };
 
     // Remove the leading and trailing quotes.
     let leading_quote = leading_quote(contents).context("Unable to identify leading quote")?;
@@ -291,7 +297,10 @@ fn try_convert_to_f_string(
     }
 
     // Construct the format string.
-    let mut contents = String::with_capacity(1 + converted.len());
+    let mut contents = String::with_capacity(usize::from(raw) + 1 + converted.len());
+    if raw {
+        contents.push('r');
+    }
     contents.push('f');
     contents.push_str(leading_quote);
     contents.push_str(&converted);

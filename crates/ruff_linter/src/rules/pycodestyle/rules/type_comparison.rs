@@ -138,6 +138,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                         | "list"
                         | "dict"
                         | "set"
+                        | "memoryview"
                 ) && checker.semantic().is_builtin(id)
                 {
                     checker.diagnostics.push(Diagnostic::new(
@@ -197,7 +198,16 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
             // Ex) `type(obj) == int`
             matches!(
                 id.as_str(),
-                "int" | "str" | "float" | "bool" | "complex" | "bytes" | "list" | "dict" | "set"
+                "int"
+                    | "str"
+                    | "float"
+                    | "bool"
+                    | "complex"
+                    | "bytes"
+                    | "list"
+                    | "dict"
+                    | "set"
+                    | "memoryview"
             ) && semantic.is_builtin(id)
         }
         _ => false,

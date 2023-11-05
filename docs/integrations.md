@@ -12,18 +12,18 @@ which supports fix actions, import sorting, and more.
 Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
 
 ```yaml
-# Run the Ruff formatter.
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.0.291
-  hooks:
-    - id: ruff-format
 # Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
   rev: v0.0.291
   hooks:
     - id: ruff
+# Run the Ruff formatter.
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.0.291
+  hooks:
+    - id: ruff-format
 ```
 
 To enable fixes, add the `--fix` argument to the linter:
@@ -47,7 +47,7 @@ To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowe
   rev: v0.0.291
   hooks:
     - id: ruff
-      types_or: [python, pyi, jupyter]
+      types_or: [ python, pyi, jupyter ]
 ```
 
 Ruff's lint hook should be placed after other formatting tools, such as Ruff's format hook, Black,
