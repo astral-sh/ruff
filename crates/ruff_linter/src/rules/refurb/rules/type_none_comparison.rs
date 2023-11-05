@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -57,14 +58,8 @@ impl Violation for TypeNoneComparison {
 }
 
 /// FURB169
-pub(crate) fn type_none_comparison(
-    checker: &mut Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    let ([op], [right]) = (ops, comparators) else {
+pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCompare) {
+    let ([op], [right]) = (compare.ops.as_slice(), compare.comparators.as_slice()) else {
         return;
     };
 
@@ -78,10 +73,10 @@ pub(crate) fn type_none_comparison(
     };
 
     // Get the objects whose types are being compared.
-    let Some(left_arg) = type_call_arg(checker, left) else {
+    let Some(left_arg) = type_call_arg(&compare.left, checker.semantic()) else {
         return;
     };
-    let Some(right_arg) = type_call_arg(checker, right) else {
+    let Some(right_arg) = type_call_arg(right, checker.semantic()) else {
         return;
     };
 
@@ -99,51 +94,54 @@ pub(crate) fn type_none_comparison(
 
     // Get the name of the other object (or `None` if both were `None`).
     let other_arg_name = match other_arg {
-        Expr::Name(ast::ExprName { id, .. }) => id.to_string(),
-        Expr::NoneLiteral { .. } => "None".to_string(),
+        Expr::Name(ast::ExprName { id, .. }) => id.as_str(),
+        Expr::NoneLiteral { .. } => "None",
         _ => return,
     };
 
     let mut diagnostic = Diagnostic::new(
         TypeNoneComparison {
-            object: other_arg_name.clone(),
+            object: other_arg_name.to_string(),
             comparison,
         },
-        expr.range(),
+        compare.range(),
     );
-    let replacement = match comparison {
-        Comparison::Is | Comparison::Eq => {
-            generate_none_identity_comparison(&other_arg_name, false, checker.generator())
-        }
-        Comparison::IsNot | Comparison::NotEq => {
-            generate_none_identity_comparison(&other_arg_name, true, checker.generator())
-        }
-    };
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        pad(replacement, expr.range(), checker.locator()),
-        expr.range(),
+        pad(
+            match comparison {
+                Comparison::Is | Comparison::Eq => {
+                    generate_none_identity_comparison(&other_arg_name, false, checker.generator())
+                }
+                Comparison::IsNot | Comparison::NotEq => {
+                    generate_none_identity_comparison(&other_arg_name, true, checker.generator())
+                }
+            },
+            compare.range(),
+            checker.locator(),
+        ),
+        compare.range(),
     )));
     checker.diagnostics.push(diagnostic);
 }
 
-/// Returns the object passed to the function if the expression is a call to
-/// `type` with one argument.
-fn type_call_arg<'a>(checker: &'a Checker, expr: &'a Expr) -> Option<&'a Expr> {
-    match expr {
-        Expr::Call(ast::ExprCall {
-            func, arguments, ..
-        }) if arguments.len() == 1 => {
-            if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                if id.as_str() == "type" && checker.semantic().is_builtin(id) {
-                    if let Some(args) = arguments.find_positional(0) {
-                        return Some(args);
-                    }
-                }
-            }
-            None
-        }
-        _ => None,
+/// Returns the object passed to the function, if the expression is a call to
+/// `type` with a single argument.
+fn type_call_arg<'a>(expr: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a Expr> {
+    // The expression must be a single-argument call to `type`.
+    let ast::ExprCall {
+        func, arguments, ..
+    } = expr.as_call_expr()?;
+    if arguments.len() != 1 {
+        return None;
     }
+
+    // The function itself must be the builtin `type`.
+    let ast::ExprName { id, .. } = func.as_name_expr()?;
+    if id.as_str() != "type" || !semantic.is_builtin(id) {
+        return None;
+    }
+
+    arguments.find_positional(0)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
