@@ -160,18 +160,18 @@ fn format_header(parent_set: &Set, configuration: ConfigurationFile) -> String {
         String::new()
     };
     match configuration {
-        ConfigurationFile::PyprojectToml => format!("[tool.ruff{fmt}]", fmt = fmt),
+        ConfigurationFile::PyprojectToml => format!("[tool.ruff{fmt}]"),
         ConfigurationFile::RuffToml => {
-            if !fmt.is_empty() {
-                format!("[{}]", fmt.strip_prefix('.').unwrap())
-            } else {
+            if fmt.is_empty() {
                 String::new()
+            } else {
+                format!("[{}]", fmt.strip_prefix('.').unwrap())
             }
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum ConfigurationFile {
     PyprojectToml,
     RuffToml,
