@@ -226,6 +226,135 @@ impl Violation for ContinuationLineOverIndentedForVisualIndent {
     }
 }
 
+/// ## What it does
+/// Checks for continuation line under-indented for visual indent.
+///
+/// ## Why is this bad?
+/// This makes distinguishing continuation lines harder.
+///
+/// ## Example
+/// ```python
+/// print("Python", ("Hello",
+///                "World"))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Python", ("Hello",
+///                  "World"))
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct ContinuationLineUnderIndentedForVisualIndent;
+
+impl Violation for ContinuationLineUnderIndentedForVisualIndent {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Continuation line under indented for visual indent.")
+    }
+}
+
+/// ## What it does
+/// Checks for lines visually indented with same indent as the next logical line.
+///
+/// ## Why is this bad?
+/// This can make reading continuation lines harder.
+///
+/// ## Example
+/// ```python
+/// if (row < 0 or module_count <= row or
+///     col < 0 or module_count <= col):
+///     raise Exception("%s,%s - %s" % (row, col, self.moduleCount))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if (row < 0 or module_count <= row or
+///         col < 0 or module_count <= col):
+///     raise Exception("%s,%s - %s" % (row, col, self.moduleCount))
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct VisuallyIndentedLineWithSameIndentAsNextLogicalLine;
+
+impl Violation for VisuallyIndentedLineWithSameIndentAsNextLogicalLine {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Visually indented line has the same indentation as the next logical line.")
+    }
+}
+
+/// ## What it does
+/// Checks for continuation lines unaligned for hanging indent.
+///
+/// ## Why is this bad?
+/// This can make reading continuation lines harder.
+///
+/// ## Example
+/// ```python
+/// my_dict = {
+///     "key": "value",
+///     "long": "the quick brown fox jumps over the "
+///         "lazy dog",
+/// }
+/// ```
+///
+/// Use instead:
+/// ```python
+/// my_dict = {
+///     "key": "value",
+///     "long": "the quick brown fox jumps over the "
+///             "lazy dog",
+/// }
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct ContinuationLineUnalignedForHangingIndent;
+
+impl Violation for ContinuationLineUnalignedForHangingIndent {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Continuation line unaligned for hanging indent.")
+    }
+}
+
+/// ## What it does
+/// Checks for closing bracket missing indentation.
+/// This error only occurs if the --hang-closing flag is used, switching the default behavior of closing brackets so that they require hanging indents.
+///
+/// ## Why is this bad?
+/// This can make reading continuation lines harder.
+///
+/// ## Example
+/// ```python
+/// my_list = [
+///     1, 2, 3,
+///     4, 5, 6,
+/// ]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// my_list = [
+///     1, 2, 3,
+///     4, 5, 6,
+///     ]
+/// ```
+///
+/// [PEP 8]: https://www.python.org/dev/peps/pep-0008/#indentation
+#[violation]
+pub struct ClosingBracketMissingIndentation;
+
+impl Violation for ClosingBracketMissingIndentation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Continuation line unaligned for hanging indent.")
+    }
+}
+
 #[derive(Debug)]
 struct TokenInfo<'a> {
     start_physical_line_idx: usize,
@@ -327,7 +456,7 @@ fn expand_indent(line: &str) -> i64 {
     indent
 }
 
-/// E121 E122 E123 E124 E125 E126 E127 E128 E129 E133
+/// E121 E122 E123 E124 E125 E126 E127 E128 E129 E131 E133
 pub(crate) fn continuation_lines(
     context: &mut LogicalLinesContext,
     logical_line: &LogicalLine,
@@ -446,14 +575,19 @@ pub(crate) fn continuation_lines(
             } else if is_closing_bracket && hang == 0 {
                 // Closing bracket matches indentation of opening bracket's line
                 if hang_closing {
-                    // TODO: Raise E133.
+                    // E133.
+                    let diagnostic = Diagnostic::new(ClosingBracketMissingIndentation, token.range);
+                    context.push_diagnostic(diagnostic);
                 }
             } else if indent[depth] != 0
                 && token_info.token_start_within_physical_line < indent[depth]
             {
                 // visual indent is broken
                 if !visual_indent {
-                    // TODO: Raise E128.
+                    // E128
+                    let diagnostic =
+                        Diagnostic::new(ContinuationLineUnderIndentedForVisualIndent, token.range);
+                    context.push_diagnostic(diagnostic);
                 }
             } else if hanging_indent || (indent_next && rel_indent[row] == (2 * indent_size)) {
                 // hanging indent is verified
@@ -481,7 +615,10 @@ pub(crate) fn continuation_lines(
                         Diagnostic::new(ContinuationLineOverIndentedForVisualIndent, token.range);
                     context.push_diagnostic(diagnostic);
                 } else if !is_closing_bracket && hangs[depth].is_some_and(|hang| hang > 0) {
-                    // TODO: Raise 131.
+                    // E131
+                    let diagnostic =
+                        Diagnostic::new(ContinuationLineUnalignedForHangingIndent, token.range);
+                    context.push_diagnostic(diagnostic);
                 } else {
                     hangs[depth] = Some(hang);
                     if hang > indent_size {
@@ -601,7 +738,12 @@ pub(crate) fn continuation_lines(
 
         if indent_next && expand_indent(token_info.line) == start_indent_level + indent_size {
             if visual_indent {
-                // TODO: Raise 129.
+                // E129.
+                let diagnostic = Diagnostic::new(
+                    VisuallyIndentedLineWithSameIndentAsNextLogicalLine,
+                    token.range,
+                );
+                context.push_diagnostic(diagnostic);
             } else {
                 // E125.
                 let diagnostic =
