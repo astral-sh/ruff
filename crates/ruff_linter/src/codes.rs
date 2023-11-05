@@ -81,7 +81,27 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         #[allow(deprecated)]
         (Pycodestyle, "E117") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::OverIndented),
         #[allow(deprecated)]
+        (Pycodestyle, "E121") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::UnderIndentedHangingIndent),
+        #[allow(deprecated)]
         (Pycodestyle, "E122") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingOrOutdentedIndentation),
+        #[allow(deprecated)]
+        (Pycodestyle, "E123") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::ClosingBracketNotMatchingOpeningBracketIndentation),
+        #[allow(deprecated)]
+        (Pycodestyle, "E124") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::ClosingBracketNotMatchingOpeningBracketVisualIndentation),
+        #[allow(deprecated)]
+        (Pycodestyle, "E125") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::ContinuationLineIndentSameAsNextLogicalLine),
+        #[allow(deprecated)]
+        (Pycodestyle, "E126") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::ContinuationLineOverIndentedForHangingIndent),
+        #[allow(deprecated)]
+        (Pycodestyle, "E127") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::ContinuationLineOverIndentedForVisualIndent),
+        #[allow(deprecated)]
+        (Pycodestyle, "E128") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::ContinuationLineUnderIndentedForVisualIndent),
+        #[allow(deprecated)]
+        (Pycodestyle, "E129") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::VisuallyIndentedLineWithSameIndentAsNextLogicalLine),
+        #[allow(deprecated)]
+        (Pycodestyle, "E131") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::ContinuationLineUnalignedForHangingIndent),
+        #[allow(deprecated)]
+        (Pycodestyle, "E133") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::ClosingBracketMissingIndentation),
         #[allow(deprecated)]
         (Pycodestyle, "E201") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::WhitespaceAfterOpenBracket),
         #[allow(deprecated)]

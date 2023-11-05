@@ -304,7 +304,17 @@ impl Rule {
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::UnderIndentedHangingIndent
             | Rule::MissingOrOutdentedIndentation
+            | Rule::ClosingBracketNotMatchingOpeningBracketIndentation
+            | Rule::ClosingBracketNotMatchingOpeningBracketVisualIndentation
+            | Rule::ContinuationLineIndentSameAsNextLogicalLine
+            | Rule::ContinuationLineOverIndentedForHangingIndent
+            | Rule::ContinuationLineOverIndentedForVisualIndent
+            | Rule::ContinuationLineUnderIndentedForVisualIndent
+            | Rule::VisuallyIndentedLineWithSameIndentAsNextLogicalLine
+            | Rule::ContinuationLineUnalignedForHangingIndent
+            | Rule::ClosingBracketMissingIndentation
             | Rule::MissingWhitespace
             | Rule::MissingWhitespaceAfterKeyword
             | Rule::MissingWhitespaceAroundArithmeticOperator
