@@ -1146,8 +1146,8 @@ mod tests {
 
     #[test]
     fn used_as_star_unpack() {
-        // Star names in unpack are used if RHS is not a tuple/list literal.
-        // EDIT: Behaviour changed to fix issue #8441.
+        // In stable, starred names in unpack are used if RHS is not a tuple/list literal.
+        // In preview, these should be marked as unused.
         flakes(
             r#"
         def f():
