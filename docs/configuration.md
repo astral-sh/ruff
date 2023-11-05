@@ -189,13 +189,13 @@ When passed a path on the command-line, Ruff will automatically discover all Pyt
 path, taking into account the [`exclude`](settings.md#exclude) and [`extend-exclude`](settings.md#extend-exclude)
 settings in each directory's `pyproject.toml` file.
 
-Files can also be selectively excluded from linting or formatting by scoping the `exclude` and
-`extend-exclude` settings to the tool-specific configuration tables. For example, the following
-would prevent `ruff` from formatting `.pyi` files, but would continue to include them in linting:
+Files can also be selectively excluded from linting or formatting by scoping the `exclude` setting
+to the tool-specific configuration tables. For example, the following would prevent `ruff` from
+formatting `.pyi` files, but would continue to include them in linting:
 
 ```toml
 [tool.ruff.format]
-extend-exclude = ["*.pyi"]
+exclude = ["*.pyi"]
 ```
 
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
@@ -401,6 +401,9 @@ File selection:
       --respect-gitignore       Respect file exclusions via `.gitignore` and other standard ignore files. Use `--no-respect-gitignore` to disable
       --exclude <FILE_PATTERN>  List of paths, used to omit files and/or directories from analysis
       --force-exclude           Enforce exclusions, even for paths passed to Ruff directly on the command-line. Use `--no-force-exclude` to disable
+
+Format configuration:
+      --line-length <LINE_LENGTH>  Set the line-length
 
 Log levels:
   -v, --verbose  Enable verbose logging

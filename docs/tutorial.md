@@ -231,8 +231,8 @@ numbers/numbers.py:1:1: D100 Missing docstring in public module
 Found 3 errors.
 ```
 
-If we want to ignore a rule for an entire file, we can add a `# ruff: noqa` comment to the top of
-the file:
+If we want to ignore a rule for an entire file, we can add the line `# ruff: noqa: {code}` anywhere
+in the file, preferably towards the top, like so:
 
 ```py
 # ruff: noqa: UP035
@@ -251,7 +251,7 @@ For more in-depth instructions on ignoring errors, please see [_Error suppressio
 When enabling a new rule on an existing codebase, you may want to ignore all _existing_
 violations of that rule and instead focus on enforcing it going forward.
 
-Ruff enables this workflow via the `--add-noqa` flag, which will adds a `# noqa` directive to each
+Ruff enables this workflow via the `--add-noqa` flag, which will add a `# noqa` directive to each
 line based on its existing violations. We can combine `--add-noqa` with the `--select` command-line
 flag to add `# noqa` directives to all existing `UP035` violations:
 

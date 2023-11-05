@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -99,7 +99,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                     if arguments
                         .args
                         .first()
-                        .is_some_and(|arg| !arg.is_name_expr() && !is_const_none(arg))
+                        .is_some_and(|arg| !arg.is_name_expr() && !arg.is_none_literal_expr())
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             TypeComparison {
@@ -191,7 +191,7 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
             arguments
                 .args
                 .first()
-                .is_some_and(|arg| !arg.is_name_expr() && !is_const_none(arg))
+                .is_some_and(|arg| !arg.is_name_expr() && !arg.is_none_literal_expr())
         }
         Expr::Name(ast::ExprName { id, .. }) => {
             // Ex) `type(obj) == int`

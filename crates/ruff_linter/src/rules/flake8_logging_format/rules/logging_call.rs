@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Operator};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Operator};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -74,7 +74,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         Expr::Call(ast::ExprCall { func, .. }) => {
             if checker.enabled(Rule::LoggingStringFormat) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
-                    if attr == "format" && value.is_constant_expr() {
+                    if attr == "format" && value.is_literal_expr() {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(LoggingStringFormat, msg.range()));
@@ -92,11 +92,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
         Expr::Dict(ast::ExprDict { keys, .. }) => {
             for key in keys {
                 if let Some(key) = &key {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(attr),
-                        ..
-                    }) = key
-                    {
+                    if let Expr::StringLiteral(ast::ExprStringLiteral { value: attr, .. }) = key {
                         if is_reserved_attr(attr) {
                             checker.diagnostics.push(Diagnostic::new(
                                 LoggingExtraAttrClash(attr.to_string()),

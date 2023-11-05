@@ -12,6 +12,7 @@ from signal import SIGINT, SIGTERM
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.defaults import DEFAULT_TARGETS
+from ruff_ecosystem.format import FormatComparison
 from ruff_ecosystem.main import OutputFormat, main
 from ruff_ecosystem.projects import RuffCommand
 
@@ -45,45 +46,58 @@ def entrypoint():
         tempfile.TemporaryDirectory() if not args.cache else nullcontext(args.cache)
     )
 
-    ruff_baseline = args.ruff_baseline
-    if not args.ruff_baseline.exists():
-        ruff_baseline = get_executable_path(str(args.ruff_baseline))
-        if not ruff_baseline:
+    baseline_executable = args.baseline_executable
+    if not args.baseline_executable.exists():
+        baseline_executable = get_executable_path(str(args.baseline_executable))
+        if not baseline_executable:
             print(
-                f"Could not find ruff baseline executable: {args.ruff_baseline}",
+                f"Could not find ruff baseline executable: {args.baseline_executable}",
                 sys.stderr,
             )
             exit(1)
         logger.info(
-            "Resolved baseline executable %s to %s", args.ruff_baseline, ruff_baseline
+            "Resolved baseline executable %s to %s",
+            args.baseline_executable,
+            baseline_executable,
         )
 
-    ruff_comparison = args.ruff_comparison
-    if not args.ruff_comparison.exists():
-        ruff_comparison = get_executable_path(str(args.ruff_comparison))
-        if not ruff_comparison:
+    comparison_executable = args.comparison_executable
+    if not args.comparison_executable.exists():
+        comparison_executable = get_executable_path(str(args.comparison_executable))
+        if not comparison_executable:
             print(
-                f"Could not find ruff comparison executable: {args.ruff_comparison}",
+                f"Could not find ruff comparison executable: {args.comparison_executable}",
                 sys.stderr,
             )
             exit(1)
         logger.info(
             "Resolved comparison executable %s to %s",
-            args.ruff_comparison,
-            ruff_comparison,
+            args.comparison_executable,
+            comparison_executable,
         )
+
+    targets = DEFAULT_TARGETS
+    if args.force_preview:
+        targets = [target.with_preview_enabled() for target in targets]
+
+    format_comparison = (
+        FormatComparison(args.format_comparison)
+        if args.ruff_command == RuffCommand.format.value
+        else None
+    )
 
     with cache_context as cache:
         loop = asyncio.get_event_loop()
         main_task = asyncio.ensure_future(
             main(
                 command=RuffCommand(args.ruff_command),
-                ruff_baseline_executable=ruff_baseline,
-                ruff_comparison_executable=ruff_comparison,
-                targets=DEFAULT_TARGETS,
+                baseline_executable=baseline_executable,
+                comparison_executable=comparison_executable,
+                targets=targets,
                 format=OutputFormat(args.output_format),
                 project_dir=Path(cache),
                 raise_on_failure=args.pdb,
+                format_comparison=format_comparison,
             )
         )
         # https://stackoverflow.com/a/58840987/3549270
@@ -116,8 +130,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-format",
-        choices=[option.name for option in OutputFormat],
-        default="json",
+        choices=[option.value for option in OutputFormat],
+        default="markdown",
         help="Location for caching cloned repositories",
     )
     parser.add_argument(
@@ -132,16 +146,27 @@ def parse_args() -> argparse.Namespace:
         help="Enable debugging on failure",
     )
     parser.add_argument(
+        "--force-preview",
+        action="store_true",
+        help="Force preview mode to be enabled for all projects",
+    )
+    parser.add_argument(
+        "--format-comparison",
+        choices=[option.value for option in FormatComparison],
+        default=FormatComparison.ruff_and_ruff,
+        help="Type of comparison to make when checking formatting.",
+    )
+    parser.add_argument(
         "ruff_command",
-        choices=[option.name for option in RuffCommand],
+        choices=[option.value for option in RuffCommand],
         help="The Ruff command to test",
     )
     parser.add_argument(
-        "ruff_baseline",
+        "baseline_executable",
         type=Path,
     )
     parser.add_argument(
-        "ruff_comparison",
+        "comparison_executable",
         type=Path,
     )
 

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Stmt, StmtClassDef};
+use ruff_python_ast::{self as ast, Expr, Stmt, StmtClassDef};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -65,13 +65,7 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
                 for target in targets {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
                         if id.as_str() == "__slots__" {
-                            if matches!(
-                                value.as_ref(),
-                                Expr::Constant(ast::ExprConstant {
-                                    value: Constant::Str(_),
-                                    ..
-                                }) | Expr::FString(_)
-                            ) {
+                            if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
                                 checker
                                     .diagnostics
                                     .push(Diagnostic::new(SingleStringSlots, stmt.identifier()));
@@ -87,13 +81,7 @@ pub(crate) fn single_string_slots(checker: &mut Checker, class: &StmtClassDef) {
             }) => {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     if id.as_str() == "__slots__" {
-                        if matches!(
-                            value.as_ref(),
-                            Expr::Constant(ast::ExprConstant {
-                                value: Constant::Str(_),
-                                ..
-                            }) | Expr::FString(_)
-                        ) {
+                        if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
                             checker
                                 .diagnostics
                                 .push(Diagnostic::new(SingleStringSlots, stmt.identifier()));

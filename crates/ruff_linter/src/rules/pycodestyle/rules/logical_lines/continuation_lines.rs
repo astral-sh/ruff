@@ -328,7 +328,7 @@ fn expand_indent(line: &str) -> i64 {
 }
 
 /// E121 E122 E123 E124 E125 E126 E127 E128 E129 E133
-pub(crate) fn continuation_line_missing_indentation_or_outdented(
+pub(crate) fn continuation_lines(
     context: &mut LogicalLinesContext,
     logical_line: &LogicalLine,
     locator: &Locator,

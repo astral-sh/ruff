@@ -172,10 +172,13 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                         .finish()
                 }
                 TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
-                TupleParentheses::NeverPreserve | TupleParentheses::OptionalParentheses => {
+                TupleParentheses::NeverPreserve => {
                     optional_parentheses(&ExprSequence::new(item)).fmt(f)
                 }
-                TupleParentheses::Default => {
+                TupleParentheses::OptionalParentheses if item.elts.len() == 2 => {
+                    optional_parentheses(&ExprSequence::new(item)).fmt(f)
+                }
+                TupleParentheses::Default | TupleParentheses::OptionalParentheses => {
                     parenthesize_if_expands(&ExprSequence::new(item)).fmt(f)
                 }
             },

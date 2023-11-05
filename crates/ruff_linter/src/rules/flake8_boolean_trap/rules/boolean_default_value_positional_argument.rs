@@ -5,7 +5,7 @@ use ruff_python_ast::{Decorator, ParameterWithDefault, Parameters};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_boolean_trap::helpers::{is_allowed_func_def, is_boolean};
+use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,
@@ -117,7 +117,10 @@ pub(crate) fn boolean_default_value_positional_argument(
         range: _,
     } in parameters.posonlyargs.iter().chain(&parameters.args)
     {
-        if default.as_ref().is_some_and(|default| is_boolean(default)) {
+        if default
+            .as_ref()
+            .is_some_and(|default| default.is_boolean_literal_expr())
+        {
             checker.diagnostics.push(Diagnostic::new(
                 BooleanDefaultValuePositionalArgument,
                 parameter.name.range(),

@@ -9,27 +9,20 @@ expression: trace
       - PatternMatchClass
         - ExprName
         - PatternMatchValue
-          - ExprConstant
-            - Int(0)
+          - ExprNumberLiteral
         - PatternMatchValue
-          - ExprConstant
-            - Int(0)
+          - ExprNumberLiteral
       - StmtExpr
-        - ExprConstant
-          - Ellipsis
+        - ExprEllipsisLiteral
     - MatchCase
       - PatternMatchClass
         - ExprName
         - PatternMatchValue
-          - ExprConstant
-            - Int(0)
+          - ExprNumberLiteral
         - PatternMatchValue
-          - ExprConstant
-            - Int(0)
+          - ExprNumberLiteral
         - PatternMatchValue
-          - ExprConstant
-            - Int(0)
+          - ExprNumberLiteral
       - StmtExpr
-        - ExprConstant
-          - Ellipsis
+        - ExprEllipsisLiteral
 

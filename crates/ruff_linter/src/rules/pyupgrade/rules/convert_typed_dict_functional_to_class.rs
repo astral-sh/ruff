@@ -1,9 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Stmt,
-};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -175,10 +173,7 @@ fn fields_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Option<Ve
         keys.iter()
             .zip(values.iter())
             .map(|(key, value)| match key {
-                Some(Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(ast::StringConstant { value: field, .. }),
-                    ..
-                })) => {
+                Some(Expr::StringLiteral(ast::ExprStringLiteral { value: field, .. })) => {
                     if !is_identifier(field) {
                         return None;
                     }

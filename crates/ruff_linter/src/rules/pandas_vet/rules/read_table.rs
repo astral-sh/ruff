@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Constant, Expr};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -51,10 +51,7 @@ pub(crate) fn use_of_read_table(checker: &mut Checker, call: &ast::ExprCall) {
         .resolve_call_path(&call.func)
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["pandas", "read_table"]))
     {
-        if let Some(Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(ast::StringConstant { value, .. }),
-            ..
-        })) = call
+        if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = call
             .arguments
             .find_keyword("sep")
             .map(|keyword| &keyword.value)

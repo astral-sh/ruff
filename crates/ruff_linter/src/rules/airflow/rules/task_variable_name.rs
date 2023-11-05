@@ -1,7 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::Constant;
 use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
@@ -79,13 +78,7 @@ pub(crate) fn variable_name_task_id(
     let keyword = arguments.find_keyword("task_id")?;
 
     // If the keyword argument is not a string, we can't do anything.
-    let task_id = match &keyword.value {
-        Expr::Constant(constant) => match &constant.value {
-            Constant::Str(ast::StringConstant { value, .. }) => value,
-            _ => return None,
-        },
-        _ => return None,
-    };
+    let ast::ExprStringLiteral { value: task_id, .. } = keyword.value.as_string_literal_expr()?;
 
     // If the target name is the same as the task_id, no violation.
     if id == task_id {

@@ -1,7 +1,7 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -65,8 +65,8 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     };
 
     // Verify that the `start` argument is the literal `0`.
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
+    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: ast::Number::Int(value),
         ..
     }) = start
     else {

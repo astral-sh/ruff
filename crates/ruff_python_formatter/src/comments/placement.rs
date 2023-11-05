@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, ModModule, Parameters};
+use ruff_python_ast::{
+    self as ast, AnyNodeRef, Comprehension, Expr, MatchCase, ModModule, Parameters,
+};
 use ruff_python_trivia::{
     find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, CommentRanges,
     SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -281,7 +282,7 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
-        AnyNodeRef::ExprConstant(_) => {
+        AnyNodeRef::ExprStringLiteral(_) => {
             if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
                 CommentPlacement::dangling(fstring, comment)
             } else {
@@ -541,6 +542,10 @@ fn handle_own_line_comment_between_statements<'a>(
     // y = 2
     // ```
     if !preceding.is_statement() || !following.is_statement() {
+        return CommentPlacement::Default(comment);
+    }
+
+    if comment.line_position().is_end_of_line() {
         return CommentPlacement::Default(comment);
     }
 

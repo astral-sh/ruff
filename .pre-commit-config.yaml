@@ -47,10 +47,13 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false # This makes it a lot faster
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.3
+    hooks:
+      - id: ruff-format
       - id: ruff
-        name: ruff
-        entry: cargo run --bin ruff -- check --no-cache --force-exclude --fix --exit-non-zero-on-fix
-        language: system
+        args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
         require_serial: true
         exclude: |
@@ -58,12 +61,6 @@ repos:
             crates/ruff_linter/resources/.*|
             crates/ruff_python_formatter/resources/.*
           )$
-
-  # Black
-  - repo: https://github.com/psf/black
-    rev: 23.1.0
-    hooks:
-      - id: black
 
   # Prettier
   - repo: https://github.com/pre-commit/mirrors-prettier

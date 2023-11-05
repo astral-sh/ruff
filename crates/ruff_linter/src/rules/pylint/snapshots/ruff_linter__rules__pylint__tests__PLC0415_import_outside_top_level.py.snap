@@ -1,0 +1,76 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+import_outside_top_level.py:10:5: PLC0415 `import` should be at the top-level of a file
+   |
+ 9 | def import_in_function():
+10 |     import symtable  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^ PLC0415
+11 |     import os, sys  # [import-outside-toplevel]
+12 |     import time as thyme  # [import-outside-toplevel]
+   |
+
+import_outside_top_level.py:11:5: PLC0415 `import` should be at the top-level of a file
+   |
+ 9 | def import_in_function():
+10 |     import symtable  # [import-outside-toplevel]
+11 |     import os, sys  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^ PLC0415
+12 |     import time as thyme  # [import-outside-toplevel]
+13 |     import random as rand, socket as sock  # [import-outside-toplevel]
+   |
+
+import_outside_top_level.py:12:5: PLC0415 `import` should be at the top-level of a file
+   |
+10 |     import symtable  # [import-outside-toplevel]
+11 |     import os, sys  # [import-outside-toplevel]
+12 |     import time as thyme  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^ PLC0415
+13 |     import random as rand, socket as sock  # [import-outside-toplevel]
+14 |     from collections import defaultdict # [import-outside-toplevel]
+   |
+
+import_outside_top_level.py:13:5: PLC0415 `import` should be at the top-level of a file
+   |
+11 |     import os, sys  # [import-outside-toplevel]
+12 |     import time as thyme  # [import-outside-toplevel]
+13 |     import random as rand, socket as sock  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
+14 |     from collections import defaultdict # [import-outside-toplevel]
+15 |     from math import sin as sign, cos as cosplay  # [import-outside-toplevel]
+   |
+
+import_outside_top_level.py:14:5: PLC0415 `import` should be at the top-level of a file
+   |
+12 |     import time as thyme  # [import-outside-toplevel]
+13 |     import random as rand, socket as sock  # [import-outside-toplevel]
+14 |     from collections import defaultdict # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
+15 |     from math import sin as sign, cos as cosplay  # [import-outside-toplevel]
+   |
+
+import_outside_top_level.py:15:5: PLC0415 `import` should be at the top-level of a file
+   |
+13 |     import random as rand, socket as sock  # [import-outside-toplevel]
+14 |     from collections import defaultdict # [import-outside-toplevel]
+15 |     from math import sin as sign, cos as cosplay  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0415
+   |
+
+import_outside_top_level.py:19:5: PLC0415 `import` should be at the top-level of a file
+   |
+18 | class ClassWithImports:
+19 |     import tokenize  # [import-outside-toplevel]
+   |     ^^^^^^^^^^^^^^^ PLC0415
+20 | 
+21 |     def __init__(self):
+   |
+
+import_outside_top_level.py:22:9: PLC0415 `import` should be at the top-level of a file
+   |
+21 |     def __init__(self):
+22 |         import trace  # [import-outside-toplevel]
+   |         ^^^^^^^^^^^^ PLC0415
+   |
+
+

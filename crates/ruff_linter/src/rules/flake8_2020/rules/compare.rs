@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -230,16 +230,16 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
         Expr::Subscript(ast::ExprSubscript { value, slice, .. })
             if is_sys(value, "version_info", checker.semantic()) =>
         {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(i),
+            if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(i),
                 ..
             }) = slice.as_ref()
             {
                 if *i == 0 {
                     if let (
                         [CmpOp::Eq | CmpOp::NotEq],
-                        [Expr::Constant(ast::ExprConstant {
-                            value: Constant::Int(n),
+                        [Expr::NumberLiteral(ast::ExprNumberLiteral {
+                            value: ast::Number::Int(n),
                             ..
                         })],
                     ) = (ops, comparators)
@@ -253,8 +253,8 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
                 } else if *i == 1 {
                     if let (
                         [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                        [Expr::Constant(ast::ExprConstant {
-                            value: Constant::Int(_),
+                        [Expr::NumberLiteral(ast::ExprNumberLiteral {
+                            value: ast::Number::Int(_),
                             ..
                         })],
                     ) = (ops, comparators)
@@ -274,8 +274,8 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
         {
             if let (
                 [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-                [Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(_),
+                [Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(_),
                     ..
                 })],
             ) = (ops, comparators)
@@ -294,13 +294,10 @@ pub(crate) fn compare(checker: &mut Checker, left: &Expr, ops: &[CmpOp], compara
     if is_sys(left, "version", checker.semantic()) {
         if let (
             [CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE],
-            [Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(s),
-                ..
-            })],
+            [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })],
         ) = (ops, comparators)
         {
-            if s.len() == 1 {
+            if value.len() == 1 {
                 if checker.enabled(Rule::SysVersionCmpStr10) {
                     checker
                         .diagnostics

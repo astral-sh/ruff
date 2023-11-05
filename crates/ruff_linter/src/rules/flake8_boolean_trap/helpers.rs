@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 
 /// Returns `true` if a function call is allowed to use a boolean trap.
 pub(super) fn is_allowed_func_call(name: &str) -> bool {
@@ -61,15 +61,4 @@ pub(super) fn allow_boolean_trap(func: &Expr) -> bool {
     }
 
     false
-}
-
-/// Returns `true` if an expression is a boolean literal.
-pub(super) const fn is_boolean(expr: &Expr) -> bool {
-    matches!(
-        &expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bool(_),
-            ..
-        })
-    )
 }

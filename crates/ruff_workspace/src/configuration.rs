@@ -1135,6 +1135,7 @@ mod tests {
         Rule::AssignmentInAssert,
         Rule::DirectLoggerInstantiation,
         Rule::InvalidGetLoggerArgument,
+        Rule::IsinstanceTypeNone,
         Rule::ManualDictComprehension,
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
