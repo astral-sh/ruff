@@ -31,3 +31,7 @@ def make_unique_pod_id(pod_id: str) -> str | None:
     :param pod_id: requested pod name
     :return: ``str`` valid Pod name of appropriate length
     """
+
+
+def shouldnt_add_raw_here2():
+    u"Sum\\mary."
