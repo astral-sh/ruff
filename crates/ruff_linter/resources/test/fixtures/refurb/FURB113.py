@@ -123,6 +123,15 @@ def yes_six(x: list):
     x.append(2)
 
 
+if True:
+    # FURB113
+    nums.append(1)
+    # comment
+    nums.append(2)
+    # comment
+    nums.append(3)
+
+
 # Non-errors.
 
 nums.append(1)
