@@ -203,3 +203,28 @@ lambda: ( # comment
     y:
     z
 )
+
+lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs), e=1, f=2, g=2: d
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/8179
+def a():
+    return b(
+        c,
+        d,
+        e,
+        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        ),
+    )
+
+def a():
+    return b(
+        c,
+        d,
+        e,
+        f=lambda self, araa, kkkwargs,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+                 args,kwargs,
+                 e=1, f=2, g=2: d,
+        g = 10
+    )
+
