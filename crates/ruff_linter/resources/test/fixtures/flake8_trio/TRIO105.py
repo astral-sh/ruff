@@ -1,10 +1,10 @@
 import trio
 
 
-async def f() -> None:
+async def func() -> None:
     trio.run(foo)  # OK, not async
 
-    # Ok
+    # OK
     await trio.aclose_forcefully(foo)
     await trio.open_file(foo)
     await trio.open_ssl_over_tcp_listeners(foo, foo)
@@ -57,3 +57,8 @@ async def f() -> None:
 
     async with trio.open_file(foo):  # TRIO105
         pass
+
+
+def func() -> None:
+    # TRIO105 (without fix)
+    trio.open_file(foo)

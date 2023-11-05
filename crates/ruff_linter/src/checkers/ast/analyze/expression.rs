@@ -926,8 +926,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::ImplicitCwd) {
                 refurb::rules::no_implicit_cwd(checker, call);
             }
-            if checker.enabled(Rule::SyncTrioCall) {
-                flake8_trio::rules::sync_trio_call(checker, call);
+            if checker.enabled(Rule::TrioSyncCall) {
+                flake8_trio::rules::sync_call(checker, call);
             }
         }
         Expr::Dict(
