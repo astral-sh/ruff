@@ -206,12 +206,13 @@ pub(crate) fn compound_statements(
                 {
                     colon = Some((range.start(), range.end()));
 
-                    // Allow `class C: ...`-style definitions in stubs.
-                    allow_ellipsis = class.is_some();
+                    // Allow `class C: ...`-style definitions.
+                    allow_ellipsis = true;
                 }
             }
             Tok::Semi => {
                 semi = Some((range.start(), range.end()));
+                allow_ellipsis = false;
             }
             Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
             _ => {

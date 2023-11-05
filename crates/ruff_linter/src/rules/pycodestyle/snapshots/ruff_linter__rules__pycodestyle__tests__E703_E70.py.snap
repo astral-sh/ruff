@@ -92,6 +92,8 @@ E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon
 70 | a = \
 71 |   5;
    |    ^ E703
+72 | #:
+73 | with x(y) as z: ...
    |
    = help: Remove unnecessary semicolon
 
@@ -101,5 +103,7 @@ E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon
 70 70 | a = \
 71    |-  5;
    71 |+  5
+72 72 | #:
+73 73 | with x(y) as z: ...
 
 
