@@ -331,6 +331,13 @@ Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA
 (add-hook 'python-mode-hook #'flymake-ruff-load)
 ```
 
+Ruff can be used as a formatter in Emacs using the [Apheleia](https://github.com/radian-software/apheleia) formatter library, by setting this configuration:
+
+```emacs-lisp
+(add-to-list 'apheleia-mode-alist '(python-mode . ruff))
+(add-to-list 'apheleia-mode-alist '(python-ts-mode . ruff))
+```
+
 ## TextMate (Unofficial)
 
 Ruff is also available via the [`textmate2-ruff-linter`](https://github.com/vigo/textmate2-ruff-linter)
