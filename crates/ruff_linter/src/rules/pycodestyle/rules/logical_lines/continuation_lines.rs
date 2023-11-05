@@ -491,7 +491,7 @@ pub(crate) fn continuation_lines(
     // indent_next tells us whether the next block is indented.
     // Assuming that it is indented by 4 spaces, then we should not allow 4-space indents on the final continuation line.
     // In turn, some other indents are allowed to have an extra 4 spaces.
-    let indent_next = logical_line.text().ends_with(':');
+    let indent_next = logical_line.text().trim_end().ends_with(':');
 
     // Here "row" is the physical line index (within the logical line).
     let mut row = 0;
@@ -522,7 +522,7 @@ pub(crate) fn continuation_lines(
     // TODO: config option: hang closing bracket instead of matching indentation of opening bracket's line.
     let hang_closing = false;
 
-    for (token, token_info) in zip(logical_line.tokens(), token_infos) {
+    for (token, token_info) in zip(logical_line.tokens(), &token_infos) {
         let mut is_newline = row < token_info.start_physical_line_idx;
         if is_newline {
             row = token_info.start_physical_line_idx;
@@ -735,21 +735,34 @@ pub(crate) fn continuation_lines(
         if last_token_multiline {
             rel_indent[token_info.end_physical_line_idx] = rel_indent[row];
         }
+    }
 
-        if indent_next && expand_indent(token_info.line) == start_indent_level + indent_size {
-            if visual_indent {
-                // E129.
-                let diagnostic = Diagnostic::new(
-                    VisuallyIndentedLineWithSameIndentAsNextLogicalLine,
-                    token.range,
-                );
-                context.push_diagnostic(diagnostic);
-            } else {
-                // E125.
-                let diagnostic =
-                    Diagnostic::new(ContinuationLineIndentSameAsNextLogicalLine, token.range);
-                context.push_diagnostic(diagnostic);
-            }
+    if indent_next
+        && expand_indent(
+            token_infos
+                .last()
+                .expect("Would have returned if line was empty")
+                .line,
+        ) == start_indent_level + indent_size
+    {
+        let last_token = logical_line
+            .tokens()
+            .last()
+            .expect("Would have returned if line was empty");
+        if visual_indent {
+            // E129.
+            let diagnostic = Diagnostic::new(
+                VisuallyIndentedLineWithSameIndentAsNextLogicalLine,
+                last_token.range,
+            );
+            context.push_diagnostic(diagnostic);
+        } else {
+            // E125.
+            let diagnostic = Diagnostic::new(
+                ContinuationLineIndentSameAsNextLogicalLine,
+                last_token.range,
+            );
+            context.push_diagnostic(diagnostic);
         }
     }
 }

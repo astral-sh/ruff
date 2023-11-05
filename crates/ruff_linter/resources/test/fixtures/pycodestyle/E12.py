@@ -284,7 +284,6 @@ if (
         or y == 4):
     pass
 
-
 #: E127
 print ("E127", ("over-",
                   "over-indent"))
