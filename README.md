@@ -9,8 +9,8 @@ This is the ekr-ruff fork of [ruff](https://github.com/rust-lang/rust). This pro
 
 - `--skip-string-normalization`: Leave the *contents* of string tokens unchanged.
 - `--ignore-comment-regex`:
-  Don't format the *interior* of comments whose *location* matches the regex.
-  For example, the regex `^\s*#@` would protect Leo's sentinel comments.
+   Don't format the *interior* of comments whose *location* matches the regex.
+   For example, the regex `^\s*#@` would protect Leo's sentinel comments.
 
 ## Flexible line lengths
 
