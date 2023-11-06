@@ -36,6 +36,19 @@ use crate::checkers::ast::Checker;
 /// print(foo(bar=2))  # prints 3
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, but there are some scenarios
+/// that fix causes the TypeError at runtime:
+///
+/// ```python
+/// def foo(bar):
+///     return bar + 1
+///
+///
+/// # TypeError: foo() got multiple values for keyword argument 'bar'
+/// foo(bar=2, **{"bar": 3})
+/// ```
+///
 /// ## References
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
