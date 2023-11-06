@@ -55,6 +55,9 @@ if isinstance(res, memoryview):
 #: Okay
 if type(res) is type:
     pass
+#: E721
+if type(res) == type:
+    pass
 #: Okay
 def func_histype(a, b, c):
     pass
