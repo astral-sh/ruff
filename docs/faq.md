@@ -265,24 +265,47 @@ them. You can find the supported settings in the [API reference](settings.md#iso
 For example, you can set [`known-first-party`](settings.md#known-first-party--isort-known-first-party-)
 like so:
 
-```toml
-[tool.ruff.lint]
-select = [
-    # Pyflakes
-    "F",
-    # Pycodestyle
-    "E",
-    "W",
-    # isort
-    "I001"
-]
+=== "pyproject.toml"
 
-# Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
-src = ["src", "tests"]
+    ```toml
+    [tool.ruff.lint]
+    select = [
+        # Pyflakes
+        "F",
+        # Pycodestyle
+        "E",
+        "W",
+        # isort
+        "I001"
+    ]
 
-[tool.ruff.lint.isort]
-known-first-party = ["my_module1", "my_module2"]
-```
+    # Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
+    src = ["src", "tests"]
+
+    [tool.ruff.lint.isort]
+    known-first-party = ["my_module1", "my_module2"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    select = [
+        # Pyflakes
+        "F",
+        # Pycodestyle
+        "E",
+        "W",
+        # isort
+        "I001"
+    ]
+
+    # Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
+    src = ["src", "tests"]
+
+    [lint.isort]
+    known-first-party = ["my_module1", "my_module2"]
+    ```
 
 ## How does Ruff determine which of my imports are first-party, third-party, etc.?
 
@@ -315,11 +338,20 @@ the `--config` option, in which case, the current working directory is used as t
 In this case, Ruff would only check the top-level directory. Instead, we can configure Ruff to
 consider `src` as a first-party source like so:
 
-```toml
-[tool.ruff]
-# All paths are relative to the project root, which is the directory containing the pyproject.toml.
-src = ["src"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    # All paths are relative to the project root, which is the directory containing the pyproject.toml.
+    src = ["src"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    # All paths are relative to the project root, which is the directory containing the pyproject.toml.
+    src = ["src"]
+    ```
 
 If your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` extends another configuration file, Ruff
 will still use the directory containing your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file as
@@ -349,10 +381,18 @@ Ruff has built-in support for linting [Jupyter Notebooks](https://jupyter.org/).
 To opt in to linting Jupyter Notebook (`.ipynb`) files, add the `*.ipynb` pattern to your
 [`extend-include`](settings.md#extend-include) setting, like so:
 
-```toml
-[tool.ruff]
-extend-include = ["*.ipynb"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extend-include = ["*.ipynb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend-include = ["*.ipynb"]
+    ```
 
 This will prompt Ruff to discover Jupyter Notebook (`.ipynb`) files in any specified
 directories, then lint and format them accordingly.
@@ -378,12 +418,21 @@ Found 3 errors.
 ## Does Ruff support NumPy- or Google-style docstrings?
 
 Yes! To enforce a docstring convention, add a [`convention`](settings.md#convention--pydocstyle-convention-)
-setting following to your `pyproject.toml`:
+setting following to your configuration file:
 
-```toml
-[tool.ruff.lint.pydocstyle]
-convention = "google"  # Accepts: "google", "numpy", or "pep257".
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint.pydocstyle]
+    convention = "google"  # Accepts: "google", "numpy", or "pep257".
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint.pydocstyle]
+    convention = "google"  # Accepts: "google", "numpy", or "pep257".
+    ```
 
 For example, if you're coming from flake8-docstrings, and your originating configuration uses
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
@@ -392,15 +441,29 @@ as above.
 Alongside [`convention`](settings.md#convention--pydocstyle-convention-), you'll want to
 explicitly enable the `D` rule code prefix, since the `D` rules are not enabled by default:
 
-```toml
-[tool.ruff.lint]
-select = [
-    "D",
-]
+=== "pyproject.toml"
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-```
+    ```toml
+    [tool.ruff.lint]
+    select = [
+        "D",
+    ]
+
+    [tool.ruff.lint.pydocstyle]
+    convention = "google"
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    select = [
+        "D",
+    ]
+
+    [lint.pydocstyle]
+    convention = "google"
+    ```
 
 Setting a [`convention`](settings.md#convention--pydocstyle-convention-) force-disables any rules
 that are incompatible with that convention, no matter how they're provided, which avoids accidental
