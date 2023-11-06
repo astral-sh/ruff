@@ -568,3 +568,54 @@ pub fn resolve_assignment<'a>(
         _ => None,
     }
 }
+
+/// Get
+pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
+    let scope = semantic.current_scope();
+    let binding_id = scope.get(id)?;
+    let binding = semantic.binding(binding_id);
+    if binding.kind.is_assignment() {
+        println!("{id}: is_assignment");
+        let parent_id = binding.source?;
+        let parent = semantic.statement(parent_id);
+        if let Stmt::Assign(ast::StmtAssign { value, .. })
+        | Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        })
+        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
+        {
+            println!("{:?}", value);
+            return Some(value.as_ref());
+        }
+        return None;
+    }
+    if binding.kind.is_unpacked_assignment() {
+        println!("{id}: is_unpacked_assignment");
+        let parent_id = binding.source?;
+        let parent = semantic.statement(parent_id);
+        if let Stmt::Assign(ast::StmtAssign { value, .. })
+        | Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        })
+        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
+        {
+            return Some(value.as_ref());
+        }
+        return None;
+    }
+    if binding.kind.is_named_expr_assignment() {
+        println!("{id}: is_named_expr_assignment");
+        let parent_id = binding.source?;
+        let parent = semantic.statement(parent_id);
+        if let Stmt::Assign(ast::StmtAssign { value, .. })
+        | Stmt::AnnAssign(ast::StmtAnnAssign {
+                              value: Some(value), ..
+                          })
+        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
+        {
+            return Some(value.as_ref());
+        }
+        return None;
+    }
+    None
+}

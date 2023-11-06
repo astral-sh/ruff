@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Stmt;
 use ruff_python_ast::{self as ast, Expr, ExprCall, Int};
+use ruff_python_semantic::analyze::typing::get_assigned_value;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -65,30 +65,15 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
             }
         }
         Expr::Name(ast::ExprName { id, .. }) => {
-            let scope = checker.semantic().current_scope();
-            if let Some(binding_id) = scope.get(id) {
-                let binding = checker.semantic().binding(binding_id);
-                if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
-                    if let Some(parent_id) = binding.source {
-                        let parent = checker.semantic().statement(parent_id);
-                        if let Stmt::Assign(ast::StmtAssign { value, .. })
-                        | Stmt::AnnAssign(ast::StmtAnnAssign {
-                            value: Some(value), ..
-                        })
-                        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
-                        {
-                            let Expr::NumberLiteral(ast::ExprNumberLiteral { value: num, .. }) =
-                                value.as_ref()
-                            else {
-                                return;
-                            };
-                            let Some(int) = num.as_int() else { return };
-                            if *int != Int::ZERO {
-                                return;
-                            }
-                        }
-                    }
-                }
+            let Some(value) = get_assigned_value(id, checker.semantic()) else {
+                return;
+            };
+            let Expr::NumberLiteral(ast::ExprNumberLiteral { value: num, .. }) = value else {
+                return;
+            };
+            let Some(int) = num.as_int() else { return };
+            if *int != Int::ZERO {
+                return;
             }
         }
         _ => return,
