@@ -202,7 +202,6 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`indentation-with-invalid-multiple`](rules/indentation-with-invalid-multiple.md) (`E111`)
 - [`indentation-with-invalid-multiple-comment`](rules/indentation-with-invalid-multiple-comment.md) (`E114`)
 - [`over-indented`](rules/over-indented.md) (`E117`)
-- [`multiple-statements-on-one-line-colon`](rules/multiple-statements-on-one-line-colon.md) (`E701`)
 - [`indent-with-spaces`](rules/indent-with-spaces.md) (`D206`)
 - [`triple-single-quotes`](rules/triple-single-quotes.md) (`D300`)
 - [`bad-quotes-inline-string`](rules/bad-quotes-inline-string.md) (`Q000`)

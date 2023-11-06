@@ -726,16 +726,6 @@ pub(super) fn warn_incompatible_formatter_settings(
     for setting in std::iter::once(&pyproject_config.settings)
         .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
     {
-        // Validate rules that only conflict in preview.
-        if setting
-            .linter
-            .rules
-            .enabled(Rule::MultipleStatementsOnOneLineColon)
-            && setting.formatter.preview.is_enabled()
-        {
-            warn_user_once!("The formatter's preview style is incompatible with `E701`, which lints against the use of colons to put multiple statements on the same line.");
-        }
-
         // Validate all rules that rely on tab styles.
         if setting.linter.rules.enabled(Rule::TabIndentation)
             && setting.formatter.indent_style.is_tab()
