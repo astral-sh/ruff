@@ -16,7 +16,7 @@ Black sometimes splits lines poorly. Suffering poor line breaks should be *optio
 
 - `--no-line-breaks`: Never split lines.
 - `--no-line-joins`: Never join lines.
-- [Speculative]: Allow *leeway* for splitting/joining lines.
+- [Speculative]: Allow *leeway* for splitting/joining lines.<br>
   Don't split or join lines within a specified *range* of line lengths.
 
 ##Summary
