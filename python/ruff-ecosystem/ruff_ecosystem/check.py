@@ -200,7 +200,7 @@ def markdown_check_result(result: Result) -> str:
         lines.extend(
             markdown_project_section(
                 title="error",
-                content=f"```\n{error}```",
+                content=f"```\n{str(error).strip()}\n```",
                 options=project.check_options,
                 project=project,
             )
