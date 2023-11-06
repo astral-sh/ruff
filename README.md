@@ -1,9 +1,8 @@
-This is the ekr-ruff fork of [ruff](https://github.com/rust-lang/rust). This project has the following goals:
+This is the ekr-ruff fork of [Ruff Format](https://github.com/rust-lang/rust). This project has the following goals:
 
-## First, Do No Harm
+## The Goal
 
-- Allow incremental formatting, thereby huge reducing diffs.
-- Let projects enforce *existing* styles and styles *of their own choosing*.
+Allow more people and projects to use Ruff Format by letting them enforce their *existing* styles.
 
 ## Protecting tokens
 
@@ -20,6 +19,10 @@ Black sometimes splits lines poorly. Suffering poor line breaks should be *optio
 - [Speculative]: Allow *leeway* for splitting/joining lines.
   Don't split or join lines within a specified *range* of line lengths.
 
-## Options are not the enemy
+##Summary
 
-Tools like git, pylint, etc. have *hundreds* of options.
+Options are not the enemy. Tools like git, pylint, etc. have *hundreds* of options.
+
+Options will let more people and projects use Ruff Format, including [Leo](https://leo-editor.github.io/leo-editor/)!
+
+Options that suppress default formatting have no impact on compatibility with Black. Such options should have minimal impact of Ruff's code or tests.
