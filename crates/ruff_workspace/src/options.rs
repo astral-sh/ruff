@@ -298,17 +298,18 @@ pub struct Options {
     /// For example, to represent supporting Python >=3.10 or ==3.10
     /// specify `target-version = "py310"`.
     ///
-    /// If you are already using a `pyproject.toml` file, we recommend using
-    /// `project.requires-python` instead, e.g. the following has the same effect
-    /// as `target-version = "py38"`:
+    /// If you're already using a `pyproject.toml` file, we recommend
+    /// `project.requires-python` instead, as it's based on Python packaging
+    /// standards, and will be respected by other tools. For example, Ruff
+    /// treats the following as identical to `target-version = "py38"`:
     ///
     /// ```toml
     /// [project]
-    /// # ...
     /// requires-python = ">=3.8"
     /// ```
     ///
-    /// `target-version` takes precedence over `requires-python`.
+    /// If both are specified, `target-version` takes precedence over
+    /// `requires-python`.
     #[option(
         default = r#""py38""#,
         value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
