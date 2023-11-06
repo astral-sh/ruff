@@ -1,3 +1,4 @@
+use ruff_python_ast::StmtClassDef;
 use ruff_python_ast::str::raw_contents_range;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -310,6 +311,11 @@ pub(crate) fn definitions(checker: &mut Checker) {
                     checker.settings.pydocstyle.convention.as_ref(),
                 );
             }
+        }
+
+        match definition.as_class_def() {
+            Some(..) => {}
+            None => {}
         }
     }
 }

@@ -14,6 +14,7 @@ use crate::rules::{
     flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify, flake8_slots,
     flake8_tidy_imports, flake8_trio, flake8_type_checking, mccabe, pandas_vet, pep8_naming,
     perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
+    wemake_python_styleguide,
 };
 use crate::settings::types::PythonVersion;
 
@@ -515,6 +516,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::MetaClassABCMeta) {
                 refurb::rules::metaclass_abcmeta(checker, class_def);
+            }
+            if checker.enabled(Rule::TooManyBaseClasses) {
+                if let Some(diagnostic) = wemake_python_styleguide::too_many_base_classes(class_def) {
+                    checker.diagnostics.push(diagnostic)
+                }
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {

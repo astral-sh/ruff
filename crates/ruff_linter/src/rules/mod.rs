@@ -57,3 +57,4 @@ pub mod pyupgrade;
 pub mod refurb;
 pub mod ruff;
 pub mod tryceratops;
+pub mod wemake_python_styleguide;

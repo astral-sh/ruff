@@ -205,6 +205,9 @@ pub enum Linter {
     /// [flake8-logging](https://pypi.org/project/flake8-logging/)
     #[prefix = "LOG"]
     Flake8Logging,
+    /// [wemake_python_styleguide](https://wemake-python-styleguide.readthedocs.io/en/latest/index.html)
+    #[prefix = "WPS"]
+    WemakePythonStyleguide,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
