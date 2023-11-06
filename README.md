@@ -424,6 +424,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
+- [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing)
 - [Reflex](https://github.com/reflex-dev/reflex)
 - [Rippling](https://rippling.com)
 - [Robyn](https://github.com/sansyrox/robyn)
