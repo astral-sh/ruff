@@ -5,7 +5,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_semantic::analyze::typing::is_list;
-use ruff_python_semantic::Binding;
 
 use crate::checkers::ast::Checker;
 
@@ -144,20 +143,16 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     }
 
     // Avoid non-list values.
-    let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+    let Some(name) = value.as_name_expr() else {
         return;
     };
-    let bindings: Vec<&Binding> = checker
+    let Some(binding) = checker
         .semantic()
-        .current_scope()
-        .get_all(id)
-        .map(|binding_id| checker.semantic().binding(binding_id))
-        .collect();
-
-    let [binding] = bindings.as_slice() else {
+        .only_binding(name)
+        .map(|id| checker.semantic().binding(id))
+    else {
         return;
     };
-
     if !is_list(binding, checker.semantic()) {
         return;
     }
@@ -176,15 +171,12 @@ pub(crate) fn manual_list_comprehension(checker: &mut Checker, target: &Expr, bo
     // ```python
     // filtered = [x for x in y if x in filtered]
     // ```
-    if let Some(value_name) = value.as_name_expr() {
-        if if_test.is_some_and(|test| {
-            any_over_expr(test, &|expr| {
-                expr.as_name_expr()
-                    .is_some_and(|expr| expr.id == value_name.id)
-            })
-        }) {
-            return;
-        }
+    if if_test.is_some_and(|test| {
+        any_over_expr(test, &|expr| {
+            expr.as_name_expr().is_some_and(|expr| expr.id == name.id)
+        })
+    }) {
+        return;
     }
 
     checker
