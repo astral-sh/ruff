@@ -210,9 +210,9 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "bitflags"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4682ae6287fcf752ecaabbfcc7b6f9b72aa33933dc23a554d853aea8eea8635"
+checksum = "327762f6e5a765692301e5bb513e0d9fef63be86bbc14528052b1cd3e6f03e07"
 
 [[package]]
 name = "bstr"
@@ -1440,7 +1440,7 @@ version = "6.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6205bd8bb1e454ad2e27422015fb5e4f2bcc7e08fa8f27058670d208324a4d2d"
 dependencies = [
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "crossbeam-channel",
  "filetime",
  "fsevent-sys",
@@ -2067,7 +2067,7 @@ dependencies = [
  "argfile",
  "assert_cmd",
  "bincode",
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "cachedir",
  "chrono",
  "clap",
@@ -2201,7 +2201,7 @@ dependencies = [
  "aho-corasick",
  "annotate-snippets 0.9.1",
  "anyhow",
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "chrono",
  "clap",
  "colored",
@@ -2293,7 +2293,7 @@ dependencies = [
 name = "ruff_python_ast"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "insta",
  "is-macro",
  "itertools 0.11.0",
@@ -2325,7 +2325,7 @@ name = "ruff_python_formatter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "clap",
  "countme",
  "insta",
@@ -2369,7 +2369,7 @@ dependencies = [
 name = "ruff_python_literal"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "hexf-parse",
  "is-macro",
  "itertools 0.11.0",
@@ -2383,7 +2383,7 @@ name = "ruff_python_parser"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "insta",
  "is-macro",
  "itertools 0.11.0",
@@ -2413,7 +2413,7 @@ dependencies = [
 name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "is-macro",
  "ruff_index",
  "ruff_python_ast",
@@ -2563,7 +2563,7 @@ version = "0.38.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b426b0506e5d50a7d8dafcf2e81471400deb602392c7dd110815afb4eaf02a3"
 dependencies = [
- "bitflags 2.4.0",
+ "bitflags 2.4.1",
  "errno",
  "libc",
  "linux-raw-sys",
