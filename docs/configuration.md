@@ -313,7 +313,7 @@ your [`extend-include`](settings.md#extend-include) setting, like so:
     extend-include = ["*.ipynb"]
     ```
 
-=== "ruff.toml'
+=== "ruff.toml"
 
     ```toml
     extend-include = ["*.ipynb"]
