@@ -222,6 +222,7 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
                     | "str"
                     | "super"
                     | "tuple"
+                    | "type"
                     | "zip"
                     | "ArithmeticError"
                     | "AssertionError"
