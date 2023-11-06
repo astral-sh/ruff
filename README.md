@@ -1,16 +1,16 @@
 This is the ekr-ruff fork of [Ruff Format](https://github.com/rust-lang/rust). This project has the following goals:
 
-## The Goal
+### The Goal
 
 Allow more people and projects to use Ruff Format by letting them enforce their *existing* styles.
 
-## Protecting tokens
+### Protecting tokens
 
 - `--skip-string-normalization`: Leave the *contents* of string tokens unchanged.
 - `--ignore-comment-regex`: Don't format the *interior* of comments whose *location* matches the regex.<br>
    For example, the regex `^\s*#@` would protect Leo's sentinel comments.
 
-## Flexible line lengths
+### Flexible line lengths
 
 Black sometimes splits lines poorly. Suffering poor line breaks should be *optional*.
 
@@ -19,7 +19,7 @@ Black sometimes splits lines poorly. Suffering poor line breaks should be *optio
 - [Speculative]: Allow *leeway* for splitting/joining lines.<br>
   Don't split or join lines within a specified *range* of line lengths.
 
-##Summary
+### Summary
 
 Options are not the enemy. Tools like git, pylint, etc. have *hundreds* of options.
 
