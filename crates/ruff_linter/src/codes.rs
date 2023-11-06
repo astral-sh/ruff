@@ -931,6 +931,13 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "007") => (RuleGroup::Preview, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Preview, rules::flake8_logging::rules::UndocumentedWarn),
 
+        // wemake_python_styleguide
+        (WemakePythonStyleguide, "201") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyImports),
+        (WemakePythonStyleguide, "202") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyModuleMembers),
+        (WemakePythonStyleguide, "203") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyImportedNames),
+
+        (WemakePythonStyleguide, "215") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyBaseClasses),
+        // (WemakePythonStyleguide, "216") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyDecorators),
         _ => return None,
     })
 }

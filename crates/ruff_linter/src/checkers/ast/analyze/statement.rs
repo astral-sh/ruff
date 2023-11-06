@@ -8,13 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
-use crate::rules::{
-    airflow, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_debugger,
-    flake8_django, flake8_errmsg, flake8_import_conventions, flake8_pie, flake8_pyi,
-    flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify, flake8_slots,
-    flake8_tidy_imports, flake8_type_checking, mccabe, pandas_vet, pep8_naming, perflint,
-    pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
-};
+use crate::rules::{airflow, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_debugger, flake8_django, flake8_errmsg, flake8_import_conventions, flake8_pie, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify, flake8_slots, flake8_tidy_imports, flake8_type_checking, mccabe, pandas_vet, pep8_naming, perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops, wemake_python_styleguide};
 use crate::settings::types::PythonVersion;
 
 /// Run lint rules over a [`Stmt`] syntax node.
@@ -518,6 +512,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::BadDunderMethodName) {
                 pylint::rules::bad_dunder_method_name(checker, body);
+            }
+            if checker.enabled(Rule::TooManyBaseClasses) {
+                if let Some(diagnostic) = wemake_python_styleguide::too_many_base_classes(class_def) {
+                    checker.diagnostics.push(diagnostic)
+                }
             }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
