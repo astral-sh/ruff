@@ -360,6 +360,8 @@ the project root (as opposed to the directory of the file pointed to via the `ex
 For example, if you add a `ruff.toml` to the `tests` directory in the above example, you'll want to
 explicitly set the `src` option in the extended configuration file:
 
+=== "ruff.toml"
+
 ```toml
 # tests/ruff.toml
 extend = "../pyproject.toml"
@@ -484,9 +486,9 @@ Run `ruff check /path/to/code.py --show-settings` to view the resolved settings 
 
 Yes! In lieu of a `pyproject.toml` file, you can use a `ruff.toml` file for configuration. The two
 files are functionally equivalent and have an identical schema, with the exception that a `ruff.toml`
-file can omit the `[tool.ruff]` section header.
+file can omit the `[tool.ruff]` section header. For example:
 
-For example, given this `pyproject.toml`:
+=== "pyproject.toml"
 
 ```toml
 [tool.ruff]
@@ -496,7 +498,7 @@ line-length = 88
 convention = "google"
 ```
 
-You could instead use a `ruff.toml` file like so:
+=== "ruff.toml"
 
 ```toml
 line-length = 88
