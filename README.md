@@ -1,13 +1,28 @@
-<!-- Begin section: Overview -->
-
 This is the ekr-ruff fork of ruff: https://github.com/rust-lang/rust
-
-# First, Do No Harm
 
 This project has the following goals:
 
-- Allow incremental formatting, reducing diffs.
-- Option: Leave the *contents* of comment tokens unchanged.
-- Option: Leave the *contents* of string tokens unchanged: `--skip-string-normalization`.
-- Option: Suppress line breaks.
-- Option: Suppress line joins.
+## First, Do No Harm
+
+- Allow incremental formatting, thereby huge reducing diffs.
+- Let projects enforce *existing* styles and styles *of their own choosing*.
+
+## Protecting tokens
+
+- `--skip-string-normalization`: Leave the *contents* of string tokens unchanged.
+- `--ignore-comment-regex`:
+  Don't format the *interior* of comments whose *location* matches the regex.
+  For example, the regex `^\s*#@` would protect Leo's sentinel comments.
+
+## Flexible line lengths
+
+Black sometimes splits lines poorly. Suffering poor line breaks should be *optional*.
+
+- `--no-line-breaks`: Never split lines.
+- `--no-line-joins`: Never join lines.
+- [Speculative]: Allow *leeway* for splitting/joining lines.
+  Don't split or join lines within a specified *range* of line lengths.
+
+## Options are not the enemy
+
+Tools like git, pylint, etc. have *hundreds* of options.
