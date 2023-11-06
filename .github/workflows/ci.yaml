@@ -185,8 +185,8 @@ jobs:
       - determine_changes
     if: |
       # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-      github.event_name == 'pull_request' &&
       # Ecosystem check needs linter and/or formatter changes.
+      github.event_name == 'pull_request' &&
       ( ${{ needs.determine_changes.outputs.linter == 'true' }} || ${{ needs.determine_changes.outputs.formatter == 'true' }} )
 
     steps:
