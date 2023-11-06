@@ -2,12 +2,12 @@ import trio
 from trio import sleep
 
 
-async def afoo():
+async def func():
     await trio.sleep(0)  # TRIO115
-    await trio.sleep(1)  # Ok
-    await trio.sleep(0, 1)  # Ok
-    await trio.sleep(...)  # Ok
-    await trio.sleep()  # Ok
+    await trio.sleep(1)  # OK
+    await trio.sleep(0, 1)  # OK
+    await trio.sleep(...)  # OK
+    await trio.sleep()  # OK
 
     trio.sleep(0)  # TRIO115
     foo = 0
@@ -21,6 +21,5 @@ async def afoo():
 trio.sleep(0)  # TRIO115
 
 
-def foo():
+def func():
     trio.run(trio.sleep(0))  # TRIO115
-

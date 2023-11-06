@@ -8,11 +8,11 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 
 /// ## What it does
-/// Checks for calls of `trio.sleep(0)` and suggests replacement with `trio.lowlevel.checkpoint()`
+/// Checks for uses of `trio.sleep(0)`.
 ///
 /// ## Why is this bad?
-/// Although equivalent to `trio.sleep(0)`, a call to `trio.lowlevel.checkpoint()` is more
-/// suggestive of the underlying process and the author's intent.
+/// `trio.sleep(0)` is equivalent to calling `trio.lowlevel.checkpoint()`.
+/// However, the latter better conveys the intent of the code.
 ///
 /// ## Example
 /// ```python
@@ -35,7 +35,7 @@ impl AlwaysFixableViolation for TrioZeroSleepCall {
     }
 
     fn fix_title(&self) -> String {
-        format!("Replace `trio.sleep(0)` with `trio.lowlevel.checkpoint()`")
+        format!("Replace with `trio.lowlevel.checkpoint()`")
     }
 }
 
@@ -103,7 +103,7 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
         )?;
         let reference_edit = Edit::range_replacement(binding, call.func.range());
         let arg_edit = Edit::range_deletion(call.arguments.range);
-        Ok(Fix::unsafe_edits(import_edit, [reference_edit, arg_edit]))
+        Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
     });
     checker.diagnostics.push(diagnostic);
 }
