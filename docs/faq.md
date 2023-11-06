@@ -357,14 +357,23 @@ If your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` extends another configura
 will still use the directory containing your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file as
 the project root (as opposed to the directory of the file pointed to via the `extends` option).
 
-For example, if you add a `ruff.toml` to the `tests` directory in the above example, you'll want to
-explicitly set the `src` option in the extended configuration file:
+For example, if you add a configuration file to the `tests` directory in the above example, you'll
+want to explicitly set the `src` option in the extended configuration file:
 
-```toml
-# tests/ruff.toml
-extend = "../pyproject.toml"
-src = ["../src"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extend = "../pyproject.toml"
+    src = ["../src"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend = "../pyproject.toml"
+    src = ["../src"]
+    ```
 
 Beyond this `src`-based detection, Ruff will also attempt to determine the current Python package
 for a given Python file, and mark imports from within the same package as first-party. For example,
@@ -482,11 +491,11 @@ Run `ruff check /path/to/code.py --show-settings` to view the resolved settings 
 
 ## I want to use Ruff, but I don't want to use `pyproject.toml`. What are my options?
 
-Yes! In lieu of a `pyproject.toml` file, you can use a `ruff.toml` file for configuration. The two
+In lieu of a `pyproject.toml` file, you can use a `ruff.toml` file for configuration. The two
 files are functionally equivalent and have an identical schema, with the exception that a `ruff.toml`
-file can omit the `[tool.ruff]` section header.
+file can omit the `[tool.ruff]` section header. For example:
 
-For example, given this `pyproject.toml`:
+=== "pyproject.toml"
 
 ```toml
 [tool.ruff]
@@ -496,7 +505,7 @@ line-length = 88
 convention = "google"
 ```
 
-You could instead use a `ruff.toml` file like so:
+=== "ruff.toml"
 
 ```toml
 line-length = 88
