@@ -41,7 +41,7 @@ repos:
           )$
 
   - repo: https://github.com/crate-ci/typos
-    rev: typos-dict-v0.11.3
+    rev: v1.16.22
     hooks:
       - id: typos
 
