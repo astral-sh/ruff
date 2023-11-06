@@ -45,7 +45,7 @@ fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticMode
             .is_some_and(|call_path| {
                 base_classes
                     .iter()
-                    .any(|base_class| from_qualified_name(base_class) == call_path)
+                    .any(|base_class| from_qualified_name(base_class).ends_with(&call_path))
             })
     })
 }
