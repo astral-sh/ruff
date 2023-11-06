@@ -107,6 +107,30 @@ impl Fix {
         }
     }
 
+    /// Create a new [`Fix`] with the specified [`Applicability`] to apply an [`Edit`] element.
+    pub fn applicable_edit(edit: Edit, applicability: Applicability) -> Self {
+        Self {
+            edits: vec![edit],
+            applicability,
+            isolation_level: IsolationLevel::default(),
+        }
+    }
+
+    /// Create a new [`Fix`] with the specified [`Applicability`] to apply multiple [`Edit`] elements.
+    pub fn applicable_edits(
+        edit: Edit,
+        rest: impl IntoIterator<Item = Edit>,
+        applicability: Applicability,
+    ) -> Self {
+        let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
+        edits.sort_by_key(|edit| (edit.start(), edit.end()));
+        Self {
+            edits,
+            applicability,
+            isolation_level: IsolationLevel::default(),
+        }
+    }
+
     /// Return the [`TextSize`] of the first [`Edit`] in the [`Fix`].
     pub fn min_start(&self) -> Option<TextSize> {
         self.edits.first().map(Edit::start)
