@@ -149,22 +149,22 @@ E721.py:41:8: E721 Do not compare types, use `isinstance()`
 42 | #:
    |
 
-E721.py:101:12: E721 Do not compare types, use `isinstance()`
+E721.py:107:12: E721 Do not compare types, use `isinstance()`
     |
- 99 |     def asdf(self, value: str | None):
-100 |         #: E721
-101 |         if type(value) is str:
+105 |     def asdf(self, value: str | None):
+106 |         #: E721
+107 |         if type(value) is str:
     |            ^^^^^^^^^^^^^^^^^^ E721
-102 |             ...
+108 |             ...
     |
 
-E721.py:111:12: E721 Do not compare types, use `isinstance()`
+E721.py:117:12: E721 Do not compare types, use `isinstance()`
     |
-109 |     def asdf(self, value: str | None):
-110 |         #: E721
-111 |         if type(value) is str:
+115 |     def asdf(self, value: str | None):
+116 |         #: E721
+117 |         if type(value) is str:
     |            ^^^^^^^^^^^^^^^^^^ E721
-112 |             ...
+118 |             ...
     |
 
 

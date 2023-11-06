@@ -119,4 +119,14 @@ E721.py:41:8: E721 Use `is` and `is not` for type comparisons, or `isinstance()`
 42 | #:
    |
 
+E721.py:59:4: E721 Use `is` and `is not` for type comparisons, or `isinstance()` for isinstance checks
+   |
+57 |     pass
+58 | #: E721
+59 | if type(res) == type:
+   |    ^^^^^^^^^^^^^^^^^ E721
+60 |     pass
+61 | #: Okay
+   |
+
 
