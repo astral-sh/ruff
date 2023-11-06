@@ -15,10 +15,6 @@ use crate::rules::flake8_trio::method_name::MethodName;
 /// to take effect. Calling a trio function without an `await` can lead to
 /// `RuntimeWarning` diagnostics and unexpected behaviour.
 ///
-/// ## Fix safety
-/// This rule's fix is marked as unsafe, as adding an `await` to a function
-/// call changes its semantics and runtime behavior.
-///
 /// ## Example
 /// ```python
 /// async def double_sleep(x):
@@ -30,6 +26,10 @@ use crate::rules::flake8_trio::method_name::MethodName;
 /// async def double_sleep(x):
 ///     await trio.sleep(2 * x)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as adding an `await` to a function
+/// call changes its semantics and runtime behavior.
 #[violation]
 pub struct TrioSyncCall {
     method_name: MethodName,
