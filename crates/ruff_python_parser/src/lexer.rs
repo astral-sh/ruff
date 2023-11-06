@@ -1344,6 +1344,8 @@ pub enum LexicalErrorType {
     LineContinuationError,
     /// An unexpected end of file was encountered.
     Eof,
+    /// Occurs when a syntactically invalid assignment was encountered.
+    AssignmentError,
     /// An unexpected error occurred.
     OtherError(String),
 }
@@ -1389,6 +1391,7 @@ impl std::fmt::Display for LexicalErrorType {
                 write!(f, "unexpected character after line continuation character")
             }
             LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
+            LexicalErrorType::AssignmentError => write!(f, "invalid assignment target"),
             LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
         }
     }
