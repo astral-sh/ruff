@@ -616,6 +616,16 @@ impl<'a> SemanticModel<'a> {
         self.resolved_names.get(&name.into()).copied()
     }
 
+    /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if it's the
+    /// only binding to that name in its scope.
+    pub fn only_binding(&self, name: &ast::ExprName) -> Option<BindingId> {
+        self.resolve_name(name).filter(|id| {
+            let binding = self.binding(*id);
+            let scope = &self.scopes[binding.scope];
+            scope.shadowed_binding(*id).is_none()
+        })
+    }
+
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
     /// or builtin symbol.
     ///
