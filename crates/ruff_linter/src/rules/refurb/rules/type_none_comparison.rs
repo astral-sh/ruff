@@ -110,10 +110,10 @@ pub(crate) fn type_none_comparison(checker: &mut Checker, compare: &ast::ExprCom
         pad(
             match comparison {
                 Comparison::Is | Comparison::Eq => {
-                    generate_none_identity_comparison(&other_arg_name, false, checker.generator())
+                    generate_none_identity_comparison(other_arg_name, false, checker.generator())
                 }
                 Comparison::IsNot | Comparison::NotEq => {
-                    generate_none_identity_comparison(&other_arg_name, true, checker.generator())
+                    generate_none_identity_comparison(other_arg_name, true, checker.generator())
                 }
             },
             compare.range(),
