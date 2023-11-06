@@ -1,6 +1,4 @@
-This is the ekr-ruff fork of ruff: https://github.com/rust-lang/rust
-
-This project has the following goals:
+This is the ekr-ruff fork of [ruff](https://github.com/rust-lang/rust). This project has the following goals:
 
 ## First, Do No Harm
 
