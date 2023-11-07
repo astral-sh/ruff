@@ -8,10 +8,10 @@ use ruff_text_size::Ranged;
 /// Checks for uses of the `mako` templates.
 ///
 /// ## Why is this bad?
-/// Mako templates allow HTML/JS rendering by default and are
+/// Mako templates allow HTML and JavaScript rendering by default, and are
 /// inherently open to XSS attacks. Ensure variables in all templates are
-/// properly sanitized via the 'n', 'h' or 'x' flags (depending on context).
-/// For example, to HTML escape the variable 'data' do ${ data |h }.
+/// properly sanitized via the `n`, `h` or `x` flags (depending on context).
+/// For example, to HTML escape the variable `data`, use `${ data |h }`.
 ///
 /// ## Example
 /// ```python
@@ -38,9 +38,7 @@ impl Violation for MakoTemplates {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Mako templates allow HTML/JS rendering by default and are inherently open to XSS attacks.\
-            Ensure variables in all templates are properly sanitized via the 'n', 'h' or 'x' flags (depending on context).\
-            For example, to HTML escape the variable 'data' do ${{ data |h }}."
+            "Mako templates allow HTML and JavaScript rendering by default and are inherently open to XSS attacks"
         )
     }
 }
