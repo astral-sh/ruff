@@ -27,7 +27,7 @@ impl FixSafetyTable {
     ) -> Applicability {
         match applicability {
             // If applicability is display-only we don't change it
-            Applicability::Display => applicability,
+            Applicability::DisplayOnly => applicability,
             Applicability::Safe | Applicability::Unsafe => {
                 if self.forced_unsafe.contains(rule) {
                     Applicability::Unsafe
