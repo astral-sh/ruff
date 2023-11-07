@@ -602,6 +602,9 @@ impl LintConfiguration {
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
         Ok(LintConfiguration {
+            // `--extension` is a hidden command-line argument that isn't supported in configuration
+            // files at present.
+            extension: None,
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
@@ -612,7 +615,6 @@ impl LintConfiguration {
                     .collect()
             }),
             preview: options.preview.map(PreviewMode::from),
-            extension: options.common.extension.map(ExtensionMapping::from),
 
             rule_selections: vec![RuleSelection {
                 select: options.common.select,
