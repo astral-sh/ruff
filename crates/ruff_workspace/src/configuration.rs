@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
+use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
 use shellexpand::LookupError;
@@ -239,26 +240,14 @@ impl Configuration {
                         .collect(),
                 )?,
 
-                extend_safe_fixes: lint
-                    .extend_safe_fixes
-                    .iter()
-                    .flat_map(|selector| {
-                        selector.rules(&PreviewOptions {
-                            mode: lint_preview,
-                            require_explicit: false,
-                        })
-                    })
-                    .collect(),
-                extend_unsafe_fixes: lint
-                    .extend_unsafe_fixes
-                    .iter()
-                    .flat_map(|selector| {
-                        selector.rules(&PreviewOptions {
-                            mode: lint_preview,
-                            require_explicit: false,
-                        })
-                    })
-                    .collect(),
+                fix_safety: FixSafetyTable::from_rule_selectors(
+                    &lint.extend_safe_fixes,
+                    &lint.extend_unsafe_fixes,
+                    &PreviewOptions {
+                        mode: lint_preview,
+                        require_explicit: false,
+                    },
+                ),
 
                 src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
                 explicit_preview_rules: lint.explicit_preview_rules.unwrap_or_default(),
