@@ -10,7 +10,7 @@ E731.py:3:5: E731 [*] Do not assign a `lambda` expression, use a `def`
   |
   = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | def scope():
 2 2 |     # E731
 3   |-    f = lambda x: 2 * x
@@ -29,7 +29,7 @@ E731.py:8:5: E731 [*] Do not assign a `lambda` expression, use a `def`
   |
   = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 5  5  | 
 6  6  | def scope():
 7  7  |     # E731
@@ -49,7 +49,7 @@ E731.py:14:9: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `this` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 | def scope():
 12 12 |     # E731
 13 13 |     while False:
@@ -69,7 +69,7 @@ E731.py:19:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 16 16 | 
 17 17 | def scope():
 18 18 |     # E731
@@ -89,7 +89,7 @@ E731.py:24:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 21 21 | 
 22 22 | def scope():
 23 23 |     # E731
@@ -109,7 +109,7 @@ E731.py:57:5: E731 Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Possible fix
+ℹ Display-only fix
 54 54 | 
 55 55 | class Scope:
 56 56 |     # E731
@@ -128,7 +128,7 @@ E731.py:64:5: E731 Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Possible fix
+ℹ Display-only fix
 61 61 |     from typing import Callable
 62 62 | 
 63 63 |     # E731
@@ -150,7 +150,7 @@ E731.py:73:9: E731 Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `x` as a `def`
 
-ℹ Possible fix
+ℹ Display-only fix
 70 70 | 
 71 71 |     x: Callable[[int], int]
 72 72 |     if True:
@@ -171,7 +171,7 @@ E731.py:75:9: E731 Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `x` as a `def`
 
-ℹ Possible fix
+ℹ Display-only fix
 72 72 |     if True:
 73 73 |         x = lambda: 1
 74 74 |     else:
@@ -191,7 +191,7 @@ E731.py:86:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 83 83 | 
 84 84 |     # ParamSpec cannot be used in this context, so do not preserve the annotation.
 85 85 |     P = ParamSpec("P")
@@ -211,7 +211,7 @@ E731.py:94:5: E731 [*] Do not assign a `lambda` expression, use a `def`
    |
    = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 91 91 | 
 92 92 |     from typing import Callable
 93 93 | 
@@ -231,7 +231,7 @@ E731.py:102:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 99  99  | 
 100 100 |     from typing import Callable
 101 101 | 
@@ -251,7 +251,7 @@ E731.py:110:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 107 107 | 
 108 108 |     from typing import Callable
 109 109 | 
@@ -271,7 +271,7 @@ E731.py:119:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 116 116 | 
 117 117 |     from collections.abc import Callable
 118 118 | 
@@ -291,7 +291,7 @@ E731.py:127:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 124 124 | 
 125 125 |     from collections.abc import Callable
 126 126 | 
@@ -311,7 +311,7 @@ E731.py:135:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 132 132 | 
 133 133 |     from collections.abc import Callable
 134 134 | 
@@ -331,7 +331,7 @@ E731.py:139:5: E731 Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `CELSIUS` as a `def`
 
-ℹ Possible fix
+ℹ Display-only fix
 136 136 | 
 137 137 | 
 138 138 | class TemperatureScales(Enum):
@@ -351,7 +351,7 @@ E731.py:140:5: E731 Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `FAHRENHEIT` as a `def`
 
-ℹ Possible fix
+ℹ Display-only fix
 137 137 | 
 138 138 | class TemperatureScales(Enum):
 139 139 |     CELSIUS = (lambda deg_c: deg_c)
@@ -374,7 +374,7 @@ E731.py:147:5: E731 [*] Do not assign a `lambda` expression, use a `def`
     |
     = help: Rewrite `f` as a `def`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 144 144 | def scope():
 145 145 |     # E731
 146 146 | 

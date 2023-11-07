@@ -9,7 +9,7 @@ TCH004_5.py:4:24: TCH004 [*] Move import `typing.List` out of type-checking bloc
   |
   = help: Move out of type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | from typing import TYPE_CHECKING
   2 |+from typing import List, Sequence, Set
 2 3 | 
@@ -28,7 +28,7 @@ TCH004_5.py:4:30: TCH004 [*] Move import `typing.Sequence` out of type-checking 
   |
   = help: Move out of type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | from typing import TYPE_CHECKING
   2 |+from typing import List, Sequence, Set
 2 3 | 
@@ -47,7 +47,7 @@ TCH004_5.py:4:40: TCH004 [*] Move import `typing.Set` out of type-checking block
   |
   = help: Move out of type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | from typing import TYPE_CHECKING
   2 |+from typing import List, Sequence, Set
 2 3 | 

@@ -278,7 +278,7 @@ pub struct CheckCommand {
     #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
     /// Disable cache reads.
-    #[arg(short, long, help_heading = "Miscellaneous")]
+    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
@@ -374,7 +374,7 @@ pub struct FormatCommand {
     pub config: Option<PathBuf>,
 
     /// Disable cache reads.
-    #[arg(short, long, help_heading = "Miscellaneous")]
+    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
     /// Path to the cache directory.
     #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]

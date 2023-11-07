@@ -123,7 +123,7 @@ pub(crate) fn lambda_assignment(
                 .get_all(id)
                 .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
         {
-            diagnostic.set_fix(Fix::display_edit(Edit::range_replacement(
+            diagnostic.set_fix(Fix::display_only_edit(Edit::range_replacement(
                 indented,
                 stmt.range(),
             )));
