@@ -356,6 +356,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
+            if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
+                flake8_trio::rules::async_function_with_timeout(checker, parameters, *is_async);
+            }
             #[cfg(feature = "unreachable-code")]
             if checker.enabled(Rule::UnreachableCode) {
                 checker

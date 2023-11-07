@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/flake8_trio/mod.rs
+---
+TRIO109.py:5:15: TRIO109 Async function definition with a `timeout` parameter - use `trio.[fail/move_on]_[after/at]` instead
+  |
+3 |     ...
+4 | 
+5 | async def foo(timeout):
+  |               ^^^^^^^ TRIO109
+6 |     ...
+  |
+
+TRIO109.py:8:15: TRIO109 Async function definition with a `timeout` parameter - use `trio.[fail/move_on]_[after/at]` instead
+  |
+6 |     ...
+7 | 
+8 | async def foo(timeout=10):
+  |               ^^^^^^^^^^ TRIO109
+9 |     ...
+  |
+
+

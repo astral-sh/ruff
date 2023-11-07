@@ -1,0 +1,9 @@
+
+async def foo():
+    ...
+
+async def foo(timeout):
+    ...
+
+async def foo(timeout=10):
+    ...
