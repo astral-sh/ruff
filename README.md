@@ -1,3 +1,5 @@
+<!-- https://github.com/edreamleo/ekr-ruff -->
+
 This repo is the ekr-ruff fork of [ruff format](https://github.com/rust-lang/rust).
 
 **The Goal**
