@@ -314,10 +314,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         unsafe_fixes,
         printer_flags,
     );
-    let extension_override = cli
-        .extension_override
-        .map(|eo| eo.into_iter().collect())
-        .unwrap_or_default();
 
     if cli.watch {
         if output_format != SerializationFormat::Text {
@@ -346,7 +342,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             noqa.into(),
             fix_mode,
             unsafe_fixes,
-            &extension_override,
         )?;
         printer.write_continuously(&mut writer, &messages)?;
 
@@ -380,7 +375,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         noqa.into(),
                         fix_mode,
                         unsafe_fixes,
-                        &extension_override,
                     )?;
                     printer.write_continuously(&mut writer, &messages)?;
                 }
@@ -398,7 +392,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 &overrides,
                 noqa.into(),
                 fix_mode,
-                &extension_override,
             )?
         } else {
             commands::check::check(
@@ -409,7 +402,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                 noqa.into(),
                 fix_mode,
                 unsafe_fixes,
-                &extension_override,
             )?
         };
 

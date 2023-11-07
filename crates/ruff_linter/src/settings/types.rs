@@ -375,7 +375,7 @@ impl From<ExtensionPair> for (String, Language) {
         (value.extension, value.language)
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, CacheKey)]
 pub struct ExtensionMapping {
     mapping: FxHashMap<String, Language>,
 }
@@ -391,6 +391,11 @@ impl Default for ExtensionMapping {
         Self {
             mapping: FxHashMap::from_iter([]),
         }
+    }
+}
+impl From<FxHashMap<String, Language>> for ExtensionMapping {
+    fn from(value: FxHashMap<String, Language>) -> Self {
+        Self { mapping: value }
     }
 }
 

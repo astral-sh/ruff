@@ -197,7 +197,6 @@ pub(crate) fn lint_path(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
-    extension_override: &ExtensionMapping,
 ) -> Result<Diagnostics> {
     // Check the cache.
     let caching = match cache {
@@ -232,7 +231,8 @@ pub(crate) fn lint_path(
     };
 
     debug!("Checking: {}", path.display());
-    let source_type = match get_override_source_type(Some(path), extension_override) {
+
+    let source_type = match get_override_source_type(Some(path), &settings.extension) {
         Some(source_type) => source_type,
         None => match SourceType::from(path) {
             SourceType::Toml(TomlSourceType::Pyproject) => {
@@ -383,10 +383,10 @@ pub(crate) fn lint_stdin(
     settings: &Settings,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
-    extension_override: &ExtensionMapping,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
-    let source_type = if let Some(source_type) = get_override_source_type(path, extension_override)
+    let source_type = if let Some(source_type) =
+        get_override_source_type(path, &settings.linter.extension)
     {
         source_type
     } else {

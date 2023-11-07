@@ -14,7 +14,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::message::Message;
 use ruff_linter::registry::Rule;
-use ruff_linter::settings::types::{ExtensionMapping, UnsafeFixes};
+use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::{fs, warn_user_once, IOError};
 use ruff_python_ast::imports::ImportMap;
@@ -39,7 +39,6 @@ pub(crate) fn check(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
-    extension_override: &ExtensionMapping,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -105,7 +104,6 @@ pub(crate) fn check(
                     noqa,
                     fix_mode,
                     unsafe_fixes,
-                    extension_override,
                 )
                 .map_err(|e| {
                     (Some(path.to_path_buf()), {
@@ -196,19 +194,9 @@ fn lint_path(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
-    extension_override: &ExtensionMapping,
 ) -> Result<Diagnostics> {
     let result = catch_unwind(|| {
-        crate::diagnostics::lint_path(
-            path,
-            package,
-            settings,
-            cache,
-            noqa,
-            fix_mode,
-            unsafe_fixes,
-            extension_override,
-        )
+        crate::diagnostics::lint_path(path, package, settings, cache, noqa, fix_mode, unsafe_fixes)
     });
 
     match result {
@@ -245,7 +233,7 @@ mod test {
 
     use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
     use ruff_linter::registry::Rule;
-    use ruff_linter::settings::types::{ExtensionMapping, UnsafeFixes};
+    use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{flags, LinterSettings};
     use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff_workspace::Settings;
@@ -294,7 +282,6 @@ mod test {
             flags::Noqa::Disabled,
             flags::FixMode::Generate,
             UnsafeFixes::Enabled,
-            &ExtensionMapping::default(),
         )
         .unwrap();
         let mut output = Vec::new();
