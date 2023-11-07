@@ -341,17 +341,13 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 [pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
 
 ```yaml
-# Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
   rev: v0.1.4
   hooks:
+    # Run the linter.
     - id: ruff
-# Run the Ruff formatter.
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.1.4
-  hooks:
+    # Run the formatter.
     - id: ruff-format
 ```
 

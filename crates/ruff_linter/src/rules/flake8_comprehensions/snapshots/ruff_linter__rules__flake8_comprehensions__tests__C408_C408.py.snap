@@ -10,7 +10,7 @@ C408.py:1:5: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
   |
   = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1   |-t = tuple()
   1 |+t = ()
 2 2 | l = list()
@@ -27,7 +27,7 @@ C408.py:2:5: C408 [*] Unnecessary `list` call (rewrite as a literal)
   |
   = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | t = tuple()
 2   |-l = list()
   2 |+l = []
@@ -46,7 +46,7 @@ C408.py:3:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
   |
   = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | t = tuple()
 2 2 | l = list()
 3   |-d1 = dict()
@@ -65,7 +65,7 @@ C408.py:4:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
   |
   = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | t = tuple()
 2 2 | l = list()
 3 3 | d1 = dict()
@@ -86,7 +86,7 @@ C408.py:14:4: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 | 
 12 12 | a = list()
 13 13 | 
@@ -106,7 +106,7 @@ C408.py:15:4: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 12 12 | a = list()
 13 13 | 
 14 14 | f"{dict(x='y')}"
@@ -126,7 +126,7 @@ C408.py:16:4: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 13 13 | 
 14 14 | f"{dict(x='y')}"
 15 15 | f'{dict(x="y")}'
@@ -147,7 +147,7 @@ C408.py:17:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 14 14 | f"{dict(x='y')}"
 15 15 | f'{dict(x="y")}'
 16 16 | f"{dict()}"
@@ -168,7 +168,7 @@ C408.py:19:4: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 16 16 | f"{dict()}"
 17 17 | f"a {dict()} b"
 18 18 | 
@@ -189,7 +189,7 @@ C408.py:19:18: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 16 16 | f"{dict()}"
 17 17 | f"a {dict()} b"
 18 18 | 
@@ -209,7 +209,7 @@ C408.py:20:5: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 17 17 | f"a {dict()} b"
 18 18 | 
 19 19 | f"{dict(x='y') | dict(y='z')}"
@@ -228,7 +228,7 @@ C408.py:20:19: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 17 17 | f"a {dict()} b"
 18 18 | 
 19 19 | f"{dict(x='y') | dict(y='z')}"
@@ -247,7 +247,7 @@ C408.py:21:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 18 18 | 
 19 19 | f"{dict(x='y') | dict(y='z')}"
 20 20 | f"{ dict(x='y') | dict(y='z') }"
@@ -265,7 +265,7 @@ C408.py:21:20: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 18 18 | 
 19 19 | f"{dict(x='y') | dict(y='z')}"
 20 20 | f"{ dict(x='y') | dict(y='z') }"
@@ -282,7 +282,7 @@ C408.py:22:7: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 19 19 | f"{dict(x='y') | dict(y='z')}"
 20 20 | f"{ dict(x='y') | dict(y='z') }"
 21 21 | f"a {dict(x='y') | dict(y='z')} b"
@@ -298,7 +298,7 @@ C408.py:22:21: C408 [*] Unnecessary `dict` call (rewrite as a literal)
    |
    = help: Rewrite as a literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 19 19 | f"{dict(x='y') | dict(y='z')}"
 20 20 | f"{ dict(x='y') | dict(y='z') }"
 21 21 | f"a {dict(x='y') | dict(y='z')} b"

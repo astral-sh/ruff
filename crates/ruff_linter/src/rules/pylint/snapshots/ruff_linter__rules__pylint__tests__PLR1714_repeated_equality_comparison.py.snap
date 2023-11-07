@@ -11,7 +11,7 @@ repeated_equality_comparison.py:2:1: PLR1714 [*] Consider merging multiple compa
   |
   = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | # Errors.
 2   |-foo == "a" or foo == "b"
   2 |+foo in ("a", "b")
@@ -30,7 +30,7 @@ repeated_equality_comparison.py:4:1: PLR1714 [*] Consider merging multiple compa
   |
   = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | # Errors.
 2 2 | foo == "a" or foo == "b"
 3 3 | 
@@ -51,7 +51,7 @@ repeated_equality_comparison.py:6:1: PLR1714 [*] Consider merging multiple compa
   |
   = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 3 3 | 
 4 4 | foo != "a" and foo != "b"
 5 5 | 
@@ -72,7 +72,7 @@ repeated_equality_comparison.py:8:1: PLR1714 [*] Consider merging multiple compa
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 5 5 | 
 6 6 | foo == "a" or foo == "b" or foo == "c"
 7 7 | 
@@ -93,7 +93,7 @@ repeated_equality_comparison.py:10:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 7  7  | 
 8  8  | foo != "a" and foo != "b" and foo != "c"
 9  9  | 
@@ -114,7 +114,7 @@ repeated_equality_comparison.py:12:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 9  9  | 
 10 10 | foo == a or foo == "b" or foo == 3  # Mixed types.
 11 11 | 
@@ -135,7 +135,7 @@ repeated_equality_comparison.py:14:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 | 
 12 12 | "a" == foo or "b" == foo or "c" == foo
 13 13 | 
@@ -156,7 +156,7 @@ repeated_equality_comparison.py:16:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 13 13 | 
 14 14 | "a" != foo and "b" != foo and "c" != foo
 15 15 | 
@@ -177,7 +177,7 @@ repeated_equality_comparison.py:18:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 15 15 | 
 16 16 | "a" == foo or foo == "b" or "c" == foo
 17 17 | 
@@ -198,7 +198,7 @@ repeated_equality_comparison.py:20:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 17 17 | 
 18 18 | foo == bar or baz == foo or qux == foo
 19 19 | 
@@ -219,7 +219,7 @@ repeated_equality_comparison.py:22:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 19 19 | 
 20 20 | foo == "a" or "b" == foo or foo == "c"
 21 21 | 
@@ -240,7 +240,7 @@ repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 21 21 | 
 22 22 | foo != "a" and "b" != foo and foo != "c"
 23 23 | 
@@ -261,7 +261,7 @@ repeated_equality_comparison.py:24:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 21 21 | 
 22 22 | foo != "a" and "b" != foo and foo != "c"
 23 23 | 
@@ -282,7 +282,7 @@ repeated_equality_comparison.py:26:1: PLR1714 [*] Consider merging multiple comp
    |
    = help: Merge multiple comparisons
 
-ℹ Suggested fix
+ℹ Unsafe fix
 23 23 | 
 24 24 | foo == "a" or foo == "b" or "c" == bar or "d" == bar  # Multiple targets
 25 25 | 
