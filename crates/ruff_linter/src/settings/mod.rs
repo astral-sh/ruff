@@ -28,10 +28,12 @@ use crate::{codes, RuleSelector};
 
 use super::line_width::IndentWidth;
 
+use self::fix_safety_table::FixSafetyTable;
 use self::rule_table::RuleTable;
 use self::types::PreviewMode;
 use crate::rule_selector::PreviewOptions;
 
+pub mod fix_safety_table;
 pub mod flags;
 pub mod rule_table;
 pub mod types;
@@ -43,8 +45,7 @@ pub struct LinterSettings {
 
     pub rules: RuleTable,
     pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
-    pub extend_unsafe_fixes: RuleSet,
-    pub extend_safe_fixes: RuleSet,
+    pub fix_safety: FixSafetyTable,
 
     pub target_version: PythonVersion,
     pub preview: PreviewMode,
@@ -151,8 +152,7 @@ impl LinterSettings {
             namespace_packages: vec![],
 
             per_file_ignores: vec![],
-            extend_safe_fixes: RuleSet::empty(),
-            extend_unsafe_fixes: RuleSet::empty(),
+            fix_safety: FixSafetyTable::default(),
 
             src: vec![path_dedot::CWD.clone()],
             // Needs duplicating

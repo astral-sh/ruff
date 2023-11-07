@@ -152,9 +152,10 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
   # Ruff version.
   rev: v0.1.4
   hooks:
-    # Run the Ruff linter.
+    # Run the linter.
     - id: ruff
-    # Run the Ruff formatter.
+      args: [ --fix ]
+    # Run the formatter.
     - id: ruff-format
 ```
 
@@ -415,6 +416,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PDM](https://github.com/pdm-project/pdm)
 - [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
 - [Pandas](https://github.com/pandas-dev/pandas)
+- [Pillow](https://github.com/python-pillow/Pillow)
 - [Poetry](https://github.com/python-poetry/poetry)
 - [Polars](https://github.com/pola-rs/polars)
 - [PostHog](https://github.com/PostHog/posthog)
@@ -423,6 +425,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
+- [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing)
 - [Reflex](https://github.com/reflex-dev/reflex)
 - [Rippling](https://rippling.com)
 - [Robyn](https://github.com/sansyrox/robyn)

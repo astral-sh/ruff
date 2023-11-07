@@ -12,7 +12,7 @@ B004.py:3:8: B004 [*] Using `hasattr(x, "__call__")` to test if x is callable is
   |
   = help: Replace with `callable()`
 
-ℹ Fix
+ℹ Safe fix
 1 1 | def this_is_a_bug():
 2 2 |     o = object()
 3   |-    if hasattr(o, "__call__"):

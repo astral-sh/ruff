@@ -4,7 +4,6 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_dict;
-use ruff_python_semantic::Binding;
 
 use crate::checkers::ast::Checker;
 
@@ -129,22 +128,16 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
     }
 
     // Exclude non-dictionary value.
-    let Expr::Name(ast::ExprName {
-        id: subscript_name, ..
-    }) = subscript_value.as_ref()
+    let Some(name) = subscript_value.as_name_expr() else {
+        return;
+    };
+    let Some(binding) = checker
+        .semantic()
+        .only_binding(name)
+        .map(|id| checker.semantic().binding(id))
     else {
         return;
     };
-    let scope = checker.semantic().current_scope();
-    let bindings: Vec<&Binding> = scope
-        .get_all(subscript_name)
-        .map(|binding_id| checker.semantic().binding(binding_id))
-        .collect();
-
-    let [binding] = bindings.as_slice() else {
-        return;
-    };
-
     if !is_dict(binding, checker.semantic()) {
         return;
     }
@@ -165,8 +158,7 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, target: &Expr, bo
     // ```
     if if_test.is_some_and(|test| {
         any_over_expr(test, &|expr| {
-            expr.as_name_expr()
-                .is_some_and(|expr| expr.id == *subscript_name)
+            ComparableExpr::from(expr) == ComparableExpr::from(name)
         })
     }) {
         return;

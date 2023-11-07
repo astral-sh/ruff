@@ -77,14 +77,14 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
                         })
                         | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
                         {
-                            if let Expr::NumberLiteral(ast::ExprNumberLiteral {
-                                value: num, ..
-                            }) = value.as_ref()
-                            {
-                                let Some(int) = num.as_int() else { return };
-                                if *int != Int::ZERO {
-                                    return;
-                                }
+                            let Expr::NumberLiteral(ast::ExprNumberLiteral { value: num, .. }) =
+                                value.as_ref()
+                            else {
+                                return;
+                            };
+                            let Some(int) = num.as_int() else { return };
+                            if *int != Int::ZERO {
+                                return;
                             }
                         }
                     }
