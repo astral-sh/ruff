@@ -1,3 +1,6 @@
+import trio
+
+
 async def func():
     ...
 
