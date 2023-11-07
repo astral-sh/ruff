@@ -56,7 +56,7 @@ uuid = { version = "1.5.0", features = ["v4", "fast-rng", "macro-diagnostics", "
 wsl = { version = "0.1.0" }
 
 [profile.release]
-lto = "fat"
+lto = "thin"
 codegen-units = 1
 
 [profile.dev.package.insta]
