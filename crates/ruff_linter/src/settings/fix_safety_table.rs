@@ -131,8 +131,8 @@ mod tests {
             Rule::UndefinedName,
         ] {
             assert_eq!(
-                table.resolve_applicability(*rule, Applicability::Display),
-                Applicability::Display // Display is never changed
+                table.resolve_applicability(*rule, Applicability::DisplayOnly),
+                Applicability::DisplayOnly // Display is never changed
             );
         }
     }
