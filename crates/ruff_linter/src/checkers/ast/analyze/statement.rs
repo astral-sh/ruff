@@ -12,8 +12,8 @@ use crate::rules::{
     airflow, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_debugger,
     flake8_django, flake8_errmsg, flake8_import_conventions, flake8_pie, flake8_pyi,
     flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify, flake8_slots,
-    flake8_tidy_imports, flake8_type_checking, mccabe, pandas_vet, pep8_naming, perflint,
-    pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
+    flake8_tidy_imports, flake8_trio, flake8_type_checking, mccabe, pandas_vet, pep8_naming,
+    perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 
@@ -1006,6 +1006,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pyupgrade::rules::os_error_alias_raise(checker, item);
                 }
             }
+            if checker.enabled(Rule::TimeoutErrorAlias) {
+                if checker.settings.target_version >= PythonVersion::Py310 {
+                    if let Some(item) = exc {
+                        pyupgrade::rules::timeout_error_alias_raise(checker, item);
+                    }
+                }
+            }
             if checker.enabled(Rule::RaiseVanillaClass) {
                 if let Some(expr) = exc {
                     tryceratops::rules::raise_vanilla_class(checker, expr);
@@ -1195,6 +1202,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UselessWithLock) {
                 pylint::rules::useless_with_lock(checker, with_stmt);
             }
+            if checker.enabled(Rule::TrioTimeoutWithoutAwait) {
+                flake8_trio::rules::timeout_without_await(checker, with_stmt, items);
+            }
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
@@ -1300,6 +1310,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::OSErrorAlias) {
                 pyupgrade::rules::os_error_alias_handlers(checker, handlers);
+            }
+            if checker.enabled(Rule::TimeoutErrorAlias) {
+                if checker.settings.target_version >= PythonVersion::Py310 {
+                    pyupgrade::rules::timeout_error_alias_handlers(checker, handlers);
+                }
             }
             if checker.enabled(Rule::PytestAssertInExcept) {
                 flake8_pytest_style::rules::assert_in_exception_handler(checker, handlers);

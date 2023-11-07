@@ -103,19 +103,34 @@ Ruff's behavior.
 To determine the appropriate settings for each Python file, Ruff looks for the first
 `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file in the file's directory or any parent directory.
 
-To configure Ruff, let's create a `pyproject.toml` file in our project's root directory:
+To configure Ruff, let's create a configuration file in our project's root directory:
 
-```toml
-[tool.ruff]
-# Set the maximum line length to 79.
-line-length = 79
+=== "pyproject.toml"
 
-[tool.ruff.lint]
-# Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
-# overlap with the use of a formatter, like Black, but we can override this behavior by
-# explicitly adding the rule.
-extend-select = ["E501"]
-```
+     ```toml
+     [tool.ruff]
+     # Set the maximum line length to 79.
+     line-length = 79
+
+     [tool.ruff.lint]
+     # Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
+     # overlap with the use of a formatter, like Black, but we can override this behavior by
+     # explicitly adding the rule.
+     extend-select = ["E501"]
+     ```
+
+=== "ruff.toml"
+
+     ```toml
+     # Set the maximum line length to 79.
+     line-length = 79
+
+     [lint]
+     # Add the `line-too-long` rule to the enforced rule set. By default, Ruff omits rules that
+     # overlap with the use of a formatter, like Black, but we can override this behavior by
+     # explicitly adding the rule.
+     extend-select = ["E501"]
+     ```
 
 Running Ruff again, we see that it now enforces a maximum line width, with a limit of 79:
 
@@ -128,19 +143,34 @@ Found 1 error.
 For a full enumeration of the supported settings, see [_Settings_](settings.md). For our project
 specifically, we'll want to make note of the minimum supported Python version:
 
-```toml
-[project]
-# Support Python 3.10+.
-requires-python = ">=3.10"
+=== "pyproject.toml"
 
-[tool.ruff]
-# Set the maximum line length to 79.
-line-length = 79
+     ```toml
+     [project]
+     # Support Python 3.10+.
+     requires-python = ">=3.10"
 
-[tool.ruff.lint]
-# Add the `line-too-long` rule to the enforced rule set.
-extend-select = ["E501"]
-```
+     [tool.ruff]
+     # Set the maximum line length to 79.
+     line-length = 79
+
+     [tool.ruff.lint]
+     # Add the `line-too-long` rule to the enforced rule set.
+     extend-select = ["E501"]
+     ```
+
+=== "ruff.toml"
+
+     ```toml
+     # Support Python 3.10+.
+     target-version = "py310"
+     # Set the maximum line length to 79.
+     line-length = 79
+
+     [lint]
+     # Add the `line-too-long` rule to the enforced rule set.
+     extend-select = ["E501"]
+     ```
 
 ### Rule Selection
 
@@ -158,17 +188,30 @@ imports) with zero configuration.
 
 If you're migrating to Ruff from another linter, you can enable rules that are equivalent to
 those enforced in your previous configuration. For example, if we want to enforce the pyupgrade
-rules, we can set our `pyproject.toml` to the following:
+rules, we can set our configuration file to the following:
 
-```toml
-[project]
-requires-python = ">=3.10"
+=== "pyproject.toml"
 
-[tool.ruff.lint]
-extend-select = [
-  "UP",  # pyupgrade
-]
-```
+     ```toml
+     [project]
+     requires-python = ">=3.10"
+
+     [tool.ruff.lint]
+     extend-select = [
+       "UP",  # pyupgrade
+     ]
+     ```
+
+=== "ruff.toml"
+
+     ```toml
+     target-version = "py310"
+
+     [lint]
+     extend-select = [
+       "UP",  # pyupgrade
+     ]
+     ```
 
 If we run Ruff again, we'll see that it now enforces the pyupgrade rules. In particular, Ruff flags
 the use of the deprecated `typing.Iterable` instead of `collections.abc.Iterable`:
@@ -183,19 +226,36 @@ Found 1 error.
 Over time, we may choose to enforce additional rules. For example, we may want to enforce that
 all functions have docstrings:
 
-```toml
-[project]
-requires-python = ">=3.10"
+=== "pyproject.toml"
 
-[tool.ruff.lint]
-extend-select = [
-  "UP",  # pyupgrade
-  "D",   # pydocstyle
-]
+     ```toml
+     [project]
+     requires-python = ">=3.10"
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-```
+     [tool.ruff.lint]
+     extend-select = [
+       "UP",  # pyupgrade
+       "D",   # pydocstyle
+     ]
+
+     [tool.ruff.lint.pydocstyle]
+     convention = "google"
+     ```
+
+=== "ruff.toml"
+
+     ```toml
+     target-version = "py310"
+
+     [lint]
+     extend-select = [
+       "UP",  # pyupgrade
+       "D",   # pydocstyle
+     ]
+
+     [lint.pydocstyle]
+     convention = "google"
+     ```
 
 If we run Ruff again, we'll see that it now enforces the pydocstyle rules:
 
@@ -284,13 +344,13 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 # Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.3
+  rev: v0.1.4
   hooks:
     - id: ruff
 # Run the Ruff formatter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.3
+  rev: v0.1.4
   hooks:
     - id: ruff-format
 ```

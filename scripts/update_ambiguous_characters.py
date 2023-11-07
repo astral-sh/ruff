@@ -13,7 +13,7 @@ prelude = """
 
 /// Via: <https://github.com/hediet/vscode-unicode-data/blob/main/out/ambiguous.json>
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
-pub(crate) fn confusable(c: u32) -> Option<u8> {
+pub(crate) fn confusable(c: u32) -> Option<char> {
   let result = match c {
 
 """.lstrip()
@@ -36,16 +36,52 @@ def get_mapping_data() -> dict:
     return json.loads(json.loads(content))
 
 
+def format_number(number: int) -> str:
+    """Underscore-separate the digits of a number."""
+    # For unknown historical reasons, numbers greater than 100,000 were
+    # underscore-delimited in the generated file, so we now preserve that property to
+    # avoid unnecessary churn.
+    if number > 100000:
+        number = str(number)
+        number = "_".join(number[i : i + 3] for i in range(0, len(number), 3))
+        return f"{number}_u32"
+
+    return f"{number}u32"
+
+
+def format_char(number: int) -> str:
+    """Format a Python integer as a Rust character literal."""
+    char = chr(number)
+    if char == "\\":
+        return "\\\\"
+    return char
+
+
 def format_confusables_rs(raw_data: dict[str, list[int]]) -> str:
     """Format the downloaded data into a Rust source file."""
-    # The input data contains duplicate entries
+    # The input data contains duplicate entries.
     flattened_items: set[tuple[int, int]] = set()
     for _category, items in raw_data.items():
         assert len(items) % 2 == 0, "Expected pairs of items"
         for i in range(0, len(items), 2):
             flattened_items.add((items[i], items[i + 1]))
 
-    tuples = [f"    {left}u32 => {right},\n" for left, right in sorted(flattened_items)]
+    tuples = [
+        f"    {format_number(left)} => '{format_char(right)}',\n"
+        for left, right in sorted(flattened_items)
+    ]
+
+    # Add some additional confusable pairs that are not included in the VS Code data,
+    # as they're unicode-to-unicode confusables, not unicode-to-ASCII confusables.
+    confusable_units = [
+        # ANGSTROM SIGN → LATIN CAPITAL LETTER A WITH RING ABOVE
+        ("0x212B", chr(0x00C5)),
+        # OHM SIGN → GREEK CAPITAL LETTER OMEGA
+        ("0x2126", chr(0x03A9)),
+        # MICRO SIGN → GREEK SMALL LETTER MU
+        ("0x00B5", chr(0x03BC)),
+    ]
+    tuples += [f"    {left} => '{right}',\n" for left, right in confusable_units]
 
     print(f"{len(tuples)} confusable tuples.")
 

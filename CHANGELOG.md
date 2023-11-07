@@ -1,5 +1,66 @@
 # Changelog
 
+## 0.1.4
+
+### Preview features
+
+- \[`flake8-trio`\] Implement `timeout-without-await` (`TRIO001`) ([#8439](https://github.com/astral-sh/ruff/pull/8439))
+- \[`numpy`\] Implement NumPy 2.0 migration rule (`NPY200`) ([#7702](https://github.com/astral-sh/ruff/pull/7702))
+- \[`pylint`\] Implement `bad-open-mode` (`W1501`) ([#8294](https://github.com/astral-sh/ruff/pull/8294))
+- \[`pylint`\] Implement `import-outside-toplevel` (`C0415`) rule ([#5180](https://github.com/astral-sh/ruff/pull/5180))
+- \[`pylint`\] Implement `useless-with-lock` (`W2101`) ([#8321](https://github.com/astral-sh/ruff/pull/8321))
+- \[`pyupgrade`\] Implement `timeout-error-alias` (`UP041`) ([#8476](https://github.com/astral-sh/ruff/pull/8476))
+- \[`refurb`\] Implement `isinstance-type-none` (`FURB168`) ([#8308](https://github.com/astral-sh/ruff/pull/8308))
+- Detect confusable Unicode-to-Unicode units in `RUF001`, `RUF002`, and `RUF003` ([#4430](https://github.com/astral-sh/ruff/pull/4430))
+- Add newline after module docstrings in preview style ([#8283](https://github.com/astral-sh/ruff/pull/8283))
+
+### Formatter
+
+- Add a note on line-too-long to the formatter docs ([#8314](https://github.com/astral-sh/ruff/pull/8314))
+- Preserve trailing statement semicolons when using `fmt: skip` ([#8273](https://github.com/astral-sh/ruff/pull/8273))
+- Preserve trailing semicolons when using `fmt: off` ([#8275](https://github.com/astral-sh/ruff/pull/8275))
+- Avoid duplicating linter-formatter compatibility warnings ([#8292](https://github.com/astral-sh/ruff/pull/8292))
+- Avoid inserting a newline after function docstrings ([#8375](https://github.com/astral-sh/ruff/pull/8375))
+- Insert newline between docstring and following own line comment ([#8216](https://github.com/astral-sh/ruff/pull/8216))
+- Split tuples in return positions by comma first ([#8280](https://github.com/astral-sh/ruff/pull/8280))
+- Avoid treating byte strings as docstrings ([#8350](https://github.com/astral-sh/ruff/pull/8350))
+- Add `--line-length` option to `format` command ([#8363](https://github.com/astral-sh/ruff/pull/8363))
+- Avoid parenthesizing unsplittable because of comments ([#8431](https://github.com/astral-sh/ruff/pull/8431))
+
+### CLI
+
+- Add `--output-format` to `ruff rule` and `ruff linter` ([#8203](https://github.com/astral-sh/ruff/pull/8203))
+
+### Bug fixes
+
+- Respect `--force-exclude` in `lint.exclude` and `format.exclude` ([#8393](https://github.com/astral-sh/ruff/pull/8393))
+- Respect `--extend-per-file-ignores` on the CLI ([#8329](https://github.com/astral-sh/ruff/pull/8329))
+- Extend `bad-dunder-method-name` to permit `__index__` ([#8300](https://github.com/astral-sh/ruff/pull/8300))
+- Fix panic with 8 in octal escape ([#8356](https://github.com/astral-sh/ruff/pull/8356))
+- Avoid raising `D300` when both triple quote styles are present ([#8462](https://github.com/astral-sh/ruff/pull/8462))
+- Consider unterminated f-strings in `FStringRanges` ([#8154](https://github.com/astral-sh/ruff/pull/8154))
+- Avoid including literal `shell=True` for truthy, non-`True` diagnostics ([#8359](https://github.com/astral-sh/ruff/pull/8359))
+- Avoid triggering single-element test for starred expressions ([#8433](https://github.com/astral-sh/ruff/pull/8433))
+- Detect and ignore Jupyter automagics ([#8398](https://github.com/astral-sh/ruff/pull/8398))
+- Fix invalid E231 error with f-strings ([#8369](https://github.com/astral-sh/ruff/pull/8369))
+- Avoid triggering `NamedTuple` rewrite with starred annotation ([#8434](https://github.com/astral-sh/ruff/pull/8434))
+- Avoid un-setting bracket flag in logical lines ([#8380](https://github.com/astral-sh/ruff/pull/8380))
+- Place 'r' prefix before 'f' for raw format strings ([#8464](https://github.com/astral-sh/ruff/pull/8464))
+- Remove trailing periods from NumPy 2.0 code actions ([#8475](https://github.com/astral-sh/ruff/pull/8475))
+- Fix bug where `PLE1307` was raised when formatting `%c` with characters ([#8407](https://github.com/astral-sh/ruff/pull/8407))
+- Remove unicode flag from comparable ([#8440](https://github.com/astral-sh/ruff/pull/8440))
+- Improve B015 message ([#8295](https://github.com/astral-sh/ruff/pull/8295))
+- Use `fixedOverflowWidgets` for playground popover ([#8458](https://github.com/astral-sh/ruff/pull/8458))
+- Mark `byte_bounds` as a non-backwards-compatible NumPy 2.0 change ([#8474](https://github.com/astral-sh/ruff/pull/8474))
+
+### Internals
+
+- Add a dedicated cache directory per Ruff version ([#8333](https://github.com/astral-sh/ruff/pull/8333))
+- Allow selective caching for `--fix` and `--diff` ([#8316](https://github.com/astral-sh/ruff/pull/8316))
+- Improve performance of comment parsing ([#8193](https://github.com/astral-sh/ruff/pull/8193))
+- Improve performance of string parsing ([#8227](https://github.com/astral-sh/ruff/pull/8227))
+- Use a dedicated sort key for isort import sorting ([#7963](https://github.com/astral-sh/ruff/pull/7963))
+
 ## 0.1.3
 
 This release includes a variety of improvements to the Ruff formatter, removing several known and

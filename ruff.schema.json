@@ -649,7 +649,7 @@
       ]
     },
     "target-version": {
-      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf omitted, and Ruff is configured via a `pyproject.toml` file, the target version will be inferred from its `project.requires-python` field (e.g., `requires-python = \">=3.8\"`). If Ruff is configured via `ruff.toml` or `.ruff.toml`, no such inference will be performed.",
+      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend `project.requires-python` instead, as it's based on Python packaging standards, and will be respected by other tools. For example, Ruff treats the following as identical to `target-version = \"py38\"`:\n\n```toml [project] requires-python = \">=3.8\" ```\n\nIf both are specified, `target-version` takes precedence over `requires-python`.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -2822,6 +2822,7 @@
         "FURB148",
         "FURB16",
         "FURB168",
+        "FURB169",
         "FURB17",
         "FURB171",
         "FURB177",
@@ -2903,6 +2904,9 @@
         "NPY001",
         "NPY002",
         "NPY003",
+        "NPY2",
+        "NPY20",
+        "NPY201",
         "NURSERY",
         "PD",
         "PD0",
@@ -3465,6 +3469,13 @@
         "TID251",
         "TID252",
         "TID253",
+        "TRIO",
+        "TRIO1",
+        "TRIO10",
+        "TRIO100",
+        "TRIO105",
+        "TRIO11",
+        "TRIO115",
         "TRY",
         "TRY0",
         "TRY00",
@@ -3529,6 +3540,7 @@
         "UP039",
         "UP04",
         "UP040",
+        "UP041",
         "W",
         "W1",
         "W19",

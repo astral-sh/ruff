@@ -278,7 +278,7 @@ pub struct CheckCommand {
     #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
     /// Disable cache reads.
-    #[arg(short, long, help_heading = "Miscellaneous")]
+    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
@@ -374,7 +374,7 @@ pub struct FormatCommand {
     pub config: Option<PathBuf>,
 
     /// Disable cache reads.
-    #[arg(short, long, help_heading = "Miscellaneous")]
+    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
     /// Path to the cache directory.
     #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
@@ -409,6 +409,9 @@ pub struct FormatCommand {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
+    /// Set the line-length.
+    #[arg(long, help_heading = "Format configuration")]
+    pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
     pub isolated: bool,
@@ -552,6 +555,7 @@ impl FormatCommand {
                 stdin_filename: self.stdin_filename,
             },
             CliOverrides {
+                line_length: self.line_length,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,

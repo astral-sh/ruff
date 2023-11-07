@@ -10,7 +10,7 @@ from asyncio import create_subprocess_exec
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from subprocess import PIPE
+from subprocess import DEVNULL, PIPE
 from typing import Self
 
 from ruff_ecosystem import logger
@@ -49,7 +49,7 @@ class CommandOptions(Serializable, abc.ABC):
         return type(self)(**{**dataclasses.asdict(self), **kwargs})
 
     @abc.abstractmethod
-    def to_cli_args(self) -> list[str]:
+    def to_ruff_args(self) -> list[str]:
         pass
 
 
@@ -70,7 +70,7 @@ class CheckOptions(CommandOptions):
     # Limit the number of reported lines per rule
     max_lines_per_rule: int | None = 50
 
-    def to_cli_args(self) -> list[str]:
+    def to_ruff_args(self) -> list[str]:
         args = ["check", "--no-cache", "--exit-zero"]
         if self.select:
             args.extend(["--select", self.select])
@@ -88,14 +88,22 @@ class CheckOptions(CommandOptions):
 @dataclass(frozen=True)
 class FormatOptions(CommandOptions):
     """
-    Ruff format options.
+    Format ecosystem check options.
     """
 
     preview: bool = False
     exclude: str = ""
 
-    def to_cli_args(self) -> list[str]:
+    def to_ruff_args(self) -> list[str]:
         args = ["format"]
+        if self.exclude:
+            args.extend(["--exclude", self.exclude])
+        if self.preview:
+            args.append("--preview")
+        return args
+
+    def to_black_args(self) -> list[str]:
+        args = []
         if self.exclude:
             args.extend(["--exclude", self.exclude])
         if self.preview:
@@ -130,10 +138,11 @@ class Repository(Serializable):
         Shallow clone this repository
         """
         if checkout_dir.exists():
-            logger.debug(f"Reusing {self.owner}:{self.name}")
+            logger.debug(f"Reusing cached {self.fullname}")
 
             if self.ref:
-                logger.debug(f"Checking out ref {self.ref}")
+                logger.debug(f"Checking out {self.fullname} @ {self.ref}")
+
                 process = await create_subprocess_exec(
                     *["git", "checkout", "-f", self.ref],
                     cwd=checkout_dir,
@@ -147,7 +156,13 @@ class Repository(Serializable):
                         f"Failed to checkout {self.ref}: {stderr.decode()}"
                     )
 
-            return await ClonedRepository.from_path(checkout_dir, self)
+            cloned_repo = await ClonedRepository.from_path(checkout_dir, self)
+            await cloned_repo.reset()
+
+            logger.debug(f"Pulling latest changes for {self.fullname} @ {self.ref}")
+            await cloned_repo.pull()
+
+            return cloned_repo
 
         logger.debug(f"Cloning {self.owner}:{self.name} to {checkout_dir}")
         command = [
@@ -179,6 +194,28 @@ class Repository(Serializable):
         logger.debug(
             f"Finished cloning {self.fullname} with status {status_code}",
         )
+
+        # Configure git user — needed for `self.commit` to work
+        await (
+            await create_subprocess_exec(
+                *["git", "config", "user.email", "ecosystem@astral.sh"],
+                cwd=checkout_dir,
+                env={"GIT_TERMINAL_PROMPT": "0"},
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+            )
+        ).wait()
+
+        await (
+            await create_subprocess_exec(
+                *["git", "config", "user.name", "Ecosystem Bot"],
+                cwd=checkout_dir,
+                env={"GIT_TERMINAL_PROMPT": "0"},
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+            )
+        ).wait()
+
         return await ClonedRepository.from_path(checkout_dir, self)
 
 
@@ -236,3 +273,73 @@ class ClonedRepository(Repository, Serializable):
             raise ProjectSetupError(f"Failed to retrieve commit sha at {checkout_dir}")
 
         return stdout.decode().strip()
+
+    async def reset(self: Self) -> None:
+        """
+        Reset the cloned repository to the ref it started at.
+        """
+        process = await create_subprocess_exec(
+            *["git", "reset", "--hard", "origin/" + self.ref] if self.ref else [],
+            cwd=self.path,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        _, stderr = await process.communicate()
+        if await process.wait() != 0:
+            raise RuntimeError(f"Failed to reset: {stderr.decode()}")
+
+    async def pull(self: Self) -> None:
+        """
+        Pull the latest changes.
+
+        Typically `reset` should be run first.
+        """
+        process = await create_subprocess_exec(
+            *["git", "pull"],
+            cwd=self.path,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        _, stderr = await process.communicate()
+        if await process.wait() != 0:
+            raise RuntimeError(f"Failed to pull: {stderr.decode()}")
+
+    async def commit(self: Self, message: str) -> str:
+        """
+        Commit all current changes.
+
+        Empty commits are allowed.
+        """
+        process = await create_subprocess_exec(
+            *["git", "commit", "--allow-empty", "-a", "-m", message],
+            cwd=self.path,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        _, stderr = await process.communicate()
+        if await process.wait() != 0:
+            raise RuntimeError(f"Failed to commit: {stderr.decode()}")
+
+        return await self._get_head_commit(self.path)
+
+    async def diff(self: Self, *args: str) -> list[str]:
+        """
+        Get the current diff from git.
+
+        Arguments are passed to `git diff ...`
+        """
+        process = await create_subprocess_exec(
+            *["git", "diff", *args],
+            cwd=self.path,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        stdout, stderr = await process.communicate()
+        if await process.wait() != 0:
+            raise RuntimeError(f"Failed to commit: {stderr.decode()}")
+
+        return stdout.decode().splitlines()

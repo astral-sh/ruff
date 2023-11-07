@@ -24,7 +24,7 @@ use ruff_source_file::Locator;
 /// if foo == "blah":
 ///     do_blah_thing()
 /// ```
-
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[violation]
 pub struct MultipleStatementsOnOneLineColon;
@@ -206,12 +206,13 @@ pub(crate) fn compound_statements(
                 {
                     colon = Some((range.start(), range.end()));
 
-                    // Allow `class C: ...`-style definitions in stubs.
-                    allow_ellipsis = class.is_some();
+                    // Allow `class C: ...`-style definitions.
+                    allow_ellipsis = true;
                 }
             }
             Tok::Semi => {
                 semi = Some((range.start(), range.end()));
+                allow_ellipsis = false;
             }
             Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
             _ => {
@@ -223,6 +224,7 @@ pub(crate) fn compound_statements(
 
                     // Reset.
                     semi = None;
+                    allow_ellipsis = false;
                 }
 
                 if let Some((start, end)) = colon {
@@ -245,6 +247,7 @@ pub(crate) fn compound_statements(
                     try_ = None;
                     while_ = None;
                     with = None;
+                    allow_ellipsis = false;
                 }
             }
         }

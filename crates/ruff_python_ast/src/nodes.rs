@@ -2516,32 +2516,9 @@ impl Parameters {
     }
 }
 
-#[allow(clippy::borrowed_box)] // local utility
-fn clone_boxed_expr(expr: &Box<Expr>) -> Box<Expr> {
-    let expr: &Expr = expr.as_ref();
-    Box::new(expr.clone())
-}
-
 impl ParameterWithDefault {
     pub fn as_parameter(&self) -> &Parameter {
         &self.parameter
-    }
-
-    pub fn to_parameter(&self) -> (Parameter, Option<Box<Expr>>) {
-        let ParameterWithDefault {
-            range: _,
-            parameter,
-            default,
-        } = self;
-        (parameter.clone(), default.as_ref().map(clone_boxed_expr))
-    }
-    pub fn into_parameter(self) -> (Parameter, Option<Box<Expr>>) {
-        let ParameterWithDefault {
-            range: _,
-            parameter,
-            default,
-        } = self;
-        (parameter, default)
     }
 }
 

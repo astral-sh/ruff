@@ -62,7 +62,7 @@ impl FormatNodeRule<ParameterWithDefault> for FormatParameterWithDefault {
                     token("="),
                     (!needs_line_break).then_some(space),
                     needs_line_break.then_some(hard_line_break()),
-                    group(&default.format())
+                    default.format()
                 ]
             )?;
         }

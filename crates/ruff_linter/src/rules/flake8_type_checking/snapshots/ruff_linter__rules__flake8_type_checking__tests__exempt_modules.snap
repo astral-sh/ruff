@@ -11,7 +11,7 @@ exempt_modules.py:14:12: TCH002 [*] Move third-party import `flask` into a type-
    |
    = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
    1  |+from typing import TYPE_CHECKING
    2  |+
    3  |+if TYPE_CHECKING:
