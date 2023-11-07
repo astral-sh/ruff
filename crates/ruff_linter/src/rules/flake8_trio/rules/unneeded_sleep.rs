@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// Instead of sleeping in a loop waiting for a condition to be true,
-/// it's preferable to use a trio. Event.
+/// it's preferable to use a `trio.Event`.
 ///
 /// ## Example
 /// ```python
