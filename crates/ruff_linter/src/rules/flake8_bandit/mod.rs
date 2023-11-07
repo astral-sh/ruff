@@ -28,6 +28,7 @@ mod tests {
     #[test_case(Rule::HardcodedTempFile, Path::new("S108.py"))]
     #[test_case(Rule::HashlibInsecureHashFunction, Path::new("S324.py"))]
     #[test_case(Rule::Jinja2AutoescapeFalse, Path::new("S701.py"))]
+    #[test_case(Rule::MakoTemplates, Path::new("S702.py"))]
     #[test_case(Rule::LoggingConfigInsecureListen, Path::new("S612.py"))]
     #[test_case(Rule::ParamikoCall, Path::new("S601.py"))]
     #[test_case(Rule::RequestWithNoCertValidation, Path::new("S501.py"))]

@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/flake8_trio/mod.rs
+---
+TRIO110.py:5:5: TRIO110 Use `trio.Event` instead of awaiting `trio.sleep` in a `while` loop
+  |
+4 |   async def func():
+5 |       while True:
+  |  _____^
+6 | |         await trio.sleep(10)
+  | |____________________________^ TRIO110
+  |
+
+TRIO110.py:10:5: TRIO110 Use `trio.Event` instead of awaiting `trio.sleep` in a `while` loop
+   |
+ 9 |   async def func():
+10 |       while True:
+   |  _____^
+11 | |         await trio.sleep_until(10)
+   | |__________________________________^ TRIO110
+   |
+
+
