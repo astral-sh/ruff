@@ -1,14 +1,17 @@
-use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Parameters;
+use ruff_python_ast as ast;
+use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for asynchronous functions that have a timeout argument.
+/// Checks for `async` functions with a `timeout` argument.
 ///
 /// ## Why is this bad?
-/// It is preferable to use the special functions that Trio
-/// provides to handle timeouts rather than implement them manually.
+/// Rather than implementing asynchronous timeout behavior manually, prefer
+/// trio's built-in timeout functionality, available as `trio.fail_after`,
+/// `trio.move_on_after`, `trio.fail_at`, and `trio.move_on_at`.
 ///
 /// ## Example
 /// ```python
@@ -28,27 +31,23 @@ pub struct TrioAsyncFunctionWithTimeout;
 impl Violation for TrioAsyncFunctionWithTimeout {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Async function definition with a `timeout` parameter - use `trio.[fail/move_on]_[after/at]` instead")
+        format!("Prefer `trio.fail_after` and `trio.move_on_after` over manual `async` timeout behavior")
     }
 }
 
+/// TRIO109
 pub(crate) fn async_function_with_timeout(
     checker: &mut Checker,
-    parameters: &Parameters,
-    is_async: bool,
+    function_def: &ast::StmtFunctionDef,
 ) {
-    if !is_async {
+    if !function_def.is_async {
         return;
     }
-
-    if let Some(timeout_argument) = parameters
-        .args
-        .iter()
-        .find(|argument| argument.parameter.name.eq("timeout"))
-    {
-        checker.diagnostics.push(Diagnostic::new(
-            TrioAsyncFunctionWithTimeout,
-            timeout_argument.range,
-        ));
-    }
+    let Some(timeout) = function_def.parameters.find("timeout") else {
+        return;
+    };
+    checker.diagnostics.push(Diagnostic::new(
+        TrioAsyncFunctionWithTimeout,
+        timeout.range(),
+    ));
 }

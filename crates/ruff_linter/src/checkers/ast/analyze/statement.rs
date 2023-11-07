@@ -357,7 +357,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
-                flake8_trio::rules::async_function_with_timeout(checker, parameters, *is_async);
+                flake8_trio::rules::async_function_with_timeout(checker, function_def);
             }
             #[cfg(feature = "unreachable-code")]
             if checker.enabled(Rule::UnreachableCode) {
