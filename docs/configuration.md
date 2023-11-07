@@ -466,7 +466,7 @@ File selection:
 
 Miscellaneous:
   -n, --no-cache
-          Disable cache reads
+          Disable cache reads [env: RUFF_NO_CACHE=]
       --isolated
           Ignore all configuration files
       --cache-dir <CACHE_DIR>
@@ -513,7 +513,7 @@ Options:
           Print help
 
 Miscellaneous:
-  -n, --no-cache                         Disable cache reads
+  -n, --no-cache                         Disable cache reads [env: RUFF_NO_CACHE=]
       --cache-dir <CACHE_DIR>            Path to the cache directory [env: RUFF_CACHE_DIR=]
       --isolated                         Ignore all configuration files
       --stdin-filename <STDIN_FILENAME>  The name of the file when passing it through stdin
