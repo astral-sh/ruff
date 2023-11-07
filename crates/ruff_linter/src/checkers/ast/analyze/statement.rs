@@ -1206,7 +1206,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_trio::rules::timeout_without_await(checker, with_stmt, items);
             }
         }
-        Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+        Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Stmt(stmt));
             }
@@ -1216,11 +1216,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TryExceptInLoop) {
                 perflint::rules::try_except_in_loop(checker, body);
             }
-            if checker.enabled(Rule::TryExceptInLoop) {
-                perflint::rules::try_except_in_loop(checker, body);
-            }
             if checker.enabled(Rule::TrioUnneededSleep) {
-                flake8_trio::rules::unneeded_sleep(checker, stmt, body);
+                flake8_trio::rules::unneeded_sleep(checker, while_stmt);
             }
         }
         Stmt::For(

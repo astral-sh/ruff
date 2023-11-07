@@ -1,20 +1,21 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Expr, ExprAwait, ExprCall, Stmt, StmtExpr};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for the while loop, which waits for the event.
+/// Checks for the use of `trio.sleep` in a `while` loop.
 ///
 /// ## Why is this bad?
-/// Instead of sleeping in a loop waiting for a condition to be true,
-/// it's preferable to use a `trio.Event`.
+/// Instead of sleeping in a `while` loop, and waiting for a condition
+/// to become true, it's preferable to `wait()` on a `trio.Event`.
 ///
 /// ## Example
 /// ```python
 /// DONE = False
+///
 ///
 /// async def func():
 ///     while not DONE:
@@ -25,6 +26,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// DONE = trio.Event()
 ///
+///
 /// async def func():
 ///     await DONE.wait()
 /// ```
@@ -34,41 +36,33 @@ pub struct TrioUnneededSleep;
 impl Violation for TrioUnneededSleep {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use event instead of `while <condition>: await trio.sleep()`")
+        format!("Use `trio.Event` instead of awaiting `trio.sleep` in a `while` loop")
     }
 }
 
-pub(crate) fn unneeded_sleep(checker: &mut Checker, stmt: &Stmt, body: &[Stmt]) {
-    if body.len() != 1 {
+/// TRIO110
+pub(crate) fn unneeded_sleep(checker: &mut Checker, while_stmt: &ast::StmtWhile) {
+    // The body should be a single `await` call.
+    let [stmt] = while_stmt.body.as_slice() else {
         return;
-    }
-
-    let awaitable = {
-        if let Stmt::Expr(StmtExpr { range: _, value }) = &body[0] {
-            if let Expr::Await(ExprAwait { range: _, value }) = value.as_ref() {
-                Some(value.as_ref())
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+    };
+    let Stmt::Expr(ast::StmtExpr { value, .. }) = stmt else {
+        return;
+    };
+    let Expr::Await(ast::ExprAwait { value, .. }) = value.as_ref() else {
+        return;
+    };
+    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+        return;
     };
 
-    if let Some(Expr::Call(ExprCall {
-        range: _,
-        func,
-        arguments: _,
-    })) = awaitable
+    if checker
+        .semantic()
+        .resolve_call_path(func.as_ref())
+        .is_some_and(|path| matches!(path.as_slice(), ["trio", "sleep" | "sleep_until"]))
     {
-        if checker
-            .semantic()
-            .resolve_call_path(func.as_ref())
-            .is_some_and(|path| matches!(path.as_slice(), ["trio", "sleep" | "sleep_until"]))
-        {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(TrioUnneededSleep, stmt.range()));
-        }
+        checker
+            .diagnostics
+            .push(Diagnostic::new(TrioUnneededSleep, while_stmt.range()));
     }
 }
