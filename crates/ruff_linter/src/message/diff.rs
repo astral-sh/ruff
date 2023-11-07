@@ -56,7 +56,7 @@ impl Display for Diff<'_> {
             // TODO(zanieb): Adjust this messaging once it's user-facing
             Applicability::Safe => "Safe fix",
             Applicability::Unsafe => "Unsafe fix",
-            Applicability::Display => "Display only fix",
+            Applicability::DisplayOnly => "Display-only fix",
         };
         writeln!(f, "ℹ {}", message.blue())?;
 

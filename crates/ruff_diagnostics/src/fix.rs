@@ -12,7 +12,7 @@ use crate::edit::Edit;
 pub enum Applicability {
     /// The fix is unsafe and should only be displayed for manual application by the user.
     /// The fix is likely to be incorrect or the resulting code may have invalid syntax.
-    Display,
+    DisplayOnly,
 
     /// The fix is unsafe and should only be applied with user opt-in.
     /// The fix may be what the user intended, but it is uncertain; the resulting code will have valid syntax.
@@ -87,22 +87,22 @@ impl Fix {
         }
     }
 
-    /// Create a new [`Fix`] that should only [display](Applicability::Display) and not apply from an [`Edit`] element .
-    pub fn display_edit(edit: Edit) -> Self {
+    /// Create a new [`Fix`] that should only [display](Applicability::DisplayOnly) and not apply from an [`Edit`] element .
+    pub fn display_only_edit(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Display,
+            applicability: Applicability::DisplayOnly,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] that should only [display](Applicability::Display) and not apply from multiple [`Edit`] elements.
-    pub fn display_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] that should only [display](Applicability::DisplayOnly) and not apply from multiple [`Edit`] elements.
+    pub fn display_only_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
         edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Display,
+            applicability: Applicability::DisplayOnly,
             isolation_level: IsolationLevel::default(),
         }
     }
