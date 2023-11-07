@@ -13,6 +13,7 @@ use crate::{
     context::set_context,
     string::{StringType, concatenate_strings, parse_fstring_middle, parse_string_literal},
     token::{self, StringKind},
+    invalid,
 };
 use lalrpop_util::ParseError;
 
@@ -108,12 +109,12 @@ DelStatement: ast::Stmt = {
 };
 
 ExpressionStatement: ast::Stmt = {
-    <location:@L> <expression:TestOrStarExprList> <suffix:AssignSuffix*> <end_location:@R> => {
+    <location:@L> <expression:TestOrStarExprList> <suffix:AssignSuffix*> <end_location:@R> =>? {
         // Just an expression, no assignment:
         if suffix.is_empty() {
-            ast::Stmt::Expr(
+            Ok(ast::Stmt::Expr(
                 ast::StmtExpr { value: Box::new(expression.into()), range: (location..end_location).into() }
-            )
+            ))
         } else {
             let mut targets = vec![set_context(expression.into(), ast::ExprContext::Store)];
             let mut values = suffix;
@@ -123,25 +124,27 @@ ExpressionStatement: ast::Stmt = {
             for target in values {
                 targets.push(set_context(target.into(), ast::ExprContext::Store));
             }
-
-            ast::Stmt::Assign(
+            invalid::assignment_targets(&targets)?;
+            Ok(ast::Stmt::Assign(
                 ast::StmtAssign { targets, value, range: (location..end_location).into() }
-            )
+            ))
         }
     },
-    <location:@L> <target:TestOrStarExprList> <op:AugAssign> <rhs:TestListOrYieldExpr> <end_location:@R> => {
-        ast::Stmt::AugAssign(
+    <location:@L> <target:TestOrStarExprList> <op:AugAssign> <rhs:TestListOrYieldExpr> <end_location:@R> =>? {
+        invalid::assignment_target(&target.expr)?;
+        Ok(ast::Stmt::AugAssign(
             ast::StmtAugAssign {
                 target: Box::new(set_context(target.into(), ast::ExprContext::Store)),
                 op,
                 value: Box::new(rhs.into()),
                 range: (location..end_location).into()
             },
-        )
+        ))
     },
-    <location:@L> <target:Test<"all">> ":" <annotation:Test<"all">> <rhs:AssignSuffix?> <end_location:@R> => {
+    <location:@L> <target:Test<"all">> ":" <annotation:Test<"all">> <rhs:AssignSuffix?> <end_location:@R> =>? {
         let simple = target.expr.is_name_expr();
-        ast::Stmt::AnnAssign(
+        invalid::assignment_target(&target.expr)?;
+        Ok(ast::Stmt::AnnAssign(
             ast::StmtAnnAssign {
                 target: Box::new(set_context(target.into(), ast::ExprContext::Store)),
                 annotation: Box::new(annotation.into()),
@@ -149,7 +152,7 @@ ExpressionStatement: ast::Stmt = {
                 simple,
                 range: (location..end_location).into()
             },
-        )
+        ))
     },
 };
 
