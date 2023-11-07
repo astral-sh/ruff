@@ -564,7 +564,7 @@ mod tests {
     use anyhow::Result;
     use filetime::{set_file_mtime, FileTime};
     use itertools::Itertools;
-    use rustc_hash::FxHashMap;
+    use ruff_linter::settings::types::ExtensionMapping;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
@@ -628,7 +628,7 @@ mod tests {
                     flags::Noqa::Enabled,
                     flags::FixMode::Generate,
                     UnsafeFixes::Enabled,
-                    &FxHashMap::default(),
+                    &ExtensionMapping::default(),
                 )
                 .unwrap();
                 if diagnostics
@@ -675,7 +675,7 @@ mod tests {
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
                 UnsafeFixes::Enabled,
-                &FxHashMap::default(),
+                &ExtensionMapping::default(),
             )
             .unwrap();
         }
@@ -1049,7 +1049,7 @@ mod tests {
                 flags::Noqa::Enabled,
                 flags::FixMode::Generate,
                 UnsafeFixes::Enabled,
-                &FxHashMap::default(),
+                &ExtensionMapping::default(),
             )
         }
 

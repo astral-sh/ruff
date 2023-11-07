@@ -1,3 +1,4 @@
+use rustc_hash::FxHashMap;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -8,6 +9,7 @@ use anyhow::{bail, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::PySourceType;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -328,6 +330,16 @@ impl FromStr for Language {
     }
 }
 
+impl From<Language> for PySourceType {
+    fn from(value: Language) -> Self {
+        match value {
+            Language::Python => Self::Python,
+            Language::Ipynb => Self::Ipynb,
+            Language::Pyi => Self::Stub,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExtensionPair {
     pub extension: String,
@@ -361,6 +373,35 @@ impl FromStr for ExtensionPair {
 impl From<ExtensionPair> for (String, Language) {
     fn from(value: ExtensionPair) -> Self {
         (value.extension, value.language)
+    }
+}
+#[derive(Debug, Clone)]
+pub struct ExtensionMapping {
+    mapping: FxHashMap<String, Language>,
+}
+
+impl ExtensionMapping {
+    pub fn map_ext(&self, ext: &str) -> Option<Language> {
+        self.mapping.get(ext).copied()
+    }
+}
+
+impl Default for ExtensionMapping {
+    fn default() -> Self {
+        Self {
+            mapping: FxHashMap::from_iter([]),
+        }
+    }
+}
+
+impl FromIterator<ExtensionPair> for ExtensionMapping {
+    fn from_iter<T: IntoIterator<Item = ExtensionPair>>(iter: T) -> Self {
+        Self {
+            mapping: iter
+                .into_iter()
+                .map(|y| (y.extension, y.language))
+                .collect(),
+        }
     }
 }
 

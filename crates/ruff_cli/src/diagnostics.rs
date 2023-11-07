@@ -17,7 +17,7 @@ use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::types::{Language, UnsafeFixes};
+use ruff_linter::settings::types::{ExtensionMapping, UnsafeFixes};
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
@@ -179,17 +179,12 @@ impl AddAssign for FixMap {
 
 fn get_override_source_type(
     path: Option<&Path>,
-    extension: &FxHashMap<String, Language>,
+    extension: &ExtensionMapping,
 ) -> Option<PySourceType> {
     let Some(ext) = path.and_then(|p| p.extension()).and_then(|p| p.to_str()) else {
         return None;
     };
-    match extension.get(ext) {
-        Some(Language::Python) => Some(PySourceType::Python),
-        Some(Language::Ipynb) => Some(PySourceType::Ipynb),
-        Some(Language::Pyi) => Some(PySourceType::Stub),
-        None => None,
-    }
+    extension.map_ext(ext).map(PySourceType::from)
 }
 
 /// Lint the source code at the given `Path`.
@@ -202,7 +197,7 @@ pub(crate) fn lint_path(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
-    extension_override: &FxHashMap<String, Language>,
+    extension_override: &ExtensionMapping,
 ) -> Result<Diagnostics> {
     // Check the cache.
     let caching = match cache {
@@ -388,7 +383,7 @@ pub(crate) fn lint_stdin(
     settings: &Settings,
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
-    extension_override: &FxHashMap<String, Language>,
+    extension_override: &ExtensionMapping,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
     let source_type = if let Some(source_type) = get_override_source_type(path, extension_override)

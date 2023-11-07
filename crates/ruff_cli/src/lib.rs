@@ -17,7 +17,6 @@ use ruff_linter::settings::flags::FixMode;
 use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
-use rustc_hash::FxHashMap;
 
 use crate::args::{Args, CheckCommand, Command, FormatCommand, HelpFormat};
 use crate::printer::{Flags as PrinterFlags, Printer};
@@ -317,8 +316,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     );
     let extension_override = cli
         .extension_override
-        .map(|eo| eo.into_iter().map(|y| (y.extension, y.language)))
-        .map(FxHashMap::from_iter)
+        .map(|eo| eo.into_iter().collect())
         .unwrap_or_default();
 
     if cli.watch {
