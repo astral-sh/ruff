@@ -23,7 +23,6 @@ Adding or deleting newlines should be *options*, not mandates.
 - `--no-line-joins`: Never join lines.
 - [Speculative]: Allow *leeway* for splitting/joining lines.<br>
   Don't split or join lines within a specified *range* of line lengths.
-<br>
 
 **Compatibility**
 
