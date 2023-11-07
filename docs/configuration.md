@@ -326,23 +326,23 @@ If you'd prefer to either only lint or only format Jupyter Notebook files, you c
 section specific `exclude` option to do so. For example, the following would only lint Jupyter
 Notebook files and not format them:
 
-```toml
-[tool.ruff]
-extend-include = ["*.ipynb"]
+    ```toml
+    [tool.ruff]
+    extend-include = ["*.ipynb"]
 
-[tool.ruff.format]
-exclude = ["*.ipynb"]
-```
+    [tool.ruff.format]
+    exclude = ["*.ipynb"]
+    ```
 
 And, conversely, the following would only format Jupyter Notebook files and not lint them:
 
-```toml
-[tool.ruff]
-extend-include = ["*.ipynb"]
+    ```toml
+    [tool.ruff]
+    extend-include = ["*.ipynb"]
 
-[tool.ruff.lint]
-exclude = ["*.ipynb"]
-```
+    [tool.ruff.lint]
+    exclude = ["*.ipynb"]
+    ```
 
 Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
 `ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`. Similarly,
@@ -353,9 +353,9 @@ Alternatively, pass the notebook file(s) to `ruff` on the command-line directly.
 Some configuration options can be provided via the command-line, such as those related to rule
 enablement and disablement, file discovery, logging level, and more:
 
-```shell
-ruff check path/to/code/ --select F401 --select F403 --quiet
-```
+    ```shell
+    ruff check path/to/code/ --select F401 --select F403 --quiet
+    ```
 
 See `ruff help` for more on Ruff's top-level commands:
 
@@ -548,7 +548,7 @@ As an example: to enable autocompletion for Zsh, run
 `ruff generate-shell-completion zsh > ~/.zfunc/_ruff`. Then add the following line to your
 `~/.zshrc` file, if they're not already present:
 
-```zsh
-fpath+=~/.zfunc
-autoload -Uz compinit && compinit
-```
+    ```zsh
+    fpath+=~/.zfunc
+    autoload -Uz compinit && compinit
+    ```

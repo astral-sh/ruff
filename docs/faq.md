@@ -222,9 +222,9 @@ Ruff is installable under any Python version from 3.7 onwards.
 
 Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
-```shell
-pip install ruff
-```
+    ```shell
+    pip install ruff
+    ```
 
 Ruff ships with wheels for all major platforms, which enables `pip` to install Ruff without relying
 on Rust at all.
@@ -245,18 +245,18 @@ isort treat inline comments in some cases (see: [#1381](https://github.com/astra
 
 For example, Ruff tends to group non-aliased imports from the same module:
 
-```py
-from numpy import cos, int8, int16, int32, int64, tan, uint8, uint16, uint32, uint64
-from numpy import sin as np_sin
-```
+    ```py
+    from numpy import cos, int8, int16, int32, int64, tan, uint8, uint16, uint32, uint64
+    from numpy import sin as np_sin
+    ```
 
 Whereas isort splits them into separate import statements at each aliased boundary:
 
-```py
-from numpy import cos, int8, int16, int32, int64
-from numpy import sin as np_sin
-from numpy import tan, uint8, uint16, uint32, uint64
-```
+    ```py
+    from numpy import cos, int8, int16, int32, int64
+    from numpy import sin as np_sin
+    from numpy import tan, uint8, uint16, uint32, uint64
+    ```
 
 Like isort, Ruff's import sorting is compatible with Black.
 
@@ -315,16 +315,16 @@ first-party.
 
 For example, if you have a project with the following structure:
 
-```tree
-my_project
-├── pyproject.toml
-└── src
-    └── foo
-        ├── __init__.py
-        └── bar
+    ```tree
+    my_project
+    ├── pyproject.toml
+    └── src
+        └── foo
             ├── __init__.py
-            └── baz.py
-```
+            └── bar
+                ├── __init__.py
+                └── baz.py
+    ```
 
 When Ruff sees an import like `import foo`, it will then iterate over the `src` directories,
 looking for a corresponding Python module (in reality, a directory named `foo` or a file named
@@ -415,14 +415,14 @@ code formatters over Jupyter Notebooks.
 
 After installing `ruff` and `nbqa`, you can run Ruff over a notebook like so:
 
-```shell
-> nbqa ruff Untitled.ipynb
-Untitled.ipynb:cell_1:2:5: F841 Local variable `x` is assigned to but never used
-Untitled.ipynb:cell_2:1:1: E402 Module level import not at top of file
-Untitled.ipynb:cell_2:1:8: F401 `os` imported but unused
-Found 3 errors.
-1 potentially fixable with the --fix option.
-```
+    ```shell
+    > nbqa ruff Untitled.ipynb
+    Untitled.ipynb:cell_1:2:5: F841 Local variable `x` is assigned to but never used
+    Untitled.ipynb:cell_2:1:1: E402 Module level import not at top of file
+    Untitled.ipynb:cell_2:1:8: F401 `os` imported but unused
+    Found 3 errors.
+    1 potentially fixable with the --fix option.
+    ```
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
@@ -497,22 +497,22 @@ file can omit the `[tool.ruff]` section header. For example:
 
 === "pyproject.toml"
 
-```toml
-[tool.ruff]
-line-length = 88
+    ```toml
+    [tool.ruff]
+    line-length = 88
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-```
+    [tool.ruff.lint.pydocstyle]
+    convention = "google"
+    ```
 
 === "ruff.toml"
 
-```toml
-line-length = 88
+    ```toml
+    line-length = 88
 
-[pydocstyle]
-convention = "google"
-```
+    [pydocstyle]
+    convention = "google"
+    ```
 
 Ruff doesn't currently support INI files, like `setup.cfg` or `tox.ini`.
 

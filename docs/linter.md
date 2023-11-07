@@ -10,11 +10,11 @@ and more.
 `ruff check` is the primary entrypoint to the Ruff linter. It accepts a list of files or
 directories, and lints all discovered Python files, optionally fixing any fixable errors:
 
-```shell
-ruff check .          # Lint all files in the current directory.
-ruff check . --fix    # Lint all files in the current directory, and fix any fixable errors.
-ruff check . --watch  # Lint all files in the current directory, and re-lint on change.
-```
+    ```shell
+    ruff check .          # Lint all files in the current directory.
+    ruff check . --fix    # Lint all files in the current directory, and fix any fixable errors.
+    ruff check . --watch  # Lint all files in the current directory, and re-lint on change.
+    ```
 
 For the full list of supported options, run `ruff check --help`.
 
@@ -145,9 +145,9 @@ imports, reformat docstrings, rewrite type annotations to use newer Python synta
 
 To enable fixes, pass the `--fix` flag to `ruff check`:
 
-```shell
-ruff check . --fix
-```
+    ```shell
+    ruff check . --fix
+    ```
 
 By default, Ruff will fix all violations for which safe fixes are available; to determine
 whether a rule supports fixing, see [_Rules_](rules.md).
@@ -161,43 +161,43 @@ For example, [`unnecessary-iterable-allocation-for-first-element`](rules/unneces
 (`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix
 replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
 
-```shell
-$ python -m timeit "head = list(range(99999999))[0]"
-1 loop, best of 5: 1.69 sec per loop
-```
+    ```shell
+    $ python -m timeit "head = list(range(99999999))[0]"
+    1 loop, best of 5: 1.69 sec per loop
+    ```
 
-```shell
-$ python -m timeit "head = next(iter(range(99999999)))"
-5000000 loops, best of 5: 70.8 nsec per loop
-```
+    ```shell
+    $ python -m timeit "head = next(iter(range(99999999)))"
+    5000000 loops, best of 5: 70.8 nsec per loop
+    ```
 
 However, when the collection is empty, this changes the raised exception from an `IndexError` to `StopIteration`:
 
-```shell
-$ python -c 'list(range(0))[0]'
-Traceback (most recent call last):
-  File "<string>", line 1, in <module>
-IndexError: list index out of range
-```
+    ```shell
+    $ python -c 'list(range(0))[0]'
+    Traceback (most recent call last):
+      File "<string>", line 1, in <module>
+    IndexError: list index out of range
+    ```
 
-```shell
-$ python -c 'next(iter(range(0)))[0]'
-Traceback (most recent call last):
-  File "<string>", line 1, in <module>
-StopIteration
-```
+    ```shell
+    $ python -c 'next(iter(range(0)))[0]'
+    Traceback (most recent call last):
+      File "<string>", line 1, in <module>
+    StopIteration
+    ```
 
 Since this could break error handling, this fix is categorized as unsafe.
 
 Ruff only enables safe fixes by default. Unsafe fixes can be enabled by settings [`unsafe-fixes`](settings.md#unsafe-fixes) in your configuration file or passing the `--unsafe-fixes` flag to `ruff check`:
 
-```shell
-# Show unsafe fixes
-ruff check . --unsafe-fixes
+    ```shell
+    # Show unsafe fixes
+    ruff check . --unsafe-fixes
 
-# Apply unsafe fixes
-ruff check . --fix --unsafe-fixes
-```
+    # Apply unsafe fixes
+    ruff check . --fix --unsafe-fixes
+    ```
 
 The safety of fixes can be adjusted per rule using the [`extend-safe-fixes`](settings.md#extend-safe-fixes) and [`extend-unsafe-fixes`](settings.md#extend-unsafe-fixes) settings.
 
@@ -276,40 +276,40 @@ setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` f
 To suppress a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
 
-```python
-# Ignore F841.
-x = 1  # noqa: F841
+    ```python
+    # Ignore F841.
+    x = 1  # noqa: F841
 
-# Ignore E741 and F841.
-i = 1  # noqa: E741, F841
+    # Ignore E741 and F841.
+    i = 1  # noqa: E741, F841
 
-# Ignore _all_ violations.
-x = 1  # noqa
-```
+    # Ignore _all_ violations.
+    x = 1  # noqa
+    ```
 
 For multi-line strings (like docstrings), the `noqa` directive should come at the end of the string
 (after the closing triple quote), and will apply to the entire string, like so:
 
-```python
-"""Lorem ipsum dolor sit amet.
+    ```python
+    """Lorem ipsum dolor sit amet.
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
-"""  # noqa: E501
-```
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
+    """  # noqa: E501
+    ```
 
 To ignore all violations across an entire file, add the line `# ruff: noqa` anywhere in the file,
 preferably towards the top, like so:
 
-```python
-# ruff: noqa
-```
+    ```python
+    # ruff: noqa
+    ```
 
 To ignore a specific rule across an entire file, add the line `# ruff: noqa: {code}` anywhere in the
 file, preferably towards the top, like so:
 
-```python
-# ruff: noqa: F841
-```
+    ```python
+    # ruff: noqa: F841
+    ```
 
 Or see the [`per-file-ignores`](settings.md#per-file-ignores) setting, which enables the same
 functionality from within your `pyproject.toml` or `ruff.toml` file.

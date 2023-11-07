@@ -11,44 +11,44 @@ which supports fix actions, import sorting, and more.
 
 Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
 
-```yaml
-# Run the Ruff linter.
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.0.291
-  hooks:
-    - id: ruff
-# Run the Ruff formatter.
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.0.291
-  hooks:
-    - id: ruff-format
-```
+    ```yaml
+    # Run the Ruff linter.
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      # Ruff version.
+      rev: v0.0.291
+      hooks:
+        - id: ruff
+    # Run the Ruff formatter.
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      # Ruff version.
+      rev: v0.0.291
+      hooks:
+        - id: ruff-format
+    ```
 
 To enable fixes, add the `--fix` argument to the linter:
 
-```yaml
-# Run the Ruff linter.
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.0.291
-  hooks:
-    - id: ruff
-      args: [ --fix, --exit-non-zero-on-fix ]
-```
+    ```yaml
+    # Run the Ruff linter.
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      # Ruff version.
+      rev: v0.0.291
+      hooks:
+        - id: ruff
+          args: [ --fix, --exit-non-zero-on-fix ]
+    ```
 
 To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowed filetypes:
 
-```yaml
-# Run the Ruff linter.
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.0.291
-  hooks:
-    - id: ruff
-      types_or: [ python, pyi, jupyter ]
-```
+    ```yaml
+    # Run the Ruff linter.
+    - repo: https://github.com/astral-sh/ruff-pre-commit
+      # Ruff version.
+      rev: v0.0.291
+      hooks:
+        - id: ruff
+          types_or: [ python, pyi, jupyter ]
+    ```
 
 Ruff's lint hook should be placed after other formatting tools, such as Ruff's format hook, Black,
 or isort, _unless_ you enable autofix, in which case, Ruff's pre-commit hook should run _before_
@@ -73,60 +73,60 @@ For example, to use `ruff-lsp` with Neovim, install `ruff-lsp` from PyPI along w
 [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig). Then, add something like the following
 to your `init.lua`:
 
-```lua
--- See: https://github.com/neovim/nvim-lspconfig/tree/54eb2a070a4f389b1be0f98070f81d23e2b1a715#suggested-configuration
-local opts = { noremap=true, silent=true }
-vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, opts)
-vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, opts)
-vim.keymap.set('n', ']d', vim.diagnostic.goto_next, opts)
-vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
+    ```lua
+    -- See: https://github.com/neovim/nvim-lspconfig/tree/54eb2a070a4f389b1be0f98070f81d23e2b1a715#suggested-configuration
+    local opts = { noremap=true, silent=true }
+    vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, opts)
+    vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, opts)
+    vim.keymap.set('n', ']d', vim.diagnostic.goto_next, opts)
+    vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
 
--- Use an on_attach function to only map the following keys
--- after the language server attaches to the current buffer
-local on_attach = function(client, bufnr)
-  -- Enable completion triggered by <c-x><c-o>
-  vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
+    -- Use an on_attach function to only map the following keys
+    -- after the language server attaches to the current buffer
+    local on_attach = function(client, bufnr)
+      -- Enable completion triggered by <c-x><c-o>
+      vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
 
-  -- Mappings.
-  -- See `:help vim.lsp.*` for documentation on any of the below functions
-  local bufopts = { noremap=true, silent=true, buffer=bufnr }
-  vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
-  vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
-  vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
-  vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
-  vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, bufopts)
-  vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder, bufopts)
-  vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder, bufopts)
-  vim.keymap.set('n', '<space>wl', function()
-    print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
-  end, bufopts)
-  vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts)
-  vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
-  vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
-  vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
-  vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end, bufopts)
-end
+      -- Mappings.
+      -- See `:help vim.lsp.*` for documentation on any of the below functions
+      local bufopts = { noremap=true, silent=true, buffer=bufnr }
+      vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
+      vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
+      vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
+      vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
+      vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, bufopts)
+      vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder, bufopts)
+      vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder, bufopts)
+      vim.keymap.set('n', '<space>wl', function()
+        print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+      end, bufopts)
+      vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts)
+      vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
+      vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
+      vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
+      vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end, bufopts)
+    end
 
--- Configure `ruff-lsp`.
-local configs = require 'lspconfig.configs'
-if not configs.ruff_lsp then
-  configs.ruff_lsp = {
-    default_config = {
-      cmd = { 'ruff-lsp' },
-      filetypes = { 'python' },
-      root_dir = require('lspconfig').util.find_git_ancestor,
-      init_options = {
-        settings = {
-          args = {}
+    -- Configure `ruff-lsp`.
+    local configs = require 'lspconfig.configs'
+    if not configs.ruff_lsp then
+      configs.ruff_lsp = {
+        default_config = {
+          cmd = { 'ruff-lsp' },
+          filetypes = { 'python' },
+          root_dir = require('lspconfig').util.find_git_ancestor,
+          init_options = {
+            settings = {
+              args = {}
+            }
+          }
         }
       }
+    end
+    require('lspconfig').ruff_lsp.setup {
+      on_attach = on_attach,
     }
-  }
-end
-require('lspconfig').ruff_lsp.setup {
-  on_attach = on_attach,
-}
-```
+    ```
 
 Upon successful installation, you should see Ruff's diagnostics surfaced directly in your editor:
 
@@ -140,37 +140,37 @@ Ruff is also available as the [`python-lsp-ruff`](https://github.com/python-lsp/
 plugin for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-ruff), both of which are
 installable from PyPI:
 
-```shell
-pip install python-lsp-server python-lsp-ruff
-```
+    ```shell
+    pip install python-lsp-server python-lsp-ruff
+    ```
 
 The LSP server can then be used with any editor that supports the Language Server Protocol.
 
 For example, to use `python-lsp-ruff` with Neovim, add something like the following to your
 `init.lua`:
 
-```lua
-require'lspconfig'.pylsp.setup {
-  settings = {
-    pylsp = {
-      plugins = {
-        ruff = {
-          enabled = true
-        },
-        pycodestyle = {
-          enabled = false
-        },
-        pyflakes = {
-          enabled = false
-        },
-        mccabe = {
-          enabled = false
+    ```lua
+    require'lspconfig'.pylsp.setup {
+      settings = {
+        pylsp = {
+          plugins = {
+            ruff = {
+              enabled = true
+            },
+            pycodestyle = {
+              enabled = false
+            },
+            pyflakes = {
+              enabled = false
+            },
+            mccabe = {
+              enabled = false
+            }
+          }
         }
-      }
+      },
     }
-  },
-}
-```
+    ```
 
 ## Vim & Neovim
 
@@ -182,53 +182,53 @@ officially supported LSP server for Ruff. To use `ruff-lsp` with Neovim, install
 PyPI along with [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig). Then, add something
 like the following to your `init.lua`:
 
-```lua
--- See: https://github.com/neovim/nvim-lspconfig/tree/54eb2a070a4f389b1be0f98070f81d23e2b1a715#suggested-configuration
-local opts = { noremap=true, silent=true }
-vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, opts)
-vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, opts)
-vim.keymap.set('n', ']d', vim.diagnostic.goto_next, opts)
-vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
+    ```lua
+    -- See: https://github.com/neovim/nvim-lspconfig/tree/54eb2a070a4f389b1be0f98070f81d23e2b1a715#suggested-configuration
+    local opts = { noremap=true, silent=true }
+    vim.keymap.set('n', '<space>e', vim.diagnostic.open_float, opts)
+    vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, opts)
+    vim.keymap.set('n', ']d', vim.diagnostic.goto_next, opts)
+    vim.keymap.set('n', '<space>q', vim.diagnostic.setloclist, opts)
 
--- Use an on_attach function to only map the following keys
--- after the language server attaches to the current buffer
-local on_attach = function(client, bufnr)
-  -- Enable completion triggered by <c-x><c-o>
-  vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
+    -- Use an on_attach function to only map the following keys
+    -- after the language server attaches to the current buffer
+    local on_attach = function(client, bufnr)
+      -- Enable completion triggered by <c-x><c-o>
+      vim.api.nvim_buf_set_option(bufnr, 'omnifunc', 'v:lua.vim.lsp.omnifunc')
 
-  -- Mappings.
-  -- See `:help vim.lsp.*` for documentation on any of the below functions
-  local bufopts = { noremap=true, silent=true, buffer=bufnr }
-  vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
-  vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
-  vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
-  vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
-  vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, bufopts)
-  vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder, bufopts)
-  vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder, bufopts)
-  vim.keymap.set('n', '<space>wl', function()
-    print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
-  end, bufopts)
-  vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts)
-  vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
-  vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
-  vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
-  vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end, bufopts)
-end
+      -- Mappings.
+      -- See `:help vim.lsp.*` for documentation on any of the below functions
+      local bufopts = { noremap=true, silent=true, buffer=bufnr }
+      vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
+      vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
+      vim.keymap.set('n', 'K', vim.lsp.buf.hover, bufopts)
+      vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
+      vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help, bufopts)
+      vim.keymap.set('n', '<space>wa', vim.lsp.buf.add_workspace_folder, bufopts)
+      vim.keymap.set('n', '<space>wr', vim.lsp.buf.remove_workspace_folder, bufopts)
+      vim.keymap.set('n', '<space>wl', function()
+        print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+      end, bufopts)
+      vim.keymap.set('n', '<space>D', vim.lsp.buf.type_definition, bufopts)
+      vim.keymap.set('n', '<space>rn', vim.lsp.buf.rename, bufopts)
+      vim.keymap.set('n', '<space>ca', vim.lsp.buf.code_action, bufopts)
+      vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
+      vim.keymap.set('n', '<space>f', function() vim.lsp.buf.format { async = true } end, bufopts)
+    end
 
--- Configure `ruff-lsp`.
--- See: https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#ruff_lsp
--- For the default config, along with instructions on how to customize the settings
-require('lspconfig').ruff_lsp.setup {
-  on_attach = on_attach,
-  init_options = {
-    settings = {
-      -- Any extra CLI arguments for `ruff` go here.
-      args = {},
+    -- Configure `ruff-lsp`.
+    -- See: https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md#ruff_lsp
+    -- For the default config, along with instructions on how to customize the settings
+    require('lspconfig').ruff_lsp.setup {
+      on_attach = on_attach,
+      init_options = {
+        settings = {
+          -- Any extra CLI arguments for `ruff` go here.
+          args = {},
+        }
+      }
     }
-  }
-}
-```
+    ```
 
 Ruff is also available as part of the [coc-pyright](https://github.com/fannheyward/coc-pyright)
 extension for `coc.nvim`.
@@ -236,12 +236,12 @@ extension for `coc.nvim`.
 <details>
 <summary>With the <a href="https://github.com/dense-analysis/ale">ALE</a> plugin for (Neo)Vim.</summary>
 
-```vim
-let g:ale_linters = { "python": ["ruff"] }
-let g:ale_fixers = {
-\       "python": ["black", "ruff"],
-\}
-```
+    ```vim
+    let g:ale_linters = { "python": ["ruff"] }
+    let g:ale_fixers = {
+    \       "python": ["black", "ruff"],
+    \}
+    ```
 
 </details>
 
@@ -258,16 +258,16 @@ in just a
 </summary>
 <br>
 
-```yaml
-tools:
-  python-ruff: &python-ruff
-    lint-command: "ruff check --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}"
-    lint-stdin: true
-    lint-formats:
-      - "%f:%l:%c: %m"
-    format-command: "ruff check --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -"
-    format-stdin: true
-```
+    ```yaml
+    tools:
+      python-ruff: &python-ruff
+        lint-command: "ruff check --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}"
+        lint-stdin: true
+        lint-formats:
+          - "%f:%l:%c: %m"
+        format-command: "ruff check --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -"
+        format-stdin: true
+    ```
 
 </details>
 
@@ -277,18 +277,18 @@ With the <a href="https://github.com/stevearc/conform.nvim"><code>conform.nvim</
 </summary>
 <br>
 
-```lua
-require("conform").setup({
-    formatters_by_ft = {
-        python = {
-          -- To fix lint errors.
-          "ruff_fix",
-          -- To run the Ruff formatter.
-          "ruff_format",
+    ```lua
+    require("conform").setup({
+        formatters_by_ft = {
+            python = {
+              -- To fix lint errors.
+              "ruff_fix",
+              -- To run the Ruff formatter.
+              "ruff_format",
+            },
         },
-    },
-})
-```
+    })
+    ```
 
 </details>
 
@@ -297,11 +297,11 @@ require("conform").setup({
 With the <a href="https://github.com/mfussenegger/nvim-lint"><code>nvim-lint</code></a> plugin for Neovim.
 </summary>
 
-```lua
-require("lint").linters_by_ft = {
-  python = { "ruff" },
-}
-```
+    ```lua
+    require("lint").linters_by_ft = {
+      python = { "ruff" },
+    }
+    ```
 
 </details>
 
@@ -326,17 +326,17 @@ IntelliJ Marketplace (maintained by @koxudaxi).
 
 Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA:
 
-```elisp
-(require 'flymake-ruff)
-(add-hook 'python-mode-hook #'flymake-ruff-load)
-```
+    ```elisp
+    (require 'flymake-ruff)
+    (add-hook 'python-mode-hook #'flymake-ruff-load)
+    ```
 
 Ruff can be used as a formatter in Emacs using the [Apheleia](https://github.com/radian-software/apheleia) formatter library, by setting this configuration:
 
-```emacs-lisp
-(add-to-list 'apheleia-mode-alist '(python-mode . ruff))
-(add-to-list 'apheleia-mode-alist '(python-ts-mode . ruff))
-```
+    ```emacs-lisp
+    (add-to-list 'apheleia-mode-alist '(python-mode . ruff))
+    (add-to-list 'apheleia-mode-alist '(python-ts-mode . ruff))
+    ```
 
 ## TextMate (Unofficial)
 
@@ -347,26 +347,26 @@ bundle for TextMate.
 
 GitHub Actions has everything you need to run Ruff out-of-the-box:
 
-```yaml
-name: CI
-on: push
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff
-      # Update output format to enable automatic inline annotations.
-      - name: Run Ruff
-        run: ruff check --output-format=github .
-```
+    ```yaml
+    name: CI
+    on: push
+    jobs:
+      build:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          - name: Install Python
+            uses: actions/setup-python@v4
+            with:
+              python-version: "3.11"
+          - name: Install dependencies
+            run: |
+              python -m pip install --upgrade pip
+              pip install ruff
+          # Update output format to enable automatic inline annotations.
+          - name: Run Ruff
+            run: ruff check --output-format=github .
+    ```
 
 Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
 
@@ -381,22 +381,22 @@ execute any supported `ruff` command (e.g., `ruff check --fix`).
 To use `ruff-action`, create a file (e.g., `.github/workflows/ruff.yml`) inside your repository
 with:
 
-```yaml
-name: Ruff
-on: [ push, pull_request ]
-jobs:
-  ruff:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: chartboost/ruff-action@v1
-```
+    ```yaml
+    name: Ruff
+    on: [ push, pull_request ]
+    jobs:
+      ruff:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          - uses: chartboost/ruff-action@v1
+    ```
 
 Alternatively, you can include `ruff-action` as a step in any other workflow file:
 
-```yaml
-      - uses: chartboost/ruff-action@v1
-```
+    ```yaml
+          - uses: chartboost/ruff-action@v1
+    ```
 
 `ruff-action` accepts optional configuration parameters via `with:`, including:
 
@@ -406,10 +406,10 @@ Alternatively, you can include `ruff-action` as a step in any other workflow fil
 
 For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
 
-```yaml
-- uses: chartboost/ruff-action@v1
-  with:
-    src: "./src"
-    version: 0.0.259
-    args: --select B
-```
+    ```yaml
+    - uses: chartboost/ruff-action@v1
+      with:
+        src: "./src"
+        version: 0.0.259
+        args: --select B
+    ```

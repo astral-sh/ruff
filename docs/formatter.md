@@ -8,10 +8,10 @@ The Ruff formatter is an extremely fast Python code formatter designed as a drop
 `ruff format` is the primary entrypoint to the formatter. It accepts a list of files or
 directories, and formats all discovered Python files:
 
-```shell
-ruff format .                 # Format all files in the current directory.
-ruff format /path/to/file.py  # Format a single file.
-```
+    ```shell
+    ruff format .                 # Format all files in the current directory.
+    ruff format /path/to/file.py  # Format a single file.
+    ```
 
 Similar to Black, running `ruff format /path/to/file.py` will format the given file or directory
 in-place, while `ruff format --check /path/to/file.py` will avoid writing any formatted files back,
@@ -38,46 +38,46 @@ Given this focus on Black compatibility, the formatter thus adheres to [Black's 
 which aims for "consistency, generality, readability and reducing git diffs". To give you a sense
 for the enforced code style, here's an example:
 
-```python
-# Input
-def _make_ssl_transport(
-    rawsock, protocol, sslcontext, waiter=None,
-    *, server_side=False, server_hostname=None,
-    extra=None, server=None,
-    ssl_handshake_timeout=None,
-    call_connection_made=True):
-    '''Make an SSL transport.'''
-    if waiter is None:
-      waiter = Future(loop=loop)
+    ```python
+    # Input
+    def _make_ssl_transport(
+        rawsock, protocol, sslcontext, waiter=None,
+        *, server_side=False, server_hostname=None,
+        extra=None, server=None,
+        ssl_handshake_timeout=None,
+        call_connection_made=True):
+        '''Make an SSL transport.'''
+        if waiter is None:
+          waiter = Future(loop=loop)
 
-    if extra is None:
-      extra = {}
+        if extra is None:
+          extra = {}
 
-    ...
+        ...
 
-# Ruff
-def _make_ssl_transport(
-    rawsock,
-    protocol,
-    sslcontext,
-    waiter=None,
-    *,
-    server_side=False,
-    server_hostname=None,
-    extra=None,
-    server=None,
-    ssl_handshake_timeout=None,
-    call_connection_made=True,
-):
-    """Make an SSL transport."""
-    if waiter is None:
-        waiter = Future(loop=loop)
+    # Ruff
+    def _make_ssl_transport(
+        rawsock,
+        protocol,
+        sslcontext,
+        waiter=None,
+        *,
+        server_side=False,
+        server_hostname=None,
+        extra=None,
+        server=None,
+        ssl_handshake_timeout=None,
+        call_connection_made=True,
+    ):
+        """Make an SSL transport."""
+        if waiter is None:
+            waiter = Future(loop=loop)
 
-    if extra is None:
-        extra = {}
+        if extra is None:
+            extra = {}
 
-    ...
-```
+        ...
+    ```
 
 Like Black, the Ruff formatter does _not_ support extensive code style configuration; however,
 unlike Black, it _does_ support configuring the desired quote style, indent style, line endings,
@@ -137,54 +137,54 @@ be used to temporarily disable formatting for a given code block.
 
 `# fmt: on` and `# fmt: off` comments are enforced at the statement level:
 
-```python
-# fmt: off
-not_formatted=3
-also_not_formatted=4
-# fmt: on
-```
+    ```python
+    # fmt: off
+    not_formatted=3
+    also_not_formatted=4
+    # fmt: on
+    ```
 
 As such, adding `# fmt: on` and `# fmt: off` comments within expressions will have no effect. In
 the following example, both list entries will be formatted, despite the `# fmt: off`:
 
-```python
-[
-    # fmt: off
-    '1',
-    # fmt: on
-    '2',
-]
-```
+    ```python
+    [
+        # fmt: off
+        '1',
+        # fmt: on
+        '2',
+    ]
+    ```
 
 Instead, apply the `# fmt: off` comment to the entire statement:
 
-```python
-# fmt: off
-[
-    '1',
-    '2',
-]
-# fmt: on
-```
+    ```python
+    # fmt: off
+    [
+        '1',
+        '2',
+    ]
+    # fmt: on
+    ```
 
 `# fmt: skip` comments suppress formatting for a preceding statement, case header, decorator,
 function definition, or class definition:
 
-```python
-if True:
-    pass
-elif False: # fmt: skip
-    pass
+    ```python
+    if True:
+        pass
+    elif False: # fmt: skip
+        pass
 
-@Test
-@Test2 # fmt: skip
-def test(): ...
+    @Test
+    @Test2 # fmt: skip
+    def test(): ...
 
-a = [1, 2, 3, 4, 5] # fmt: skip
+    a = [1, 2, 3, 4, 5] # fmt: skip
 
-def test(a, b, c, d, e, f) -> int: # fmt: skip
-    pass
-```
+    def test(a, b, c, d, e, f) -> int: # fmt: skip
+        pass
+    ```
 
 Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
 comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
