@@ -12,7 +12,7 @@ NPY201.py:4:5: NPY201 [*] `np.add_docstring` will be removed in NumPy 2.0. Use `
   |
   = help: Replace with `numpy.lib.add_docstring`
 
-ℹ Fix
+ℹ Safe fix
   1 |+from numpy.lib import add_docstring
 1 2 | def func():
 2 3 |     import numpy as np
@@ -34,7 +34,7 @@ NPY201.py:6:5: NPY201 [*] `np.add_newdoc` will be removed in NumPy 2.0. Use `num
   |
   = help: Replace with `numpy.lib.add_newdoc`
 
-ℹ Fix
+ℹ Safe fix
   1 |+from numpy.lib import add_newdoc
 1 2 | def func():
 2 3 |     import numpy as np
@@ -78,7 +78,7 @@ NPY201.py:12:5: NPY201 [*] `np.byte_bounds` will be removed in NumPy 2.0. Use `n
    |
    = help: Replace with `numpy.lib.array_utils.byte_bounds` (requires NumPy 2.0 or greater)
 
-ℹ Suggested fix
+ℹ Unsafe fix
    1  |+from numpy.lib.array_utils import byte_bounds
 1  2  | def func():
 2  3  |     import numpy as np
@@ -114,7 +114,7 @@ NPY201.py:16:5: NPY201 [*] `np.cfloat` will be removed in NumPy 2.0. Use `numpy.
    |
    = help: Replace with `numpy.complex128`
 
-ℹ Fix
+ℹ Safe fix
 13 13 | 
 14 14 |     np.cast
 15 15 | 
@@ -135,7 +135,7 @@ NPY201.py:18:5: NPY201 [*] `np.clongfloat` will be removed in NumPy 2.0. Use `nu
    |
    = help: Replace with `numpy.clongdouble`
 
-ℹ Fix
+ℹ Safe fix
 15 15 | 
 16 16 |     np.cfloat(12+34j)
 17 17 | 
@@ -166,7 +166,7 @@ NPY201.py:22:5: NPY201 [*] `np.complex_` will be removed in NumPy 2.0. Use `nump
    |
    = help: Replace with `numpy.complex128`
 
-ℹ Fix
+ℹ Safe fix
 19 19 | 
 20 20 |     np.compat
 21 21 | 
@@ -187,7 +187,7 @@ NPY201.py:24:5: NPY201 [*] `np.DataSource` will be removed in NumPy 2.0. Use `nu
    |
    = help: Replace with `numpy.lib.npyio.DataSource`
 
-ℹ Fix
+ℹ Safe fix
    1  |+from numpy.lib.npyio import DataSource
 1  2  | def func():
 2  3  |     import numpy as np
@@ -273,7 +273,7 @@ NPY201.py:38:5: NPY201 [*] `np.float_` will be removed in NumPy 2.0. Use `numpy.
    |
    = help: Replace with `numpy.float64`
 
-ℹ Fix
+ℹ Safe fix
 35 35 | 
 36 36 |     np.get_array_wrap
 37 37 | 
@@ -304,7 +304,7 @@ NPY201.py:42:5: NPY201 [*] `np.Inf` will be removed in NumPy 2.0. Use `numpy.inf
    |
    = help: Replace with `numpy.inf`
 
-ℹ Fix
+ℹ Safe fix
 39 39 | 
 40 40 |     np.geterrobj
 41 41 | 
@@ -325,7 +325,7 @@ NPY201.py:44:5: NPY201 [*] `np.Infinity` will be removed in NumPy 2.0. Use `nump
    |
    = help: Replace with `numpy.inf`
 
-ℹ Fix
+ℹ Safe fix
 41 41 | 
 42 42 |     np.Inf
 43 43 | 
@@ -346,7 +346,7 @@ NPY201.py:46:5: NPY201 [*] `np.infty` will be removed in NumPy 2.0. Use `numpy.i
    |
    = help: Replace with `numpy.inf`
 
-ℹ Fix
+ℹ Safe fix
 43 43 | 
 44 44 |     np.Infinity
 45 45 | 
@@ -377,7 +377,7 @@ NPY201.py:50:5: NPY201 [*] `np.issubclass_` will be removed in NumPy 2.0. Use `i
    |
    = help: Replace with `issubclass`
 
-ℹ Fix
+ℹ Safe fix
 47 47 | 
 48 48 |     np.issctype
 49 49 | 
@@ -398,7 +398,7 @@ NPY201.py:52:5: NPY201 [*] `np.issubsctype` will be removed in NumPy 2.0. Use `n
    |
    = help: Replace with `numpy.issubdtype`
 
-ℹ Fix
+ℹ Safe fix
 49 49 | 
 50 50 |     np.issubclass_(np.int32, np.integer)
 51 51 | 
@@ -419,7 +419,7 @@ NPY201.py:54:5: NPY201 [*] `np.mat` will be removed in NumPy 2.0. Use `numpy.asm
    |
    = help: Replace with `numpy.asmatrix`
 
-ℹ Fix
+ℹ Safe fix
 51 51 | 
 52 52 |     np.issubsctype
 53 53 | 
@@ -450,7 +450,7 @@ NPY201.py:58:5: NPY201 [*] `np.NaN` will be removed in NumPy 2.0. Use `numpy.nan
    |
    = help: Replace with `numpy.nan`
 
-ℹ Fix
+ℹ Safe fix
 55 55 | 
 56 56 |     np.maximum_sctype
 57 57 | 
@@ -481,7 +481,7 @@ NPY201.py:62:5: NPY201 [*] `np.NINF` will be removed in NumPy 2.0. Use `-np.inf`
    |
    = help: Replace with `-np.inf`
 
-ℹ Fix
+ℹ Safe fix
 59 59 | 
 60 60 |     np.nbytes[np.int64]
 61 61 | 
@@ -502,7 +502,7 @@ NPY201.py:64:5: NPY201 [*] `np.NZERO` will be removed in NumPy 2.0. Use `-0.0` i
    |
    = help: Replace with `-0.0`
 
-ℹ Fix
+ℹ Safe fix
 61 61 | 
 62 62 |     np.NINF
 63 63 | 
@@ -523,7 +523,7 @@ NPY201.py:66:5: NPY201 [*] `np.longcomplex` will be removed in NumPy 2.0. Use `n
    |
    = help: Replace with `numpy.clongdouble`
 
-ℹ Fix
+ℹ Safe fix
 63 63 | 
 64 64 |     np.NZERO
 65 65 | 
@@ -544,7 +544,7 @@ NPY201.py:68:5: NPY201 [*] `np.longfloat` will be removed in NumPy 2.0. Use `num
    |
    = help: Replace with `numpy.longdouble`
 
-ℹ Fix
+ℹ Safe fix
 65 65 | 
 66 66 |     np.longcomplex(12+34j)
 67 67 | 
@@ -585,7 +585,7 @@ NPY201.py:74:5: NPY201 [*] `np.PINF` will be removed in NumPy 2.0. Use `numpy.in
    |
    = help: Replace with `numpy.inf`
 
-ℹ Fix
+ℹ Safe fix
 71 71 | 
 72 72 |     np.obj2sctype(int)
 73 73 | 
@@ -606,7 +606,7 @@ NPY201.py:76:5: NPY201 [*] `np.PZERO` will be removed in NumPy 2.0. Use `0.0` in
    |
    = help: Replace with `0.0`
 
-ℹ Fix
+ℹ Safe fix
 73 73 | 
 74 74 |     np.PINF
 75 75 | 
@@ -647,7 +647,7 @@ NPY201.py:82:5: NPY201 [*] `np.round_` will be removed in NumPy 2.0. Use `numpy.
    |
    = help: Replace with `numpy.round`
 
-ℹ Fix
+ℹ Safe fix
 79 79 | 
 80 80 |     np.recfromtxt
 81 81 | 
@@ -668,7 +668,7 @@ NPY201.py:84:5: NPY201 [*] `np.safe_eval` will be removed in NumPy 2.0. Use `ast
    |
    = help: Replace with `ast.literal_eval`
 
-ℹ Fix
+ℹ Safe fix
    1  |+from ast import literal_eval
 1  2  | def func():
 2  3  |     import numpy as np
@@ -734,7 +734,7 @@ NPY201.py:96:5: NPY201 [*] `np.singlecomplex` will be removed in NumPy 2.0. Use 
    |
    = help: Replace with `numpy.complex64`
 
-ℹ Fix
+ℹ Safe fix
 93 93 | 
 94 94 |     np.set_string_function
 95 95 | 
@@ -755,7 +755,7 @@ NPY201.py:98:5: NPY201 [*] `np.string_` will be removed in NumPy 2.0. Use `numpy
     |
     = help: Replace with `numpy.bytes_`
 
-ℹ Fix
+ℹ Safe fix
 95 95 | 
 96 96 |     np.singlecomplex(12+1j)
 97 97 | 
@@ -776,7 +776,7 @@ NPY201.py:100:5: NPY201 [*] `np.source` will be removed in NumPy 2.0. Use `inspe
     |
     = help: Replace with `inspect.getsource`
 
-ℹ Fix
+ℹ Safe fix
     1   |+from inspect import getsource
 1   2   | def func():
 2   3   |     import numpy as np
@@ -802,7 +802,7 @@ NPY201.py:102:5: NPY201 [*] `np.tracemalloc_domain` will be removed in NumPy 2.0
     |
     = help: Replace with `numpy.lib.tracemalloc_domain`
 
-ℹ Fix
+ℹ Safe fix
     1   |+from numpy.lib import tracemalloc_domain
 1   2   | def func():
 2   3   |     import numpy as np
@@ -828,7 +828,7 @@ NPY201.py:104:5: NPY201 [*] `np.unicode_` will be removed in NumPy 2.0. Use `num
     |
     = help: Replace with `numpy.str_`
 
-ℹ Fix
+ℹ Safe fix
 101 101 | 
 102 102 |     np.tracemalloc_domain
 103 103 | 
