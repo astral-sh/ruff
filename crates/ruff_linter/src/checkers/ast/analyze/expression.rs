@@ -571,6 +571,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::Jinja2AutoescapeFalse) {
                 flake8_bandit::rules::jinja2_autoescape_false(checker, call);
             }
+            if checker.enabled(Rule::MakoTemplates) {
+                flake8_bandit::rules::mako_templates(checker, call);
+            }
             if checker.enabled(Rule::HardcodedPasswordFuncArg) {
                 flake8_bandit::rules::hardcoded_password_func_arg(checker, keywords);
             }
