@@ -13,6 +13,10 @@ use crate::checkers::ast::Checker;
 /// trio's built-in timeout functionality, available as `trio.fail_after`,
 /// `trio.move_on_after`, `trio.fail_at`, and `trio.move_on_at`.
 ///
+/// ## Known problems
+/// To avoid false positives, this rule is only enabled if `trio` is imported
+/// in the module.
+///
 /// ## Example
 /// ```python
 /// async def func():
@@ -40,12 +44,19 @@ pub(crate) fn async_function_with_timeout(
     checker: &mut Checker,
     function_def: &ast::StmtFunctionDef,
 ) {
+    // Detect `async` calls with a `timeout` argument.
     if !function_def.is_async {
         return;
     }
     let Some(timeout) = function_def.parameters.find("timeout") else {
         return;
     };
+
+    // If `trio` isn't in scope, avoid raising the diagnostic.
+    if !checker.semantic().seen(&["trio"]) {
+        return;
+    }
+
     checker.diagnostics.push(Diagnostic::new(
         TrioAsyncFunctionWithTimeout,
         timeout.range(),
