@@ -53,7 +53,6 @@ impl FixSafetyTable {
             Safe,
             Unsafe,
         }
-        use Override::{Safe, Unsafe};
 
         let safety_override_map: FxHashMap<Rule, Override> = {
             Specificity::iter()
@@ -62,13 +61,13 @@ impl FixSafetyTable {
                         .iter()
                         .filter(|selector| selector.specificity() == spec)
                         .flat_map(|selector| selector.rules(preview_options))
-                        .map(|rule| (rule, Safe));
+                        .map(|rule| (rule, Override::Safe));
 
                     let unsafe_overrides = extend_unsafe_fixes
                         .iter()
                         .filter(|selector| selector.specificity() == spec)
                         .flat_map(|selector| selector.rules(preview_options))
-                        .map(|rule| (rule, Unsafe));
+                        .map(|rule| (rule, Override::Unsafe));
 
                     // Unsafe overrides take precedence over safe overrides
                     safe_overrides.chain(unsafe_overrides).collect::<Vec<_>>()
@@ -81,15 +80,15 @@ impl FixSafetyTable {
             forced_safe: safety_override_map
                 .iter()
                 .filter_map(|(rule, o)| match o {
-                    Safe => Some(*rule),
-                    Unsafe => None,
+                    Override::Safe => Some(*rule),
+                    Override::Unsafe => None,
                 })
                 .collect(),
             forced_unsafe: safety_override_map
                 .iter()
                 .filter_map(|(rule, o)| match o {
-                    Unsafe => Some(*rule),
-                    Safe => None,
+                    Override::Unsafe => Some(*rule),
+                    Override::Safe => None,
                 })
                 .collect(),
         }
