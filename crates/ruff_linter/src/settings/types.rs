@@ -1,4 +1,3 @@
-use rustc_hash::FxHashMap;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -8,14 +7,15 @@ use std::string::ToString;
 use anyhow::{bail, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
-use ruff_diagnostics::Applicability;
-use ruff_python_ast::PySourceType;
+use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
+use ruff_python_ast::PySourceType;
 
 use crate::fs;
 use crate::registry::RuleSet;
@@ -305,8 +305,8 @@ impl FromStr for PatternPrefixPair {
     CacheKey,
     EnumIter,
 )]
-#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum Language {
     #[default]
@@ -317,15 +317,15 @@ pub enum Language {
 
 impl FromStr for Language {
     type Err = anyhow::Error;
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
             "python" => Ok(Self::Python),
             "pyi" => Ok(Self::Pyi),
             "ipynb" => Ok(Self::Ipynb),
-            _ => bail!(
-                "Unrecognised language {}. Must be one of python,pyi,ipynb",
-                s
-            ),
+            _ => {
+                bail!("Unrecognized language: `{s}`. Expected one of `python`, `pyi`, or `ipynb`.")
+            }
         }
     }
 }
@@ -375,24 +375,18 @@ impl From<ExtensionPair> for (String, Language) {
         (value.extension, value.language)
     }
 }
-#[derive(Debug, Clone, CacheKey)]
+#[derive(Debug, Clone, Default, CacheKey)]
 pub struct ExtensionMapping {
     mapping: FxHashMap<String, Language>,
 }
 
 impl ExtensionMapping {
-    pub fn map_ext(&self, ext: &str) -> Option<Language> {
-        self.mapping.get(ext).copied()
+    /// Return the [`Language`] for the given extension.
+    pub fn get(&self, extension: &str) -> Option<Language> {
+        self.mapping.get(extension).copied()
     }
 }
 
-impl Default for ExtensionMapping {
-    fn default() -> Self {
-        Self {
-            mapping: FxHashMap::from_iter([]),
-        }
-    }
-}
 impl From<FxHashMap<String, Language>> for ExtensionMapping {
     fn from(value: FxHashMap<String, Language>) -> Self {
         Self { mapping: value }
@@ -404,7 +398,7 @@ impl FromIterator<ExtensionPair> for ExtensionMapping {
         Self {
             mapping: iter
                 .into_iter()
-                .map(|y| (y.extension, y.language))
+                .map(|pair| (pair.extension, pair.language))
                 .collect(),
         }
     }

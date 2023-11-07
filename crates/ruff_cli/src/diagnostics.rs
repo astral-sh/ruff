@@ -177,14 +177,9 @@ impl AddAssign for FixMap {
     }
 }
 
-fn get_override_source_type(
-    path: Option<&Path>,
-    extension: &ExtensionMapping,
-) -> Option<PySourceType> {
-    let Some(ext) = path.and_then(|p| p.extension()).and_then(|p| p.to_str()) else {
-        return None;
-    };
-    extension.map_ext(ext).map(PySourceType::from)
+fn override_source_type(path: Option<&Path>, extension: &ExtensionMapping) -> Option<PySourceType> {
+    let ext = path?.extension()?.to_str()?;
+    extension.get(ext).map(PySourceType::from)
 }
 
 /// Lint the source code at the given `Path`.
@@ -232,7 +227,7 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    let source_type = match get_override_source_type(Some(path), &settings.extension) {
+    let source_type = match override_source_type(Some(path), &settings.extension) {
         Some(source_type) => source_type,
         None => match SourceType::from(path) {
             SourceType::Toml(TomlSourceType::Pyproject) => {
@@ -386,7 +381,7 @@ pub(crate) fn lint_stdin(
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
     let source_type = if let Some(source_type) =
-        get_override_source_type(path, &settings.linter.extension)
+        override_source_type(path, &settings.linter.extension)
     {
         source_type
     } else {
