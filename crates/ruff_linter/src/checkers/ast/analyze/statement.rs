@@ -1216,6 +1216,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TryExceptInLoop) {
                 perflint::rules::try_except_in_loop(checker, body);
             }
+            if checker.enabled(Rule::TryExceptInLoop) {
+                perflint::rules::try_except_in_loop(checker, body);
+            }
+            if checker.enabled(Rule::TrioUnneededSleep) {
+                flake8_trio::rules::unneeded_sleep(checker, stmt, body);
+            }
         }
         Stmt::For(
             for_stmt @ ast::StmtFor {
