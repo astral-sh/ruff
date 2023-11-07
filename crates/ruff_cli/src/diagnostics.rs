@@ -183,7 +183,6 @@ fn override_source_type(path: Option<&Path>, extension: &ExtensionMapping) -> Op
 }
 
 /// Lint the source code at the given `Path`.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn lint_path(
     path: &Path,
     package: Option<&Path>,
