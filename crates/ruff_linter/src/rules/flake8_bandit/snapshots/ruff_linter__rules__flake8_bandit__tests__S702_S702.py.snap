@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S702.py:6:1: S702 Mako templates allow HTML/JS rendering by default and are inherently open to XSS attacks.Ensure variables in all templates are properly sanitized via the 'n', 'h' or 'x' flags (depending on context).For example, to HTML escape the variable 'data' do ${ data |h }.
+  |
+4 | from mako import template
+5 | 
+6 | Template("hello")
+  | ^^^^^^^^ S702
+7 | 
+8 | # XXX(fletcher): for some reason, bandit is missing the one below. keeping it
+  |
+
+S702.py:10:1: S702 Mako templates allow HTML/JS rendering by default and are inherently open to XSS attacks.Ensure variables in all templates are properly sanitized via the 'n', 'h' or 'x' flags (depending on context).For example, to HTML escape the variable 'data' do ${ data |h }.
+   |
+ 8 | # XXX(fletcher): for some reason, bandit is missing the one below. keeping it
+ 9 | # in for now so that if it gets fixed inadvertitently we know.
+10 | mako.template.Template("hern")
+   | ^^^^^^^^^^^^^^^^^^^^^^ S702
+11 | template.Template("hern")
+   |
+
+S702.py:11:1: S702 Mako templates allow HTML/JS rendering by default and are inherently open to XSS attacks.Ensure variables in all templates are properly sanitized via the 'n', 'h' or 'x' flags (depending on context).For example, to HTML escape the variable 'data' do ${ data |h }.
+   |
+ 9 | # in for now so that if it gets fixed inadvertitently we know.
+10 | mako.template.Template("hern")
+11 | template.Template("hern")
+   | ^^^^^^^^^^^^^^^^^ S702
+   |
+
+
