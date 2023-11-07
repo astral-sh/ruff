@@ -12,7 +12,7 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
   |
   = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 3  3  | 
 4  4  | from typing import TYPE_CHECKING
 5  5  | 
@@ -35,7 +35,7 @@ source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
   |
   = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 3  3  | 
 4  4  | from typing import TYPE_CHECKING
 5  5  | 

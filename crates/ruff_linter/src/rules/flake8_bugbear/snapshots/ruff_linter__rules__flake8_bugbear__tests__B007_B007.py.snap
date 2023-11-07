@@ -21,7 +21,7 @@ B007.py:18:13: B007 [*] Loop control variable `k` not used within loop body
    |
    = help: Rename unused `k` to `_k`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 15 15 | 
 16 16 | for i in range(10):
 17 17 |     for j in range(10):
@@ -47,7 +47,7 @@ B007.py:30:13: B007 [*] Loop control variable `k` not used within loop body
    |
    = help: Rename unused `k` to `_k`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 27 27 |                     yield i, (j, (k, l))
 28 28 | 
 29 29 | 
@@ -110,7 +110,7 @@ B007.py:52:14: B007 [*] Loop control variable `bar` not used within loop body
    |
    = help: Rename unused `bar` to `_bar`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 49 49 | 
 50 50 | def f():
 51 51 |     # Fixable.
@@ -142,7 +142,7 @@ B007.py:68:14: B007 [*] Loop control variable `bar` not used within loop body
    |
    = help: Rename unused `bar` to `_bar`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 65 65 | 
 66 66 | def f():
 67 67 |     # Fixable.
