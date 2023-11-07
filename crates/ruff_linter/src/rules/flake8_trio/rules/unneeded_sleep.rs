@@ -6,27 +6,27 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for trio functions that should contain await but don't.
+/// Checks for the while loop, which waits for the event.
 ///
 /// ## Why is this bad?
-/// Some trio context managers, such as `trio.fail_after` and
-/// `trio.move_on_after`, have no effect unless they contain an `await`
-/// statement. The use of such functions without an `await` statement is
-/// likely a mistake.
+/// Instead of sleeping in a loop waiting for a condition to be true,
+/// it's preferable to use a trio. Event.
 ///
 /// ## Example
 /// ```python
+/// DONE = False
+///
 /// async def func():
-///     with trio.move_on_after(2):
-///         do_something()
+///     while not DONE:
+///         await trio.sleep(1)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// DONE = trio.Event()
+///
 /// async def func():
-///     with trio.move_on_after(2):
-///         do_something()
-///         await awaitable()
+///     await DONE.wait()
 /// ```
 #[violation]
 pub struct TrioUnneededSleep;
