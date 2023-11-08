@@ -12,6 +12,7 @@ use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::fs::relativize_path;
+use crate::fs::normalize_path;
 use crate::line_width::{IndentWidth, LineWidthBuilder};
 use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
@@ -27,6 +28,8 @@ bitflags! {
         const SHOW_FIX_DIFF      = 0b0000_0010;
         /// Whether to show the source code of a diagnostic.
         const SHOW_SOURCE        = 0b0000_0100;
+        /// Whether to show absolute paths for files.
+        const SHOW_ABSOLUTE_PATH = 0b0000_1000;
     }
 }
 
@@ -71,10 +74,15 @@ impl Emitter for TextEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
+            let path = if self.flags.intersects(EmitterFlags::SHOW_ABSOLUTE_PATH) {
+                normalize_path(message.filename()).bold()
+            } else {
+                relativize_path(message.filename()).bold()
+            }
             write!(
                 writer,
                 "{path}{sep}",
-                path = relativize_path(message.filename()).bold(),
+                path = path,
                 sep = ":".cyan(),
             )?;
 
