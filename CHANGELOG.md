@@ -4,17 +4,14 @@
 
 ### Preview features
 
-- \[TRIO\] Add TRIO109 rule ([#8534](https://github.com/astral-sh/ruff/pull/8534))
-- Add TRIO110 rule ([#8537](https://github.com/astral-sh/ruff/pull/8537))
-- \[`refurb`\] Implement `type-none-comparison` (`FURB169`) ([#8487](https://github.com/astral-sh/ruff/pull/8487))
-- Make `SIM118` fix as safe when the expression is a known dictionary  ([#8525](https://github.com/astral-sh/ruff/pull/8525))
-- \[`TRIO`\] Add `TRIO105`: `SyncTrioCall` ([#8490](https://github.com/astral-sh/ruff/pull/8490))
-
-### Rule changes
-
-- Flag all comparisons against builtin types in E721 ([#8491](https://github.com/astral-sh/ruff/pull/8491))
 - \[`flake8-bandit`\] Implement `mako-templates` (`S702`) ([#8533](https://github.com/astral-sh/ruff/pull/8533))
-- \[`TRIO`\] Add `TRIO115`: TrioZeroSleepCall ([#8486](https://github.com/astral-sh/ruff/pull/8486))
+- \[`flake8-trio`\] Implement `TRIO105` ([#8490](https://github.com/astral-sh/ruff/pull/8490))
+- \[`flake8-trio`\] Implement `TRIO109` ([#8534](https://github.com/astral-sh/ruff/pull/8534))
+- \[`flake8-trio`\] Implement `TRIO110` ([#8537](https://github.com/astral-sh/ruff/pull/8537))
+- \[`flake8-trio`\] Implement `TRIO115` ([#8486](https://github.com/astral-sh/ruff/pull/8486))
+- \[`refurb`\] Implement `type-none-comparison` (`FURB169`) ([#8487](https://github.com/astral-sh/ruff/pull/8487))
+- Flag all comparisons against builtin types in `E721` ([#8491](https://github.com/astral-sh/ruff/pull/8491))
+- Make `SIM118` fix as safe when the expression is a known dictionary  ([#8525](https://github.com/astral-sh/ruff/pull/8525))
 
 ### Formatter
 
@@ -23,49 +20,34 @@
 ### CLI
 
 - Add hidden `--extension` to override inference of source type from file extension ([#8373](https://github.com/astral-sh/ruff/pull/8373))
-- Allow RUFF_NO_CACHE environment variable (like RUFF_CACHE_DIR) ([#8538](https://github.com/astral-sh/ruff/pull/8538))
 
 ### Configuration
 
 - Account for selector specificity when merging `extend_unsafe_fixes` and `override extend_safe_fixes` ([#8444](https://github.com/astral-sh/ruff/pull/8444))
+- Add support for disabling cache with `RUFF_NO_CACHE` environment variable ([#8538](https://github.com/astral-sh/ruff/pull/8538))
 
 ### Bug fixes
 
 - \[`E721`\] Flag comparisons to `memoryview` ([#8485](https://github.com/astral-sh/ruff/pull/8485))
 - Allow collapsed-ellipsis bodies in other statements ([#8499](https://github.com/astral-sh/ruff/pull/8499))
 - Avoid `D301` autofix for `u` prefixed strings ([#8495](https://github.com/astral-sh/ruff/pull/8495))
-- Only flag flake8-trio rule when trio is present ([#8550](https://github.com/astral-sh/ruff/pull/8550))
+- Only flag `flake8-trio` rules when `trio` import is present ([#8550](https://github.com/astral-sh/ruff/pull/8550))
 - Reject more syntactically invalid Python programs ([#8524](https://github.com/astral-sh/ruff/pull/8524))
 - Avoid raising `TRIO115` violations for `trio.sleep(...)` calls with non-number values ([#8532](https://github.com/astral-sh/ruff/pull/8532))
+- Fix `F841` false negative on assignment to multiple variables ([#8489](https://github.com/astral-sh/ruff/pull/8489))
 
-### Other changes
+### Documentation
 
-- Add Pillow to Ruff users ([#8523](https://github.com/astral-sh/ruff/pull/8523))
-- Add a `Fix` constructor that takes `Applicability` as an argument ([#8514](https://github.com/astral-sh/ruff/pull/8514))
-- Bump bitflags from 2.4.0 to 2.4.1 ([#8511](https://github.com/astral-sh/ruff/pull/8511))
-- Doc: Fix link to isort `known-first-party` ([#8562](https://github.com/astral-sh/ruff/pull/8562))
+- Fix link to isort `known-first-party` ([#8562](https://github.com/astral-sh/ruff/pull/8562))
 - Add notes on fix safety to a few rules ([#8500](https://github.com/astral-sh/ruff/pull/8500))
+- Add missing toml config tabs ([#8512](https://github.com/astral-sh/ruff/pull/8512))
 - Add instructions for configuration of Emacs ([#8488](https://github.com/astral-sh/ruff/pull/8488))
-- Bump syn from 2.0.38 to 2.0.39 ([#8509](https://github.com/astral-sh/ruff/pull/8509))
-- Add dedicated method to find typed binding ([#8517](https://github.com/astral-sh/ruff/pull/8517))
 - Improve detail link contrast in dark mode ([#8548](https://github.com/astral-sh/ruff/pull/8548))
 - Fix typo in example ([#8506](https://github.com/astral-sh/ruff/pull/8506))
-- Fix `F841` false negative on assignment to multiple variables ([#8489](https://github.com/astral-sh/ruff/pull/8489))
-- Upgrade pre-commit dependencies ([#8518](https://github.com/astral-sh/ruff/pull/8518))
-- docs: Add missing toml config tabs ([#8512](https://github.com/astral-sh/ruff/pull/8512))
-- Update applicability messages for clarity in tests ([#8541](https://github.com/astral-sh/ruff/pull/8541))
-- Add PyMC Marketing to Users ([#8529](https://github.com/astral-sh/ruff/pull/8529))
-- Add `rooster` release management configuration and instructions ([#8567](https://github.com/astral-sh/ruff/pull/8567))
-- Ensure ecosystem project errors are properly fenced ([#8516](https://github.com/astral-sh/ruff/pull/8516))
 - Added tabs for configuration files in the documentation ([#8480](https://github.com/astral-sh/ruff/pull/8480))
-- Bump serde_json from 1.0.107 to 1.0.108 ([#8510](https://github.com/astral-sh/ruff/pull/8510))
-- Bump serde-wasm-bindgen from 0.6.0 to 0.6.1 ([#8507](https://github.com/astral-sh/ruff/pull/8507))
-- Bump codspeed-criterion-compat from 2.3.0 to 2.3.1 ([#8508](https://github.com/astral-sh/ruff/pull/8508))
-- Add singleton escape hatch to B008 documentation ([#8501](https://github.com/astral-sh/ruff/pull/8501))
 - Recommend `project.requires-python` over `target-version` ([#8513](https://github.com/astral-sh/ruff/pull/8513))
-- Skip ecosystem check when no changes detected ([#8520](https://github.com/astral-sh/ruff/pull/8520))
+- Add singleton escape hatch to `B008` documentation ([#8501](https://github.com/astral-sh/ruff/pull/8501))
 - Fix tab configuration docs ([#8502](https://github.com/astral-sh/ruff/pull/8502))
-- Update pre-commit documentation ([#8545](https://github.com/astral-sh/ruff/pull/8545))
 
 ## 0.1.4
 
