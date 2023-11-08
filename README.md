@@ -4,7 +4,7 @@ This repo is the ekr-ruff fork of [ruff format](https://github.com/rust-lang/rus
 
 **The Goal**
 
-Increase Ruff Format's popularity by letting projects enforce their *existing* styles.
+Increase ruff format's popularity by letting projects enforce their *existing* styles.
 
 **Motivation**
 
