@@ -208,9 +208,9 @@ Linter plugin configurations are expressed as subsections, e.g.:
     docstring-quotes = "double"
     ```
 
-Ruff respects `pyproject.toml`, `ruff.toml`, and `.ruff.toml` files. All three implement
-an equivalent schema (though in the `ruff.toml` and `.ruff.toml` versions, the
-`[tool.ruff]` header is omitted).
+Ruff respects `pyproject.toml`, `ruff.toml`, and `.ruff.toml` files. All three implement an
+equivalent schema (though in the `ruff.toml` and `.ruff.toml` versions, the `[tool.ruff]` header and
+`tool.ruff` section prefix is omitted).
 
 For a complete enumeration of the available configuration options, see [_Settings_](settings.md).
 
