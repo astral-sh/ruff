@@ -69,3 +69,19 @@ force-exclude = '''
   | crates/ruff_python_formatter/resources
 )/
 '''
+
+[tool.rooster]
+major_labels = []  # Ruff never uses the major version number
+minor_labels = ["breaking"]   # Bump the minor version on breaking changes
+
+changelog_sections.breaking = "Breaking changes"
+changelog_sections.preview = "Preview features"
+changelog_sections.rule = "Rule changes"
+changelog_sections.formatter = "Formatter"
+changelog_sections.cli = "CLI"
+changelog_sections.configuration = "Configuration"
+changelog_sections.bug = "Bug fixes"
+changelog_sections.__unknown__ = "Other changes"
+
+changelog_ignore_labels = ["internal"]
+changelog_authors = false
