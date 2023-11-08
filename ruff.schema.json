@@ -2206,7 +2206,7 @@
       "type": "object",
       "properties": {
         "hang-closing": {
-          "description": "Whether missing indentation for closing brakets (E133) should be triggered. If set to true, this switches the default behavior of closing brackets so that they require hanging indents.",
+          "description": "Whether missing indentation for closing brackets (E133) should be triggered. If set to true, this switches the default behavior of closing brackets so that they require hanging indents.",
           "type": [
             "boolean",
             "null"

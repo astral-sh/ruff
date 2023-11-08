@@ -2355,7 +2355,7 @@ pub struct PycodestyleOptions {
     )]
     pub ignore_overlong_task_comments: Option<bool>,
 
-    /// Whether missing indentation for closing brakets (E133) should be triggered.
+    /// Whether missing indentation for closing brackets (E133) should be triggered.
     /// If set to true, this switches the default behavior of closing brackets so that they require hanging indents.
     #[option(
         default = "false",

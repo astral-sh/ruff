@@ -75,7 +75,7 @@ impl Violation for MissingOrOutdentedIndentation {
 /// Checks for brackets that do not match the indentation level of the line that their opening bracket started on.
 ///
 /// ## Why is this bad?
-/// This makes identifying brakets pair harder.
+/// This makes identifying brackets pair harder.
 ///
 /// ## Example
 /// ```python
@@ -108,7 +108,7 @@ impl Violation for ClosingBracketNotMatchingOpeningBracketIndentation {
 /// Checks for closing brackets that do not match the indentation of the opening bracket.
 ///
 /// ## Why is this bad?
-/// This makes identifying brakets pair harder.
+/// This makes identifying brackets pair harder.
 ///
 /// ## Example
 /// ```python
@@ -689,23 +689,17 @@ pub(crate) fn continuation_lines(
             );
         }
         // Visual indent after assert/raise/with.
-        else if row == 0
+        else if (row == 0
             && depth == 0
             && matches!(
                 token.kind,
                 TokenKind::Assert | TokenKind::Raise | TokenKind::With
-            )
-        {
-            indent_chances.insert(
-                token_info.token_end_within_physical_line + 1,
-                IndentFlag::Standard,
-            );
-        }
+            ))
         // Special case for the "if" statement because "if (".len() == 4
-        else if indent_chances.is_empty()
+       || (indent_chances.is_empty()
             && row == 0
             && depth == 0
-            && matches!(token.kind, TokenKind::If)
+            && matches!(token.kind, TokenKind::If))
         {
             indent_chances.insert(
                 token_info.token_end_within_physical_line + 1,
@@ -766,13 +760,9 @@ pub(crate) fn continuation_lines(
                     }
                 }
             }
-            if !indent_chances.contains_key(&token_info.token_start_within_physical_line) {
-                // Allow lining up tokens
-                indent_chances.insert(
-                    token_info.token_start_within_physical_line,
-                    IndentFlag::Token(token.kind),
-                );
-            }
+            indent_chances
+                .entry(token_info.token_start_within_physical_line)
+                .or_insert(IndentFlag::Token(token.kind));
         }
 
         last_token_multiline =
