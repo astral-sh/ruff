@@ -1415,7 +1415,7 @@ impl<'a> Checker<'a> {
         // subsequent nodes are evaluated in the inner scope.
         //
         // For example, given:
-        // ```py
+        // ```python
         // class A:
         //     T = range(10)
         //
@@ -1423,7 +1423,7 @@ impl<'a> Checker<'a> {
         // ```
         //
         // Conceptually, this is compiled as:
-        // ```py
+        // ```python
         // class A:
         //     T = range(10)
         //

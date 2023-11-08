@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/parentheses/opening_parentheses_comment_empty.py
 ---
 ## Input
-```py
+```python
 # Opening parentheses end-of-line comment without a value in the parentheses
 
 (  # a 1
@@ -93,7 +93,7 @@ f3 = {  # f3
 ```
 
 ## Output
-```py
+```python
 # Opening parentheses end-of-line comment without a value in the parentheses
 
 (  # a 1

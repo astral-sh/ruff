@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/function.py
 ---
 ## Input
-```py
+```python
 # Dangling comments
 def test(
     # comment
@@ -419,7 +419,7 @@ def default_arg_comments2(#
 ```
 
 ## Output
-```py
+```python
 # Dangling comments
 def test(
     # comment

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/binary_pow_spacing.py
 ---
 ## Input
-```py
+```python
 # No spacing
 5 ** 5
 5.0 ** 5.0
@@ -17,7 +17,7 @@ None ** None
 ```
 
 ## Output
-```py
+```python
 # No spacing
 5**5
 5.0**5.0

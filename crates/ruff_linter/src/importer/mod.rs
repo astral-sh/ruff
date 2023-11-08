@@ -209,7 +209,7 @@ impl<'a> Importer<'a> {
         // We also add a no-op edit to force conflicts with any other fixes that might try to
         // remove the import. Consider:
         //
-        // ```py
+        // ```python
         // import sys
         //
         // quit()

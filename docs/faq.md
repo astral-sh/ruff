@@ -245,14 +245,14 @@ isort treat inline comments in some cases (see: [#1381](https://github.com/astra
 
 For example, Ruff tends to group non-aliased imports from the same module:
 
-```py
+```python
 from numpy import cos, int8, int16, int32, int64, tan, uint8, uint16, uint32, uint64
 from numpy import sin as np_sin
 ```
 
 Whereas isort splits them into separate import statements at each aliased boundary:
 
-```py
+```python
 from numpy import cos, int8, int16, int32, int64
 from numpy import sin as np_sin
 from numpy import tan, uint8, uint16, uint32, uint64

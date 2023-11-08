@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/top_level.pyi
 ---
 ## Input
-```py
+```python
 class A:
     def __init__(self):
         pass
@@ -98,7 +98,7 @@ class EllipsisWithLeadingComment:
 ```
 
 ## Output
-```py
+```python
 class A:
     def __init__(self):
         pass

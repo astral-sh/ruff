@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/form_feed.py
 ---
 ## Input
-```py
+```python
 # Regression test for: https://github.com/astral-sh/ruff/issues/7624
 if symbol is not None:
     request["market"] = market["id"]
@@ -13,7 +13,7 @@ else:
 ```
 
 ## Output
-```py
+```python
 # Regression test for: https://github.com/astral-sh/ruff/issues/7624
 if symbol is not None:
     request["market"] = market["id"]

@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 a, b, c = 3, 4,       5
 if (
     a ==    3
@@ -34,7 +34,7 @@ else:
 
 ## Ruff Output
 
-```py
+```python
 a, b, c = 3, 4, 5
 if (
     a == 3
@@ -48,7 +48,7 @@ else:
 
 ## Black Output
 
-```py
+```python
 a, b, c = 3, 4, 5
 if (
     a == 3

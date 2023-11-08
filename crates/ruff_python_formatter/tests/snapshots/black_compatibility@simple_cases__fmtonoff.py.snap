@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 #!/usr/bin/env python3
 import asyncio
 import sys
@@ -271,7 +271,7 @@ d={'a':1,
 
 ## Ruff Output
 
-```py
+```python
 #!/usr/bin/env python3
 import asyncio
 import sys
@@ -506,7 +506,7 @@ d={'a':1,
 
 ## Black Output
 
-```py
+```python
 #!/usr/bin/env python3
 import asyncio
 import sys
