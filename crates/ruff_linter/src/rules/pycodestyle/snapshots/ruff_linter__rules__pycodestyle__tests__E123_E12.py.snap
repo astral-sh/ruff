@@ -1,0 +1,73 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:79:5: E123 Closing bracket not matching its corresponding opening bracket's indentation.
+   |
+77 |     1, 2, 3,
+78 |     4, 5, 6,
+79 |     ]
+   |     ^ E123
+80 | 
+81 | #: E123
+   |
+
+E12.py:84:5: E123 Closing bracket not matching its corresponding opening bracket's indentation.
+   |
+82 | print "Indent", (
+83 |     "bad", "hanging", "close"
+84 |     )
+   |     ^ E123
+85 | 
+86 | #: E123
+   |
+
+E12.py:91:13: E123 Closing bracket not matching its corresponding opening bracket's indentation.
+   |
+89 |         'bar', {
+90 |             'baz': 'frop',
+91 |             }
+   |             ^ E123
+92 |         ]
+93 |     }
+   |
+
+E12.py:92:9: E123 Closing bracket not matching its corresponding opening bracket's indentation.
+   |
+90 |             'baz': 'frop',
+91 |             }
+92 |         ]
+   |         ^ E123
+93 |     }
+   |
+
+E12.py:93:5: E123 Closing bracket not matching its corresponding opening bracket's indentation.
+   |
+91 |             }
+92 |         ]
+93 |     }
+   |     ^ E123
+94 | 
+95 | #: E123
+   |
+
+E12.py:99:5: E123 Closing bracket not matching its corresponding opening bracket's indentation.
+    |
+ 97 |     'a', 'b', 'c',
+ 98 |     'd', 'e', 'f',
+ 99 |     )
+    |     ^ E123
+100 | 
+101 | #: E123
+    |
+
+E12.py:111:17: E123 Closing bracket not matching its corresponding opening bracket's indentation.
+    |
+109 |                 # Replace them.
+110 |                 for replacement in replace(child)
+111 |                 ),
+    |                 ^ E123
+112 |             dict(name=token.undefined)
+113 |         )]
+    |
+
+

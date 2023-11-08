@@ -1,0 +1,26 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:421:44: E129 Visually indented line has the same indentation as the next logical line.
+    |
+419 | #: E129 W503
+420 | if (row < 0 or self.moduleCount <= row
+421 |     or col < 0 or self.moduleCount <= col):
+    |                                            ^ E129
+422 |     raise Exception("%s,%s - %s" % (row, col, self.moduleCount))
+423 | 
+424 | #: E129
+    |
+
+E12.py:427:16: E129 Visually indented line has the same indentation as the next logical line.
+    |
+425 | if (a == 2
+426 |     or b == "abc def ghi"
+427 |     "jkl mno"):
+    |                ^ E129
+428 |     return True
+429 | 
+430 | #: E131
+    |
+
+
