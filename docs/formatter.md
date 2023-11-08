@@ -99,16 +99,29 @@ The Ruff Formatter exposes a small set of configuration options, some of which a
 by Black (like line width), some of which are unique to Ruff (like quote and indentation style).
 
 For example, to configure the formatter to use single quotes, a line width of 100, and
-tab indentation, add the following to your `pyproject.toml`:
+tab indentation, add the following to your configuration file:
 
-```toml
-[tool.ruff]
-line-length = 100
+=== "pyproject.toml"
 
-[tool.ruff.format]
-quote-style = "single"
-indent-style = "tab"
-```
+    ```toml
+    [tool.ruff]
+    line-length = 100
+
+    [tool.ruff.format]
+    quote-style = "single"
+    indent-style = "tab"
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    line-length = 100
+
+    [format]
+    quote-style = "single"
+    indent-style = "tab"
+    ```
+
 
 For the full list of supported settings, see [_Settings_](settings.md#format). For more on
 configuring Ruff via `pyproject.toml`, see [_Configuring Ruff_](configuration.md).

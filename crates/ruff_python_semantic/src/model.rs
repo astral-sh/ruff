@@ -616,6 +616,16 @@ impl<'a> SemanticModel<'a> {
         self.resolved_names.get(&name.into()).copied()
     }
 
+    /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if it's the
+    /// only binding to that name in its scope.
+    pub fn only_binding(&self, name: &ast::ExprName) -> Option<BindingId> {
+        self.resolve_name(name).filter(|id| {
+            let binding = self.binding(*id);
+            let scope = &self.scopes[binding.scope];
+            scope.shadowed_binding(*id).is_none()
+        })
+    }
+
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
     /// or builtin symbol.
     ///
@@ -1195,6 +1205,16 @@ impl<'a> SemanticModel<'a> {
             exceptions.insert(*exception);
         }
         exceptions
+    }
+
+    /// Return `true` if the module at the given path was seen anywhere in the semantic model.
+    /// This includes both direct imports (`import trio`) and member imports (`from trio import
+    /// TrioTask`).
+    pub fn seen(&self, module: &[&str]) -> bool {
+        self.bindings
+            .iter()
+            .filter_map(Binding::as_any_import)
+            .any(|import| import.call_path().starts_with(module))
     }
 
     /// Generate a [`Snapshot`] of the current semantic model.

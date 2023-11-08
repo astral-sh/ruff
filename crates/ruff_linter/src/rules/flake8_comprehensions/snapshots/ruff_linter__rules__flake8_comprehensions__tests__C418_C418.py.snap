@@ -10,7 +10,7 @@ C418.py:1:1: C418 [*] Unnecessary `dict` literal passed to `dict()` (remove the 
   |
   = help: Remove outer `dict` call
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1   |-dict({})
   1 |+{}
 2 2 | dict({'a': 1})
@@ -27,7 +27,7 @@ C418.py:2:1: C418 [*] Unnecessary `dict` literal passed to `dict()` (remove the 
   |
   = help: Remove outer `dict` call
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | dict({})
 2   |-dict({'a': 1})
   2 |+{'a': 1}
@@ -46,7 +46,7 @@ C418.py:3:1: C418 [*] Unnecessary `dict` comprehension passed to `dict()` (remov
   |
   = help: Remove outer `dict` call
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | dict({})
 2 2 | dict({'a': 1})
 3   |-dict({'x': 1 for x in range(10)})
@@ -68,7 +68,7 @@ C418.py:4:1: C418 [*] Unnecessary `dict` comprehension passed to `dict()` (remov
   |
   = help: Remove outer `dict` call
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | dict({})
 2 2 | dict({'a': 1})
 3 3 | dict({'x': 1 for x in range(10)})

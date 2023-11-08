@@ -356,6 +356,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
+            if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
+                flake8_trio::rules::async_function_with_timeout(checker, function_def);
+            }
             #[cfg(feature = "unreachable-code")]
             if checker.enabled(Rule::UnreachableCode) {
                 checker
@@ -1006,6 +1009,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pyupgrade::rules::os_error_alias_raise(checker, item);
                 }
             }
+            if checker.enabled(Rule::TimeoutErrorAlias) {
+                if checker.settings.target_version >= PythonVersion::Py310 {
+                    if let Some(item) = exc {
+                        pyupgrade::rules::timeout_error_alias_raise(checker, item);
+                    }
+                }
+            }
             if checker.enabled(Rule::RaiseVanillaClass) {
                 if let Some(expr) = exc {
                     tryceratops::rules::raise_vanilla_class(checker, expr);
@@ -1199,7 +1209,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_trio::rules::timeout_without_await(checker, with_stmt, items);
             }
         }
-        Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+        Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Stmt(stmt));
             }
@@ -1208,6 +1218,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::TryExceptInLoop) {
                 perflint::rules::try_except_in_loop(checker, body);
+            }
+            if checker.enabled(Rule::TrioUnneededSleep) {
+                flake8_trio::rules::unneeded_sleep(checker, while_stmt);
             }
         }
         Stmt::For(
@@ -1303,6 +1316,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::OSErrorAlias) {
                 pyupgrade::rules::os_error_alias_handlers(checker, handlers);
+            }
+            if checker.enabled(Rule::TimeoutErrorAlias) {
+                if checker.settings.target_version >= PythonVersion::Py310 {
+                    pyupgrade::rules::timeout_error_alias_handlers(checker, handlers);
+                }
             }
             if checker.enabled(Rule::PytestAssertInExcept) {
                 flake8_pytest_style::rules::assert_in_exception_handler(checker, handlers);

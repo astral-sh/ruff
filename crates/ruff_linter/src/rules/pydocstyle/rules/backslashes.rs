@@ -1,6 +1,6 @@
 use memchr::memchr_iter;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
@@ -46,14 +46,16 @@ use crate::docstrings::Docstring;
 #[violation]
 pub struct EscapeSequenceInDocstring;
 
-impl AlwaysFixableViolation for EscapeSequenceInDocstring {
+impl Violation for EscapeSequenceInDocstring {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(r#"Use `r"""` if any backslashes in a docstring"#)
     }
 
-    fn fix_title(&self) -> String {
-        format!(r#"Add `r` prefix"#)
+    fn fix_title(&self) -> Option<String> {
+        Some(format!(r#"Add `r` prefix"#))
     }
 }
 
@@ -74,10 +76,12 @@ pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     }) {
         let mut diagnostic = Diagnostic::new(EscapeSequenceInDocstring, docstring.range());
 
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            "r".to_owned() + docstring.contents,
-            docstring.range(),
-        )));
+        if !docstring.leading_quote().contains(['u', 'U']) {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                "r".to_owned() + docstring.contents,
+                docstring.range(),
+            )));
+        }
 
         checker.diagnostics.push(diagnostic);
     }

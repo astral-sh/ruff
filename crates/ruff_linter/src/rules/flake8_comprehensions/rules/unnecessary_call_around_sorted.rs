@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
@@ -83,13 +83,14 @@ pub(crate) fn unnecessary_call_around_sorted(
         expr.range(),
     );
     diagnostic.try_set_fix(|| {
-        let edit =
-            fixes::fix_unnecessary_call_around_sorted(expr, checker.locator(), checker.stylist())?;
-        if outer.id == "reversed" {
-            Ok(Fix::unsafe_edit(edit))
-        } else {
-            Ok(Fix::safe_edit(edit))
-        }
+        Ok(Fix::applicable_edit(
+            fixes::fix_unnecessary_call_around_sorted(expr, checker.locator(), checker.stylist())?,
+            if outer.id == "reversed" {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            },
+        ))
     });
     checker.diagnostics.push(diagnostic);
 }

@@ -12,7 +12,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |
   = help: Remove assignment to unused variable `x`
 
-ℹ Fix
+ℹ Safe fix
 4 4 | 
 5 5 |     try:
 6 6 |         1 / 0
@@ -32,7 +32,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
    |
    = help: Remove assignment to unused variable `x`
 
-ℹ Fix
+ℹ Safe fix
 6  6  |         1 / 0
 7  7  |     except ValueError as x:
 8  8  |         pass

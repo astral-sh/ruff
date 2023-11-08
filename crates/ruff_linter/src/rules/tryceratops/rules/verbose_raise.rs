@@ -31,6 +31,10 @@ use crate::checkers::ast::Checker;
 ///     except ValueError:
 ///         raise
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it doesn't properly handle bound
+/// exceptions that are shadowed between the `except` and `raise` statements.
 #[violation]
 pub struct VerboseRaise;
 
