@@ -7,6 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashMap;
 
 /// ## What it does
 /// Checks for lines less indented than they should be for hanging indents.
@@ -364,6 +365,16 @@ struct TokenInfo<'a> {
     line: &'a str,
 }
 
+#[derive(Debug, Clone)]
+enum IndentFlag {
+    /// The pycodestyle's True
+    Standard,
+    /// The pycodestyle's text (str instance)
+    Token(TokenKind),
+    /// The pycodestyle's str class
+    StringOrComment,
+}
+
 /// Compute the `TokenInfo` of each token.
 fn get_token_infos<'a>(logical_line: &LogicalLine, locator: &'a Locator) -> Vec<TokenInfo<'a>> {
     let mut token_infos = Vec::new();
@@ -512,9 +523,9 @@ pub(crate) fn continuation_lines(
     let mut hang: i64 = 0;
     let mut hanging_indent: bool = false;
     // Visual indents
-    let mut indent_chances: Vec<i64> = Vec::new();
+    let mut indent_chances: FxHashMap<i64, IndentFlag> = FxHashMap::default();
     let mut last_indent = start_indent_level;
-    let mut visual_indent = false;
+    let mut visual_indent: Option<IndentFlag> = None;
     let mut last_token_multiline = false;
     // For each depth, memorize the visual indent column.
     let mut indent = vec![start_indent_level];
@@ -558,9 +569,13 @@ pub(crate) fn continuation_lines(
             }
 
             // Is there any chance of visual indent ?
-            visual_indent = !is_closing_bracket
-                && hang > 0
-                && indent_chances.contains(&token_info.token_start_within_physical_line);
+            visual_indent = if !is_closing_bracket && hang > 0 {
+                indent_chances
+                    .get(&token_info.token_start_within_physical_line)
+                    .cloned()
+            } else {
+                None
+            };
 
             if is_closing_bracket && indent[depth] != 0 {
                 // Closing bracket for visual indent.
@@ -583,7 +598,7 @@ pub(crate) fn continuation_lines(
                 && token_info.token_start_within_physical_line < indent[depth]
             {
                 // visual indent is broken
-                if !visual_indent {
+                if !matches!(visual_indent, Some(IndentFlag::Standard)) {
                     // E128
                     let diagnostic =
                         Diagnostic::new(ContinuationLineUnderIndentedForVisualIndent, token.range);
@@ -600,38 +615,55 @@ pub(crate) fn continuation_lines(
                     context.push_diagnostic(diagnostic);
                 }
                 hangs[depth] = Some(hang);
-            } else if visual_indent {
-                // Visual indent is verified.
-                indent[depth] = token_info.token_start_within_physical_line;
             } else {
-                // Indent is broken.
-                if hang <= 0 {
-                    // E122.
-                    let diagnostic = Diagnostic::new(MissingOrOutdentedIndentation, token.range);
-                    context.push_diagnostic(diagnostic);
-                } else if indent[depth] != 0 {
-                    // E127
-                    let diagnostic =
-                        Diagnostic::new(ContinuationLineOverIndentedForVisualIndent, token.range);
-                    context.push_diagnostic(diagnostic);
-                } else if !is_closing_bracket && hangs[depth].is_some_and(|hang| hang > 0) {
-                    // E131
-                    let diagnostic =
-                        Diagnostic::new(ContinuationLineUnalignedForHangingIndent, token.range);
-                    context.push_diagnostic(diagnostic);
-                } else {
-                    hangs[depth] = Some(hang);
-                    if hang > indent_size {
-                        // E126
-                        let diagnostic = Diagnostic::new(
-                            ContinuationLineOverIndentedForHangingIndent,
-                            token.range,
-                        );
-                        context.push_diagnostic(diagnostic);
-                    } else {
-                        // E121.
-                        let diagnostic = Diagnostic::new(UnderIndentedHangingIndent, token.range);
-                        context.push_diagnostic(diagnostic);
+                match visual_indent {
+                    Some(IndentFlag::Standard) => {
+                        // Visual indent is verified.
+                        indent[depth] = token_info.token_start_within_physical_line;
+                    }
+                    Some(IndentFlag::StringOrComment) => {
+                        // Ignore token lined up with matching one from a previous line.
+                    }
+                    Some(IndentFlag::Token(t)) if t == token.kind => {
+                        // Ignore token lined up with matching one from a previous line.
+                    }
+                    _ => {
+                        // Indent is broken.
+                        if hang <= 0 {
+                            // E122.
+                            let diagnostic =
+                                Diagnostic::new(MissingOrOutdentedIndentation, token.range);
+                            context.push_diagnostic(diagnostic);
+                        } else if indent[depth] != 0 {
+                            // E127
+                            let diagnostic = Diagnostic::new(
+                                ContinuationLineOverIndentedForVisualIndent,
+                                token.range,
+                            );
+                            context.push_diagnostic(diagnostic);
+                        } else if !is_closing_bracket && hangs[depth].is_some_and(|hang| hang > 0) {
+                            // E131
+                            let diagnostic = Diagnostic::new(
+                                ContinuationLineUnalignedForHangingIndent,
+                                token.range,
+                            );
+                            context.push_diagnostic(diagnostic);
+                        } else {
+                            hangs[depth] = Some(hang);
+                            if hang > indent_size {
+                                // E126
+                                let diagnostic = Diagnostic::new(
+                                    ContinuationLineOverIndentedForHangingIndent,
+                                    token.range,
+                                );
+                                context.push_diagnostic(diagnostic);
+                            } else {
+                                // E121.
+                                let diagnostic =
+                                    Diagnostic::new(UnderIndentedHangingIndent, token.range);
+                                context.push_diagnostic(diagnostic);
+                            }
+                        }
                     }
                 }
             }
@@ -646,11 +678,17 @@ pub(crate) fn continuation_lines(
             && indent[depth] == 0
         {
             indent[depth] = token_info.token_start_within_physical_line;
-            indent_chances.push(token_info.token_start_within_physical_line);
+            indent_chances.insert(
+                token_info.token_start_within_physical_line,
+                IndentFlag::Standard,
+            );
         }
         // Deal with implicit string concatenation.
         else if matches!(token.kind, TokenKind::Comment | TokenKind::String) {
-            indent_chances.push(token_info.token_start_within_physical_line);
+            indent_chances.insert(
+                token_info.token_start_within_physical_line,
+                IndentFlag::StringOrComment,
+            );
         }
         // Visual indent after assert/raise/with.
         else if row == 0
@@ -660,7 +698,10 @@ pub(crate) fn continuation_lines(
                 TokenKind::Assert | TokenKind::Raise | TokenKind::With
             )
         {
-            indent_chances.push(token_info.token_end_within_physical_line + 1);
+            indent_chances.insert(
+                token_info.token_end_within_physical_line + 1,
+                IndentFlag::Standard,
+            );
         }
         // Special case for the "if" statement because "if (".len() == 4
         else if indent_chances.is_empty()
@@ -668,7 +709,10 @@ pub(crate) fn continuation_lines(
             && depth == 0
             && matches!(token.kind, TokenKind::If)
         {
-            indent_chances.push(token_info.token_end_within_physical_line + 1);
+            indent_chances.insert(
+                token_info.token_end_within_physical_line + 1,
+                IndentFlag::Standard,
+            );
         } else if matches!(token.kind, TokenKind::Colon)
             && token_info.line[usize::try_from(token_info.token_end_within_physical_line)
                 .expect("Line to be relatively short.")..]
@@ -711,11 +755,11 @@ pub(crate) fn continuation_lines(
                         *ind = 0;
                     }
                 }
-                indent_chances.retain(|&ind| ind < prev_indent);
+                indent_chances.retain(|&ind, _| ind < prev_indent);
                 open_rows.truncate(depth);
                 depth -= 1;
                 if depth > 0 {
-                    indent_chances.push(indent[depth]);
+                    indent_chances.insert(indent[depth], IndentFlag::Standard);
                 }
                 for idx in (0..=row).rev() {
                     if parens[idx] != 0 {
@@ -724,9 +768,12 @@ pub(crate) fn continuation_lines(
                     }
                 }
             }
-            if !indent_chances.contains(&token_info.token_start_within_physical_line) {
+            if !indent_chances.contains_key(&token_info.token_start_within_physical_line) {
                 // Allow lining up tokens
-                indent_chances.push(token_info.token_start_within_physical_line);
+                indent_chances.insert(
+                    token_info.token_start_within_physical_line,
+                    IndentFlag::Token(token.kind),
+                );
             }
         }
 
@@ -749,7 +796,7 @@ pub(crate) fn continuation_lines(
             .tokens()
             .last()
             .expect("Would have returned if line was empty");
-        if visual_indent {
+        if visual_indent.is_some() {
             // E129.
             let diagnostic = Diagnostic::new(
                 VisuallyIndentedLineWithSameIndentAsNextLogicalLine,

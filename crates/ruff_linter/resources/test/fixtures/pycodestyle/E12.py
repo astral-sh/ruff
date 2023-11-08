@@ -9,7 +9,7 @@ result = {
 }
 
 #: E122
-print("E122", (
+print("In", (
 "dent"))
 
 #: E122:6:5 E122:7:5 E122:8:1
@@ -68,12 +68,9 @@ setup('',
           'Intended Audience :: Developers',
       ])
 
-#: E122:2:1 E128:5:1
+#: E122:2:1
 if True:\
 print(True)
-
-print(a
-, end=' ')
 
 #: E123
 my_list = [
@@ -82,7 +79,7 @@ my_list = [
     ]
 
 #: E123
-print "E123", (
+print "Indent", (
     "bad", "hanging", "close"
     )
 
@@ -115,12 +112,12 @@ if True:
             dict(name=token.undefined)
         )]
 
-#: E124
+#: E124 E128
 print ("E124", ("visual",
                "indent_two"
               ))
 
-#: E124
+#: E124 E128
 print ("E124", ("visual",
                "indent_five"
 ))
@@ -205,16 +202,16 @@ if ("""
 
 for foo in """
     abc
-    123
+    def
     """.strip().split():
     print(foo)
 
 #: E126
-print "E126", (
+print "In", (
             "dent")
 
 #: E126
-print "E126", (
+print "In", (
         "dent")
 
 #: E126
@@ -285,33 +282,41 @@ if (
     pass
 
 #: E127
-print ("E127", ("over-",
+print ("abcd", ("over-",
                   "over-indent"))
 
 #: E127
 foo(1, 2, 3,
      4, 5, 6)
+
 #: E127
 foo(1, 2, 3,
       4, 5, 6)
+
 #: E127
 foo(1, 2, 3,
        4, 5, 6)
+
 #: E127
 foo(1, 2, 3,
         4, 5, 6)
+
 #: E127
 foo(1, 2, 3,
          4, 5, 6)
+
 #: E127
 foo(1, 2, 3,
           4, 5, 6)
+
 #: E127
 foo(1, 2, 3,
            4, 5, 6)
+
 #: E127
 foo(1, 2, 3,
             4, 5, 6)
+
 #: E127
 foo(1, 2, 3,
              4, 5, 6)
@@ -324,6 +329,7 @@ rv.update(d=('a', 'b', 'c'),
 rv.update(d=('a' + 'b', 'c'),
           e=42, f=42
                  + 42)
+
 #: E127 W503
 input1 = {'a': {'calc': 1 + 2}, 'b': 1
                           + 42}
@@ -355,6 +361,10 @@ def f1():
           open('later-misindent'):
         file_2.write(file_1.read())
 
+#: E128:5:1
+print(a
+, end=' ')
+
 #: E128 E128
 if line_removed:
     self.event(cr, uid,
@@ -363,11 +373,11 @@ if line_removed:
                )
 
 #: E128
-print ("E128", ("visual",
+print ("abcd", ("visual",
     "hanging"))
 
 #: E128
-print ("E128", ("under-",
+print ("abcd", ("under-",
               "under-indent"))
 
 #: E128
@@ -385,14 +395,18 @@ def qualify_by_address(self, cr, uid, ids, context=None,
     """ This gets called by the web server """
 
 #: E128
+
 foo(1, 2, 3,
 4, 5, 6)
+
 #: E128
 foo(1, 2, 3,
  4, 5, 6)
+
 #: E128
 foo(1, 2, 3,
   4, 5, 6)
+
 #: E128
 foo(1, 2, 3,
    4, 5, 6)
@@ -412,3 +426,17 @@ if (a == 2
     or b == "abc def ghi"
     "jkl mno"):
     return True
+
+#: E131
+print "hello", (
+
+    "there",
+     # "john",
+    "dude")
+
+#: E131
+troublesome_hash = {
+    "hash": "value",
+    "long": "the quick brown fox jumps over the lazy dog before doing a "
+        "somersault",
+}
