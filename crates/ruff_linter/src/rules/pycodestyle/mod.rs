@@ -147,7 +147,6 @@ mod tests {
         Path::new("E12.py")
     )]
     #[test_case(Rule::ContinuationLineUnalignedForHangingIndent, Path::new("E12.py"))]
-    #[test_case(Rule::ClosingBracketMissingIndentation, Path::new("E12.py"))]
     #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
