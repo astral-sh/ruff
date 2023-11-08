@@ -497,22 +497,22 @@ file can omit the `[tool.ruff]` section header. For example:
 
 === "pyproject.toml"
 
-```toml
-[tool.ruff]
-line-length = 88
+    ```toml
+    [tool.ruff]
+    line-length = 88
 
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-```
+    [tool.ruff.lint.pydocstyle]
+    convention = "google"
+    ```
 
 === "ruff.toml"
 
-```toml
-line-length = 88
+    ```toml
+    line-length = 88
 
-[pydocstyle]
-convention = "google"
-```
+    [pydocstyle]
+    convention = "google"
+    ```
 
 Ruff doesn't currently support INI files, like `setup.cfg` or `tox.ini`.
 
