@@ -88,3 +88,13 @@ changelog_sections.__unknown__ = "Other changes"
 # We exclude contributors from the CHANGELOG file
 # Generate separately with `rooster contributors` for the GitHub release page
 changelog_contributors = false
+
+version_files = [
+  "README.md", 
+  "docs/integrations.md",
+  "crates/flake8_to_ruff/Cargo.toml",
+  "crates/ruff_cli/Cargo.toml",
+  "crates/ruff_linter/Cargo.toml",
+  "crates/ruff_shrinking/Cargo.toml",
+  "scripts/benchmarks/pyproject.toml",
+]
