@@ -810,7 +810,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -2060,7 +2060,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2196,7 +2196,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "aho-corasick",
  "annotate-snippets 0.9.1",
@@ -2447,7 +2447,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_shrinking"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "clap",
