@@ -326,23 +326,45 @@ If you'd prefer to either only lint or only format Jupyter Notebook files, you c
 section specific `exclude` option to do so. For example, the following would only lint Jupyter
 Notebook files and not format them:
 
-```toml
-[tool.ruff]
-extend-include = ["*.ipynb"]
+=== "pyproject.toml"
 
-[tool.ruff.format]
-exclude = ["*.ipynb"]
-```
+    ```toml
+    [tool.ruff]
+    extend-include = ["*.ipynb"]
+
+    [tool.ruff.format]
+    exclude = ["*.ipynb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend-include = ["*.ipynb"]
+
+    [format]
+    exclude = ["*.ipynb"]
+    ```
 
 And, conversely, the following would only format Jupyter Notebook files and not lint them:
 
-```toml
-[tool.ruff]
-extend-include = ["*.ipynb"]
+=== "pyproject.toml"
 
-[tool.ruff.lint]
-exclude = ["*.ipynb"]
-```
+    ```toml
+    [tool.ruff]
+    extend-include = ["*.ipynb"]
+
+    [tool.ruff.lint]
+    exclude = ["*.ipynb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend-include = ["*.ipynb"]
+
+    [lint]
+    exclude = ["*.ipynb"]
+    ```
 
 Alternatively, pass the notebook file(s) to `ruff` on the command-line directly. For example,
 `ruff check /path/to/notebook.ipynb` will always lint `notebook.ipynb`. Similarly,
