@@ -4,11 +4,11 @@ This repo is the ekr-ruff fork of [ruff format](https://github.com/rust-lang/rus
 
 **The Goal**
 
-Allow more people and projects to use Ruff Format by letting them enforce their *existing* styles.
+Increase Ruff Format's popularity by letting projects enforce their *existing* styles.
 
 **Motivation**
 
-- Leo can't use ruff format: it rewrites Leo's sentinel comments.
+- [Leo](https://leo-editor.github.io/leo-editor/) can't use ruff format: it rewrites Leo's sentinel comments.
 - Working on this project will teach me rust and improve Leo's rust importer.
 
 **Token-related options**
@@ -34,4 +34,4 @@ Adding or deleting newlines should be *options*, not mandates.
 **Summary**
 
 - Options are not the enemy: git, pylint, etc. have *hundreds* of options.
-- Options will let more projects use ruff format, including [Leo](https://leo-editor.github.io/leo-editor/)!
+- Options will let more projects use ruff format, including Leo!
