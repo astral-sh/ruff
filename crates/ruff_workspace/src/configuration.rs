@@ -25,8 +25,8 @@ use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
-    UnsafeFixes, Version,
+    ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion,
+    SerializationFormat, UnsafeFixes, Version,
 };
 use ruff_linter::settings::{
     resolve_per_file_ignores, LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS,
@@ -216,6 +216,7 @@ impl Configuration {
             linter: LinterSettings {
                 rules: lint.as_rule_table(lint_preview),
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
+                extension: lint.extension.unwrap_or_default(),
                 preview: lint_preview,
                 target_version,
                 project_root: project_root.to_path_buf(),
@@ -523,6 +524,7 @@ impl Configuration {
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
+    pub extension: Option<ExtensionMapping>,
 
     // Rule selection
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
@@ -589,6 +591,9 @@ impl LintConfiguration {
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
         Ok(LintConfiguration {
+            // `--extension` is a hidden command-line argument that isn't supported in configuration
+            // files at present.
+            extension: None,
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
@@ -905,6 +910,7 @@ impl LintConfiguration {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
+            extension: self.extension.or(config.extension),
             rule_selections: config
                 .rule_selections
                 .into_iter()

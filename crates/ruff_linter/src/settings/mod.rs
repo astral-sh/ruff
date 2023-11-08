@@ -23,7 +23,7 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion};
+use crate::settings::types::{ExtensionMapping, FilePatternSet, PerFileIgnore, PythonVersion};
 use crate::{codes, RuleSelector};
 
 use super::line_width::IndentWidth;
@@ -50,6 +50,7 @@ pub struct LinterSettings {
     pub target_version: PythonVersion,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
+    pub extension: ExtensionMapping,
 
     // Rule-specific settings
     pub allowed_confusables: FxHashSet<char>,
@@ -187,6 +188,7 @@ impl LinterSettings {
             pyupgrade: pyupgrade::settings::Settings::default(),
             preview: PreviewMode::default(),
             explicit_preview_rules: false,
+            extension: ExtensionMapping::default(),
         }
     }
 
