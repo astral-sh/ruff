@@ -2346,6 +2346,17 @@ pub struct PycodestyleOptions {
         "#
     )]
     pub ignore_overlong_task_comments: Option<bool>,
+
+    /// Whether missing indentation for closing brakets (E133) should be triggered.
+    /// If set to true, this switches the default behavior of closing brackets so that they require hanging indents.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            hang-closing = true
+        "#
+    )]
+    pub hang_closing: Option<bool>,
 }
 
 impl PycodestyleOptions {
@@ -2354,6 +2365,7 @@ impl PycodestyleOptions {
             max_doc_length: self.max_doc_length,
             max_line_length: self.max_line_length.unwrap_or(global_line_length),
             ignore_overlong_task_comments: self.ignore_overlong_task_comments.unwrap_or_default(),
+            hang_closing: self.hang_closing.unwrap_or_default(),
         }
     }
 }

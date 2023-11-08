@@ -474,6 +474,7 @@ pub(crate) fn continuation_lines(
     locator: &Locator,
     indent_char: char,
     indent_size: usize,
+    hang_closing: bool,
 ) {
     // The pycodestyle implementation makes use of negative values,
     // converting the indent_size type at the start avoids converting it multiple times later.
@@ -529,9 +530,6 @@ pub(crate) fn continuation_lines(
     let mut last_token_multiline = false;
     // For each depth, memorize the visual indent column.
     let mut indent = vec![start_indent_level];
-
-    // TODO: config option: hang closing bracket instead of matching indentation of opening bracket's line.
-    let hang_closing = false;
 
     for (token, token_info) in zip(logical_line.tokens(), &token_infos) {
         let mut is_newline = row < token_info.start_physical_line_idx;

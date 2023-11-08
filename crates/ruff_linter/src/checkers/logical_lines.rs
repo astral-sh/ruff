@@ -88,7 +88,14 @@ pub(crate) fn check_logical_lines(
 
         let indent_size = 4;
 
-        continuation_lines(&mut context, &line, locator, indent_char, indent_size);
+        continuation_lines(
+            &mut context,
+            &line,
+            locator,
+            indent_char,
+            indent_size,
+            settings.pycodestyle.hang_closing,
+        );
 
         for kind in indentation(
             &line,
