@@ -1186,9 +1186,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ReadWholeFile) {
                 refurb::rules::read_whole_file(checker, with_stmt);
             }
-            if checker.enabled(Rule::RedefinedArgumentFromLocal) {
-                pylint::rules::redefined_argument_from_local(checker, stmt);
-            }
         }
         Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
@@ -1260,9 +1257,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     perflint::rules::try_except_in_loop(checker, body);
                 }
             }
-            if checker.enabled(Rule::RedefinedArgumentFromLocal) {
-                pylint::rules::redefined_argument_from_local(checker, stmt);
-            }
         }
         Stmt::Try(ast::StmtTry {
             body,
@@ -1328,9 +1322,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ErrorInsteadOfException) {
                 tryceratops::rules::error_instead_of_exception(checker, handlers);
-            }
-            if checker.enabled(Rule::RedefinedArgumentFromLocal) {
-                pylint::rules::redefined_argument_from_local(checker, stmt);
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
