@@ -607,6 +607,19 @@ pub const fn is_const_false(expr: &Expr) -> bool {
     )
 }
 
+/// Return `true` if the [`Expr`] is a mutable iterable initizer.
+pub const fn is_mutable_iterable_initializer(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Set(_)
+            | Expr::SetComp(_)
+            | Expr::List(_)
+            | Expr::ListComp(_)
+            | Expr::Dict(_)
+            | Expr::DictComp(_)
+    )
+}
+
 /// Extract the names of all handled exceptions.
 pub fn extract_handled_exceptions(handlers: &[ExceptHandler]) -> Vec<&Expr> {
     let mut handled_exceptions = Vec::new();

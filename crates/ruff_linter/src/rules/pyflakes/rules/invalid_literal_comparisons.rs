@@ -80,8 +80,10 @@ pub(crate) fn invalid_literal_comparison(
     let mut left = left;
     for (index, (op, right)) in ops.iter().zip(comparators).enumerate() {
         if matches!(op, CmpOp::Is | CmpOp::IsNot)
-            && (helpers::is_constant_non_singleton(left)
+            && ((helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right))
+                || helpers::is_mutable_iterable_initializer(left)
+                || helpers::is_mutable_iterable_initializer(right))
         {
             let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
             if lazy_located.is_none() {
