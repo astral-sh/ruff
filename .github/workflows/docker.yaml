@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  PACKAGE_NAME: ruff
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  docker-build:
+    name: "build docker image"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine latest tag
+        # https://stackoverflow.com/a/75079768/5511061
+        run: |
+          echo "LATEST_TAG=$(curl -qsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
+          | jq -r .tag_name)" >> $GITHUB_ENV
+
+      - name: Generate tags for prefecthq/prefect
+        id: metadata-prod
+        uses: docker/metadata-action@v5
+        # only generate the production tags on release events
+        if: ${{ github.event_name == 'release' }}
+        with:
+          images: prefecthq/prefect
+          # push `latest`, `X.Y` and `X` tags only when the release is not marked as prerelease
+          # push `latest` and `X` tags only when the release is marked as latest
+          tags: |
+            type=pep440,pattern={{version}},suffix=-python${{ matrix.python-version }}${{ matrix.flavor }}
+            type=pep440,pattern={{major}}.{{minor}},suffix=-python${{ matrix.python-version }}${{ matrix.flavor }},enable=${{ github.event.release.prerelease == false }}
+            type=pep440,pattern={{major}},suffix=-python${{ matrix.python-version }}${{ matrix.flavor }},enable=${{ github.event.release.prerelease == false && github.ref_name == env.LATEST_TAG }}
+            type=raw,value=2-latest${{ matrix.flavor }},enable=${{ matrix.python-version == '3.10' && github.event.release.prerelease == false && github.ref_name == env.LATEST_TAG }}
+          flavor: |
+            latest=false
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ join(steps.metadata-dev.outputs.tags) }},${{ join(steps.metadata-prod.outputs.tags) }}
+          labels: ${{ steps.metadata-dev.outputs.labels }}
+          push: false
+          pull: false
+          provenance: false
