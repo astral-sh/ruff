@@ -939,4 +939,43 @@ COM81.py:632:42: COM812 [*] Trailing comma missing
 634 634 | 
 635 635 | foo = namedtuple(
 
+COM81.py:644:46: COM819 [*] Trailing comma prohibited
+    |
+643 | # F-strings
+644 | kwargs.pop("remove", f"this {trailing_comma}",)
+    |                                              ^ COM819
+645 | 
+646 | raise Exception(
+    |
+    = help: Remove trailing comma
+
+ℹ Safe fix
+641 641 | )
+642 642 | 
+643 643 | # F-strings
+644     |-kwargs.pop("remove", f"this {trailing_comma}",)
+    644 |+kwargs.pop("remove", f"this {trailing_comma}")
+645 645 | 
+646 646 | raise Exception(
+647 647 |     "first", extra=f"Add trailing comma here ->"
+
+COM81.py:647:49: COM812 [*] Trailing comma missing
+    |
+646 | raise Exception(
+647 |     "first", extra=f"Add trailing comma here ->"
+    |                                                  COM812
+648 | )
+    |
+    = help: Add trailing comma
+
+ℹ Safe fix
+644 644 | kwargs.pop("remove", f"this {trailing_comma}",)
+645 645 | 
+646 646 | raise Exception(
+647     |-    "first", extra=f"Add trailing comma here ->"
+    647 |+    "first", extra=f"Add trailing comma here ->",
+648 648 | )
+649 649 | 
+650 650 | assert False, f"<- This is not a trailing comma"
+
 
