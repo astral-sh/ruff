@@ -426,7 +426,7 @@ Found 3 errors.
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enforce a docstring convention, add a [`convention`](settings.md#convention--pydocstyle-convention-)
+Yes! To enforce a docstring convention, add a [`convention`](settings.md#pydocstyle-convention)
 setting following to your configuration file:
 
 === "pyproject.toml"
@@ -447,7 +447,7 @@ For example, if you're coming from flake8-docstrings, and your originating confi
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Alongside [`convention`](settings.md#convention--pydocstyle-convention-), you'll want to
+Alongside [`convention`](settings.md#pydocstyle-convention), you'll want to
 explicitly enable the `D` rule code prefix, since the `D` rules are not enabled by default:
 
 === "pyproject.toml"
@@ -474,9 +474,9 @@ explicitly enable the `D` rule code prefix, since the `D` rules are not enabled 
     convention = "google"
     ```
 
-Setting a [`convention`](settings.md#convention--pydocstyle-convention-) force-disables any rules
+Setting a [`convention`](settings.md#pydocstyle-convention) force-disables any rules
 that are incompatible with that convention, no matter how they're provided, which avoids accidental
-incompatibilities and simplifies configuration. By default, no [`convention`](settings.md#convention--pydocstyle-convention-)
+incompatibilities and simplifies configuration. By default, no [`convention`](settings.md#pydocstyle-convention)
 is set, and so the enabled rules are determined by the [`select`](settings.md#select) setting alone.
 
 ## What is "preview"?
