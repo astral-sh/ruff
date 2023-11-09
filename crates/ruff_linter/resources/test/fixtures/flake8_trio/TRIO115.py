@@ -19,6 +19,10 @@ async def func():
 
     bar = "bar"
     trio.sleep(bar)
+    
+    x, y = 0, 2000
+    trio.sleep(x)  # TRIO115
+    trio.sleep(y)  # OK
 
 
 trio.sleep(0)  # TRIO115
