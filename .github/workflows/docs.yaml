@@ -9,6 +9,7 @@ on:
         type: string
   release:
     types: [published]
+  pull_request:
 
 jobs:
   mkdocs:
