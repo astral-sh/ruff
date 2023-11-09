@@ -705,6 +705,10 @@ impl LintConfiguration {
         let mut deprecated_nursery_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
 
+        // Track which docstring rules are specifically enabled
+        // which lets us override the docstring convention ignore-list
+        let mut docstring_overrides: FxHashSet<Rule> = FxHashSet::default();
+
         for selection in &self.rule_selections {
             // If a selection only specifies extend-select we cannot directly
             // apply its rule selectors to the select_set because we firstly have
@@ -715,6 +719,8 @@ impl LintConfiguration {
             // whether to enable or disable the given rule.
             let mut select_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
             let mut fixable_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
+
+            let mut docstring_override_updates: FxHashSet<Rule> = FxHashSet::default();
 
             let carriedover_ignores = carryover_ignores.take();
             let carriedover_unfixables = carryover_unfixables.take();
@@ -730,6 +736,10 @@ impl LintConfiguration {
                 {
                     for rule in selector.rules(&preview) {
                         select_map_updates.insert(rule, true);
+
+                        if spec == Specificity::Rule {
+                            docstring_override_updates.insert(rule);
+                        }
                     }
                 }
                 for selector in selection
@@ -742,6 +752,7 @@ impl LintConfiguration {
                         select_map_updates.insert(rule, false);
                     }
                 }
+
                 // Apply the same logic to `fixable` and `unfixable`.
                 for selector in selection
                     .fixable
@@ -780,6 +791,8 @@ impl LintConfiguration {
                 {
                     carryover_ignores = Some(&selection.ignore);
                 }
+
+                docstring_overrides = docstring_override_updates;
             } else {
                 // Otherwise we apply the updates on top of the existing select_set.
                 for (rule, enabled) in select_map_updates {
@@ -788,6 +801,10 @@ impl LintConfiguration {
                     } else {
                         select_set.remove(rule);
                     }
+                }
+
+                for rule in docstring_override_updates {
+                    docstring_overrides.insert(rule);
                 }
             }
 
@@ -881,15 +898,17 @@ impl LintConfiguration {
             rules.enable(rule, fix);
         }
 
-        // If a docstring convention is specified, force-disable any incompatible error
-        // codes.
+        // If a docstring convention is specified, disable any incompatible error
+        // codes unless we are specifically overridden.
         if let Some(convention) = self
             .pydocstyle
             .as_ref()
             .and_then(|pydocstyle| pydocstyle.convention)
         {
             for rule in convention.rules_to_be_ignored() {
-                rules.disable(*rule);
+                if !docstring_overrides.contains(rule) {
+                    rules.disable(*rule);
+                }
             }
         }
 
