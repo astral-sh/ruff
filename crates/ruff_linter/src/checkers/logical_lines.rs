@@ -7,10 +7,11 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::rules::logical_lines::{
-    extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
-    missing_whitespace_around_operator, space_after_comma, space_around_operator,
-    whitespace_around_keywords, whitespace_around_named_parameter_equals,
-    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
+    blank_lines, extraneous_whitespace, indentation, missing_whitespace,
+    missing_whitespace_after_keyword, missing_whitespace_around_operator, space_after_comma,
+    space_around_operator, whitespace_around_keywords, whitespace_around_named_parameter_equals,
+    whitespace_before_comment, whitespace_before_parameters, BlankLinesTrackingVars, LogicalLines,
+    TokenFlags,
 };
 use crate::settings::LinterSettings;
 
@@ -38,6 +39,7 @@ pub(crate) fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
+    let mut blank_lines_tracking_vars = BlankLinesTrackingVars::default();
     let mut prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
@@ -100,6 +102,16 @@ pub(crate) fn check_logical_lines(
                 context.push(kind, range);
             }
         }
+
+        blank_lines(
+            &line,
+            prev_line.as_ref(),
+            &mut blank_lines_tracking_vars,
+            indent_level,
+            locator,
+            stylist,
+            &mut context,
+        );
 
         if !line.is_comment_only() {
             prev_line = Some(line);

@@ -122,6 +122,31 @@ mod tests {
     #[test_case(Rule::TooFewSpacesBeforeInlineComment, Path::new("E26.py"))]
     #[test_case(Rule::UnexpectedIndentation, Path::new("E11.py"))]
     #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]
+    #[test_case(Rule::UnderIndentedHangingIndent, Path::new("E12.py"))]
+    #[test_case(Rule::MissingOrOutdentedIndentation, Path::new("E12.py"))]
+    #[test_case(
+        Rule::ClosingBracketNotMatchingOpeningBracketIndentation,
+        Path::new("E12.py")
+    )]
+    #[test_case(
+        Rule::ClosingBracketNotMatchingOpeningBracketVisualIndentation,
+        Path::new("E12.py")
+    )]
+    #[test_case(Rule::ContinuationLineIndentSameAsNextLogicalLine, Path::new("E12.py"))]
+    #[test_case(
+        Rule::ContinuationLineOverIndentedForHangingIndent,
+        Path::new("E12.py")
+    )]
+    #[test_case(Rule::ContinuationLineOverIndentedForVisualIndent, Path::new("E12.py"))]
+    #[test_case(
+        Rule::ContinuationLineUnderIndentedForVisualIndent,
+        Path::new("E12.py")
+    )]
+    #[test_case(
+        Rule::VisuallyIndentedLineWithSameIndentAsNextLogicalLine,
+        Path::new("E12.py")
+    )]
+    #[test_case(Rule::ContinuationLineUnalignedForHangingIndent, Path::new("E12.py"))]
     #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]

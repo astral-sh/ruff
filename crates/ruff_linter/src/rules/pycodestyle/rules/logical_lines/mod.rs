@@ -1,3 +1,4 @@
+pub(crate) use blank_lines::*;
 pub(crate) use extraneous_whitespace::*;
 pub(crate) use indentation::*;
 pub(crate) use missing_whitespace::*;
@@ -20,6 +21,7 @@ use ruff_python_parser::TokenKind;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
 
+mod blank_lines;
 mod extraneous_whitespace;
 mod indentation;
 mod missing_whitespace;
@@ -119,7 +121,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 ///     2
 /// ]
 /// ```
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct LogicalLine<'a> {
     lines: &'a LogicalLines<'a>,
     line: &'a Line,
@@ -412,6 +414,10 @@ struct LogicalLinesBuilder {
     tokens: Vec<LogicalLineToken>,
     lines: Vec<Line>,
     current_line: CurrentLine,
+    /// Number of consecutive blank lines.
+    current_blank_lines: u32,
+    /// Number of blank characters in the blank lines (\n vs \r\n for example).
+    current_blank_characters: u32,
 }
 
 impl LogicalLinesBuilder {
@@ -475,12 +481,19 @@ impl LogicalLinesBuilder {
             let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
                 .iter()
                 .all(|token| token.kind.is_newline());
-            if !is_empty {
+            if is_empty {
+                self.current_blank_lines += 1;
+                self.current_blank_characters += end - self.current_line.tokens_start;
+            } else {
                 self.lines.push(Line {
                     flags: self.current_line.flags,
+                    preceding_blank_lines: self.current_blank_lines,
+                    preceding_blank_characters: self.current_blank_characters,
                     tokens_start: self.current_line.tokens_start,
                     tokens_end: end,
                 });
+                self.current_blank_lines = 0;
+                self.current_blank_characters = 0;
             }
 
             self.current_line = CurrentLine {
@@ -504,6 +517,8 @@ impl LogicalLinesBuilder {
 #[derive(Debug, Clone)]
 struct Line {
     flags: TokenFlags,
+    preceding_blank_lines: u32,
+    preceding_blank_characters: u32,
     tokens_start: u32,
     tokens_end: u32,
 }

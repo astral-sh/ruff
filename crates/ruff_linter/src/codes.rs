@@ -132,6 +132,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E274") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TabBeforeKeyword),
         #[allow(deprecated)]
         (Pycodestyle, "E275") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAfterKeyword),
+        (Pycodestyle, "E301") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLineBetweenMethods),
+        (Pycodestyle, "E302") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLinesTopLevel),
+        (Pycodestyle, "E303") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TooManyBlankLines),
+        (Pycodestyle, "E304") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLineAfterDecorator),
+        (Pycodestyle, "E305") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLinesAfterFunctionOrClass),
+        (Pycodestyle, "E306") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLinesBeforeNestedDefinition),
         (Pycodestyle, "E401") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleImportsOnOneLine),
         (Pycodestyle, "E402") => (RuleGroup::Stable, rules::pycodestyle::rules::ModuleImportNotAtTopOfFile),
         (Pycodestyle, "E501") => (RuleGroup::Stable, rules::pycodestyle::rules::LineTooLong),
