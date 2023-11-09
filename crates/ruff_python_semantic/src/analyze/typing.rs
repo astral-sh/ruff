@@ -582,7 +582,7 @@ pub fn resolve_assignment<'a>(
 ///
 /// TODOs:
 /// - Handle unpacked assignment
-/// - Handle complex assignment e.g.  [x, y], (z,) = (1, 2), [3]
+/// - Handle complex assignment e.g.  `[x, y], (z,) = (1, 2), [3]`
 pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
     let scope = semantic.current_scope();
     let binding_id = scope.get(id)?;
