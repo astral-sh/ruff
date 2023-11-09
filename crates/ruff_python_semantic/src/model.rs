@@ -174,11 +174,10 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
-        if matches!(
-            call_path.as_slice(),
-            ["typing" | "_typeshed" | "typing_extensions", _target]
-        ) {
-            return true;
+        if let ["typing" | "_typeshed" | "typing_extensions", name] = call_path.as_slice() {
+            if *name == target {
+                return true;
+            }
         }
 
         if self.typing_modules.iter().any(|module| {
