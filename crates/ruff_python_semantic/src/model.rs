@@ -175,18 +175,11 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
-        if call_path.as_slice() == ["typing", target] {
+        if matches!(
+            call_path.as_slice(),
+            ["typing" | "_typeshed" | "typing_extensions", target]
+        ) {
             return true;
-        }
-
-        if call_path.as_slice() == ["_typeshed", target] {
-            return true;
-        }
-
-        if is_typing_extension(target) {
-            if call_path.as_slice() == ["typing_extensions", target] {
-                return true;
-            }
         }
 
         if self.typing_modules.iter().any(|module| {
@@ -198,6 +191,14 @@ impl<'a> SemanticModel<'a> {
         }
 
         false
+    }
+
+    /// Return an iterator over the set of `typing` modules allowed in the semantic model.
+    pub fn typing_modules(&self) -> impl Iterator<Item = &str> {
+        ["typing", "_typeshed", "typing_extensions"]
+            .iter()
+            .copied()
+            .chain(self.typing_modules.iter().map(String::as_str))
     }
 
     /// Create a new [`Binding`] for a builtin.
