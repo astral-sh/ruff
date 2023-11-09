@@ -262,7 +262,7 @@ Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
 them. You can find the supported settings in the [API reference](settings.md#isort).
-For example, you can set [`known-first-party`](settings.md#known-first-party--isort-known-first-party-)
+For example, you can set [`known-first-party`](settings.md#isort-known-first-party)
 like so:
 
 === "pyproject.toml"

@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.1.5
+
+### Preview features
+
+- \[`flake8-bandit`\] Implement `mako-templates` (`S702`) ([#8533](https://github.com/astral-sh/ruff/pull/8533))
+- \[`flake8-trio`\] Implement `TRIO105` ([#8490](https://github.com/astral-sh/ruff/pull/8490))
+- \[`flake8-trio`\] Implement `TRIO109` ([#8534](https://github.com/astral-sh/ruff/pull/8534))
+- \[`flake8-trio`\] Implement `TRIO110` ([#8537](https://github.com/astral-sh/ruff/pull/8537))
+- \[`flake8-trio`\] Implement `TRIO115` ([#8486](https://github.com/astral-sh/ruff/pull/8486))
+- \[`refurb`\] Implement `type-none-comparison` (`FURB169`) ([#8487](https://github.com/astral-sh/ruff/pull/8487))
+- Flag all comparisons against builtin types in `E721` ([#8491](https://github.com/astral-sh/ruff/pull/8491))
+- Make `SIM118` fix as safe when the expression is a known dictionary  ([#8525](https://github.com/astral-sh/ruff/pull/8525))
+
+### Formatter
+
+- Fix multiline lambda expression statement formatting ([#8466](https://github.com/astral-sh/ruff/pull/8466))
+
+### CLI
+
+- Add hidden `--extension` to override inference of source type from file extension ([#8373](https://github.com/astral-sh/ruff/pull/8373))
+
+### Configuration
+
+- Account for selector specificity when merging `extend_unsafe_fixes` and `override extend_safe_fixes` ([#8444](https://github.com/astral-sh/ruff/pull/8444))
+- Add support for disabling cache with `RUFF_NO_CACHE` environment variable ([#8538](https://github.com/astral-sh/ruff/pull/8538))
+
+### Bug fixes
+
+- \[`E721`\] Flag comparisons to `memoryview` ([#8485](https://github.com/astral-sh/ruff/pull/8485))
+- Allow collapsed-ellipsis bodies in other statements ([#8499](https://github.com/astral-sh/ruff/pull/8499))
+- Avoid `D301` autofix for `u` prefixed strings ([#8495](https://github.com/astral-sh/ruff/pull/8495))
+- Only flag `flake8-trio` rules when `trio` import is present ([#8550](https://github.com/astral-sh/ruff/pull/8550))
+- Reject more syntactically invalid Python programs ([#8524](https://github.com/astral-sh/ruff/pull/8524))
+- Avoid raising `TRIO115` violations for `trio.sleep(...)` calls with non-number values ([#8532](https://github.com/astral-sh/ruff/pull/8532))
+- Fix `F841` false negative on assignment to multiple variables ([#8489](https://github.com/astral-sh/ruff/pull/8489))
+
+### Documentation
+
+- Fix link to isort `known-first-party` ([#8562](https://github.com/astral-sh/ruff/pull/8562))
+- Add notes on fix safety to a few rules ([#8500](https://github.com/astral-sh/ruff/pull/8500))
+- Add missing toml config tabs ([#8512](https://github.com/astral-sh/ruff/pull/8512))
+- Add instructions for configuration of Emacs ([#8488](https://github.com/astral-sh/ruff/pull/8488))
+- Improve detail link contrast in dark mode ([#8548](https://github.com/astral-sh/ruff/pull/8548))
+- Fix typo in example ([#8506](https://github.com/astral-sh/ruff/pull/8506))
+- Added tabs for configuration files in the documentation ([#8480](https://github.com/astral-sh/ruff/pull/8480))
+- Recommend `project.requires-python` over `target-version` ([#8513](https://github.com/astral-sh/ruff/pull/8513))
+- Add singleton escape hatch to `B008` documentation ([#8501](https://github.com/astral-sh/ruff/pull/8501))
+- Fix tab configuration docs ([#8502](https://github.com/astral-sh/ruff/pull/8502))
+
 ## 0.1.4
 
 ### Preview features
