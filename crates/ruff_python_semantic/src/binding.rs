@@ -514,6 +514,13 @@ pub enum BindingKind<'a> {
     /// Stores the ID of the binding that was shadowed in the enclosing
     /// scope, if any.
     UnboundException(Option<BindingId>),
+
+    /// A binding for a with statement variable, like `x` in:
+    /// ```python
+    /// with open('foo.py') as x:
+    ///     ...
+    /// ```
+    WithItemVar,
 }
 
 bitflags! {
