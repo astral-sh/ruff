@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/skip_magic_trailing_comma.py
 ---
 ## Input
-```py
+```python
 (
     "First entry",
     "Second entry",
@@ -50,7 +50,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 (
     "First entry",
     "Second entry",
@@ -103,7 +103,7 @@ magic-trailing-comma    = Ignore
 preview                 = Disabled
 ```
 
-```py
+```python
 ("First entry", "Second entry", "last with trailing comma")
 
 ("First entry", "Second entry", "last without trailing comma")

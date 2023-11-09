@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 ...
 'some_string'
 b'\\xa3'
@@ -279,7 +279,7 @@ last_call()
 
 ## Ruff Output
 
-```py
+```python
 ...
 "some_string"
 b"\\xa3"
@@ -655,7 +655,7 @@ last_call()
 
 ## Black Output
 
-```py
+```python
 ...
 "some_string"
 b"\\xa3"

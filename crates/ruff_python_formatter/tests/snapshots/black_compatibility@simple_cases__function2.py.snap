@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 def f(
   a,
   **kwargs,
@@ -85,7 +85,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
 
 ## Ruff Output
 
-```py
+```python
 def f(
     a,
     **kwargs,
@@ -153,7 +153,7 @@ with hmm_but_this_should_get_two_preceding_newlines():
 
 ## Black Output
 
-```py
+```python
 def f(
     a,
     **kwargs,

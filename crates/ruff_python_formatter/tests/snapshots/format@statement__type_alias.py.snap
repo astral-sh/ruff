@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/type_alias.py
 ---
 ## Input
-```py
+```python
 # basic usage
 
 type X = int
@@ -101,7 +101,7 @@ type bounds_trailing_comma[T: (a, b,)] = T
 ```
 
 ## Output
-```py
+```python
 # basic usage
 
 type X = int

@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 ---
 ## Input
 
-```py
+```python
 ''''''
 
 '\''
@@ -88,7 +88,7 @@ f"\"{a}\"{'hello' * b}\"{c}\""
 
 ## Ruff Output
 
-```py
+```python
 """"""
 
 "'"
@@ -151,7 +151,7 @@ f"\"{a}\"{'hello' * b}\"{c}\""
 
 ## Black Output
 
-```py
+```python
 """"""
 
 "'"

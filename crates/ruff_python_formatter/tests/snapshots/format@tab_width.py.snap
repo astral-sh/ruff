@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/tab_width.py
 ---
 ## Input
-```py
+```python
 # Fits with tab width 2
 (1 + "	012345678901234567890123456789012345678901234567890123456789012345678901234567")
 
@@ -25,7 +25,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 # Fits with tab width 2
 (1 + "	012345678901234567890123456789012345678901234567890123456789012345678901234567")
 
@@ -47,7 +47,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 # Fits with tab width 2
 (
     1
@@ -72,7 +72,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 # Fits with tab width 2
 (
         1

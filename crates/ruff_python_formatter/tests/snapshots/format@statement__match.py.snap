@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/match.py
 ---
 ## Input
-```py
+```python
 # leading match comment
 match foo:  # dangling match comment
     case "bar":
@@ -587,7 +587,7 @@ match n % 3, n % 5:
 ```
 
 ## Output
-```py
+```python
 # leading match comment
 match foo:  # dangling match comment
     case "bar":
