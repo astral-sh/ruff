@@ -177,4 +177,86 @@ EM.py:60:35: EM101 Exception must not use a string literal, assign to variable f
    |
    = help: Assign to variable; remove string literal
 
+EM.py:64:24: EM102 [*] Exception must not use an f-string literal, assign to variable first
+   |
+63 | def f_triple_quoted_string():
+64 |     raise RuntimeError(f"""This is an {"example"} exception""")
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102
+   |
+   = help: Assign to variable; remove f-string literal
+
+ℹ Unsafe fix
+61 61 | 
+62 62 | 
+63 63 | def f_triple_quoted_string():
+64    |-    raise RuntimeError(f"""This is an {"example"} exception""")
+   64 |+    msg = f"""This is an {"example"} exception"""
+   65 |+    raise RuntimeError(msg)
+65 66 | 
+66 67 | 
+67 68 | def f_multi_line_string():
+
+EM.py:76:9: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+   |
+74 |   def f_multi_line_string2():
+75 |       raise RuntimeError(
+76 |           "This is an {example} exception".format(
+   |  _________^
+77 | |             example="example"
+78 | |         )
+   | |_________^ EM103
+79 |       )
+   |
+   = help: Assign to variable; remove `.format()` string
+
+ℹ Unsafe fix
+72 72 | 
+73 73 | 
+74 74 | def f_multi_line_string2():
+75    |-    raise RuntimeError(
+   75 |+    msg = (
+76 76 |         "This is an {example} exception".format(
+77 77 |             example="example"
+78 78 |         )
+79 79 |     )
+   80 |+    raise RuntimeError(
+   81 |+        msg
+   82 |+    )
+80 83 | 
+81 84 | 
+82 85 | def f_multi_line_string2():
+
+EM.py:84:9: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
+   |
+82 |   def f_multi_line_string2():
+83 |       raise RuntimeError(
+84 |           (
+   |  _________^
+85 | |             "This is an "
+86 | |             "{example} exception"
+87 | |         ).format(
+88 | |             example="example"
+89 | |         )
+   | |_________^ EM103
+90 |       )
+   |
+   = help: Assign to variable; remove `.format()` string
+
+ℹ Unsafe fix
+80 80 | 
+81 81 | 
+82 82 | def f_multi_line_string2():
+83    |-    raise RuntimeError(
+   83 |+    msg = (
+84 84 |         (
+85 85 |             "This is an "
+86 86 |             "{example} exception"
+--------------------------------------------------------------------------------
+88 88 |             example="example"
+89 89 |         )
+90 90 |     )
+   91 |+    raise RuntimeError(
+   92 |+        msg
+   93 |+    )
+
 
