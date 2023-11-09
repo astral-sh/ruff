@@ -34,13 +34,13 @@ jobs:
             "${{ github.api_url }}/repos/${{ github.repository }}/releases/latest" \
           | jq -r .tag_name)" >> $GITHUB_ENV
 
-      - name: Generate tags for prefecthq/prefect
+      - name: Generate tags for ghcr.io/ruff/ruff
         id: metadata-prod
         uses: docker/metadata-action@v5
         # only generate the production tags on release events
         if: ${{ github.event_name == 'release' }}
         with:
-          images: prefecthq/prefect
+          images: ghcr.io/ruff/ruff
           # push `latest`, `X.Y` and `X` tags only when the release is not marked as prerelease
           # push `latest` and `X` tags only when the release is marked as latest
           tags: |
