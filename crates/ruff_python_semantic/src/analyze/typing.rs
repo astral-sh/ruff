@@ -569,53 +569,69 @@ pub fn resolve_assignment<'a>(
     }
 }
 
-/// Get
+/// Get the assigned [`Expr`] value of a given id, if any.
+///
+/// For example given
+/// ```python
+///  foo = 42
+///  (bar, bla) = 1, "str"
+/// ```
+///
+/// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
+/// `StringLiteral` with value `"str"` when called with `bla`.
+///
+/// TODOs:
+/// - Handle unpacked assignment
+/// - Handle complex assignment e.g.  [x, y], (z,) = (1, 2), [3]
 pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
     let scope = semantic.current_scope();
     let binding_id = scope.get(id)?;
     let binding = semantic.binding(binding_id);
-    if binding.kind.is_assignment() {
-        println!("{id}: is_assignment");
+    if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
         let parent_id = binding.source?;
         let parent = semantic.statement(parent_id);
-        if let Stmt::Assign(ast::StmtAssign { value, .. })
-        | Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value), ..
-        })
-        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
-        {
-            println!("{:?}", value);
-            return Some(value.as_ref());
+        match parent {
+            Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
+                match value.as_ref() {
+                    Expr::Tuple(ast::ExprTuple { elts, .. })
+                    | Expr::List(ast::ExprList { elts, .. })
+                    | Expr::Set(ast::ExprSet { elts, .. }) => {
+                        let Some(first_target) = targets.first() else {
+                            return None;
+                        };
+                        match first_target {
+                            Expr::Tuple(ast::ExprTuple {
+                                elts: target_elts, ..
+                            })
+                            | Expr::List(ast::ExprList {
+                                elts: target_elts, ..
+                            })
+                            | Expr::Set(ast::ExprSet {
+                                elts: target_elts, ..
+                            }) => {
+                                if let Some(index) = target_elts.iter().position(|x| {
+                                    if let Expr::Name(ast::ExprName { id: target_id, .. }) = x {
+                                        return target_id == id;
+                                    }
+                                    false
+                                }) {
+                                    return elts.get(index);
+                                }
+                            }
+                            _ => return Some(value.as_ref()),
+                        }
+                    }
+                    _ => return Some(value.as_ref()),
+                }
+            }
+            Stmt::AnnAssign(ast::StmtAnnAssign {
+                value: Some(value), ..
+            })
+            | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => {
+                return Some(value.as_ref());
+            }
+            _ => return None,
         }
-        return None;
-    }
-    if binding.kind.is_unpacked_assignment() {
-        println!("{id}: is_unpacked_assignment");
-        let parent_id = binding.source?;
-        let parent = semantic.statement(parent_id);
-        if let Stmt::Assign(ast::StmtAssign { value, .. })
-        | Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value), ..
-        })
-        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
-        {
-            return Some(value.as_ref());
-        }
-        return None;
-    }
-    if binding.kind.is_named_expr_assignment() {
-        println!("{id}: is_named_expr_assignment");
-        let parent_id = binding.source?;
-        let parent = semantic.statement(parent_id);
-        if let Stmt::Assign(ast::StmtAssign { value, .. })
-        | Stmt::AnnAssign(ast::StmtAnnAssign {
-                              value: Some(value), ..
-                          })
-        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
-        {
-            return Some(value.as_ref());
-        }
-        return None;
     }
     None
 }

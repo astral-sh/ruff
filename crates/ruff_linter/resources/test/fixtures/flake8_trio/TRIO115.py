@@ -26,7 +26,3 @@ trio.sleep(0)  # TRIO115
 
 def func():
     trio.run(trio.sleep(0))  # TRIO115
-
-    x, y = 0, 2000
-    trio.sleep(x)
-    trio.sleep(y)
