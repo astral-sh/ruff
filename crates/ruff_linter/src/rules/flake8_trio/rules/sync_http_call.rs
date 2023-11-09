@@ -13,13 +13,14 @@ use ruff_python_ast::ExprCall;
 /// ## Example
 /// ```python
 /// async def make_request():
-///     httpx.get("https://astral.sh/")
+///     requests.get("https://astral.sh/")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// async def make_request():
-///     await httpx.get("https://astral.sh/")
+///     client = httpx.AsyncClient()
+///     await client.get("https://astral.sh/")
 /// ```
 #[violation]
 pub struct TrioSyncHTTPCall;
@@ -27,7 +28,7 @@ pub struct TrioSyncHTTPCall;
 impl Violation for TrioSyncHTTPCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Sync HTTP call")
+        format!("Synchronous HTTP request detected in an async function.")
     }
 }
 

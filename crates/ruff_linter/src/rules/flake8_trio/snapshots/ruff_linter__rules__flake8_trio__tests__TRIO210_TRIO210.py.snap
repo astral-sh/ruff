@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_trio/mod.rs
 ---
-TRIO210.py:10:5: TRIO210 Sync HTTP call
+TRIO210.py:10:5: TRIO210 Synchronous HTTP request detected in an async function.
    |
  9 | async def foo():
 10 |     requests.get("https://example.com")
@@ -10,7 +10,7 @@ TRIO210.py:10:5: TRIO210 Sync HTTP call
 12 | async def foo():
    |
 
-TRIO210.py:13:5: TRIO210 Sync HTTP call
+TRIO210.py:13:5: TRIO210 Synchronous HTTP request detected in an async function.
    |
 12 | async def foo():
 13 |     httpx.get("https://example.com")
@@ -19,7 +19,7 @@ TRIO210.py:13:5: TRIO210 Sync HTTP call
 15 | async def foo():
    |
 
-TRIO210.py:16:5: TRIO210 Sync HTTP call
+TRIO210.py:16:5: TRIO210 Synchronous HTTP request detected in an async function.
    |
 15 | async def foo():
 16 |     urllib3.request("GET", "https://example.com")
@@ -28,7 +28,7 @@ TRIO210.py:16:5: TRIO210 Sync HTTP call
 18 | async def foo():
    |
 
-TRIO210.py:19:5: TRIO210 Sync HTTP call
+TRIO210.py:19:5: TRIO210 Synchronous HTTP request detected in an async function.
    |
 18 | async def foo():
 19 |     urllib.request.urlopen("https://example.com")
@@ -37,7 +37,7 @@ TRIO210.py:19:5: TRIO210 Sync HTTP call
 21 | async def foo():
    |
 
-TRIO210.py:22:5: TRIO210 Sync HTTP call
+TRIO210.py:22:5: TRIO210 Synchronous HTTP request detected in an async function.
    |
 21 | async def foo():
 22 |     request.urlopen("https://example.com")
@@ -46,7 +46,7 @@ TRIO210.py:22:5: TRIO210 Sync HTTP call
 24 | async def foo():
    |
 
-TRIO210.py:25:5: TRIO210 Sync HTTP call
+TRIO210.py:25:5: TRIO210 Synchronous HTTP request detected in an async function.
    |
 24 | async def foo():
 25 |     urlopen("https://example.com")
