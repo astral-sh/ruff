@@ -686,6 +686,16 @@ impl<'a> SemanticModel<'a> {
                 Some(resolved)
             }
             BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
+            BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
+                let value_path = collect_call_path(value)?;
+                let resolved: CallPath = self
+                    .module_path?
+                    .iter()
+                    .map(String::as_str)
+                    .chain(value_path)
+                    .collect();
+                Some(resolved)
+            }
             _ => None,
         }
     }
