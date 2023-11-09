@@ -2242,7 +2242,8 @@ pub struct Pep8NamingOptions {
     /// in this list takes a `cls` argument as its first argument.
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `pydantic.validator`,
-    /// rather than `validator`).
+    /// rather than `validator`) or alternatively a plain name which is then matched against
+    /// the last segment in case the decorator itself consists of a dotted name.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2261,7 +2262,8 @@ pub struct Pep8NamingOptions {
     /// in this list has no `self` or `cls` argument.
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`,
-    /// rather than `teardown`).
+    /// rather than `teardown`) or alternatively a plain name which is then matched against
+    /// the last segment in case the decorator itself consists of a dotted name.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",

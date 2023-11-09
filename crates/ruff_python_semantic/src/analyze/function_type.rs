@@ -1,3 +1,4 @@
+use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::Decorator;
@@ -28,16 +29,29 @@ pub fn classify(
     if decorator_list.iter().any(|decorator| {
         // The method is decorated with a static method decorator (like
         // `@staticmethod`).
-        semantic
-            .resolve_call_path(map_callable(&decorator.expression))
-            .is_some_and(|call_path| {
+        let real_decorator = map_callable(&decorator.expression);
+        match semantic.resolve_call_path(real_decorator) {
+            Some(call_path) => {
                 matches!(
                     call_path.as_slice(),
                     ["", "staticmethod"] | ["abc", "abstractstaticmethod"]
                 ) || staticmethod_decorators
                     .iter()
                     .any(|decorator| call_path == from_qualified_name(decorator))
-            })
+            }
+            // We do not have a resolvable call path, most likely from a decorator similar
+            // to `@someproperty.setter` - for those we match the last element.
+            // It would be nicer to use e.g. `.whatever` in the `staticmethod-decorators` config
+            // option but `pep8-naming` doesn't do this either.
+            // XXX: It's quite unlikely that this is ever used for staticmethods, but we need it
+            // for classmethods below and like this the behavior is consistent.
+            None => collect_call_path(real_decorator).is_some_and(|call_path| {
+                let tail = call_path.as_slice().last().unwrap();
+                staticmethod_decorators
+                    .iter()
+                    .any(|decorator| tail == decorator)
+            }),
+        }
     }) {
         FunctionType::StaticMethod
     } else if matches!(name, "__new__" | "__init_subclass__" | "__class_getitem__")
@@ -52,16 +66,30 @@ pub fn classify(
         })
         || decorator_list.iter().any(|decorator| {
             // The method is decorated with a class method decorator (like `@classmethod`).
-            semantic
-                .resolve_call_path(map_callable(&decorator.expression))
-                .is_some_and( |call_path| {
+            let real_decorator = map_callable(&decorator.expression);
+            match semantic.resolve_call_path(real_decorator) {
+                Some(call_path) => {
                     matches!(
                         call_path.as_slice(),
                         ["", "classmethod"] | ["abc", "abstractclassmethod"]
                     ) || classmethod_decorators
                         .iter()
                         .any(|decorator| call_path == from_qualified_name(decorator))
-                })
+                },
+                // We do not have a resolvable call path, most likely from a decorator similar
+                // to `@someproperty.setter` - for those we match the last element.
+                // It would be nicer to use e.g. `.whatever` in the `classmethod-decorators` config
+                // option but `pep8-naming` doesn't do this either.
+                None => {
+                    collect_call_path(real_decorator)
+                        .is_some_and(|call_path| {
+                            let tail = call_path.as_slice().last().unwrap();
+                            classmethod_decorators
+                                .iter()
+                                .any(|decorator| tail == decorator)
+                        })
+                }
+            }
         })
     {
         FunctionType::ClassMethod

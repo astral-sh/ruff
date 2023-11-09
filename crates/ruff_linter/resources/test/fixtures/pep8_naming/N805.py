@@ -63,3 +63,33 @@ class PosOnlyClass:
 
     def bad_method_pos_only(this, blah, /, self, something: str):
         pass
+
+
+class ModelClass:
+    @hybrid_property
+    def bad(cls):
+        pass
+
+    @bad.expression
+    def bad(self):
+        pass
+
+    @bad.wtf
+    def bad(cls):
+        pass
+
+    @hybrid_property
+    def good(self):
+        pass
+
+    @good.expression
+    def good(cls):
+        pass
+
+    @good.wtf
+    def good(self):
+        pass
+
+    @foobar.thisisstatic
+    def badstatic(foo):
+        pass
