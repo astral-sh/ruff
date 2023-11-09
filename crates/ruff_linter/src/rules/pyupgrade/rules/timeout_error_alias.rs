@@ -61,12 +61,12 @@ impl AlwaysFixableViolation for TimeoutErrorAlias {
 fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion) -> bool {
     semantic.resolve_call_path(expr).is_some_and(|call_path| {
         if target_version >= PythonVersion::Py311 {
-            matches!(call_path.as_slice(), [""] | ["asyncio", "TimeoutError"])
-        } else {
             matches!(
                 call_path.as_slice(),
-                [""] | ["asyncio", "TimeoutError"] | ["socket", "timeout"]
+                ["socket", "timeout"] | ["asyncio", "TimeoutError"]
             )
+        } else {
+            matches!(call_path.as_slice(), ["socket", "timeout"])
         }
     })
 }
