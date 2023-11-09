@@ -591,39 +591,37 @@ pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Opti
         let parent_id = binding.source?;
         let parent = semantic.statement(parent_id);
         match parent {
-            Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
-                match value.as_ref() {
-                    Expr::Tuple(ast::ExprTuple { elts, .. })
-                    | Expr::List(ast::ExprList { elts, .. })
-                    | Expr::Set(ast::ExprSet { elts, .. }) => {
-                        let Some(first_target) = targets.first() else {
-                            return None;
-                        };
-                        match first_target {
-                            Expr::Tuple(ast::ExprTuple {
-                                elts: target_elts, ..
-                            })
-                            | Expr::List(ast::ExprList {
-                                elts: target_elts, ..
-                            })
-                            | Expr::Set(ast::ExprSet {
-                                elts: target_elts, ..
-                            }) => {
-                                if let Some(index) = target_elts.iter().position(|x| {
-                                    if let Expr::Name(ast::ExprName { id: target_id, .. }) = x {
-                                        return target_id == id;
-                                    }
-                                    false
-                                }) {
-                                    return elts.get(index);
+            Stmt::Assign(ast::StmtAssign { value, targets, .. }) => match value.as_ref() {
+                Expr::Tuple(ast::ExprTuple { elts, .. })
+                | Expr::List(ast::ExprList { elts, .. })
+                | Expr::Set(ast::ExprSet { elts, .. }) => {
+                    let Some(first_target) = targets.first() else {
+                        return None;
+                    };
+                    match first_target {
+                        Expr::Tuple(ast::ExprTuple {
+                            elts: target_elts, ..
+                        })
+                        | Expr::List(ast::ExprList {
+                            elts: target_elts, ..
+                        })
+                        | Expr::Set(ast::ExprSet {
+                            elts: target_elts, ..
+                        }) => {
+                            if let Some(index) = target_elts.iter().position(|x| {
+                                if let Expr::Name(ast::ExprName { id: target_id, .. }) = x {
+                                    return target_id == id;
                                 }
+                                false
+                            }) {
+                                return elts.get(index);
                             }
-                            _ => return Some(value.as_ref()),
                         }
+                        _ => return Some(value.as_ref()),
                     }
-                    _ => return Some(value.as_ref()),
                 }
-            }
+                _ => return Some(value.as_ref()),
+            },
             Stmt::AnnAssign(ast::StmtAnnAssign {
                 value: Some(value), ..
             })
