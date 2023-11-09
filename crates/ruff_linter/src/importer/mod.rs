@@ -174,7 +174,7 @@ impl<'a> Importer<'a> {
             }
         }
 
-        self.get_or_import_symbol(
+        self.import_symbol(
             &ImportRequest::import_from("typing", "TYPE_CHECKING"),
             at,
             semantic,
