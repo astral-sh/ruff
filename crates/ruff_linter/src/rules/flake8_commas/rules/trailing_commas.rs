@@ -223,11 +223,24 @@ pub(crate) fn trailing_commas(
     tokens: &[LexResult],
     locator: &Locator,
 ) {
+    let mut fstrings = 0u32;
     let tokens = tokens
         .iter()
         .flatten()
-        // Completely ignore comments -- they just interfere with the logic.
-        .filter(|&r| !matches!(r, (Tok::Comment(_), _)))
+        .filter(|(tok, _)| match tok {
+            // Completely ignore comments -- they just interfere with the logic.
+            Tok::Comment(_) => false,
+            // Ignore content within f-strings.
+            Tok::FStringStart => {
+                fstrings = fstrings.saturating_add(1);
+                false
+            }
+            Tok::FStringEnd => {
+                fstrings = fstrings.saturating_sub(1);
+                false
+            }
+            _ => fstrings == 0,
+        })
         .map(Token::from_spanned);
     let tokens = [Token::irrelevant(), Token::irrelevant()]
         .into_iter()

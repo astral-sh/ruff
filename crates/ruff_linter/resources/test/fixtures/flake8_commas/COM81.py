@@ -42,7 +42,7 @@ foo = (
 4,
 )
 
-foo = 3, 
+foo = 3,
 
 class A(object):
  foo = 3
@@ -639,3 +639,10 @@ foo = namedtuple(
         :20
     ],
 )
+
+# Make sure we don't insert commas within f-strings.
+f"""This is a test. {
+    "Another sentence."
+    if True else
+    "Alternative route!"
+}"""
