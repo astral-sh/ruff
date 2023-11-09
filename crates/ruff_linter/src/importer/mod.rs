@@ -132,11 +132,7 @@ impl<'a> Importer<'a> {
         )?;
 
         // Import the `TYPE_CHECKING` symbol from the typing module.
-        let (type_checking_edit, type_checking) = self.get_or_import_symbol(
-            &ImportRequest::import_from("typing", "TYPE_CHECKING"),
-            at,
-            semantic,
-        )?;
+        let (type_checking_edit, type_checking) = self.get_or_import_type_checking(at, semantic)?;
 
         // Add the import to a `TYPE_CHECKING` block.
         let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
@@ -159,6 +155,30 @@ impl<'a> Importer<'a> {
             type_checking_edit,
             add_import_edit,
         })
+    }
+
+    /// Generate an [`Edit`] to reference `typing.TYPE_CHECKING`. Returns the [`Edit`] necessary to
+    /// make the symbol available in the current scope along with the bound name of the symbol.
+    fn get_or_import_type_checking(
+        &self,
+        at: TextSize,
+        semantic: &SemanticModel,
+    ) -> Result<(Edit, String), ResolutionError> {
+        for module in semantic.typing_modules() {
+            if let Some((edit, name)) = self.get_symbol(
+                &ImportRequest::import_from(module, "TYPE_CHECKING"),
+                at,
+                semantic,
+            )? {
+                return Ok((edit, name));
+            }
+        }
+
+        self.import_symbol(
+            &ImportRequest::import_from("typing", "TYPE_CHECKING"),
+            at,
+            semantic,
+        )
     }
 
     /// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make

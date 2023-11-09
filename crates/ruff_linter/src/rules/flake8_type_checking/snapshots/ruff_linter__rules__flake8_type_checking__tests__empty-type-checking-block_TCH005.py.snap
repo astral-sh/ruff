@@ -96,4 +96,19 @@ TCH005.py:22:9: TCH005 [*] Found empty type-checking block
 24 22 | 
 25 23 | 
 
+TCH005.py:45:5: TCH005 [*] Found empty type-checking block
+   |
+44 | if TYPE_CHECKING:
+45 |     pass  # TCH005
+   |     ^^^^ TCH005
+   |
+   = help: Delete empty type-checking block
+
+ℹ Safe fix
+41 41 | 
+42 42 | from typing_extensions import TYPE_CHECKING
+43 43 | 
+44    |-if TYPE_CHECKING:
+45    |-    pass  # TCH005
+
 
