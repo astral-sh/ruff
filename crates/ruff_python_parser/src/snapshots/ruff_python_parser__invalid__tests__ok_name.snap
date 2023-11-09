@@ -1,0 +1,30 @@
+---
+source: crates/ruff_python_parser/src/invalid.rs
+expression: ast
+---
+Ok(
+    [
+        Assign(
+            StmtAssign {
+                range: 0..8,
+                targets: [
+                    Name(
+                        ExprName {
+                            range: 0..3,
+                            id: "foo",
+                            ctx: Store,
+                        },
+                    ),
+                ],
+                value: NumberLiteral(
+                    ExprNumberLiteral {
+                        range: 6..8,
+                        value: Int(
+                            42,
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+)

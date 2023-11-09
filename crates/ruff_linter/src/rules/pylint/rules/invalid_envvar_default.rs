@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -73,10 +73,7 @@ fn is_valid_default(expr: &Expr) -> bool {
     // Otherwise, the default must be a string or `None`.
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str { .. } | Constant::None { .. },
-            ..
-        }) | Expr::FString(_)
+        Expr::StringLiteral(_) | Expr::NoneLiteral(_) | Expr::FString(_)
     )
 }
 

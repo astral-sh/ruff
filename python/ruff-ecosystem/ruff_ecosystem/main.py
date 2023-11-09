@@ -7,7 +7,11 @@ from typing import Awaitable, TypeVar
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.check import compare_check, markdown_check_result
-from ruff_ecosystem.format import compare_format, markdown_format_result
+from ruff_ecosystem.format import (
+    FormatComparison,
+    compare_format,
+    markdown_format_result,
+)
 from ruff_ecosystem.projects import (
     Project,
     RuffCommand,
@@ -25,18 +29,21 @@ class OutputFormat(Enum):
 
 async def main(
     command: RuffCommand,
-    ruff_baseline_executable: Path,
-    ruff_comparison_executable: Path,
+    baseline_executable: Path,
+    comparison_executable: Path,
     targets: list[Project],
     project_dir: Path,
     format: OutputFormat,
+    format_comparison: FormatComparison | None,
     max_parallelism: int = 50,
     raise_on_failure: bool = False,
 ) -> None:
     logger.debug("Using command %s", command.value)
-    logger.debug("Using baseline executable at %s", ruff_baseline_executable)
-    logger.debug("Using comparison executable at %s", ruff_comparison_executable)
+    logger.debug("Using baseline executable at %s", baseline_executable)
+    logger.debug("Using comparison executable at %s", comparison_executable)
     logger.debug("Using checkout_dir directory %s", project_dir)
+    if format_comparison:
+        logger.debug("Using format comparison type %s", format_comparison.value)
     logger.debug("Checking %s targets", len(targets))
 
     # Limit parallelism to avoid high memory consumption
@@ -51,10 +58,11 @@ async def main(
             limited_parallelism(
                 clone_and_compare(
                     command,
-                    ruff_baseline_executable,
-                    ruff_comparison_executable,
+                    baseline_executable,
+                    comparison_executable,
                     target,
                     project_dir,
+                    format_comparison,
                 )
             )
             for target in targets
@@ -92,10 +100,11 @@ async def main(
 
 async def clone_and_compare(
     command: RuffCommand,
-    ruff_baseline_executable: Path,
-    ruff_comparison_executable: Path,
+    baseline_executable: Path,
+    comparison_executable: Path,
     target: Project,
     project_dir: Path,
+    format_comparison: FormatComparison | None,
 ) -> Comparison:
     """Check a specific repository against two versions of ruff."""
     assert ":" not in target.repo.owner
@@ -103,14 +112,12 @@ async def clone_and_compare(
 
     match command:
         case RuffCommand.check:
-            compare, options = (
-                compare_check,
-                target.check_options,
-            )
+            compare, options, kwargs = (compare_check, target.check_options, {})
         case RuffCommand.format:
-            compare, options = (
+            compare, options, kwargs = (
                 compare_format,
                 target.format_options,
+                {"format_comparison": format_comparison},
             )
         case _:
             raise ValueError(f"Unknown target Ruff command {command}")
@@ -120,10 +127,11 @@ async def clone_and_compare(
 
     try:
         return await compare(
-            ruff_baseline_executable,
-            ruff_comparison_executable,
+            baseline_executable,
+            comparison_executable,
             options,
             cloned_repo,
+            **kwargs,
         )
     except ExceptionGroup as e:
         raise e.exceptions[0] from e

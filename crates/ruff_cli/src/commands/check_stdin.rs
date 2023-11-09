@@ -18,17 +18,19 @@ pub(crate) fn check_stdin(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
-    if let Some(filename) = filename {
-        if !python_file_at_path(filename, pyproject_config, overrides)? {
-            return Ok(Diagnostics::default());
-        }
+    if pyproject_config.settings.file_resolver.force_exclude {
+        if let Some(filename) = filename {
+            if !python_file_at_path(filename, pyproject_config, overrides)? {
+                return Ok(Diagnostics::default());
+            }
 
-        let lint_settings = &pyproject_config.settings.linter;
-        if filename
-            .file_name()
-            .is_some_and(|name| match_exclusion(filename, name, &lint_settings.exclude))
-        {
-            return Ok(Diagnostics::default());
+            let lint_settings = &pyproject_config.settings.linter;
+            if filename
+                .file_name()
+                .is_some_and(|name| match_exclusion(filename, name, &lint_settings.exclude))
+            {
+                return Ok(Diagnostics::default());
+            }
         }
     }
     let package_root = filename.and_then(Path::parent).and_then(|path| {

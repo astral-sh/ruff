@@ -13,6 +13,7 @@ theme:
     - navigation.path
     - navigation.top
     - content.code.copy
+    - content.tabs.link
   palette:
     # Note: Using the system theme works with the insiders version
     # https://squidfunk.github.io/mkdocs-material/setup/changing-the-colors/#automatic-light-dark-mode
@@ -55,6 +56,8 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.highlight:
       anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
 plugins:
   - search
 extra_css:

@@ -1,9 +1,9 @@
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprBinOp};
+use ruff_python_ast::ExprBinOp;
 
 use crate::comments::SourceComment;
 use crate::expression::binary_like::BinaryLike;
-use crate::expression::expr_constant::is_multiline_string;
+use crate::expression::expr_string_literal::is_multiline_string;
 use crate::expression::has_parentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
@@ -35,10 +35,10 @@ impl NeedsParentheses for ExprBinOp {
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
             OptionalParentheses::Always
-        } else if let Expr::Constant(constant) = self.left.as_ref() {
+        } else if self.left.is_literal_expr() {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
-            if !constant.value.is_implicit_concatenated()
-                && is_multiline_string(constant, context.source())
+            if !self.left.is_implicit_concatenated_string()
+                && is_multiline_string(self.left.as_ref().into(), context.source())
                 && has_parentheses(&self.right, context).is_some()
                 && !context.comments().has_dangling(self)
                 && !context.comments().has(self.left.as_ref())

@@ -2,7 +2,7 @@ use bitflags::bitflags;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -59,11 +59,7 @@ pub(crate) fn bad_open_mode(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(ast::StringConstant { value, .. }),
-        ..
-    }) = mode
-    else {
+    let Some(ast::ExprStringLiteral { value, .. }) = mode.as_string_literal_expr() else {
         return;
     };
 

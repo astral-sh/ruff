@@ -64,14 +64,14 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesC
         match kind {
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
-            TokenKind::Lsqb => {
+            TokenKind::Lsqb if fstrings == 0 => {
                 open_parentheses = open_parentheses.saturating_add(1);
                 prev_lsqb = token.start();
             }
-            TokenKind::Rsqb => {
+            TokenKind::Rsqb if fstrings == 0 => {
                 open_parentheses = open_parentheses.saturating_sub(1);
             }
-            TokenKind::Lbrace => {
+            TokenKind::Lbrace if fstrings == 0 => {
                 prev_lbrace = token.start();
             }
             TokenKind::Colon if fstrings > 0 => {

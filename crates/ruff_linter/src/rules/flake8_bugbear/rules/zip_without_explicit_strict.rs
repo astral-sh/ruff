@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -81,14 +81,14 @@ fn is_infinite_iterator(arg: &Expr, semantic: &SemanticModel) -> bool {
                 }
 
                 // Ex) `itertools.repeat(1, None)`
-                if args.len() == 2 && is_const_none(&args[1]) {
+                if args.len() == 2 && args[1].is_none_literal_expr() {
                     return true;
                 }
 
                 // Ex) `iterools.repeat(1, times=None)`
                 for keyword in keywords {
                     if keyword.arg.as_ref().is_some_and(|name| name == "times") {
-                        if is_const_none(&keyword.value) {
+                        if keyword.value.is_none_literal_expr() {
                             return true;
                         }
                     }

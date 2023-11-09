@@ -19,20 +19,16 @@ expression: parse_ast
                     arguments: Arguments {
                         range: 5..23,
                         args: [
-                            Constant(
-                                ExprConstant {
+                            StringLiteral(
+                                ExprStringLiteral {
                                     range: 6..19,
-                                    value: Str(
-                                        StringConstant {
-                                            value: "Hello world",
-                                            unicode: false,
-                                            implicit_concatenated: false,
-                                        },
-                                    ),
+                                    value: "Hello world",
+                                    unicode: false,
+                                    implicit_concatenated: false,
                                 },
                             ),
-                            Constant(
-                                ExprConstant {
+                            NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 21..22,
                                     value: Int(
                                         2,

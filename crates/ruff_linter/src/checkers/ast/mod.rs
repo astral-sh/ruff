@@ -31,9 +31,8 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
-    Suite, UnaryOp,
+    self as ast, Arguments, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
+    Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -787,11 +786,7 @@ where
             && self.semantic.in_type_definition()
             && self.semantic.future_annotations()
         {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
-                ..
-            }) = expr
-            {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.deferred.string_type_definitions.push((
                     expr.range(),
                     value,
@@ -1186,10 +1181,7 @@ where
                     }
                 }
             }
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
-                range: _,
-            }) => {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 if self.semantic.in_type_definition()
                     && !self.semantic.in_literal()
                     && !self.semantic.in_f_string()

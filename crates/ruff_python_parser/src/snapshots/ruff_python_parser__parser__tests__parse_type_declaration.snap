@@ -78,16 +78,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         },
                     ),
                     op: BitOr,
-                    right: Constant(
-                        ExprConstant {
+                    right: StringLiteral(
+                        ExprStringLiteral {
                             range: 48..61,
-                            value: Str(
-                                StringConstant {
-                                    value: "ForwardRefY",
-                                    unicode: false,
-                                    implicit_concatenated: false,
-                                },
-                            ),
+                            value: "ForwardRefY",
+                            unicode: false,
+                            implicit_concatenated: false,
                         },
                     ),
                 },

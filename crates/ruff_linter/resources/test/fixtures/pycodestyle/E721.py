@@ -4,6 +4,9 @@ if type(res) == type(42):
 #: E721
 if type(res) != type(""):
     pass
+#: E721
+if type(res) == memoryview:
+    pass
 #: Okay
 import types
 
@@ -46,6 +49,14 @@ if isinstance(res, int):
 if isinstance(res, str):
     pass
 if isinstance(res, types.MethodType):
+    pass
+if isinstance(res, memoryview):
+    pass
+#: Okay
+if type(res) is type:
+    pass
+#: E721
+if type(res) == type:
     pass
 #: Okay
 def func_histype(a, b, c):

@@ -10,16 +10,12 @@ expression: parse_ast
                 ExprFString {
                     range: 0..38,
                     values: [
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 2..6,
-                                value: Str(
-                                    StringConstant {
-                                        value: "mix ",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "mix ",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                         FormattedValue(
@@ -42,16 +38,12 @@ expression: parse_ast
                                 format_spec: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 13..28,
-                                value: Str(
-                                    StringConstant {
-                                        value: " with text and ",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: " with text and ",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                         FormattedValue(

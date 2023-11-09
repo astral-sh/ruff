@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.1.3"
+version = "0.1.5"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -44,7 +44,6 @@ glob = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
-itoa = { version = "1.0.6" }
 log = { workspace = true }
 notify = { version = "6.1.1" }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
@@ -68,7 +67,7 @@ assert_cmd = { version = "2.0.8" }
 colored = { workspace = true, features = ["no-color"]}
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { version = "0.4.0" }
-tempfile = "3.6.0"
+tempfile = "3.8.1"
 test-case = { workspace = true }
 ureq = { version = "2.8.0", features = [] }
 

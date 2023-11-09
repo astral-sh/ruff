@@ -3,9 +3,9 @@
 use std::ops::Deref;
 
 use ruff_python_ast::{
-    self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag,
-    DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters,
-    Pattern, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
+    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
+    Singleton, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
     WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
@@ -112,12 +112,6 @@ impl<'a> Generator<'a> {
     /// Generate source code from an [`Expr`].
     pub fn expr(mut self, expr: &Expr) -> String {
         self.unparse_expr(expr, 0);
-        self.generate()
-    }
-
-    /// Generate source code from a [`Constant`].
-    pub fn constant(mut self, constant: &Constant) -> String {
-        self.unparse_constant(constant);
         self.generate()
     }
 
@@ -672,7 +666,7 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(value, precedence::MAX);
             }
             Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range: _ }) => {
-                self.unparse_constant(value);
+                self.unparse_singleton(value);
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => {
                 self.p("[");
@@ -1090,12 +1084,56 @@ impl<'a> Generator<'a> {
             Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, false);
             }
-            Expr::Constant(ast::ExprConstant { value, range: _ }) => {
-                self.unparse_constant(value);
+            Expr::StringLiteral(ast::ExprStringLiteral { value, unicode, .. }) => {
+                if *unicode {
+                    self.p("u");
+                }
+                self.p_str_repr(value);
+            }
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+                self.p_bytes_repr(value);
+            }
+            Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+                static INF_STR: &str = "1e309";
+                assert_eq!(f64::MAX_10_EXP, 308);
+
+                match value {
+                    ast::Number::Int(i) => {
+                        self.p(&format!("{i}"));
+                    }
+                    ast::Number::Float(fp) => {
+                        if fp.is_infinite() {
+                            self.p(INF_STR);
+                        } else {
+                            self.p(&ruff_python_literal::float::to_string(*fp));
+                        }
+                    }
+                    ast::Number::Complex { real, imag } => {
+                        let value = if *real == 0.0 {
+                            format!("{imag}j")
+                        } else {
+                            format!("({real}{imag:+}j)")
+                        };
+                        if real.is_infinite() || imag.is_infinite() {
+                            self.p(&value.replace("inf", INF_STR));
+                        } else {
+                            self.p(&value);
+                        }
+                    }
+                }
+            }
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                self.p(if *value { "True" } else { "False" });
+            }
+            Expr::NoneLiteral(_) => {
+                self.p("None");
+            }
+            Expr::EllipsisLiteral(_) => {
+                self.p("...");
             }
             Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(_),
+                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(_),
                     ..
                 }) = value.as_ref()
                 {
@@ -1166,42 +1204,11 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_constant(&mut self, constant: &Constant) {
-        assert_eq!(f64::MAX_10_EXP, 308);
-        let inf_str = "1e309";
-        match constant {
-            Constant::Bytes(b) => {
-                self.p_bytes_repr(b);
-            }
-            Constant::Str(ast::StringConstant { value, unicode, .. }) => {
-                if *unicode {
-                    self.p("u");
-                }
-                self.p_str_repr(value);
-            }
-            Constant::None => self.p("None"),
-            Constant::Bool(b) => self.p(if *b { "True" } else { "False" }),
-            Constant::Int(i) => self.p(&format!("{i}")),
-            Constant::Float(fp) => {
-                if fp.is_infinite() {
-                    self.p(inf_str);
-                } else {
-                    self.p(&ruff_python_literal::float::to_string(*fp));
-                }
-            }
-            Constant::Complex { real, imag } => {
-                let value = if *real == 0.0 {
-                    format!("{imag}j")
-                } else {
-                    format!("({real}{imag:+}j)")
-                };
-                if real.is_infinite() || imag.is_infinite() {
-                    self.p(&value.replace("inf", inf_str));
-                } else {
-                    self.p(&value);
-                }
-            }
-            Constant::Ellipsis => self.p("..."),
+    pub(crate) fn unparse_singleton(&mut self, singleton: &Singleton) {
+        match singleton {
+            Singleton::None => self.p("None"),
+            Singleton::True => self.p("True"),
+            Singleton::False => self.p("False"),
         }
     }
 
@@ -1317,12 +1324,8 @@ impl<'a> Generator<'a> {
 
     fn unparse_f_string_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
-            Expr::Constant(ast::ExprConstant { value, .. }) => {
-                if let Constant::Str(ast::StringConstant { value, .. }) = value {
-                    self.unparse_f_string_literal(value);
-                } else {
-                    unreachable!()
-                }
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                self.unparse_f_string_literal(value);
             }
             Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, is_spec);

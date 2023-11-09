@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, ExprContext, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -182,10 +182,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
         if let Some(first) = args.first() {
             match first {
                 // Check for string literals.
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(string),
-                    ..
-                }) => {
+                Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {
                     if checker.enabled(Rule::RawStringInException) {
                         if string.len() >= checker.settings.flake8_errmsg.max_string_length {
                             let mut diagnostic =
@@ -232,7 +229,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                         if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
                             func.as_ref()
                         {
-                            if attr == "format" && value.is_constant_expr() {
+                            if attr == "format" && value.is_literal_expr() {
                                 let mut diagnostic =
                                     Diagnostic::new(DotFormatInException, first.range());
                                 if let Some(indentation) =

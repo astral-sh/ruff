@@ -1,88 +1,65 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::ExprConstant;
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{ExprNumberLiteral, Number};
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
 
-pub(super) struct FormatInt<'a> {
-    constant: &'a ExprConstant,
-}
+#[derive(Default)]
+pub struct FormatExprNumberLiteral;
 
-impl<'a> FormatInt<'a> {
-    pub(super) fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_int());
-        Self { constant }
-    }
-}
+impl FormatNodeRule<ExprNumberLiteral> for FormatExprNumberLiteral {
+    fn fmt_fields(&self, item: &ExprNumberLiteral, f: &mut PyFormatter) -> FormatResult<()> {
+        match item.value {
+            Number::Int(_) => {
+                let range = item.range();
+                let content = f.context().locator().slice(range);
+                let normalized = normalize_integer(content);
 
-impl Format<PyFormatContext<'_>> for FormatInt<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let range = self.constant.range();
-        let content = f.context().locator().slice(range);
-
-        let normalized = normalize_integer(content);
-
-        match normalized {
-            Cow::Borrowed(_) => source_text_slice(range).fmt(f),
-            Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
-        }
-    }
-}
-
-pub(super) struct FormatFloat<'a> {
-    constant: &'a ExprConstant,
-}
-
-impl<'a> FormatFloat<'a> {
-    pub(super) fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_float());
-        Self { constant }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for FormatFloat<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let range = self.constant.range();
-        let content = f.context().locator().slice(range);
-
-        let normalized = normalize_floating_number(content);
-
-        match normalized {
-            Cow::Borrowed(_) => source_text_slice(range).fmt(f),
-            Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
-        }
-    }
-}
-
-pub(super) struct FormatComplex<'a> {
-    constant: &'a ExprConstant,
-}
-
-impl<'a> FormatComplex<'a> {
-    pub(super) fn new(constant: &'a ExprConstant) -> Self {
-        debug_assert!(constant.value.is_complex());
-        Self { constant }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for FormatComplex<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let range = self.constant.range();
-        let content = f.context().locator().slice(range);
-
-        let normalized = normalize_floating_number(content.trim_end_matches(['j', 'J']));
-
-        match normalized {
-            Cow::Borrowed(_) => {
-                source_text_slice(range.sub_end(TextSize::from(1))).fmt(f)?;
+                match normalized {
+                    Cow::Borrowed(_) => source_text_slice(range).fmt(f),
+                    Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
+                }
             }
-            Cow::Owned(normalized) => {
-                text(&normalized, Some(range.start())).fmt(f)?;
+            Number::Float(_) => {
+                let range = item.range();
+                let content = f.context().locator().slice(range);
+                let normalized = normalize_floating_number(content);
+
+                match normalized {
+                    Cow::Borrowed(_) => source_text_slice(range).fmt(f),
+                    Cow::Owned(normalized) => text(&normalized, Some(range.start())).fmt(f),
+                }
+            }
+            Number::Complex { .. } => {
+                let range = item.range();
+                let content = f.context().locator().slice(range);
+                let normalized = normalize_floating_number(content.trim_end_matches(['j', 'J']));
+
+                match normalized {
+                    Cow::Borrowed(_) => {
+                        source_text_slice(range.sub_end(TextSize::from(1))).fmt(f)?;
+                    }
+                    Cow::Owned(normalized) => {
+                        text(&normalized, Some(range.start())).fmt(f)?;
+                    }
+                }
+
+                token("j").fmt(f)
             }
         }
+    }
+}
 
-        token("j").fmt(f)
+impl NeedsParentheses for ExprNumberLiteral {
+    fn needs_parentheses(
+        &self,
+        _parent: AnyNodeRef,
+        _context: &PyFormatContext,
+    ) -> OptionalParentheses {
+        OptionalParentheses::BestFit
     }
 }
 

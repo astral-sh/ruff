@@ -10,7 +10,7 @@ FURB148.py:14:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
    |
    = help: Replace with `range(len(...))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 | books_tuple = ("Dune", "Foundation", "Neuromancer")
 12 12 | 
 13 13 | # Errors
@@ -30,7 +30,7 @@ FURB148.py:17:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
    |
    = help: Replace with `range(len(...))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 14 14 | for index, _ in enumerate(books):
 15 15 |     print(index)
 16 16 | 
@@ -50,7 +50,7 @@ FURB148.py:20:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
    |
    = help: Replace with `range(len(...))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 17 17 | for index, _ in enumerate(books, start=0):
 18 18 |     print(index)
 19 19 | 
@@ -110,7 +110,7 @@ FURB148.py:35:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 32 32 | for index, _ in enumerate(books, x):
 33 33 |     print(book)
 34 34 | 
@@ -130,7 +130,7 @@ FURB148.py:38:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 35 35 | for _, book in enumerate(books):
 36 36 |     print(book)
 37 37 | 
@@ -150,7 +150,7 @@ FURB148.py:41:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 38 38 | for _, book in enumerate(books, start=0):
 39 39 |     print(book)
 40 40 | 
@@ -170,7 +170,7 @@ FURB148.py:44:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 41 41 | for _, book in enumerate(books, 0):
 42 42 |     print(book)
 43 43 | 
@@ -190,7 +190,7 @@ FURB148.py:47:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 44 44 | for _, book in enumerate(books, start=1):
 45 45 |     print(book)
 46 46 | 
@@ -210,7 +210,7 @@ FURB148.py:50:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 47 47 | for _, book in enumerate(books, 1):
 48 48 |     print(book)
 49 49 | 
@@ -230,7 +230,7 @@ FURB148.py:53:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 50 50 | for _, book in enumerate(books, start=x):
 51 51 |     print(book)
 52 52 | 
@@ -250,7 +250,7 @@ FURB148.py:56:22: FURB148 [*] `enumerate` value is unused, use `for x in range(l
    |
    = help: Replace with `range(len(...))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 53 53 | for _, book in enumerate(books, x):
 54 54 |     print(book)
 55 55 | 
@@ -270,7 +270,7 @@ FURB148.py:59:21: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 56 56 | for index, (_, _) in enumerate(books):
 57 57 |     print(index)
 58 58 | 
@@ -290,7 +290,7 @@ FURB148.py:62:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
    |
    = help: Replace with `range(len(...))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 59 59 | for (_, _), book in enumerate(books):
 60 60 |     print(book)
 61 61 | 
@@ -310,7 +310,7 @@ FURB148.py:65:18: FURB148 [*] `enumerate` value is unused, use `for x in range(l
    |
    = help: Replace with `range(len(...))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 62 62 | for(index, _)in enumerate(books):
 63 63 |     print(index)
 64 64 | 
@@ -330,7 +330,7 @@ FURB148.py:68:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
    |
    = help: Replace with `range(len(...))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 65 65 | for(index), _ in enumerate(books):
 66 66 |     print(index)
 67 67 | 
@@ -350,7 +350,7 @@ FURB148.py:71:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 68 68 | for index, _ in enumerate(books_and_authors):
 69 69 |     print(index)
 70 70 | 
@@ -370,7 +370,7 @@ FURB148.py:74:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
    |
    = help: Replace with `range(len(...))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 71 71 | for _, book in enumerate(books_and_authors):
 72 72 |     print(book)
 73 73 | 
@@ -390,7 +390,7 @@ FURB148.py:77:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 74 74 | for index, _ in enumerate(books_set):
 75 75 |     print(index)
 76 76 | 
@@ -410,7 +410,7 @@ FURB148.py:80:17: FURB148 [*] `enumerate` value is unused, use `for x in range(l
    |
    = help: Replace with `range(len(...))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 77 77 | for _, book in enumerate(books_set):
 78 78 |     print(book)
 79 79 | 
@@ -430,7 +430,7 @@ FURB148.py:83:16: FURB148 [*] `enumerate` index is unused, use `for x in y` inst
    |
    = help: Remove `enumerate`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 80 80 | for index, _ in enumerate(books_tuple):
 81 81 |     print(index)
 82 82 | 

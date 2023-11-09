@@ -20,7 +20,7 @@ impl FormatNodeRule<ExprAwait> for FormatExprAwait {
             [
                 token("await"),
                 space(),
-                maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
+                maybe_parenthesize_expression(value, item, Parenthesize::IfRequired)
             ]
         )
     }
@@ -39,6 +39,7 @@ impl NeedsParentheses for ExprAwait {
             context.comments().ranges(),
             context.source(),
         ) {
+            // Prefer splitting the value if it is parenthesized.
             OptionalParentheses::Never
         } else {
             self.value.needs_parentheses(self.into(), context)

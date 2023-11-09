@@ -2,7 +2,6 @@ use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -52,13 +51,13 @@ impl Violation for HardcodedTempFile {
 }
 
 /// S108
-pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, expr: &Expr, value: &str) {
+pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: &ast::ExprStringLiteral) {
     if !checker
         .settings
         .flake8_bandit
         .hardcoded_tmp_directory
         .iter()
-        .any(|prefix| value.starts_with(prefix))
+        .any(|prefix| string.value.starts_with(prefix))
     {
         return;
     }
@@ -77,8 +76,8 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, expr: &Expr, value:
 
     checker.diagnostics.push(Diagnostic::new(
         HardcodedTempFile {
-            string: value.to_string(),
+            string: string.value.clone(),
         },
-        expr.range(),
+        string.range,
     ));
 }

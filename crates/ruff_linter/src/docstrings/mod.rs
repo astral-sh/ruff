@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
-use ruff_python_ast::Expr;
+use ruff_python_ast::ExprStringLiteral;
 use ruff_python_semantic::Definition;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -14,7 +14,8 @@ pub(crate) mod styles;
 #[derive(Debug)]
 pub(crate) struct Docstring<'a> {
     pub(crate) definition: &'a Definition<'a>,
-    pub(crate) expr: &'a Expr,
+    /// The literal AST node representing the docstring.
+    pub(crate) expr: &'a ExprStringLiteral,
     /// The content of the docstring, including the leading and trailing quotes.
     pub(crate) contents: &'a str,
     /// The range of the docstring body (without the quotes). The range is relative to [`Self::contents`].

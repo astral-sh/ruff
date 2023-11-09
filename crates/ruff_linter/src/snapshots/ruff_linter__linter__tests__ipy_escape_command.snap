@@ -12,7 +12,7 @@ ipy_escape_command.ipynb:cell 1:5:8: F401 [*] `os` imported but unused
   |
   = help: Remove unused import: `os`
 
-ℹ Fix
+ℹ Safe fix
 2 2 | 
 3 3 | %matplotlib inline
 4 4 | 

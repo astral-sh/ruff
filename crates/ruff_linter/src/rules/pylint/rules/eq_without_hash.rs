@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
@@ -80,7 +80,7 @@ fn has_eq_without_hash(body: &[Stmt]) -> bool {
                 //
                 //     __hash__ = None
                 // ```
-                if id == "__hash__" && is_const_none(value) {
+                if id == "__hash__" && value.is_none_literal_expr() {
                     has_hash = true;
                 }
             }

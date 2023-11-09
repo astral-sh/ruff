@@ -8,7 +8,7 @@ use smallvec::SmallVec;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -245,7 +245,7 @@ fn non_none_annotation_element<'a>(
     // E.g., `typing.Union` or `typing.Optional`
     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation {
         if semantic.match_typing_expr(value, "Optional") {
-            return if is_const_none(slice) {
+            return if slice.is_none_literal_expr() {
                 None
             } else {
                 Some(slice)
@@ -264,7 +264,7 @@ fn non_none_annotation_element<'a>(
             return None;
         };
 
-        return match (is_const_none(left), is_const_none(right)) {
+        return match (left.is_none_literal_expr(), right.is_none_literal_expr()) {
             (false, true) => Some(left),
             (true, false) => Some(right),
             (true, true) => None,
@@ -280,11 +280,11 @@ fn non_none_annotation_element<'a>(
         ..
     }) = annotation
     {
-        if !is_const_none(left) {
+        if !left.is_none_literal_expr() {
             return Some(left);
         }
 
-        if !is_const_none(right) {
+        if !right.is_none_literal_expr() {
             return Some(right);
         }
 

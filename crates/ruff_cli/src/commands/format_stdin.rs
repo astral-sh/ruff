@@ -31,17 +31,19 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
 
     let mode = FormatMode::from_cli(cli);
 
-    if let Some(filename) = cli.stdin_filename.as_deref() {
-        if !python_file_at_path(filename, &pyproject_config, overrides)? {
-            return Ok(ExitStatus::Success);
-        }
+    if pyproject_config.settings.file_resolver.force_exclude {
+        if let Some(filename) = cli.stdin_filename.as_deref() {
+            if !python_file_at_path(filename, &pyproject_config, overrides)? {
+                return Ok(ExitStatus::Success);
+            }
 
-        let format_settings = &pyproject_config.settings.formatter;
-        if filename
-            .file_name()
-            .is_some_and(|name| match_exclusion(filename, name, &format_settings.exclude))
-        {
-            return Ok(ExitStatus::Success);
+            let format_settings = &pyproject_config.settings.formatter;
+            if filename
+                .file_name()
+                .is_some_and(|name| match_exclusion(filename, name, &format_settings.exclude))
+            {
+                return Ok(ExitStatus::Success);
+            }
         }
     }
 

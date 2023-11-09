@@ -16,8 +16,8 @@ expression: parse_ast
                                 value: Compare(
                                     ExprCompare {
                                         range: 3..9,
-                                        left: Constant(
-                                            ExprConstant {
+                                        left: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 3..4,
                                                 value: Int(
                                                     1,
@@ -28,8 +28,8 @@ expression: parse_ast
                                             NotEq,
                                         ],
                                         comparators: [
-                                            Constant(
-                                                ExprConstant {
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 8..9,
                                                     value: Int(
                                                         2,

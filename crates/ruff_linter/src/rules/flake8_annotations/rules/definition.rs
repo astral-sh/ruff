@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::statement_visitor::StatementVisitor;
-use ruff_python_ast::{self as ast, Constant, Expr, ParameterWithDefault, Stmt};
+use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Stmt};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::Definition;
@@ -431,10 +431,7 @@ fn is_none_returning(body: &[Stmt]) -> bool {
     visitor.visit_body(body);
     for stmt in visitor.returns {
         if let Some(value) = stmt.value.as_deref() {
-            if !matches!(
-                value,
-                Expr::Constant(constant) if constant.value.is_none()
-            ) {
+            if !value.is_none_literal_expr() {
                 return false;
             }
         }
@@ -451,9 +448,10 @@ fn check_dynamically_typed<F>(
 ) where
     F: FnOnce() -> String,
 {
-    if let Expr::Constant(ast::ExprConstant {
+    if let Expr::StringLiteral(ast::ExprStringLiteral {
         range,
-        value: Constant::Str(string),
+        value: string,
+        ..
     }) = annotation
     {
         // Quoted annotations

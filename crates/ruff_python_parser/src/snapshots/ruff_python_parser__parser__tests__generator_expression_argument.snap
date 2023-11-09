@@ -8,16 +8,12 @@ Call(
         func: Attribute(
             ExprAttribute {
                 range: 0..8,
-                value: Constant(
-                    ExprConstant {
+                value: StringLiteral(
+                    ExprStringLiteral {
                         range: 0..3,
-                        value: Str(
-                            StringConstant {
-                                value: " ",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
-                        ),
+                        value: " ",
+                        unicode: false,
+                        implicit_concatenated: false,
                     },
                 ),
                 attr: Identifier {
@@ -67,16 +63,12 @@ Call(
                                                     body: BinOp(
                                                         ExprBinOp {
                                                             range: 43..61,
-                                                            left: Constant(
-                                                                ExprConstant {
+                                                            left: StringLiteral(
+                                                                ExprStringLiteral {
                                                                     range: 43..53,
-                                                                    value: Str(
-                                                                        StringConstant {
-                                                                            value: "LIMIT %d",
-                                                                            unicode: false,
-                                                                            implicit_concatenated: false,
-                                                                        },
-                                                                    ),
+                                                                    value: "LIMIT %d",
+                                                                    unicode: false,
+                                                                    implicit_concatenated: false,
                                                                 },
                                                             ),
                                                             op: Mod,
@@ -89,10 +81,9 @@ Call(
                                                             ),
                                                         },
                                                     ),
-                                                    orelse: Constant(
-                                                        ExprConstant {
+                                                    orelse: NoneLiteral(
+                                                        ExprNoneLiteral {
                                                             range: 76..80,
-                                                            value: None,
                                                         },
                                                     ),
                                                 },
@@ -110,16 +101,12 @@ Call(
                                                     body: BinOp(
                                                         ExprBinOp {
                                                             range: 91..111,
-                                                            left: Constant(
-                                                                ExprConstant {
+                                                            left: StringLiteral(
+                                                                ExprStringLiteral {
                                                                     range: 91..102,
-                                                                    value: Str(
-                                                                        StringConstant {
-                                                                            value: "OFFSET %d",
-                                                                            unicode: false,
-                                                                            implicit_concatenated: false,
-                                                                        },
-                                                                    ),
+                                                                    value: "OFFSET %d",
+                                                                    unicode: false,
+                                                                    implicit_concatenated: false,
                                                                 },
                                                             ),
                                                             op: Mod,
@@ -132,10 +119,9 @@ Call(
                                                             ),
                                                         },
                                                     ),
-                                                    orelse: Constant(
-                                                        ExprConstant {
+                                                    orelse: NoneLiteral(
+                                                        ExprNoneLiteral {
                                                             range: 128..132,
-                                                            value: None,
                                                         },
                                                     ),
                                                 },
