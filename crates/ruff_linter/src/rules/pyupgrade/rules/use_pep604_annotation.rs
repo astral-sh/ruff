@@ -147,10 +147,10 @@ fn union(elts: &[Expr]) -> Expr {
         }),
         [Expr::Tuple(ast::ExprTuple { elts, .. })] => union(elts),
         [elt] => elt.clone(),
-        [elt, rest @ ..] => Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(union(&[elt.clone()])),
+        [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+            left: Box::new(union(rest)),
             op: Operator::BitOr,
-            right: Box::new(union(rest)),
+            right: Box::new(union(&[elt.clone()])),
             range: TextRange::default(),
         }),
     }
