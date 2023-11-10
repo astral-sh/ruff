@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# **NOTE**
+# This script is being replaced by the ruff-ecosystem package which is no
+# longer focused on black-compatibility but on changes in formatting between
+# ruff versions. ruff-ecosystem does not support instability checks yet.
+#
 # Check black compatibility and check for formatter instabilities and other
 # errors.
 #
@@ -69,6 +74,12 @@ if [ ! -d "$dir/cpython/.git" ]; then
   git clone --filter=tree:0 https://github.com/python/cpython "$dir/cpython"
 fi
 git -C "$dir/cpython" checkout -q b75186f69edcf54615910a5cd707996144163ef7
+
+# poetry itself
+if [ ! -d "$dir/poetry/.git" ]; then
+  git clone --filter=tree:0 https://github.com/python-poetry/poetry "$dir/poetry"
+fi
+git -C "$dir/poetry" checkout -q 611033a7335f3c8e2b74dd58688fb9021cf84a5b
 
 # Uncomment if you want to update the hashes
 #for i in "$dir"/*/; do git -C "$i" switch main && git -C "$i" pull; done

@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 # fmt: off
 @test([
     1, 2,
@@ -53,7 +53,7 @@ def f(): pass
 
 ## Ruff Output
 
-```py
+```python
 # fmt: off
 @test([
     1, 2,
@@ -71,7 +71,7 @@ def f(): pass
 
 ## Black Output
 
-```py
+```python
 # fmt: off
 @test([
     1, 2,

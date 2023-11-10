@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, CmpOp, Constant, Expr};
+use ruff_python_ast::{Arguments, CmpOp, Expr};
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
@@ -11,11 +11,7 @@ use crate::settings::LinterSettings;
 pub(super) fn type_param_name(arguments: &Arguments) -> Option<&str> {
     // Handle both `TypeVar("T")` and `TypeVar(name="T")`.
     let name_param = arguments.find_argument("name", 0)?;
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(name),
-        ..
-    }) = &name_param
-    {
+    if let Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }) = &name_param {
         Some(name)
     } else {
         None

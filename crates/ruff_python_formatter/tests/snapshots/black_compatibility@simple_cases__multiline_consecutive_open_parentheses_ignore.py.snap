@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 # This is a regression test. Issue #3737
 
 a = (  # type: ignore
@@ -48,7 +48,7 @@ print(   "111"       ) # type: ignore
 
 ## Ruff Output
 
-```py
+```python
 # This is a regression test. Issue #3737
 
 a = (  # type: ignore
@@ -70,7 +70,7 @@ print("111")  # type: ignore
 
 ## Black Output
 
-```py
+```python
 # This is a regression test. Issue #3737
 
 a = (  # type: ignore

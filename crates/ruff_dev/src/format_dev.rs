@@ -33,7 +33,7 @@ use ruff_formatter::{FormatError, LineWidth, PrintError};
 use ruff_linter::logging::LogLevel;
 use ruff_linter::settings::types::{FilePattern, FilePatternSet};
 use ruff_python_formatter::{
-    format_module_source, FormatModuleError, MagicTrailingComma, PyFormatOptions,
+    format_module_source, FormatModuleError, MagicTrailingComma, PreviewMode, PyFormatOptions,
 };
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile, Resolver};
 
@@ -871,9 +871,7 @@ struct BlackOptions {
     line_length: NonZeroU16,
     #[serde(alias = "skip-magic-trailing-comma")]
     skip_magic_trailing_comma: bool,
-    #[allow(unused)]
-    #[serde(alias = "force-exclude")]
-    force_exclude: Option<String>,
+    preview: bool,
 }
 
 impl Default for BlackOptions {
@@ -881,7 +879,7 @@ impl Default for BlackOptions {
         Self {
             line_length: NonZeroU16::new(88).unwrap(),
             skip_magic_trailing_comma: false,
-            force_exclude: None,
+            preview: false,
         }
     }
 }
@@ -928,6 +926,11 @@ impl BlackOptions {
                 MagicTrailingComma::Ignore
             } else {
                 MagicTrailingComma::Respect
+            })
+            .with_preview(if self.preview {
+                PreviewMode::Enabled
+            } else {
+                PreviewMode::Disabled
             })
     }
 }

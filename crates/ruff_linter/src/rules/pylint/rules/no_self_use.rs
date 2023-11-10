@@ -15,7 +15,7 @@ use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
 ///
 /// ## Why is this bad?
 /// Unused `self` parameters are usually a sign of a method that could be
-/// replaced by a function or a static method.
+/// replaced by a function, class method, or static method.
 ///
 /// ## Example
 /// ```python
@@ -26,10 +26,8 @@ use crate::{checkers::ast::Checker, rules::flake8_unused_arguments::helpers};
 ///
 /// Use instead:
 /// ```python
-/// class Person:
-///     @staticmethod
-///     def greeting():
-///         print("Greetings friend!")
+/// def greeting():
+///     print("Greetings friend!")
 /// ```
 #[violation]
 pub struct NoSelfUse {
@@ -40,7 +38,7 @@ impl Violation for NoSelfUse {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NoSelfUse { method_name } = self;
-        format!("Method `{method_name}` could be a function or static method")
+        format!("Method `{method_name}` could be a function, class method, or static method")
     }
 }
 

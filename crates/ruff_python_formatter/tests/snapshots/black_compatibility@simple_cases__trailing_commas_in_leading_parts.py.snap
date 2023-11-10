@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 zero(one,).two(three,).four(five,)
 
 func1(arg1).func2(arg2,).func3(arg3).func4(arg4,).func5(arg5)
@@ -72,7 +72,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 
 ## Ruff Output
 
-```py
+```python
 zero(
     one,
 ).two(
@@ -123,7 +123,7 @@ assert (
 
 ## Black Output
 
-```py
+```python
 zero(
     one,
 ).two(

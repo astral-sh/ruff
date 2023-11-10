@@ -7,13 +7,15 @@ use std::string::ToString;
 use anyhow::{bail, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
-use ruff_diagnostics::Applicability;
+use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
+use ruff_python_ast::PySourceType;
 
 use crate::fs;
 use crate::registry::RuleSet;
@@ -161,7 +163,7 @@ impl FilePattern {
 
                 // Add basename path.
                 if !pattern.contains(std::path::MAIN_SEPARATOR) {
-                    builder.add(Glob::from_str(&pattern)?);
+                    builder.add(Glob::new(&pattern)?);
                 }
             }
         }
@@ -286,6 +288,119 @@ impl FromStr for PatternPrefixPair {
         let pattern = pattern_str.into();
         let prefix = RuleSelector::from_str(code_string)?;
         Ok(Self { pattern, prefix })
+    }
+}
+
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    CacheKey,
+    EnumIter,
+)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum Language {
+    #[default]
+    Python,
+    Pyi,
+    Ipynb,
+}
+
+impl FromStr for Language {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "python" => Ok(Self::Python),
+            "pyi" => Ok(Self::Pyi),
+            "ipynb" => Ok(Self::Ipynb),
+            _ => {
+                bail!("Unrecognized language: `{s}`. Expected one of `python`, `pyi`, or `ipynb`.")
+            }
+        }
+    }
+}
+
+impl From<Language> for PySourceType {
+    fn from(value: Language) -> Self {
+        match value {
+            Language::Python => Self::Python,
+            Language::Ipynb => Self::Ipynb,
+            Language::Pyi => Self::Stub,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExtensionPair {
+    pub extension: String,
+    pub language: Language,
+}
+
+impl ExtensionPair {
+    const EXPECTED_PATTERN: &'static str = "<Extension>:<LanguageCode> pattern";
+}
+
+impl FromStr for ExtensionPair {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let (extension_str, language_str) = {
+            let tokens = s.split(':').collect::<Vec<_>>();
+            if tokens.len() != 2 {
+                bail!("Expected {}", Self::EXPECTED_PATTERN);
+            }
+            (tokens[0].trim(), tokens[1].trim())
+        };
+        let extension = extension_str.into();
+        let language = Language::from_str(language_str)?;
+        Ok(Self {
+            extension,
+            language,
+        })
+    }
+}
+
+impl From<ExtensionPair> for (String, Language) {
+    fn from(value: ExtensionPair) -> Self {
+        (value.extension, value.language)
+    }
+}
+#[derive(Debug, Clone, Default, CacheKey)]
+pub struct ExtensionMapping {
+    mapping: FxHashMap<String, Language>,
+}
+
+impl ExtensionMapping {
+    /// Return the [`Language`] for the given extension.
+    pub fn get(&self, extension: &str) -> Option<Language> {
+        self.mapping.get(extension).copied()
+    }
+}
+
+impl From<FxHashMap<String, Language>> for ExtensionMapping {
+    fn from(value: FxHashMap<String, Language>) -> Self {
+        Self { mapping: value }
+    }
+}
+
+impl FromIterator<ExtensionPair> for ExtensionMapping {
+    fn from_iter<T: IntoIterator<Item = ExtensionPair>>(iter: T) -> Self {
+        Self {
+            mapping: iter
+                .into_iter()
+                .map(|pair| (pair.extension, pair.language))
+                .collect(),
+        }
     }
 }
 

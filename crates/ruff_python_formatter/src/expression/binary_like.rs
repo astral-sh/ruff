@@ -5,8 +5,7 @@ use smallvec::SmallVec;
 
 use ruff_formatter::write;
 use ruff_python_ast::{
-    Constant, Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprConstant, ExprUnaryOp,
-    UnaryOp,
+    Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, UnaryOp,
 };
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
@@ -505,10 +504,7 @@ const fn is_simple_power_operand(expr: &Expr) -> bool {
         Expr::UnaryOp(ExprUnaryOp {
             op: UnaryOp::Not, ..
         }) => false,
-        Expr::Constant(ExprConstant {
-            value: Constant::Complex { .. } | Constant::Float(_) | Constant::Int(_),
-            ..
-        }) => true,
+        Expr::NumberLiteral(_) | Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) => true,
         Expr::Name(_) => true,
         Expr::UnaryOp(ExprUnaryOp { operand, .. }) => is_simple_power_operand(operand),
         Expr::Attribute(ExprAttribute { value, .. }) => is_simple_power_operand(value),

@@ -17,13 +17,13 @@ use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::types::UnsafeFixes;
+use ruff_linter::settings::types::{ExtensionMapping, UnsafeFixes};
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::{SourceType, TomlSourceType};
+use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
 use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
@@ -177,6 +177,11 @@ impl AddAssign for FixMap {
     }
 }
 
+fn override_source_type(path: Option<&Path>, extension: &ExtensionMapping) -> Option<PySourceType> {
+    let ext = path?.extension()?.to_str()?;
+    extension.get(ext).map(PySourceType::from)
+}
+
 /// Lint the source code at the given `Path`.
 pub(crate) fn lint_path(
     path: &Path,
@@ -188,13 +193,8 @@ pub(crate) fn lint_path(
     unsafe_fixes: UnsafeFixes,
 ) -> Result<Diagnostics> {
     // Check the cache.
-    // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
-    // side-effects that aren't captured in the cache. (In practice, it's fine
-    // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
-    // write the fixes to disk, thus invalidating the cache. But it's a bit hard
-    // to reason about. We need to come up with a better solution here.)
     let caching = match cache {
-        Some(cache) if noqa.into() && fix_mode.is_generate() => {
+        Some(cache) if noqa.into() => {
             let relative_path = cache
                 .relative_path(path)
                 .expect("wrong package cache for file");
@@ -204,7 +204,17 @@ pub(crate) fn lint_path(
                 .get(relative_path, &cache_key)
                 .and_then(|entry| entry.to_diagnostics(path));
             if let Some(diagnostics) = cached_diagnostics {
-                return Ok(diagnostics);
+                // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
+                // and writing the diff to stdout, respectively). If a file has diagnostics, we
+                // need to avoid reading from and writing to the cache in these modes.
+                if match fix_mode {
+                    flags::FixMode::Generate => true,
+                    flags::FixMode::Apply | flags::FixMode::Diff => {
+                        diagnostics.messages.is_empty() && diagnostics.fixed.is_empty()
+                    }
+                } {
+                    return Ok(diagnostics);
+                }
             }
 
             // Stash the file metadata for later so when we update the cache it reflects the prerun
@@ -216,31 +226,35 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    let source_type = match SourceType::from(path) {
-        SourceType::Toml(TomlSourceType::Pyproject) => {
-            let messages = if settings
-                .rules
-                .iter_enabled()
-                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
-            {
-                let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
-                    Ok(contents) => contents,
-                    Err(err) => {
-                        return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
-                    }
+    let source_type = match override_source_type(Some(path), &settings.extension) {
+        Some(source_type) => source_type,
+        None => match SourceType::from(path) {
+            SourceType::Toml(TomlSourceType::Pyproject) => {
+                let messages = if settings
+                    .rules
+                    .iter_enabled()
+                    .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                {
+                    let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
+                        Ok(contents) => contents,
+                        Err(err) => {
+                            return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
+                        }
+                    };
+                    let source_file =
+                        SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+                    lint_pyproject_toml(source_file, settings)
+                } else {
+                    vec![]
                 };
-                let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-                lint_pyproject_toml(source_file, settings)
-            } else {
-                vec![]
-            };
-            return Ok(Diagnostics {
-                messages,
-                ..Diagnostics::default()
-            });
-        }
-        SourceType::Toml(_) => return Ok(Diagnostics::default()),
-        SourceType::Python(source_type) => source_type,
+                return Ok(Diagnostics {
+                    messages,
+                    ..Diagnostics::default()
+                });
+            }
+            SourceType::Toml(_) => return Ok(Diagnostics::default()),
+            SourceType::Python(source_type) => source_type,
+        },
     };
 
     // Extract the sources from the file.
@@ -304,15 +318,25 @@ pub(crate) fn lint_path(
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
         if parse_error.is_none() {
-            cache.update_lint(
-                relative_path.to_owned(),
-                &key,
-                LintCacheData::from_messages(
-                    &messages,
-                    imports.clone(),
-                    source_kind.as_ipy_notebook().map(Notebook::index).cloned(),
-                ),
-            );
+            // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
+            // and writing the diff to stdout, respectively). If a file has diagnostics, we
+            // need to avoid reading from and writing to the cache in these modes.
+            if match fix_mode {
+                flags::FixMode::Generate => true,
+                flags::FixMode::Apply | flags::FixMode::Diff => {
+                    messages.is_empty() && fixed.is_empty()
+                }
+            } {
+                cache.update_lint(
+                    relative_path.to_owned(),
+                    &key,
+                    LintCacheData::from_messages(
+                        &messages,
+                        imports.clone(),
+                        source_kind.as_ipy_notebook().map(Notebook::index).cloned(),
+                    ),
+                );
+            }
         }
     }
 
@@ -355,8 +379,15 @@ pub(crate) fn lint_stdin(
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
-    let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
-        return Ok(Diagnostics::default());
+    let source_type = if let Some(source_type) =
+        override_source_type(path, &settings.linter.extension)
+    {
+        source_type
+    } else {
+        let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
+            return Ok(Diagnostics::default());
+        };
+        source_type
     };
 
     // Extract the sources from the file.

@@ -10,21 +10,23 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
+use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
 use shellexpand::LookupError;
 use strum::IntoEnumIterator;
 
 use ruff_cache::cache_dir;
-use ruff_formatter::{IndentStyle, IndentWidth, LineWidth};
-use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_formatter::IndentStyle;
+use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::registry::RuleNamespace;
 use ruff_linter::registry::{Rule, RuleSet, INCOMPATIBLE_CODES};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
+use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
-    UnsafeFixes, Version,
+    ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion,
+    SerializationFormat, UnsafeFixes, Version,
 };
 use ruff_linter::settings::{
     resolve_per_file_ignores, LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS,
@@ -132,7 +134,7 @@ pub struct Configuration {
 
     // Global formatting options
     pub line_length: Option<LineLength>,
-    pub tab_size: Option<TabSize>,
+    pub indent_width: Option<IndentWidth>,
 
     pub lint: LintConfiguration,
     pub format: FormatConfiguration,
@@ -165,14 +167,14 @@ impl Configuration {
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {
-                    LineWidth::from(NonZeroU16::from(length))
+                    ruff_formatter::LineWidth::from(NonZeroU16::from(length))
                 }),
             line_ending: format.line_ending.unwrap_or(format_defaults.line_ending),
             indent_style: format.indent_style.unwrap_or(format_defaults.indent_style),
             indent_width: self
-                .tab_size
+                .indent_width
                 .map_or(format_defaults.indent_width, |tab_size| {
-                    IndentWidth::from(NonZeroU8::from(tab_size))
+                    ruff_formatter::IndentWidth::from(NonZeroU8::from(tab_size))
                 }),
             quote_style: format.quote_style.unwrap_or(format_defaults.quote_style),
             magic_trailing_comma: format
@@ -182,6 +184,8 @@ impl Configuration {
 
         let lint = self.lint;
         let lint_preview = lint.preview.unwrap_or(global_preview);
+
+        let line_length = self.line_length.unwrap_or_default();
 
         Ok(Settings {
             cache_dir: self
@@ -212,6 +216,7 @@ impl Configuration {
             linter: LinterSettings {
                 rules: lint.as_rule_table(lint_preview),
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
+                extension: lint.extension.unwrap_or_default(),
                 preview: lint_preview,
                 target_version,
                 project_root: project_root.to_path_buf(),
@@ -223,10 +228,10 @@ impl Configuration {
                 dummy_variable_rgx: lint
                     .dummy_variable_rgx
                     .unwrap_or_else(|| DUMMY_VARIABLE_RGX.clone()),
-                external: FxHashSet::from_iter(lint.external.unwrap_or_default()),
+                external: lint.external.unwrap_or_default(),
                 ignore_init_module_imports: lint.ignore_init_module_imports.unwrap_or_default(),
-                line_length: self.line_length.unwrap_or_default(),
-                tab_size: self.tab_size.unwrap_or_default(),
+                line_length,
+                tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
                 per_file_ignores: resolve_per_file_ignores(
                     lint.per_file_ignores
@@ -236,26 +241,14 @@ impl Configuration {
                         .collect(),
                 )?,
 
-                extend_safe_fixes: lint
-                    .extend_safe_fixes
-                    .iter()
-                    .flat_map(|selector| {
-                        selector.rules(&PreviewOptions {
-                            mode: lint_preview,
-                            require_explicit: false,
-                        })
-                    })
-                    .collect(),
-                extend_unsafe_fixes: lint
-                    .extend_unsafe_fixes
-                    .iter()
-                    .flat_map(|selector| {
-                        selector.rules(&PreviewOptions {
-                            mode: lint_preview,
-                            require_explicit: false,
-                        })
-                    })
-                    .collect(),
+                fix_safety: FixSafetyTable::from_rule_selectors(
+                    &lint.extend_safe_fixes,
+                    &lint.extend_unsafe_fixes,
+                    &PreviewOptions {
+                        mode: lint_preview,
+                        require_explicit: false,
+                    },
+                ),
 
                 src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
                 explicit_preview_rules: lint.explicit_preview_rules.unwrap_or_default(),
@@ -346,10 +339,14 @@ impl Configuration {
                     .map(Pep8NamingOptions::try_into_settings)
                     .transpose()?
                     .unwrap_or_default(),
-                pycodestyle: lint
-                    .pycodestyle
-                    .map(PycodestyleOptions::into_settings)
-                    .unwrap_or_default(),
+                pycodestyle: if let Some(pycodestyle) = lint.pycodestyle {
+                    pycodestyle.into_settings(line_length)
+                } else {
+                    pycodestyle::settings::Settings {
+                        max_line_length: line_length,
+                        ..pycodestyle::settings::Settings::default()
+                    }
+                },
                 pydocstyle: lint
                     .pydocstyle
                     .map(PydocstyleOptions::into_settings)
@@ -381,6 +378,15 @@ impl Configuration {
                 common: options.lint_top_level,
                 ..LintOptions::default()
             }
+        };
+
+        #[allow(deprecated)]
+        let indent_width = {
+            if options.tab_size.is_some() {
+                warn_user_once!("The `tab-size` option has been renamed to `indent-width` to emphasize that it configures the indentation used by the formatter as well as the tab width. Please update your configuration to use `indent-width = <value>` instead.");
+            }
+
+            options.indent_width.or(options.tab_size)
         };
 
         Ok(Self {
@@ -450,7 +456,7 @@ impl Configuration {
             output_format: options.output_format,
             force_exclude: options.force_exclude,
             line_length: options.line_length,
-            tab_size: options.tab_size,
+            indent_width,
             namespace_packages: options
                 .namespace_packages
                 .map(|namespace_package| resolve_src(&namespace_package, project_root))
@@ -498,7 +504,7 @@ impl Configuration {
             output_format: self.output_format.or(config.output_format),
             force_exclude: self.force_exclude.or(config.force_exclude),
             line_length: self.line_length.or(config.line_length),
-            tab_size: self.tab_size.or(config.tab_size),
+            indent_width: self.indent_width.or(config.indent_width),
             namespace_packages: self.namespace_packages.or(config.namespace_packages),
             required_version: self.required_version.or(config.required_version),
             respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
@@ -518,6 +524,7 @@ impl Configuration {
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
+    pub extension: Option<ExtensionMapping>,
 
     // Rule selection
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
@@ -584,6 +591,9 @@ impl LintConfiguration {
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
         Ok(LintConfiguration {
+            // `--extension` is a hidden command-line argument that isn't supported in configuration
+            // files at present.
+            extension: None,
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
@@ -900,6 +910,7 @@ impl LintConfiguration {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
+            extension: self.extension.or(config.extension),
             rule_selections: config
                 .rule_selections
                 .into_iter()
@@ -1118,6 +1129,7 @@ mod tests {
         Rule::AssignmentInAssert,
         Rule::DirectLoggerInstantiation,
         Rule::InvalidGetLoggerArgument,
+        Rule::IsinstanceTypeNone,
         Rule::ManualDictComprehension,
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,

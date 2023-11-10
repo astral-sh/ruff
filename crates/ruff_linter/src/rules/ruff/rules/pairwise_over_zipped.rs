@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Int};
+use ruff_python_ast::{self as ast, Expr, Int};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -65,8 +65,8 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
     if let Some(step) = step {
         if !matches!(
             step.as_ref(),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(Int::ONE),
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(Int::ONE),
                 ..
             })
         ) {
@@ -76,8 +76,8 @@ fn match_slice_info(expr: &Expr) -> Option<SliceInfo> {
 
     // If the slice start is a non-constant, we can't be sure that it's successive.
     let slice_start = if let Some(lower) = lower.as_ref() {
-        let Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(int),
+        let Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(int),
             range: _,
         }) = lower.as_ref()
         else {

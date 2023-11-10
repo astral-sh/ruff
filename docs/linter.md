@@ -20,9 +20,8 @@ For the full list of supported options, run `ruff check --help`.
 
 ## Rule selection
 
-The set of enabled rules is controlled via the [`select`](settings.md#select) and [`ignore`](settings.md#ignore)
-settings, along with the [`extend-select`](settings.md#extend-select) and [`extend-ignore`](settings.md#extend-ignore)
-modifiers.
+The set of enabled rules is controlled via the [`select`](settings.md#select),
+[`extend-select`](settings.md#extend-select), and [`ignore`](settings.md#ignore) settings.
 
 Ruff's linter mirrors Flake8's rule code system, in which each rule code consists of a one-to-three
 letter prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
@@ -30,13 +29,23 @@ letter prefix, followed by three digits (e.g., `F401`). The prefix indicates tha
 
 Rule selectors like [`select`](settings.md#select) and [`ignore`](settings.md#ignore) accept either
 a full rule code (e.g., `F401`) or any valid prefix (e.g., `F`). For example, given the following
-`pyproject.toml` file:
+configuration file:
 
-```toml
-[tool.ruff.lint]
-select = ["E", "F"]
-ignore = ["F401"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    select = ["E", "F"]
+    ignore = ["F401"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    select = ["E", "F"]
+    ignore = ["F401"]
+    ```
 
 Ruff would enable all rules with the `E` (pycodestyle) or `F` (Pyflakes) prefix, with the exception
 of `F401`. For more on configuring Ruff via `pyproject.toml`, see [_Configuring Ruff_](configuration.md).
@@ -47,8 +56,7 @@ formats. Ruff will automatically disable any conflicting rules when `ALL` is ena
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
-- Prefer `select` and `ignore` over `extend-select` and `extend-ignore`, to make your rule set
-    explicit.
+- Prefer [`select`](settings.md#select) over [`extend-select`](settings.md#extend-select) to make your rule set explicit.
 - Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
 - Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
     you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
@@ -57,40 +65,73 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
 For example, a configuration that enables some of the most popular rules (without being too
 pedantic) might look like the following:
 
-```toml
-[tool.ruff.lint]
-select = [
-  # pycodestyle
-  "E",
-  # Pyflakes
-  "F",
-  # pyupgrade
-  "UP",
-  # flake8-bugbear
-  "B",
-  # flake8-simplify
-  "SIM",
-  # isort
-  "I",
-]
-```
+=== "pyproject.toml"
 
-To resolve the enabled rule set, Ruff may need to reconcile `select` and `ignore` from a variety
-of sources, including the current `pyproject.toml`, any inherited `pyproject.toml` files, and the
-CLI (e.g., `--select`).
+    ```toml
+    [tool.ruff.lint]
+    select = [
+        # pycodestyle
+        "E",
+        # Pyflakes
+        "F",
+        # pyupgrade
+        "UP",
+        # flake8-bugbear
+        "B",
+        # flake8-simplify
+        "SIM",
+        # isort
+        "I",
+    ]
+    ```
 
-In those scenarios, Ruff uses the "highest-priority" `select` as the basis for the rule set, and
-then applies any `extend-select`, `ignore`, and `extend-ignore` adjustments. CLI options are given
-higher priority than `pyproject.toml` options, and the current `pyproject.toml` file is given higher
-priority than any inherited `pyproject.toml` files.
+=== "ruff.toml"
 
-For example, given the following `pyproject.toml` file:
+    ```toml
+    [lint]
+    select = [
+        # pycodestyle
+        "E",
+        # Pyflakes
+        "F",
+        # pyupgrade
+        "UP",
+        # flake8-bugbear
+        "B",
+        # flake8-simplify
+        "SIM",
+        # isort
+        "I",
+    ]
+    ```
 
-```toml
-[tool.ruff.lint]
-select = ["E", "F"]
-ignore = ["F401"]
-```
+To resolve the enabled rule set, Ruff may need to reconcile [`select`](settings.md#select) and
+[`ignore`](settings.md#ignore) from a variety of sources, including the current `pyproject.toml`,
+any inherited `pyproject.toml` files, and the CLI (e.g., [`--select`](settings.md#select)).
+
+In those scenarios, Ruff uses the "highest-priority" [`select`](settings.md#select) as the basis for
+the rule set, and then applies [`extend-select`](settings.md#extend-select) and
+[`ignore`](settings.md#ignore) adjustments. CLI options are given higher priority than
+`pyproject.toml` options, and the current `pyproject.toml` file is given higher priority than any
+inherited `pyproject.toml` files.
+
+For example, given the following configuration file:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    select = ["E", "F"]
+    ignore = ["F401"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    select = ["E", "F"]
+    ignore = ["F401"]
+    ```
 
 Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no other rules.
 
@@ -113,9 +154,12 @@ whether a rule supports fixing, see [_Rules_](rules.md).
 
 ### Fix safety
 
-Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when applying safe fixes, but the meaning could be changed when applying unsafe fixes.
+Ruff labels fixes as "safe" and "unsafe". The meaning and intent of your code will be retained when
+applying safe fixes, but the meaning could be changed when applying unsafe fixes.
 
-For example, [`unnecessary-iterable-allocation-for-first-element`](rules/unnecessary-iterable-allocation-for-first-element.md) (`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
+For example, [`unnecessary-iterable-allocation-for-first-element`](rules/unnecessary-iterable-allocation-for-first-element.md)
+(`RUF015`) is a rule which checks for potentially unperformant use of `list(...)[0]`. The fix
+replaces this pattern with `next(iter(...))` which can result in a drastic speedup:
 
 ```shell
 $ python -m timeit "head = list(range(99999999))[0]"
@@ -159,11 +203,21 @@ The safety of fixes can be adjusted per rule using the [`extend-safe-fixes`](set
 
 For example, the following configuration would promote unsafe fixes for `F601` to safe fixes and demote safe fixes for `UP034` to unsafe fixes:
 
-```toml
-[tool.ruff.lint]
-extend-safe-fixes = ["F601"]
-extend-unsafe-fixes = ["UP034"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    extend-safe-fixes = ["F601"]
+    extend-unsafe-fixes = ["UP034"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    extend-safe-fixes = ["F601"]
+    extend-unsafe-fixes = ["UP034"]
+    ```
 
 You may use prefixes to select rules as well, e.g., `F` can be used to promote fixes for all rules in Pyflakes to safe.
 
@@ -172,24 +226,44 @@ You may use prefixes to select rules as well, e.g., `F` can be used to promote f
 
 ### Disabling fixes
 
-To limit the set of rules that Ruff should fix, use the [`fixable`](settings.md#fixable) and [`unfixable`](settings.md#unfixable) settings, along with their [`extend-fixable`](settings.md#extend-fixable) and [`extend-unfixable`](settings.md#extend-unfixable)
-variants.
+To limit the set of rules that Ruff should fix, use the [`fixable`](settings.md#fixable) and
+[`unfixable`](settings.md#unfixable) settings, along with their [`extend-fixable`](settings.md#extend-fixable)
+and [`extend-unfixable`](settings.md#extend-unfixable) variants.
 
 For example, the following configuration would enable fixes for all rules except
 [`unused-imports`](rules/unused-import.md) (`F401`):
 
-```toml
-[tool.ruff.lint]
-fixable = ["ALL"]
-unfixable = ["F401"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    fixable = ["ALL"]
+    unfixable = ["F401"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    fixable = ["ALL"]
+    unfixable = ["F401"]
+    ```
 
 Conversely, the following configuration would only enable fixes for `F401`:
 
-```toml
-[tool.ruff.lint]
-fixable = ["F401"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    fixable = ["F401"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    fixable = ["F401"]
+    ```
 
 ## Error suppression
 
@@ -197,8 +271,7 @@ Ruff supports several mechanisms for suppressing lint errors, be they false posi
 permissible violations.
 
 To omit a lint rule entirely, add it to the "ignore" list via the [`ignore`](settings.md#ignore)
-or [`extend-ignore`](settings.md#extend-ignore) settings, either on the command-line
-or in your `pyproject.toml` or `ruff.toml` file.
+setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` file.
 
 To suppress a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
@@ -224,14 +297,15 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 """  # noqa: E501
 ```
 
-To ignore all violations across an entire file, add `# ruff: noqa` to any line in the file, like so:
+To ignore all violations across an entire file, add the line `# ruff: noqa` anywhere in the file,
+preferably towards the top, like so:
 
 ```python
 # ruff: noqa
 ```
 
-To ignore a specific rule across an entire file, add `# ruff: noqa: {code}` to any line in the file,
-like so:
+To ignore a specific rule across an entire file, add the line `# ruff: noqa: {code}` anywhere in the
+file, preferably towards the top, like so:
 
 ```python
 # ruff: noqa: F841
@@ -239,6 +313,9 @@ like so:
 
 Or see the [`per-file-ignores`](settings.md#per-file-ignores) setting, which enables the same
 functionality from within your `pyproject.toml` or `ruff.toml` file.
+
+Global `noqa` comments must be on their own line to disambiguate from comments which ignore
+violations on a single line.
 
 Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
 equivalent to `# ruff: noqa`.
@@ -270,6 +347,8 @@ Ruff will also respect variants of these action comments with a `# ruff:` prefix
 (e.g., `# ruff: isort: skip_file`, `# ruff: isort: on`, and so on). These variants more clearly
 convey that the action comment is intended for Ruff, but are functionally equivalent to the
 isort variants.
+
+Unlike isort, Ruff does not respect action comments within docstrings.
 
 See the [isort documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.

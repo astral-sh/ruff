@@ -6,7 +6,7 @@ use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use crate::int;
+use crate::{int, LiteralExpressionRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
@@ -591,8 +591,18 @@ pub enum Expr {
     FormattedValue(ExprFormattedValue),
     #[is(name = "f_string_expr")]
     FString(ExprFString),
-    #[is(name = "constant_expr")]
-    Constant(ExprConstant),
+    #[is(name = "string_literal_expr")]
+    StringLiteral(ExprStringLiteral),
+    #[is(name = "bytes_literal_expr")]
+    BytesLiteral(ExprBytesLiteral),
+    #[is(name = "number_literal_expr")]
+    NumberLiteral(ExprNumberLiteral),
+    #[is(name = "boolean_literal_expr")]
+    BooleanLiteral(ExprBooleanLiteral),
+    #[is(name = "none_literal_expr")]
+    NoneLiteral(ExprNoneLiteral),
+    #[is(name = "ellipsis_literal_expr")]
+    EllipsisLiteral(ExprEllipsisLiteral),
     #[is(name = "attribute_expr")]
     Attribute(ExprAttribute),
     #[is(name = "subscript_expr")]
@@ -611,6 +621,54 @@ pub enum Expr {
     // Jupyter notebook specific
     #[is(name = "ipy_escape_command_expr")]
     IpyEscapeCommand(ExprIpyEscapeCommand),
+}
+
+impl Expr {
+    /// Returns `true` if the expression is a literal expression.
+    ///
+    /// A literal expression is either a string literal, bytes literal,
+    /// integer, float, complex number, boolean, `None`, or ellipsis (`...`).
+    pub fn is_literal_expr(&self) -> bool {
+        matches!(
+            self,
+            Expr::StringLiteral(_)
+                | Expr::BytesLiteral(_)
+                | Expr::NumberLiteral(_)
+                | Expr::BooleanLiteral(_)
+                | Expr::NoneLiteral(_)
+                | Expr::EllipsisLiteral(_)
+        )
+    }
+
+    pub fn as_literal_expr(&self) -> Option<LiteralExpressionRef<'_>> {
+        match self {
+            Expr::StringLiteral(expr) => Some(LiteralExpressionRef::StringLiteral(expr)),
+            Expr::BytesLiteral(expr) => Some(LiteralExpressionRef::BytesLiteral(expr)),
+            Expr::NumberLiteral(expr) => Some(LiteralExpressionRef::NumberLiteral(expr)),
+            Expr::BooleanLiteral(expr) => Some(LiteralExpressionRef::BooleanLiteral(expr)),
+            Expr::NoneLiteral(expr) => Some(LiteralExpressionRef::NoneLiteral(expr)),
+            Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
+            _ => None,
+        }
+    }
+
+    pub fn is_implicit_concatenated_string(&self) -> bool {
+        match self {
+            Expr::StringLiteral(ExprStringLiteral {
+                implicit_concatenated,
+                ..
+            })
+            | Expr::BytesLiteral(ExprBytesLiteral {
+                implicit_concatenated,
+                ..
+            })
+            | Expr::FString(ExprFString {
+                implicit_concatenated,
+                ..
+            }) => *implicit_concatenated,
+            _ => false,
+        }
+    }
 }
 
 /// An AST node used to represent a IPython escape command at the expression level.
@@ -941,16 +999,127 @@ impl From<ExprFString> for Expr {
     }
 }
 
-/// See also [Constant](https://docs.python.org/3/library/ast.html#ast.Constant)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ExprConstant {
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ExprStringLiteral {
     pub range: TextRange,
-    pub value: Constant,
+    pub value: String,
+    pub unicode: bool,
+    pub implicit_concatenated: bool,
 }
 
-impl From<ExprConstant> for Expr {
-    fn from(payload: ExprConstant) -> Self {
-        Expr::Constant(payload)
+impl From<ExprStringLiteral> for Expr {
+    fn from(payload: ExprStringLiteral) -> Self {
+        Expr::StringLiteral(payload)
+    }
+}
+
+impl Ranged for ExprStringLiteral {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl Deref for ExprStringLiteral {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.value.as_str()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ExprBytesLiteral {
+    pub range: TextRange,
+    pub value: Vec<u8>,
+    pub implicit_concatenated: bool,
+}
+
+impl From<ExprBytesLiteral> for Expr {
+    fn from(payload: ExprBytesLiteral) -> Self {
+        Expr::BytesLiteral(payload)
+    }
+}
+
+impl Ranged for ExprBytesLiteral {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprNumberLiteral {
+    pub range: TextRange,
+    pub value: Number,
+}
+
+impl From<ExprNumberLiteral> for Expr {
+    fn from(payload: ExprNumberLiteral) -> Self {
+        Expr::NumberLiteral(payload)
+    }
+}
+
+impl Ranged for ExprNumberLiteral {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+pub enum Number {
+    Int(int::Int),
+    Float(f64),
+    Complex { real: f64, imag: f64 },
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ExprBooleanLiteral {
+    pub range: TextRange,
+    pub value: bool,
+}
+
+impl From<ExprBooleanLiteral> for Expr {
+    fn from(payload: ExprBooleanLiteral) -> Self {
+        Expr::BooleanLiteral(payload)
+    }
+}
+
+impl Ranged for ExprBooleanLiteral {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ExprNoneLiteral {
+    pub range: TextRange,
+}
+
+impl From<ExprNoneLiteral> for Expr {
+    fn from(payload: ExprNoneLiteral) -> Self {
+        Expr::NoneLiteral(payload)
+    }
+}
+
+impl Ranged for ExprNoneLiteral {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ExprEllipsisLiteral {
+    pub range: TextRange,
+}
+
+impl From<ExprEllipsisLiteral> for Expr {
+    fn from(payload: ExprEllipsisLiteral) -> Self {
+        Expr::EllipsisLiteral(payload)
+    }
+}
+
+impl Ranged for ExprEllipsisLiteral {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -1923,7 +2092,7 @@ impl From<PatternMatchValue> for Pattern {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PatternMatchSingleton {
     pub range: TextRange,
-    pub value: Constant,
+    pub value: Singleton,
 }
 
 impl From<PatternMatchSingleton> for Pattern {
@@ -2112,6 +2281,15 @@ pub struct Parameters {
 }
 
 impl Parameters {
+    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
+    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+        self.posonlyargs
+            .iter()
+            .chain(&self.args)
+            .chain(&self.kwonlyargs)
+            .find(|arg| arg.parameter.name.as_str() == name)
+    }
+
     /// Returns `true` if a parameter with the given name included in this [`Parameters`].
     pub fn includes(&self, name: &str) -> bool {
         if self
@@ -2347,32 +2525,9 @@ impl Parameters {
     }
 }
 
-#[allow(clippy::borrowed_box)] // local utility
-fn clone_boxed_expr(expr: &Box<Expr>) -> Box<Expr> {
-    let expr: &Expr = expr.as_ref();
-    Box::new(expr.clone())
-}
-
 impl ParameterWithDefault {
     pub fn as_parameter(&self) -> &Parameter {
         &self.parameter
-    }
-
-    pub fn to_parameter(&self) -> (Parameter, Option<Box<Expr>>) {
-        let ParameterWithDefault {
-            range: _,
-            parameter,
-            default,
-        } = self;
-        (parameter.clone(), default.as_ref().map(clone_boxed_expr))
-    }
-    pub fn into_parameter(self) -> (Parameter, Option<Box<Expr>>) {
-        let ParameterWithDefault {
-            range: _,
-            parameter,
-            default,
-        } = self;
-        (parameter, default)
     }
 }
 
@@ -2578,138 +2733,19 @@ impl Ranged for Identifier {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, is_macro::Is)]
-pub enum Constant {
+#[derive(Clone, Debug, PartialEq)]
+pub enum Singleton {
     None,
-    Bool(bool),
-    Str(StringConstant),
-    Bytes(BytesConstant),
-    Int(int::Int),
-    Float(f64),
-    Complex { real: f64, imag: f64 },
-    Ellipsis,
+    True,
+    False,
 }
 
-impl Constant {
-    /// Returns `true` if the constant is a string or bytes constant that contains multiple,
-    /// implicitly concatenated string tokens.
-    pub fn is_implicit_concatenated(&self) -> bool {
-        match self {
-            Constant::Str(value) => value.implicit_concatenated,
-            Constant::Bytes(value) => value.implicit_concatenated,
-            _ => false,
-        }
-    }
-
-    /// Returns `true` if the constant is a string constant that is a unicode string (i.e., `u"..."`).
-    pub fn is_unicode_string(&self) -> bool {
-        match self {
-            Constant::Str(value) => value.unicode,
-            _ => false,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StringConstant {
-    /// The string value as resolved by the parser (i.e., without quotes, or escape sequences, or
-    /// implicit concatenations).
-    pub value: String,
-    /// Whether the string is a Unicode string (i.e., `u"..."`).
-    pub unicode: bool,
-    /// Whether the string contains multiple string tokens that were implicitly concatenated.
-    pub implicit_concatenated: bool,
-}
-
-impl Deref for StringConstant {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.value.as_str()
-    }
-}
-
-impl From<String> for StringConstant {
-    fn from(value: String) -> StringConstant {
-        Self {
-            value,
-            unicode: false,
-            implicit_concatenated: false,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BytesConstant {
-    /// The bytes value as resolved by the parser (i.e., without quotes, or escape sequences, or
-    /// implicit concatenations).
-    pub value: Vec<u8>,
-    /// Whether the string contains multiple string tokens that were implicitly concatenated.
-    pub implicit_concatenated: bool,
-}
-
-impl Deref for BytesConstant {
-    type Target = [u8];
-    fn deref(&self) -> &Self::Target {
-        self.value.as_slice()
-    }
-}
-
-impl From<Vec<u8>> for BytesConstant {
-    fn from(value: Vec<u8>) -> BytesConstant {
-        Self {
-            value,
-            implicit_concatenated: false,
-        }
-    }
-}
-
-impl From<Vec<u8>> for Constant {
-    fn from(value: Vec<u8>) -> Constant {
-        Self::Bytes(BytesConstant {
-            value,
-            implicit_concatenated: false,
-        })
-    }
-}
-impl From<String> for Constant {
-    fn from(value: String) -> Constant {
-        Self::Str(StringConstant {
-            value,
-            unicode: false,
-            implicit_concatenated: false,
-        })
-    }
-}
-impl From<bool> for Constant {
-    fn from(value: bool) -> Constant {
-        Self::Bool(value)
-    }
-}
-
-#[cfg(feature = "rustpython-literal")]
-impl std::fmt::Display for Constant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Constant::None => f.pad("None"),
-            Constant::Bool(b) => f.pad(if *b { "True" } else { "False" }),
-            Constant::Str(s) => rustpython_literal::escape::UnicodeEscape::new_repr(s.as_str())
-                .str_repr()
-                .write(f),
-            Constant::Bytes(b) => {
-                let escape = rustpython_literal::escape::AsciiEscape::new_repr(b);
-                let repr = escape.bytes_repr().to_string().unwrap();
-                f.pad(&repr)
-            }
-            Constant::Int(i) => std::fmt::Display::fmt(&i, f),
-            Constant::Float(fp) => f.pad(&rustpython_literal::float::to_string(*fp)),
-            Constant::Complex { real, imag } => {
-                if *real == 0.0 {
-                    write!(f, "{imag}j")
-                } else {
-                    write!(f, "({real}{imag:+}j)")
-                }
-            }
-            Constant::Ellipsis => f.pad("..."),
+impl From<bool> for Singleton {
+    fn from(value: bool) -> Self {
+        if value {
+            Singleton::True
+        } else {
+            Singleton::False
         }
     }
 }
@@ -2990,11 +3026,6 @@ impl Ranged for crate::nodes::ExprFString {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprConstant {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::nodes::ExprAttribute {
     fn range(&self) -> TextRange {
         self.range
@@ -3057,7 +3088,12 @@ impl Ranged for crate::Expr {
             Self::Call(node) => node.range(),
             Self::FormattedValue(node) => node.range(),
             Self::FString(node) => node.range(),
-            Self::Constant(node) => node.range(),
+            Expr::StringLiteral(node) => node.range(),
+            Expr::BytesLiteral(node) => node.range(),
+            Expr::NumberLiteral(node) => node.range(),
+            Expr::BooleanLiteral(node) => node.range(),
+            Expr::NoneLiteral(node) => node.range(),
+            Expr::EllipsisLiteral(node) => node.range(),
             Self::Attribute(node) => node.range(),
             Self::Subscript(node) => node.range(),
             Self::Starred(node) => node.range(),
@@ -3358,9 +3394,34 @@ impl From<ExprFString> for ParenthesizedExpr {
         Expr::FString(payload).into()
     }
 }
-impl From<ExprConstant> for ParenthesizedExpr {
-    fn from(payload: ExprConstant) -> Self {
-        Expr::Constant(payload).into()
+impl From<ExprStringLiteral> for ParenthesizedExpr {
+    fn from(payload: ExprStringLiteral) -> Self {
+        Expr::StringLiteral(payload).into()
+    }
+}
+impl From<ExprBytesLiteral> for ParenthesizedExpr {
+    fn from(payload: ExprBytesLiteral) -> Self {
+        Expr::BytesLiteral(payload).into()
+    }
+}
+impl From<ExprNumberLiteral> for ParenthesizedExpr {
+    fn from(payload: ExprNumberLiteral) -> Self {
+        Expr::NumberLiteral(payload).into()
+    }
+}
+impl From<ExprBooleanLiteral> for ParenthesizedExpr {
+    fn from(payload: ExprBooleanLiteral) -> Self {
+        Expr::BooleanLiteral(payload).into()
+    }
+}
+impl From<ExprNoneLiteral> for ParenthesizedExpr {
+    fn from(payload: ExprNoneLiteral) -> Self {
+        Expr::NoneLiteral(payload).into()
+    }
+}
+impl From<ExprEllipsisLiteral> for ParenthesizedExpr {
+    fn from(payload: ExprEllipsisLiteral) -> Self {
+        Expr::EllipsisLiteral(payload).into()
     }
 }
 impl From<ExprAttribute> for ParenthesizedExpr {
@@ -3411,7 +3472,6 @@ mod size_assertions {
     assert_eq_size!(StmtClassDef, [u8; 104]);
     assert_eq_size!(StmtTry, [u8; 112]);
     assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Constant, [u8; 40]);
     assert_eq_size!(Pattern, [u8; 96]);
     assert_eq_size!(Mod, [u8; 32]);
 }

@@ -262,9 +262,135 @@ from test import say_hy
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
 "#), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
+    generated.py:4:16: Q000 [*] Double quotes found but single quotes preferred
+    generated.py:5:12: Q000 [*] Double quotes found but single quotes preferred
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn line_too_long_width_override() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+line-length = 80
+select = ["E501"]
+
+[pycodestyle]
+max-line-length = 100
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .arg("--config")
+        .arg(&ruff_toml)
+        .args(["--stdin-filename", "test.py"])
+        .arg("-")
+        .pass_stdin(r#"
+# longer than 80, but less than 100
+_ = "---------------------------------------------------------------------------亜亜亜亜亜亜"
+# longer than 100
+_ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜亜亜亜亜亜亜亜"
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:5:91: E501 Line too long (109 > 100)
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn per_file_ignores_stdin() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend-select = ["B", "Q"]
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .arg("check")
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--stdin-filename", "generated.py"])
+        .args(["--per-file-ignores", "generated.py:Q"])
+        .arg("-")
+        .pass_stdin(r#"
+import os
+
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    generated.py:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}
+
+#[test]
+fn extend_per_file_ignores_stdin() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+extend-select = ["B", "Q"]
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .arg("check")
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--stdin-filename", "generated.py"])
+        .args(["--extend-per-file-ignores", "generated.py:Q"])
+        .arg("-")
+        .pass_stdin(r#"
+import os
+
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    generated.py:2:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     "###);

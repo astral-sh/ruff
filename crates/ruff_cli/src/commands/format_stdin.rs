@@ -3,8 +3,6 @@ use std::path::Path;
 
 use anyhow::Result;
 use log::error;
-use ruff_linter::fs;
-use similar::TextDiff;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
@@ -33,17 +31,19 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
 
     let mode = FormatMode::from_cli(cli);
 
-    if let Some(filename) = cli.stdin_filename.as_deref() {
-        if !python_file_at_path(filename, &pyproject_config, overrides)? {
-            return Ok(ExitStatus::Success);
-        }
+    if pyproject_config.settings.file_resolver.force_exclude {
+        if let Some(filename) = cli.stdin_filename.as_deref() {
+            if !python_file_at_path(filename, &pyproject_config, overrides)? {
+                return Ok(ExitStatus::Success);
+            }
 
-        let format_settings = &pyproject_config.settings.formatter;
-        if filename
-            .file_name()
-            .is_some_and(|name| match_exclusion(filename, name, &format_settings.exclude))
-        {
-            return Ok(ExitStatus::Success);
+            let format_settings = &pyproject_config.settings.formatter;
+            if filename
+                .file_name()
+                .is_some_and(|name| match_exclusion(filename, name, &format_settings.exclude))
+            {
+                return Ok(ExitStatus::Success);
+            }
         }
     }
 
@@ -109,14 +109,9 @@ fn format_source_code(
             }
             FormatMode::Check => {}
             FormatMode::Diff => {
-                let mut writer = stdout().lock();
-                let text_diff =
-                    TextDiff::from_lines(source_kind.source_code(), formatted.source_code());
-                let mut unified_diff = text_diff.unified_diff();
-                if let Some(path) = path {
-                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
-                }
-                unified_diff.to_writer(&mut writer).unwrap();
+                source_kind
+                    .diff(formatted, path, &mut stdout().lock())
+                    .map_err(|err| FormatCommandError::Diff(path.map(Path::to_path_buf), err))?;
             }
         },
         FormattedSource::Unchanged => {

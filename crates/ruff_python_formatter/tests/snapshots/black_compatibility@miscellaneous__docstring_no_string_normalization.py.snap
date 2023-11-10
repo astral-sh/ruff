@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 ---
 ## Input
 
-```py
+```python
 class ALonelyClass:
     '''
     A multiline class docstring.
@@ -208,7 +208,7 @@ def multiline_backslash_3():
 
 ## Ruff Output
 
-```py
+```python
 class ALonelyClass:
     """
     A multiline class docstring.
@@ -336,7 +336,7 @@ def multiline_backslash_3():
 
 ## Black Output
 
-```py
+```python
 class ALonelyClass:
     '''
     A multiline class docstring.

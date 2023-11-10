@@ -1,5 +1,225 @@
 # Changelog
 
+## 0.1.5
+
+### Preview features
+
+- \[`flake8-bandit`\] Implement `mako-templates` (`S702`) ([#8533](https://github.com/astral-sh/ruff/pull/8533))
+- \[`flake8-trio`\] Implement `TRIO105` ([#8490](https://github.com/astral-sh/ruff/pull/8490))
+- \[`flake8-trio`\] Implement `TRIO109` ([#8534](https://github.com/astral-sh/ruff/pull/8534))
+- \[`flake8-trio`\] Implement `TRIO110` ([#8537](https://github.com/astral-sh/ruff/pull/8537))
+- \[`flake8-trio`\] Implement `TRIO115` ([#8486](https://github.com/astral-sh/ruff/pull/8486))
+- \[`refurb`\] Implement `type-none-comparison` (`FURB169`) ([#8487](https://github.com/astral-sh/ruff/pull/8487))
+- Flag all comparisons against builtin types in `E721` ([#8491](https://github.com/astral-sh/ruff/pull/8491))
+- Make `SIM118` fix as safe when the expression is a known dictionary  ([#8525](https://github.com/astral-sh/ruff/pull/8525))
+
+### Formatter
+
+- Fix multiline lambda expression statement formatting ([#8466](https://github.com/astral-sh/ruff/pull/8466))
+
+### CLI
+
+- Add hidden `--extension` to override inference of source type from file extension ([#8373](https://github.com/astral-sh/ruff/pull/8373))
+
+### Configuration
+
+- Account for selector specificity when merging `extend_unsafe_fixes` and `override extend_safe_fixes` ([#8444](https://github.com/astral-sh/ruff/pull/8444))
+- Add support for disabling cache with `RUFF_NO_CACHE` environment variable ([#8538](https://github.com/astral-sh/ruff/pull/8538))
+
+### Bug fixes
+
+- \[`E721`\] Flag comparisons to `memoryview` ([#8485](https://github.com/astral-sh/ruff/pull/8485))
+- Allow collapsed-ellipsis bodies in other statements ([#8499](https://github.com/astral-sh/ruff/pull/8499))
+- Avoid `D301` autofix for `u` prefixed strings ([#8495](https://github.com/astral-sh/ruff/pull/8495))
+- Only flag `flake8-trio` rules when `trio` import is present ([#8550](https://github.com/astral-sh/ruff/pull/8550))
+- Reject more syntactically invalid Python programs ([#8524](https://github.com/astral-sh/ruff/pull/8524))
+- Avoid raising `TRIO115` violations for `trio.sleep(...)` calls with non-number values ([#8532](https://github.com/astral-sh/ruff/pull/8532))
+- Fix `F841` false negative on assignment to multiple variables ([#8489](https://github.com/astral-sh/ruff/pull/8489))
+
+### Documentation
+
+- Fix link to isort `known-first-party` ([#8562](https://github.com/astral-sh/ruff/pull/8562))
+- Add notes on fix safety to a few rules ([#8500](https://github.com/astral-sh/ruff/pull/8500))
+- Add missing toml config tabs ([#8512](https://github.com/astral-sh/ruff/pull/8512))
+- Add instructions for configuration of Emacs ([#8488](https://github.com/astral-sh/ruff/pull/8488))
+- Improve detail link contrast in dark mode ([#8548](https://github.com/astral-sh/ruff/pull/8548))
+- Fix typo in example ([#8506](https://github.com/astral-sh/ruff/pull/8506))
+- Added tabs for configuration files in the documentation ([#8480](https://github.com/astral-sh/ruff/pull/8480))
+- Recommend `project.requires-python` over `target-version` ([#8513](https://github.com/astral-sh/ruff/pull/8513))
+- Add singleton escape hatch to `B008` documentation ([#8501](https://github.com/astral-sh/ruff/pull/8501))
+- Fix tab configuration docs ([#8502](https://github.com/astral-sh/ruff/pull/8502))
+
+## 0.1.4
+
+### Preview features
+
+- \[`flake8-trio`\] Implement `timeout-without-await` (`TRIO001`) ([#8439](https://github.com/astral-sh/ruff/pull/8439))
+- \[`numpy`\] Implement NumPy 2.0 migration rule (`NPY200`) ([#7702](https://github.com/astral-sh/ruff/pull/7702))
+- \[`pylint`\] Implement `bad-open-mode` (`W1501`) ([#8294](https://github.com/astral-sh/ruff/pull/8294))
+- \[`pylint`\] Implement `import-outside-toplevel` (`C0415`) rule ([#5180](https://github.com/astral-sh/ruff/pull/5180))
+- \[`pylint`\] Implement `useless-with-lock` (`W2101`) ([#8321](https://github.com/astral-sh/ruff/pull/8321))
+- \[`pyupgrade`\] Implement `timeout-error-alias` (`UP041`) ([#8476](https://github.com/astral-sh/ruff/pull/8476))
+- \[`refurb`\] Implement `isinstance-type-none` (`FURB168`) ([#8308](https://github.com/astral-sh/ruff/pull/8308))
+- Detect confusable Unicode-to-Unicode units in `RUF001`, `RUF002`, and `RUF003` ([#4430](https://github.com/astral-sh/ruff/pull/4430))
+- Add newline after module docstrings in preview style ([#8283](https://github.com/astral-sh/ruff/pull/8283))
+
+### Formatter
+
+- Add a note on line-too-long to the formatter docs ([#8314](https://github.com/astral-sh/ruff/pull/8314))
+- Preserve trailing statement semicolons when using `fmt: skip` ([#8273](https://github.com/astral-sh/ruff/pull/8273))
+- Preserve trailing semicolons when using `fmt: off` ([#8275](https://github.com/astral-sh/ruff/pull/8275))
+- Avoid duplicating linter-formatter compatibility warnings ([#8292](https://github.com/astral-sh/ruff/pull/8292))
+- Avoid inserting a newline after function docstrings ([#8375](https://github.com/astral-sh/ruff/pull/8375))
+- Insert newline between docstring and following own line comment ([#8216](https://github.com/astral-sh/ruff/pull/8216))
+- Split tuples in return positions by comma first ([#8280](https://github.com/astral-sh/ruff/pull/8280))
+- Avoid treating byte strings as docstrings ([#8350](https://github.com/astral-sh/ruff/pull/8350))
+- Add `--line-length` option to `format` command ([#8363](https://github.com/astral-sh/ruff/pull/8363))
+- Avoid parenthesizing unsplittable because of comments ([#8431](https://github.com/astral-sh/ruff/pull/8431))
+
+### CLI
+
+- Add `--output-format` to `ruff rule` and `ruff linter` ([#8203](https://github.com/astral-sh/ruff/pull/8203))
+
+### Bug fixes
+
+- Respect `--force-exclude` in `lint.exclude` and `format.exclude` ([#8393](https://github.com/astral-sh/ruff/pull/8393))
+- Respect `--extend-per-file-ignores` on the CLI ([#8329](https://github.com/astral-sh/ruff/pull/8329))
+- Extend `bad-dunder-method-name` to permit `__index__` ([#8300](https://github.com/astral-sh/ruff/pull/8300))
+- Fix panic with 8 in octal escape ([#8356](https://github.com/astral-sh/ruff/pull/8356))
+- Avoid raising `D300` when both triple quote styles are present ([#8462](https://github.com/astral-sh/ruff/pull/8462))
+- Consider unterminated f-strings in `FStringRanges` ([#8154](https://github.com/astral-sh/ruff/pull/8154))
+- Avoid including literal `shell=True` for truthy, non-`True` diagnostics ([#8359](https://github.com/astral-sh/ruff/pull/8359))
+- Avoid triggering single-element test for starred expressions ([#8433](https://github.com/astral-sh/ruff/pull/8433))
+- Detect and ignore Jupyter automagics ([#8398](https://github.com/astral-sh/ruff/pull/8398))
+- Fix invalid E231 error with f-strings ([#8369](https://github.com/astral-sh/ruff/pull/8369))
+- Avoid triggering `NamedTuple` rewrite with starred annotation ([#8434](https://github.com/astral-sh/ruff/pull/8434))
+- Avoid un-setting bracket flag in logical lines ([#8380](https://github.com/astral-sh/ruff/pull/8380))
+- Place 'r' prefix before 'f' for raw format strings ([#8464](https://github.com/astral-sh/ruff/pull/8464))
+- Remove trailing periods from NumPy 2.0 code actions ([#8475](https://github.com/astral-sh/ruff/pull/8475))
+- Fix bug where `PLE1307` was raised when formatting `%c` with characters ([#8407](https://github.com/astral-sh/ruff/pull/8407))
+- Remove unicode flag from comparable ([#8440](https://github.com/astral-sh/ruff/pull/8440))
+- Improve B015 message ([#8295](https://github.com/astral-sh/ruff/pull/8295))
+- Use `fixedOverflowWidgets` for playground popover ([#8458](https://github.com/astral-sh/ruff/pull/8458))
+- Mark `byte_bounds` as a non-backwards-compatible NumPy 2.0 change ([#8474](https://github.com/astral-sh/ruff/pull/8474))
+
+### Internals
+
+- Add a dedicated cache directory per Ruff version ([#8333](https://github.com/astral-sh/ruff/pull/8333))
+- Allow selective caching for `--fix` and `--diff` ([#8316](https://github.com/astral-sh/ruff/pull/8316))
+- Improve performance of comment parsing ([#8193](https://github.com/astral-sh/ruff/pull/8193))
+- Improve performance of string parsing ([#8227](https://github.com/astral-sh/ruff/pull/8227))
+- Use a dedicated sort key for isort import sorting ([#7963](https://github.com/astral-sh/ruff/pull/7963))
+
+## 0.1.3
+
+This release includes a variety of improvements to the Ruff formatter, removing several known and
+unintentional deviations from Black.
+
+### Formatter
+
+- Avoid space around pow for `None`, `True` and `False` ([#8189](https://github.com/astral-sh/ruff/pull/8189))
+- Avoid sorting all paths in the format command ([#8181](https://github.com/astral-sh/ruff/pull/8181))
+- Insert necessary blank line between class and leading comments ([#8224](https://github.com/astral-sh/ruff/pull/8224))
+- Avoid introducing new parentheses in annotated assignments ([#8233](https://github.com/astral-sh/ruff/pull/8233))
+- Refine the warnings about incompatible linter options ([#8196](https://github.com/astral-sh/ruff/pull/8196))
+- Add test and basic implementation for formatter preview mode ([#8044](https://github.com/astral-sh/ruff/pull/8044))
+- Refine warning about incompatible `isort` settings ([#8192](https://github.com/astral-sh/ruff/pull/8192))
+- Only omit optional parentheses for starting or ending with parentheses ([#8238](https://github.com/astral-sh/ruff/pull/8238))
+- Use source type to determine parser mode for formatting ([#8205](https://github.com/astral-sh/ruff/pull/8205))
+- Don't warn about magic trailing comma when `isort.force-single-line` is true ([#8244](https://github.com/astral-sh/ruff/pull/8244))
+- Use `SourceKind::diff` for formatter ([#8240](https://github.com/astral-sh/ruff/pull/8240))
+- Fix `fmt:off` with trailing child comment ([#8234](https://github.com/astral-sh/ruff/pull/8234))
+- Formatter parentheses support for `IpyEscapeCommand` ([#8207](https://github.com/astral-sh/ruff/pull/8207))
+
+### Linter
+
+- \[`pylint`\] Add buffer methods to `bad-dunder-method-name` (`PLW3201`) exclusions ([#8190](https://github.com/astral-sh/ruff/pull/8190))
+- Match rule prefixes from `external` codes setting in `unused-noqa` ([#8177](https://github.com/astral-sh/ruff/pull/8177))
+- Use `line-length` setting for isort in lieu of `pycodestyle.max-line-length` ([#8235](https://github.com/astral-sh/ruff/pull/8235))
+- Update fix for `unnecessary-paren-on-raise-exception` to unsafe for unknown types ([#8231](https://github.com/astral-sh/ruff/pull/8231))
+- Correct quick fix message for `W605` ([#8255](https://github.com/astral-sh/ruff/pull/8255))
+
+### Documentation
+
+- Fix typo in max-doc-length documentation ([#8201](https://github.com/astral-sh/ruff/pull/8201))
+- Improve documentation around linter-formatter conflicts ([#8257](https://github.com/astral-sh/ruff/pull/8257))
+- Fix link to error suppression documentation in `unused-noqa` ([#8172](https://github.com/astral-sh/ruff/pull/8172))
+- Add `external` option to `unused-noqa` documentation ([#8171](https://github.com/astral-sh/ruff/pull/8171))
+- Add title attribute to icons ([#8060](https://github.com/astral-sh/ruff/pull/8060))
+- Clarify unsafe case in RSE102 ([#8256](https://github.com/astral-sh/ruff/pull/8256))
+- Fix skipping formatting examples ([#8210](https://github.com/astral-sh/ruff/pull/8210))
+- docs: fix name of `magic-trailing-comma` option in README ([#8200](https://github.com/astral-sh/ruff/pull/8200))
+- Add note about scope of rule changing in versioning policy ([#8169](https://github.com/astral-sh/ruff/pull/8169))
+- Document: Fix default lint rules ([#8218](https://github.com/astral-sh/ruff/pull/8218))
+- Fix a wrong setting in configuration.md ([#8186](https://github.com/astral-sh/ruff/pull/8186))
+- Fix misspelled TOML headers in the tutorial ([#8209](https://github.com/astral-sh/ruff/pull/8209))
+
+## 0.1.2
+
+This release includes the Beta version of the Ruff formatter — an extremely fast, Black-compatible Python formatter.
+Try it today with `ruff format`! [Check out the blog post](https://astral.sh/blog/the-ruff-formatter) and [read the docs](https://docs.astral.sh/ruff/formatter/).
+
+### Preview features
+
+- \[`pylint`\] Implement `non-ascii-module-import` (`C2403`) ([#8056](https://github.com/astral-sh/ruff/pull/8056))
+- \[`pylint`\] implement `non-ascii-name` (`C2401`) ([#8038](https://github.com/astral-sh/ruff/pull/8038))
+- \[`pylint`\] Implement unnecessary-lambda (W0108) ([#7953](https://github.com/astral-sh/ruff/pull/7953))
+- \[`refurb`\] Implement `read-whole-file` (`FURB101`) ([#7682](https://github.com/astral-sh/ruff/pull/7682))
+- Add fix for `E223`, `E224`, and `E242` ([#8143](https://github.com/astral-sh/ruff/pull/8143))
+- Add fix for `E225`, `E226`, `E227`, and `E228` ([#8136](https://github.com/astral-sh/ruff/pull/8136))
+- Add fix for `E252` ([#8142](https://github.com/astral-sh/ruff/pull/8142))
+- Add fix for `E261` ([#8114](https://github.com/astral-sh/ruff/pull/8114))
+- Add fix for `E273` and `E274` ([#8144](https://github.com/astral-sh/ruff/pull/8144))
+- Add fix for `E275` ([#8133](https://github.com/astral-sh/ruff/pull/8133))
+- Update `SIM401` to catch ternary operations ([#7415](https://github.com/astral-sh/ruff/pull/7415))
+- Update `E721` to allow `is` and `is` not for direct type comparisons ([#7905](https://github.com/astral-sh/ruff/pull/7905))
+
+### Rule changes
+
+- Add `backports.strenum` to `deprecated-imports` ([#8113](https://github.com/astral-sh/ruff/pull/8113))
+- Update `SIM112` to ignore `https_proxy`, `http_proxy`, and `no_proxy` ([#8140](https://github.com/astral-sh/ruff/pull/8140))
+- Update fix for `literal-membership` (`PLR6201`) to be unsafe ([#8097](https://github.com/astral-sh/ruff/pull/8097))
+- Update fix for  `mutable-argument-defaults` (`B006`) to be unsafe ([#8108](https://github.com/astral-sh/ruff/pull/8108))
+
+### Formatter
+
+- Change `line-ending` default to `auto` ([#8057](https://github.com/astral-sh/ruff/pull/8057))
+- Respect parenthesized generators in `has_own_parentheses` ([#8100](https://github.com/astral-sh/ruff/pull/8100))
+- Add caching to formatter ([#8089](https://github.com/astral-sh/ruff/pull/8089))
+- Remove `--line-length` option from `format` command ([#8131](https://github.com/astral-sh/ruff/pull/8131))
+- Add formatter to `line-length` documentation ([#8150](https://github.com/astral-sh/ruff/pull/8150))
+- Warn about incompatible formatter options ([#8088](https://github.com/astral-sh/ruff/pull/8088))
+- Fix range of unparenthesized tuple subject in match statement ([#8101](https://github.com/astral-sh/ruff/pull/8101))
+- Remove experimental formatter warning ([#8148](https://github.com/astral-sh/ruff/pull/8148))
+- Don't move type param opening parenthesis comment ([#8163](https://github.com/astral-sh/ruff/pull/8163))
+- Update versions in format benchmark script ([#8110](https://github.com/astral-sh/ruff/pull/8110))
+- Avoid loading files for cached format results ([#8134](https://github.com/astral-sh/ruff/pull/8134))
+
+### CLI
+
+- Show the `ruff format` command in help menus ([#8167](https://github.com/astral-sh/ruff/pull/8167))
+- Add `ruff version` command with long version display ([#8034](https://github.com/astral-sh/ruff/pull/8034))
+
+### Configuration
+
+- New `pycodestyle.max-line-length` option ([#8039](https://github.com/astral-sh/ruff/pull/8039))
+
+### Bug fixes
+
+- Detect `sys.version_info` slices in `outdated-version-block` ([#8112](https://github.com/astral-sh/ruff/pull/8112))
+- Avoid if-else simplification for `TYPE_CHECKING` blocks ([#8072](https://github.com/astral-sh/ruff/pull/8072))
+- Avoid false-positive print separator diagnostic with starred argument ([#8079](https://github.com/astral-sh/ruff/pull/8079))
+
+### Documentation
+
+- Fix message for `too-many-arguments` lint ([#8092](https://github.com/astral-sh/ruff/pull/8092))
+- Fix `extend-unsafe-fixes` and `extend-safe-fixes` example ([#8139](https://github.com/astral-sh/ruff/pull/8139))
+- Add links to `flake8-import-conventions` options ([#8115](https://github.com/astral-sh/ruff/pull/8115))
+- Rework the documentation to incorporate the Ruff formatter ([#7732](https://github.com/astral-sh/ruff/pull/7732))
+- Fix `Options` JSON schema description ([#8081](https://github.com/astral-sh/ruff/pull/8081))
+- Fix typo (`pytext` -> `pytest`) ([#8117](https://github.com/astral-sh/ruff/pull/8117))
+- Improve `magic-value-comparison` example in docs ([#8111](https://github.com/astral-sh/ruff/pull/8111))
+
 ## 0.1.1
 
 ### Rule changes

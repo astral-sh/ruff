@@ -9,6 +9,7 @@ use std::sync::RwLock;
 
 use anyhow::Result;
 use anyhow::{anyhow, bail};
+use globset::{Candidate, GlobSet};
 use ignore::{WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
@@ -333,12 +334,18 @@ pub fn python_files_in_path(
                     let resolver = resolver.read().unwrap();
                     let settings = resolver.resolve(path, pyproject_config);
                     if let Some(file_name) = path.file_name() {
-                        if match_exclusion(path, file_name, &settings.file_resolver.exclude) {
+                        let file_path = Candidate::new(path);
+                        let file_basename = Candidate::new(file_name);
+                        if match_candidate_exclusion(
+                            &file_path,
+                            &file_basename,
+                            &settings.file_resolver.exclude,
+                        ) {
                             debug!("Ignored path via `exclude`: {:?}", path);
                             return WalkState::Skip;
-                        } else if match_exclusion(
-                            path,
-                            file_name,
+                        } else if match_candidate_exclusion(
+                            &file_path,
+                            &file_basename,
                             &settings.file_resolver.extend_exclude,
                         ) {
                             debug!("Ignored path via `extend-exclude`: {:?}", path);
@@ -476,10 +483,6 @@ pub fn python_file_at_path(
     pyproject_config: &PyprojectConfig,
     transformer: &dyn ConfigurationTransformer,
 ) -> Result<bool> {
-    if !pyproject_config.settings.file_resolver.force_exclude {
-        return Ok(true);
-    }
-
     // Normalize the path (e.g., convert from relative to absolute).
     let path = fs::normalize_path(path);
 
@@ -509,10 +512,20 @@ fn is_file_excluded(
     for path in path.ancestors() {
         let settings = resolver.resolve(path, pyproject_strategy);
         if let Some(file_name) = path.file_name() {
-            if match_exclusion(path, file_name, &settings.file_resolver.exclude) {
+            let file_path = Candidate::new(path);
+            let file_basename = Candidate::new(file_name);
+            if match_candidate_exclusion(
+                &file_path,
+                &file_basename,
+                &settings.file_resolver.exclude,
+            ) {
                 debug!("Ignored path via `exclude`: {:?}", path);
                 return true;
-            } else if match_exclusion(path, file_name, &settings.file_resolver.extend_exclude) {
+            } else if match_candidate_exclusion(
+                &file_path,
+                &file_basename,
+                &settings.file_resolver.extend_exclude,
+            ) {
                 debug!("Ignored path via `extend-exclude`: {:?}", path);
                 return true;
             }
@@ -530,12 +543,30 @@ fn is_file_excluded(
 
 /// Return `true` if the given file should be ignored based on the exclusion
 /// criteria.
+#[inline]
 pub fn match_exclusion<P: AsRef<Path>, R: AsRef<Path>>(
     file_path: P,
     file_basename: R,
-    exclusion: &globset::GlobSet,
+    exclusion: &GlobSet,
 ) -> bool {
-    exclusion.is_match(file_path) || exclusion.is_match(file_basename)
+    match_candidate_exclusion(
+        &Candidate::new(file_path.as_ref()),
+        &Candidate::new(file_basename.as_ref()),
+        exclusion,
+    )
+}
+
+/// Return `true` if the given candidates should be ignored based on the exclusion
+/// criteria.
+pub fn match_candidate_exclusion(
+    file_path: &Candidate,
+    file_basename: &Candidate,
+    exclusion: &GlobSet,
+) -> bool {
+    if exclusion.is_empty() {
+        return false;
+    }
+    exclusion.is_match_candidate(file_path) || exclusion.is_match_candidate(file_basename)
 }
 
 #[cfg(test)]

@@ -1,13 +1,45 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/assign_breaking.py
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/preview.py
 ---
 ## Input
-```py
-# Below is black stable style
-# In preview style, black always breaks the right side first
+```python
+"""
+Black's `Preview.module_docstring_newlines`
+"""
+first_stmt_after_module_level_docstring = 1
 
-if True:
+
+class CachedRepository:
+    # Black's `Preview.dummy_implementations`
+    def get_release_info(self): ...
+
+
+def raw_docstring():
+
+    r"""Black's `Preview.accept_raw_docstrings`
+        a
+            b
+    """
+    pass
+
+
+def reference_docstring_newlines():
+
+    """A regular docstring for comparison
+        a
+            b
+    """
+    pass
+
+
+class RemoveNewlineBeforeClassDocstring:
+
+    """Black's `Preview.no_blank_line_before_class_docstring`"""
+
+
+def f():
+    """Black's `Preview.prefer_splitting_right_hand_side_of_assignments`"""
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[
         bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ] = cccccccc.ccccccccccccc.cccccccc
@@ -51,11 +83,42 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
-# Below is black stable style
-# In preview style, black always breaks the right side first
+```python
+"""
+Black's `Preview.module_docstring_newlines`
+"""
+first_stmt_after_module_level_docstring = 1
 
-if True:
+
+class CachedRepository:
+    # Black's `Preview.dummy_implementations`
+    def get_release_info(self):
+        ...
+
+
+def raw_docstring():
+    r"""Black's `Preview.accept_raw_docstrings`
+    a
+        b
+    """
+    pass
+
+
+def reference_docstring_newlines():
+    """A regular docstring for comparison
+    a
+        b
+    """
+    pass
+
+
+class RemoveNewlineBeforeClassDocstring:
+
+    """Black's `Preview.no_blank_line_before_class_docstring`"""
+
+
+def f():
+    """Black's `Preview.prefer_splitting_right_hand_side_of_assignments`"""
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[
         bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ] = cccccccc.ccccccccccccc.cccccccc
@@ -99,11 +162,42 @@ magic-trailing-comma    = Respect
 preview                 = Enabled
 ```
 
-```py
-# Below is black stable style
-# In preview style, black always breaks the right side first
+```python
+"""
+Black's `Preview.module_docstring_newlines`
+"""
 
-if True:
+first_stmt_after_module_level_docstring = 1
+
+
+class CachedRepository:
+    # Black's `Preview.dummy_implementations`
+    def get_release_info(self): ...
+
+
+def raw_docstring():
+    r"""Black's `Preview.accept_raw_docstrings`
+    a
+        b
+    """
+    pass
+
+
+def reference_docstring_newlines():
+    """A regular docstring for comparison
+    a
+        b
+    """
+    pass
+
+
+class RemoveNewlineBeforeClassDocstring:
+
+    """Black's `Preview.no_blank_line_before_class_docstring`"""
+
+
+def f():
+    """Black's `Preview.prefer_splitting_right_hand_side_of_assignments`"""
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[
         bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     ] = cccccccc.ccccccccccccc.cccccccc

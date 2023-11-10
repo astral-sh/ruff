@@ -24,6 +24,8 @@ mod tests {
     #[test_case(Rule::PrintEmptyString, Path::new("FURB105.py"))]
     #[test_case(Rule::ImplicitCwd, Path::new("FURB177.py"))]
     #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171.py"))]
+    #[test_case(Rule::IsinstanceTypeNone, Path::new("FURB168.py"))]
+    #[test_case(Rule::TypeNoneComparison, Path::new("FURB169.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

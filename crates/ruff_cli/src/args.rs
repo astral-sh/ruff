@@ -8,11 +8,12 @@ use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
-    FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
-    UnsafeFixes,
+    ExtensionPair, FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion,
+    SerializationFormat, UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
+use ruff_workspace::options::PycodestyleOptions;
 use ruff_workspace::resolver::ConfigurationTransformer;
 
 #[derive(Debug, Parser)]
@@ -49,7 +50,11 @@ pub enum Command {
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// List or describe the available configuration options.
     Config { option: Option<String> },
@@ -57,7 +62,11 @@ pub enum Command {
     Linter {
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
@@ -66,8 +75,6 @@ pub enum Command {
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
-    #[doc(hidden)]
-    #[clap(hide = true)]
     Format(FormatCommand),
     /// Display Ruff's version
     Version {
@@ -271,7 +278,7 @@ pub struct CheckCommand {
     #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
     /// Disable cache reads.
-    #[arg(short, long, help_heading = "Miscellaneous")]
+    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
@@ -344,6 +351,9 @@ pub struct CheckCommand {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
+    /// List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]).
+    #[arg(long, value_delimiter = ',', hide = true)]
+    pub extension: Option<Vec<ExtensionPair>>,
     /// Dev-only argument to show fixes
     #[arg(long, hide = true)]
     pub ecosystem_ci: bool,
@@ -367,7 +377,7 @@ pub struct FormatCommand {
     pub config: Option<PathBuf>,
 
     /// Disable cache reads.
-    #[arg(short, long, help_heading = "Miscellaneous")]
+    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
     /// Path to the cache directory.
     #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
@@ -402,6 +412,9 @@ pub struct FormatCommand {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
+    /// Set the line-length.
+    #[arg(long, help_heading = "Format configuration")]
+    pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
     pub isolated: bool,
@@ -500,6 +513,7 @@ impl CheckCommand {
                 extend_exclude: self.extend_exclude,
                 extend_fixable: self.extend_fixable,
                 extend_ignore: self.extend_ignore,
+                extend_per_file_ignores: self.extend_per_file_ignores,
                 extend_select: self.extend_select,
                 extend_unfixable: self.extend_unfixable,
                 fixable: self.fixable,
@@ -524,6 +538,7 @@ impl CheckCommand {
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 output_format: self.output_format,
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
+                extension: self.extension,
             },
         )
     }
@@ -544,6 +559,7 @@ impl FormatCommand {
                 stdin_filename: self.stdin_filename,
             },
             CliOverrides {
+                line_length: self.line_length,
                 respect_gitignore: resolve_bool_arg(
                     self.respect_gitignore,
                     self.no_respect_gitignore,
@@ -620,6 +636,7 @@ pub struct CliOverrides {
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub preview: Option<PreviewMode>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
@@ -634,6 +651,7 @@ pub struct CliOverrides {
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
+    pub extension: Option<Vec<ExtensionPair>>,
 }
 
 impl ConfigurationTransformer for CliOverrides {
@@ -649,6 +667,12 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(extend_exclude) = &self.extend_exclude {
             config.extend_exclude.extend(extend_exclude.clone());
+        }
+        if let Some(extend_per_file_ignores) = &self.extend_per_file_ignores {
+            config
+                .lint
+                .extend_per_file_ignores
+                .extend(collect_per_file_ignores(extend_per_file_ignores.clone()));
         }
         if let Some(fix) = &self.fix {
             config.fix = Some(*fix);
@@ -685,8 +709,12 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
         }
-        if let Some(line_length) = &self.line_length {
-            config.line_length = Some(*line_length);
+        if let Some(line_length) = self.line_length {
+            config.line_length = Some(line_length);
+            config.lint.pycodestyle = Some(PycodestyleOptions {
+                max_line_length: Some(line_length),
+                ..config.lint.pycodestyle.unwrap_or_default()
+            });
         }
         if let Some(preview) = &self.preview {
             config.preview = Some(*preview);
@@ -707,6 +735,9 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);
+        }
+        if let Some(extension) = &self.extension {
+            config.lint.extension = Some(extension.clone().into_iter().collect());
         }
 
         config

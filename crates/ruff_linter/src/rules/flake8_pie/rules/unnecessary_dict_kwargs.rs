@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr, Keyword};
 
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
@@ -96,7 +96,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
                     .iter()
                     .zip(values.iter())
                     .map(|(kwarg, value)| {
-                        format!("{}={}", kwarg.value, checker.locator().slice(value.range()))
+                        format!("{}={}", kwarg, checker.locator().slice(value.range()))
                     })
                     .join(", "),
                 kw.range(),
@@ -108,12 +108,8 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
 }
 
 /// Return `Some` if a key is a valid keyword argument name, or `None` otherwise.
-fn as_kwarg(key: &Expr) -> Option<&ast::StringConstant> {
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(value),
-        ..
-    }) = key
-    {
+fn as_kwarg(key: &Expr) -> Option<&str> {
+    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = key {
         if is_identifier(value) {
             return Some(value);
         }

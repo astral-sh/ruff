@@ -82,15 +82,14 @@ impl Violation for YodaConditions {
 fn is_constant_like(expr: &Expr) -> bool {
     match expr {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => str::is_cased_uppercase(attr),
-        Expr::Constant(_) => true,
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant_like),
         Expr::Name(ast::ExprName { id, .. }) => str::is_cased_uppercase(id),
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
             operand,
             range: _,
-        }) => operand.is_constant_expr(),
-        _ => false,
+        }) => operand.is_literal_expr(),
+        _ => expr.is_literal_expr(),
     }
 }
 

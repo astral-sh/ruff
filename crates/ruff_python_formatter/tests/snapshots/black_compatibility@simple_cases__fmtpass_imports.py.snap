@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 # Regression test for https://github.com/psf/black/issues/3438
 
 import ast
@@ -43,7 +43,7 @@ import zoneinfo
 
 ## Ruff Output
 
-```py
+```python
 # Regression test for https://github.com/psf/black/issues/3438
 
 import ast
@@ -68,7 +68,7 @@ import zoneinfo
 
 ## Black Output
 
-```py
+```python
 # Regression test for https://github.com/psf/black/issues/3438
 
 import ast

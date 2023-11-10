@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/delete.py
 ---
 ## Input
-```py
+```python
 x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
 a, b, c, d = 1, 2, 3, 4
@@ -86,7 +86,7 @@ del (  # dangling end of line comment
 ```
 
 ## Output
-```py
+```python
 x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
 a, b, c, d = 1, 2, 3, 4

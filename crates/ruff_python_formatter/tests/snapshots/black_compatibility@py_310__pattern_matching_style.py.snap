@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_310/pa
 ---
 ## Input
 
-```py
+```python
 match something:
     case b(): print(1+1)
     case c(
@@ -99,7 +99,7 @@ match match(
 
 ## Ruff Output
 
-```py
+```python
 match something:
     case b():
         print(1 + 1)
@@ -145,7 +145,7 @@ match match():
 
 ## Black Output
 
-```py
+```python
 match something:
     case b():
         print(1 + 1)

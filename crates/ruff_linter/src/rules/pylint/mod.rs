@@ -21,6 +21,7 @@ mod tests {
     #[test_case(Rule::AndOrTernary, Path::new("and_or_ternary.py"))]
     #[test_case(Rule::AssertOnStringLiteral, Path::new("assert_on_string_literal.py"))]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"))]
+    #[test_case(Rule::BadOpenMode, Path::new("bad_open_mode.py"))]
     #[test_case(
         Rule::BadStringFormatCharacter,
         Path::new("bad_string_format_character.py")
@@ -59,6 +60,7 @@ mod tests {
         Rule::GlobalVariableNotAssigned,
         Path::new("global_variable_not_assigned.py")
     )]
+    #[test_case(Rule::ImportOutsideTopLevel, Path::new("import_outside_top_level.py"))]
     #[test_case(Rule::ImportSelf, Path::new("import_self/module.py"))]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"))]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
@@ -118,6 +120,7 @@ mod tests {
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"))]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"))]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"))]
+    #[test_case(Rule::UselessWithLock, Path::new("useless_with_lock.py"))]
     #[test_case(
         Rule::YieldFromInAsyncFunction,
         Path::new("yield_from_in_async_function.py")

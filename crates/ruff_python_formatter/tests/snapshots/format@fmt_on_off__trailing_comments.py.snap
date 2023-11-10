@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/trailing_comments.py
 ---
 ## Input
-```py
+```python
 a = 10
 # fmt: off
 
@@ -47,7 +47,7 @@ def test3  ():
 ```
 
 ## Output
-```py
+```python
 a = 10
 # fmt: off
 
@@ -90,6 +90,23 @@ def test3  ():
     ...
 
 # fmt: on
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -21,8 +21,7 @@
+ 
+ 
+ # formatted
+-def test2():
+-    ...
++def test2(): ...
+ 
+ 
+ a = 10
 ```
 
 

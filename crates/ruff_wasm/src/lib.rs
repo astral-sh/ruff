@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
-use ruff_linter::line_width::{LineLength, TabSize};
+use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::{check_path, LinterResult};
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
@@ -126,7 +126,7 @@ impl Workspace {
 
             line_length: Some(LineLength::default()),
 
-            tab_size: Some(TabSize::default()),
+            indent_width: Some(IndentWidth::default()),
             target_version: Some(PythonVersion::default()),
 
             lint: Some(LintOptions {

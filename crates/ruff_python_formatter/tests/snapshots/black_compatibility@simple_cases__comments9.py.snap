@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 # Test for https://github.com/psf/black/issues/246.
 
 some = statement
@@ -179,7 +179,7 @@ def bar():
 
 ## Ruff Output
 
-```py
+```python
 # Test for https://github.com/psf/black/issues/246.
 
 some = statement
@@ -342,7 +342,7 @@ def bar():
 
 ## Black Output
 
-```py
+```python
 # Test for https://github.com/psf/black/issues/246.
 
 some = statement

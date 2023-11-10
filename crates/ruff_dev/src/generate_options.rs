@@ -3,6 +3,7 @@
 //! Used for <https://docs.astral.sh/ruff/settings/>.
 use std::fmt::Write;
 
+use ruff_python_trivia::textwrap;
 use ruff_workspace::options::Options;
 use ruff_workspace::options_base::{OptionField, OptionSet, OptionsMetadata, Visit};
 
@@ -125,16 +126,55 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
     output.push('\n');
     output.push_str(&format!("**Type**: `{}`\n", field.value_type));
     output.push('\n');
-    output.push_str(&format!(
-        "**Example usage**:\n\n```toml\n[tool.ruff{}]\n{}\n```\n",
-        if let Some(set_name) = parent_set.name() {
-            format!(".{set_name}")
-        } else {
-            String::new()
-        },
-        field.example
+    output.push_str("**Example usage**:\n\n");
+    output.push_str(&format_tab(
+        "pyproject.toml",
+        &format_header(parent_set, ConfigurationFile::PyprojectToml),
+        field.example,
+    ));
+    output.push_str(&format_tab(
+        "ruff.toml",
+        &format_header(parent_set, ConfigurationFile::RuffToml),
+        field.example,
     ));
     output.push('\n');
+}
+
+fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
+    format!(
+        "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
+        tab_name,
+        header,
+        textwrap::indent(content, "    ")
+    )
+}
+
+fn format_header(parent_set: &Set, configuration: ConfigurationFile) -> String {
+    let fmt = if let Some(set_name) = parent_set.name() {
+        if set_name == "format" {
+            String::from(".format")
+        } else {
+            format!(".lint.{set_name}")
+        }
+    } else {
+        String::new()
+    };
+    match configuration {
+        ConfigurationFile::PyprojectToml => format!("[tool.ruff{fmt}]"),
+        ConfigurationFile::RuffToml => {
+            if fmt.is_empty() {
+                String::new()
+            } else {
+                format!("[{}]", fmt.strip_prefix('.').unwrap())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum ConfigurationFile {
+    PyprojectToml,
+    RuffToml,
 }
 
 #[derive(Default)]

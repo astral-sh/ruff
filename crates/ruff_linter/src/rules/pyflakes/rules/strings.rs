@@ -4,7 +4,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, Identifier, Keyword};
+use ruff_python_ast::{self as ast, Expr, Identifier, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -582,10 +582,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         .iter()
         .enumerate()
         .filter_map(|(index, key)| match key {
-            Some(Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(ast::StringConstant { value, .. }),
-                ..
-            })) => {
+            Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
                 if summary.keywords.contains(value.as_str()) {
                     None
                 } else {
@@ -643,10 +640,7 @@ pub(crate) fn percent_format_missing_arguments(
     let mut keywords = FxHashSet::default();
     for key in keys.iter().flatten() {
         match key {
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(ast::StringConstant { value, .. }),
-                ..
-            }) => {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 keywords.insert(value);
             }
             _ => {

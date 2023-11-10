@@ -1,5 +1,5 @@
 use ruff_formatter::FormatOptions;
-use ruff_python_formatter::{format_module_source, PyFormatOptions};
+use ruff_python_formatter::{format_module_source, PreviewMode, PyFormatOptions};
 use similar::TextDiff;
 use std::fmt::{Formatter, Write};
 use std::io::BufReader;
@@ -71,7 +71,7 @@ fn black_compatibility() {
             // today.
             let mut snapshot = String::new();
             write!(snapshot, "{}", Header::new("Input")).unwrap();
-            write!(snapshot, "{}", CodeFrame::new("py", &content)).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("python", &content)).unwrap();
 
             write!(snapshot, "{}", Header::new("Black Differences")).unwrap();
 
@@ -83,10 +83,10 @@ fn black_compatibility() {
             write!(snapshot, "{}", CodeFrame::new("diff", &diff)).unwrap();
 
             write!(snapshot, "{}", Header::new("Ruff Output")).unwrap();
-            write!(snapshot, "{}", CodeFrame::new("py", &formatted_code)).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("python", &formatted_code)).unwrap();
 
             write!(snapshot, "{}", Header::new("Black Output")).unwrap();
-            write!(snapshot, "{}", CodeFrame::new("py", &expected_output)).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("python", &expected_output)).unwrap();
 
             insta::with_settings!({
                 omit_expression => true,
@@ -113,7 +113,7 @@ fn format() {
 
         ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
 
-        let mut snapshot = format!("## Input\n{}", CodeFrame::new("py", &content));
+        let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
 
         let options_path = input_path.with_extension("options.json");
         if let Ok(options_file) = fs::File::open(options_path) {
@@ -135,23 +135,52 @@ fn format() {
                     "### Output {}\n{}{}",
                     i + 1,
                     CodeFrame::new("", &DisplayPyOptions(&options)),
-                    CodeFrame::new("py", &formatted_code)
+                    CodeFrame::new("python", &formatted_code)
                 )
                 .unwrap();
             }
         } else {
             let printed =
                 format_module_source(&content, options.clone()).expect("Formatting to succeed");
-            let formatted_code = printed.as_code();
+            let formatted = printed.as_code();
 
-            ensure_stability_when_formatting_twice(formatted_code, options, input_path);
+            ensure_stability_when_formatting_twice(formatted, options.clone(), input_path);
 
-            writeln!(
-                snapshot,
-                "## Output\n{}",
-                CodeFrame::new("py", &formatted_code)
-            )
-            .unwrap();
+            // We want to capture the differences in the preview style in our fixtures
+            let options_preview = options.with_preview(PreviewMode::Enabled);
+            let printed_preview = format_module_source(&content, options_preview.clone())
+                .expect("Formatting to succeed");
+            let formatted_preview = printed_preview.as_code();
+
+            ensure_stability_when_formatting_twice(
+                formatted_preview,
+                options_preview.clone(),
+                input_path,
+            );
+
+            if formatted == formatted_preview {
+                writeln!(
+                    snapshot,
+                    "## Output\n{}",
+                    CodeFrame::new("python", &formatted)
+                )
+                .unwrap();
+            } else {
+                // Having both snapshots makes it hard to see the difference, so we're keeping only
+                // diff.
+                writeln!(
+                    snapshot,
+                    "## Output\n{}\n## Preview changes\n{}",
+                    CodeFrame::new("python", &formatted),
+                    CodeFrame::new(
+                        "diff",
+                        TextDiff::from_lines(formatted, formatted_preview)
+                            .unified_diff()
+                            .header("Stable", "Preview")
+                    )
+                )
+                .unwrap();
+            }
         }
 
         insta::with_settings!({

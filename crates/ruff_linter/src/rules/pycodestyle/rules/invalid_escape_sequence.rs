@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_python_parser::Tok;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use crate::fix::edits::pad_start;
 
@@ -25,21 +25,49 @@ use crate::fix::edits::pad_start;
 /// regex = r"\.png$"
 /// ```
 ///
+/// Or, if the string already contains a valid escape sequence:
+/// ```python
+/// value = "new line\nand invalid escape \_ here"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// value = "new line\nand invalid escape \\_ here"
+/// ```
+///
 /// ## References
 /// - [Python documentation: String and Bytes literals](https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals)
 #[violation]
-pub struct InvalidEscapeSequence(char);
+pub struct InvalidEscapeSequence {
+    ch: char,
+    fix_title: FixTitle,
+}
 
 impl AlwaysFixableViolation for InvalidEscapeSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidEscapeSequence(char) = self;
-        format!("Invalid escape sequence: `\\{char}`")
+        let InvalidEscapeSequence { ch, .. } = self;
+        format!("Invalid escape sequence: `\\{ch}`")
     }
 
     fn fix_title(&self) -> String {
-        "Add backslash to escape sequence".to_string()
+        match self.fix_title {
+            FixTitle::AddBackslash => format!("Add backslash to escape sequence"),
+            FixTitle::UseRawStringLiteral => format!("Use a raw string literal"),
+        }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum FixTitle {
+    AddBackslash,
+    UseRawStringLiteral,
+}
+
+#[derive(Debug)]
+struct InvalidEscapeChar {
+    ch: char,
+    range: TextRange,
 }
 
 /// W605
@@ -50,24 +78,27 @@ pub(crate) fn invalid_escape_sequence(
     token: &Tok,
     token_range: TextRange,
 ) {
-    let token_source_code = match token {
+    let (token_source_code, string_start_location) = match token {
         Tok::FStringMiddle { value, is_raw } => {
             if *is_raw {
                 return;
             }
-            value.as_str()
+            let Some(range) = indexer.fstring_ranges().innermost(token_range.start()) else {
+                return;
+            };
+            (value.as_str(), range.start())
         }
         Tok::String { kind, .. } => {
             if kind.is_raw() {
                 return;
             }
-            locator.slice(token_range)
+            (locator.slice(token_range), token_range.start())
         }
         _ => return,
     };
 
     let mut contains_valid_escape_sequence = false;
-    let mut invalid_escape_sequence = Vec::new();
+    let mut invalid_escape_chars = Vec::new();
 
     let mut prev = None;
     let bytes = token_source_code.as_bytes();
@@ -154,38 +185,49 @@ pub(crate) fn invalid_escape_sequence(
 
         let location = token_range.start() + TextSize::try_from(i).unwrap();
         let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
-        invalid_escape_sequence.push(Diagnostic::new(InvalidEscapeSequence(next_char), range));
+        invalid_escape_chars.push(InvalidEscapeChar {
+            ch: next_char,
+            range,
+        });
     }
 
+    let mut invalid_escape_sequence = Vec::new();
     if contains_valid_escape_sequence {
         // Escape with backslash.
-        for diagnostic in &mut invalid_escape_sequence {
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+        for invalid_escape_char in &invalid_escape_chars {
+            let diagnostic = Diagnostic::new(
+                InvalidEscapeSequence {
+                    ch: invalid_escape_char.ch,
+                    fix_title: FixTitle::AddBackslash,
+                },
+                invalid_escape_char.range,
+            )
+            .with_fix(Fix::safe_edit(Edit::insertion(
                 r"\".to_string(),
-                diagnostic.start() + TextSize::from(1),
+                invalid_escape_char.range.start() + TextSize::from(1),
             )));
+            invalid_escape_sequence.push(diagnostic);
         }
     } else {
-        let tok_start = if token.is_f_string_middle() {
-            // SAFETY: If this is a `FStringMiddle` token, then the indexer
-            // must have the f-string range.
-            indexer
-                .fstring_ranges()
-                .innermost(token_range.start())
-                .unwrap()
-                .start()
-        } else {
-            token_range.start()
-        };
         // Turn into raw string.
-        for diagnostic in &mut invalid_escape_sequence {
-            // If necessary, add a space between any leading keyword (`return`, `yield`,
-            // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
-            // `returnr"foo"` is not.
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                pad_start("r".to_string(), tok_start, locator),
-                tok_start,
-            )));
+        for invalid_escape_char in &invalid_escape_chars {
+            let diagnostic = Diagnostic::new(
+                InvalidEscapeSequence {
+                    ch: invalid_escape_char.ch,
+                    fix_title: FixTitle::UseRawStringLiteral,
+                },
+                invalid_escape_char.range,
+            )
+            .with_fix(
+                // If necessary, add a space between any leading keyword (`return`, `yield`,
+                // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
+                // `returnr"foo"` is not.
+                Fix::safe_edit(Edit::insertion(
+                    pad_start("r".to_string(), string_start_location, locator),
+                    string_start_location,
+                )),
+            );
+            invalid_escape_sequence.push(diagnostic);
         }
     }
 

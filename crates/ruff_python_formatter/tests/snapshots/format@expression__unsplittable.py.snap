@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/unsplittable.py
 ---
 ## Input
-```py
+```python
 x = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 x_aa = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -103,7 +103,7 @@ def f():
 ```
 
 ## Output
-```py
+```python
 x = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 x_aa = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
@@ -164,9 +164,7 @@ for converter in connection.ops.get_db_converters(
     pass
 
 
-aaa = (
-    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  # awkward comment
-)
+aaa = bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb  # awkward comment
 
 
 def test():
@@ -202,13 +200,9 @@ if True:
     if True:
         if True:
             # Black layout
-            model.config.use_cache = (
-                False  # FSTM still requires this hack -> FSTM should probably be refactored s
-            )
+            model.config.use_cache = False  # FSTM still requires this hack -> FSTM should probably be refactored s
             # Ruff layout
-            model.config.use_cache = (
-                False
-            )  # FSTM still requires this hack -> FSTM should probably be refactored s
+            model.config.use_cache = False  # FSTM still requires this hack -> FSTM should probably be refactored s
 
 
 # Regression test for https://github.com/astral-sh/ruff/issues/7463

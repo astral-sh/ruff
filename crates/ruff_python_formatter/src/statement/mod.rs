@@ -1,5 +1,7 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{AnyNodeRef, Stmt};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::prelude::*;
 
@@ -79,5 +81,27 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Stmt {
 
     fn into_format(self) -> Self::Format {
         FormatOwnedWithRule::new(self, FormatStmt)
+    }
+}
+
+/// Returns the range of the semicolon terminating the statement or `None` if the statement
+/// isn't terminated by a semicolon.
+pub(super) fn trailing_semicolon(node: AnyNodeRef, source: &str) -> Option<TextRange> {
+    debug_assert!(node.is_statement());
+
+    let tokenizer = SimpleTokenizer::starts_at(node.end(), source);
+
+    let next_token = tokenizer
+        .take_while(|token| !token.kind().is_comment())
+        .find(|token| !token.kind().is_trivia());
+
+    if let Some(SimpleToken {
+        kind: SimpleTokenKind::Semi,
+        range,
+    }) = next_token
+    {
+        Some(range)
+    } else {
+        None
     }
 }

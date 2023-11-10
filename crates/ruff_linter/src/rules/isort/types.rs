@@ -89,6 +89,7 @@ type ImportFrom<'a> = (
     Vec<AliasDataWithComments<'a>>,
 );
 
+#[derive(Debug)]
 pub(crate) enum EitherImport<'a> {
     Import(Import<'a>),
     ImportFrom(ImportFrom<'a>),

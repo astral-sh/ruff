@@ -3,7 +3,7 @@
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast as ast;
-use ruff_python_ast::{Constant, Expr, Operator, UnaryOp};
+use ruff_python_ast::{Expr, Operator, UnaryOp};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResolvedPythonType {
@@ -59,22 +59,24 @@ impl From<&Expr> for ResolvedPythonType {
             Expr::Tuple(_) => ResolvedPythonType::Atom(PythonType::Tuple),
             Expr::GeneratorExp(_) => ResolvedPythonType::Atom(PythonType::Generator),
             Expr::FString(_) => ResolvedPythonType::Atom(PythonType::String),
-            Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                Constant::Str(_) => ResolvedPythonType::Atom(PythonType::String),
-                Constant::Int(_) => {
+            Expr::StringLiteral(_) => ResolvedPythonType::Atom(PythonType::String),
+            Expr::BytesLiteral(_) => ResolvedPythonType::Atom(PythonType::Bytes),
+            Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+                ast::Number::Int(_) => {
                     ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
                 }
-                Constant::Float(_) => {
+                ast::Number::Float(_) => {
                     ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
                 }
-                Constant::Bool(_) => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool)),
-                Constant::Complex { .. } => {
+                ast::Number::Complex { .. } => {
                     ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex))
                 }
-                Constant::None => ResolvedPythonType::Atom(PythonType::None),
-                Constant::Ellipsis => ResolvedPythonType::Atom(PythonType::Ellipsis),
-                Constant::Bytes(_) => ResolvedPythonType::Atom(PythonType::Bytes),
             },
+            Expr::BooleanLiteral(_) => {
+                ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
+            }
+            Expr::NoneLiteral(_) => ResolvedPythonType::Atom(PythonType::None),
+            Expr::EllipsisLiteral(_) => ResolvedPythonType::Atom(PythonType::Ellipsis),
             // Simple container expressions.
             Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => {
                 ResolvedPythonType::from(value.as_ref())

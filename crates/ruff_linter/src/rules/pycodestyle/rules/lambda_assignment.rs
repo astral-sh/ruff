@@ -1,5 +1,5 @@
 use ruff_python_ast::{
-    self as ast, Constant, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Stmt,
+    self as ast, Expr, Identifier, Parameter, ParameterWithDefault, Parameters, Stmt,
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -123,7 +123,7 @@ pub(crate) fn lambda_assignment(
                 .get_all(id)
                 .any(|binding_id| checker.semantic().binding(binding_id).kind.is_annotation())
         {
-            diagnostic.set_fix(Fix::display_edit(Edit::range_replacement(
+            diagnostic.set_fix(Fix::display_only_edit(Edit::range_replacement(
                 indented,
                 stmt.range(),
             )));
@@ -164,10 +164,7 @@ fn extract_types(annotation: &Expr, semantic: &SemanticModel) -> Option<(Vec<Exp
     // specification, or ellipsis.
     let params = match param_types {
         Expr::List(ast::ExprList { elts, .. }) => elts.clone(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Ellipsis,
-            ..
-        }) => vec![],
+        Expr::EllipsisLiteral(_) => vec![],
         _ => return None,
     };
 

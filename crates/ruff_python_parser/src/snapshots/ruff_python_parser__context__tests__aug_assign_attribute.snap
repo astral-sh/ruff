@@ -28,24 +28,24 @@ expression: parse_ast
                 ExprTuple {
                     range: 7..16,
                     elts: [
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 8..9,
                                 value: Int(
                                     1,
                                 ),
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 11..12,
                                 value: Int(
                                     2,
                                 ),
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 14..15,
                                 value: Int(
                                     3,

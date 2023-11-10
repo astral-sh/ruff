@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -75,10 +75,8 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
     }
 
     // Does the `strptime` call contain a format string with a timezone specifier?
-    if let Some(Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(format),
-        range: _,
-    })) = call.arguments.args.get(1).as_ref()
+    if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value: format, .. })) =
+        call.arguments.args.get(1).as_ref()
     {
         if format.contains("%z") {
             return;

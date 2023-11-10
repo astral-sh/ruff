@@ -96,8 +96,8 @@ pub(crate) fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Do
                     );
                     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
                         content,
-                        docstring.expr.end() - num_trailing_quotes - num_trailing_spaces,
-                        docstring.expr.end() - num_trailing_quotes,
+                        docstring.end() - num_trailing_quotes - num_trailing_spaces,
+                        docstring.end() - num_trailing_quotes,
                     )));
                     checker.diagnostics.push(diagnostic);
                 }

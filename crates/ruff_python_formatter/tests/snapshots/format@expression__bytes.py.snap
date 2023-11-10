@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/bytes.py
 ---
 ## Input
-```py
+```python
 b"' test"
 b'" test'
 
@@ -137,7 +137,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 b"' test"
 b'" test'
 
@@ -286,7 +286,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 b"' test"
 b'" test'
 

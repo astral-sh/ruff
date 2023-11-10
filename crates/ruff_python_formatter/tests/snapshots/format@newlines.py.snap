@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/newlines.py
 ---
 ## Input
-```py
+```python
 ###
 # Blank lines around functions
 ###
@@ -262,7 +262,7 @@ if True:
         pass```
 
 ## Output
-```py
+```python
 ###
 # Blank lines around functions
 ###
@@ -546,6 +546,29 @@ if True:
 
     def nested_trailing_function():
         pass
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -245,13 +245,11 @@
+ class Path:
+     if sys.version_info >= (3, 11):
+ 
+-        def joinpath(self):
+-            ...
++        def joinpath(self): ...
+ 
+     # The .open method comes from pathlib.pyi and should be kept in sync.
+     @overload
+-    def open(self):
+-        ...
++    def open(self): ...
+ 
+ 
+ def fakehttp():
 ```
 
 

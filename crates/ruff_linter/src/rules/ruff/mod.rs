@@ -17,7 +17,7 @@ mod tests {
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::settings::resolve_per_file_ignores;
-    use crate::settings::types::{PerFileIgnore, PythonVersion};
+    use crate::settings::types::{PerFileIgnore, PreviewMode, PythonVersion};
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
@@ -89,6 +89,24 @@ mod tests {
     }
 
     #[test]
+    fn preview_confusables() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/confusables.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::AmbiguousUnicodeCharacterString,
+                    Rule::AmbiguousUnicodeCharacterDocstring,
+                    Rule::AmbiguousUnicodeCharacterComment,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/noqa.py"),
@@ -106,7 +124,26 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
             &settings::LinterSettings {
-                external: FxHashSet::from_iter(vec!["V101".to_string()]),
+                external: vec!["V101".to_string()],
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::UnusedNOQA,
+                    Rule::LineTooLong,
+                    Rule::UnusedImport,
+                    Rule::UnusedVariable,
+                    Rule::TabIndentation,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruf100_0_prefix() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_0.py"),
+            &settings::LinterSettings {
+                external: vec!["V".to_string()],
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::UnusedNOQA,
                     Rule::LineTooLong,
