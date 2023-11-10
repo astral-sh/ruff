@@ -2405,22 +2405,14 @@ pub struct PydocstyleOptions {
     /// convention = "google"
     /// ```
     ///
-    /// If you must, you can enable rules not included in a convention by
-    /// requesting the specific error code:
+    /// To modify a convention (i.e., to enable an additional rule that's excluded
+    /// from the convention by default), select the desired rule via its fully
+    /// qualified rule code (e.g., `D400` instead of `D4` or `D40`):
     ///
     /// ```toml
     /// [tool.ruff.lint]
-    /// extend-select = ["D400"]   #  will enable D400 rule
-    ///
-    /// [tool.ruff.lint.pydocstyle]
-    /// convention = "google"
-    /// ```
-    ///
-    /// Just adding a rule prefix will not enable convention-specified rules.
-    ///
-    /// ```toml
-    /// [tool.ruff.lint]
-    /// extend-select = ["D40"]   #  will *not* enable D400 rule
+    /// # Enable D400 on top of the Google convention.
+    /// extend-select = ["D400"]
     ///
     /// [tool.ruff.lint.pydocstyle]
     /// convention = "google"
