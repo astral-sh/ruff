@@ -132,11 +132,17 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pycodestyle, "E274") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TabBeforeKeyword),
         #[allow(deprecated)]
         (Pycodestyle, "E275") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAfterKeyword),
+        #[allow(deprecated)]
         (Pycodestyle, "E301") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLineBetweenMethods),
+        #[allow(deprecated)]
         (Pycodestyle, "E302") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLinesTopLevel),
+        #[allow(deprecated)]
         (Pycodestyle, "E303") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TooManyBlankLines),
+        #[allow(deprecated)]
         (Pycodestyle, "E304") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLineAfterDecorator),
+        #[allow(deprecated)]
         (Pycodestyle, "E305") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLinesAfterFunctionOrClass),
+        #[allow(deprecated)]
         (Pycodestyle, "E306") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLinesBeforeNestedDefinition),
         (Pycodestyle, "E401") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleImportsOnOneLine),
         (Pycodestyle, "E402") => (RuleGroup::Stable, rules::pycodestyle::rules::ModuleImportNotAtTopOfFile),

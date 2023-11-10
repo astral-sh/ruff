@@ -305,7 +305,6 @@ impl Rule {
             | Rule::BlankLinesBeforeNestedDefinition
             | Rule::BlankLinesTopLevel
             | Rule::IndentationWithInvalidMultiple
-            | Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace
             | Rule::MissingWhitespaceAfterKeyword

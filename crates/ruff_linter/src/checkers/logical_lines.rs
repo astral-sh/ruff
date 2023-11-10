@@ -40,6 +40,7 @@ pub(crate) fn check_logical_lines(
     let mut context = LogicalLinesContext::new(settings);
 
     let mut blank_lines_tracking_vars = BlankLinesTrackingVars::default();
+    let mut non_comment_prev_line = None;
     let mut prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
@@ -92,7 +93,7 @@ pub(crate) fn check_logical_lines(
 
         for kind in indentation(
             &line,
-            prev_line.as_ref(),
+            non_comment_prev_line.as_ref(),
             indent_char,
             indent_level,
             prev_indent_level,
@@ -114,9 +115,10 @@ pub(crate) fn check_logical_lines(
         );
 
         if !line.is_comment_only() {
-            prev_line = Some(line);
+            non_comment_prev_line = Some(line.clone());
             prev_indent_level = Some(indent_level);
         }
+        prev_line = Some(line);
     }
     context.diagnostics
 }

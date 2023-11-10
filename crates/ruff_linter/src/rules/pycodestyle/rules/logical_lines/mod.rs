@@ -487,7 +487,11 @@ impl LogicalLinesBuilder {
             } else {
                 self.lines.push(Line {
                     flags: self.current_line.flags,
-                    preceding_blank_lines: self.current_blank_lines,
+                    blank_lines: self.current_blank_lines,
+                    preceding_blank_lines: self
+                        .lines
+                        .last()
+                        .map_or(0, |previous_line| previous_line.blank_lines),
                     preceding_blank_characters: self.current_blank_characters,
                     tokens_start: self.current_line.tokens_start,
                     tokens_end: end,
@@ -517,6 +521,7 @@ impl LogicalLinesBuilder {
 #[derive(Debug, Clone)]
 struct Line {
     flags: TokenFlags,
+    blank_lines: u32,
     preceding_blank_lines: u32,
     preceding_blank_characters: u32,
     tokens_start: u32,

@@ -14,7 +14,7 @@ use crate::checkers::logical_lines::LogicalLinesContext;
 use super::LogicalLine;
 
 /// Contains variables used for the linting of blank lines.
-#[derive(Default)]
+#[derive(Default, Debug)]
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct BlankLinesTrackingVars {
     follows_decorator: bool,
@@ -329,22 +329,28 @@ pub(crate) fn blank_lines(
         tracked_vars.is_in_fn = false;
     }
 
-    for (token_idx, token) in line.tokens().iter().enumerate() {
+    if let Some(token) = line.tokens_trimmed().first() {
         if token.kind() == TokenKind::Def
+            // Only applies to method.
             && tracked_vars.is_in_class
-            && line.line.preceding_blank_lines == 0
-            && !tracked_vars.follows_decorator
-            && prev_line
-                .and_then(|prev_line| prev_line.tokens_trimmed().first())
-                .map_or(false, |token| {
-                    !matches!(token.kind(), TokenKind::Def | TokenKind::Class)
-                })
+            && (
+                // A comment before the def is allowed (as long as it is preceded by a blank line).
+                (line.line.preceding_blank_lines == 0 && line.line.blank_lines == 0 && prev_line.is_some_and(|line| line.is_comment_only()))
+                // Standard case.
+                || line.line.blank_lines == 0
+                    && prev_line
+                    .and_then(|prev_line| prev_line.tokens_trimmed().first())
+                    .map_or(false, |token| {
+                        !matches!(
+                            token.kind(),
+                            TokenKind::Def | TokenKind::Class | TokenKind::At
+                        )
+                    })
+            )
         {
             // E301
-            let mut diagnostic = Diagnostic::new(
-                BlankLineBetweenMethods(line.line.preceding_blank_lines),
-                token.range,
-            );
+            let mut diagnostic =
+                Diagnostic::new(BlankLineBetweenMethods(line.line.blank_lines), token.range);
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 stylist.line_ending().as_str().to_string(),
                 locator.line_start(token.range.start()),
@@ -362,33 +368,28 @@ pub(crate) fn blank_lines(
             && prev_line
                 .and_then(|prev_line| prev_line.tokens_trimmed().first())
                 .map_or(false, |token| !matches!(token.kind(), TokenKind::Except))
-            && line.line.preceding_blank_lines < 2
+            && line.line.blank_lines < 2
             && prev_line.is_some()
         {
             // E302
-            let mut diagnostic = Diagnostic::new(
-                BlankLinesTopLevel(line.line.preceding_blank_lines),
-                token.range,
-            );
+            let mut diagnostic =
+                Diagnostic::new(BlankLinesTopLevel(line.line.blank_lines), token.range);
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 stylist
                     .line_ending()
                     .as_str()
                     .to_string()
-                    .repeat(2 - line.line.preceding_blank_lines as usize),
+                    .repeat(2 - line.line.blank_lines as usize),
                 locator.line_start(token.range.start()),
             )));
             context.push_diagnostic(diagnostic);
-        } else if token_idx == 0
-            && (line.line.preceding_blank_lines > BlankLinesConfig::TOP_LEVEL
-                || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
-                    && line.line.preceding_blank_lines > BlankLinesConfig::METHOD))
+        } else if line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
+            || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
+                && line.line.blank_lines > BlankLinesConfig::METHOD)
         {
             // E303
-            let mut diagnostic = Diagnostic::new(
-                TooManyBlankLines(line.line.preceding_blank_lines),
-                token.range,
-            );
+            let mut diagnostic =
+                Diagnostic::new(TooManyBlankLines(line.line.blank_lines), token.range);
 
             let chars_to_remove = if indent_level > 0 {
                 line.line.preceding_blank_characters - BlankLinesConfig::METHOD
@@ -400,7 +401,7 @@ pub(crate) fn blank_lines(
             diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
 
             context.push_diagnostic(diagnostic);
-        } else if tracked_vars.follows_decorator && line.line.preceding_blank_lines > 0 {
+        } else if tracked_vars.follows_decorator && line.line.blank_lines > 0 {
             // E304
             let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range);
 
@@ -411,13 +412,13 @@ pub(crate) fn blank_lines(
                 locator.line_start(range.start()),
             )));
             context.push_diagnostic(diagnostic);
-        } else if line.line.preceding_blank_lines < 2
+        } else if line.line.blank_lines < 2
             && (tracked_vars.is_in_fn || tracked_vars.is_in_class)
             && indent_level == 0
         {
             // E305
             let mut diagnostic = Diagnostic::new(
-                BlankLinesAfterFunctionOrClass(line.line.preceding_blank_lines),
+                BlankLinesAfterFunctionOrClass(line.line.blank_lines),
                 token.range,
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -425,17 +426,17 @@ pub(crate) fn blank_lines(
                     .line_ending()
                     .as_str()
                     .to_string()
-                    .repeat(2 - line.line.preceding_blank_lines as usize),
+                    .repeat(2 - line.line.blank_lines as usize),
                 locator.line_start(token.range.start()),
             )));
             context.push_diagnostic(diagnostic);
         } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
             && (tracked_vars.is_in_class || tracked_vars.is_in_fn)
-            && line.line.preceding_blank_lines == 0
+            && line.line.blank_lines == 0
         {
             // E306
             let mut diagnostic = Diagnostic::new(
-                BlankLinesBeforeNestedDefinition(line.line.preceding_blank_lines),
+                BlankLinesBeforeNestedDefinition(line.line.blank_lines),
                 token.range,
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -454,12 +455,10 @@ pub(crate) fn blank_lines(
                 tracked_vars.is_in_class = true;
                 tracked_vars.follows_decorator = false;
                 tracked_vars.follows_def = false;
-                break;
             }
             TokenKind::At => {
                 tracked_vars.follows_decorator = true;
                 tracked_vars.follows_def = false;
-                break;
             }
             TokenKind::Def => {
                 if !tracked_vars.is_in_fn {
@@ -468,7 +467,6 @@ pub(crate) fn blank_lines(
                 tracked_vars.is_in_fn = true;
                 tracked_vars.follows_def = true;
                 tracked_vars.follows_decorator = false;
-                break;
             }
             _ => {
                 tracked_vars.follows_decorator = false;
