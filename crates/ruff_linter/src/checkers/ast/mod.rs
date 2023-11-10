@@ -1635,6 +1635,11 @@ impl<'a> Checker<'a> {
             return;
         }
 
+        if parent.is_with_stmt() {
+            self.add_binding(id, expr.range(), BindingKind::WithItemVar, flags);
+            return;
+        }
+
         let scope = self.semantic.current_scope();
 
         if scope.kind.is_module()

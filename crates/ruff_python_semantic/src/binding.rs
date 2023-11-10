@@ -432,6 +432,13 @@ pub enum BindingKind<'a> {
     /// ```
     LoopVar,
 
+    /// A binding for a with statement variable, like `x` in:
+    /// ```python
+    /// with open('foo.py') as x:
+    ///     ...
+    /// ```
+    WithItemVar,
+
     /// A binding for a global variable, like `x` in:
     /// ```python
     /// def foo():
