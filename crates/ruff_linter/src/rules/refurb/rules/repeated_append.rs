@@ -106,7 +106,16 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
 
             // We only suggest a fix when all appends in a group are clumped together. If they're
             // non-consecutive, fixing them is much more difficult.
-            if group.is_consecutive {
+            //
+            // Avoid fixing if there are comments in between the appends:
+            //
+            // ```python
+            // a.append(1)
+            // # comment
+            // a.append(2)
+            // ```
+            if group.is_consecutive && !checker.indexer().comment_ranges().intersects(group.range())
+            {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     replacement,
                     group.start(),

@@ -1,10 +1,11 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Stmt};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace;
-use ruff_python_codegen::{Generator, Stylist};
+use ruff_python_codegen::Stylist;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -196,7 +197,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                         first,
                                         indentation,
                                         checker.stylist(),
-                                        checker.generator(),
+                                        checker.locator(),
                                     ));
                                 }
                             }
@@ -216,7 +217,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                     first,
                                     indentation,
                                     checker.stylist(),
-                                    checker.generator(),
+                                    checker.locator(),
                                 ));
                             }
                         }
@@ -241,7 +242,7 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                             first,
                                             indentation,
                                             checker.stylist(),
-                                            checker.generator(),
+                                            checker.locator(),
                                         ));
                                     }
                                 }
@@ -269,28 +270,27 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
 fn generate_fix(
     stmt: &Stmt,
     exc_arg: &Expr,
-    indentation: &str,
+    stmt_indentation: &str,
     stylist: &Stylist,
-    generator: Generator,
+    locator: &Locator,
 ) -> Fix {
-    let assignment = Stmt::Assign(ast::StmtAssign {
-        targets: vec![Expr::Name(ast::ExprName {
-            id: "msg".into(),
-            ctx: ExprContext::Store,
-            range: TextRange::default(),
-        })],
-        value: Box::new(exc_arg.clone()),
-        range: TextRange::default(),
-    });
-
     Fix::unsafe_edits(
         Edit::insertion(
-            format!(
-                "{}{}{}",
-                generator.stmt(&assignment),
-                stylist.line_ending().as_str(),
-                indentation,
-            ),
+            if locator.contains_line_break(exc_arg.range()) {
+                format!(
+                    "msg = ({line_ending}{stmt_indentation}{indentation}{}{line_ending}{stmt_indentation}){line_ending}{stmt_indentation}",
+                    locator.slice(exc_arg.range()),
+                    line_ending = stylist.line_ending().as_str(),
+                    indentation = stylist.indentation().as_str(),
+                )
+            } else {
+                format!(
+                    "msg = {}{}{}",
+                    locator.slice(exc_arg.range()),
+                    stylist.line_ending().as_str(),
+                    stmt_indentation,
+                )
+            },
             stmt.start(),
         ),
         [Edit::range_replacement(

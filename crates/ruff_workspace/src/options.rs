@@ -2242,13 +2242,20 @@ pub struct Pep8NamingOptions {
     /// in this list takes a `cls` argument as its first argument.
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `pydantic.validator`,
-    /// rather than `validator`).
+    /// rather than `validator`) or alternatively a plain name which is then matched against
+    /// the last segment in case the decorator itself consists of a dotted name.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            # Allow Pydantic's `@validator` decorator to trigger class method treatment.
-            classmethod-decorators = ["pydantic.validator"]
+            classmethod-decorators = [
+                # Allow Pydantic's `@validator` decorator to trigger class method treatment.
+                "pydantic.validator",
+                # Allow SQLAlchemy's dynamic decorators, like `@field.expression`, to trigger class method treatment.
+                "declared_attr",
+                "expression",
+                "comparator",
+            ]
         "#
     )]
     pub classmethod_decorators: Option<Vec<String>>,
@@ -2261,7 +2268,8 @@ pub struct Pep8NamingOptions {
     /// in this list has no `self` or `cls` argument.
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`,
-    /// rather than `teardown`).
+    /// rather than `teardown`) or alternatively a plain name which is then matched against
+    /// the last segment in case the decorator itself consists of a dotted name.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",

@@ -330,6 +330,20 @@ FURB113.py:122:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calli
     122 |+    x.extend((1, 2))
 124 123 | 
 125 124 | 
-126 125 | # Non-errors.
+126 125 | if True:
+
+FURB113.py:128:5: FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+    |
+126 |   if True:
+127 |       # FURB113
+128 |       nums.append(1)
+    |  _____^
+129 | |     # comment
+130 | |     nums.append(2)
+131 | |     # comment
+132 | |     nums.append(3)
+    | |__________________^ FURB113
+    |
+    = help: Replace with `nums.extend((1, 2, 3))`
 
 

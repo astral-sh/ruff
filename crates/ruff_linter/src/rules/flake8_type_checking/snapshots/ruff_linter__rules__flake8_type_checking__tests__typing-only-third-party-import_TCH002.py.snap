@@ -248,5 +248,6 @@ TCH002.py:172:24: TCH002 [*] Move third-party import `module.Member` into a type
 172     |-    from module import Member
 173 176 | 
 174 177 |     x: Member = 1
+175 178 | 
 
 
