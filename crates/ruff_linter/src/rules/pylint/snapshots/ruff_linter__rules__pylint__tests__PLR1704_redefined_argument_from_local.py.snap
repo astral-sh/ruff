@@ -1,58 +1,98 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-redefined_argument_from_local.py:28:9: PLR1704 Redefining argument with the local name `i`
+redefined_argument_from_local.py:34:9: PLR1704 Redefining argument with the local name `i`
    |
-27 | def foo(i):
-28 |     for i in range(10):
+33 | def foo(i):
+34 |     for i in range(10):
    |         ^ PLR1704
-29 |         ...
+35 |         print(i)
    |
 
-redefined_argument_from_local.py:34:25: PLR1704 Redefining argument with the local name `e`
+redefined_argument_from_local.py:40:25: PLR1704 Redefining argument with the local name `e`
    |
-32 |     try:
-33 |         ...
-34 |     except Exception as e:
+38 |     try:
+39 |         ...
+40 |     except Exception as e:
    |                         ^ PLR1704
-35 |         ...
+41 |         print(e)
    |
 
-redefined_argument_from_local.py:51:13: PLR1704 Redefining argument with the local name `a`
+redefined_argument_from_local.py:44:24: PLR1704 Redefining argument with the local name `f`
    |
-49 | def foo(a):
-50 |     def bar(b):
-51 |         for a in range(1):
-   |             ^ PLR1704
-52 |             ...
-   |
-
-redefined_argument_from_local.py:56:13: PLR1704 Redefining argument with the local name `b`
-   |
-54 | def foo(a):
-55 |     def bar(b):
-56 |         for b in range(1):
-   |             ^ PLR1704
-57 |             ...
+43 | def foo(f):
+44 |     with open('', ) as f:
+   |                        ^ PLR1704
+45 |         print(f)
    |
 
-redefined_argument_from_local.py:61:13: PLR1704 Redefining argument with the local name `a`
+redefined_argument_from_local.py:48:24: PLR1704 Redefining argument with the local name `a`
    |
-59 | def foo(a=1):
-60 |     def bar(b=2):
-61 |         for a in range(1):
-   |             ^ PLR1704
-62 |             ...
-63 |         for b in range(1):
+47 | def foo(a, b):
+48 |     with context() as (a, b, c):
+   |                        ^ PLR1704
+49 |         print(a, b, c)
    |
 
-redefined_argument_from_local.py:63:13: PLR1704 Redefining argument with the local name `b`
+redefined_argument_from_local.py:48:27: PLR1704 Redefining argument with the local name `b`
    |
-61 |         for a in range(1):
-62 |             ...
-63 |         for b in range(1):
+47 | def foo(a, b):
+48 |     with context() as (a, b, c):
+   |                           ^ PLR1704
+49 |         print(a, b, c)
+   |
+
+redefined_argument_from_local.py:52:24: PLR1704 Redefining argument with the local name `a`
+   |
+51 | def foo(a, b):
+52 |     with context() as [a, b, c]:
+   |                        ^ PLR1704
+53 |         print(a, b, c)
+   |
+
+redefined_argument_from_local.py:52:27: PLR1704 Redefining argument with the local name `b`
+   |
+51 | def foo(a, b):
+52 |     with context() as [a, b, c]:
+   |                           ^ PLR1704
+53 |         print(a, b, c)
+   |
+
+redefined_argument_from_local.py:57:13: PLR1704 Redefining argument with the local name `a`
+   |
+55 | def foo(a):
+56 |     def bar(b):
+57 |         for a in range(1):
    |             ^ PLR1704
-64 |             ...
+58 |             print(a)
+   |
+
+redefined_argument_from_local.py:62:13: PLR1704 Redefining argument with the local name `b`
+   |
+60 | def foo(a):
+61 |     def bar(b):
+62 |         for b in range(1):
+   |             ^ PLR1704
+63 |             print(b)
+   |
+
+redefined_argument_from_local.py:67:13: PLR1704 Redefining argument with the local name `a`
+   |
+65 | def foo(a=1):
+66 |     def bar(b=2):
+67 |         for a in range(1):
+   |             ^ PLR1704
+68 |             print(a)
+69 |         for b in range(1):
+   |
+
+redefined_argument_from_local.py:69:13: PLR1704 Redefining argument with the local name `b`
+   |
+67 |         for a in range(1):
+68 |             print(a)
+69 |         for b in range(1):
+   |             ^ PLR1704
+70 |             print(b)
    |
 
 
