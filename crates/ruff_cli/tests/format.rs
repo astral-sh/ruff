@@ -320,6 +320,11 @@ if __name__ == '__main__':
     exit_code: 0
     ----- stdout -----
 
+    from test import say_hy
+
+    if __name__ == '__main__':
+        say_hy("dear Ruff contributor")
+
     ----- stderr -----
     "###);
     Ok(())

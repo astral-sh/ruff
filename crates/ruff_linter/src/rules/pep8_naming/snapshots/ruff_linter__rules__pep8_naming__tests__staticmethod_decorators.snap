@@ -68,12 +68,4 @@ N805.py:86:14: N805 First argument of a method should be named `self`
 87 |         pass
    |
 
-N805.py:94:19: N805 First argument of a method should be named `self`
-   |
-93 |     @foobar.thisisstatic
-94 |     def badstatic(foo):
-   |                   ^^^ N805
-95 |         pass
-   |
-
 
