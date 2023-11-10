@@ -1,0 +1,138 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/module_docstring_2.py
+---
+## Input
+
+```python
+# flags: --preview
+"""I am a very helpful module docstring.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris
+nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate
+velit esse cillum dolore eu fugiat nulla pariatur.
+Excepteur sint occaecat cupidatat non proident,
+sunt in culpa qui officia deserunt mollit anim id est laborum.
+"""
+
+
+
+
+a = 1
+
+
+"""Look at me I'm a docstring...
+
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+........................................................NOT!
+"""
+
+
+
+
+b = 2
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,3 +1,4 @@
++# flags: --preview
+ """I am a very helpful module docstring.
+ 
+ Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+@@ -11,6 +12,7 @@
+ sunt in culpa qui officia deserunt mollit anim id est laborum.
+ """
+ 
++
+ a = 1
+ 
+ 
+```
+
+## Ruff Output
+
+```python
+# flags: --preview
+"""I am a very helpful module docstring.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris
+nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate
+velit esse cillum dolore eu fugiat nulla pariatur.
+Excepteur sint occaecat cupidatat non proident,
+sunt in culpa qui officia deserunt mollit anim id est laborum.
+"""
+
+
+a = 1
+
+
+"""Look at me I'm a docstring...
+
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+........................................................NOT!
+"""
+
+
+b = 2
+```
+
+## Black Output
+
+```python
+"""I am a very helpful module docstring.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris
+nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in voluptate
+velit esse cillum dolore eu fugiat nulla pariatur.
+Excepteur sint occaecat cupidatat non proident,
+sunt in culpa qui officia deserunt mollit anim id est laborum.
+"""
+
+a = 1
+
+
+"""Look at me I'm a docstring...
+
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+............................................................
+........................................................NOT!
+"""
+
+
+b = 2
+```
+
+

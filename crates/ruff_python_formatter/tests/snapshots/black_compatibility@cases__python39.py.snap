@@ -1,0 +1,84 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/python39.py
+---
+## Input
+
+```python
+# flags: --minimum-version=3.9
+
+@relaxed_decorator[0]
+def f():
+    ...
+
+@relaxed_decorator[extremely_long_name_that_definitely_will_not_fit_on_one_line_of_standard_length]
+def f():
+    ...
+
+@extremely_long_variable_name_that_doesnt_fit := complex.expression(with_long="arguments_value_that_wont_fit_at_the_end_of_the_line")
+def f():
+    ...
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,3 +1,6 @@
++# flags: --minimum-version=3.9
++
++
+ @relaxed_decorator[0]
+ def f():
+     ...
+```
+
+## Ruff Output
+
+```python
+# flags: --minimum-version=3.9
+
+
+@relaxed_decorator[0]
+def f():
+    ...
+
+
+@relaxed_decorator[
+    extremely_long_name_that_definitely_will_not_fit_on_one_line_of_standard_length
+]
+def f():
+    ...
+
+
+@extremely_long_variable_name_that_doesnt_fit := complex.expression(
+    with_long="arguments_value_that_wont_fit_at_the_end_of_the_line"
+)
+def f():
+    ...
+```
+
+## Black Output
+
+```python
+@relaxed_decorator[0]
+def f():
+    ...
+
+
+@relaxed_decorator[
+    extremely_long_name_that_definitely_will_not_fit_on_one_line_of_standard_length
+]
+def f():
+    ...
+
+
+@extremely_long_variable_name_that_doesnt_fit := complex.expression(
+    with_long="arguments_value_that_wont_fit_at_the_end_of_the_line"
+)
+def f():
+    ...
+```
+
+

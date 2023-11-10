@@ -43,6 +43,7 @@ def import_fixture(fixture: Path, fixture_set: str):
 
 # The name of the folders in the `data` for which the tests should be imported
 FIXTURE_SETS = [
+    "cases",
     "fast",
     "py_36",
     "py_37",
@@ -63,6 +64,8 @@ IGNORE_LIST = [
     "async_as_identifier.py",
     "invalid_header.py",
     "pattern_matching_invalid.py",
+    "pep_572_do_not_remove_parens.py",
+    "type_aliases.py",
 
     # Python 2
     "python2_detection.py"

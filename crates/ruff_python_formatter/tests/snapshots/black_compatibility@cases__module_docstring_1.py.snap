@@ -1,0 +1,70 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/module_docstring_1.py
+---
+## Input
+
+```python
+# flags: --preview
+"""Single line module-level docstring should be followed by single newline."""
+
+
+
+
+a = 1
+
+
+"""I'm just a string so should be followed by 2 newlines."""
+
+
+
+
+b = 2
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,5 +1,7 @@
++# flags: --preview
+ """Single line module-level docstring should be followed by single newline."""
+ 
++
+ a = 1
+ 
+ 
+```
+
+## Ruff Output
+
+```python
+# flags: --preview
+"""Single line module-level docstring should be followed by single newline."""
+
+
+a = 1
+
+
+"""I'm just a string so should be followed by 2 newlines."""
+
+
+b = 2
+```
+
+## Black Output
+
+```python
+"""Single line module-level docstring should be followed by single newline."""
+
+a = 1
+
+
+"""I'm just a string so should be followed by 2 newlines."""
+
+
+b = 2
+```
+
+

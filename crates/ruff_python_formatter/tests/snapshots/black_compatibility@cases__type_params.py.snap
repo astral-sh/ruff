@@ -1,0 +1,127 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/type_params.py
+---
+## Input
+
+```python
+# flags: --minimum-version=3.12
+def func  [T ](): pass
+async def func [ T ] (): pass
+class C[ T ] : pass
+
+def all_in[T   :   int,U : (bytes, str),*   Ts,**P](): pass
+
+def really_long[WhatIsTheLongestTypeVarNameYouCanThinkOfEnoughToMakeBlackSplitThisLine](): pass
+
+def even_longer[WhatIsTheLongestTypeVarNameYouCanThinkOfEnoughToMakeBlackSplitThisLine: WhatIfItHadABound](): pass
+
+def it_gets_worse[WhatIsTheLongestTypeVarNameYouCanThinkOfEnoughToMakeBlackSplitThisLine, ItCouldBeGenericOverMultipleTypeVars](): pass
+
+def magic[Trailing, Comma,](): pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,3 +1,4 @@
++# flags: --minimum-version=3.12
+ def func[T]():
+     pass
+ 
+```
+
+## Ruff Output
+
+```python
+# flags: --minimum-version=3.12
+def func[T]():
+    pass
+
+
+async def func[T]():
+    pass
+
+
+class C[T]:
+    pass
+
+
+def all_in[T: int, U: (bytes, str), *Ts, **P]():
+    pass
+
+
+def really_long[
+    WhatIsTheLongestTypeVarNameYouCanThinkOfEnoughToMakeBlackSplitThisLine
+]():
+    pass
+
+
+def even_longer[
+    WhatIsTheLongestTypeVarNameYouCanThinkOfEnoughToMakeBlackSplitThisLine: WhatIfItHadABound
+]():
+    pass
+
+
+def it_gets_worse[
+    WhatIsTheLongestTypeVarNameYouCanThinkOfEnoughToMakeBlackSplitThisLine,
+    ItCouldBeGenericOverMultipleTypeVars,
+]():
+    pass
+
+
+def magic[
+    Trailing,
+    Comma,
+]():
+    pass
+```
+
+## Black Output
+
+```python
+def func[T]():
+    pass
+
+
+async def func[T]():
+    pass
+
+
+class C[T]:
+    pass
+
+
+def all_in[T: int, U: (bytes, str), *Ts, **P]():
+    pass
+
+
+def really_long[
+    WhatIsTheLongestTypeVarNameYouCanThinkOfEnoughToMakeBlackSplitThisLine
+]():
+    pass
+
+
+def even_longer[
+    WhatIsTheLongestTypeVarNameYouCanThinkOfEnoughToMakeBlackSplitThisLine: WhatIfItHadABound
+]():
+    pass
+
+
+def it_gets_worse[
+    WhatIsTheLongestTypeVarNameYouCanThinkOfEnoughToMakeBlackSplitThisLine,
+    ItCouldBeGenericOverMultipleTypeVars,
+]():
+    pass
+
+
+def magic[
+    Trailing,
+    Comma,
+]():
+    pass
+```
+
+

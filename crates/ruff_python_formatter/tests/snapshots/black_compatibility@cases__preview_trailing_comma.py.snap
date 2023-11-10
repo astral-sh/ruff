@@ -1,0 +1,114 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_trailing_comma.py
+---
+## Input
+
+```python
+# flags: --preview
+e = {
+    "a": fun(msg, "ts"),
+    "longggggggggggggggid": ...,
+    "longgggggggggggggggggggkey": ..., "created": ...
+    # "longkey": ...
+}
+f = [
+    arg1,
+    arg2,
+    arg3, arg4
+    # comment
+]
+g = (
+    arg1,
+    arg2,
+    arg3, arg4
+    # comment
+)
+h = {
+    arg1,
+    arg2,
+    arg3, arg4
+    # comment
+}
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,3 +1,4 @@
++# flags: --preview
+ e = {
+     "a": fun(msg, "ts"),
+     "longggggggggggggggid": ...,
+```
+
+## Ruff Output
+
+```python
+# flags: --preview
+e = {
+    "a": fun(msg, "ts"),
+    "longggggggggggggggid": ...,
+    "longgggggggggggggggggggkey": ...,
+    "created": ...,
+    # "longkey": ...
+}
+f = [
+    arg1,
+    arg2,
+    arg3,
+    arg4,
+    # comment
+]
+g = (
+    arg1,
+    arg2,
+    arg3,
+    arg4,
+    # comment
+)
+h = {
+    arg1,
+    arg2,
+    arg3,
+    arg4,
+    # comment
+}
+```
+
+## Black Output
+
+```python
+e = {
+    "a": fun(msg, "ts"),
+    "longggggggggggggggid": ...,
+    "longgggggggggggggggggggkey": ...,
+    "created": ...,
+    # "longkey": ...
+}
+f = [
+    arg1,
+    arg2,
+    arg3,
+    arg4,
+    # comment
+]
+g = (
+    arg1,
+    arg2,
+    arg3,
+    arg4,
+    # comment
+)
+h = {
+    arg1,
+    arg2,
+    arg3,
+    arg4,
+    # comment
+}
+```
+
+
