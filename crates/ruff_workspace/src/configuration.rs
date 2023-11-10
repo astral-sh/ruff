@@ -1092,11 +1092,13 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 #[cfg(test)]
 mod tests {
     use crate::configuration::{LintConfiguration, RuleSelection};
+    use crate::options::PydocstyleOptions;
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
     use ruff_linter::RuleSelector;
+    use std::str::FromStr;
 
     const NURSERY_RULES: &[Rule] = &[
         Rule::MissingCopyrightNotice,
@@ -1587,5 +1589,94 @@ mod tests {
         );
         let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_docstring_convention_override() {
+        fn _check_docstring_override(
+            rule_selections: Vec<RuleSelection>,
+            should_be_overridden: bool,
+        ) {
+            use ruff_linter::rules::pydocstyle::settings::Convention;
+
+            let config = LintConfiguration {
+                rule_selections,
+                pydocstyle: Some(PydocstyleOptions {
+                    convention: Some(Convention::Numpy),
+                    ..PydocstyleOptions::default()
+                }),
+                ..LintConfiguration::default()
+            };
+
+            let mut expected = RuleSet::from_rules(&[
+                Rule::from_code("D410").unwrap(),
+                Rule::from_code("D411").unwrap(),
+                Rule::from_code("D412").unwrap(),
+                Rule::from_code("D414").unwrap(),
+                Rule::from_code("D418").unwrap(),
+                Rule::from_code("D419").unwrap(),
+            ]);
+            if should_be_overridden {
+                expected.insert(Rule::from_code("D417").unwrap());
+            }
+            assert_eq!(
+                config
+                    .as_rule_table(PreviewMode::Disabled)
+                    .iter_enabled()
+                    .collect::<RuleSet>(),
+                expected,
+            );
+        }
+
+        let d41 = RuleSelector::from_str("D41").unwrap();
+        let d417 = RuleSelector::from_str("D417").unwrap();
+
+        // D417 does not appear with prefix
+        _check_docstring_override(
+            vec![RuleSelection {
+                select: Some(vec![d41.clone()]),
+                ..RuleSelection::default()
+            }],
+            false,
+        );
+
+        // But does appear with rule selector
+        _check_docstring_override(
+            vec![RuleSelection {
+                select: Some(vec![d41.clone(), d417.clone()]),
+                ..RuleSelection::default()
+            }],
+            true,
+        );
+
+        // But disappears if there's another select
+        _check_docstring_override(
+            vec![
+                RuleSelection {
+                    select: Some(vec![d417.clone()]),
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    select: Some(vec![d41.clone()]),
+                    ..RuleSelection::default()
+                },
+            ],
+            false,
+        );
+
+        // But an extend-select is ok
+        _check_docstring_override(
+            vec![
+                RuleSelection {
+                    select: Some(vec![d417.clone()]),
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    extend_select: vec![d41.clone()],
+                    ..RuleSelection::default()
+                },
+            ],
+            true,
+        );
     }
 }
