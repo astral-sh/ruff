@@ -1564,3 +1564,62 @@ extend-safe-fixes = ["UP03"]
 
     Ok(())
 }
+
+#[test]
+fn check_docstring_conventions_overrides() -> Result<()> {
+    // But if we explicitly select it, we override the convention
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.pydocstyle]
+convention = "numpy"
+"#,
+    )?;
+
+    let stdin = r#"
+def log(x, base) -> float:
+    """Calculate natural log of a value
+
+    Parameters
+    ----------
+    x :
+        Hello
+    """
+    return math.log(x)
+"#;
+
+    // If we only select the prefix, then everything passes
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "-", "--config"])
+        .arg(&ruff_toml)
+        .args(["--output-format", "text", "--no-cache", "--select", "D41"])
+        .pass_stdin(stdin),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###
+    );
+
+    // But if we select the exact code, we get an error
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "-", "--config"])
+        .arg(&ruff_toml)
+        .args(["--output-format", "text", "--no-cache", "--select", "D417"])
+        .pass_stdin(stdin),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:5: D417 Missing argument description in the docstring for `log`: `base`
+    Found 1 error.
+
+    ----- stderr -----
+    "###
+    );
+    Ok(())
+}
