@@ -96,8 +96,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     let binding = &checker.semantic.bindings[shadow.binding_id()];
                     if !matches!(
                         binding.kind,
-                        BindingKind::LoopVar
-                            | BindingKind::BoundException
+                        BindingKind::LoopVar | BindingKind::BoundException
                     ) {
                         continue;
                     }
