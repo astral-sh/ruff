@@ -2397,9 +2397,26 @@ pub struct PydocstyleOptions {
     /// convention = "google"
     /// ```
     ///
-    /// As conventions force-disable all rules not included in the convention,
-    /// enabling _additional_ rules on top of a convention is currently
-    /// unsupported.
+    /// If you must, you can enable rules not included in a convention by
+    /// requesting the specific error code:
+    ///
+    /// ```toml
+    /// [tool.ruff.lint]
+    /// extend-select = ["D400"]   #  will enable D400 rule
+    ///
+    /// [tool.ruff.lint.pydocstyle]
+    /// convention = "google"
+    /// ```
+    ///
+    /// Just adding a rule prefix will not enable convention-specified rules.
+    ///
+    /// ```toml
+    /// [tool.ruff.lint]
+    /// extend-select = ["D40"]   #  will *not* enable D400 rule
+    ///
+    /// [tool.ruff.lint.pydocstyle]
+    /// convention = "google"
+    /// ```
     #[option(
         default = r#"null"#,
         value_type = r#""google" | "numpy" | "pep257""#,
