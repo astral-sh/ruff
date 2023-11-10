@@ -21,6 +21,7 @@ use crate::checkers::ast::Checker;
 /// @dataclass
 /// class Foo:
 ///     bar: list[int] = field(default_factory=lambda: [])
+///     baz: dict[str, int] = field(default_factory=lambda: {})
 /// ```
 ///
 /// Use instead:
@@ -31,28 +32,29 @@ use crate::checkers::ast::Checker;
 /// @dataclass
 /// class Foo:
 ///     bar: list[int] = field(default_factory=list)
+///     baz: dict[str, int] = field(default_factory=dict)
 /// ```
 ///
 /// ## References
 /// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
 #[violation]
-pub struct ReimplementedListBuiltin;
+pub struct ReimplementedContainerBuiltin;
 
-impl Violation for ReimplementedListBuiltin {
+impl Violation for ReimplementedContainerBuiltin {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `list` over useless lambda")
+        format!("Prefer `list` or `dict` over useless lambda")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with `list`".to_string())
+        Some("Replace with `list` or `dict`".to_string())
     }
 }
 
 /// PIE807
-pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambda) {
+pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &ExprLambda) {
     let ExprLambda {
         parameters,
         body,
@@ -60,17 +62,20 @@ pub(crate) fn reimplemented_list_builtin(checker: &mut Checker, expr: &ExprLambd
     } = expr;
 
     if parameters.is_none() {
-        if let Expr::List(ast::ExprList { elts, .. }) = body.as_ref() {
-            if elts.is_empty() {
-                let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
-                if checker.semantic().is_builtin("list") {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        "list".to_string(),
-                        expr.range(),
-                    )));
-                }
-                checker.diagnostics.push(diagnostic);
+        let builtin = match body.as_ref() {
+            Expr::List(ast::ExprList { elts, .. }) if elts.is_empty() => Some("list"),
+            Expr::Dict(ast::ExprDict { values, .. }) if values.is_empty() => Some("dict"),
+            _ => None,
+        };
+        if let Some(builtin) = builtin {
+            let mut diagnostic = Diagnostic::new(ReimplementedContainerBuiltin, expr.range());
+            if checker.semantic().is_builtin(builtin) {
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    builtin.to_string(),
+                    expr.range(),
+                )));
             }
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
