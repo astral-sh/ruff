@@ -443,14 +443,6 @@ where
                     }
                 }
             }
-            Stmt::With(ast::StmtWith {
-                           items,
-                           ..
-                       }) => {
-                for expr in items.iter().filter_map(|item| item.optional_vars.as_ref()) {
-                    self.visit_expr(expr);
-                }
-            }
             _ => {}
         }
 
@@ -1651,16 +1643,6 @@ impl<'a> Checker<'a> {
                 id,
                 expr.range(),
                 BindingKind::LoopVar,
-                BindingFlags::empty(),
-            );
-            return;
-        }
-
-        if parent.is_with_stmt() {
-            self.add_binding(
-                id,
-                expr.range(),
-                BindingKind::WithItemVar,
                 BindingFlags::empty(),
             );
             return;
