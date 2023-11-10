@@ -414,4 +414,21 @@ UP007.py:110:28: UP007 [*] Use `X | Y` for type annotations
 112 112 | 
 113 113 | # Regression test for: https://github.com/astral-sh/ruff/issues/7452
 
+UP007.py:120:10: UP007 [*] Use `X | Y` for type annotations
+    |
+119 | # Regression test for: https://github.com/astral-sh/ruff/issues/8609
+120 | def f(x: Union[int, str, bytes]) -> None:
+    |          ^^^^^^^^^^^^^^^^^^^^^^ UP007
+121 |     ...
+    |
+    = help: Convert to `X | Y`
+
+ℹ Unsafe fix
+117 117 | 
+118 118 | 
+119 119 | # Regression test for: https://github.com/astral-sh/ruff/issues/8609
+120     |-def f(x: Union[int, str, bytes]) -> None:
+    120 |+def f(x: int | (str | bytes)) -> None:
+121 121 |     ...
+
 
