@@ -322,7 +322,9 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
         .bindings()
         .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
         .filter_map(|(name, binding)| {
-            if (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
+            if (binding.kind.is_assignment()
+                || binding.kind.is_named_expr_assignment()
+                || binding.kind.is_with_item_var())
                 && (!binding.is_unpacked_assignment()
                     || matches!(checker.settings.preview, PreviewMode::Enabled))
                 && !binding.is_nonlocal()
