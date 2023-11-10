@@ -1593,10 +1593,7 @@ mod tests {
 
     #[test]
     fn select_docstring_convention_override() {
-        fn _check_docstring_override(
-            rule_selections: Vec<RuleSelection>,
-            should_be_overridden: bool,
-        ) {
+        fn assert_override(rule_selections: Vec<RuleSelection>, should_be_overridden: bool) {
             use ruff_linter::rules::pydocstyle::settings::Convention;
 
             let config = LintConfiguration {
@@ -1631,8 +1628,8 @@ mod tests {
         let d41 = RuleSelector::from_str("D41").unwrap();
         let d417 = RuleSelector::from_str("D417").unwrap();
 
-        // D417 does not appear with prefix
-        _check_docstring_override(
+        // D417 does not appear when D41 is provided...
+        assert_override(
             vec![RuleSelection {
                 select: Some(vec![d41.clone()]),
                 ..RuleSelection::default()
@@ -1640,8 +1637,8 @@ mod tests {
             false,
         );
 
-        // But does appear with rule selector
-        _check_docstring_override(
+        // ...but does appear when specified directly.
+        assert_override(
             vec![RuleSelection {
                 select: Some(vec![d41.clone(), d417.clone()]),
                 ..RuleSelection::default()
@@ -1649,8 +1646,8 @@ mod tests {
             true,
         );
 
-        // But disappears if there's another select
-        _check_docstring_override(
+        // ...but disappears if there's a subsequent `--select`.
+        assert_override(
             vec![
                 RuleSelection {
                     select: Some(vec![d417.clone()]),
@@ -1664,8 +1661,8 @@ mod tests {
             false,
         );
 
-        // But an extend-select is ok
-        _check_docstring_override(
+        // ...although an `--extend-select` is fine.
+        assert_override(
             vec![
                 RuleSelection {
                     select: Some(vec![d417.clone()]),
