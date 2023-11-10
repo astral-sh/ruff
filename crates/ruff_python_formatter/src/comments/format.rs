@@ -323,7 +323,7 @@ pub(crate) struct FormatEmptyLines {
 impl Format<PyFormatContext<'_>> for FormatEmptyLines {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         match f.context().node_level() {
-            NodeLevel::TopLevel => match self.lines {
+            NodeLevel::TopLevel(_) => match self.lines {
                 0 | 1 => write!(f, [hard_line_break()]),
                 2 => write!(f, [empty_line()]),
                 _ => match f.options().source_type() {
@@ -519,9 +519,9 @@ pub(crate) fn empty_lines_before_trailing_comments<'a>(
 ) -> FormatEmptyLinesBeforeTrailingComments<'a> {
     // Black has different rules for stub vs. non-stub and top level vs. indented
     let empty_lines = match (f.options().source_type(), f.context().node_level()) {
-        (PySourceType::Stub, NodeLevel::TopLevel) => 1,
+        (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
         (PySourceType::Stub, _) => 0,
-        (_, NodeLevel::TopLevel) => 2,
+        (_, NodeLevel::TopLevel(_)) => 2,
         (_, _) => 1,
     };
 
@@ -573,9 +573,9 @@ pub(crate) fn empty_lines_after_leading_comments<'a>(
 ) -> FormatEmptyLinesAfterLeadingComments<'a> {
     // Black has different rules for stub vs. non-stub and top level vs. indented
     let empty_lines = match (f.options().source_type(), f.context().node_level()) {
-        (PySourceType::Stub, NodeLevel::TopLevel) => 1,
+        (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
         (PySourceType::Stub, _) => 0,
-        (_, NodeLevel::TopLevel) => 2,
+        (_, NodeLevel::TopLevel(_)) => 2,
         (_, _) => 1,
     };
 

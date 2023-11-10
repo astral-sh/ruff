@@ -135,7 +135,9 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             }
         } else {
             let level = match f.context().node_level() {
-                NodeLevel::TopLevel | NodeLevel::CompoundStatement => NodeLevel::Expression(None),
+                NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement => {
+                    NodeLevel::Expression(None)
+                }
                 saved_level @ (NodeLevel::Expression(_) | NodeLevel::ParenthesizedExpression) => {
                     saved_level
                 }
