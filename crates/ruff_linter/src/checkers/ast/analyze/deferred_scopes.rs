@@ -98,7 +98,6 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         binding.kind,
                         BindingKind::LoopVar
                             | BindingKind::BoundException
-                            | BindingKind::WithItemVar
                     ) {
                         continue;
                     }
