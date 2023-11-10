@@ -2248,8 +2248,14 @@ pub struct Pep8NamingOptions {
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            # Allow Pydantic's `@validator` decorator to trigger class method treatment.
-            classmethod-decorators = ["pydantic.validator"]
+            classmethod-decorators = [
+                # Allow Pydantic's `@validator` decorator to trigger class method treatment.
+                "pydantic.validator",
+                # Allow SQLAlchemy's dynamic decorators, like `@field.expression`, to trigger class method treatment.
+                "declared_attr",
+                "expression",
+                "comparator",
+            ]
         "#
     )]
     pub classmethod_decorators: Option<Vec<String>>,

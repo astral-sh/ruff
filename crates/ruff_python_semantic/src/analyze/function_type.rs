@@ -26,33 +26,10 @@ pub fn classify(
     let ScopeKind::Class(class_def) = &scope.kind else {
         return FunctionType::Function;
     };
-    if decorator_list.iter().any(|decorator| {
-        // The method is decorated with a static method decorator (like
-        // `@staticmethod`).
-        let real_decorator = map_callable(&decorator.expression);
-        match semantic.resolve_call_path(real_decorator) {
-            Some(call_path) => {
-                matches!(
-                    call_path.as_slice(),
-                    ["", "staticmethod"] | ["abc", "abstractstaticmethod"]
-                ) || staticmethod_decorators
-                    .iter()
-                    .any(|decorator| call_path == from_qualified_name(decorator))
-            }
-            // We do not have a resolvable call path, most likely from a decorator similar
-            // to `@someproperty.setter` - for those we match the last element.
-            // It would be nicer to use e.g. `.whatever` in the `staticmethod-decorators` config
-            // option but `pep8-naming` doesn't do this either.
-            // XXX: It's quite unlikely that this is ever used for staticmethods, but we need it
-            // for classmethods below and like this the behavior is consistent.
-            None => collect_call_path(real_decorator).is_some_and(|call_path| {
-                let tail = call_path.as_slice().last().unwrap();
-                staticmethod_decorators
-                    .iter()
-                    .any(|decorator| tail == decorator)
-            }),
-        }
-    }) {
+    if decorator_list
+        .iter()
+        .any(|decorator| is_static_method(decorator, semantic, staticmethod_decorators))
+    {
         FunctionType::StaticMethod
     } else if matches!(name, "__new__" | "__init_subclass__" | "__class_getitem__")
     // Special-case class method, like `__new__`.
@@ -64,37 +41,91 @@ pub fn classify(
                     matches!(call_path.as_slice(), ["", "type"] | ["abc", "ABCMeta"])
                 })
         })
-        || decorator_list.iter().any(|decorator| {
-            // The method is decorated with a class method decorator (like `@classmethod`).
-            let real_decorator = map_callable(&decorator.expression);
-            match semantic.resolve_call_path(real_decorator) {
-                Some(call_path) => {
-                    matches!(
-                        call_path.as_slice(),
-                        ["", "classmethod"] | ["abc", "abstractclassmethod"]
-                    ) || classmethod_decorators
-                        .iter()
-                        .any(|decorator| call_path == from_qualified_name(decorator))
-                },
-                // We do not have a resolvable call path, most likely from a decorator similar
-                // to `@someproperty.setter` - for those we match the last element.
-                // It would be nicer to use e.g. `.whatever` in the `classmethod-decorators` config
-                // option but `pep8-naming` doesn't do this either.
-                None => {
-                    collect_call_path(real_decorator)
-                        .is_some_and(|call_path| {
-                            let tail = call_path.as_slice().last().unwrap();
-                            classmethod_decorators
-                                .iter()
-                                .any(|decorator| tail == decorator)
-                        })
-                }
-            }
-        })
+        || decorator_list.iter().any(|decorator| is_class_method(decorator, semantic, classmethod_decorators))
     {
         FunctionType::ClassMethod
     } else {
         // It's an instance method.
         FunctionType::Method
     }
+}
+
+/// Return `true` if a [`Decorator`] is indicative of a static method.
+fn is_static_method(
+    decorator: &Decorator,
+    semantic: &SemanticModel,
+    staticmethod_decorators: &[String],
+) -> bool {
+    let decorator = map_callable(&decorator.expression);
+
+    // The decorator is an import, so should match against a qualified path.
+    if semantic
+        .resolve_call_path(decorator)
+        .is_some_and(|call_path| {
+            matches!(
+                call_path.as_slice(),
+                ["", "staticmethod"] | ["abc", "abstractstaticmethod"]
+            ) || staticmethod_decorators
+                .iter()
+                .any(|decorator| call_path == from_qualified_name(decorator))
+        })
+    {
+        return true;
+    }
+
+    // We do not have a resolvable call path, most likely from a decorator like
+    // `@someproperty.setter`. Instead, match on the last element.
+    if !staticmethod_decorators.is_empty() {
+        if collect_call_path(decorator).is_some_and(|call_path| {
+            call_path.last().is_some_and(|tail| {
+                staticmethod_decorators
+                    .iter()
+                    .any(|decorator| tail == decorator)
+            })
+        }) {
+            return true;
+        }
+    }
+
+    false
+}
+
+/// Return `true` if a [`Decorator`] is indicative of a class method.
+fn is_class_method(
+    decorator: &Decorator,
+    semantic: &SemanticModel,
+    classmethod_decorators: &[String],
+) -> bool {
+    let decorator = map_callable(&decorator.expression);
+
+    // The decorator is an import, so should match against a qualified path.
+    if semantic
+        .resolve_call_path(decorator)
+        .is_some_and(|call_path| {
+            matches!(
+                call_path.as_slice(),
+                ["", "classmethod"] | ["abc", "abstractclassmethod"]
+            ) || classmethod_decorators
+                .iter()
+                .any(|decorator| call_path == from_qualified_name(decorator))
+        })
+    {
+        return true;
+    }
+
+    // We do not have a resolvable call path, most likely from a decorator like
+    // `@someproperty.setter`. Instead, match on the last element.
+    if !classmethod_decorators.is_empty() {
+        if collect_call_path(decorator).is_some_and(|call_path| {
+            call_path.last().is_some_and(|tail| {
+                classmethod_decorators
+                    .iter()
+                    .any(|decorator| tail == decorator)
+            })
+        }) {
+            return true;
+        }
+    }
+
+    false
 }
