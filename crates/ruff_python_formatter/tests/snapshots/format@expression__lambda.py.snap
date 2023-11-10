@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/lambda.py
 ---
 ## Input
-```py
+```python
 # Leading
 lambda x: x  # Trailing
 # Trailing
@@ -237,7 +237,7 @@ def a():
 ```
 
 ## Output
-```py
+```python
 # Leading
 lambda x: x  # Trailing
 # Trailing

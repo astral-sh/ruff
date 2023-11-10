@@ -315,9 +315,18 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 ### Creating a new release
 
-1. Update the version with `rg 0.0.269 --files-with-matches | xargs sed -i 's/0.0.269/0.0.270/g'`
-1. Update `BREAKING_CHANGES.md`
-1. Create a PR with the version and `BREAKING_CHANGES.md` updated
+We use an experimental in-house tool for managing releases.
+
+1. Install `rooster`: `pip install git+https://github.com/zanieb/rooster@main`
+1. Run `rooster release`; this command will:
+    - Generate a changelog entry in `CHANGELOG.md`
+    - Update versions in `pyproject.toml` and `Cargo.toml`
+    - Update references to versions in the `README.md` and documentation
+1. The changelog should then be editorialized for consistency
+    - Often labels will be missing from pull requests they will need to be manually organized into the proper section
+    - Changes should be edited to be user-facing descriptions, avoiding internal details
+1. Highlight any breaking changes in `BREAKING_CHANGES.md`
+1. Create a pull request with the changelog and version updates
 1. Merge the PR
 1. Run the release workflow with the version number (without starting `v`) as input. Make sure
     main has your merged PR as last commit
@@ -330,7 +339,11 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
-1. Create release notes in GitHub UI and promote from draft.
+1. Publish the GitHub release
+    1. Open the draft release in the GitHub release section
+    1. Copy the changelog for the release into the GitHub release
+        - See previous releases for formatting of section headers
+    1. Generate the contributor list with `rooster contributors` and add to the release notes
 1. If needed, [update the schemastore](https://github.com/charliermarsh/ruff/blob/main/scripts/update_schemastore.py)
 1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
 

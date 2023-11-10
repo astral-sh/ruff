@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/assert.py
 ---
 ## Input
-```py
+```python
 assert True  # Trailing same-line
 assert True is True  # Trailing same-line
 assert 1, "Some string"  # Trailing same-line
@@ -178,7 +178,7 @@ assert package.files == [
 ```
 
 ## Output
-```py
+```python
 assert True  # Trailing same-line
 assert True is True  # Trailing same-line
 assert 1, "Some string"  # Trailing same-line

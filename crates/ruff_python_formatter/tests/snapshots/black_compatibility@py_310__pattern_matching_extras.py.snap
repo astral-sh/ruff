@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_310/pa
 ---
 ## Input
 
-```py
+```python
 import match
 
 match something:
@@ -162,7 +162,7 @@ match bar1:
 
 ## Ruff Output
 
-```py
+```python
 import match
 
 match something:
@@ -295,7 +295,7 @@ match bar1:
 
 ## Black Output
 
-```py
+```python
 import match
 
 match something:

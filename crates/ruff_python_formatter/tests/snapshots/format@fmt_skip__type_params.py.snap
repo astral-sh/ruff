@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/type_params.py
 ---
 ## Input
-```py
+```python
 class TestTypeParam[ T ]: # fmt: skip
     pass
 
@@ -45,7 +45,7 @@ def test  [
 ```
 
 ## Output
-```py
+```python
 class TestTypeParam[ T ]:  # fmt: skip
     pass
 

@@ -27,4 +27,29 @@ N805.py:64:29: N805 First argument of a method should be named `self`
 65 |         pass
    |
 
+N805.py:70:13: N805 First argument of a method should be named `self`
+   |
+68 | class ModelClass:
+69 |     @hybrid_property
+70 |     def bad(cls):
+   |             ^^^ N805
+71 |         pass
+   |
+
+N805.py:78:13: N805 First argument of a method should be named `self`
+   |
+77 |     @bad.wtf
+78 |     def bad(cls):
+   |             ^^^ N805
+79 |         pass
+   |
+
+N805.py:94:19: N805 First argument of a method should be named `self`
+   |
+93 |     @foobar.thisisstatic
+94 |     def badstatic(foo):
+   |                   ^^^ N805
+95 |         pass
+   |
+
 

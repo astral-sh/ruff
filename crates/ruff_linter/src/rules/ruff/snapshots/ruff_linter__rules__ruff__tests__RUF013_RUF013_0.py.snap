@@ -9,7 +9,7 @@ RUF013_0.py:21:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 18 18 |     pass
 19 19 | 
 20 20 | 
@@ -27,7 +27,7 @@ RUF013_0.py:25:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 22 22 |     pass
 23 23 | 
 24 24 | 
@@ -45,7 +45,7 @@ RUF013_0.py:29:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 26 26 |     pass
 27 27 | 
 28 28 | 
@@ -63,7 +63,7 @@ RUF013_0.py:33:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 30 30 |     pass
 31 31 | 
 32 32 | 
@@ -81,7 +81,7 @@ RUF013_0.py:71:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 68 68 |     pass
 69 69 | 
 70 70 | 
@@ -99,7 +99,7 @@ RUF013_0.py:75:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 72 72 |     pass
 73 73 | 
 74 74 | 
@@ -117,7 +117,7 @@ RUF013_0.py:79:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 76 76 |     pass
 77 77 | 
 78 78 | 
@@ -135,7 +135,7 @@ RUF013_0.py:83:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
    |
    = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 80 80 |     pass
 81 81 | 
 82 82 | 
@@ -153,7 +153,7 @@ RUF013_0.py:102:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 99  99  |     pass
 100 100 | 
 101 101 | 
@@ -171,7 +171,7 @@ RUF013_0.py:106:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 103 103 |     pass
 104 104 | 
 105 105 | 
@@ -189,7 +189,7 @@ RUF013_0.py:125:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 122 122 |     pass
 123 123 | 
 124 124 | 
@@ -207,7 +207,7 @@ RUF013_0.py:129:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 126 126 |     pass
 127 127 | 
 128 128 | 
@@ -225,7 +225,7 @@ RUF013_0.py:133:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 130 130 |     pass
 131 131 | 
 132 132 | 
@@ -243,7 +243,7 @@ RUF013_0.py:152:22: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 149 149 |     pass
 150 150 | 
 151 151 | 
@@ -261,7 +261,7 @@ RUF013_0.py:156:32: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 153 153 |     pass
 154 154 | 
 155 155 | 
@@ -281,7 +281,7 @@ RUF013_0.py:172:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 169 169 | 
 170 170 | 
 171 171 | def f(
@@ -302,7 +302,7 @@ RUF013_0.py:173:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 170 170 | 
 171 171 | def f(
 172 172 |     arg1: int = None,  # RUF013
@@ -323,7 +323,7 @@ RUF013_0.py:174:11: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 171 171 | def f(
 172 172 |     arg1: int = None,  # RUF013
 173 173 |     arg2: Union[int, float] = None,  # RUF013
@@ -341,7 +341,7 @@ RUF013_0.py:202:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 199 199 |     pass
 200 200 | 
 201 201 | 
@@ -359,7 +359,7 @@ RUF013_0.py:209:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 206 206 | # Quoted
 207 207 | 
 208 208 | 
@@ -377,7 +377,7 @@ RUF013_0.py:213:13: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 210 210 |     pass
 211 211 | 
 212 212 | 
@@ -403,7 +403,7 @@ RUF013_0.py:225:12: RUF013 [*] PEP 484 prohibits implicit `Optional`
     |
     = help: Convert to `T | None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 222 222 |     pass
 223 223 | 
 224 224 | 

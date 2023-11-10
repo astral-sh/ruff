@@ -11,7 +11,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |
   = help: Remove unused import: `os`
 
-ℹ Fix
+ℹ Safe fix
 2 2 | import os
 3 3 | 
 4 4 | def f():

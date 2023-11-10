@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/preview.py
 ---
 ## Input
-```py
+```python
 """
 Black's `Preview.module_docstring_newlines`
 """
@@ -83,7 +83,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 """
 Black's `Preview.module_docstring_newlines`
 """
@@ -162,7 +162,7 @@ magic-trailing-comma    = Respect
 preview                 = Enabled
 ```
 
-```py
+```python
 """
 Black's `Preview.module_docstring_newlines`
 """

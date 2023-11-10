@@ -12,52 +12,55 @@ which supports fix actions, import sorting, and more.
 Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
 
 ```yaml
-# Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.291
+  rev: v0.1.5
   hooks:
+    # Run the linter.
     - id: ruff
-# Run the Ruff formatter.
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.0.291
-  hooks:
+    # Run the formatter.
     - id: ruff-format
 ```
 
-To enable fixes, add the `--fix` argument to the linter:
+To enable lint fixes, add the `--fix` argument to the lint hook:
 
 ```yaml
-# Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.291
+  rev: v0.1.5
   hooks:
+    # Run the linter.
     - id: ruff
-      args: [ --fix, --exit-non-zero-on-fix ]
+      args: [ --fix ]
+    # Run the formatter.
+    - id: ruff-format
 ```
 
 To run the hooks over Jupyter Notebooks too, add `jupyter` to the list of allowed filetypes:
 
 ```yaml
-# Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.0.291
+  rev: v0.1.5
   hooks:
+    # Run the linter.
     - id: ruff
+      types_or: [ python, pyi, jupyter ]
+      args: [ --fix ]
+    # Run the formatter.
+    - id: ruff-format
       types_or: [ python, pyi, jupyter ]
 ```
 
-Ruff's lint hook should be placed after other formatting tools, such as Ruff's format hook, Black,
-or isort, _unless_ you enable autofix, in which case, Ruff's pre-commit hook should run _before_
-Black, isort, and other formatting tools, as Ruff's autofix behavior can output code changes that
-require reformatting.
+When running with `--fix`, Ruff's lint hook should be placed _before_ Ruff's formatter hook, and
+_before_ Black, isort, and other formatting tools, as Ruff's fix behavior can output code changes
+that require reformatting.
 
-As long as your Ruff configuration avoids any [linter-formatter incompatibilities](formatter.md#conflicting-lint-rules),
+When running without `--fix`, Ruff's formatter hook can be placed before or after Ruff's lint hook.
+
+(As long as your Ruff configuration avoids any [linter-formatter incompatibilities](formatter.md#conflicting-lint-rules),
 `ruff format` should never introduce new lint errors, so it's safe to run Ruff's format hook _after_
-`ruff check --fix`.
+`ruff check --fix`.)
 
 ## Language Server Protocol (Official)
 
@@ -329,6 +332,13 @@ Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA
 ```elisp
 (require 'flymake-ruff)
 (add-hook 'python-mode-hook #'flymake-ruff-load)
+```
+
+Ruff can be used as a formatter in Emacs using the [Apheleia](https://github.com/radian-software/apheleia) formatter library, by setting this configuration:
+
+```emacs-lisp
+(add-to-list 'apheleia-mode-alist '(python-mode . ruff))
+(add-to-list 'apheleia-mode-alist '(python-ts-mode . ruff))
 ```
 
 ## TextMate (Unofficial)

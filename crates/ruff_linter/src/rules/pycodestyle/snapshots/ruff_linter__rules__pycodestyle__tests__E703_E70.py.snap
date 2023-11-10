@@ -12,7 +12,7 @@ E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
    |
    = help: Remove unnecessary semicolon
 
-ℹ Fix
+ℹ Safe fix
 7  7  | #: E702:1:17
 8  8  | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
 9  9  | #: E703:1:13
@@ -33,7 +33,7 @@ E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
    |
    = help: Remove unnecessary semicolon
 
-ℹ Fix
+ℹ Safe fix
 9  9  | #: E703:1:13
 10 10 | import shlex;
 11 11 | #: E702:1:9 E703:1:23
@@ -54,7 +54,7 @@ E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
    |
    = help: Remove unnecessary semicolon
 
-ℹ Fix
+ℹ Safe fix
 22 22 | while all is round:
 23 23 |     def f(x): return 2*x
 24 24 | #: E704:1:8 E702:1:11 E703:1:14
@@ -75,7 +75,7 @@ E70.py:68:1: E703 [*] Statement ends with an unnecessary semicolon
    |
    = help: Remove unnecessary semicolon
 
-ℹ Fix
+ℹ Safe fix
 64 64 | while 1:
 65 65 |   1;...
 66 66 | #: E703:2:1
@@ -92,14 +92,18 @@ E70.py:71:4: E703 [*] Statement ends with an unnecessary semicolon
 70 | a = \
 71 |   5;
    |    ^ E703
+72 | #:
+73 | with x(y) as z: ...
    |
    = help: Remove unnecessary semicolon
 
-ℹ Fix
+ℹ Safe fix
 68 68 | ;
 69 69 | #: E701:2:3
 70 70 | a = \
 71    |-  5;
    71 |+  5
+72 72 | #:
+73 73 | with x(y) as z: ...
 
 

@@ -53,6 +53,12 @@ if isinstance(res, types.MethodType):
 if isinstance(res, memoryview):
     pass
 #: Okay
+if type(res) is type:
+    pass
+#: E721
+if type(res) == type:
+    pass
+#: Okay
 def func_histype(a, b, c):
     pass
 #: E722

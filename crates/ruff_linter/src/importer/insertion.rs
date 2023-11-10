@@ -189,7 +189,7 @@ impl<'a> Insertion<'a> {
                     Tok::NonLogicalNewline => {}
                     Tok::Indent => {
                         // This is like:
-                        // ```py
+                        // ```python
                         // if True:
                         //     pass
                         // ```

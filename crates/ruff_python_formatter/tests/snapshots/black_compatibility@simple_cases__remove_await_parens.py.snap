@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 import asyncio
 
 # Control example
@@ -108,7 +108,7 @@ async def main():
 
 ## Ruff Output
 
-```py
+```python
 import asyncio
 
 
@@ -208,7 +208,7 @@ async def main():
 
 ## Black Output
 
-```py
+```python
 import asyncio
 
 

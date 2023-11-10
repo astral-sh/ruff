@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/class_definition.py
 ---
 ## Input
-```py
+```python
 # comment
 
 class Test(
@@ -233,7 +233,7 @@ class QuerySet(AltersData):
 ```
 
 ## Output
-```py
+```python
 # comment
 
 

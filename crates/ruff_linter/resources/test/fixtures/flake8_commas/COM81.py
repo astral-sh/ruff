@@ -639,3 +639,18 @@ foo = namedtuple(
         :20
     ],
 )
+
+# F-strings
+kwargs.pop("remove", f"this {trailing_comma}",)
+
+raise Exception(
+    "first", extra=f"Add trailing comma here ->"
+)
+
+assert False, f"<- This is not a trailing comma"
+
+f"""This is a test. {
+    "Another sentence."
+    if True else
+    "Don't add a trailing comma here ->"
+}"""

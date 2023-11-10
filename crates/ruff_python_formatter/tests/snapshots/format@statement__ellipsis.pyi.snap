@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/ellipsis.pyi
 ---
 ## Input
-```py
+```python
 """Compound statements with no body should be written on one line."""
 
 if True:
@@ -108,7 +108,7 @@ finally:
     ...  # comment```
 
 ## Output
-```py
+```python
 """Compound statements with no body should be written on one line."""
 
 if True: ...

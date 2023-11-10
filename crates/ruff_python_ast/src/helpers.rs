@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::call_path::CallPath;
 use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use crate::visitor::Visitor;
 use crate::AnyNodeRef;
 use crate::{
     self as ast, Arguments, CmpOp, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
@@ -927,6 +928,29 @@ where
                 }
             }
             _ => {}
+        }
+    }
+}
+
+/// A [`Visitor`] that detects the presence of `await` expressions in the current scope.
+#[derive(Debug, Default)]
+pub struct AwaitVisitor {
+    pub seen_await: bool,
+}
+
+impl Visitor<'_> for AwaitVisitor {
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
+            _ => crate::visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &Expr) {
+        if let Expr::Await(ast::ExprAwait { .. }) = expr {
+            self.seen_await = true;
+        } else {
+            crate::visitor::walk_expr(self, expr);
         }
     }
 }

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/indent.py
 ---
 ## Input
-```py
+```python
 ```
 
 ## Outputs
@@ -17,7 +17,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 ```
 
 
@@ -31,7 +31,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 ```
 
 
@@ -45,7 +45,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 ```
 
 
