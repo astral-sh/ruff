@@ -249,7 +249,6 @@ impl Renamer {
             | BindingKind::Assignment
             | BindingKind::BoundException
             | BindingKind::LoopVar
-            | BindingKind::WithItemVar
             | BindingKind::Global
             | BindingKind::Nonlocal(_)
             | BindingKind::ClassDefinition(_)
