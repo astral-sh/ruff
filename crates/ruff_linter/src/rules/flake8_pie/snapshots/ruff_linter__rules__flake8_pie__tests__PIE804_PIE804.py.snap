@@ -128,7 +128,7 @@ PIE804.py:25:1: PIE804 [*] Unnecessary `dict` kwargs
    |
    = help: Remove unnecessary kwargs
 
-ℹ Fix
+ℹ Safe fix
 22 22 | abc(**{"for": 3})
 23 23 | 
 24 24 | # Duplicated key names wont be fixed to avoid syntax error.
