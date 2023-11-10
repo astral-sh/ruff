@@ -103,7 +103,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         continue;
                     }
                     let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
-                    if !shadowed.kind.is_argument() || !binding.is_used() {
+                    if !shadowed.kind.is_argument() {
                         continue;
                     }
                     checker.diagnostics.push(Diagnostic::new(
