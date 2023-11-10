@@ -46,7 +46,6 @@ pub(super) fn test_expression(expr: &Expr, semantic: &SemanticModel) -> Resoluti
                         BindingKind::Annotation
                         | BindingKind::Assignment
                         | BindingKind::NamedExprAssignment
-                        | BindingKind::UnpackedAssignment
                         | BindingKind::LoopVar
                         | BindingKind::Global
                         | BindingKind::Nonlocal(_) => Resolution::RelevantLocal,
