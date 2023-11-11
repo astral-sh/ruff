@@ -27,6 +27,12 @@ use crate::settings::types::PreviewMode;
 /// Instead, use `==` and `!=` to compare constant literals, which will compare
 /// the values of the objects instead of their identities.
 ///
+/// In [preview], this rule will also flag `is` and `is not` comparisons against
+/// non-constant literals, like lists, sets, and dictionaries. While such
+/// comparisons will not raise a `SyntaxWarning`, they are still likely to be
+/// incorrect, as they will compare the identities of the objects instead of
+/// their values, which will always evaluate to `False`.
+///
 /// ## Example
 /// ```python
 /// x = 200
@@ -45,6 +51,8 @@ use crate::settings::types::PreviewMode;
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 /// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct IsLiteral {
     cmp_op: IsCmpOp,

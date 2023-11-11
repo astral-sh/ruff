@@ -607,7 +607,7 @@ pub const fn is_const_false(expr: &Expr) -> bool {
     )
 }
 
-/// Return `true` if the [`Expr`] is a mutable iterable initizer.
+/// Return `true` if the [`Expr`] is a mutable iterable initializer, like `{}` or `[]`.
 pub const fn is_mutable_iterable_initializer(expr: &Expr) -> bool {
     matches!(
         expr,
