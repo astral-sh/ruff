@@ -166,7 +166,7 @@ constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None
    16 |+if None is False:  # E711, E712 (fix)
 17 17 |     pass
 18 18 | 
-19 19 | ###
+19 19 | named_var = []
 
 constant_literals.py:16:12: E712 [*] Comparison to `False` should be `cond is False` or `if not cond:`
    |
@@ -186,6 +186,6 @@ constant_literals.py:16:12: E712 [*] Comparison to `False` should be `cond is Fa
    16 |+if None is False:  # E711, E712 (fix)
 17 17 |     pass
 18 18 | 
-19 19 | ###
+19 19 | named_var = []
 
 
