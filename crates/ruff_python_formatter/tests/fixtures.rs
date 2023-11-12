@@ -71,7 +71,7 @@ fn black_compatibility() {
             // today.
             let mut snapshot = String::new();
             write!(snapshot, "{}", Header::new("Input")).unwrap();
-            write!(snapshot, "{}", CodeFrame::new("py", &content)).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("python", &content)).unwrap();
 
             write!(snapshot, "{}", Header::new("Black Differences")).unwrap();
 
@@ -83,10 +83,10 @@ fn black_compatibility() {
             write!(snapshot, "{}", CodeFrame::new("diff", &diff)).unwrap();
 
             write!(snapshot, "{}", Header::new("Ruff Output")).unwrap();
-            write!(snapshot, "{}", CodeFrame::new("py", &formatted_code)).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("python", &formatted_code)).unwrap();
 
             write!(snapshot, "{}", Header::new("Black Output")).unwrap();
-            write!(snapshot, "{}", CodeFrame::new("py", &expected_output)).unwrap();
+            write!(snapshot, "{}", CodeFrame::new("python", &expected_output)).unwrap();
 
             insta::with_settings!({
                 omit_expression => true,
@@ -113,7 +113,7 @@ fn format() {
 
         ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
 
-        let mut snapshot = format!("## Input\n{}", CodeFrame::new("py", &content));
+        let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
 
         let options_path = input_path.with_extension("options.json");
         if let Ok(options_file) = fs::File::open(options_path) {
@@ -135,7 +135,7 @@ fn format() {
                     "### Output {}\n{}{}",
                     i + 1,
                     CodeFrame::new("", &DisplayPyOptions(&options)),
-                    CodeFrame::new("py", &formatted_code)
+                    CodeFrame::new("python", &formatted_code)
                 )
                 .unwrap();
             }
@@ -159,14 +159,19 @@ fn format() {
             );
 
             if formatted == formatted_preview {
-                writeln!(snapshot, "## Output\n{}", CodeFrame::new("py", &formatted)).unwrap();
+                writeln!(
+                    snapshot,
+                    "## Output\n{}",
+                    CodeFrame::new("python", &formatted)
+                )
+                .unwrap();
             } else {
                 // Having both snapshots makes it hard to see the difference, so we're keeping only
                 // diff.
                 writeln!(
                     snapshot,
                     "## Output\n{}\n## Preview changes\n{}",
-                    CodeFrame::new("py", &formatted),
+                    CodeFrame::new("python", &formatted),
                     CodeFrame::new(
                         "diff",
                         TextDiff::from_lines(formatted, formatted_preview)

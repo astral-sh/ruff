@@ -1,0 +1,70 @@
+---
+source: crates/ruff_python_parser/src/invalid.rs
+expression: ast
+---
+Ok(
+    [
+        Assign(
+            StmtAssign {
+                range: 0..13,
+                targets: [
+                    Subscript(
+                        ExprSubscript {
+                            range: 0..6,
+                            value: Name(
+                                ExprName {
+                                    range: 0..1,
+                                    id: "x",
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Slice(
+                                ExprSlice {
+                                    range: 2..5,
+                                    lower: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 2..3,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    upper: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 4..5,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                    step: None,
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                ],
+                value: List(
+                    ExprList {
+                        range: 9..13,
+                        elts: [
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 10..12,
+                                    value: Int(
+                                        42,
+                                    ),
+                                },
+                            ),
+                        ],
+                        ctx: Load,
+                    },
+                ),
+            },
+        ),
+    ],
+)

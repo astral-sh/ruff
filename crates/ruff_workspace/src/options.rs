@@ -298,10 +298,18 @@ pub struct Options {
     /// For example, to represent supporting Python >=3.10 or ==3.10
     /// specify `target-version = "py310"`.
     ///
-    /// If omitted, and Ruff is configured via a `pyproject.toml` file, the
-    /// target version will be inferred from its `project.requires-python`
-    /// field (e.g., `requires-python = ">=3.8"`). If Ruff is configured via
-    /// `ruff.toml` or `.ruff.toml`, no such inference will be performed.
+    /// If you're already using a `pyproject.toml` file, we recommend
+    /// `project.requires-python` instead, as it's based on Python packaging
+    /// standards, and will be respected by other tools. For example, Ruff
+    /// treats the following as identical to `target-version = "py38"`:
+    ///
+    /// ```toml
+    /// [project]
+    /// requires-python = ">=3.8"
+    /// ```
+    ///
+    /// If both are specified, `target-version` takes precedence over
+    /// `requires-python`.
     #[option(
         default = r#""py38""#,
         value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
@@ -2234,13 +2242,20 @@ pub struct Pep8NamingOptions {
     /// in this list takes a `cls` argument as its first argument.
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `pydantic.validator`,
-    /// rather than `validator`).
+    /// rather than `validator`) or alternatively a plain name which is then matched against
+    /// the last segment in case the decorator itself consists of a dotted name.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            # Allow Pydantic's `@validator` decorator to trigger class method treatment.
-            classmethod-decorators = ["pydantic.validator"]
+            classmethod-decorators = [
+                # Allow Pydantic's `@validator` decorator to trigger class method treatment.
+                "pydantic.validator",
+                # Allow SQLAlchemy's dynamic decorators, like `@field.expression`, to trigger class method treatment.
+                "declared_attr",
+                "expression",
+                "comparator",
+            ]
         "#
     )]
     pub classmethod_decorators: Option<Vec<String>>,
@@ -2253,7 +2268,8 @@ pub struct Pep8NamingOptions {
     /// in this list has no `self` or `cls` argument.
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`,
-    /// rather than `teardown`).
+    /// rather than `teardown`) or alternatively a plain name which is then matched against
+    /// the last segment in case the decorator itself consists of a dotted name.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2389,9 +2405,18 @@ pub struct PydocstyleOptions {
     /// convention = "google"
     /// ```
     ///
-    /// As conventions force-disable all rules not included in the convention,
-    /// enabling _additional_ rules on top of a convention is currently
-    /// unsupported.
+    /// To modify a convention (i.e., to enable an additional rule that's excluded
+    /// from the convention by default), select the desired rule via its fully
+    /// qualified rule code (e.g., `D400` instead of `D4` or `D40`):
+    ///
+    /// ```toml
+    /// [tool.ruff.lint]
+    /// # Enable D400 on top of the Google convention.
+    /// extend-select = ["D400"]
+    ///
+    /// [tool.ruff.lint.pydocstyle]
+    /// convention = "google"
+    /// ```
     #[option(
         default = r#"null"#,
         value_type = r#""google" | "numpy" | "pep257""#,

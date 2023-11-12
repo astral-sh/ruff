@@ -399,7 +399,7 @@ def update_emission_strength():
     value = self.emission_strength * 2
 ```
 
-### Call chain calls break differently
+### Call chain calls break differently in some cases
 
 Black occasionally breaks call chains differently than Ruff; in particular, Black occasionally
 expands the arguments for the last call in the chain, as in:
@@ -468,6 +468,27 @@ df.drop(columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]).drop_duplicates(a).rename
 ).to_csv(path / "aaaaaa.csv", index=False).other(a)
 ```
 
+Similarly, in some cases, Ruff will collapse composite binary expressions more aggressively than
+Black, if doing so allows the expression to fit within the configured line width:
+
+```python
+# Black
+assert AAAAAAAAAAAAAAAAAAAAAA.bbbbbb.fooo(
+    aaaaaaaaaaaa=aaaaaaaaaaaa
+).ccccc() == (len(aaaaaaaaaa) + 1) * fooooooooooo * (
+    foooooo + 1
+) * foooooo * len(
+    list(foo(bar(4, foo), foo))
+)
+
+# Ruff
+assert AAAAAAAAAAAAAAAAAAAAAA.bbbbbb.fooo(
+    aaaaaaaaaaaa=aaaaaaaaaaaa
+).ccccc() == (len(aaaaaaaaaa) + 1) * fooooooooooo * (
+    foooooo + 1
+) * foooooo * len(list(foo(bar(4, foo), foo)))
+```
+
 ### Expressions with (non-pragma) trailing comments are split more often
 
 Both Ruff and Black will break the following expression over multiple lines, since it then allows
@@ -508,3 +529,52 @@ some_long_variable_name = (
 Doing so leads to fewer overlong lines while retaining the comment's intent. As pragma comments
 (like `# noqa` and `# type: ignore`) are ignored when computing line width, this behavior only
 applies to non-pragma comments.
+
+### The last context manager in a `with` statement may be collapsed onto a single line
+
+When using a `with` statement with multiple unparenthesized context managers, Ruff may collapse the
+last context manager onto a single line, if doing so allows the `with` statement to fit within the
+configured line width.
+
+Black, meanwhile, tends to break the last context manager slightly differently, as in the following
+example:
+
+```python
+# Black
+with tempfile.TemporaryDirectory() as d1:
+    symlink_path = Path(d1).joinpath("testsymlink")
+    with tempfile.TemporaryDirectory(dir=d1) as d2, tempfile.TemporaryDirectory(
+        dir=d1
+    ) as d4, tempfile.TemporaryDirectory(dir=d2) as d3, tempfile.NamedTemporaryFile(
+        dir=d4
+    ) as source_file, tempfile.NamedTemporaryFile(
+        dir=d3
+    ) as lock_file:
+        pass
+
+# Ruff
+with tempfile.TemporaryDirectory() as d1:
+    symlink_path = Path(d1).joinpath("testsymlink")
+    with tempfile.TemporaryDirectory(dir=d1) as d2, tempfile.TemporaryDirectory(
+        dir=d1
+    ) as d4, tempfile.TemporaryDirectory(dir=d2) as d3, tempfile.NamedTemporaryFile(
+        dir=d4
+    ) as source_file, tempfile.NamedTemporaryFile(dir=d3) as lock_file:
+        pass
+```
+
+In future versions of Ruff, and in Black's preview style, parentheses will be inserted around the
+context managers to allow for clearer breaks across multiple lines, as in:
+
+```python
+with tempfile.TemporaryDirectory() as d1:
+    symlink_path = Path(d1).joinpath("testsymlink")
+    with (
+        tempfile.TemporaryDirectory(dir=d1) as d2,
+        tempfile.TemporaryDirectory(dir=d1) as d4,
+        tempfile.TemporaryDirectory(dir=d2) as d3,
+        tempfile.NamedTemporaryFile(dir=d4) as source_file,
+        tempfile.NamedTemporaryFile(dir=d3) as lock_file,
+    ):
+        pass
+```

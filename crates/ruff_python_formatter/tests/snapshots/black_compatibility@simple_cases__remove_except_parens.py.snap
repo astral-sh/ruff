@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 # These brackets are redundant, therefore remove.
 try:
     a.something
@@ -62,7 +62,7 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
 
 ## Ruff Output
 
-```py
+```python
 # These brackets are redundant, therefore remove.
 try:
     a.something
@@ -107,7 +107,7 @@ except (
 
 ## Black Output
 
-```py
+```python
 # These brackets are redundant, therefore remove.
 try:
     a.something

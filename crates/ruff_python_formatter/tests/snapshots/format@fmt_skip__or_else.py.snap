@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/or_else.py
 ---
 ## Input
-```py
+```python
 for item in container:
     if search_something(item):
         # Found it!
@@ -38,7 +38,7 @@ finally  :  # fmt: skip
 ```
 
 ## Output
-```py
+```python
 for item in container:
     if search_something(item):
         # Found it!

@@ -43,6 +43,12 @@ def yes_four(x: Dict[int, str]):
     del x[:]
 
 
+def yes_five(x: Dict[int, str]):
+    # FURB131
+    del x[:]
+
+    x = 1
+
 # these should not
 
 del names["key"]

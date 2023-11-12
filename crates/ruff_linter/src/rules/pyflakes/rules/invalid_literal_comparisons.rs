@@ -8,6 +8,7 @@ use ruff_python_parser::locate_cmp_ops;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for `is` and `is not` comparisons against constant literals, like
@@ -25,6 +26,12 @@ use crate::checkers::ast::Checker;
 ///
 /// Instead, use `==` and `!=` to compare constant literals, which will compare
 /// the values of the objects instead of their identities.
+///
+/// In [preview], this rule will also flag `is` and `is not` comparisons against
+/// non-constant literals, like lists, sets, and dictionaries. While such
+/// comparisons will not raise a `SyntaxWarning`, they are still likely to be
+/// incorrect, as they will compare the identities of the objects instead of
+/// their values, which will always evaluate to `False`.
 ///
 /// ## Example
 /// ```python
@@ -44,6 +51,8 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 /// - [Python documentation: Value comparisons](https://docs.python.org/3/reference/expressions.html#value-comparisons)
 /// - [_Why does Python log a SyntaxWarning for ‘is’ with literals?_ by Adam Johnson](https://adamj.eu/tech/2020/01/21/why-does-python-3-8-syntaxwarning-for-is-literal/)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct IsLiteral {
     cmp_op: IsCmpOp,
@@ -81,7 +90,10 @@ pub(crate) fn invalid_literal_comparison(
     for (index, (op, right)) in ops.iter().zip(comparators).enumerate() {
         if matches!(op, CmpOp::Is | CmpOp::IsNot)
             && (helpers::is_constant_non_singleton(left)
-                || helpers::is_constant_non_singleton(right))
+                || helpers::is_constant_non_singleton(right)
+                || (matches!(checker.settings.preview, PreviewMode::Enabled)
+                    && (helpers::is_mutable_iterable_initializer(left)
+                        || helpers::is_mutable_iterable_initializer(right))))
         {
             let mut diagnostic = Diagnostic::new(IsLiteral { cmp_op: op.into() }, expr.range());
             if lazy_located.is_none() {

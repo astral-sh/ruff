@@ -12,7 +12,7 @@ constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
   |
   = help: Replace `is` with `==`
 
-ℹ Fix
+ℹ Safe fix
 1 1 | ###
 2 2 | # Errors
 3 3 | ###
@@ -33,7 +33,7 @@ constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
   |
   = help: Replace `is` with `==`
 
-ℹ Fix
+ℹ Safe fix
 3 3 | ###
 4 4 | if "abc" is "def":  # F632 (fix)
 5 5 |     pass
@@ -54,7 +54,7 @@ constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Fix
+ℹ Safe fix
 5 5 |     pass
 6 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
 7 7 |     pass
@@ -75,7 +75,7 @@ constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Fix
+ℹ Safe fix
 7  7  |     pass
 8  8  | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
 9  9  |     pass
@@ -96,7 +96,7 @@ constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
    |
    = help: Replace `is` with `==`
 
-ℹ Fix
+ℹ Safe fix
 9  9  |     pass
 10 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
 11 11 |     pass
@@ -117,7 +117,7 @@ constant_literals.py:14:4: E712 [*] Comparison to `False` should be `cond is Fal
    |
    = help: Replace with `cond is False`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 |     pass
 12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 13 |     pass
@@ -138,7 +138,7 @@ constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is Non
    |
    = help: Replace with `cond is None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 |     pass
 12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 13 |     pass
@@ -158,7 +158,7 @@ constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None
    |
    = help: Replace with `cond is None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 13 13 |     pass
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
@@ -166,7 +166,7 @@ constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None
    16 |+if None is False:  # E711, E712 (fix)
 17 17 |     pass
 18 18 | 
-19 19 | ###
+19 19 | named_var = []
 
 constant_literals.py:16:12: E712 [*] Comparison to `False` should be `cond is False` or `if not cond:`
    |
@@ -178,7 +178,7 @@ constant_literals.py:16:12: E712 [*] Comparison to `False` should be `cond is Fa
    |
    = help: Replace with `cond is False`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 13 13 |     pass
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
@@ -186,6 +186,6 @@ constant_literals.py:16:12: E712 [*] Comparison to `False` should be `cond is Fa
    16 |+if None is False:  # E711, E712 (fix)
 17 17 |     pass
 18 18 | 
-19 19 | ###
+19 19 | named_var = []
 
 

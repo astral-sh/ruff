@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring.py
 ---
 ## Input
-```py
+```python
 def single_line_backslashes1():
   """ content\     """
   return
@@ -169,7 +169,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
     """content\ """
     return
@@ -335,7 +335,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
   """content\ """
   return
@@ -501,7 +501,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
 	"""content\ """
 	return
@@ -667,7 +667,7 @@ magic-trailing-comma    = Respect
 preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
 	"""content\ """
 	return

@@ -2281,6 +2281,15 @@ pub struct Parameters {
 }
 
 impl Parameters {
+    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
+    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+        self.posonlyargs
+            .iter()
+            .chain(&self.args)
+            .chain(&self.kwonlyargs)
+            .find(|arg| arg.parameter.name.as_str() == name)
+    }
+
     /// Returns `true` if a parameter with the given name included in this [`Parameters`].
     pub fn includes(&self, name: &str) -> bool {
         if self
@@ -2516,32 +2525,9 @@ impl Parameters {
     }
 }
 
-#[allow(clippy::borrowed_box)] // local utility
-fn clone_boxed_expr(expr: &Box<Expr>) -> Box<Expr> {
-    let expr: &Expr = expr.as_ref();
-    Box::new(expr.clone())
-}
-
 impl ParameterWithDefault {
     pub fn as_parameter(&self) -> &Parameter {
         &self.parameter
-    }
-
-    pub fn to_parameter(&self) -> (Parameter, Option<Box<Expr>>) {
-        let ParameterWithDefault {
-            range: _,
-            parameter,
-            default,
-        } = self;
-        (parameter.clone(), default.as_ref().map(clone_boxed_expr))
-    }
-    pub fn into_parameter(self) -> (Parameter, Option<Box<Expr>>) {
-        let ParameterWithDefault {
-            range: _,
-            parameter,
-            default,
-        } = self;
-        (parameter, default)
     }
 }
 

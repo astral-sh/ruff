@@ -10,7 +10,7 @@ unused_variable.ipynb:cell 1:2:5: F841 [*] Local variable `foo1` is assigned to 
   |
   = help: Remove assignment to unused variable `foo1`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | def f():
 2   |-    foo1 = %matplotlib --list
   2 |+    %matplotlib --list
@@ -27,7 +27,7 @@ unused_variable.ipynb:cell 1:3:5: F841 [*] Local variable `foo2` is assigned to 
   |
   = help: Remove assignment to unused variable `foo2`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | def f():
 2 2 |     foo1 = %matplotlib --list
 3   |-    foo2: list[str] = %matplotlib --list
@@ -45,7 +45,7 @@ unused_variable.ipynb:cell 2:2:5: F841 [*] Local variable `bar1` is assigned to 
   |
   = help: Remove assignment to unused variable `bar1`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 2 2 |     foo1 = %matplotlib --list
 3 3 |     foo2: list[str] = %matplotlib --list
 4 4 | def f():
@@ -62,7 +62,7 @@ unused_variable.ipynb:cell 2:3:5: F841 [*] Local variable `bar2` is assigned to 
   |
   = help: Remove assignment to unused variable `bar2`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 3 3 |     foo2: list[str] = %matplotlib --list
 4 4 | def f():
 5 5 |     bar1 = !pwd

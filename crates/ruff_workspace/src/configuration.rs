@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use glob::{glob, GlobError, Paths, PatternError};
 use regex::Regex;
+use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
 use shellexpand::LookupError;
@@ -24,8 +25,8 @@ use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
-    UnsafeFixes, Version,
+    ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion,
+    SerializationFormat, UnsafeFixes, Version,
 };
 use ruff_linter::settings::{
     resolve_per_file_ignores, LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS,
@@ -215,6 +216,7 @@ impl Configuration {
             linter: LinterSettings {
                 rules: lint.as_rule_table(lint_preview),
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
+                extension: lint.extension.unwrap_or_default(),
                 preview: lint_preview,
                 target_version,
                 project_root: project_root.to_path_buf(),
@@ -239,26 +241,14 @@ impl Configuration {
                         .collect(),
                 )?,
 
-                extend_safe_fixes: lint
-                    .extend_safe_fixes
-                    .iter()
-                    .flat_map(|selector| {
-                        selector.rules(&PreviewOptions {
-                            mode: lint_preview,
-                            require_explicit: false,
-                        })
-                    })
-                    .collect(),
-                extend_unsafe_fixes: lint
-                    .extend_unsafe_fixes
-                    .iter()
-                    .flat_map(|selector| {
-                        selector.rules(&PreviewOptions {
-                            mode: lint_preview,
-                            require_explicit: false,
-                        })
-                    })
-                    .collect(),
+                fix_safety: FixSafetyTable::from_rule_selectors(
+                    &lint.extend_safe_fixes,
+                    &lint.extend_unsafe_fixes,
+                    &PreviewOptions {
+                        mode: lint_preview,
+                        require_explicit: false,
+                    },
+                ),
 
                 src: self.src.unwrap_or_else(|| vec![project_root.to_path_buf()]),
                 explicit_preview_rules: lint.explicit_preview_rules.unwrap_or_default(),
@@ -534,6 +524,7 @@ impl Configuration {
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
+    pub extension: Option<ExtensionMapping>,
 
     // Rule selection
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
@@ -600,6 +591,9 @@ impl LintConfiguration {
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
         Ok(LintConfiguration {
+            // `--extension` is a hidden command-line argument that isn't supported in configuration
+            // files at present.
+            extension: None,
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
@@ -711,6 +705,10 @@ impl LintConfiguration {
         let mut deprecated_nursery_selectors = FxHashSet::default();
         let mut ignored_preview_selectors = FxHashSet::default();
 
+        // Track which docstring rules are specifically enabled
+        // which lets us override the docstring convention ignore-list
+        let mut docstring_overrides: FxHashSet<Rule> = FxHashSet::default();
+
         for selection in &self.rule_selections {
             // If a selection only specifies extend-select we cannot directly
             // apply its rule selectors to the select_set because we firstly have
@@ -721,6 +719,8 @@ impl LintConfiguration {
             // whether to enable or disable the given rule.
             let mut select_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
             let mut fixable_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
+
+            let mut docstring_override_updates: FxHashSet<Rule> = FxHashSet::default();
 
             let carriedover_ignores = carryover_ignores.take();
             let carriedover_unfixables = carryover_unfixables.take();
@@ -736,6 +736,10 @@ impl LintConfiguration {
                 {
                     for rule in selector.rules(&preview) {
                         select_map_updates.insert(rule, true);
+
+                        if spec == Specificity::Rule {
+                            docstring_override_updates.insert(rule);
+                        }
                     }
                 }
                 for selector in selection
@@ -748,6 +752,7 @@ impl LintConfiguration {
                         select_map_updates.insert(rule, false);
                     }
                 }
+
                 // Apply the same logic to `fixable` and `unfixable`.
                 for selector in selection
                     .fixable
@@ -786,6 +791,8 @@ impl LintConfiguration {
                 {
                     carryover_ignores = Some(&selection.ignore);
                 }
+
+                docstring_overrides = docstring_override_updates;
             } else {
                 // Otherwise we apply the updates on top of the existing select_set.
                 for (rule, enabled) in select_map_updates {
@@ -794,6 +801,10 @@ impl LintConfiguration {
                     } else {
                         select_set.remove(rule);
                     }
+                }
+
+                for rule in docstring_override_updates {
+                    docstring_overrides.insert(rule);
                 }
             }
 
@@ -887,15 +898,17 @@ impl LintConfiguration {
             rules.enable(rule, fix);
         }
 
-        // If a docstring convention is specified, force-disable any incompatible error
-        // codes.
+        // If a docstring convention is specified, disable any incompatible error
+        // codes unless we are specifically overridden.
         if let Some(convention) = self
             .pydocstyle
             .as_ref()
             .and_then(|pydocstyle| pydocstyle.convention)
         {
             for rule in convention.rules_to_be_ignored() {
-                rules.disable(*rule);
+                if !docstring_overrides.contains(rule) {
+                    rules.disable(*rule);
+                }
             }
         }
 
@@ -916,6 +929,7 @@ impl LintConfiguration {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
+            extension: self.extension.or(config.extension),
             rule_selections: config
                 .rule_selections
                 .into_iter()
@@ -1078,11 +1092,13 @@ pub fn resolve_src(src: &[String], project_root: &Path) -> Result<Vec<PathBuf>> 
 #[cfg(test)]
 mod tests {
     use crate::configuration::{LintConfiguration, RuleSelection};
+    use crate::options::PydocstyleOptions;
     use ruff_linter::codes::{Flake8Copyright, Pycodestyle, Refurb};
     use ruff_linter::registry::{Linter, Rule, RuleSet};
     use ruff_linter::rule_selector::PreviewOptions;
     use ruff_linter::settings::types::PreviewMode;
     use ruff_linter::RuleSelector;
+    use std::str::FromStr;
 
     const NURSERY_RULES: &[Rule] = &[
         Rule::MissingCopyrightNotice,
@@ -1573,5 +1589,91 @@ mod tests {
         );
         let expected = RuleSet::from_rules(NURSERY_RULES);
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn select_docstring_convention_override() {
+        fn assert_override(rule_selections: Vec<RuleSelection>, should_be_overridden: bool) {
+            use ruff_linter::rules::pydocstyle::settings::Convention;
+
+            let config = LintConfiguration {
+                rule_selections,
+                pydocstyle: Some(PydocstyleOptions {
+                    convention: Some(Convention::Numpy),
+                    ..PydocstyleOptions::default()
+                }),
+                ..LintConfiguration::default()
+            };
+
+            let mut expected = RuleSet::from_rules(&[
+                Rule::from_code("D410").unwrap(),
+                Rule::from_code("D411").unwrap(),
+                Rule::from_code("D412").unwrap(),
+                Rule::from_code("D414").unwrap(),
+                Rule::from_code("D418").unwrap(),
+                Rule::from_code("D419").unwrap(),
+            ]);
+            if should_be_overridden {
+                expected.insert(Rule::from_code("D417").unwrap());
+            }
+            assert_eq!(
+                config
+                    .as_rule_table(PreviewMode::Disabled)
+                    .iter_enabled()
+                    .collect::<RuleSet>(),
+                expected,
+            );
+        }
+
+        let d41 = RuleSelector::from_str("D41").unwrap();
+        let d417 = RuleSelector::from_str("D417").unwrap();
+
+        // D417 does not appear when D41 is provided...
+        assert_override(
+            vec![RuleSelection {
+                select: Some(vec![d41.clone()]),
+                ..RuleSelection::default()
+            }],
+            false,
+        );
+
+        // ...but does appear when specified directly.
+        assert_override(
+            vec![RuleSelection {
+                select: Some(vec![d41.clone(), d417.clone()]),
+                ..RuleSelection::default()
+            }],
+            true,
+        );
+
+        // ...but disappears if there's a subsequent `--select`.
+        assert_override(
+            vec![
+                RuleSelection {
+                    select: Some(vec![d417.clone()]),
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    select: Some(vec![d41.clone()]),
+                    ..RuleSelection::default()
+                },
+            ],
+            false,
+        );
+
+        // ...although an `--extend-select` is fine.
+        assert_override(
+            vec![
+                RuleSelection {
+                    select: Some(vec![d417.clone()]),
+                    ..RuleSelection::default()
+                },
+                RuleSelection {
+                    extend_select: vec![d41.clone()],
+                    ..RuleSelection::default()
+                },
+            ],
+            true,
+        );
     }
 }

@@ -61,12 +61,14 @@ impl Violation for TripleSingleQuotes {
 pub(crate) fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     let leading_quote = docstring.leading_quote();
 
-    let prefixes = docstring
-        .leading_quote()
+    let prefixes = leading_quote
         .trim_end_matches(|c| c == '\'' || c == '"')
         .to_owned();
 
     let expected_quote = if docstring.body().contains("\"\"\"") {
+        if docstring.body().contains("\'\'\'") {
+            return;
+        }
         Quote::Single
     } else {
         Quote::Double

@@ -23,6 +23,8 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_13.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_14.pyi"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_15.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_16.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_17.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_2.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_3.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_4.py"))]
@@ -36,6 +38,8 @@ mod tests {
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("typing_modules_1.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("typing_modules_2.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -135,6 +139,28 @@ mod tests {
                         "attrs.define".to_string(),
                         "attrs.frozen".to_string(),
                     ],
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("module/direct.py"))]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("module/import.py"))]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("module/undefined.py")
+    )]
+    fn base_class_same_file(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    runtime_evaluated_base_classes: vec!["module.direct.MyBaseClass".to_string()],
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)

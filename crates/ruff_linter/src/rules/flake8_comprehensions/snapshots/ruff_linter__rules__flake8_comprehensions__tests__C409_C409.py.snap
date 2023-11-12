@@ -10,7 +10,7 @@ C409.py:1:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
   |
   = help: Rewrite as a `tuple` literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1   |-t1 = tuple([])
   1 |+t1 = ()
 2 2 | t2 = tuple([1, 2])
@@ -27,7 +27,7 @@ C409.py:2:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
   |
   = help: Rewrite as a `tuple` literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | t1 = tuple([])
 2   |-t2 = tuple([1, 2])
   2 |+t2 = (1, 2)
@@ -46,7 +46,7 @@ C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove th
   |
   = help: Remove outer `tuple` call
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | t1 = tuple([])
 2 2 | t2 = tuple([1, 2])
 3   |-t3 = tuple((1, 2))
@@ -70,7 +70,7 @@ C409.py:4:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as
   |
   = help: Rewrite as a `tuple` literal
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | t1 = tuple([])
 2 2 | t2 = tuple([1, 2])
 3 3 | t3 = tuple((1, 2))
@@ -96,7 +96,7 @@ C409.py:8:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove th
    |
    = help: Remove outer `tuple` call
 
-ℹ Suggested fix
+ℹ Unsafe fix
 5 5 |     1,
 6 6 |     2
 7 7 | ])

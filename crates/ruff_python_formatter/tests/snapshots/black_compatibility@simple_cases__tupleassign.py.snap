@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 # This is a standalone comment.
 sdfjklsdfsjldkflkjsf, sdfjsdfjlksdljkfsdlkf, sdfsdjfklsdfjlksdljkf, sdsfsdfjskdflsfsdf = 1, 2, 3
 
@@ -32,7 +32,7 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 
 ## Ruff Output
 
-```py
+```python
 # This is a standalone comment.
 (
     sdfjklsdfsjldkflkjsf,
@@ -49,7 +49,7 @@ this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
 
 ## Black Output
 
-```py
+```python
 # This is a standalone comment.
 (
     sdfjklsdfsjldkflkjsf,

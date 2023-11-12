@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.1.3"
+version = "0.1.5"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -69,3 +69,33 @@ force-exclude = '''
   | crates/ruff_python_formatter/resources
 )/
 '''
+
+[tool.rooster]
+major_labels = []  # Ruff never uses the major version number
+minor_labels = ["breaking"]   # Bump the minor version on breaking changes
+
+changelog_ignore_labels = ["internal"]
+
+changelog_sections.breaking = "Breaking changes"
+changelog_sections.preview = "Preview features"
+changelog_sections.rule = "Rule changes"
+changelog_sections.formatter = "Formatter"
+changelog_sections.cli = "CLI"
+changelog_sections.configuration = "Configuration"
+changelog_sections.bug = "Bug fixes"
+changelog_sections.documentation = "Documentation"
+changelog_sections.__unknown__ = "Other changes"
+
+# We exclude contributors from the CHANGELOG file
+# Generate separately with `rooster contributors` for the GitHub release page
+changelog_contributors = false
+
+version_files = [
+  "README.md", 
+  "docs/integrations.md",
+  "crates/flake8_to_ruff/Cargo.toml",
+  "crates/ruff_cli/Cargo.toml",
+  "crates/ruff_linter/Cargo.toml",
+  "crates/ruff_shrinking/Cargo.toml",
+  "scripts/benchmarks/pyproject.toml",
+]

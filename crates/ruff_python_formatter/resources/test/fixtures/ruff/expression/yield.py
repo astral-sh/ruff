@@ -22,8 +22,6 @@ def foo():
         pass
 
 
-    (yield a, b) = (1, 2)
-
     # some comment
     for e in l : yield e # some comment
 

@@ -84,7 +84,7 @@ def markdown_format_result(result: Result) -> str:
         lines.extend(
             markdown_project_section(
                 title="error",
-                content=f"```\n{error}```",
+                content=f"```\n{str(error).strip()}\n```",
                 options=project.format_options,
                 project=project,
             )

@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: c798bc6e7bd9950e88dd5d950470865a75b5ff0352f4fc7fb51f13147de6ba6c
+// sha3: b8ac4a859b69d580e50733d39c96a3fe018f568e71e532ebb3153a19902e64e5
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -10,6 +10,7 @@ use crate::{
     context::set_context,
     string::{StringType, concatenate_strings, parse_fstring_middle, parse_string_literal},
     token::{self, StringKind},
+    invalid,
 };
 use lalrpop_util::ParseError;
 #[allow(unused_extern_crates)]
@@ -33,6 +34,7 @@ mod __parse__Top {
     context::set_context,
     string::{StringType, concatenate_strings, parse_fstring_middle, parse_string_literal},
     token::{self, StringKind},
+    invalid,
 };
     use lalrpop_util::ParseError;
     #[allow(unused_extern_crates)]
@@ -13725,19 +13727,76 @@ mod __parse__Top {
                 __reduce356(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
             }
             357 => {
-                __reduce357(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
+                // ExpressionStatement = GenericList<TestOrStarExpr> => ActionFn(1752);
+                let __sym0 = __pop_Variant15(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym0.2;
+                let __nt = match super::__action1752::<>(source_code, mode, __sym0) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant37(__nt), __end));
+                (1, 137)
             }
             358 => {
-                __reduce358(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
+                // ExpressionStatement = GenericList<TestOrStarExpr>, AssignSuffix+ => ActionFn(1753);
+                assert!(__symbols.len() >= 2);
+                let __sym1 = __pop_Variant17(__symbols);
+                let __sym0 = __pop_Variant15(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym1.2;
+                let __nt = match super::__action1753::<>(source_code, mode, __sym0, __sym1) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant37(__nt), __end));
+                (2, 137)
             }
             359 => {
-                __reduce359(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
+                // ExpressionStatement = GenericList<TestOrStarExpr>, AugAssign, TestListOrYieldExpr => ActionFn(1754);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant15(__symbols);
+                let __sym1 = __pop_Variant49(__symbols);
+                let __sym0 = __pop_Variant15(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym2.2;
+                let __nt = match super::__action1754::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant37(__nt), __end));
+                (3, 137)
             }
             360 => {
-                __reduce360(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
+                // ExpressionStatement = Test<"all">, ":", Test<"all">, AssignSuffix => ActionFn(1531);
+                assert!(__symbols.len() >= 4);
+                let __sym3 = __pop_Variant15(__symbols);
+                let __sym2 = __pop_Variant15(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant15(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym3.2;
+                let __nt = match super::__action1531::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant37(__nt), __end));
+                (4, 137)
             }
             361 => {
-                __reduce361(source_code, mode, __lookahead_start, __symbols, core::marker::PhantomData::<()>)
+                // ExpressionStatement = Test<"all">, ":", Test<"all"> => ActionFn(1532);
+                assert!(__symbols.len() >= 3);
+                let __sym2 = __pop_Variant15(__symbols);
+                let __sym1 = __pop_Variant0(__symbols);
+                let __sym0 = __pop_Variant15(__symbols);
+                let __start = __sym0.0;
+                let __end = __sym2.2;
+                let __nt = match super::__action1532::<>(source_code, mode, __sym0, __sym1, __sym2) {
+                    Ok(v) => v,
+                    Err(e) => return Some(Err(e)),
+                };
+                __symbols.push((__start, __Symbol::Variant37(__nt), __end));
+                (3, 137)
             }
             362 => {
                 // FStringConversion = "!", name => ActionFn(800);
@@ -24718,103 +24777,6 @@ mod __parse__Top {
         __symbols.push((__start, __Symbol::Variant15(__nt), __end));
         (1, 136)
     }
-    pub(crate) fn __reduce357<
-    >(
-        source_code: &str,
-        mode: Mode,
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // ExpressionStatement = GenericList<TestOrStarExpr> => ActionFn(1752);
-        let __sym0 = __pop_Variant15(__symbols);
-        let __start = __sym0.0;
-        let __end = __sym0.2;
-        let __nt = super::__action1752::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant37(__nt), __end));
-        (1, 137)
-    }
-    pub(crate) fn __reduce358<
-    >(
-        source_code: &str,
-        mode: Mode,
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // ExpressionStatement = GenericList<TestOrStarExpr>, AssignSuffix+ => ActionFn(1753);
-        assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant17(__symbols);
-        let __sym0 = __pop_Variant15(__symbols);
-        let __start = __sym0.0;
-        let __end = __sym1.2;
-        let __nt = super::__action1753::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant37(__nt), __end));
-        (2, 137)
-    }
-    pub(crate) fn __reduce359<
-    >(
-        source_code: &str,
-        mode: Mode,
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // ExpressionStatement = GenericList<TestOrStarExpr>, AugAssign, TestListOrYieldExpr => ActionFn(1754);
-        assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant15(__symbols);
-        let __sym1 = __pop_Variant49(__symbols);
-        let __sym0 = __pop_Variant15(__symbols);
-        let __start = __sym0.0;
-        let __end = __sym2.2;
-        let __nt = super::__action1754::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant37(__nt), __end));
-        (3, 137)
-    }
-    pub(crate) fn __reduce360<
-    >(
-        source_code: &str,
-        mode: Mode,
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // ExpressionStatement = Test<"all">, ":", Test<"all">, AssignSuffix => ActionFn(1531);
-        assert!(__symbols.len() >= 4);
-        let __sym3 = __pop_Variant15(__symbols);
-        let __sym2 = __pop_Variant15(__symbols);
-        let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant15(__symbols);
-        let __start = __sym0.0;
-        let __end = __sym3.2;
-        let __nt = super::__action1531::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant37(__nt), __end));
-        (4, 137)
-    }
-    pub(crate) fn __reduce361<
-    >(
-        source_code: &str,
-        mode: Mode,
-        __lookahead_start: Option<&TextSize>,
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>,
-        _: core::marker::PhantomData<()>,
-    ) -> (usize, usize)
-    {
-        // ExpressionStatement = Test<"all">, ":", Test<"all"> => ActionFn(1532);
-        assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant15(__symbols);
-        let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant15(__symbols);
-        let __start = __sym0.0;
-        let __end = __sym2.2;
-        let __nt = super::__action1532::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant37(__nt), __end));
-        (3, 137)
-    }
     pub(crate) fn __reduce363<
     >(
         source_code: &str,
@@ -32789,14 +32751,14 @@ fn __action26<
     (_, expression, _): (TextSize, ast::ParenthesizedExpr, TextSize),
     (_, suffix, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         // Just an expression, no assignment:
         if suffix.is_empty() {
-            ast::Stmt::Expr(
+            Ok(ast::Stmt::Expr(
                 ast::StmtExpr { value: Box::new(expression.into()), range: (location..end_location).into() }
-            )
+            ))
         } else {
             let mut targets = vec![set_context(expression.into(), ast::ExprContext::Store)];
             let mut values = suffix;
@@ -32806,10 +32768,10 @@ fn __action26<
             for target in values {
                 targets.push(set_context(target.into(), ast::ExprContext::Store));
             }
-
-            ast::Stmt::Assign(
+            invalid::assignment_targets(&targets)?;
+            Ok(ast::Stmt::Assign(
                 ast::StmtAssign { targets, value, range: (location..end_location).into() }
-            )
+            ))
         }
     }
 }
@@ -32825,17 +32787,18 @@ fn __action27<
     (_, op, _): (TextSize, ast::Operator, TextSize),
     (_, rhs, _): (TextSize, ast::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        ast::Stmt::AugAssign(
+        invalid::assignment_target(&target.expr)?;
+        Ok(ast::Stmt::AugAssign(
             ast::StmtAugAssign {
                 target: Box::new(set_context(target.into(), ast::ExprContext::Store)),
                 op,
                 value: Box::new(rhs.into()),
                 range: (location..end_location).into()
             },
-        )
+        ))
     }
 }
 
@@ -32851,11 +32814,12 @@ fn __action28<
     (_, annotation, _): (TextSize, ast::ParenthesizedExpr, TextSize),
     (_, rhs, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         let simple = target.expr.is_name_expr();
-        ast::Stmt::AnnAssign(
+        invalid::assignment_target(&target.expr)?;
+        Ok(ast::Stmt::AnnAssign(
             ast::StmtAnnAssign {
                 target: Box::new(set_context(target.into(), ast::ExprContext::Store)),
                 annotation: Box::new(annotation.into()),
@@ -32863,7 +32827,7 @@ fn __action28<
                 simple,
                 range: (location..end_location).into()
             },
-        )
+        ))
     }
 }
 
@@ -48215,7 +48179,7 @@ fn __action797<
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48246,7 +48210,7 @@ fn __action798<
     __1: (TextSize, ast::Operator, TextSize),
     __2: (TextSize, ast::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48279,7 +48243,7 @@ fn __action799<
     __2: (TextSize, ast::ParenthesizedExpr, TextSize),
     __3: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -64278,7 +64242,7 @@ fn __action1309<
     mode: Mode,
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -64307,7 +64271,7 @@ fn __action1310<
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
     __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -64338,7 +64302,7 @@ fn __action1311<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::ParenthesizedExpr, TextSize),
     __3: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -71035,7 +70999,7 @@ fn __action1529<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -71062,7 +71026,7 @@ fn __action1530<
     mode: Mode,
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -71090,7 +71054,7 @@ fn __action1531<
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::ParenthesizedExpr, TextSize),
     __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -71119,7 +71083,7 @@ fn __action1532<
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -78391,7 +78355,7 @@ fn __action1752<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -78416,7 +78380,7 @@ fn __action1753<
     mode: Mode,
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
     __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -78443,7 +78407,7 @@ fn __action1754<
     __0: (TextSize, ast::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
     __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::Stmt
+) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;

@@ -10,7 +10,7 @@ RET504.py:6:12: RET504 [*] Unnecessary assignment to `a` before `return` stateme
   |
   = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 2 2 | # Errors
 3 3 | ###
 4 4 | def x():
@@ -30,7 +30,7 @@ RET504.py:23:12: RET504 [*] Unnecessary assignment to `formatted` before `return
    |
    = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 19 19 | def x():
 20 20 |     formatted = _USER_AGENT_FORMATTER.format(format_string, **values)
 21 21 |     # clean up after any blank components
@@ -50,7 +50,7 @@ RET504.py:246:12: RET504 [*] Unnecessary assignment to `queryset` before `return
     |
     = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 242 242 | 
 243 243 | def get_queryset():
 244 244 |     queryset = Model.filter(a=1)
@@ -70,7 +70,7 @@ RET504.py:251:12: RET504 [*] Unnecessary assignment to `queryset` before `return
     |
     = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 247 247 | 
 248 248 | 
 249 249 | def get_queryset():
@@ -90,7 +90,7 @@ RET504.py:269:12: RET504 [*] Unnecessary assignment to `val` before `return` sta
     |
     = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 265 265 | def str_to_bool(val):
 266 266 |     if isinstance(val, bool):
 267 267 |         return val
@@ -110,7 +110,7 @@ RET504.py:321:12: RET504 [*] Unnecessary assignment to `x` before `return` state
     |
     = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 317 317 | # `with` statements
 318 318 | def foo():
 319 319 |     with open("foo.txt", "r") as f:
@@ -130,7 +130,7 @@ RET504.py:342:12: RET504 [*] Unnecessary assignment to `b` before `return` state
     |
     = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 338 338 | # Fix cases
 339 339 | def foo():
 340 340 |     a = 1
@@ -150,7 +150,7 @@ RET504.py:348:12: RET504 [*] Unnecessary assignment to `b` before `return` state
     |
     = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 344 344 | 
 345 345 | def foo():
 346 346 |     a = 1
@@ -170,7 +170,7 @@ RET504.py:354:12: RET504 [*] Unnecessary assignment to `b` before `return` state
     |
     = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 350 350 | 
 351 351 | def foo():
 352 352 |     a = 1
@@ -190,7 +190,7 @@ RET504.py:359:12: RET504 [*] Unnecessary assignment to `a` before `return` state
     |
     = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 355 355 | 
 356 356 | 
 357 357 | def foo():
@@ -210,7 +210,7 @@ RET504.py:365:12: RET504 [*] Unnecessary assignment to `D` before `return` state
     |
     = help: Remove unnecessary assignment
 
-ℹ Suggested fix
+ℹ Unsafe fix
 361 361 | 
 362 362 | # Regression test for: https://github.com/astral-sh/ruff/issues/7098
 363 363 | def mavko_debari(P_kbar):

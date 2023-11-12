@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 ---
 ## Input
 
-```py
+```python
 importA;()<<0**0#
 ```
 
@@ -25,14 +25,14 @@ importA;()<<0**0#
 
 ## Ruff Output
 
-```py
+```python
 importA
 () << 0**0  #
 ```
 
 ## Black Output
 
-```py
+```python
 importA
 (
     ()

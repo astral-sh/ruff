@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/try.py
 ---
 ## Input
-```py
+```python
 try:
     pass
 except:
@@ -175,7 +175,7 @@ finally:
 ```
 
 ## Output
-```py
+```python
 try:
     pass
 except:

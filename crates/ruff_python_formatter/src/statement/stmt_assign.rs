@@ -6,6 +6,7 @@ use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::expression::{has_own_parentheses, maybe_parenthesize_expression};
 use crate::prelude::*;
+use crate::statement::trailing_semicolon;
 
 #[derive(Default)]
 pub struct FormatStmtAssign;
@@ -40,7 +41,18 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
                 item,
                 Parenthesize::IfBreaks
             )]
-        )
+        )?;
+
+        if f.options().source_type().is_ipynb()
+            && f.context().node_level().is_last_top_level_statement()
+            && rest.is_empty()
+            && first.is_name_expr()
+            && trailing_semicolon(item.into(), f.context().source()).is_some()
+        {
+            token(";").fmt(f)?;
+        }
+
+        Ok(())
     }
 
     fn is_suppressed(

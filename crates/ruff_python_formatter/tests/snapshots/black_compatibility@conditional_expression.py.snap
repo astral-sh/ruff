@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/condition
 ---
 ## Input
 
-```py
+```python
 long_kwargs_single_line = my_function(
     foo="test, this is a sample value",
     bar=some_long_value_name_foo_bar_baz if some_boolean_variable else some_fallback_value_foo_bar_baz,
@@ -149,7 +149,7 @@ def something():
 
 ## Ruff Output
 
-```py
+```python
 long_kwargs_single_line = my_function(
     foo="test, this is a sample value",
     bar=some_long_value_name_foo_bar_baz
@@ -238,7 +238,7 @@ def something():
 
 ## Black Output
 
-```py
+```python
 long_kwargs_single_line = my_function(
     foo="test, this is a sample value",
     bar=(

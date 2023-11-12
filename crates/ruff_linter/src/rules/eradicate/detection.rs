@@ -163,11 +163,15 @@ mod tests {
             "# ( user_content_type , _ )= TimelineEvent.objects.using(db_alias).get_or_create(",
             &[]
         ));
-        assert!(comment_contains_code(
+        assert!(comment_contains_code("# )", &[]));
+
+        // This used to return true, but our parser has gotten a bit better
+        // at rejecting invalid Python syntax. And indeed, this is not valid
+        // Python code.
+        assert!(!comment_contains_code(
             "#     app_label=\"core\", model=\"user\"",
             &[]
         ));
-        assert!(comment_contains_code("# )", &[]));
 
         // TODO(charlie): This should be `true` under aggressive mode.
         assert!(!comment_contains_code("#def foo():", &[]));
