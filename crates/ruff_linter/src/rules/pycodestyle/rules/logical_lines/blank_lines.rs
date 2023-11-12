@@ -347,9 +347,9 @@ pub(crate) fn blank_lines(
     //     line.text(),
     //     &line.line.blank_lines,
     //     &line.line.preceding_blank_lines,
+    //     indent_level,
     //     &tracked_vars
     // );
-    // dbg!(is_decorator(prev_line));
     // dbg!();
 
     if tracked_vars.is_first_logical_line {
@@ -360,15 +360,24 @@ pub(crate) fn blank_lines(
         return;
     }
 
-    if indent_level <= tracked_vars.class_indent_level {
+    let mut follows_class_or_fn = false;
+    if indent_level <= tracked_vars.class_indent_level
+        && tracked_vars.is_in_class
+        && !line.is_comment_only()
+    {
         tracked_vars.is_in_class = false;
+        follows_class_or_fn = true;
     }
 
-    if indent_level <= tracked_vars.fn_indent_level {
+    if indent_level <= tracked_vars.fn_indent_level
+        && tracked_vars.is_in_fn
+        && !line.is_comment_only()
+    {
         tracked_vars.is_in_fn = false;
+        follows_class_or_fn = true;
     }
 
-    for (token_idx, token) in line.tokens().iter().enumerate() {
+    for (token_idx, token) in line.tokens_trimmed().iter().enumerate() {
         if token.kind() == TokenKind::Def
             // Only applies to method.
             && tracked_vars.is_in_class
@@ -462,8 +471,16 @@ pub(crate) fn blank_lines(
             )));
             context.push_diagnostic(diagnostic);
         } else if line.line.blank_lines < 2
-            && (tracked_vars.is_in_fn || tracked_vars.is_in_class)
+            // If a comment is preceding the line, the 2 blank lines can be before that comment.
+            && !(line.line.preceding_blank_lines >= 2
+                 && prev_line.map_or(false, |prev_line| prev_line.is_comment_only()))
+            && follows_class_or_fn
             && indent_level == 0
+            && !line.is_comment_only()
+            && !matches!(
+                token.kind(),
+                TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async
+            )
         {
             // E305
             let mut diagnostic = Diagnostic::new(
@@ -520,9 +537,14 @@ pub(crate) fn blank_lines(
                 tracked_vars.follows_decorator = false;
                 break;
             }
+            TokenKind::Async => {
+                tracked_vars.follows_decorator = false;
+                tracked_vars.follows_def = false;
+            }
             _ => {
                 tracked_vars.follows_decorator = false;
                 tracked_vars.follows_def = false;
+                break;
             }
         }
     }
