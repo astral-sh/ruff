@@ -14,7 +14,7 @@ use crate::checkers::logical_lines::LogicalLinesContext;
 use super::LogicalLine;
 
 /// Contains variables used for the linting of blank lines.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct BlankLinesTrackingVars {
     follows_decorator: bool,
@@ -25,6 +25,22 @@ pub(crate) struct BlankLinesTrackingVars {
     is_in_fn: bool,
     /// The indent level where the function started.
     fn_indent_level: usize,
+    /// First line that is not a comment.
+    is_first_logical_line: bool,
+}
+
+impl Default for BlankLinesTrackingVars {
+    fn default() -> BlankLinesTrackingVars {
+        BlankLinesTrackingVars {
+            follows_decorator: false,
+            follows_def: false,
+            is_in_class: false,
+            class_indent_level: 0,
+            is_in_fn: false,
+            fn_indent_level: 0,
+            is_first_logical_line: true,
+        }
+    }
 }
 
 /// Number of blank lines between various code parts.
@@ -311,6 +327,12 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
     }
 }
 
+/// Check if the given line starts with a decorator.
+fn is_decorator(line: Option<&LogicalLine>) -> bool {
+    line.and_then(|line| line.tokens_trimmed().first())
+        .map_or(false, |token| matches!(token.kind(), TokenKind::At))
+}
+
 /// E301, E302, E303, E304, E305, E306
 pub(crate) fn blank_lines(
     line: &LogicalLine,
@@ -321,6 +343,23 @@ pub(crate) fn blank_lines(
     stylist: &Stylist,
     context: &mut LogicalLinesContext,
 ) {
+    // dbg!(
+    //     line.text(),
+    //     &line.line.blank_lines,
+    //     &line.line.preceding_blank_lines,
+    //     &tracked_vars
+    // );
+    // dbg!(is_decorator(prev_line));
+    // dbg!();
+
+    if tracked_vars.is_first_logical_line {
+        if !line.is_comment_only() {
+            tracked_vars.is_first_logical_line = false;
+        }
+        // Don't expect blank lines before the first line non comment line.
+        return;
+    }
+
     if indent_level <= tracked_vars.class_indent_level {
         tracked_vars.is_in_class = false;
     }
@@ -329,7 +368,7 @@ pub(crate) fn blank_lines(
         tracked_vars.is_in_fn = false;
     }
 
-    if let Some(token) = line.tokens_trimmed().first() {
+    for (token_idx, token) in line.tokens().iter().enumerate() {
         if token.kind() == TokenKind::Def
             // Only applies to method.
             && tracked_vars.is_in_class
@@ -356,18 +395,27 @@ pub(crate) fn blank_lines(
                 locator.line_start(token.range.start()),
             )));
             context.push_diagnostic(diagnostic);
-        } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
-            && !(tracked_vars.follows_decorator
-                || tracked_vars.is_in_class
-                || tracked_vars.is_in_fn
-                || tracked_vars.follows_def
+        } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class | TokenKind::At)
+            && !(
+                // Allow decorators.
+                is_decorator(prev_line)
+                // Allow groups of one-liners.
+                || (tracked_vars.follows_def
                     && line
-                        .tokens_trimmed()
-                        .last()
-                        .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon)))
+                    .tokens_trimmed()
+                    .last()
+                    .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
+                )
+                // Only apply to top level functions.
+                    || tracked_vars.is_in_class
+                    || tracked_vars.is_in_fn
+                // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
+                    || (line.line.preceding_blank_lines >= 2 && prev_line.map_or(false, |prev_line| prev_line.is_comment_only()))
+            )
+        // Allow directly following an except.
             && prev_line
-                .and_then(|prev_line| prev_line.tokens_trimmed().first())
-                .map_or(false, |token| !matches!(token.kind(), TokenKind::Except))
+            .and_then(|prev_line| prev_line.tokens_trimmed().first())
+            .map_or(true, |token| !matches!(token.kind(), TokenKind::Except))
             && line.line.blank_lines < 2
             && prev_line.is_some()
         {
@@ -383,9 +431,10 @@ pub(crate) fn blank_lines(
                 locator.line_start(token.range.start()),
             )));
             context.push_diagnostic(diagnostic);
-        } else if line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
-            || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
-                && line.line.blank_lines > BlankLinesConfig::METHOD)
+        } else if token_idx == 0
+            && (line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
+                || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
+                    && line.line.blank_lines > BlankLinesConfig::METHOD))
         {
             // E303
             let mut diagnostic =
@@ -455,10 +504,12 @@ pub(crate) fn blank_lines(
                 tracked_vars.is_in_class = true;
                 tracked_vars.follows_decorator = false;
                 tracked_vars.follows_def = false;
+                break;
             }
             TokenKind::At => {
                 tracked_vars.follows_decorator = true;
                 tracked_vars.follows_def = false;
+                break;
             }
             TokenKind::Def => {
                 if !tracked_vars.is_in_fn {
@@ -467,6 +518,7 @@ pub(crate) fn blank_lines(
                 tracked_vars.is_in_fn = true;
                 tracked_vars.follows_def = true;
                 tracked_vars.follows_decorator = false;
+                break;
             }
             _ => {
                 tracked_vars.follows_decorator = false;

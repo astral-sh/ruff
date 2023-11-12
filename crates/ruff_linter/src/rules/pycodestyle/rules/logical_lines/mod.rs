@@ -414,6 +414,8 @@ struct LogicalLinesBuilder {
     tokens: Vec<LogicalLineToken>,
     lines: Vec<Line>,
     current_line: CurrentLine,
+    /// Number of previous consecutive blank lines.
+    previous_blank_lines: u32,
     /// Number of consecutive blank lines.
     current_blank_lines: u32,
     /// Number of blank characters in the blank lines (\n vs \r\n for example).
@@ -485,17 +487,20 @@ impl LogicalLinesBuilder {
                 self.current_blank_lines += 1;
                 self.current_blank_characters += end - self.current_line.tokens_start;
             } else {
+                if self.previous_blank_lines < self.current_blank_lines {
+                    self.previous_blank_lines = self.current_blank_lines
+                }
                 self.lines.push(Line {
                     flags: self.current_line.flags,
                     blank_lines: self.current_blank_lines,
-                    preceding_blank_lines: self
-                        .lines
-                        .last()
-                        .map_or(0, |previous_line| previous_line.blank_lines),
+                    preceding_blank_lines: self.previous_blank_lines,
                     preceding_blank_characters: self.current_blank_characters,
                     tokens_start: self.current_line.tokens_start,
                     tokens_end: end,
                 });
+                if self.current_line.flags != TokenFlags::COMMENT {
+                    self.previous_blank_lines = 0;
+                }
                 self.current_blank_lines = 0;
                 self.current_blank_characters = 0;
             }
