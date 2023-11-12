@@ -20,8 +20,8 @@ use crate::settings::LinterSettings;
 /// different code points. For example, `LATIN CAPITAL LETTER A` (`U+0041`) is
 /// visually similar, but not identical, to the ASCII character `A`.
 ///
-/// The use of ambiguous Unicode characters can confuse readers and cause
-/// subtle bugs.
+/// The use of ambiguous Unicode characters can confuse readers, cause subtle
+/// bugs and even make malicious code look harmless.
 ///
 /// In [preview], this rule will also flag Unicode characters that are
 /// confusable with other, non-preferred Unicode characters. For example, the
@@ -67,8 +67,8 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// different code points. For example, `LATIN CAPITAL LETTER A` (`U+0041`) is
 /// visually similar, but not identical, to the ASCII character `A`.
 ///
-/// The use of ambiguous Unicode characters can confuse readers and cause
-/// subtle bugs.
+/// The use of ambiguous Unicode characters can confuse readers, cause subtle
+/// bugs and even make malicious code look harmless.
 ///
 /// In [preview], this rule will also flag Unicode characters that are
 /// confusable with other, non-preferred Unicode characters. For example, the
@@ -114,8 +114,8 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// different code points. For example, `LATIN CAPITAL LETTER A` (`U+0041`) is
 /// visually similar, but not identical, to the ASCII character `A`.
 ///
-/// The use of ambiguous Unicode characters can confuse readers and cause
-/// subtle bugs.
+/// The use of ambiguous Unicode characters can confuse readers, cause subtle
+/// bugs and even make malicious code look harmless.
 ///
 /// In [preview], this rule will also flag Unicode characters that are
 /// confusable with other, non-preferred Unicode characters. For example, the
