@@ -27,6 +27,9 @@ pub(crate) struct BlankLinesTrackingVars {
     fn_indent_level: usize,
     /// First line that is not a comment.
     is_first_logical_line: bool,
+    /// This needs to be tracked between lines since the `is_in_class` and `is_in_fn` are set to
+    /// false when a comment is set dedented, but E305 should trigger on the next non-comment line.
+    follows_comment_after_class_or_fn: bool,
 }
 
 impl Default for BlankLinesTrackingVars {
@@ -39,6 +42,7 @@ impl Default for BlankLinesTrackingVars {
             is_in_fn: false,
             fn_indent_level: 0,
             is_first_logical_line: true,
+            follows_comment_after_class_or_fn: false,
         }
     }
 }
@@ -362,23 +366,34 @@ pub(crate) fn blank_lines(
     }
 
     let mut follows_class_or_fn = false;
-    if indent_level <= tracked_vars.class_indent_level
-        && tracked_vars.is_in_class
-        && !line.is_comment_only()
-    {
+    if indent_level <= tracked_vars.class_indent_level && tracked_vars.is_in_class {
         tracked_vars.is_in_class = false;
-        follows_class_or_fn = true;
+        if line.is_comment_only() {
+            tracked_vars.follows_comment_after_class_or_fn = true
+        } else {
+            follows_class_or_fn = true;
+        }
     }
 
-    if indent_level <= tracked_vars.fn_indent_level
-        && tracked_vars.is_in_fn
-        && !line.is_comment_only()
-    {
+    if indent_level <= tracked_vars.fn_indent_level && tracked_vars.is_in_fn {
         tracked_vars.is_in_fn = false;
-        follows_class_or_fn = true;
+        if line.is_comment_only() {
+            tracked_vars.follows_comment_after_class_or_fn = true
+        } else {
+            follows_class_or_fn = true;
+        }
     }
 
-    for (token_idx, token) in line.tokens_trimmed().iter().enumerate() {
+    if tracked_vars.follows_comment_after_class_or_fn && !line.is_comment_only() {
+        follows_class_or_fn = true;
+        tracked_vars.follows_comment_after_class_or_fn = false;
+    }
+
+    for token in line.tokens().iter() {
+        if matches!(token.kind, TokenKind::Indent | TokenKind::Dedent) {
+            continue;
+        }
+
         if token.kind() == TokenKind::Def
             // Only applies to method.
             && tracked_vars.is_in_class
@@ -441,10 +456,9 @@ pub(crate) fn blank_lines(
                 locator.line_start(token.range.start()),
             )));
             context.push_diagnostic(diagnostic);
-        } else if token_idx == 0
-            && (line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
-                || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
-                    && line.line.blank_lines > BlankLinesConfig::METHOD))
+        } else if line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
+            || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
+                && line.line.blank_lines > BlankLinesConfig::METHOD)
         {
             // E303
             let mut diagnostic =
@@ -471,10 +485,7 @@ pub(crate) fn blank_lines(
                 locator.line_start(range.start()),
             )));
             context.push_diagnostic(diagnostic);
-        } else if line.line.blank_lines < 2
-            // If a comment is preceding the line, the 2 blank lines can be before that comment.
-            && !(line.line.preceding_blank_lines >= 2
-                 && prev_line.map_or(false, |prev_line| prev_line.is_comment_only()))
+        } else if line.line.preceding_blank_lines < BlankLinesConfig::TOP_LEVEL
             && follows_class_or_fn
             && indent_level == 0
             && !line.is_comment_only()
