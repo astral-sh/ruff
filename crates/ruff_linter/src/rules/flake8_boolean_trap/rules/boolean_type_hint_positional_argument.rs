@@ -27,6 +27,9 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// keyword-only argument, to force callers to be explicit when providing
 /// the argument.
 ///
+/// In [preview], this rule will also flag annotations that include boolean
+/// variants, like `bool | int`.
+///
 /// ## Example
 /// ```python
 /// from math import ceil, floor
@@ -87,6 +90,8 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct BooleanTypeHintPositionalArgument;
 
@@ -97,37 +102,7 @@ impl Violation for BooleanTypeHintPositionalArgument {
     }
 }
 
-fn match_annotation_to_bool(annotation: &Expr, semantic: &SemanticModel) -> bool {
-    // check for both bool (python class) and 'bool' (string annotation)
-    let hint = match annotation {
-        Expr::Name(name) => &name.id == "bool",
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            op: ast::Operator::BitOr,
-            right,
-            ..
-        }) => match_annotation_to_bool(left, semantic) || match_annotation_to_bool(right, semantic),
-        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            if semantic.match_typing_expr(value, "Union") {
-                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                    elts.iter()
-                        .any(|elt| match_annotation_to_bool(elt, semantic))
-                } else {
-                    // Union with a single type is an invalid type annotation
-                    false
-                }
-            } else if semantic.match_typing_expr(value, "Optional") {
-                match_annotation_to_bool(slice, semantic)
-            } else {
-                false
-            }
-        }
-        _ => false,
-    };
-    hint && semantic.is_builtin("bool")
-}
-
+/// FBT001
 pub(crate) fn boolean_type_hint_positional_argument(
     checker: &mut Checker,
     name: &str,
@@ -154,13 +129,65 @@ pub(crate) fn boolean_type_hint_positional_argument(
         let Some(annotation) = parameter.annotation.as_ref() else {
             continue;
         };
-
-        if !match_annotation_to_bool(annotation, checker.semantic()) {
+        if if checker.settings.preview.is_enabled() {
+            match_annotation_to_literal_bool(annotation)
+        } else {
+            match_annotation_to_complex_bool(annotation, checker.semantic())
+        } {
             continue;
         }
         checker.diagnostics.push(Diagnostic::new(
             BooleanTypeHintPositionalArgument,
             parameter.name.range(),
         ));
+    }
+}
+
+/// Returns `true` if the annotation is a boolean type hint (e.g., `bool`).
+fn match_annotation_to_literal_bool(annotation: &Expr) -> bool {
+    match annotation {
+        // Ex) `True`
+        Expr::Name(name) => &name.id == "True",
+        // Ex) `"True"`
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "True",
+        _ => false,
+    }
+}
+
+/// Returns `true` if the annotation is a boolean type hint (e.g., `bool`), or a type hint that
+/// includes boolean as a variant (e.g., `bool | int`).
+fn match_annotation_to_complex_bool(annotation: &Expr, semantic: &SemanticModel) -> bool {
+    match annotation {
+        // Ex) `bool`
+        Expr::Name(name) => &name.id == "bool",
+        // Ex) `"bool"`
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
+        // Ex) `bool | int`
+        Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: ast::Operator::BitOr,
+            right,
+            ..
+        }) => {
+            match_annotation_to_complex_bool(left, semantic)
+                || match_annotation_to_complex_bool(right, semantic)
+        }
+        // Ex) `typing.Union[bool, int]`
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            if semantic.match_typing_expr(value, "Union") {
+                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                    elts.iter()
+                        .any(|elt| match_annotation_to_complex_bool(elt, semantic))
+                } else {
+                    // Union with a single type is an invalid type annotation
+                    false
+                }
+            } else if semantic.match_typing_expr(value, "Optional") {
+                match_annotation_to_complex_bool(slice, semantic)
+            } else {
+                false
+            }
+        }
+        _ => false,
     }
 }
