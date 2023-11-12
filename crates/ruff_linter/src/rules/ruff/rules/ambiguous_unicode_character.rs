@@ -17,8 +17,8 @@ use crate::settings::LinterSettings;
 ///
 /// ## Why is this bad?
 /// Some Unicode characters are visually similar to ASCII characters, but have
-/// different code points. For example, `LATIN CAPITAL LETTER A` (`U+0041`) is
-/// visually similar, but not identical, to the ASCII character `A`.
+/// different code points. For example, `GREEK CAPITAL LETTER ALPHA` (`U+0391`)
+/// is visually similar, but not identical, to the ASCII character `A`.
 ///
 /// The use of ambiguous Unicode characters can confuse readers, cause subtle
 /// bugs and even make malicious code look harmless.
@@ -64,8 +64,8 @@ impl Violation for AmbiguousUnicodeCharacterString {
 ///
 /// ## Why is this bad?
 /// Some Unicode characters are visually similar to ASCII characters, but have
-/// different code points. For example, `LATIN CAPITAL LETTER A` (`U+0041`) is
-/// visually similar, but not identical, to the ASCII character `A`.
+/// different code points. For example, `GREEK CAPITAL LETTER ALPHA` (`U+0391`)
+/// is visually similar, but not identical, to the ASCII character `A`.
 ///
 /// The use of ambiguous Unicode characters can confuse readers, cause subtle
 /// bugs and even make malicious code look harmless.
@@ -111,8 +111,8 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 ///
 /// ## Why is this bad?
 /// Some Unicode characters are visually similar to ASCII characters, but have
-/// different code points. For example, `LATIN CAPITAL LETTER A` (`U+0041`) is
-/// visually similar, but not identical, to the ASCII character `A`.
+/// different code points. For example, `GREEK CAPITAL LETTER ALPHA` (`U+0391`)
+/// is visually similar, but not identical, to the ASCII character `A`.
 ///
 /// The use of ambiguous Unicode characters can confuse readers, cause subtle
 /// bugs and even make malicious code look harmless.
