@@ -1,29 +1,25 @@
 //! An equivalent object hierarchy to the `RustPython` AST hierarchy, but with the
-//! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
+//! ability to compare nodes for equality after formatting.
 //!
-//! Two [`ComparableExpr`]s are considered equal if the underlying AST nodes have the
-//! same shape, ignoring trivia (e.g., parentheses, comments, and whitespace), the
-//! location in the source code, and other contextual information (e.g., whether they
-//! represent reads or writes, which is typically encoded in the Python AST).
-//!
-//! For example, in `[(a, b) for a, b in c]`, the `(a, b)` and `a, b` expressions are
-//! considered equal, despite the former being parenthesized, and despite the former
-//! being a write ([`ast::ExprContext::Store`]) and the latter being a read
-//! ([`ast::ExprContext::Load`]).
-//!
-//! Similarly, `"a" "b"` and `"ab"` would be considered equal, despite the former being
-//! an implicit concatenation of string literals, as these expressions are considered to
-//! have the same shape in that they evaluate to the same value.
+//! Vis-à-vis comparing ASTs, comparing these normalized representations does the following:
+//! - Removes all locations from the AST.
+//! - Ignores non-abstraction information that we've encoded into the AST, e.g., the difference
+//!   between `class C: ...` and `class C(): ...`, which is part of our AST but not `CPython`'s.
+//! - Normalize strings. The formatter can re-indent docstrings, so we need to compare string
+//!   contents ignoring whitespace. (Black does the same.)
+//! - Ignores nested tuples in deletions. (Black does the same.)
 
-use crate as ast;
+use itertools::Either::{Left, Right};
+
+use ruff_python_ast as ast;
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableBoolOp {
+enum NormalizedBoolOp {
     And,
     Or,
 }
 
-impl From<ast::BoolOp> for ComparableBoolOp {
+impl From<ast::BoolOp> for NormalizedBoolOp {
     fn from(op: ast::BoolOp) -> Self {
         match op {
             ast::BoolOp::And => Self::And,
@@ -33,7 +29,7 @@ impl From<ast::BoolOp> for ComparableBoolOp {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableOperator {
+enum NormalizedOperator {
     Add,
     Sub,
     Mult,
@@ -49,7 +45,7 @@ pub enum ComparableOperator {
     FloorDiv,
 }
 
-impl From<ast::Operator> for ComparableOperator {
+impl From<ast::Operator> for NormalizedOperator {
     fn from(op: ast::Operator) -> Self {
         match op {
             ast::Operator::Add => Self::Add,
@@ -70,14 +66,14 @@ impl From<ast::Operator> for ComparableOperator {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableUnaryOp {
+enum NormalizedUnaryOp {
     Invert,
     Not,
     UAdd,
     USub,
 }
 
-impl From<ast::UnaryOp> for ComparableUnaryOp {
+impl From<ast::UnaryOp> for NormalizedUnaryOp {
     fn from(op: ast::UnaryOp) -> Self {
         match op {
             ast::UnaryOp::Invert => Self::Invert,
@@ -89,7 +85,7 @@ impl From<ast::UnaryOp> for ComparableUnaryOp {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableCmpOp {
+enum NormalizedCmpOp {
     Eq,
     NotEq,
     Lt,
@@ -102,7 +98,7 @@ pub enum ComparableCmpOp {
     NotIn,
 }
 
-impl From<ast::CmpOp> for ComparableCmpOp {
+impl From<ast::CmpOp> for NormalizedCmpOp {
     fn from(op: ast::CmpOp) -> Self {
         match op {
             ast::CmpOp::Eq => Self::Eq,
@@ -120,12 +116,12 @@ impl From<ast::CmpOp> for ComparableCmpOp {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableAlias<'a> {
+struct NormalizedAlias<'a> {
     name: &'a str,
     asname: Option<&'a str>,
 }
 
-impl<'a> From<&'a ast::Alias> for ComparableAlias<'a> {
+impl<'a> From<&'a ast::Alias> for NormalizedAlias<'a> {
     fn from(alias: &'a ast::Alias) -> Self {
         Self {
             name: alias.name.as_str(),
@@ -135,12 +131,12 @@ impl<'a> From<&'a ast::Alias> for ComparableAlias<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableWithItem<'a> {
-    context_expr: ComparableExpr<'a>,
-    optional_vars: Option<ComparableExpr<'a>>,
+struct NormalizedWithItem<'a> {
+    context_expr: NormalizedExpr<'a>,
+    optional_vars: Option<NormalizedExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::WithItem> for ComparableWithItem<'a> {
+impl<'a> From<&'a ast::WithItem> for NormalizedWithItem<'a> {
     fn from(with_item: &'a ast::WithItem) -> Self {
         Self {
             context_expr: (&with_item.context_expr).into(),
@@ -150,12 +146,12 @@ impl<'a> From<&'a ast::WithItem> for ComparableWithItem<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparablePatternArguments<'a> {
-    patterns: Vec<ComparablePattern<'a>>,
-    keywords: Vec<ComparablePatternKeyword<'a>>,
+struct NormalizedPatternArguments<'a> {
+    patterns: Vec<NormalizedPattern<'a>>,
+    keywords: Vec<NormalizedPatternKeyword<'a>>,
 }
 
-impl<'a> From<&'a ast::PatternArguments> for ComparablePatternArguments<'a> {
+impl<'a> From<&'a ast::PatternArguments> for NormalizedPatternArguments<'a> {
     fn from(parameters: &'a ast::PatternArguments) -> Self {
         Self {
             patterns: parameters.patterns.iter().map(Into::into).collect(),
@@ -165,12 +161,12 @@ impl<'a> From<&'a ast::PatternArguments> for ComparablePatternArguments<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparablePatternKeyword<'a> {
+struct NormalizedPatternKeyword<'a> {
     attr: &'a str,
-    pattern: ComparablePattern<'a>,
+    pattern: NormalizedPattern<'a>,
 }
 
-impl<'a> From<&'a ast::PatternKeyword> for ComparablePatternKeyword<'a> {
+impl<'a> From<&'a ast::PatternKeyword> for NormalizedPatternKeyword<'a> {
     fn from(keyword: &'a ast::PatternKeyword) -> Self {
         Self {
             attr: keyword.attr.as_str(),
@@ -180,52 +176,52 @@ impl<'a> From<&'a ast::PatternKeyword> for ComparablePatternKeyword<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchValue<'a> {
-    value: ComparableExpr<'a>,
+struct PatternMatchValue<'a> {
+    value: NormalizedExpr<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchSingleton {
-    value: ComparableSingleton,
+struct PatternMatchSingleton {
+    value: NormalizedSingleton,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchSequence<'a> {
-    patterns: Vec<ComparablePattern<'a>>,
+struct PatternMatchSequence<'a> {
+    patterns: Vec<NormalizedPattern<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchMapping<'a> {
-    keys: Vec<ComparableExpr<'a>>,
-    patterns: Vec<ComparablePattern<'a>>,
+struct PatternMatchMapping<'a> {
+    keys: Vec<NormalizedExpr<'a>>,
+    patterns: Vec<NormalizedPattern<'a>>,
     rest: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchClass<'a> {
-    cls: ComparableExpr<'a>,
-    arguments: ComparablePatternArguments<'a>,
+struct PatternMatchClass<'a> {
+    cls: NormalizedExpr<'a>,
+    arguments: NormalizedPatternArguments<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchStar<'a> {
+struct PatternMatchStar<'a> {
     name: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchAs<'a> {
-    pattern: Option<Box<ComparablePattern<'a>>>,
+struct PatternMatchAs<'a> {
+    pattern: Option<Box<NormalizedPattern<'a>>>,
     name: Option<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchOr<'a> {
-    patterns: Vec<ComparablePattern<'a>>,
+struct PatternMatchOr<'a> {
+    patterns: Vec<NormalizedPattern<'a>>,
 }
 
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparablePattern<'a> {
+enum NormalizedPattern<'a> {
     MatchValue(PatternMatchValue<'a>),
     MatchSingleton(PatternMatchSingleton),
     MatchSequence(PatternMatchSequence<'a>),
@@ -236,7 +232,7 @@ pub enum ComparablePattern<'a> {
     MatchOr(PatternMatchOr<'a>),
 }
 
-impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
+impl<'a> From<&'a ast::Pattern> for NormalizedPattern<'a> {
     fn from(pattern: &'a ast::Pattern) -> Self {
         match pattern {
             ast::Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => {
@@ -290,20 +286,20 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
     }
 }
 
-impl<'a> From<&'a Box<ast::Pattern>> for Box<ComparablePattern<'a>> {
+impl<'a> From<&'a Box<ast::Pattern>> for Box<NormalizedPattern<'a>> {
     fn from(pattern: &'a Box<ast::Pattern>) -> Self {
         Box::new((pattern.as_ref()).into())
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableMatchCase<'a> {
-    pattern: ComparablePattern<'a>,
-    guard: Option<ComparableExpr<'a>>,
-    body: Vec<ComparableStmt<'a>>,
+struct NormalizedMatchCase<'a> {
+    pattern: NormalizedPattern<'a>,
+    guard: Option<NormalizedExpr<'a>>,
+    body: Vec<NormalizedStmt<'a>>,
 }
 
-impl<'a> From<&'a ast::MatchCase> for ComparableMatchCase<'a> {
+impl<'a> From<&'a ast::MatchCase> for NormalizedMatchCase<'a> {
     fn from(match_case: &'a ast::MatchCase) -> Self {
         Self {
             pattern: (&match_case.pattern).into(),
@@ -314,11 +310,11 @@ impl<'a> From<&'a ast::MatchCase> for ComparableMatchCase<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableDecorator<'a> {
-    expression: ComparableExpr<'a>,
+struct NormalizedDecorator<'a> {
+    expression: NormalizedExpr<'a>,
 }
 
-impl<'a> From<&'a ast::Decorator> for ComparableDecorator<'a> {
+impl<'a> From<&'a ast::Decorator> for NormalizedDecorator<'a> {
     fn from(decorator: &'a ast::Decorator) -> Self {
         Self {
             expression: (&decorator.expression).into(),
@@ -327,13 +323,13 @@ impl<'a> From<&'a ast::Decorator> for ComparableDecorator<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableSingleton {
+enum NormalizedSingleton {
     None,
     True,
     False,
 }
 
-impl From<&ast::Singleton> for ComparableSingleton {
+impl From<&ast::Singleton> for NormalizedSingleton {
     fn from(singleton: &ast::Singleton) -> Self {
         match singleton {
             ast::Singleton::None => Self::None,
@@ -344,13 +340,13 @@ impl From<&ast::Singleton> for ComparableSingleton {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableNumber<'a> {
+enum NormalizedNumber<'a> {
     Int(&'a ast::Int),
     Float(u64),
     Complex { real: u64, imag: u64 },
 }
 
-impl<'a> From<&'a ast::Number> for ComparableNumber<'a> {
+impl<'a> From<&'a ast::Number> for NormalizedNumber<'a> {
     fn from(number: &'a ast::Number) -> Self {
         match number {
             ast::Number::Int(value) => Self::Int(value),
@@ -363,13 +359,13 @@ impl<'a> From<&'a ast::Number> for ComparableNumber<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableArguments<'a> {
-    args: Vec<ComparableExpr<'a>>,
-    keywords: Vec<ComparableKeyword<'a>>,
+#[derive(Debug, PartialEq, Eq, Hash, Default)]
+struct NormalizedArguments<'a> {
+    args: Vec<NormalizedExpr<'a>>,
+    keywords: Vec<NormalizedKeyword<'a>>,
 }
 
-impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
+impl<'a> From<&'a ast::Arguments> for NormalizedArguments<'a> {
     fn from(arguments: &'a ast::Arguments) -> Self {
         Self {
             args: arguments.args.iter().map(Into::into).collect(),
@@ -378,22 +374,22 @@ impl<'a> From<&'a ast::Arguments> for ComparableArguments<'a> {
     }
 }
 
-impl<'a> From<&'a Box<ast::Arguments>> for ComparableArguments<'a> {
+impl<'a> From<&'a Box<ast::Arguments>> for NormalizedArguments<'a> {
     fn from(arguments: &'a Box<ast::Arguments>) -> Self {
         (arguments.as_ref()).into()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableParameters<'a> {
-    posonlyargs: Vec<ComparableParameterWithDefault<'a>>,
-    args: Vec<ComparableParameterWithDefault<'a>>,
-    vararg: Option<ComparableParameter<'a>>,
-    kwonlyargs: Vec<ComparableParameterWithDefault<'a>>,
-    kwarg: Option<ComparableParameter<'a>>,
+struct NormalizedParameters<'a> {
+    posonlyargs: Vec<NormalizedParameterWithDefault<'a>>,
+    args: Vec<NormalizedParameterWithDefault<'a>>,
+    vararg: Option<NormalizedParameter<'a>>,
+    kwonlyargs: Vec<NormalizedParameterWithDefault<'a>>,
+    kwarg: Option<NormalizedParameter<'a>>,
 }
 
-impl<'a> From<&'a ast::Parameters> for ComparableParameters<'a> {
+impl<'a> From<&'a ast::Parameters> for NormalizedParameters<'a> {
     fn from(parameters: &'a ast::Parameters) -> Self {
         Self {
             posonlyargs: parameters.posonlyargs.iter().map(Into::into).collect(),
@@ -405,25 +401,25 @@ impl<'a> From<&'a ast::Parameters> for ComparableParameters<'a> {
     }
 }
 
-impl<'a> From<&'a Box<ast::Parameters>> for ComparableParameters<'a> {
+impl<'a> From<&'a Box<ast::Parameters>> for NormalizedParameters<'a> {
     fn from(parameters: &'a Box<ast::Parameters>) -> Self {
         (parameters.as_ref()).into()
     }
 }
 
-impl<'a> From<&'a Box<ast::Parameter>> for ComparableParameter<'a> {
+impl<'a> From<&'a Box<ast::Parameter>> for NormalizedParameter<'a> {
     fn from(arg: &'a Box<ast::Parameter>) -> Self {
         (arg.as_ref()).into()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableParameter<'a> {
+struct NormalizedParameter<'a> {
     arg: &'a str,
-    annotation: Option<Box<ComparableExpr<'a>>>,
+    annotation: Option<Box<NormalizedExpr<'a>>>,
 }
 
-impl<'a> From<&'a ast::Parameter> for ComparableParameter<'a> {
+impl<'a> From<&'a ast::Parameter> for NormalizedParameter<'a> {
     fn from(arg: &'a ast::Parameter) -> Self {
         Self {
             arg: arg.name.as_str(),
@@ -433,12 +429,12 @@ impl<'a> From<&'a ast::Parameter> for ComparableParameter<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableParameterWithDefault<'a> {
-    def: ComparableParameter<'a>,
-    default: Option<ComparableExpr<'a>>,
+struct NormalizedParameterWithDefault<'a> {
+    def: NormalizedParameter<'a>,
+    default: Option<NormalizedExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::ParameterWithDefault> for ComparableParameterWithDefault<'a> {
+impl<'a> From<&'a ast::ParameterWithDefault> for NormalizedParameterWithDefault<'a> {
     fn from(arg: &'a ast::ParameterWithDefault) -> Self {
         Self {
             def: (&arg.parameter).into(),
@@ -448,12 +444,12 @@ impl<'a> From<&'a ast::ParameterWithDefault> for ComparableParameterWithDefault<
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableKeyword<'a> {
+struct NormalizedKeyword<'a> {
     arg: Option<&'a str>,
-    value: ComparableExpr<'a>,
+    value: NormalizedExpr<'a>,
 }
 
-impl<'a> From<&'a ast::Keyword> for ComparableKeyword<'a> {
+impl<'a> From<&'a ast::Keyword> for NormalizedKeyword<'a> {
     fn from(keyword: &'a ast::Keyword) -> Self {
         Self {
             arg: keyword.arg.as_ref().map(ast::Identifier::as_str),
@@ -463,14 +459,14 @@ impl<'a> From<&'a ast::Keyword> for ComparableKeyword<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableComprehension<'a> {
-    target: ComparableExpr<'a>,
-    iter: ComparableExpr<'a>,
-    ifs: Vec<ComparableExpr<'a>>,
+struct NormalizedComprehension<'a> {
+    target: NormalizedExpr<'a>,
+    iter: NormalizedExpr<'a>,
+    ifs: Vec<NormalizedExpr<'a>>,
     is_async: bool,
 }
 
-impl<'a> From<&'a ast::Comprehension> for ComparableComprehension<'a> {
+impl<'a> From<&'a ast::Comprehension> for NormalizedComprehension<'a> {
     fn from(comprehension: &'a ast::Comprehension) -> Self {
         Self {
             target: (&comprehension.target).into(),
@@ -482,18 +478,18 @@ impl<'a> From<&'a ast::Comprehension> for ComparableComprehension<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExceptHandlerExceptHandler<'a> {
-    type_: Option<Box<ComparableExpr<'a>>>,
+struct ExceptHandlerExceptHandler<'a> {
+    type_: Option<Box<NormalizedExpr<'a>>>,
     name: Option<&'a str>,
-    body: Vec<ComparableStmt<'a>>,
+    body: Vec<NormalizedStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableExceptHandler<'a> {
+enum NormalizedExceptHandler<'a> {
     ExceptHandler(ExceptHandlerExceptHandler<'a>),
 }
 
-impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
+impl<'a> From<&'a ast::ExceptHandler> for NormalizedExceptHandler<'a> {
     fn from(except_handler: &'a ast::ExceptHandler) -> Self {
         let ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
             type_,
@@ -510,12 +506,12 @@ impl<'a> From<&'a ast::ExceptHandler> for ComparableExceptHandler<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableElifElseClause<'a> {
-    test: Option<ComparableExpr<'a>>,
-    body: Vec<ComparableStmt<'a>>,
+struct NormalizedElifElseClause<'a> {
+    test: Option<NormalizedExpr<'a>>,
+    body: Vec<NormalizedStmt<'a>>,
 }
 
-impl<'a> From<&'a ast::ElifElseClause> for ComparableElifElseClause<'a> {
+impl<'a> From<&'a ast::ElifElseClause> for NormalizedElifElseClause<'a> {
     fn from(elif_else_clause: &'a ast::ElifElseClause) -> Self {
         let ast::ElifElseClause {
             range: _,
@@ -530,131 +526,131 @@ impl<'a> From<&'a ast::ElifElseClause> for ComparableElifElseClause<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprBoolOp<'a> {
-    op: ComparableBoolOp,
-    values: Vec<ComparableExpr<'a>>,
+struct ExprBoolOp<'a> {
+    op: NormalizedBoolOp,
+    values: Vec<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprNamedExpr<'a> {
-    target: Box<ComparableExpr<'a>>,
-    value: Box<ComparableExpr<'a>>,
+struct ExprNamedExpr<'a> {
+    target: Box<NormalizedExpr<'a>>,
+    value: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprBinOp<'a> {
-    left: Box<ComparableExpr<'a>>,
-    op: ComparableOperator,
-    right: Box<ComparableExpr<'a>>,
+struct ExprBinOp<'a> {
+    left: Box<NormalizedExpr<'a>>,
+    op: NormalizedOperator,
+    right: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprUnaryOp<'a> {
-    op: ComparableUnaryOp,
-    operand: Box<ComparableExpr<'a>>,
+struct ExprUnaryOp<'a> {
+    op: NormalizedUnaryOp,
+    operand: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprLambda<'a> {
-    parameters: Option<ComparableParameters<'a>>,
-    body: Box<ComparableExpr<'a>>,
+struct ExprLambda<'a> {
+    parameters: Option<NormalizedParameters<'a>>,
+    body: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprIfExp<'a> {
-    test: Box<ComparableExpr<'a>>,
-    body: Box<ComparableExpr<'a>>,
-    orelse: Box<ComparableExpr<'a>>,
+struct ExprIfExp<'a> {
+    test: Box<NormalizedExpr<'a>>,
+    body: Box<NormalizedExpr<'a>>,
+    orelse: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprDict<'a> {
-    keys: Vec<Option<ComparableExpr<'a>>>,
-    values: Vec<ComparableExpr<'a>>,
+struct ExprDict<'a> {
+    keys: Vec<Option<NormalizedExpr<'a>>>,
+    values: Vec<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprSet<'a> {
-    elts: Vec<ComparableExpr<'a>>,
+struct ExprSet<'a> {
+    elts: Vec<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprListComp<'a> {
-    elt: Box<ComparableExpr<'a>>,
-    generators: Vec<ComparableComprehension<'a>>,
+struct ExprListComp<'a> {
+    elt: Box<NormalizedExpr<'a>>,
+    generators: Vec<NormalizedComprehension<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprSetComp<'a> {
-    elt: Box<ComparableExpr<'a>>,
-    generators: Vec<ComparableComprehension<'a>>,
+struct ExprSetComp<'a> {
+    elt: Box<NormalizedExpr<'a>>,
+    generators: Vec<NormalizedComprehension<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprDictComp<'a> {
-    key: Box<ComparableExpr<'a>>,
-    value: Box<ComparableExpr<'a>>,
-    generators: Vec<ComparableComprehension<'a>>,
+struct ExprDictComp<'a> {
+    key: Box<NormalizedExpr<'a>>,
+    value: Box<NormalizedExpr<'a>>,
+    generators: Vec<NormalizedComprehension<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprGeneratorExp<'a> {
-    elt: Box<ComparableExpr<'a>>,
-    generators: Vec<ComparableComprehension<'a>>,
+struct ExprGeneratorExp<'a> {
+    elt: Box<NormalizedExpr<'a>>,
+    generators: Vec<NormalizedComprehension<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprAwait<'a> {
-    value: Box<ComparableExpr<'a>>,
+struct ExprAwait<'a> {
+    value: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprYield<'a> {
-    value: Option<Box<ComparableExpr<'a>>>,
+struct ExprYield<'a> {
+    value: Option<Box<NormalizedExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprYieldFrom<'a> {
-    value: Box<ComparableExpr<'a>>,
+struct ExprYieldFrom<'a> {
+    value: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprCompare<'a> {
-    left: Box<ComparableExpr<'a>>,
-    ops: Vec<ComparableCmpOp>,
-    comparators: Vec<ComparableExpr<'a>>,
+struct ExprCompare<'a> {
+    left: Box<NormalizedExpr<'a>>,
+    ops: Vec<NormalizedCmpOp>,
+    comparators: Vec<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprCall<'a> {
-    func: Box<ComparableExpr<'a>>,
-    arguments: ComparableArguments<'a>,
+struct ExprCall<'a> {
+    func: Box<NormalizedExpr<'a>>,
+    arguments: NormalizedArguments<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprFormattedValue<'a> {
-    value: Box<ComparableExpr<'a>>,
+struct ExprFormattedValue<'a> {
+    value: Box<NormalizedExpr<'a>>,
     debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
-    format_spec: Option<Box<ComparableExpr<'a>>>,
+    format_spec: Option<Box<NormalizedExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprFString<'a> {
-    values: Vec<ComparableExpr<'a>>,
+struct ExprFString<'a> {
+    values: Vec<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableLiteral<'a> {
+enum NormalizedLiteral<'a> {
     None,
     Ellipsis,
     Bool(&'a bool),
-    Str(&'a str),
+    Str(String),
     Bytes(&'a [u8]),
-    Number(ComparableNumber<'a>),
+    Number(NormalizedNumber<'a>),
 }
 
-impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
+impl<'a> From<ast::LiteralExpressionRef<'a>> for NormalizedLiteral<'a> {
     fn from(literal: ast::LiteralExpressionRef<'a>) -> Self {
         match literal {
             ast::LiteralExpressionRef::NoneLiteral(_) => Self::None,
@@ -663,7 +659,7 @@ impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
                 value, ..
             }) => Self::Bool(value),
             ast::LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                Self::Str(value)
+                Self::Str(normalize(value))
             }
             ast::LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
                 Self::Bytes(value)
@@ -676,72 +672,72 @@ impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprStringLiteral<'a> {
-    value: &'a str,
+struct ExprStringLiteral {
+    value: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprBytesLiteral<'a> {
+struct ExprBytesLiteral<'a> {
     value: &'a [u8],
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprNumberLiteral<'a> {
-    value: ComparableNumber<'a>,
+struct ExprNumberLiteral<'a> {
+    value: NormalizedNumber<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprBoolLiteral<'a> {
+struct ExprBoolLiteral<'a> {
     value: &'a bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprAttribute<'a> {
-    value: Box<ComparableExpr<'a>>,
+struct ExprAttribute<'a> {
+    value: Box<NormalizedExpr<'a>>,
     attr: &'a str,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprSubscript<'a> {
-    value: Box<ComparableExpr<'a>>,
-    slice: Box<ComparableExpr<'a>>,
+struct ExprSubscript<'a> {
+    value: Box<NormalizedExpr<'a>>,
+    slice: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprStarred<'a> {
-    value: Box<ComparableExpr<'a>>,
+struct ExprStarred<'a> {
+    value: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprName<'a> {
+struct ExprName<'a> {
     id: &'a str,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprList<'a> {
-    elts: Vec<ComparableExpr<'a>>,
+struct ExprList<'a> {
+    elts: Vec<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprTuple<'a> {
-    elts: Vec<ComparableExpr<'a>>,
+struct ExprTuple<'a> {
+    elts: Vec<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprSlice<'a> {
-    lower: Option<Box<ComparableExpr<'a>>>,
-    upper: Option<Box<ComparableExpr<'a>>>,
-    step: Option<Box<ComparableExpr<'a>>>,
+struct ExprSlice<'a> {
+    lower: Option<Box<NormalizedExpr<'a>>>,
+    upper: Option<Box<NormalizedExpr<'a>>>,
+    step: Option<Box<NormalizedExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprIpyEscapeCommand<'a> {
+struct ExprIpyEscapeCommand<'a> {
     kind: ast::IpyEscapeKind,
     value: &'a str,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableExpr<'a> {
+enum NormalizedExpr<'a> {
     BoolOp(ExprBoolOp<'a>),
     NamedExpr(ExprNamedExpr<'a>),
     BinOp(ExprBinOp<'a>),
@@ -759,9 +755,9 @@ pub enum ComparableExpr<'a> {
     YieldFrom(ExprYieldFrom<'a>),
     Compare(ExprCompare<'a>),
     Call(ExprCall<'a>),
-    FormattedValue(ExprFormattedValue<'a>),
+    NormalizedValue(ExprFormattedValue<'a>),
     FString(ExprFString<'a>),
-    StringLiteral(ExprStringLiteral<'a>),
+    StringLiteral(ExprStringLiteral),
     BytesLiteral(ExprBytesLiteral<'a>),
     NumberLiteral(ExprNumberLiteral<'a>),
     BoolLiteral(ExprBoolLiteral<'a>),
@@ -777,19 +773,19 @@ pub enum ComparableExpr<'a> {
     IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
 }
 
-impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
+impl<'a> From<&'a Box<ast::Expr>> for Box<NormalizedExpr<'a>> {
     fn from(expr: &'a Box<ast::Expr>) -> Self {
         Box::new((expr.as_ref()).into())
     }
 }
 
-impl<'a> From<&'a Box<ast::Expr>> for ComparableExpr<'a> {
+impl<'a> From<&'a Box<ast::Expr>> for NormalizedExpr<'a> {
     fn from(expr: &'a Box<ast::Expr>) -> Self {
         (expr.as_ref()).into()
     }
 }
 
-impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
+impl<'a> From<&'a ast::Expr> for NormalizedExpr<'a> {
     fn from(expr: &'a ast::Expr) -> Self {
         match expr {
             ast::Expr::BoolOp(ast::ExprBoolOp {
@@ -927,7 +923,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 debug_text,
                 format_spec,
                 range: _,
-            }) => Self::FormattedValue(ExprFormattedValue {
+            }) => Self::NormalizedValue(ExprFormattedValue {
                 value: value.into(),
                 conversion: *conversion,
                 debug_text: debug_text.as_ref(),
@@ -947,7 +943,9 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 implicit_concatenated: _,
                 unicode: _,
                 range: _,
-            }) => Self::StringLiteral(ExprStringLiteral { value }),
+            }) => Self::StringLiteral(ExprStringLiteral {
+                value: normalize(value),
+            }),
             ast::Expr::BytesLiteral(ast::ExprBytesLiteral {
                 value,
                 // Compare bytes based on resolved value, not representation (i.e., ignore whether
@@ -1027,7 +1025,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ExprName> for ComparableExpr<'a> {
+impl<'a> From<&'a ast::ExprName> for NormalizedExpr<'a> {
     fn from(expr: &'a ast::ExprName) -> Self {
         Self::Name(ExprName {
             id: expr.id.as_str(),
@@ -1036,48 +1034,48 @@ impl<'a> From<&'a ast::ExprName> for ComparableExpr<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtFunctionDef<'a> {
+struct StmtFunctionDef<'a> {
     is_async: bool,
-    decorator_list: Vec<ComparableDecorator<'a>>,
+    decorator_list: Vec<NormalizedDecorator<'a>>,
     name: &'a str,
-    type_params: Option<ComparableTypeParams<'a>>,
-    parameters: ComparableParameters<'a>,
-    returns: Option<ComparableExpr<'a>>,
-    body: Vec<ComparableStmt<'a>>,
+    type_params: Option<NormalizedTypeParams<'a>>,
+    parameters: NormalizedParameters<'a>,
+    returns: Option<NormalizedExpr<'a>>,
+    body: Vec<NormalizedStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtClassDef<'a> {
-    decorator_list: Vec<ComparableDecorator<'a>>,
+struct StmtClassDef<'a> {
+    decorator_list: Vec<NormalizedDecorator<'a>>,
     name: &'a str,
-    type_params: Option<ComparableTypeParams<'a>>,
-    arguments: Option<ComparableArguments<'a>>,
-    body: Vec<ComparableStmt<'a>>,
+    type_params: Option<NormalizedTypeParams<'a>>,
+    arguments: NormalizedArguments<'a>,
+    body: Vec<NormalizedStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtReturn<'a> {
-    value: Option<ComparableExpr<'a>>,
+struct StmtReturn<'a> {
+    value: Option<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtDelete<'a> {
-    targets: Vec<ComparableExpr<'a>>,
+struct StmtDelete<'a> {
+    targets: Vec<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtTypeAlias<'a> {
-    pub name: Box<ComparableExpr<'a>>,
-    pub type_params: Option<ComparableTypeParams<'a>>,
-    pub value: Box<ComparableExpr<'a>>,
+struct StmtTypeAlias<'a> {
+    name: Box<NormalizedExpr<'a>>,
+    type_params: Option<NormalizedTypeParams<'a>>,
+    value: Box<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableTypeParams<'a> {
-    pub type_params: Vec<ComparableTypeParam<'a>>,
+struct NormalizedTypeParams<'a> {
+    type_params: Vec<NormalizedTypeParam<'a>>,
 }
 
-impl<'a> From<&'a ast::TypeParams> for ComparableTypeParams<'a> {
+impl<'a> From<&'a ast::TypeParams> for NormalizedTypeParams<'a> {
     fn from(type_params: &'a ast::TypeParams) -> Self {
         Self {
             type_params: type_params.iter().map(Into::into).collect(),
@@ -1085,20 +1083,20 @@ impl<'a> From<&'a ast::TypeParams> for ComparableTypeParams<'a> {
     }
 }
 
-impl<'a> From<&'a Box<ast::TypeParams>> for ComparableTypeParams<'a> {
+impl<'a> From<&'a Box<ast::TypeParams>> for NormalizedTypeParams<'a> {
     fn from(type_params: &'a Box<ast::TypeParams>) -> Self {
         type_params.as_ref().into()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableTypeParam<'a> {
+enum NormalizedTypeParam<'a> {
     TypeVar(TypeParamTypeVar<'a>),
     ParamSpec(TypeParamParamSpec<'a>),
     TypeVarTuple(TypeParamTypeVarTuple<'a>),
 }
 
-impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
+impl<'a> From<&'a ast::TypeParam> for NormalizedTypeParam<'a> {
     fn from(type_param: &'a ast::TypeParam) -> Self {
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar {
@@ -1124,134 +1122,134 @@ impl<'a> From<&'a ast::TypeParam> for ComparableTypeParam<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct TypeParamTypeVar<'a> {
-    pub name: &'a str,
-    pub bound: Option<Box<ComparableExpr<'a>>>,
+struct TypeParamTypeVar<'a> {
+    name: &'a str,
+    bound: Option<Box<NormalizedExpr<'a>>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct TypeParamParamSpec<'a> {
-    pub name: &'a str,
+struct TypeParamParamSpec<'a> {
+    name: &'a str,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct TypeParamTypeVarTuple<'a> {
-    pub name: &'a str,
+struct TypeParamTypeVarTuple<'a> {
+    name: &'a str,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAssign<'a> {
-    targets: Vec<ComparableExpr<'a>>,
-    value: ComparableExpr<'a>,
+struct StmtAssign<'a> {
+    targets: Vec<NormalizedExpr<'a>>,
+    value: NormalizedExpr<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAugAssign<'a> {
-    target: ComparableExpr<'a>,
-    op: ComparableOperator,
-    value: ComparableExpr<'a>,
+struct StmtAugAssign<'a> {
+    target: NormalizedExpr<'a>,
+    op: NormalizedOperator,
+    value: NormalizedExpr<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAnnAssign<'a> {
-    target: ComparableExpr<'a>,
-    annotation: ComparableExpr<'a>,
-    value: Option<ComparableExpr<'a>>,
+struct StmtAnnAssign<'a> {
+    target: NormalizedExpr<'a>,
+    annotation: NormalizedExpr<'a>,
+    value: Option<NormalizedExpr<'a>>,
     simple: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtFor<'a> {
+struct StmtFor<'a> {
     is_async: bool,
-    target: ComparableExpr<'a>,
-    iter: ComparableExpr<'a>,
-    body: Vec<ComparableStmt<'a>>,
-    orelse: Vec<ComparableStmt<'a>>,
+    target: NormalizedExpr<'a>,
+    iter: NormalizedExpr<'a>,
+    body: Vec<NormalizedStmt<'a>>,
+    orelse: Vec<NormalizedStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtWhile<'a> {
-    test: ComparableExpr<'a>,
-    body: Vec<ComparableStmt<'a>>,
-    orelse: Vec<ComparableStmt<'a>>,
+struct StmtWhile<'a> {
+    test: NormalizedExpr<'a>,
+    body: Vec<NormalizedStmt<'a>>,
+    orelse: Vec<NormalizedStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtIf<'a> {
-    test: ComparableExpr<'a>,
-    body: Vec<ComparableStmt<'a>>,
-    elif_else_clauses: Vec<ComparableElifElseClause<'a>>,
+struct StmtIf<'a> {
+    test: NormalizedExpr<'a>,
+    body: Vec<NormalizedStmt<'a>>,
+    elif_else_clauses: Vec<NormalizedElifElseClause<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtWith<'a> {
+struct StmtWith<'a> {
     is_async: bool,
-    items: Vec<ComparableWithItem<'a>>,
-    body: Vec<ComparableStmt<'a>>,
+    items: Vec<NormalizedWithItem<'a>>,
+    body: Vec<NormalizedStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtMatch<'a> {
-    subject: ComparableExpr<'a>,
-    cases: Vec<ComparableMatchCase<'a>>,
+struct StmtMatch<'a> {
+    subject: NormalizedExpr<'a>,
+    cases: Vec<NormalizedMatchCase<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtRaise<'a> {
-    exc: Option<ComparableExpr<'a>>,
-    cause: Option<ComparableExpr<'a>>,
+struct StmtRaise<'a> {
+    exc: Option<NormalizedExpr<'a>>,
+    cause: Option<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtTry<'a> {
-    body: Vec<ComparableStmt<'a>>,
-    handlers: Vec<ComparableExceptHandler<'a>>,
-    orelse: Vec<ComparableStmt<'a>>,
-    finalbody: Vec<ComparableStmt<'a>>,
+struct StmtTry<'a> {
+    body: Vec<NormalizedStmt<'a>>,
+    handlers: Vec<NormalizedExceptHandler<'a>>,
+    orelse: Vec<NormalizedStmt<'a>>,
+    finalbody: Vec<NormalizedStmt<'a>>,
     is_star: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtAssert<'a> {
-    test: ComparableExpr<'a>,
-    msg: Option<ComparableExpr<'a>>,
+struct StmtAssert<'a> {
+    test: NormalizedExpr<'a>,
+    msg: Option<NormalizedExpr<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtImport<'a> {
-    names: Vec<ComparableAlias<'a>>,
+struct StmtImport<'a> {
+    names: Vec<NormalizedAlias<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtImportFrom<'a> {
+struct StmtImportFrom<'a> {
     module: Option<&'a str>,
-    names: Vec<ComparableAlias<'a>>,
+    names: Vec<NormalizedAlias<'a>>,
     level: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtGlobal<'a> {
+struct StmtGlobal<'a> {
     names: Vec<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtNonlocal<'a> {
+struct StmtNonlocal<'a> {
     names: Vec<&'a str>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtExpr<'a> {
-    value: ComparableExpr<'a>,
+struct StmtExpr<'a> {
+    value: NormalizedExpr<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct StmtIpyEscapeCommand<'a> {
+struct StmtIpyEscapeCommand<'a> {
     kind: ast::IpyEscapeKind,
     value: &'a str,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableStmt<'a> {
+enum NormalizedStmt<'a> {
     FunctionDef(StmtFunctionDef<'a>),
     ClassDef(StmtClassDef<'a>),
     Return(StmtReturn<'a>),
@@ -1279,7 +1277,7 @@ pub enum ComparableStmt<'a> {
     Continue,
 }
 
-impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
+impl<'a> From<&'a ast::Stmt> for NormalizedStmt<'a> {
     fn from(stmt: &'a ast::Stmt) -> Self {
         match stmt {
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -1309,7 +1307,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 range: _,
             }) => Self::ClassDef(StmtClassDef {
                 name: name.as_str(),
-                arguments: arguments.as_ref().map(Into::into),
+                arguments: arguments.as_ref().map(Into::into).unwrap_or_default(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 type_params: type_params.as_ref().map(Into::into),
@@ -1318,7 +1316,19 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 value: value.as_ref().map(Into::into),
             }),
             ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => Self::Delete(StmtDelete {
-                targets: targets.iter().map(Into::into).collect(),
+                // Like Black, flatten all tuples, as we may insert parentheses, which changes the
+                // AST but not the semantics.
+                targets: targets
+                    .iter()
+                    .flat_map(|target| {
+                        if let ast::Expr::Tuple(tuple) = target {
+                            Left(tuple.elts.iter())
+                        } else {
+                            Right(std::iter::once(target))
+                        }
+                    })
+                    .map(Into::into)
+                    .collect(),
             }),
             ast::Stmt::TypeAlias(ast::StmtTypeAlias {
                 range: _,
@@ -1482,22 +1492,22 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableMod<'a> {
-    Module(ComparableModModule<'a>),
-    Expression(ComparableModExpression<'a>),
+pub(crate) enum NormalizedMod<'a> {
+    Module(NormalizedModModule<'a>),
+    Expression(NormalizedModExpression<'a>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableModModule<'a> {
-    body: Vec<ComparableStmt<'a>>,
+pub(crate) struct NormalizedModModule<'a> {
+    body: Vec<NormalizedStmt<'a>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ComparableModExpression<'a> {
-    body: Box<ComparableExpr<'a>>,
+pub(crate) struct NormalizedModExpression<'a> {
+    body: Box<NormalizedExpr<'a>>,
 }
 
-impl<'a> From<&'a ast::Mod> for ComparableMod<'a> {
+impl<'a> From<&'a ast::Mod> for NormalizedMod<'a> {
     fn from(mod_: &'a ast::Mod) -> Self {
         match mod_ {
             ast::Mod::Module(module) => Self::Module(module.into()),
@@ -1506,7 +1516,7 @@ impl<'a> From<&'a ast::Mod> for ComparableMod<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ModModule> for ComparableModModule<'a> {
+impl<'a> From<&'a ast::ModModule> for NormalizedModModule<'a> {
     fn from(module: &'a ast::ModModule) -> Self {
         Self {
             body: module.body.iter().map(Into::into).collect(),
@@ -1514,10 +1524,21 @@ impl<'a> From<&'a ast::ModModule> for ComparableModModule<'a> {
     }
 }
 
-impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
+impl<'a> From<&'a ast::ModExpression> for NormalizedModExpression<'a> {
     fn from(expr: &'a ast::ModExpression) -> Self {
         Self {
             body: (&expr.body).into(),
         }
     }
+}
+
+/// Normalize a string by (1) stripping any leading and trailing space from each line, and
+/// (2) removing any blank lines from the start and end of the string.
+fn normalize(s: &str) -> String {
+    s.lines()
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_owned()
 }

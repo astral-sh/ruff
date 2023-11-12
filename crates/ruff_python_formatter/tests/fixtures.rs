@@ -1,10 +1,16 @@
-use ruff_formatter::FormatOptions;
-use ruff_python_formatter::{format_module_source, PreviewMode, PyFormatOptions};
-use similar::TextDiff;
 use std::fmt::{Formatter, Write};
 use std::io::BufReader;
 use std::path::Path;
 use std::{fmt, fs};
+
+use similar::TextDiff;
+
+use normalized_ast::NormalizedMod;
+use ruff_formatter::FormatOptions;
+use ruff_python_formatter::{format_module_source, PreviewMode, PyFormatOptions};
+use ruff_python_parser::{parse, AsMode};
+
+mod normalized_ast;
 
 #[test]
 fn black_compatibility() {
@@ -33,6 +39,7 @@ fn black_compatibility() {
 
         let formatted_code = printed.as_code();
 
+        ensure_unchanged_ast(&content, formatted_code, &options, input_path);
         ensure_stability_when_formatting_twice(formatted_code, options, input_path);
 
         if formatted_code == expected_output {
@@ -111,6 +118,7 @@ fn format() {
             format_module_source(&content, options.clone()).expect("Formatting to succeed");
         let formatted_code = printed.as_code();
 
+        ensure_unchanged_ast(&content, formatted_code, &options, input_path);
         ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
 
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
@@ -128,6 +136,7 @@ fn format() {
                     format_module_source(&content, options.clone()).expect("Formatting to succeed");
                 let formatted_code = printed.as_code();
 
+                ensure_unchanged_ast(&content, formatted_code, &options, input_path);
                 ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
 
                 writeln!(
@@ -140,29 +149,20 @@ fn format() {
                 .unwrap();
             }
         } else {
-            let printed =
-                format_module_source(&content, options.clone()).expect("Formatting to succeed");
-            let formatted = printed.as_code();
-
-            ensure_stability_when_formatting_twice(formatted, options.clone(), input_path);
-
             // We want to capture the differences in the preview style in our fixtures
             let options_preview = options.with_preview(PreviewMode::Enabled);
             let printed_preview = format_module_source(&content, options_preview.clone())
                 .expect("Formatting to succeed");
             let formatted_preview = printed_preview.as_code();
 
-            ensure_stability_when_formatting_twice(
-                formatted_preview,
-                options_preview.clone(),
-                input_path,
-            );
+            ensure_unchanged_ast(&content, formatted_preview, &options_preview, input_path);
+            ensure_stability_when_formatting_twice(formatted_preview, options_preview, input_path);
 
-            if formatted == formatted_preview {
+            if formatted_code == formatted_preview {
                 writeln!(
                     snapshot,
                     "## Output\n{}",
-                    CodeFrame::new("python", &formatted)
+                    CodeFrame::new("python", &formatted_code)
                 )
                 .unwrap();
             } else {
@@ -171,10 +171,10 @@ fn format() {
                 writeln!(
                     snapshot,
                     "## Output\n{}\n## Preview changes\n{}",
-                    CodeFrame::new("python", &formatted),
+                    CodeFrame::new("python", &formatted_code),
                     CodeFrame::new(
                         "diff",
-                        TextDiff::from_lines(formatted, formatted_preview)
+                        TextDiff::from_lines(formatted_code, formatted_preview)
                             .unified_diff()
                             .header("Stable", "Preview")
                     )
@@ -235,6 +235,55 @@ Formatted twice:
 {}---"#,
             input_path.display(),
             reformatted.as_code(),
+        );
+    }
+}
+
+/// Ensure that formatting doesn't change the AST.
+///
+/// Like Black, there are a few exceptions to this "invariant" which are encoded in
+/// [`NormalizedMod`] and related structs. Namely, formatting can change indentation within strings,
+/// and can also flatten tuples within `del` statements.
+fn ensure_unchanged_ast(
+    unformatted_code: &str,
+    formatted_code: &str,
+    options: &PyFormatOptions,
+    input_path: &Path,
+) {
+    let source_type = options.source_type();
+
+    // Parse the unformatted code.
+    let unformatted_ast = parse(
+        unformatted_code,
+        source_type.as_mode(),
+        &input_path.to_string_lossy(),
+    )
+    .expect("Unformatted code to be valid syntax");
+    let unformatted_ast = NormalizedMod::from(&unformatted_ast);
+
+    // Parse the formatted code.
+    let formatted_ast = parse(
+        formatted_code,
+        source_type.as_mode(),
+        &input_path.to_string_lossy(),
+    )
+    .expect("Formatted code to be valid syntax");
+    let formatted_ast = NormalizedMod::from(&formatted_ast);
+
+    if formatted_ast != unformatted_ast {
+        let diff = TextDiff::from_lines(
+            &format!("{unformatted_ast:#?}"),
+            &format!("{formatted_ast:#?}"),
+        )
+        .unified_diff()
+        .header("Unformatted", "Formatted")
+        .to_string();
+        panic!(
+            r#"Reformatting the unformatted code of {} resulted in AST changes.
+---
+{diff}
+"#,
+            input_path.display(),
         );
     }
 }
