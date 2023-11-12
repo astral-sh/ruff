@@ -351,15 +351,6 @@ pub(crate) fn blank_lines(
     stylist: &Stylist,
     context: &mut LogicalLinesContext,
 ) {
-    // dbg!(
-    //     line.text(),
-    //     &line.line.blank_lines,
-    //     &line.line.preceding_blank_lines,
-    //     indent_level,
-    //     &tracked_vars
-    // );
-    // dbg!();
-
     if tracked_vars.is_first_logical_line {
         if !line.is_comment_only() {
             tracked_vars.is_first_logical_line = false;
@@ -372,7 +363,7 @@ pub(crate) fn blank_lines(
     if indent_level < tracked_vars.class_indent_level && tracked_vars.is_in_class {
         tracked_vars.is_in_class = false;
         if line.is_comment_only() {
-            tracked_vars.follows_comment_after_class = true
+            tracked_vars.follows_comment_after_class = true;
         } else {
             follows_class_or_fn = true;
         }
@@ -381,7 +372,7 @@ pub(crate) fn blank_lines(
     if indent_level < tracked_vars.fn_indent_level && tracked_vars.is_in_fn {
         tracked_vars.is_in_fn = false;
         if line.is_comment_only() {
-            tracked_vars.follows_comment_after_fn = true
+            tracked_vars.follows_comment_after_fn = true;
         } else {
             follows_class_or_fn = true;
         }
@@ -405,7 +396,7 @@ pub(crate) fn blank_lines(
         tracked_vars.follows_comment_after_class = false;
     }
 
-    for token in line.tokens().iter() {
+    for token in line.tokens() {
         if matches!(token.kind, TokenKind::Indent | TokenKind::Dedent) {
             continue;
         }
@@ -415,7 +406,7 @@ pub(crate) fn blank_lines(
             && tracked_vars.is_in_class
             && (
                 // A comment before the def is allowed (as long as it is preceded by a blank line).
-                (line.line.preceding_blank_lines == 0 && line.line.blank_lines == 0 && prev_line.is_some_and(|line| line.is_comment_only()))
+                (line.line.preceding_blank_lines == 0 && line.line.blank_lines == 0 && prev_line.is_some_and(LogicalLine::is_comment_only))
                 // Standard case.
                 || line.line.blank_lines == 0
                     && prev_line
@@ -453,7 +444,7 @@ pub(crate) fn blank_lines(
                     || tracked_vars.is_in_class
                     || tracked_vars.is_in_fn
                 // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
-                    || (line.line.preceding_blank_lines >= 2 && prev_line.map_or(false, |prev_line| prev_line.is_comment_only()))
+                    || (line.line.preceding_blank_lines >= 2 && prev_line.map_or(false, LogicalLine::is_comment_only))
             )
         // Allow directly following an except.
             && prev_line

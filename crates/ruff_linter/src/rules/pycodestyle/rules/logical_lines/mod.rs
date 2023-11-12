@@ -488,7 +488,7 @@ impl LogicalLinesBuilder {
                 self.current_blank_characters += end - self.current_line.tokens_start;
             } else {
                 if self.previous_blank_lines < self.current_blank_lines {
-                    self.previous_blank_lines = self.current_blank_lines
+                    self.previous_blank_lines = self.current_blank_lines;
                 }
                 self.lines.push(Line {
                     flags: self.current_line.flags,
