@@ -28,7 +28,7 @@ use crate::settings::LinterSettings;
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [allowed-confusables] setting.
+/// [`allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -40,8 +40,10 @@ use crate::settings::LinterSettings;
 /// print("Hello, world!")  # "H" is the Latin capital H (`U+0048`).
 /// ```
 ///
+/// ## Options
+/// - `allowed-confusables`
+///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-/// [allowed-confusables]: https://docs.astral.sh/ruff/settings/#allowed-confusables
 #[violation]
 pub struct AmbiguousUnicodeCharacterString {
     confusable: char,
@@ -79,7 +81,7 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [allowed-confusables] setting.
+/// [`allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -91,8 +93,10 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// """A lovely docstring (with no strange parentheses)."""
 /// ```
 ///
+/// ## Options
+/// - `allowed-confusables`
+///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-/// [allowed-confusables]: https://docs.astral.sh/ruff/settings/#allowed-confusables
 #[violation]
 pub struct AmbiguousUnicodeCharacterDocstring {
     confusable: char,
@@ -130,7 +134,7 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
 /// You can omit characters from being flagged as ambiguous via the
-/// [allowed-confusables] setting.
+/// [`allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -142,8 +146,10 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// foo()  # noqa  # "o" is Latin (`U+006F`)
 /// ```
 ///
+/// ## Options
+/// - `allowed-confusables`
+///
 /// [preview]: https://docs.astral.sh/ruff/preview/
-/// [allowed-confusables]: https://docs.astral.sh/ruff/settings/#allowed-confusables
 #[violation]
 pub struct AmbiguousUnicodeCharacterComment {
     confusable: char,
