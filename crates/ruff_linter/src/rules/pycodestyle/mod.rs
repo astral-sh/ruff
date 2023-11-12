@@ -122,31 +122,6 @@ mod tests {
     #[test_case(Rule::TooFewSpacesBeforeInlineComment, Path::new("E26.py"))]
     #[test_case(Rule::UnexpectedIndentation, Path::new("E11.py"))]
     #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]
-    #[test_case(Rule::UnderIndentedHangingIndent, Path::new("E12.py"))]
-    #[test_case(Rule::MissingOrOutdentedIndentation, Path::new("E12.py"))]
-    #[test_case(
-        Rule::ClosingBracketNotMatchingOpeningBracketIndentation,
-        Path::new("E12.py")
-    )]
-    #[test_case(
-        Rule::ClosingBracketNotMatchingOpeningBracketVisualIndentation,
-        Path::new("E12.py")
-    )]
-    #[test_case(Rule::ContinuationLineIndentSameAsNextLogicalLine, Path::new("E12.py"))]
-    #[test_case(
-        Rule::ContinuationLineOverIndentedForHangingIndent,
-        Path::new("E12.py")
-    )]
-    #[test_case(Rule::ContinuationLineOverIndentedForVisualIndent, Path::new("E12.py"))]
-    #[test_case(
-        Rule::ContinuationLineUnderIndentedForVisualIndent,
-        Path::new("E12.py")
-    )]
-    #[test_case(
-        Rule::VisuallyIndentedLineWithSameIndentAsNextLogicalLine,
-        Path::new("E12.py")
-    )]
-    #[test_case(Rule::ContinuationLineUnalignedForHangingIndent, Path::new("E12.py"))]
     #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
@@ -156,6 +131,13 @@ mod tests {
         Path::new("E25.py")
     )]
     #[test_case(Rule::MissingWhitespaceAroundParameterEquals, Path::new("E25.py"))]
+    #[test_case(Rule::BlankLineBetweenMethods, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLinesTopLevel, Path::new("E30.py"))]
+    #[test_case(Rule::TooManyBlankLines, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLineAfterDecorator, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLinesAfterFunctionOrClass, Path::new("E30.py"))]
+    #[test_case(Rule::BlankLinesBeforeNestedDefinition, Path::new("E30.py"))]
+
     fn logical(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
