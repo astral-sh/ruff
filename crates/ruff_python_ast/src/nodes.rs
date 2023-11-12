@@ -101,6 +101,8 @@ pub enum Stmt {
     // Jupyter notebook specific
     #[is(name = "ipy_escape_command_stmt")]
     IpyEscapeCommand(StmtIpyEscapeCommand),
+    #[is(name = "crement_stmt")]
+    Crement(StmtCrement),
 }
 
 /// An AST node used to represent a IPython escape command at the statement level.
@@ -294,6 +296,26 @@ pub struct StmtAugAssign {
 impl From<StmtAugAssign> for Stmt {
     fn from(payload: StmtAugAssign) -> Self {
         Stmt::AugAssign(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum CrementKind {
+    Increment,
+    Decrement,
+}
+
+/// `++` or `--`
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtCrement {
+    pub range: TextRange,
+    pub target: Box<Expr>,
+    pub op: CrementKind,
+}
+
+impl From<StmtCrement> for Stmt {
+    fn from(payload: StmtCrement) -> Self {
+        Stmt::Crement(payload)
     }
 }
 
@@ -3693,6 +3715,11 @@ impl Ranged for crate::nodes::StmtAugAssign {
         self.range
     }
 }
+impl Ranged for crate::nodes::StmtCrement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::nodes::StmtAnnAssign {
     fn range(&self) -> TextRange {
         self.range
@@ -3816,6 +3843,7 @@ impl Ranged for crate::Stmt {
             Self::Break(node) => node.range(),
             Self::Continue(node) => node.range(),
             Stmt::IpyEscapeCommand(node) => node.range(),
+            Stmt::Crement(node) => node.range(),
         }
     }
 }

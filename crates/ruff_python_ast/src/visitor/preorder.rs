@@ -209,6 +209,7 @@ where
             Stmt::TypeAlias(stmt) => stmt.visit_preorder(visitor),
             Stmt::Assign(stmt) => stmt.visit_preorder(visitor),
             Stmt::AugAssign(stmt) => stmt.visit_preorder(visitor),
+            Stmt::Crement(stmt) => stmt.visit_preorder(visitor),
             Stmt::AnnAssign(stmt) => stmt.visit_preorder(visitor),
             Stmt::For(stmt) => stmt.visit_preorder(visitor),
             Stmt::While(stmt) => stmt.visit_preorder(visitor),

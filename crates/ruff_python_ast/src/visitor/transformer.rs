@@ -306,6 +306,7 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
         Stmt::Nonlocal(_) => {}
         Stmt::Expr(ast::StmtExpr { value, range: _ }) => visitor.visit_expr(value),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) | Stmt::IpyEscapeCommand(_) => {}
+        Stmt::Crement(_) => {}
     }
 }
 

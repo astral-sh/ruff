@@ -203,6 +203,14 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_operator(op);
             visitor.visit_expr(target);
         }
+        Stmt::Crement(ast::StmtCrement {
+            target,
+            op: _,
+            range: _,
+        }) => {
+            // TODO(konstin): visitor.visit_operator(op);
+            visitor.visit_expr(target);
+        }
         Stmt::AnnAssign(ast::StmtAnnAssign {
             target,
             annotation,

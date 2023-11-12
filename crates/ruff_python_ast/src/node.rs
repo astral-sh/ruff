@@ -36,6 +36,7 @@ pub enum AnyNode {
     StmtTypeAlias(ast::StmtTypeAlias),
     StmtAssign(ast::StmtAssign),
     StmtAugAssign(ast::StmtAugAssign),
+    StmtCrement(ast::StmtCrement),
     StmtAnnAssign(ast::StmtAnnAssign),
     StmtFor(ast::StmtFor),
     StmtWhile(ast::StmtWhile),
@@ -130,6 +131,7 @@ impl AnyNode {
             AnyNode::StmtTypeAlias(node) => Some(Stmt::TypeAlias(node)),
             AnyNode::StmtAssign(node) => Some(Stmt::Assign(node)),
             AnyNode::StmtAugAssign(node) => Some(Stmt::AugAssign(node)),
+            AnyNode::StmtCrement(node) => Some(Stmt::Crement(node)),
             AnyNode::StmtAnnAssign(node) => Some(Stmt::AnnAssign(node)),
             AnyNode::StmtFor(node) => Some(Stmt::For(node)),
             AnyNode::StmtWhile(node) => Some(Stmt::While(node)),
@@ -262,6 +264,7 @@ impl AnyNode {
             | AnyNode::StmtTypeAlias(_)
             | AnyNode::StmtAssign(_)
             | AnyNode::StmtAugAssign(_)
+            | AnyNode::StmtCrement(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
             | AnyNode::StmtWhile(_)
@@ -327,6 +330,7 @@ impl AnyNode {
             | AnyNode::StmtTypeAlias(_)
             | AnyNode::StmtAssign(_)
             | AnyNode::StmtAugAssign(_)
+            | AnyNode::StmtCrement(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
             | AnyNode::StmtWhile(_)
@@ -432,6 +436,7 @@ impl AnyNode {
             | AnyNode::StmtTypeAlias(_)
             | AnyNode::StmtAssign(_)
             | AnyNode::StmtAugAssign(_)
+            | AnyNode::StmtCrement(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
             | AnyNode::StmtWhile(_)
@@ -522,6 +527,7 @@ impl AnyNode {
             | AnyNode::StmtTypeAlias(_)
             | AnyNode::StmtAssign(_)
             | AnyNode::StmtAugAssign(_)
+            | AnyNode::StmtCrement(_)
             | AnyNode::StmtAnnAssign(_)
             | AnyNode::StmtFor(_)
             | AnyNode::StmtWhile(_)
@@ -637,6 +643,7 @@ impl AnyNode {
             Self::StmtTypeAlias(node) => AnyNodeRef::StmtTypeAlias(node),
             Self::StmtAssign(node) => AnyNodeRef::StmtAssign(node),
             Self::StmtAugAssign(node) => AnyNodeRef::StmtAugAssign(node),
+            Self::StmtCrement(node) => AnyNodeRef::StmtCrement(node),
             Self::StmtAnnAssign(node) => AnyNodeRef::StmtAnnAssign(node),
             Self::StmtFor(node) => AnyNodeRef::StmtFor(node),
             Self::StmtWhile(node) => AnyNodeRef::StmtWhile(node),
@@ -1123,6 +1130,48 @@ impl AstNode for ast::StmtAugAssign {
         visitor.visit_expr(target);
         visitor.visit_operator(op);
         visitor.visit_expr(value);
+    }
+}
+impl AstNode for ast::StmtCrement {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StmtCrement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StmtCrement(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::StmtCrement {
+            target,
+            op: _,
+            range: _,
+        } = self;
+
+        visitor.visit_expr(target);
+        // TODO(konstin): visitor.visit_operator(op);
     }
 }
 impl AstNode for ast::StmtAnnAssign {
@@ -4538,6 +4587,7 @@ impl From<Stmt> for AnyNode {
             Stmt::Break(node) => AnyNode::StmtBreak(node),
             Stmt::Continue(node) => AnyNode::StmtContinue(node),
             Stmt::IpyEscapeCommand(node) => AnyNode::StmtIpyEscapeCommand(node),
+            Stmt::Crement(node) => AnyNode::StmtCrement(node),
         }
     }
 }
@@ -4673,6 +4723,12 @@ impl From<ast::StmtAssign> for AnyNode {
 impl From<ast::StmtAugAssign> for AnyNode {
     fn from(node: ast::StmtAugAssign) -> Self {
         AnyNode::StmtAugAssign(node)
+    }
+}
+
+impl From<ast::StmtCrement> for AnyNode {
+    fn from(node: ast::StmtCrement) -> Self {
+        AnyNode::StmtCrement(node)
     }
 }
 
@@ -5251,6 +5307,7 @@ impl Ranged for AnyNode {
             AnyNode::StringLiteral(node) => node.range(),
             AnyNode::BytesLiteral(node) => node.range(),
             AnyNode::ElifElseClause(node) => node.range(),
+            AnyNode::StmtCrement(node) => node.range(),
         }
     }
 }
@@ -5266,6 +5323,7 @@ pub enum AnyNodeRef<'a> {
     StmtTypeAlias(&'a ast::StmtTypeAlias),
     StmtAssign(&'a ast::StmtAssign),
     StmtAugAssign(&'a ast::StmtAugAssign),
+    StmtCrement(&'a ast::StmtCrement),
     StmtAnnAssign(&'a ast::StmtAnnAssign),
     StmtFor(&'a ast::StmtFor),
     StmtWhile(&'a ast::StmtWhile),
@@ -5444,6 +5502,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StringLiteral(node) => NonNull::from(*node).cast(),
             AnyNodeRef::BytesLiteral(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ElifElseClause(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StmtCrement(node) => NonNull::from(*node).cast(),
         }
     }
 
@@ -5546,6 +5605,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StringLiteral(_) => NodeKind::StringLiteral,
             AnyNodeRef::BytesLiteral(_) => NodeKind::BytesLiteral,
             AnyNodeRef::ElifElseClause(_) => NodeKind::ElifElseClause,
+            AnyNodeRef::StmtCrement(_) => NodeKind::StmtCrement,
         }
     }
 
@@ -5558,6 +5618,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtCrement(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
             | AnyNodeRef::StmtWhile(_)
@@ -5690,6 +5751,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtCrement(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
             | AnyNodeRef::StmtWhile(_)
@@ -5754,6 +5816,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtCrement(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
             | AnyNodeRef::StmtWhile(_)
@@ -5859,6 +5922,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtCrement(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
             | AnyNodeRef::StmtWhile(_)
@@ -5949,6 +6013,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::StmtTypeAlias(_)
             | AnyNodeRef::StmtAssign(_)
             | AnyNodeRef::StmtAugAssign(_)
+            | AnyNodeRef::StmtCrement(_)
             | AnyNodeRef::StmtAnnAssign(_)
             | AnyNodeRef::StmtFor(_)
             | AnyNodeRef::StmtWhile(_)
@@ -6058,6 +6123,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StmtTypeAlias(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtAssign(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtAugAssign(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StmtCrement(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtAnnAssign(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtFor(node) => node.visit_preorder(visitor),
             AnyNodeRef::StmtWhile(node) => node.visit_preorder(visitor),
@@ -6369,6 +6435,12 @@ impl<'a> From<&'a ast::StmtAssign> for AnyNodeRef<'a> {
 impl<'a> From<&'a ast::StmtAugAssign> for AnyNodeRef<'a> {
     fn from(node: &'a ast::StmtAugAssign) -> Self {
         AnyNodeRef::StmtAugAssign(node)
+    }
+}
+
+impl<'a> From<&'a ast::StmtCrement> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::StmtCrement) -> Self {
+        AnyNodeRef::StmtCrement(node)
     }
 }
 
@@ -6837,6 +6909,7 @@ impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
             Stmt::Break(node) => AnyNodeRef::StmtBreak(node),
             Stmt::Continue(node) => AnyNodeRef::StmtContinue(node),
             Stmt::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
+            Stmt::Crement(node) => AnyNodeRef::StmtCrement(node),
         }
     }
 }
@@ -7073,6 +7146,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::FString(node) => node.range(),
             AnyNodeRef::StringLiteral(node) => node.range(),
             AnyNodeRef::BytesLiteral(node) => node.range(),
+            AnyNodeRef::StmtCrement(node) => node.range(),
         }
     }
 }
@@ -7173,4 +7247,5 @@ pub enum NodeKind {
     FString,
     StringLiteral,
     BytesLiteral,
+    StmtCrement,
 }

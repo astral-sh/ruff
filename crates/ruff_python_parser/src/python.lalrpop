@@ -110,6 +110,16 @@ DelStatement: ast::Stmt = {
 };
 
 ExpressionStatement: ast::Stmt = {
+    <location:@L> <target:TestOrStarExprList> <op:Crement> <end_location:@R> =>? {
+        invalid::assignment_target(&target.expr)?;
+        Ok(ast::Stmt::Crement(
+            ast::StmtCrement {
+                target: Box::new(set_context(target.into(), ast::ExprContext::Store)),
+                op,
+                range: (location..end_location).into()
+            },
+        ))
+    },
     <location:@L> <expression:TestOrStarExprList> <suffix:AssignSuffix*> <end_location:@R> =>? {
         // Just an expression, no assignment:
         if suffix.is_empty() {
@@ -202,6 +212,11 @@ AugAssign: ast::Operator = {
     ">>=" => ast::Operator::RShift,
     "**=" => ast::Operator::Pow,
     "//=" => ast::Operator::FloorDiv,
+};
+
+Crement: ast::CrementKind = {
+    "++" => ast::CrementKind::Increment,
+    "--" => ast::CrementKind::Decrement,
 };
 
 FlowStatement: ast::Stmt = {
@@ -2033,6 +2048,8 @@ extern {
         ">" => token::Tok::Greater,
         ">=" => token::Tok::GreaterEqual,
         "->" => token::Tok::Rarrow,
+        "++" => token::Tok::Increment,
+        "--" => token::Tok::Decrement,
         "and" => token::Tok::And,
         "as" => token::Tok::As,
         "assert" => token::Tok::Assert,

@@ -1079,7 +1079,9 @@ impl<'source> Lexer<'source> {
                 }
             }
             '+' => {
-                if self.cursor.eat_char('=') {
+                if self.cursor.eat_char('+') {
+                    Tok::Increment
+                } else if self.cursor.eat_char('=') {
                     Tok::PlusEqual
                 } else {
                     Tok::Plus
@@ -1166,7 +1168,9 @@ impl<'source> Lexer<'source> {
                 }
             }
             '-' => {
-                if self.cursor.eat_char('=') {
+                if self.cursor.eat_char('-') {
+                    Tok::Increment
+                } else if self.cursor.eat_char('=') {
                     Tok::MinusEqual
                 } else if self.cursor.eat_char('>') {
                     Tok::Rarrow

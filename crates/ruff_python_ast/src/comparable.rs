@@ -1543,6 +1543,9 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::Pass(_) => Self::Pass,
             ast::Stmt::Break(_) => Self::Break,
             ast::Stmt::Continue(_) => Self::Continue,
+            ast::Stmt::Crement(_) => {
+                todo!()
+            }
         }
     }
 }

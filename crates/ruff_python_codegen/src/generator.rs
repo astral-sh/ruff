@@ -4,10 +4,10 @@ use std::ops::Deref;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::{
-    self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
-    Singleton, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
-    WithItem,
+    self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, CrementKind,
+    DebugText, ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters,
+    Pattern, Singleton, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
+    TypeParamTypeVarTuple, WithItem,
 };
 use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
@@ -343,6 +343,20 @@ impl<'a> Generator<'a> {
                     });
                     self.p("= ");
                     self.unparse_expr(value, precedence::AUG_ASSIGN);
+                });
+            }
+            Stmt::Crement(ast::StmtCrement {
+                target,
+                op,
+                range: _,
+            }) => {
+                statement!({
+                    self.unparse_expr(target, precedence::AUG_ASSIGN);
+                    self.p(" ");
+                    self.p(match op {
+                        CrementKind::Increment => "+= 1",
+                        CrementKind::Decrement => "-= 1",
+                    });
                 });
             }
             Stmt::AnnAssign(ast::StmtAnnAssign {

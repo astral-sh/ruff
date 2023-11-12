@@ -432,6 +432,7 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
         Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
             any_over_expr(target, func) || any_over_expr(value, func)
         }
+        Stmt::Crement(ast::StmtCrement { target, .. }) => any_over_expr(target, func),
         Stmt::AnnAssign(ast::StmtAnnAssign {
             target,
             annotation,

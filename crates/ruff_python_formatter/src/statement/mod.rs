@@ -45,6 +45,19 @@ impl FormatRule<Stmt, PyFormatContext<'_>> for FormatStmt {
             Stmt::Delete(x) => x.format().fmt(f),
             Stmt::Assign(x) => x.format().fmt(f),
             Stmt::AugAssign(x) => x.format().fmt(f),
+            Stmt::Crement(x) => {
+                x.target.format().fmt(f)?;
+                use ruff_formatter::prelude::*;
+                match x.op {
+                    ruff_python_ast::CrementKind::Increment => {
+                        ruff_formatter::write!(f, [space(), text("+="), space(), text("1")])?;
+                    }
+                    ruff_python_ast::CrementKind::Decrement => {
+                        ruff_formatter::write!(f, [space(), text("-="), space(), text("1")])?;
+                    }
+                }
+                Ok(())
+            }
             Stmt::AnnAssign(x) => x.format().fmt(f),
             Stmt::For(x) => x.format().fmt(f),
             Stmt::While(x) => x.format().fmt(f),

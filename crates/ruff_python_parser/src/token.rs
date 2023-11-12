@@ -157,6 +157,10 @@ pub enum Tok {
     VbarEqual,
     /// Token value for caret equal `^=`.
     CircumflexEqual,
+    /// Token value for `++`.
+    Increment,
+    /// Token value for `--`.
+    Decrement,
     /// Token value for left shift equal `<<=`.
     LeftShiftEqual,
     /// Token value for right shift equal `>>=`.
@@ -343,6 +347,8 @@ impl fmt::Display for Tok {
             With => f.write_str("'with'"),
             Yield => f.write_str("'yield'"),
             ColonEqual => f.write_str("':='"),
+            Increment => f.write_str("++"),
+            Decrement => f.write_str("--"),
         }
     }
 }
@@ -526,6 +532,8 @@ pub enum TokenKind {
     StartModule,
     StartInteractive,
     StartExpression,
+    Increment,
+    Decrement,
 }
 
 impl TokenKind {
@@ -620,6 +628,8 @@ impl TokenKind {
                 | TokenKind::AmperEqual
                 | TokenKind::VbarEqual
                 | TokenKind::CircumflexEqual
+                | TokenKind::Increment
+                | TokenKind::Decrement
                 | TokenKind::LeftShiftEqual
                 | TokenKind::RightShiftEqual
                 | TokenKind::DoubleStarEqual
@@ -799,6 +809,8 @@ impl TokenKind {
             Tok::Yield => TokenKind::Yield,
             Tok::StartModule => TokenKind::StartModule,
             Tok::StartExpression => TokenKind::StartExpression,
+            Tok::Increment => TokenKind::Increment,
+            Tok::Decrement => TokenKind::Decrement,
         }
     }
 }
