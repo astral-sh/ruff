@@ -129,12 +129,14 @@ pub(crate) fn boolean_type_hint_positional_argument(
         let Some(annotation) = parameter.annotation.as_ref() else {
             continue;
         };
-        if if checker.settings.preview.is_enabled() {
-            match_annotation_to_literal_bool(annotation)
+        if checker.settings.preview.is_enabled() {
+            if !match_annotation_to_complex_bool(annotation, checker.semantic()) {
+                continue;
+            }
         } else {
-            match_annotation_to_complex_bool(annotation, checker.semantic())
-        } {
-            continue;
+            if !match_annotation_to_literal_bool(annotation) {
+                continue;
+            }
         }
         if !checker.semantic().is_builtin("bool") {
             return;
@@ -150,9 +152,9 @@ pub(crate) fn boolean_type_hint_positional_argument(
 fn match_annotation_to_literal_bool(annotation: &Expr) -> bool {
     match annotation {
         // Ex) `True`
-        Expr::Name(name) => &name.id == "True",
+        Expr::Name(name) => &name.id == "bool",
         // Ex) `"True"`
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "True",
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "bool",
         _ => false,
     }
 }

@@ -1,16 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
 ---
-FBT.py:3:5: FBT001 Boolean-typed positional argument in function definition
-  |
-1 | def function(
-2 |     posonly_nohint,
-3 |     posonly_nonboolhint: int,
-  |     ^^^^^^^^^^^^^^^^^^^ FBT001
-4 |     posonly_boolhint: bool,
-5 |     posonly_boolstrhint: "bool",
-  |
-
 FBT.py:4:5: FBT001 Boolean-typed positional argument in function definition
   |
 2 |     posonly_nohint,
@@ -30,16 +20,6 @@ FBT.py:5:5: FBT001 Boolean-typed positional argument in function definition
 6 |     /,
 7 |     offset,
   |
-
-FBT.py:9:5: FBT001 Boolean-typed positional argument in function definition
-   |
- 7 |     offset,
- 8 |     posorkw_nonvalued_nohint,
- 9 |     posorkw_nonvalued_nonboolhint: int,
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FBT001
-10 |     posorkw_nonvalued_boolhint: bool,
-11 |     posorkw_nonvalued_boolstrhint: "bool",
-   |
 
 FBT.py:10:5: FBT001 Boolean-typed positional argument in function definition
    |
@@ -61,16 +41,6 @@ FBT.py:11:5: FBT001 Boolean-typed positional argument in function definition
 13 |     posorkw_boolvalued_nonboolhint: int = True,
    |
 
-FBT.py:13:5: FBT001 Boolean-typed positional argument in function definition
-   |
-11 |     posorkw_nonvalued_boolstrhint: "bool",
-12 |     posorkw_boolvalued_nohint=True,
-13 |     posorkw_boolvalued_nonboolhint: int = True,
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FBT001
-14 |     posorkw_boolvalued_boolhint: bool = True,
-15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
-   |
-
 FBT.py:14:5: FBT001 Boolean-typed positional argument in function definition
    |
 12 |     posorkw_boolvalued_nohint=True,
@@ -89,16 +59,6 @@ FBT.py:15:5: FBT001 Boolean-typed positional argument in function definition
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FBT001
 16 |     posorkw_nonboolvalued_nohint=1,
 17 |     posorkw_nonboolvalued_nonboolhint: int = 2,
-   |
-
-FBT.py:17:5: FBT001 Boolean-typed positional argument in function definition
-   |
-15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
-16 |     posorkw_nonboolvalued_nohint=1,
-17 |     posorkw_nonboolvalued_nonboolhint: int = 2,
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FBT001
-18 |     posorkw_nonboolvalued_boolhint: bool = 3,
-19 |     posorkw_nonboolvalued_boolstrhint: "bool" = 4,
    |
 
 FBT.py:18:5: FBT001 Boolean-typed positional argument in function definition
@@ -141,13 +101,6 @@ FBT.py:103:10: FBT001 Boolean-typed positional argument in function definition
 103 | def func(x: bool | str):
     |          ^ FBT001
 104 |     pass
-    |
-
-FBT.py:107:10: FBT001 Boolean-typed positional argument in function definition
-    |
-107 | def func(x: int | str):
-    |          ^ FBT001
-108 |     pass
     |
 
 
