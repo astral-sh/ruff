@@ -27,6 +27,8 @@ use crate::settings::LinterSettings;
 /// confusable with other, non-preferred Unicode characters. For example, the
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
+/// You can define characters to ignore in this rule with [allowed-confusables].
+///
 /// ## Example
 /// ```python
 /// print("Ηello, world!")  # "Η" is the Greek eta (`U+0397`).
@@ -38,6 +40,7 @@ use crate::settings::LinterSettings;
 /// ```
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
+/// [allowed-confusables]: https://docs.astral.sh/ruff/settings/#allowed-confusables
 #[violation]
 pub struct AmbiguousUnicodeCharacterString {
     confusable: char,
@@ -74,6 +77,8 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// confusable with other, non-preferred Unicode characters. For example, the
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
+/// You can define characters to ignore in this rule with [allowed-confusables].
+///
 /// ## Example
 /// ```python
 /// """A lovely docstring (with a `U+FF09` parenthesis）."""
@@ -85,6 +90,7 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// ```
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
+/// [allowed-confusables]: https://docs.astral.sh/ruff/settings/#allowed-confusables
 #[violation]
 pub struct AmbiguousUnicodeCharacterDocstring {
     confusable: char,
@@ -121,6 +127,8 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// confusable with other, non-preferred Unicode characters. For example, the
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
+/// You can define characters to ignore in this rule with [allowed-confusables].
+///
 /// ## Example
 /// ```python
 /// foo()  # nоqa  # "о" is Cyrillic (`U+043E`)
@@ -132,6 +140,7 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// ```
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
+/// [allowed-confusables]: https://docs.astral.sh/ruff/settings/#allowed-confusables
 #[violation]
 pub struct AmbiguousUnicodeCharacterComment {
     confusable: char,
