@@ -2383,10 +2383,10 @@ pub struct PydocstyleOptions {
     /// Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/)
     /// defaults when analyzing docstring sections.
     ///
-    /// Enabling a convention will force-disable any rules that are not
-    /// included in the specified convention. As such, the intended use is
-    /// to enable a convention and then selectively disable any additional
-    /// rules on top of it.
+    /// Enabling a convention will disable all rules that are not included in
+    /// the specified convention. As such, the intended workflow is to enable a
+    /// convention and then selectively enable or disable any additional rules
+    /// on top of it.
     ///
     /// For example, to use Google-style conventions but avoid requiring
     /// documentation for every function parameter:
@@ -2405,9 +2405,9 @@ pub struct PydocstyleOptions {
     /// convention = "google"
     /// ```
     ///
-    /// To modify a convention (i.e., to enable an additional rule that's excluded
-    /// from the convention by default), select the desired rule via its fully
-    /// qualified rule code (e.g., `D400` instead of `D4` or `D40`):
+    /// To enable an additional rule that's excluded from the convention,
+    /// select the desired rule via its fully qualified rule code (e.g.,
+    /// `D400` instead of `D4` or `D40`):
     ///
     /// ```toml
     /// [tool.ruff.lint]
