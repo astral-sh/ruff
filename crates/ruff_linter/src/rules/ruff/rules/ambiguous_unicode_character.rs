@@ -21,13 +21,14 @@ use crate::settings::LinterSettings;
 /// is visually similar, but not identical, to the ASCII character `A`.
 ///
 /// The use of ambiguous Unicode characters can confuse readers, cause subtle
-/// bugs and even make malicious code look harmless.
+/// bugs, and even make malicious code look harmless.
 ///
 /// In [preview], this rule will also flag Unicode characters that are
 /// confusable with other, non-preferred Unicode characters. For example, the
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
-/// You can define characters to ignore in this rule with [allowed-confusables].
+/// You can omit characters from being flagged as ambiguous via the
+/// [allowed-confusables] setting.
 ///
 /// ## Example
 /// ```python
@@ -71,13 +72,14 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// is visually similar, but not identical, to the ASCII character `A`.
 ///
 /// The use of ambiguous Unicode characters can confuse readers, cause subtle
-/// bugs and even make malicious code look harmless.
+/// bugs, and even make malicious code look harmless.
 ///
 /// In [preview], this rule will also flag Unicode characters that are
 /// confusable with other, non-preferred Unicode characters. For example, the
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
-/// You can define characters to ignore in this rule with [allowed-confusables].
+/// You can omit characters from being flagged as ambiguous via the
+/// [allowed-confusables] setting.
 ///
 /// ## Example
 /// ```python
@@ -121,13 +123,14 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// is visually similar, but not identical, to the ASCII character `A`.
 ///
 /// The use of ambiguous Unicode characters can confuse readers, cause subtle
-/// bugs and even make malicious code look harmless.
+/// bugs, and even make malicious code look harmless.
 ///
 /// In [preview], this rule will also flag Unicode characters that are
 /// confusable with other, non-preferred Unicode characters. For example, the
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
 ///
-/// You can define characters to ignore in this rule with [allowed-confusables].
+/// You can omit characters from being flagged as ambiguous via the
+/// [allowed-confusables] setting.
 ///
 /// ## Example
 /// ```python
