@@ -61,6 +61,18 @@ class Class(object):
 
 
 # No error
+class Class(object):
+
+    def func1():
+        pass
+
+# comment
+    def func2():
+        pass
+# end
+
+
+# No error
 class Class:
 
     def func1():

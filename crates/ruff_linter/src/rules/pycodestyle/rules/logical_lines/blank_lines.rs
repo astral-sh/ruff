@@ -29,7 +29,8 @@ pub(crate) struct BlankLinesTrackingVars {
     is_first_logical_line: bool,
     /// This needs to be tracked between lines since the `is_in_class` and `is_in_fn` are set to
     /// false when a comment is set dedented, but E305 should trigger on the next non-comment line.
-    follows_comment_after_class_or_fn: bool,
+    follows_comment_after_fn: bool,
+    follows_comment_after_class: bool,
 }
 
 impl Default for BlankLinesTrackingVars {
@@ -42,7 +43,8 @@ impl Default for BlankLinesTrackingVars {
             is_in_fn: false,
             fn_indent_level: 0,
             is_first_logical_line: true,
-            follows_comment_after_class_or_fn: false,
+            follows_comment_after_fn: false,
+            follows_comment_after_class: false,
         }
     }
 }
@@ -344,6 +346,7 @@ pub(crate) fn blank_lines(
     tracked_vars: &mut BlankLinesTrackingVars,
     prev_indent_level: Option<usize>,
     indent_level: usize,
+    indent_size: usize,
     locator: &Locator,
     stylist: &Stylist,
     context: &mut LogicalLinesContext,
@@ -366,27 +369,40 @@ pub(crate) fn blank_lines(
     }
 
     let mut follows_class_or_fn = false;
-    if indent_level <= tracked_vars.class_indent_level && tracked_vars.is_in_class {
+    if indent_level < tracked_vars.class_indent_level && tracked_vars.is_in_class {
         tracked_vars.is_in_class = false;
         if line.is_comment_only() {
-            tracked_vars.follows_comment_after_class_or_fn = true
+            tracked_vars.follows_comment_after_class = true
         } else {
             follows_class_or_fn = true;
         }
     }
 
-    if indent_level <= tracked_vars.fn_indent_level && tracked_vars.is_in_fn {
+    if indent_level < tracked_vars.fn_indent_level && tracked_vars.is_in_fn {
         tracked_vars.is_in_fn = false;
         if line.is_comment_only() {
-            tracked_vars.follows_comment_after_class_or_fn = true
+            tracked_vars.follows_comment_after_fn = true
         } else {
             follows_class_or_fn = true;
         }
     }
 
-    if tracked_vars.follows_comment_after_class_or_fn && !line.is_comment_only() {
-        follows_class_or_fn = true;
-        tracked_vars.follows_comment_after_class_or_fn = false;
+    if tracked_vars.follows_comment_after_fn && !line.is_comment_only() {
+        if indent_level == tracked_vars.fn_indent_level {
+            tracked_vars.is_in_fn = true;
+        } else {
+            follows_class_or_fn = true;
+        }
+        tracked_vars.follows_comment_after_fn = false;
+    }
+
+    if tracked_vars.follows_comment_after_class && !line.is_comment_only() {
+        if indent_level == tracked_vars.class_indent_level {
+            tracked_vars.is_in_class = true;
+        } else {
+            follows_class_or_fn = true;
+        }
+        tracked_vars.follows_comment_after_class = false;
     }
 
     for token in line.tokens().iter() {
@@ -537,7 +553,7 @@ pub(crate) fn blank_lines(
         match token.kind() {
             TokenKind::Class => {
                 if !tracked_vars.is_in_class {
-                    tracked_vars.class_indent_level = indent_level;
+                    tracked_vars.class_indent_level = indent_level + indent_size;
                 }
                 tracked_vars.is_in_class = true;
                 tracked_vars.follows_decorator = false;
@@ -551,7 +567,7 @@ pub(crate) fn blank_lines(
             }
             TokenKind::Def => {
                 if !tracked_vars.is_in_fn {
-                    tracked_vars.fn_indent_level = indent_level;
+                    tracked_vars.fn_indent_level = indent_level + indent_size;
                 }
                 tracked_vars.is_in_fn = true;
                 tracked_vars.follows_def = true;
