@@ -96,5 +96,13 @@ class Registry:
 from typing import Optional, Union
 
 
-def passes(x: Union[list, Optional[int | str | float | bool]]):
+def func(x: Union[list, Optional[int | str | float | bool]]):
+    pass
+
+
+def func(x: bool | str):
+    pass
+
+
+def func(x: int | str):
     pass

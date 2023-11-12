@@ -129,11 +129,25 @@ FBT.py:89:19: FBT001 Boolean-typed positional argument in function definition
 90 |         pass
    |
 
-FBT.py:99:12: FBT001 Boolean-typed positional argument in function definition
+FBT.py:99:10: FBT001 Boolean-typed positional argument in function definition
     |
- 99 | def passes(x: Union[list, Optional[int | str | float | bool]]):
-    |            ^ FBT001
+ 99 | def func(x: Union[list, Optional[int | str | float | bool]]):
+    |          ^ FBT001
 100 |     pass
+    |
+
+FBT.py:103:10: FBT001 Boolean-typed positional argument in function definition
+    |
+103 | def func(x: bool | str):
+    |          ^ FBT001
+104 |     pass
+    |
+
+FBT.py:107:10: FBT001 Boolean-typed positional argument in function definition
+    |
+107 | def func(x: int | str):
+    |          ^ FBT001
+108 |     pass
     |
 
 

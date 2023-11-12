@@ -136,6 +136,9 @@ pub(crate) fn boolean_type_hint_positional_argument(
         } {
             continue;
         }
+        if !checker.semantic().is_builtin("bool") {
+            return;
+        }
         checker.diagnostics.push(Diagnostic::new(
             BooleanTypeHintPositionalArgument,
             parameter.name.range(),
