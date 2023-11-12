@@ -108,6 +108,7 @@ pub(crate) fn check_logical_lines(
             &line,
             prev_line.as_ref(),
             &mut blank_lines_tracking_vars,
+            prev_indent_level,
             indent_level,
             locator,
             stylist,

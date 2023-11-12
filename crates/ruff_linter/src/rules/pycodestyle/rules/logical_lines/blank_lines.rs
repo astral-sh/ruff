@@ -338,6 +338,7 @@ pub(crate) fn blank_lines(
     line: &LogicalLine,
     prev_line: Option<&LogicalLine>,
     tracked_vars: &mut BlankLinesTrackingVars,
+    prev_indent_level: Option<usize>,
     indent_level: usize,
     locator: &Locator,
     stylist: &Stylist,
@@ -498,7 +499,16 @@ pub(crate) fn blank_lines(
             context.push_diagnostic(diagnostic);
         } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
             && (tracked_vars.is_in_class || tracked_vars.is_in_fn)
-            && line.line.blank_lines == 0
+            && line.line.preceding_blank_lines == 0
+            && !is_decorator(prev_line)
+            && !prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level < indent_level)
+            // Allow groups of one-liners.
+            && !(tracked_vars.follows_def
+                && line
+                .tokens_trimmed()
+                .last()
+                .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
+            )
         {
             // E306
             let mut diagnostic = Diagnostic::new(
