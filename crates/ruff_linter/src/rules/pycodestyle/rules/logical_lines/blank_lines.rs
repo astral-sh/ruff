@@ -431,6 +431,8 @@ pub(crate) fn blank_lines(
             // E301
             let mut diagnostic =
                 Diagnostic::new(BlankLineBetweenMethods(line.line.blank_lines), token.range);
+            // TODO: in the case where there is a comment between two methods, make the comment "stick"
+            // to the second method instead of the first.
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 stylist.line_ending().as_str().to_string(),
                 locator.line_start(token.range.start()),
