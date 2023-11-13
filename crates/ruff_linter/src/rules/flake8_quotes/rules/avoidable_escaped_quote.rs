@@ -50,11 +50,11 @@ impl AlwaysFixableViolation for AvoidableEscapedQuote {
 }
 
 /// ## What it does
-/// Checks for strings that include escaped quotes not matching the outer
-/// quotes, and suggests removing the unnecessary backslash.
+/// Checks for strings that include unnecessarily escaped quotes.
 ///
 /// ## Why is this bad?
-/// It's escaping something that does not need escaping.
+/// If a string contains an escaped quote that doesn't match the quote
+/// character used for the string, it's unnecessary and can be removed.
 ///
 /// ## Example
 /// ```python
@@ -78,11 +78,11 @@ pub struct UnnecessaryEscapedQuote;
 impl AlwaysFixableViolation for UnnecessaryEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Do not escape quotes that do not need escaping")
+        format!("Unnecessary escape on inner quote character")
     }
 
     fn fix_title(&self) -> String {
-        "Remove backslash from quotes that do not need escaping".to_string()
+        "Remove backslash".to_string()
     }
 }
 
@@ -289,7 +289,7 @@ pub(crate) fn avoidable_escaped_quote(
     }
 }
 
-/// Q100
+/// Q004
 pub(crate) fn unnecessary_escaped_quote(
     diagnostics: &mut Vec<Diagnostic>,
     lxr: &[LexResult],
@@ -401,6 +401,7 @@ pub(crate) fn unnecessary_escaped_quote(
     }
 }
 
+/// Return `true` if the haystack contains an escaped quote.
 fn contains_escaped_quote(quote: char, haystack: &str) -> bool {
     let mut chars = haystack.chars().peekable();
     let mut backslashes = 0;
@@ -419,10 +420,10 @@ fn contains_escaped_quote(quote: char, haystack: &str) -> bool {
         }
         backslashes += 1;
     }
-
     false
 }
 
+/// Return a modified version of the string with all quote escapes removed.
 fn unescape_string(value: &str, remove_quote: char) -> String {
     let mut fixed_contents = String::with_capacity(value.len());
 
