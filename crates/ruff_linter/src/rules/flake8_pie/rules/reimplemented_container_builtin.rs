@@ -9,9 +9,11 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for lambdas that can be replaced with the `list` builtin.
+/// If [preview] mode is enabled, then we will also look for lambdas
+/// that can be replaced with the `dict` builtin.
 ///
 /// ## Why is this bad?
-/// Using `list` builtin is more readable.
+/// Using container builtins is more readable.
 ///
 /// ## Example
 /// ```python
@@ -21,7 +23,6 @@ use crate::checkers::ast::Checker;
 /// @dataclass
 /// class Foo:
 ///     bar: list[int] = field(default_factory=lambda: [])
-///     baz: dict[str, int] = field(default_factory=lambda: {})
 /// ```
 ///
 /// Use instead:
@@ -35,21 +36,25 @@ use crate::checkers::ast::Checker;
 ///     baz: dict[str, int] = field(default_factory=dict)
 /// ```
 ///
+///
+/// If [preview]
 /// ## References
 /// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
-pub struct ReimplementedContainerBuiltin;
+pub struct ReimplementedContainerBuiltin(&'static str);
 
 impl Violation for ReimplementedContainerBuiltin {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `list` or `dict` over useless lambda")
+        format!("Prefer `{}` over useless lambda", self.0)
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace with `list` or `dict`".to_string())
+        Some(format!("Replace with lambda with `{}`", self.0))
     }
 }
 
@@ -64,11 +69,16 @@ pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &Expr
     if parameters.is_none() {
         let builtin = match body.as_ref() {
             Expr::List(ast::ExprList { elts, .. }) if elts.is_empty() => Some("list"),
-            Expr::Dict(ast::ExprDict { values, .. }) if values.is_empty() => Some("dict"),
+            Expr::Dict(ast::ExprDict { values, .. })
+                if values.is_empty() & checker.settings.preview.is_enabled() =>
+            {
+                Some("dict")
+            }
             _ => None,
         };
         if let Some(builtin) = builtin {
-            let mut diagnostic = Diagnostic::new(ReimplementedContainerBuiltin, expr.range());
+            let mut diagnostic =
+                Diagnostic::new(ReimplementedContainerBuiltin(builtin), expr.range());
             if checker.semantic().is_builtin(builtin) {
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                     builtin.to_string(),
