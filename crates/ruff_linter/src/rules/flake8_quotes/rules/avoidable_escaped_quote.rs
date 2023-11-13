@@ -183,7 +183,7 @@ pub(crate) fn avoidable_escaped_quote(
                     continue;
                 }
 
-                if string_contents.contains(quotes_settings.inline_quotes.as_char())
+                if contains_escaped_quote(string_contents, quotes_settings.inline_quotes.as_char())
                     && !string_contents.contains(quotes_settings.inline_quotes.opposite().as_char())
                 {
                     let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, tok_range);
@@ -207,9 +207,8 @@ pub(crate) fn avoidable_escaped_quote(
                 let text = locator.slice(tok_range);
                 // Check for escaped quote only if we're using the preferred quotation
                 // style and it isn't a triple-quoted f-string.
-                let check_for_escaped_quote = text
-                    .contains(quotes_settings.inline_quotes.as_char())
-                    && !is_triple_quote(text);
+                let check_for_escaped_quote = !is_triple_quote(text)
+                    && text.contains(quotes_settings.inline_quotes.as_char());
                 fstrings.push(FStringContext::new(
                     check_for_escaped_quote,
                     tok_range,
@@ -232,7 +231,8 @@ pub(crate) fn avoidable_escaped_quote(
                     context.ignore_escaped_quotes();
                     continue;
                 }
-                if string_contents.contains(quotes_settings.inline_quotes.as_char()) {
+                if contains_escaped_quote(string_contents, quotes_settings.inline_quotes.as_char())
+                {
                     context.push_fstring_middle_range(tok_range);
                 }
             }
