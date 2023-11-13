@@ -13,10 +13,10 @@ use crate::fix;
 /// blocks.
 ///
 /// In [preview], this rule also checks for unnecessary ellipsis (`...`)
-/// expressions.
+/// literals.
 ///
 /// ## Why is this bad?
-/// In Python, the `pass` statement and ellipsis (`...`) expression serve as
+/// In Python, the `pass` statement and ellipsis (`...`) literal serve as
 /// placeholders, allowing for syntactically correct empty code blocks. The
 /// primary purpose of these nodes is to avoid syntax errors in situations
 /// where a statement or expression is syntactically required, but no code
@@ -31,6 +31,19 @@ use crate::fix;
 /// def func():
 ///     """Placeholder docstring."""
 ///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def func():
+///     """Placeholder docstring."""
+/// ```
+///
+/// In [preview]:
+/// ```python
+/// def func():
+///     """Placeholder docstring."""
+///     ...
 /// ```
 ///
 /// Use instead:
@@ -54,7 +67,7 @@ impl AlwaysFixableViolation for UnnecessaryPlaceholder {
         let Self { kind } = self;
         match kind {
             Placeholder::Pass => format!("Unnecessary `pass` statement"),
-            Placeholder::Ellipsis => format!("Unnecessary `...` expression"),
+            Placeholder::Ellipsis => format!("Unnecessary `...` literal"),
         }
     }
 

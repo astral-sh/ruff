@@ -467,7 +467,7 @@ PIE790.py:150:5: PIE790 [*] Unnecessary `pass` statement
 152 151 | 
 153 152 | def foo():
 
-PIE790.py:155:5: PIE790 [*] Unnecessary `...` expression
+PIE790.py:155:5: PIE790 [*] Unnecessary `...` literal
     |
 153 | def foo():
 154 |     print("foo")
@@ -485,7 +485,7 @@ PIE790.py:155:5: PIE790 [*] Unnecessary `...` expression
 157 156 | 
 158 157 | def foo():
 
-PIE790.py:161:5: PIE790 [*] Unnecessary `...` expression
+PIE790.py:161:5: PIE790 [*] Unnecessary `...` literal
     |
 159 |     """A docstring."""
 160 |     print("foo")
@@ -503,7 +503,7 @@ PIE790.py:161:5: PIE790 [*] Unnecessary `...` expression
 163 162 | 
 164 163 | for i in range(10):
 
-PIE790.py:165:5: PIE790 [*] Unnecessary `...` expression
+PIE790.py:165:5: PIE790 [*] Unnecessary `...` literal
     |
 164 | for i in range(10):
 165 |     ...
@@ -521,7 +521,7 @@ PIE790.py:165:5: PIE790 [*] Unnecessary `...` expression
 168 167 | for i in range(10):
 169 168 |     ...
 
-PIE790.py:166:5: PIE790 [*] Unnecessary `...` expression
+PIE790.py:166:5: PIE790 [*] Unnecessary `...` literal
     |
 164 | for i in range(10):
 165 |     ...
@@ -541,7 +541,7 @@ PIE790.py:166:5: PIE790 [*] Unnecessary `...` expression
 168 167 | for i in range(10):
 169 168 |     ...
 
-PIE790.py:169:5: PIE790 [*] Unnecessary `...` expression
+PIE790.py:169:5: PIE790 [*] Unnecessary `...` literal
     |
 168 | for i in range(10):
 169 |     ...
@@ -560,7 +560,7 @@ PIE790.py:169:5: PIE790 [*] Unnecessary `...` expression
 171 170 |     ...
 172 171 | 
 
-PIE790.py:171:5: PIE790 [*] Unnecessary `...` expression
+PIE790.py:171:5: PIE790 [*] Unnecessary `...` literal
     |
 169 |     ...
 170 | 
@@ -580,7 +580,7 @@ PIE790.py:171:5: PIE790 [*] Unnecessary `...` expression
 173 172 | for i in range(10):
 174 173 |     ...  # comment
 
-PIE790.py:174:5: PIE790 [*] Unnecessary `...` expression
+PIE790.py:174:5: PIE790 [*] Unnecessary `...` literal
     |
 173 | for i in range(10):
 174 |     ...  # comment
@@ -599,7 +599,7 @@ PIE790.py:174:5: PIE790 [*] Unnecessary `...` expression
 176 176 | 
 177 177 | for i in range(10):
 
-PIE790.py:175:5: PIE790 [*] Unnecessary `...` expression
+PIE790.py:175:5: PIE790 [*] Unnecessary `...` literal
     |
 173 | for i in range(10):
 174 |     ...  # comment
@@ -619,7 +619,7 @@ PIE790.py:175:5: PIE790 [*] Unnecessary `...` expression
 177 176 | for i in range(10):
 178 177 |     ...
 
-PIE790.py:178:5: PIE790 [*] Unnecessary `...` expression
+PIE790.py:178:5: PIE790 [*] Unnecessary `...` literal
     |
 177 | for i in range(10):
 178 |     ...
