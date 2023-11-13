@@ -403,22 +403,18 @@ pub(crate) fn unnecessary_escaped_quote(
 
 /// Return `true` if the haystack contains an escaped quote.
 fn contains_escaped_quote(quote: char, haystack: &str) -> bool {
-    let mut chars = haystack.chars().peekable();
-    let mut backslashes = 0;
-    while let Some(char) = chars.next() {
-        if char != '\\' {
-            backslashes = 0;
-            continue;
-        }
-        // If we're at the end of the line
-        let Some(next_char) = chars.peek() else {
-            continue;
-        };
-        // Remove quote escape
-        if *next_char == quote && backslashes % 2 == 0 {
+    for index in memchr::memchr_iter(quote as u8, haystack.as_bytes()) {
+        // If the quote is preceded by an even number of backslashes, it's not escaped.
+        if haystack.as_bytes()[..index]
+            .iter()
+            .rev()
+            .take_while(|&&c| c == b'\\')
+            .count()
+            % 2
+            != 0
+        {
             return true;
         }
-        backslashes += 1;
     }
     false
 }
