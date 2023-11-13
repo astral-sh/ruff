@@ -1,8 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
+use ruff_python_ast::helpers::{optional, union};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
@@ -123,36 +124,6 @@ pub(crate) fn use_pep604_annotation(
             }
             checker.diagnostics.push(diagnostic);
         }
-    }
-}
-
-/// Format the expression as a PEP 604-style optional.
-fn optional(expr: &Expr) -> Expr {
-    ast::ExprBinOp {
-        left: Box::new(expr.clone()),
-        op: Operator::BitOr,
-        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
-        range: TextRange::default(),
-    }
-    .into()
-}
-
-/// Format the expressions as a PEP 604-style union.
-fn union(elts: &[Expr]) -> Expr {
-    match elts {
-        [] => Expr::Tuple(ast::ExprTuple {
-            elts: vec![],
-            ctx: ExprContext::Load,
-            range: TextRange::default(),
-        }),
-        [Expr::Tuple(ast::ExprTuple { elts, .. })] => union(elts),
-        [elt] => elt.clone(),
-        [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(union(rest)),
-            op: Operator::BitOr,
-            right: Box::new(union(&[elt.clone()])),
-            range: TextRange::default(),
-        }),
     }
 }
 

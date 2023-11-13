@@ -7,6 +7,7 @@ ignore_fully_untyped.py:24:5: ANN201 Missing return type annotation for public f
    |     ^^^^^^^^^^^^^^^^^^^^^^^ ANN201
 25 |     pass
    |
+   = help: Add return annotation
 
 ignore_fully_untyped.py:24:37: ANN001 Missing type annotation for function argument `b`
    |
@@ -28,6 +29,7 @@ ignore_fully_untyped.py:32:5: ANN201 Missing return type annotation for public f
    |     ^^^^^^^^^^^^^^^^^^^^^^^ ANN201
 33 |     pass
    |
+   = help: Add return annotation
 
 ignore_fully_untyped.py:43:9: ANN201 Missing return type annotation for public function `error_typed_self`
    |
@@ -37,5 +39,6 @@ ignore_fully_untyped.py:43:9: ANN201 Missing return type annotation for public f
    |         ^^^^^^^^^^^^^^^^ ANN201
 44 |         pass
    |
+   = help: Add return annotation
 
 

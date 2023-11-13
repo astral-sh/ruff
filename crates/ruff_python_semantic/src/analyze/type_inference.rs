@@ -24,22 +24,38 @@ impl ResolvedPythonType {
             (Self::TypeError, _) | (_, Self::TypeError) => Self::TypeError,
             (Self::Unknown, _) | (_, Self::Unknown) => Self::Unknown,
             (Self::Atom(a), Self::Atom(b)) => {
-                if a == b {
+                if a.is_subtype_of(b) {
+                    Self::Atom(b)
+                } else if b.is_subtype_of(a) {
                     Self::Atom(a)
                 } else {
                     Self::Union(FxHashSet::from_iter([a, b]))
                 }
             }
             (Self::Atom(a), Self::Union(mut b)) => {
-                b.insert(a);
+                // If `a` is a subtype of any of the types in `b`, then `a` is
+                // redundant.
+                if !b.iter().any(|type_| a.is_subtype_of(*type_)) {
+                    b.insert(a);
+                }
                 Self::Union(b)
             }
             (Self::Union(mut a), Self::Atom(b)) => {
-                a.insert(b);
+                // If `b` is a subtype of any of the types in `a`, then `b` is
+                // redundant.
+                if !a.iter().any(|type_| b.is_subtype_of(*type_)) {
+                    a.insert(b);
+                }
                 Self::Union(a)
             }
             (Self::Union(mut a), Self::Union(b)) => {
-                a.extend(b);
+                for type_ in b {
+                    // If `type_` is a subtype of any of the types in `a`, then
+                    // `type_` is redundant.
+                    if !a.iter().any(|type_| type_.is_subtype_of(*type_)) {
+                        a.insert(type_);
+                    }
+                }
                 Self::Union(a)
             }
         }
@@ -321,7 +337,7 @@ impl From<&Expr> for ResolvedPythonType {
 /// such as strings, integers, floats, and containers. It cannot infer the
 /// types of variables or expressions that are not statically known from
 /// individual AST nodes alone.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PythonType {
     /// A string literal, such as `"hello"`.
     String,
@@ -345,8 +361,48 @@ pub enum PythonType {
     Generator,
 }
 
+impl PythonType {
+    /// Returns `true` if `self` is a subtype of `other`.
+    fn is_subtype_of(self, other: Self) -> bool {
+        match (self, other) {
+            (PythonType::String, PythonType::String) => true,
+            (PythonType::Bytes, PythonType::Bytes) => true,
+            (PythonType::None, PythonType::None) => true,
+            (PythonType::Ellipsis, PythonType::Ellipsis) => true,
+            // The Numeric Tower (https://peps.python.org/pep-3141/)
+            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Bool)) => true,
+            (PythonType::Number(NumberLike::Integer), PythonType::Number(NumberLike::Integer)) => {
+                true
+            }
+            (PythonType::Number(NumberLike::Float), PythonType::Number(NumberLike::Float)) => true,
+            (PythonType::Number(NumberLike::Complex), PythonType::Number(NumberLike::Complex)) => {
+                true
+            }
+            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Integer)) => true,
+            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Float)) => true,
+            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Complex)) => true,
+            (PythonType::Number(NumberLike::Integer), PythonType::Number(NumberLike::Float)) => {
+                true
+            }
+            (PythonType::Number(NumberLike::Integer), PythonType::Number(NumberLike::Complex)) => {
+                true
+            }
+            (PythonType::Number(NumberLike::Float), PythonType::Number(NumberLike::Complex)) => {
+                true
+            }
+            // This simple type hierarchy doesn't support generics.
+            (PythonType::Dict, PythonType::Dict) => true,
+            (PythonType::List, PythonType::List) => true,
+            (PythonType::Set, PythonType::Set) => true,
+            (PythonType::Tuple, PythonType::Tuple) => true,
+            (PythonType::Generator, PythonType::Generator) => true,
+            _ => false,
+        }
+    }
+}
+
 /// A numeric type, or a type that can be trivially coerced to a numeric type.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NumberLike {
     /// An integer literal, such as `1` or `0x1`.
     Integer,
@@ -410,10 +466,7 @@ mod tests {
         );
         assert_eq!(
             ResolvedPythonType::from(&parse("1 and True")),
-            ResolvedPythonType::Union(FxHashSet::from_iter([
-                PythonType::Number(NumberLike::Integer),
-                PythonType::Number(NumberLike::Bool)
-            ]))
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
 
         // Binary operators.

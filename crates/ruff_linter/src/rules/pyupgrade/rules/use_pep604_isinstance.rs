@@ -2,8 +2,9 @@ use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Operator};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::helpers::union;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
@@ -76,19 +77,6 @@ impl AlwaysFixableViolation for NonPEP604Isinstance {
 
     fn fix_title(&self) -> String {
         "Convert to `X | Y`".to_string()
-    }
-}
-
-fn union(elts: &[Expr]) -> Expr {
-    if elts.len() == 1 {
-        elts[0].clone()
-    } else {
-        Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(union(&elts[..elts.len() - 1])),
-            op: Operator::BitOr,
-            right: Box::new(elts[elts.len() - 1].clone()),
-            range: TextRange::default(),
-        })
     }
 }
 
