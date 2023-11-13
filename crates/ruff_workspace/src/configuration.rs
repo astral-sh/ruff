@@ -1151,6 +1151,7 @@ mod tests {
         Rule::DirectLoggerInstantiation,
         Rule::InvalidGetLoggerArgument,
         Rule::IsinstanceTypeNone,
+        Rule::IfExprMinMax,
         Rule::ManualDictComprehension,
         Rule::ReimplementedStarmap,
         Rule::SliceCopy,
