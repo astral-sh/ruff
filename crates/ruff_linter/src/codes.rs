@@ -773,7 +773,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pie, "796") => (RuleGroup::Stable, rules::flake8_pie::rules::NonUniqueEnums),
         (Flake8Pie, "800") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessarySpread),
         (Flake8Pie, "804") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryDictKwargs),
-        (Flake8Pie, "807") => (RuleGroup::Stable, rules::flake8_pie::rules::ReimplementedListBuiltin),
+        (Flake8Pie, "807") => (RuleGroup::Stable, rules::flake8_pie::rules::ReimplementedContainerBuiltin),
         (Flake8Pie, "808") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryRangeStart),
         (Flake8Pie, "810") => (RuleGroup::Stable, rules::flake8_pie::rules::MultipleStartsEndsWith),
 
