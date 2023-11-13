@@ -1,4 +1,5 @@
 use ruff_python_ast::{self as ast, Expr, ExprLambda};
+use std::fmt::Write;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
@@ -9,8 +10,9 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for lambdas that can be replaced with the `list` builtin.
-/// If [preview] mode is enabled, then we will also look for lambdas
-/// that can be replaced with the `dict` builtin.
+///
+/// In [preview], this rule will also flag lambdas that can be replaced with
+/// the `dict` builtin.
 ///
 /// ## Why is this bad?
 /// Using container builtins is more readable.
@@ -43,18 +45,22 @@ use crate::checkers::ast::Checker;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
-pub struct ReimplementedContainerBuiltin(&'static str);
+pub struct ReimplementedContainerBuiltin {
+    container: Container,
+}
 
 impl Violation for ReimplementedContainerBuiltin {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Prefer `{}` over useless lambda", self.0)
+        let Self { container } = self;
+        format!("Prefer `{container}` over useless lambda")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!("Replace with lambda with `{}`", self.0))
+        let Self { container } = self;
+        Some(format!("Replace with `lambda` with `{container}`"))
     }
 }
 
@@ -67,25 +73,49 @@ pub(crate) fn reimplemented_container_builtin(checker: &mut Checker, expr: &Expr
     } = expr;
 
     if parameters.is_none() {
-        let builtin = match body.as_ref() {
-            Expr::List(ast::ExprList { elts, .. }) if elts.is_empty() => Some("list"),
+        let container = match body.as_ref() {
+            Expr::List(ast::ExprList { elts, .. }) if elts.is_empty() => Some(Container::List),
             Expr::Dict(ast::ExprDict { values, .. })
                 if values.is_empty() & checker.settings.preview.is_enabled() =>
             {
-                Some("dict")
+                Some(Container::Dict)
             }
             _ => None,
         };
-        if let Some(builtin) = builtin {
+        if let Some(container) = container {
             let mut diagnostic =
-                Diagnostic::new(ReimplementedContainerBuiltin(builtin), expr.range());
-            if checker.semantic().is_builtin(builtin) {
+                Diagnostic::new(ReimplementedContainerBuiltin { container }, expr.range());
+            if checker.semantic().is_builtin(container.as_str()) {
                 diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    builtin.to_string(),
+                    container.to_string(),
                     expr.range(),
                 )));
             }
             checker.diagnostics.push(diagnostic);
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum Container {
+    List,
+    Dict,
+}
+
+impl Container {
+    fn as_str(&self) -> &'static str {
+        match self {
+            Container::List => "list",
+            Container::Dict => "dict",
+        }
+    }
+}
+
+impl std::fmt::Display for Container {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Container::List => fmt.write_str("list"),
+            Container::Dict => fmt.write_str("dict"),
         }
     }
 }
