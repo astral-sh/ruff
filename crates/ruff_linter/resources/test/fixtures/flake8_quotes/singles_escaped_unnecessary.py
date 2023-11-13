@@ -1,24 +1,24 @@
-this_should_raise_Q100 = "This is a \'string\'"
-this_should_raise_Q100 = "'This' is a \'string\'"
+this_should_raise_Q004 = "This is a \'string\'"
+this_should_raise_Q004 = "'This' is a \'string\'"
 this_is_fine = 'This is a "string"'
 this_is_fine = '\'This\' is a "string"'
 this_is_fine = r"This is a \'string\'"
 this_is_fine = R"This is a \'string\'"
-this_should_raise_Q100 = (
+this_should_raise_Q004 = (
     "This is a"
     "\'string\'"
 )
 
 # Same as above, but with f-strings
-f"This is a \'string\'"  # Q100
-f"'This' is a \'string\'"  # Q100
+f"This is a \'string\'"  # Q004
+f"'This' is a \'string\'"  # Q004
 f'This is a "string"'
 f'\'This\' is a "string"'
 fr"This is a \'string\'"
 fR"This is a \'string\'"
-this_should_raise_Q100 = (
+this_should_raise_Q004 = (
     f"This is a"
-    f"\'string\'"  # Q100
+    f"\'string\'"  # Q004
 )
 
 # Nested f-strings (Python 3.12+)
@@ -28,16 +28,16 @@ this_should_raise_Q100 = (
 #   f'"foo" {"nested"}'
 #
 # but as the actual string itself is invalid pre 3.12, we don't catch it.
-f"\'foo\' {"foo"}"  # Q100
-f"\'foo\' {f"foo"}"  # Q100
-f"\'foo\' {f"\'foo\'"} \'\'"  # Q100
+f"\'foo\' {"foo"}"  # Q004
+f"\'foo\' {f"foo"}"  # Q004
+f"\'foo\' {f"\'foo\'"} \'\'"  # Q004
 
 f"normal {f"nested"} normal"
-f"\'normal\' {f"nested"} normal"  # Q100
+f"\'normal\' {f"nested"} normal"  # Q004
 f"\'normal\' {f"nested"} 'single quotes'"
-f"\'normal\' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q100
-f"\'normal\' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q100
+f"\'normal\' {f"\'nested\' {"other"} normal"} 'single quotes'"  # Q004
+f"\'normal\' {f"\'nested\' {"other"} 'single quotes'"} normal"  # Q004
 
 # Make sure we do not unescape quotes
 this_is_fine = "This is an \\'escaped\\' quote"
-this_should_raise_Q100 = "This is an \\\'escaped\\\' quote with an extra backslash"
+this_should_raise_Q004 = "This is an \\\'escaped\\\' quote with an extra backslash"
