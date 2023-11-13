@@ -16,6 +16,7 @@ use crate::comments::{
 };
 pub use crate::context::PyFormatContext;
 pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
+pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
 use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
@@ -29,11 +30,10 @@ mod options;
 pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
+mod shared_traits;
 pub(crate) mod statement;
 pub(crate) mod type_param;
 mod verbatim;
-
-include!("../../ruff_formatter/shared_traits.rs");
 
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
 pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
