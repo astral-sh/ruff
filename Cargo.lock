@@ -64,9 +64,9 @@ checksum = "c7021ce4924a3f25f802b2cccd1af585e39ea1a363a1aa2e72afe54b67a3a7a7"
 
 [[package]]
 name = "annotate-snippets"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3b9d411ecbaf79885c6df4d75fff75858d5995ff25385657a28af47e82f9c36"
+checksum = "ccaf7e9dfbb6ab22c82e473cd1a8a7bd313c19a5b7e40970f3d89ef5a5c9e81e"
 dependencies = [
  "unicode-width",
  "yansi-term",
@@ -2062,7 +2062,7 @@ dependencies = [
 name = "ruff_cli"
 version = "0.1.5"
 dependencies = [
- "annotate-snippets 0.9.1",
+ "annotate-snippets 0.9.2",
  "anyhow",
  "argfile",
  "assert_cmd",
@@ -2199,7 +2199,7 @@ name = "ruff_linter"
 version = "0.1.5"
 dependencies = [
  "aho-corasick",
- "annotate-snippets 0.9.1",
+ "annotate-snippets 0.9.2",
  "anyhow",
  "bitflags 2.4.1",
  "chrono",
