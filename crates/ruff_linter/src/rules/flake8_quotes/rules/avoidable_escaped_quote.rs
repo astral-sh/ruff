@@ -319,7 +319,7 @@ pub(crate) fn unnecessary_escaped_quote(
                     Some("'") => Quote::Single,
                     _ => continue,
                 };
-                if !contains_escaped_quote(leading.opposite().as_char(), string_contents) {
+                if !contains_escaped_quote(string_contents, leading.opposite().as_char()) {
                     continue;
                 }
 
@@ -362,7 +362,7 @@ pub(crate) fn unnecessary_escaped_quote(
                 if !context.check_for_escaped_quote {
                     continue;
                 }
-                if contains_escaped_quote(context.quote_style.opposite().as_char(), string_contents)
+                if contains_escaped_quote(string_contents, context.quote_style.opposite().as_char())
                 {
                     context.push_fstring_middle_range(tok_range);
                 }
@@ -402,7 +402,7 @@ pub(crate) fn unnecessary_escaped_quote(
 }
 
 /// Return `true` if the haystack contains an escaped quote.
-fn contains_escaped_quote(quote: char, haystack: &str) -> bool {
+fn contains_escaped_quote(haystack: &str, quote: char) -> bool {
     for index in memchr::memchr_iter(quote as u8, haystack.as_bytes()) {
         // If the quote is preceded by an even number of backslashes, it's not escaped.
         if haystack.as_bytes()[..index]
@@ -420,10 +420,10 @@ fn contains_escaped_quote(quote: char, haystack: &str) -> bool {
 }
 
 /// Return a modified version of the string with all quote escapes removed.
-fn unescape_string(value: &str, remove_quote: char) -> String {
-    let mut fixed_contents = String::with_capacity(value.len());
+fn unescape_string(haystack: &str, quote: char) -> String {
+    let mut fixed_contents = String::with_capacity(haystack.len());
 
-    let mut chars = value.chars().peekable();
+    let mut chars = haystack.chars().peekable();
     let mut backslashes = 0;
     while let Some(char) = chars.next() {
         if char != '\\' {
@@ -437,7 +437,7 @@ fn unescape_string(value: &str, remove_quote: char) -> String {
             continue;
         };
         // Remove quote escape
-        if *next_char == remove_quote && backslashes % 2 == 0 {
+        if *next_char == quote && backslashes % 2 == 0 {
             backslashes = 0;
             continue;
         }
