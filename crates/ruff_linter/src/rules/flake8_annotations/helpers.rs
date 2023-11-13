@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use ruff_python_ast::helpers::{union, ReturnStatementVisitor};
+use ruff_python_ast::helpers::{pep_604_union, ReturnStatementVisitor};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -78,7 +78,7 @@ pub(crate) fn auto_return_type(
                 .collect::<Vec<_>>();
 
             // Wrap in a bitwise union (e.g., `int | float`).
-            Some(union(&names))
+            Some(pep_604_union(&names))
         }
         ResolvedPythonType::Union(_) => None,
         ResolvedPythonType::Unknown => None,

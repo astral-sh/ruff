@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::union;
+use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -108,7 +108,7 @@ pub(crate) fn use_pep604_isinstance(
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    checker.generator().expr(&union(elts)),
+                    checker.generator().expr(&pep_604_union(elts)),
                     types.range(),
                 )));
                 checker.diagnostics.push(diagnostic);

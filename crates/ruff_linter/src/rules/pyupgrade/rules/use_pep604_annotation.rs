@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{optional, union};
+use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
 use ruff_text_size::Ranged;
@@ -81,7 +81,7 @@ pub(crate) fn use_pep604_annotation(
                     _ => {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             pad(
-                                checker.generator().expr(&optional(slice)),
+                                checker.generator().expr(&pep_604_optional(slice)),
                                 expr.range(),
                                 checker.locator(),
                             ),
@@ -102,7 +102,7 @@ pub(crate) fn use_pep604_annotation(
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             pad(
-                                checker.generator().expr(&union(elts)),
+                                checker.generator().expr(&pep_604_union(elts)),
                                 expr.range(),
                                 checker.locator(),
                             ),

@@ -224,9 +224,9 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
     fn fix_title(&self) -> Option<String> {
         let Self { annotation, .. } = self;
         if let Some(annotation) = annotation {
-            Some(format!("Add return annotation: `{annotation}`"))
+            Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return annotation"))
+            Some(format!("Add return type annotation"))
         }
     }
 }
@@ -268,9 +268,9 @@ impl Violation for MissingReturnTypePrivateFunction {
     fn fix_title(&self) -> Option<String> {
         let Self { annotation, .. } = self;
         if let Some(annotation) = annotation {
-            Some(format!("Add return annotation: `{annotation}`"))
+            Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return annotation"))
+            Some(format!("Add return type annotation"))
         }
     }
 }
@@ -325,9 +325,9 @@ impl Violation for MissingReturnTypeSpecialMethod {
     fn fix_title(&self) -> Option<String> {
         let Self { annotation, .. } = self;
         if let Some(annotation) = annotation {
-            Some(format!("Add return annotation: `{annotation}`"))
+            Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return annotation"))
+            Some(format!("Add return type annotation"))
         }
     }
 }
@@ -373,9 +373,9 @@ impl Violation for MissingReturnTypeStaticMethod {
     fn fix_title(&self) -> Option<String> {
         let Self { annotation, .. } = self;
         if let Some(annotation) = annotation {
-            Some(format!("Add return annotation: `{annotation}`"))
+            Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return annotation"))
+            Some(format!("Add return type annotation"))
         }
     }
 }
@@ -421,9 +421,9 @@ impl Violation for MissingReturnTypeClassMethod {
     fn fix_title(&self) -> Option<String> {
         let Self { annotation, .. } = self;
         if let Some(annotation) = annotation {
-            Some(format!("Add return annotation: `{annotation}`"))
+            Some(format!("Add return type annotation: `{annotation}`"))
         } else {
-            Some(format!("Add return annotation"))
+            Some(format!("Add return type annotation"))
         }
     }
 }

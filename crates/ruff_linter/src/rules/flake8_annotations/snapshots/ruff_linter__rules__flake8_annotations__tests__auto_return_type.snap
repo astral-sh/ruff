@@ -7,7 +7,7 @@ auto_return_type.py:1:5: ANN201 [*] Missing return type annotation for public fu
   |     ^^^^ ANN201
 2 |     return 1
   |
-  = help: Add return annotation: `int`
+  = help: Add return type annotation: `int`
 
 ℹ Unsafe fix
 1   |-def func():
@@ -22,7 +22,7 @@ auto_return_type.py:5:5: ANN201 [*] Missing return type annotation for public fu
   |     ^^^^ ANN201
 6 |     return 1.5
   |
-  = help: Add return annotation: `float`
+  = help: Add return type annotation: `float`
 
 ℹ Unsafe fix
 2 2 |     return 1
@@ -41,7 +41,7 @@ auto_return_type.py:9:5: ANN201 [*] Missing return type annotation for public fu
 10 |     if x > 0:
 11 |         return 1
    |
-   = help: Add return annotation: `float`
+   = help: Add return type annotation: `float`
 
 ℹ Unsafe fix
 6  6  |     return 1.5
@@ -59,7 +59,7 @@ auto_return_type.py:16:5: ANN201 [*] Missing return type annotation for public f
    |     ^^^^ ANN201
 17 |     return True
    |
-   = help: Add return annotation: `bool`
+   = help: Add return type annotation: `bool`
 
 ℹ Unsafe fix
 13 13 |         return 1.5
@@ -78,7 +78,7 @@ auto_return_type.py:20:5: ANN201 [*] Missing return type annotation for public f
 21 |     if x > 0:
 22 |         return None
    |
-   = help: Add return annotation: `None`
+   = help: Add return type annotation: `None`
 
 ℹ Unsafe fix
 17 17 |     return True
@@ -96,7 +96,7 @@ auto_return_type.py:27:5: ANN201 [*] Missing return type annotation for public f
    |     ^^^^ ANN201
 28 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
    |
-   = help: Add return annotation: `str | float`
+   = help: Add return type annotation: `str | float`
 
 ℹ Unsafe fix
 24 24 |         return
@@ -114,7 +114,7 @@ auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public f
    |     ^^^^ ANN201
 32 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
    |
-   = help: Add return annotation: `str | float`
+   = help: Add return type annotation: `str | float`
 
 ℹ Unsafe fix
 28 28 |     return 1 or 2.5 if x > 0 else 1.5 or "str"

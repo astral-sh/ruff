@@ -35,7 +35,7 @@ impl ResolvedPythonType {
             (Self::Atom(a), Self::Union(mut b)) => {
                 // If `a` is a subtype of any of the types in `b`, then `a` is
                 // redundant.
-                if !b.iter().any(|type_| a.is_subtype_of(*type_)) {
+                if !b.iter().any(|b_element| a.is_subtype_of(*b_element)) {
                     b.insert(a);
                 }
                 Self::Union(b)
@@ -43,17 +43,20 @@ impl ResolvedPythonType {
             (Self::Union(mut a), Self::Atom(b)) => {
                 // If `b` is a subtype of any of the types in `a`, then `b` is
                 // redundant.
-                if !a.iter().any(|type_| b.is_subtype_of(*type_)) {
+                if !a.iter().any(|a_element| b.is_subtype_of(*a_element)) {
                     a.insert(b);
                 }
                 Self::Union(a)
             }
             (Self::Union(mut a), Self::Union(b)) => {
-                for type_ in b {
+                for b_element in b {
                     // If `type_` is a subtype of any of the types in `a`, then
                     // `type_` is redundant.
-                    if !a.iter().any(|type_| type_.is_subtype_of(*type_)) {
-                        a.insert(type_);
+                    if !a
+                        .iter()
+                        .any(|a_element| b_element.is_subtype_of(*a_element))
+                    {
+                        a.insert(b_element);
                     }
                 }
                 Self::Union(a)
@@ -428,8 +431,6 @@ impl NumberLike {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashSet;
-
     use ruff_python_ast::Expr;
     use ruff_python_parser::parse_expression;
 
@@ -528,17 +529,11 @@ mod tests {
         );
         assert_eq!(
             ResolvedPythonType::from(&parse("1 if True else 2.0")),
-            ResolvedPythonType::Union(FxHashSet::from_iter([
-                PythonType::Number(NumberLike::Integer),
-                PythonType::Number(NumberLike::Float)
-            ]))
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
         );
         assert_eq!(
             ResolvedPythonType::from(&parse("1 if True else False")),
-            ResolvedPythonType::Union(FxHashSet::from_iter([
-                PythonType::Number(NumberLike::Integer),
-                PythonType::Number(NumberLike::Bool)
-            ]))
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
     }
 }

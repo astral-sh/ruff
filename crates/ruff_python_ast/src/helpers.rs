@@ -1259,7 +1259,7 @@ pub fn generate_comparison(
 }
 
 /// Format the expression as a PEP 604-style optional.
-pub fn optional(expr: &Expr) -> Expr {
+pub fn pep_604_optional(expr: &Expr) -> Expr {
     ast::ExprBinOp {
         left: Box::new(expr.clone()),
         op: Operator::BitOr,
@@ -1270,19 +1270,19 @@ pub fn optional(expr: &Expr) -> Expr {
 }
 
 /// Format the expressions as a PEP 604-style union.
-pub fn union(elts: &[Expr]) -> Expr {
+pub fn pep_604_union(elts: &[Expr]) -> Expr {
     match elts {
         [] => Expr::Tuple(ast::ExprTuple {
             elts: vec![],
             ctx: ExprContext::Load,
             range: TextRange::default(),
         }),
-        [Expr::Tuple(ast::ExprTuple { elts, .. })] => union(elts),
+        [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
         [elt] => elt.clone(),
         [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(union(rest)),
+            left: Box::new(pep_604_union(rest)),
             op: Operator::BitOr,
-            right: Box::new(union(&[elt.clone()])),
+            right: Box::new(pep_604_union(&[elt.clone()])),
             range: TextRange::default(),
         }),
     }

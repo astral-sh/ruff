@@ -8,7 +8,7 @@ annotation_presence.py:5:5: ANN201 Missing return type annotation for public fun
   |     ^^^ ANN201
 6 |     pass
   |
-  = help: Add return annotation
+  = help: Add return type annotation
 
 annotation_presence.py:5:9: ANN001 Missing type annotation for function argument `a`
   |
@@ -33,7 +33,7 @@ annotation_presence.py:10:5: ANN201 Missing return type annotation for public fu
    |     ^^^ ANN201
 11 |     pass
    |
-   = help: Add return annotation
+   = help: Add return type annotation
 
 annotation_presence.py:10:17: ANN001 Missing type annotation for function argument `b`
    |
@@ -58,7 +58,7 @@ annotation_presence.py:20:5: ANN201 Missing return type annotation for public fu
    |     ^^^ ANN201
 21 |     pass
    |
-   = help: Add return annotation
+   = help: Add return type annotation
 
 annotation_presence.py:25:5: ANN201 Missing return type annotation for public function `foo`
    |
@@ -67,7 +67,7 @@ annotation_presence.py:25:5: ANN201 Missing return type annotation for public fu
    |     ^^^ ANN201
 26 |     pass
    |
-   = help: Add return annotation
+   = help: Add return type annotation
 
 annotation_presence.py:45:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
    |
@@ -254,7 +254,7 @@ annotation_presence.py:159:9: ANN204 [*] Missing return type annotation for spec
     |         ^^^^^^^^ ANN204
 160 |        ...
     |
-    = help: Add return annotation: `None`
+    = help: Add return type annotation: `None`
 
 ℹ Unsafe fix
 156 156 | 
@@ -274,7 +274,7 @@ annotation_presence.py:165:9: ANN204 [*] Missing return type annotation for spec
     |         ^^^^^^^^ ANN204
 166 |         print(f"{self.attr=}")
     |
-    = help: Add return annotation: `None`
+    = help: Add return type annotation: `None`
 
 ℹ Unsafe fix
 162 162 | 
