@@ -1440,6 +1440,13 @@
             "type": "string"
           }
         },
+        "from-first": {
+          "description": "Sort \"from .. import ..\" imports before straight imports",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
