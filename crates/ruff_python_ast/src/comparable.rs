@@ -1480,3 +1480,44 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
         }
     }
 }
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ComparableMod<'a> {
+    Module(ComparableModModule<'a>),
+    Expression(ComparableModExpression<'a>),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableModModule<'a> {
+    body: Vec<ComparableStmt<'a>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableModExpression<'a> {
+    body: Box<ComparableExpr<'a>>,
+}
+
+impl<'a> From<&'a ast::Mod> for ComparableMod<'a> {
+    fn from(mod_: &'a ast::Mod) -> Self {
+        match mod_ {
+            ast::Mod::Module(module) => Self::Module(module.into()),
+            ast::Mod::Expression(expr) => Self::Expression(expr.into()),
+        }
+    }
+}
+
+impl<'a> From<&'a ast::ModModule> for ComparableModModule<'a> {
+    fn from(module: &'a ast::ModModule) -> Self {
+        Self {
+            body: module.body.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
+    fn from(expr: &'a ast::ModExpression) -> Self {
+        Self {
+            body: (&expr.body).into(),
+        }
+    }
+}
