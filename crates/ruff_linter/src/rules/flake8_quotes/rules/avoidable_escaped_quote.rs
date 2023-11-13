@@ -371,29 +371,30 @@ pub(crate) fn unnecessary_escaped_quote(
                 let Some(context) = fstrings.pop() else {
                     continue;
                 };
-                if context.middle_ranges_with_escapes.is_empty() {
-                    // There are no `FStringMiddle` tokens containing any escaped
-                    // quotes.
+                let [first, rest @ ..] = context.middle_ranges_with_escapes.as_slice() else {
                     continue;
-                }
+                };
                 let mut diagnostic = Diagnostic::new(
                     UnnecessaryEscapedQuote,
                     TextRange::new(context.start_range.start(), tok_range.end()),
                 );
-                let mut fstring_middle_edits =
-                    context.middle_ranges_with_escapes.iter().map(|&range| {
-                        Edit::range_replacement(
-                            unescape_string(
-                                locator.slice(range),
-                                context.quote_style.opposite().as_char(),
-                            ),
-                            range,
-                        )
-                    });
-                diagnostic.set_fix(Fix::safe_edits(
-                    fstring_middle_edits.next().unwrap(),
-                    fstring_middle_edits,
-                ));
+                let first_edit = Edit::range_replacement(
+                    unescape_string(
+                        locator.slice(first),
+                        context.quote_style.opposite().as_char(),
+                    ),
+                    *first,
+                );
+                let rest_edits = rest.iter().map(|&range| {
+                    Edit::range_replacement(
+                        unescape_string(
+                            locator.slice(range),
+                            context.quote_style.opposite().as_char(),
+                        ),
+                        range,
+                    )
+                });
+                diagnostic.set_fix(Fix::safe_edits(first_edit, rest_edits));
                 diagnostics.push(diagnostic);
             }
             _ => {}
