@@ -1497,6 +1497,13 @@
             "$ref": "#/definitions/ImportSection"
           }
         },
+        "no-sections": {
+          "description": "Put all imports into the same section bucket",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "order-by-type": {
           "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
           "type": [

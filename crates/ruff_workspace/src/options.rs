@@ -1978,6 +1978,16 @@ pub struct IsortOptions {
     )]
     pub section_order: Option<Vec<ImportSection>>,
 
+    /// Put all imports into the same section bucket
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            no-sections = true
+        "#
+    )]
+    pub no_sections: Option<bool>,
+
     /// Whether to automatically mark imports from within the same package as first-party.
     /// For example, when `detect-same-package = true`, then when analyzing files within the
     /// `foo` package, any imports from within the `foo` package will be considered first-party.
@@ -2013,6 +2023,15 @@ impl IsortOptions {
     pub fn try_into_settings(
         self,
     ) -> Result<isort::settings::Settings, isort::settings::SettingsError> {
+        let no_sections = self.no_sections.unwrap_or_default();
+        if no_sections && self.section_order.is_some() {
+            warn_user_once!("`section-order` is ignored when `no-sections` is set to `true`");
+        }
+
+        if no_sections && self.sections.is_some() {
+            warn_user_once!("`sections` is ignored when `no-sections` is set to `true`");
+        }
+
         // Extract any configuration options that deal with user-defined sections.
         let mut section_order: Vec<_> = self
             .section_order
@@ -2169,6 +2188,7 @@ impl IsortOptions {
             lines_between_types: self.lines_between_types.unwrap_or_default(),
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
+            no_sections,
         })
     }
 }

@@ -156,6 +156,7 @@ fn format_import_block(
         settings.detect_same_package,
         &settings.known_modules,
         target_version,
+        settings.no_sections,
     );
 
     let mut output = String::new();
@@ -853,6 +854,24 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     relative_imports_order: RelativeImportsOrder::ClosestToFurthest,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_sections.py"))]
+    fn no_sections(path: &Path) -> Result<()> {
+        let snapshot = format!("no_sections_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    no_sections: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
