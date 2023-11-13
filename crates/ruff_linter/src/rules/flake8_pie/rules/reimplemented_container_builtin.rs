@@ -1,5 +1,4 @@
 use ruff_python_ast::{self as ast, Expr, ExprLambda};
-use std::fmt::Write;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_diagnostics::{FixAvailability, Violation};
@@ -102,7 +101,7 @@ enum Container {
 }
 
 impl Container {
-    fn as_str(&self) -> &'static str {
+    fn as_str(self) -> &'static str {
         match self {
             Container::List => "list",
             Container::Dict => "dict",
