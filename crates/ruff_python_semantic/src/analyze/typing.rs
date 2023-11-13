@@ -579,10 +579,6 @@ pub fn resolve_assignment<'a>(
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
-///
-/// TODOs:
-/// - Handle unpacked assignment
-/// - Handle complex assignment e.g.  `[x, y], (z,) = (1, 2), [3]`
 pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
     let scope = semantic.current_scope();
     let binding_id = scope.get(id)?;
@@ -595,29 +591,19 @@ pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Opti
                 Expr::Tuple(ast::ExprTuple { elts, .. })
                 | Expr::List(ast::ExprList { elts, .. })
                 | Expr::Set(ast::ExprSet { elts, .. }) => {
-                    let Some(first_target) = targets.first() else {
-                        return None;
-                    };
-                    match first_target {
-                        Expr::Tuple(ast::ExprTuple {
-                            elts: target_elts, ..
-                        })
-                        | Expr::List(ast::ExprList {
-                            elts: target_elts, ..
-                        })
-                        | Expr::Set(ast::ExprSet {
-                            elts: target_elts, ..
-                        }) => {
-                            if let Some(index) = target_elts.iter().position(|x| {
-                                if let Expr::Name(ast::ExprName { id: target_id, .. }) = x {
-                                    return target_id == id;
-                                }
-                                false
-                            }) {
-                                return elts.get(index);
-                            }
-                        }
-                        _ => return Some(value.as_ref()),
+                    if let Some(target) = targets.iter().next() {
+                        return match target {
+                            Expr::Tuple(ast::ExprTuple {
+                                elts: target_elts, ..
+                            })
+                            | Expr::List(ast::ExprList {
+                                elts: target_elts, ..
+                            })
+                            | Expr::Set(ast::ExprSet {
+                                elts: target_elts, ..
+                            }) => get_value_by_id(id, target_elts, elts),
+                            _ => Some(value.as_ref()),
+                        };
                     }
                 }
                 _ => return Some(value.as_ref()),
@@ -629,6 +615,51 @@ pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Opti
                 return Some(value.as_ref());
             }
             _ => return None,
+        }
+    }
+    None
+}
+
+fn get_value_by_id<'a>(
+    target_id: &str,
+    targets: &'a [Expr],
+    values: &'a [Expr],
+) -> Option<&'a Expr> {
+    for (target, value) in targets.iter().zip(values.iter()) {
+        match target {
+            Expr::Tuple(ast::ExprTuple {
+                elts: target_elts, ..
+            })
+            | Expr::List(ast::ExprList {
+                elts: target_elts, ..
+            })
+            | Expr::Set(ast::ExprSet {
+                elts: target_elts, ..
+            }) => {
+                // Collection types can be mismatched like in: (a, b, [c, d]) = [1, 2, {3, 4}]
+                match value {
+                    Expr::Tuple(ast::ExprTuple {
+                        elts: value_elts, ..
+                    })
+                    | Expr::List(ast::ExprList {
+                        elts: value_elts, ..
+                    })
+                    | Expr::Set(ast::ExprSet {
+                        elts: value_elts, ..
+                    }) => {
+                        if let Some(result) = get_value_by_id(target_id, target_elts, value_elts) {
+                            return Some(result);
+                        }
+                    }
+                    _ => (),
+                };
+            }
+            Expr::Name(ast::ExprName { id, .. }) => {
+                if *id == target_id {
+                    return Some(value);
+                }
+            }
+            _ => (),
         }
     }
     None

@@ -180,4 +180,22 @@ PERF101.py:34:10: PERF101 [*] Do not cast an iterable to `list` before iterating
 38 36 | 
 39 37 | for i in list(foo_dict):  # Ok
 
+PERF101.py:57:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+55 | x, y, nested_tuple = (1, 2, (3, 4, 5))
+56 | 
+57 | for i in list(nested_tuple):  # PERF101
+   |          ^^^^^^^^^^^^^^^^^^ PERF101
+58 |     pass
+   |
+   = help: Remove `list()` cast
+
+ℹ Safe fix
+54 54 | 
+55 55 | x, y, nested_tuple = (1, 2, (3, 4, 5))
+56 56 | 
+57    |-for i in list(nested_tuple):  # PERF101
+   57 |+for i in nested_tuple:  # PERF101
+58 58 |     pass
+
 

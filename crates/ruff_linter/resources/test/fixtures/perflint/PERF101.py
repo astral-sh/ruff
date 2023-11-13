@@ -50,3 +50,9 @@ import itertools
 
 for i in itertools.product(foo_int):  # Ok
     pass
+
+
+x, y, nested_tuple = (1, 2, (3, 4, 5))
+
+for i in list(nested_tuple):  # PERF101
+    pass
