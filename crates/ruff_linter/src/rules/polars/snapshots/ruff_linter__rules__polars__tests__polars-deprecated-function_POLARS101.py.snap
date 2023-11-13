@@ -1,0 +1,57 @@
+---
+source: crates/ruff_linter/src/rules/polars/mod.rs
+---
+POLARS101.py:4:5: POLARS101 [*] `pl.avg` is deprecated; use `pl.mean` instead
+  |
+2 |     import polars as pl
+3 | 
+4 |     pl.avg('a')
+  |     ^^^^^^ POLARS101
+5 |     pl.map('a')
+6 |     pl.apply('a')
+  |
+  = help: Replace with `pl.mean`
+
+ℹ Safe fix
+1 1 | def func():
+2 2 |     import polars as pl
+3 3 | 
+4   |-    pl.avg('a')
+  4 |+    pl.mean('a')
+5 5 |     pl.map('a')
+6 6 |     pl.apply('a')
+
+POLARS101.py:5:5: POLARS101 [*] `pl.map` is deprecated; use `pl.map_batches` instead
+  |
+4 |     pl.avg('a')
+5 |     pl.map('a')
+  |     ^^^^^^ POLARS101
+6 |     pl.apply('a')
+  |
+  = help: Replace with `pl.map_batches`
+
+ℹ Safe fix
+2 2 |     import polars as pl
+3 3 | 
+4 4 |     pl.avg('a')
+5   |-    pl.map('a')
+  5 |+    pl.map_batches('a')
+6 6 |     pl.apply('a')
+
+POLARS101.py:6:5: POLARS101 [*] `pl.apply` is deprecated; use `pl.map_groups` instead
+  |
+4 |     pl.avg('a')
+5 |     pl.map('a')
+6 |     pl.apply('a')
+  |     ^^^^^^^^ POLARS101
+  |
+  = help: Replace with `pl.map_groups`
+
+ℹ Safe fix
+3 3 | 
+4 4 |     pl.avg('a')
+5 5 |     pl.map('a')
+6   |-    pl.apply('a')
+  6 |+    pl.map_groups('a')
+
+
