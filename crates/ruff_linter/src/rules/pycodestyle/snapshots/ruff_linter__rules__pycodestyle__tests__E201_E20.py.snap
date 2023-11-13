@@ -161,5 +161,27 @@ E20.py:90:5: E201 [*] Whitespace after '['
 90    |-f"{[ { {'a': 1} } ]}"
    90 |+f"{[{ {'a': 1} } ]}"
 91 91 | f"normal { {f"{ { [1, 2] } }" } } normal"
+92 92 | 
+93 93 | #: Okay
+
+E20.py:119:5: E201 [*] Whitespace after '['
+    |
+118 | #: E201:1:5
+119 | ham[ : upper]
+    |     ^ E201
+120 | 
+121 | #: Okay
+    |
+    = help: Remove whitespace before '['
+
+ℹ Safe fix
+116 116 | ham[lower + offset : upper + offset]
+117 117 | 
+118 118 | #: E201:1:5
+119     |-ham[ : upper]
+    119 |+ham[: upper]
+120 120 | 
+121 121 | #: Okay
+122 122 | ham[lower + offset :: upper + offset]
 
 
