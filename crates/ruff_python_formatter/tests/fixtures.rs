@@ -5,12 +5,13 @@ use std::{fmt, fs};
 
 use similar::TextDiff;
 
-use normalized_ast::NormalizedMod;
+use crate::normalizer::Normalizer;
 use ruff_formatter::FormatOptions;
+use ruff_python_ast::comparable::ComparableMod;
 use ruff_python_formatter::{format_module_source, PreviewMode, PyFormatOptions};
 use ruff_python_parser::{parse, AsMode};
 
-mod normalized_ast;
+mod normalizer;
 
 #[test]
 fn black_compatibility() {
@@ -253,22 +254,24 @@ fn ensure_unchanged_ast(
     let source_type = options.source_type();
 
     // Parse the unformatted code.
-    let unformatted_ast = parse(
+    let mut unformatted_ast = parse(
         unformatted_code,
         source_type.as_mode(),
         &input_path.to_string_lossy(),
     )
     .expect("Unformatted code to be valid syntax");
-    let unformatted_ast = NormalizedMod::from(&unformatted_ast);
+    Normalizer.visit_module(&mut unformatted_ast);
+    let unformatted_ast = ComparableMod::from(&unformatted_ast);
 
     // Parse the formatted code.
-    let formatted_ast = parse(
+    let mut formatted_ast = parse(
         formatted_code,
         source_type.as_mode(),
         &input_path.to_string_lossy(),
     )
     .expect("Formatted code to be valid syntax");
-    let formatted_ast = NormalizedMod::from(&formatted_ast);
+    Normalizer.visit_module(&mut formatted_ast);
+    let formatted_ast = ComparableMod::from(&formatted_ast);
 
     if formatted_ast != unformatted_ast {
         let diff = TextDiff::from_lines(

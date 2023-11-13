@@ -1,8 +1,3 @@
-//! AST visitor trait and walk functions.
-
-pub mod preorder;
-pub mod transformer;
-
 use crate::{
     self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
     ExceptHandler, Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
@@ -10,113 +5,105 @@ use crate::{
     WithItem,
 };
 
-/// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
-///
-/// Prefer [`crate::statement_visitor::StatementVisitor`] for visitors that only need to visit
-/// statements.
-///
-/// Use the [`PreorderVisitor`](preorder::PreorderVisitor) if you want to visit the nodes
-/// in pre-order rather than evaluation order.
-///
-/// Use the [`Transformer`](transformer::Transformer) if you want to modify the nodes.
-pub trait Visitor<'a> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+/// A trait for transforming ASTs. Visits all nodes in the AST recursively in evaluation-order.
+pub trait Transformer {
+    fn visit_stmt(&self, stmt: &mut Stmt) {
         walk_stmt(self, stmt);
     }
-    fn visit_annotation(&mut self, expr: &'a Expr) {
+    fn visit_annotation(&self, expr: &mut Expr) {
         walk_annotation(self, expr);
     }
-    fn visit_decorator(&mut self, decorator: &'a Decorator) {
+    fn visit_decorator(&self, decorator: &mut Decorator) {
         walk_decorator(self, decorator);
     }
-    fn visit_expr(&mut self, expr: &'a Expr) {
+    fn visit_expr(&self, expr: &mut Expr) {
         walk_expr(self, expr);
     }
-    fn visit_expr_context(&mut self, expr_context: &'a ExprContext) {
+    fn visit_expr_context(&self, expr_context: &mut ExprContext) {
         walk_expr_context(self, expr_context);
     }
-    fn visit_bool_op(&mut self, bool_op: &'a BoolOp) {
+    fn visit_bool_op(&self, bool_op: &mut BoolOp) {
         walk_bool_op(self, bool_op);
     }
-    fn visit_operator(&mut self, operator: &'a Operator) {
+    fn visit_operator(&self, operator: &mut Operator) {
         walk_operator(self, operator);
     }
-    fn visit_unary_op(&mut self, unary_op: &'a UnaryOp) {
+    fn visit_unary_op(&self, unary_op: &mut UnaryOp) {
         walk_unary_op(self, unary_op);
     }
-    fn visit_cmp_op(&mut self, cmp_op: &'a CmpOp) {
+    fn visit_cmp_op(&self, cmp_op: &mut CmpOp) {
         walk_cmp_op(self, cmp_op);
     }
-    fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
+    fn visit_comprehension(&self, comprehension: &mut Comprehension) {
         walk_comprehension(self, comprehension);
     }
-    fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
+    fn visit_except_handler(&self, except_handler: &mut ExceptHandler) {
         walk_except_handler(self, except_handler);
     }
-    fn visit_format_spec(&mut self, format_spec: &'a Expr) {
+    fn visit_format_spec(&self, format_spec: &mut Expr) {
         walk_format_spec(self, format_spec);
     }
-    fn visit_arguments(&mut self, arguments: &'a Arguments) {
+    fn visit_arguments(&self, arguments: &mut Arguments) {
         walk_arguments(self, arguments);
     }
-    fn visit_parameters(&mut self, parameters: &'a Parameters) {
+    fn visit_parameters(&self, parameters: &mut Parameters) {
         walk_parameters(self, parameters);
     }
-    fn visit_parameter(&mut self, parameter: &'a Parameter) {
+    fn visit_parameter(&self, parameter: &mut Parameter) {
         walk_parameter(self, parameter);
     }
-    fn visit_keyword(&mut self, keyword: &'a Keyword) {
+    fn visit_keyword(&self, keyword: &mut Keyword) {
         walk_keyword(self, keyword);
     }
-    fn visit_alias(&mut self, alias: &'a Alias) {
+    fn visit_alias(&self, alias: &mut Alias) {
         walk_alias(self, alias);
     }
-    fn visit_with_item(&mut self, with_item: &'a WithItem) {
+    fn visit_with_item(&self, with_item: &mut WithItem) {
         walk_with_item(self, with_item);
     }
-    fn visit_type_params(&mut self, type_params: &'a TypeParams) {
+    fn visit_type_params(&self, type_params: &mut TypeParams) {
         walk_type_params(self, type_params);
     }
-    fn visit_type_param(&mut self, type_param: &'a TypeParam) {
+    fn visit_type_param(&self, type_param: &mut TypeParam) {
         walk_type_param(self, type_param);
     }
-    fn visit_match_case(&mut self, match_case: &'a MatchCase) {
+    fn visit_match_case(&self, match_case: &mut MatchCase) {
         walk_match_case(self, match_case);
     }
-    fn visit_pattern(&mut self, pattern: &'a Pattern) {
+    fn visit_pattern(&self, pattern: &mut Pattern) {
         walk_pattern(self, pattern);
     }
-    fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments) {
+    fn visit_pattern_arguments(&self, pattern_arguments: &mut PatternArguments) {
         walk_pattern_arguments(self, pattern_arguments);
     }
-    fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword) {
+    fn visit_pattern_keyword(&self, pattern_keyword: &mut PatternKeyword) {
         walk_pattern_keyword(self, pattern_keyword);
     }
-    fn visit_body(&mut self, body: &'a [Stmt]) {
+    fn visit_body(&self, body: &mut [Stmt]) {
         walk_body(self, body);
     }
-    fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
+    fn visit_elif_else_clause(&self, elif_else_clause: &mut ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
     }
 }
 
-pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a [Stmt]) {
+pub fn walk_body<V: Transformer + ?Sized>(visitor: &V, body: &mut [Stmt]) {
     for stmt in body {
         visitor.visit_stmt(stmt);
     }
 }
 
-pub fn walk_elif_else_clause<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    elif_else_clause: &'a ElifElseClause,
+pub fn walk_elif_else_clause<V: Transformer + ?Sized>(
+    visitor: &V,
+    elif_else_clause: &mut ElifElseClause,
 ) {
-    if let Some(test) = &elif_else_clause.test {
+    if let Some(test) = &mut elif_else_clause.test {
         visitor.visit_expr(test);
     }
-    visitor.visit_body(&elif_else_clause.body);
+    visitor.visit_body(&mut elif_else_clause.body);
 }
 
-pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
+pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
     match stmt {
         Stmt::FunctionDef(ast::StmtFunctionDef {
             parameters,
@@ -237,7 +224,7 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_expr(test);
             visitor.visit_body(body);
             for clause in elif_else_clauses {
-                if let Some(test) = &clause.test {
+                if let Some(test) = &mut clause.test {
                     visitor.visit_expr(test);
                 }
                 walk_elif_else_clause(visitor, clause);
@@ -313,15 +300,15 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
     }
 }
 
-pub fn walk_annotation<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
+pub fn walk_annotation<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
     visitor.visit_expr(expr);
 }
 
-pub fn walk_decorator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, decorator: &'a Decorator) {
-    visitor.visit_expr(&decorator.expression);
+pub fn walk_decorator<V: Transformer + ?Sized>(visitor: &V, decorator: &mut Decorator) {
+    visitor.visit_expr(&mut decorator.expression);
 }
 
-pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
+pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
     match expr {
         Expr::BoolOp(ast::ExprBoolOp {
             op,
@@ -384,7 +371,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             values,
             range: _,
         }) => {
-            for expr in keys.iter().flatten() {
+            for expr in keys.iter_mut().flatten() {
                 visitor.visit_expr(expr);
             }
             for expr in values {
@@ -551,20 +538,17 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
     }
 }
 
-pub fn walk_comprehension<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    comprehension: &'a Comprehension,
-) {
-    visitor.visit_expr(&comprehension.iter);
-    visitor.visit_expr(&comprehension.target);
-    for expr in &comprehension.ifs {
+pub fn walk_comprehension<V: Transformer + ?Sized>(visitor: &V, comprehension: &mut Comprehension) {
+    visitor.visit_expr(&mut comprehension.iter);
+    visitor.visit_expr(&mut comprehension.target);
+    for expr in &mut comprehension.ifs {
         visitor.visit_expr(expr);
     }
 }
 
-pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    except_handler: &'a ExceptHandler,
+pub fn walk_except_handler<V: Transformer + ?Sized>(
+    visitor: &V,
+    except_handler: &mut ExceptHandler,
 ) {
     match except_handler {
         ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, body, .. }) => {
@@ -576,81 +560,81 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
     }
 }
 
-pub fn walk_format_spec<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, format_spec: &'a Expr) {
+pub fn walk_format_spec<V: Transformer + ?Sized>(visitor: &V, format_spec: &mut Expr) {
     visitor.visit_expr(format_spec);
 }
 
-pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
+pub fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Arguments) {
     // Note that the there might be keywords before the last arg, e.g. in
     // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
     // `keywords`. See also [Arguments::arguments_source_order`].
-    for arg in &arguments.args {
+    for arg in &mut arguments.args {
         visitor.visit_expr(arg);
     }
-    for keyword in &arguments.keywords {
+    for keyword in &mut arguments.keywords {
         visitor.visit_keyword(keyword);
     }
 }
 
-pub fn walk_parameters<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameters: &'a Parameters) {
+pub fn walk_parameters<V: Transformer + ?Sized>(visitor: &V, parameters: &mut Parameters) {
     // Defaults are evaluated before annotations.
-    for arg in &parameters.posonlyargs {
-        if let Some(default) = &arg.default {
+    for arg in &mut parameters.posonlyargs {
+        if let Some(default) = &mut arg.default {
             visitor.visit_expr(default);
         }
     }
-    for arg in &parameters.args {
-        if let Some(default) = &arg.default {
+    for arg in &mut parameters.args {
+        if let Some(default) = &mut arg.default {
             visitor.visit_expr(default);
         }
     }
-    for arg in &parameters.kwonlyargs {
-        if let Some(default) = &arg.default {
+    for arg in &mut parameters.kwonlyargs {
+        if let Some(default) = &mut arg.default {
             visitor.visit_expr(default);
         }
     }
 
-    for arg in &parameters.posonlyargs {
-        visitor.visit_parameter(&arg.parameter);
+    for arg in &mut parameters.posonlyargs {
+        visitor.visit_parameter(&mut arg.parameter);
     }
-    for arg in &parameters.args {
-        visitor.visit_parameter(&arg.parameter);
+    for arg in &mut parameters.args {
+        visitor.visit_parameter(&mut arg.parameter);
     }
-    if let Some(arg) = &parameters.vararg {
+    if let Some(arg) = &mut parameters.vararg {
         visitor.visit_parameter(arg);
     }
-    for arg in &parameters.kwonlyargs {
-        visitor.visit_parameter(&arg.parameter);
+    for arg in &mut parameters.kwonlyargs {
+        visitor.visit_parameter(&mut arg.parameter);
     }
-    if let Some(arg) = &parameters.kwarg {
+    if let Some(arg) = &mut parameters.kwarg {
         visitor.visit_parameter(arg);
     }
 }
 
-pub fn walk_parameter<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, parameter: &'a Parameter) {
-    if let Some(expr) = &parameter.annotation {
+pub fn walk_parameter<V: Transformer + ?Sized>(visitor: &V, parameter: &mut Parameter) {
+    if let Some(expr) = &mut parameter.annotation {
         visitor.visit_annotation(expr);
     }
 }
 
-pub fn walk_keyword<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, keyword: &'a Keyword) {
-    visitor.visit_expr(&keyword.value);
+pub fn walk_keyword<V: Transformer + ?Sized>(visitor: &V, keyword: &mut Keyword) {
+    visitor.visit_expr(&mut keyword.value);
 }
 
-pub fn walk_with_item<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, with_item: &'a WithItem) {
-    visitor.visit_expr(&with_item.context_expr);
-    if let Some(expr) = &with_item.optional_vars {
+pub fn walk_with_item<V: Transformer + ?Sized>(visitor: &V, with_item: &mut WithItem) {
+    visitor.visit_expr(&mut with_item.context_expr);
+    if let Some(expr) = &mut with_item.optional_vars {
         visitor.visit_expr(expr);
     }
 }
 
-pub fn walk_type_params<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_params: &'a TypeParams) {
-    for type_param in &type_params.type_params {
+pub fn walk_type_params<V: Transformer + ?Sized>(visitor: &V, type_params: &mut TypeParams) {
+    for type_param in &mut type_params.type_params {
         visitor.visit_type_param(type_param);
     }
 }
 
-pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param: &'a TypeParam) {
+pub fn walk_type_param<V: Transformer + ?Sized>(visitor: &V, type_param: &mut TypeParam) {
     match type_param {
         TypeParam::TypeVar(TypeParamTypeVar {
             bound,
@@ -665,15 +649,15 @@ pub fn walk_type_param<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, type_param:
     }
 }
 
-pub fn walk_match_case<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, match_case: &'a MatchCase) {
-    visitor.visit_pattern(&match_case.pattern);
-    if let Some(expr) = &match_case.guard {
+pub fn walk_match_case<V: Transformer + ?Sized>(visitor: &V, match_case: &mut MatchCase) {
+    visitor.visit_pattern(&mut match_case.pattern);
+    if let Some(expr) = &mut match_case.guard {
         visitor.visit_expr(expr);
     }
-    visitor.visit_body(&match_case.body);
+    visitor.visit_body(&mut match_case.body);
 }
 
-pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a Pattern) {
+pub fn walk_pattern<V: Transformer + ?Sized>(visitor: &V, pattern: &mut Pattern) {
     match pattern {
         Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => {
             visitor.visit_expr(value);
@@ -710,39 +694,39 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
     }
 }
 
-pub fn walk_pattern_arguments<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    pattern_arguments: &'a PatternArguments,
+pub fn walk_pattern_arguments<V: Transformer + ?Sized>(
+    visitor: &V,
+    pattern_arguments: &mut PatternArguments,
 ) {
-    for pattern in &pattern_arguments.patterns {
+    for pattern in &mut pattern_arguments.patterns {
         visitor.visit_pattern(pattern);
     }
-    for keyword in &pattern_arguments.keywords {
+    for keyword in &mut pattern_arguments.keywords {
         visitor.visit_pattern_keyword(keyword);
     }
 }
 
-pub fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &mut V,
-    pattern_keyword: &'a PatternKeyword,
+pub fn walk_pattern_keyword<V: Transformer + ?Sized>(
+    visitor: &V,
+    pattern_keyword: &mut PatternKeyword,
 ) {
-    visitor.visit_pattern(&pattern_keyword.pattern);
+    visitor.visit_pattern(&mut pattern_keyword.pattern);
 }
 
 #[allow(unused_variables)]
-pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(visitor: &V, expr_context: &'a ExprContext) {}
+pub fn walk_expr_context<V: Transformer + ?Sized>(visitor: &V, expr_context: &mut ExprContext) {}
 
 #[allow(unused_variables)]
-pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, bool_op: &'a BoolOp) {}
+pub fn walk_bool_op<V: Transformer + ?Sized>(visitor: &V, bool_op: &mut BoolOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &V, operator: &'a Operator) {}
+pub fn walk_operator<V: Transformer + ?Sized>(visitor: &V, operator: &mut Operator) {}
 
 #[allow(unused_variables)]
-pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, unary_op: &'a UnaryOp) {}
+pub fn walk_unary_op<V: Transformer + ?Sized>(visitor: &V, unary_op: &mut UnaryOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, cmp_op: &'a CmpOp) {}
+pub fn walk_cmp_op<V: Transformer + ?Sized>(visitor: &V, cmp_op: &mut CmpOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &V, alias: &'a Alias) {}
+pub fn walk_alias<V: Transformer + ?Sized>(visitor: &V, alias: &mut Alias) {}
