@@ -32,33 +32,20 @@ impl Normalizer {
 
 impl Transformer for Normalizer {
     fn visit_stmt(&self, stmt: &mut Stmt) {
-        match stmt {
-            Stmt::ClassDef(class_def) => {
-                // Treat `class C: ...` and `class C(): ...` equivalently.
-                if class_def
-                    .arguments
-                    .as_ref()
-                    .is_some_and(|arguments| arguments.is_empty())
-                {
-                    class_def.arguments = None;
-                }
-            }
-            Stmt::Delete(delete) => {
-                // Treat `del a, b` and `del (a, b)` equivalently.
-                delete.targets = delete
-                    .targets
-                    .clone()
-                    .into_iter()
-                    .flat_map(|target| {
-                        if let Expr::Tuple(tuple) = target {
-                            Left(tuple.elts.into_iter())
-                        } else {
-                            Right(std::iter::once(target))
-                        }
-                    })
-                    .collect();
-            }
-            _ => {}
+        if let Stmt::Delete(delete) = stmt {
+            // Treat `del a, b` and `del (a, b)` equivalently.
+            delete.targets = delete
+                .targets
+                .clone()
+                .into_iter()
+                .flat_map(|target| {
+                    if let Expr::Tuple(tuple) = target {
+                        Left(tuple.elts.into_iter())
+                    } else {
+                        Right(std::iter::once(target))
+                    }
+                })
+                .collect();
         }
 
         transformer::walk_stmt(self, stmt);
