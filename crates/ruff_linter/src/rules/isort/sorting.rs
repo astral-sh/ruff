@@ -78,8 +78,8 @@ pub(crate) struct ModuleKey<'a> {
     force_to_top: Option<bool>,
     maybe_lowercase_name: Option<NatOrdStr<'a>>,
     module_name: Option<NatOrdStr<'a>>,
-    asname: Option<NatOrdStr<'a>>,
     first_alias: Option<MemberKey<'a>>,
+    asname: Option<NatOrdStr<'a>>,
 }
 
 impl<'a> ModuleKey<'a> {
@@ -110,8 +110,8 @@ impl<'a> ModuleKey<'a> {
             force_to_top,
             maybe_lowercase_name,
             module_name,
-            asname,
             first_alias,
+            asname,
         }
     }
 }
