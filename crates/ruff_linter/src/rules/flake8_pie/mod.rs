@@ -19,7 +19,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryRangeStart, Path::new("PIE808.py"))]
     #[test_case(Rule::UnnecessaryPlaceholder, Path::new("PIE790.py"))]
     #[test_case(Rule::UnnecessarySpread, Path::new("PIE800.py"))]
-    #[test_case(Rule::ReimplementedListBuiltin, Path::new("PIE807.py"))]
+    #[test_case(Rule::ReimplementedContainerBuiltin, Path::new("PIE807.py"))]
     #[test_case(Rule::NonUniqueEnums, Path::new("PIE796.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -32,6 +32,7 @@ mod tests {
     }
 
     #[test_case(Rule::UnnecessaryPlaceholder, Path::new("PIE790.py"))]
+    #[test_case(Rule::ReimplementedContainerBuiltin, Path::new("PIE807.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
