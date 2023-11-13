@@ -12,6 +12,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     if !checker.any_enabled(&[
         Rule::GlobalVariableNotAssigned,
         Rule::ImportShadowedByLoopVar,
+        Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
         Rule::TypingOnlyFirstPartyImport,
@@ -82,6 +83,32 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     diagnostics.push(Diagnostic::new(
                         pylint::rules::GlobalVariableNotAssigned {
                             name: (*name).to_string(),
+                        },
+                        binding.range(),
+                    ));
+                }
+            }
+        }
+
+        if checker.enabled(Rule::RedefinedArgumentFromLocal) {
+            for (name, binding_id) in scope.bindings() {
+                for shadow in checker.semantic.shadowed_bindings(scope_id, binding_id) {
+                    let binding = &checker.semantic.bindings[shadow.binding_id()];
+                    if !matches!(
+                        binding.kind,
+                        BindingKind::LoopVar
+                            | BindingKind::BoundException
+                            | BindingKind::WithItemVar
+                    ) {
+                        continue;
+                    }
+                    let shadowed = &checker.semantic.bindings[shadow.shadowed_id()];
+                    if !shadowed.kind.is_argument() {
+                        continue;
+                    }
+                    checker.diagnostics.push(Diagnostic::new(
+                        pylint::rules::RedefinedArgumentFromLocal {
+                            name: name.to_string(),
                         },
                         binding.range(),
                     ));

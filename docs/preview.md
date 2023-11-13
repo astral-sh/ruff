@@ -32,14 +32,14 @@ To enable preview style formatting without enabling any preview lint rules:
 === "pyproject.toml"
 
     ```toml
-    [tool.ruff.preview]
+    [tool.ruff.format]
     preview = true
     ```
 
 === "ruff.toml"
 
     ```toml
-    [preview]
+    [format]
     preview = true
     ```
 

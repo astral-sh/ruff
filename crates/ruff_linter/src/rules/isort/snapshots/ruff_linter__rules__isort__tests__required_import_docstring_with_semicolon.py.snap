@@ -6,7 +6,7 @@ docstring_with_semicolon.py:1:1: I002 [*] Missing required import: `from __futur
 1 | """Hello, world!"""; x = 1
   |  I002
   |
-  = help: Insert required import: `from future import annotations`
+  = help: Insert required import: `from __future__ import annotations`
 
 ℹ Safe fix
 1   |-"""Hello, world!"""; x = 1
