@@ -15,7 +15,8 @@ use crate::checkers::ast::Checker;
 /// the `dict` builtin.
 ///
 /// ## Why is this bad?
-/// Using container builtins is more readable.
+/// Using container builtins are more succinct and idiomatic than wrapping
+/// the literal in a lambda.
 ///
 /// ## Example
 /// ```python
@@ -38,8 +39,6 @@ use crate::checkers::ast::Checker;
 ///     baz: dict[str, int] = field(default_factory=dict)
 /// ```
 ///
-///
-/// If [preview]
 /// ## References
 /// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
 ///
