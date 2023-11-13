@@ -827,7 +827,7 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
- "toml",
+ "toml 0.7.8",
 ]
 
 [[package]]
@@ -1802,15 +1802,15 @@ dependencies = [
 
 [[package]]
 name = "pyproject-toml"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0774c13ff0b8b7ebb4791c050c497aefcfe3f6a222c0829c7017161ed38391ff"
+checksum = "46d4a5e69187f23a29f8aa0ea57491d104ba541bc55f76552c2a74962aa20e04"
 dependencies = [
  "indexmap",
  "pep440_rs",
  "pep508_rs",
  "serde",
- "toml",
+ "toml 0.8.2",
 ]
 
 [[package]]
@@ -2154,7 +2154,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tempfile",
- "toml",
+ "toml 0.7.8",
  "tracing",
  "tracing-indicatif",
  "tracing-subscriber",
@@ -2254,7 +2254,7 @@ dependencies = [
  "tempfile",
  "test-case",
  "thiserror",
- "toml",
+ "toml 0.7.8",
  "typed-arena",
  "unicode-width",
  "unicode_names2",
@@ -2540,7 +2540,7 @@ dependencies = [
  "shellexpand",
  "strum",
  "tempfile",
- "toml",
+ "toml 0.7.8",
 ]
 
 [[package]]
@@ -3097,7 +3097,19 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit",
+ "toml_edit 0.19.15",
+]
+
+[[package]]
+name = "toml"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "185d8ab0dfbb35cf1399a6344d8484209c088f75f8f68230da55d48d95d43e3d"
+dependencies = [
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_edit 0.20.2",
 ]
 
 [[package]]
@@ -3114,6 +3126,19 @@ name = "toml_edit"
 version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
+dependencies = [
+ "indexmap",
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "winnow",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "396e4d48bbb2b7554c944bde63101b5ae446cff6ec4a24227428f15eb72ef338"
 dependencies = [
  "indexmap",
  "serde",
