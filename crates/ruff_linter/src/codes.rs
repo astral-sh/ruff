@@ -768,7 +768,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "027") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestUnittestRaisesAssertion),
 
         // flake8-pie
-        (Flake8Pie, "790") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryPass),
+        (Flake8Pie, "790") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryPlaceholder),
         (Flake8Pie, "794") => (RuleGroup::Stable, rules::flake8_pie::rules::DuplicateClassFieldDefinition),
         (Flake8Pie, "796") => (RuleGroup::Stable, rules::flake8_pie::rules::NonUniqueEnums),
         (Flake8Pie, "800") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessarySpread),
