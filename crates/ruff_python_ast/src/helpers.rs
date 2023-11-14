@@ -1,20 +1,21 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use smallvec::SmallVec;
 
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::call_path::CallPath;
 use crate::parenthesize::parenthesized_range;
-use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
-use crate::AnyNodeRef;
 use crate::{
-    self as ast, Arguments, CmpOp, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
+    self as ast, Arguments, CmpOp, ExceptHandler, Expr, MatchCase, Operator, Pattern, Stmt,
+    TypeParam,
 };
+use crate::{AnyNodeRef, ExprContext};
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
 pub const fn is_compound_statement(stmt: &Stmt) -> bool {
@@ -882,9 +883,10 @@ pub fn resolve_imported_module_path<'a>(
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<&'a ast::StmtReturn>,
+    pub is_generator: bool,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for ReturnStatementVisitor<'a>
+impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
 where
     'b: 'a,
 {
@@ -894,7 +896,15 @@ where
                 // Don't recurse.
             }
             Stmt::Return(stmt) => self.returns.push(stmt),
-            _ => walk_stmt(self, stmt),
+            _ => crate::visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'b Expr) {
+        if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
+            self.is_generator = true;
+        } else {
+            crate::visitor::walk_expr(self, expr);
         }
     }
 }
@@ -925,7 +935,7 @@ where
                 elif_else_clauses,
                 ..
             }) => {
-                walk_body(self, body);
+                crate::statement_visitor::walk_body(self, body);
                 for clause in elif_else_clauses {
                     self.visit_elif_else_clause(clause);
                 }
@@ -933,11 +943,11 @@ where
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::With(ast::StmtWith { body, .. })
             | Stmt::For(ast::StmtFor { body, .. }) => {
-                walk_body(self, body);
+                crate::statement_visitor::walk_body(self, body);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
-                    walk_body(self, &case.body);
+                    crate::statement_visitor::walk_body(self, &case.body);
                 }
             }
             _ => {}
@@ -1246,6 +1256,36 @@ pub fn generate_comparison(
     }
 
     contents
+}
+
+/// Format the expression as a PEP 604-style optional.
+pub fn pep_604_optional(expr: &Expr) -> Expr {
+    ast::ExprBinOp {
+        left: Box::new(expr.clone()),
+        op: Operator::BitOr,
+        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
+        range: TextRange::default(),
+    }
+    .into()
+}
+
+/// Format the expressions as a PEP 604-style union.
+pub fn pep_604_union(elts: &[Expr]) -> Expr {
+    match elts {
+        [] => Expr::Tuple(ast::ExprTuple {
+            elts: vec![],
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
+        }),
+        [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
+        [elt] => elt.clone(),
+        [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+            left: Box::new(pep_604_union(rest)),
+            op: Operator::BitOr,
+            right: Box::new(pep_604_union(&[elt.clone()])),
+            range: TextRange::default(),
+        }),
+    }
 }
 
 #[cfg(test)]
