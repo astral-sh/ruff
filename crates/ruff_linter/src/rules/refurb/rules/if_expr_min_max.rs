@@ -45,19 +45,13 @@ impl AlwaysFixableViolation for IfExprMinMax {
 }
 
 /// FURB136
-pub(crate) fn if_expr_min_max(
-    checker: &mut Checker,
-    expr: &Expr,
-    test: &Expr,
-    body: &Expr,
-    orelse: &Expr,
-) {
+pub(crate) fn if_expr_min_max(checker: &mut Checker, expr: &Expr, if_exp: &ast::ExprIfExp) {
     let Expr::Compare(ast::ExprCompare {
         left,
         ops,
         comparators,
         ..
-    }) = test
+    }) = if_exp.test.as_ref()
     else {
         return;
     };
@@ -79,8 +73,8 @@ pub(crate) fn if_expr_min_max(
         return;
     };
 
-    let body_cmp = ComparableExpr::from(body);
-    let orelse_cmp = ComparableExpr::from(orelse);
+    let body_cmp = ComparableExpr::from(if_exp.body.as_ref());
+    let orelse_cmp = ComparableExpr::from(if_exp.orelse.as_ref());
     let left_cmp = ComparableExpr::from(left);
     let right_cmp = ComparableExpr::from(right);
 

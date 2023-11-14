@@ -1281,12 +1281,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
         }
-        Expr::IfExp(ast::ExprIfExp {
-            test,
-            body,
-            orelse,
-            range: _,
-        }) => {
+        Expr::IfExp(
+            if_exp @ ast::ExprIfExp {
+                test,
+                body,
+                orelse,
+                range: _,
+            },
+        ) => {
             if checker.enabled(Rule::IfElseBlockInsteadOfDictGet) {
                 flake8_simplify::rules::if_exp_instead_of_dict_get(
                     checker, expr, test, body, orelse,
@@ -1302,7 +1304,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_simplify::rules::twisted_arms_in_ifexpr(checker, expr, test, body, orelse);
             }
             if checker.enabled(Rule::IfExprMinMax) {
-                refurb::rules::if_expr_min_max(checker, expr, test, body, orelse);
+                refurb::rules::if_expr_min_max(checker, expr, if_exp);
             }
         }
         Expr::ListComp(
