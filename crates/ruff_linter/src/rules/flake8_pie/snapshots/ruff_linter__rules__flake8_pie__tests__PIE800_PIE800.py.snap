@@ -8,6 +8,7 @@ PIE800.py:1:14: PIE800 Unnecessary spread `**`
 2 | 
 3 | foo({**foo, **{"bar": True}})  # PIE800
   |
+  = help: Remove unnecessary dict
 
 PIE800.py:3:15: PIE800 Unnecessary spread `**`
   |
@@ -18,6 +19,7 @@ PIE800.py:3:15: PIE800 Unnecessary spread `**`
 4 | 
 5 | {**foo, **{"bar": 10}}  # PIE800
   |
+  = help: Remove unnecessary dict
 
 PIE800.py:5:11: PIE800 Unnecessary spread `**`
   |
@@ -28,6 +30,7 @@ PIE800.py:5:11: PIE800 Unnecessary spread `**`
 6 | 
 7 | {**foo, **buzz, **{bar: 10}}  # PIE800
   |
+  = help: Remove unnecessary dict
 
 PIE800.py:7:19: PIE800 Unnecessary spread `**`
   |
@@ -38,5 +41,6 @@ PIE800.py:7:19: PIE800 Unnecessary spread `**`
 8 | 
 9 | {**foo,    "bar": True  }  # OK
   |
+  = help: Remove unnecessary dict
 
 
