@@ -613,9 +613,7 @@ pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Opti
             }) => {
                 return Some(value.as_ref());
             }
-            Stmt::AugAssign(_) => {
-                return None
-            }
+            Stmt::AugAssign(_) => return None,
             _ => return None,
         }
     }
