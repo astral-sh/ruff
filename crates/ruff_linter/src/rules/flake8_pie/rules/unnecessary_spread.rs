@@ -2,6 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_trivia::{BackwardsTokenizer, SimpleTokenKind};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -49,22 +50,56 @@ pub(crate) fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], v
         if let (None, value) = item {
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
-            if let Expr::Dict(_) = value {
+            if let Expr::Dict(dict) = value {
                 let mut diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
                 if checker.settings.preview.is_enabled() {
-                    let range = value.range();
-                    // unwrap -- `item.0 == None` iff this is a spread operator
-                    // which means there *must* be a `**` here
-                    let doublestar = checker.locator().up_to(range.start()).rfind("**").unwrap();
-                    diagnostic.set_fix(Fix::safe_edits(
-                        // delete the `**{`
-                        Edit::deletion(
-                            TextSize::from(doublestar as u32),
-                            range.start() + TextSize::from(1),
-                        ),
-                        // delete the `}`
-                        [Edit::deletion(range.end() - TextSize::from(1), range.end())],
-                    ));
+                    // Delete the `**{`
+                    let tokenizer = BackwardsTokenizer::up_to(
+                        dict.range.start(),
+                        checker.locator().contents(),
+                        &[],
+                    );
+                    let mut start = None;
+                    for tok in tokenizer {
+                        if let SimpleTokenKind::DoubleStar = tok.kind() {
+                            start = Some(tok.range.start());
+                            break;
+                        }
+                    }
+                    // unwrap is ok, b/c item.0 can't be None without a DoubleStar
+                    let first =
+                        Edit::deletion(start.unwrap(), dict.range.start() + TextSize::from(1));
+
+                    // Delete the `}` (and possibly a trailing comma) but preserve comments
+                    let mut edits = Vec::with_capacity(1);
+                    let mut end = dict.range.end();
+
+                    let tokenizer = BackwardsTokenizer::up_to(
+                        dict.range.end() - TextSize::from(1),
+                        checker.locator().contents(),
+                        &[],
+                    );
+                    for tok in tokenizer {
+                        match tok.kind() {
+                            SimpleTokenKind::Comment => {
+                                if tok.range.end() != end {
+                                    edits.push(Edit::deletion(tok.range.end(), end));
+                                }
+                                end = tok.range.start();
+                            }
+                            SimpleTokenKind::Comma
+                            | SimpleTokenKind::Whitespace
+                            | SimpleTokenKind::Newline
+                            | SimpleTokenKind::Continuation => {}
+                            _ => {
+                                if tok.range.end() != end {
+                                    edits.push(Edit::deletion(tok.range.end(), end));
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    diagnostic.set_fix(Fix::safe_edits(first, edits));
                 }
                 checker.diagnostics.push(diagnostic);
             }
