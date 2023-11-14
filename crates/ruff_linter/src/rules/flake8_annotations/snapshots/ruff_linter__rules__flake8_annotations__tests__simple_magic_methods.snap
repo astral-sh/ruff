@@ -8,9 +8,9 @@ simple_magic_methods.py:2:9: ANN204 [*] Missing return type annotation for speci
   |         ^^^^^^^ ANN204
 3 |         ...
   |
-  = help: Add `None` return type
+  = help: Add return type annotation: `str`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | class Foo:
 2   |-    def __str__(self):
   2 |+    def __str__(self) -> str:
@@ -26,9 +26,9 @@ simple_magic_methods.py:5:9: ANN204 [*] Missing return type annotation for speci
   |         ^^^^^^^^ ANN204
 6 |         ...
   |
-  = help: Add `None` return type
+  = help: Add return type annotation: `str`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 2 2 |     def __str__(self):
 3 3 |         ...
 4 4 | 
@@ -46,9 +46,9 @@ simple_magic_methods.py:8:9: ANN204 [*] Missing return type annotation for speci
   |         ^^^^^^^ ANN204
 9 |         ...
   |
-  = help: Add `None` return type
+  = help: Add return type annotation: `int`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 5 5 |     def __repr__(self):
 6 6 |         ...
 7 7 | 
@@ -66,9 +66,9 @@ simple_magic_methods.py:11:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^^^^^^^^^ ANN204
 12 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `int`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 8  8  |     def __len__(self):
 9  9  |         ...
 10 10 | 
@@ -86,9 +86,9 @@ simple_magic_methods.py:14:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^^ ANN204
 15 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 |     def __length_hint__(self):
 12 12 |         ...
 13 13 | 
@@ -106,9 +106,9 @@ simple_magic_methods.py:17:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^ ANN204
 18 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `None`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 14 14 |     def __init__(self):
 15 15 |         ...
 16 16 | 
@@ -126,9 +126,9 @@ simple_magic_methods.py:20:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^^ ANN204
 21 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `bool`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 17 17 |     def __del__(self):
 18 18 |         ...
 19 19 | 
@@ -146,9 +146,9 @@ simple_magic_methods.py:23:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^^^ ANN204
 24 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `bytes`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 20 20 |     def __bool__(self):
 21 21 |         ...
 22 22 | 
@@ -166,9 +166,9 @@ simple_magic_methods.py:26:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^^^^ ANN204
 27 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `str`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 23 23 |     def __bytes__(self):
 24 24 |         ...
 25 25 | 
@@ -186,9 +186,9 @@ simple_magic_methods.py:29:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^^^^^^ ANN204
 30 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `bool`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 26 26 |     def __format__(self, format_spec):
 27 27 |         ...
 28 28 | 
@@ -206,9 +206,9 @@ simple_magic_methods.py:32:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^^^^^ ANN204
 33 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `complex`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 29 29 |     def __contains__(self, item):
 30 30 |         ...
 31 31 | 
@@ -226,9 +226,9 @@ simple_magic_methods.py:35:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^ ANN204
 36 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `int`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 32 32 |     def __complex__(self):
 33 33 |         ...
 34 34 | 
@@ -246,9 +246,9 @@ simple_magic_methods.py:38:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^^^ ANN204
 39 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `float`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 35 35 |     def __int__(self):
 36 36 |         ...
 37 37 | 
@@ -266,9 +266,9 @@ simple_magic_methods.py:41:9: ANN204 [*] Missing return type annotation for spec
    |         ^^^^^^^^^ ANN204
 42 |         ...
    |
-   = help: Add `None` return type
+   = help: Add return type annotation: `int`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 38 38 |     def __float__(self):
 39 39 |         ...
 40 40 | 

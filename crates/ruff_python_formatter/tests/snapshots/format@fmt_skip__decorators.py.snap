@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/decorators.py
 ---
 ## Input
-```py
+```python
 
 @FormattedDecorator(a =b)
  # leading comment
@@ -39,7 +39,7 @@ def foo():  # fmt: skip
 ```
 
 ## Output
-```py
+```python
 @FormattedDecorator(a=b)
 # leading comment
 @MyDecorator( # dangling comment

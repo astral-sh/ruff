@@ -324,8 +324,9 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
         .filter_map(|(name, binding)| {
             if (binding.kind.is_assignment()
                 || binding.kind.is_named_expr_assignment()
-                || (matches!(checker.settings.preview, PreviewMode::Enabled)
-                    && binding.kind.is_unpacked_assignment()))
+                || binding.kind.is_with_item_var())
+                && (!binding.is_unpacked_assignment()
+                    || matches!(checker.settings.preview, PreviewMode::Enabled))
                 && !binding.is_nonlocal()
                 && !binding.is_global()
                 && !binding.is_used()

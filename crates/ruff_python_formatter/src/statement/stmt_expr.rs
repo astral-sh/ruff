@@ -2,9 +2,11 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{Expr, Operator, StmtExpr};
 
 use crate::comments::{SourceComment, SuppressionKind};
+
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
+use crate::statement::trailing_semicolon;
 
 #[derive(Default)]
 pub struct FormatStmtExpr;
@@ -14,10 +16,19 @@ impl FormatNodeRule<StmtExpr> for FormatStmtExpr {
         let StmtExpr { value, .. } = item;
 
         if is_arithmetic_like(value) {
-            maybe_parenthesize_expression(value, item, Parenthesize::Optional).fmt(f)
+            maybe_parenthesize_expression(value, item, Parenthesize::Optional).fmt(f)?;
         } else {
-            value.format().fmt(f)
+            value.format().fmt(f)?;
         }
+
+        if f.options().source_type().is_ipynb()
+            && f.context().node_level().is_last_top_level_statement()
+            && trailing_semicolon(item.into(), f.context().source()).is_some()
+        {
+            token(";").fmt(f)?;
+        }
+
+        Ok(())
     }
 
     fn is_suppressed(

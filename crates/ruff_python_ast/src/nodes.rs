@@ -2281,6 +2281,15 @@ pub struct Parameters {
 }
 
 impl Parameters {
+    /// Returns the [`ParameterWithDefault`] with the given name, or `None` if no such [`ParameterWithDefault`] exists.
+    pub fn find(&self, name: &str) -> Option<&ParameterWithDefault> {
+        self.posonlyargs
+            .iter()
+            .chain(&self.args)
+            .chain(&self.kwonlyargs)
+            .find(|arg| arg.parameter.name.as_str() == name)
+    }
+
     /// Returns `true` if a parameter with the given name included in this [`Parameters`].
     pub fn includes(&self, name: &str) -> bool {
         if self

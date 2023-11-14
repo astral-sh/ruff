@@ -16,6 +16,8 @@ mod tests {
 
     #[test_case(Rule::TrioTimeoutWithoutAwait, Path::new("TRIO100.py"))]
     #[test_case(Rule::TrioSyncCall, Path::new("TRIO105.py"))]
+    #[test_case(Rule::TrioAsyncFunctionWithTimeout, Path::new("TRIO109.py"))]
+    #[test_case(Rule::TrioUnneededSleep, Path::new("TRIO110.py"))]
     #[test_case(Rule::TrioZeroSleepCall, Path::new("TRIO115.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

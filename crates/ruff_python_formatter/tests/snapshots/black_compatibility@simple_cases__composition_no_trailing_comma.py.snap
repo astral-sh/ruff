@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 class C:
     def test(self) -> None:
         with patch("black.out", print):
@@ -242,7 +242,7 @@ class C:
 
 ## Ruff Output
 
-```py
+```python
 class C:
     def test(self) -> None:
         with patch("black.out", print):
@@ -427,7 +427,7 @@ class C:
 
 ## Black Output
 
-```py
+```python
 class C:
     def test(self) -> None:
         with patch("black.out", print):

@@ -148,3 +148,32 @@ for i in range(10):
 for i in range(10):
     pass  # comment
     pass
+
+
+def foo():
+    print("foo")
+    ...
+
+
+def foo():
+    """A docstring."""
+    print("foo")
+    ...
+
+
+for i in range(10):
+    ...
+    ...
+
+for i in range(10):
+    ...
+
+    ...
+
+for i in range(10):
+    ...  # comment
+    ...
+
+for i in range(10):
+    ...
+    pass

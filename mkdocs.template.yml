@@ -60,6 +60,7 @@ markdown_extensions:
       alternate_style: true
 plugins:
   - search
+  - typeset
 extra_css:
   - stylesheets/extra.css
 not_in_nav: |

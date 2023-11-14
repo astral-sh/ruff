@@ -697,6 +697,7 @@ mod tests {
     }
 
     #[test_case(Path::new("force_sort_within_sections.py"))]
+    #[test_case(Path::new("force_sort_within_sections_with_as_names.py"))]
     fn force_sort_within_sections(path: &Path) -> Result<()> {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
         let mut diagnostics = test_path(

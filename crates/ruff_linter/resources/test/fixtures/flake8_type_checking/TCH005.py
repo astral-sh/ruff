@@ -37,3 +37,9 @@ if False:
 
 if 0:
     x: List
+
+
+from typing_extensions import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass  # TCH005

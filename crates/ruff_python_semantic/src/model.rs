@@ -200,6 +200,14 @@ impl<'a> SemanticModel<'a> {
         false
     }
 
+    /// Return an iterator over the set of `typing` modules allowed in the semantic model.
+    pub fn typing_modules(&self) -> impl Iterator<Item = &str> {
+        ["typing", "_typeshed", "typing_extensions"]
+            .iter()
+            .copied()
+            .chain(self.typing_modules.iter().map(String::as_str))
+    }
+
     /// Create a new [`Binding`] for a builtin.
     pub fn push_builtin(&mut self) -> BindingId {
         self.bindings.push(Binding {
@@ -686,6 +694,16 @@ impl<'a> SemanticModel<'a> {
                 Some(resolved)
             }
             BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
+            BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
+                let value_path = collect_call_path(value)?;
+                let resolved: CallPath = self
+                    .module_path?
+                    .iter()
+                    .map(String::as_str)
+                    .chain(value_path)
+                    .collect();
+                Some(resolved)
+            }
             _ => None,
         }
     }
@@ -1205,6 +1223,16 @@ impl<'a> SemanticModel<'a> {
             exceptions.insert(*exception);
         }
         exceptions
+    }
+
+    /// Return `true` if the module at the given path was seen anywhere in the semantic model.
+    /// This includes both direct imports (`import trio`) and member imports (`from trio import
+    /// TrioTask`).
+    pub fn seen(&self, module: &[&str]) -> bool {
+        self.bindings
+            .iter()
+            .filter_map(Binding::as_any_import)
+            .any(|import| import.call_path().starts_with(module))
     }
 
     /// Generate a [`Snapshot`] of the current semantic model.

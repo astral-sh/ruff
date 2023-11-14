@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/split_empty_brackets.py
 ---
 ## Input
-```py
+```python
 # Expressions with empty parentheses.
 ct_match = (
     unicodedata.normalize("NFKC", s1).casefold()
@@ -97,7 +97,7 @@ response = await sync_to_async(
 ```
 
 ## Output
-```py
+```python
 # Expressions with empty parentheses.
 ct_match = (
     unicodedata.normalize("NFKC", s1).casefold()

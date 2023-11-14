@@ -111,6 +111,24 @@ mod tests {
     }
 
     #[test]
+    fn auto_return_type() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_annotations/auto_return_type.py"),
+            &LinterSettings {
+                ..LinterSettings::for_rules(vec![
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn suppress_none_returning() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_annotations/suppress_none_returning.py"),

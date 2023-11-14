@@ -21,7 +21,7 @@ numbers
 
 ...where `numbers.py` contains the following code:
 
-```py
+```python
 from typing import Iterable
 
 import os
@@ -273,7 +273,7 @@ Found 3 errors.
 Any lint rule can be ignored by adding a `# noqa` comment to the line in question. For example,
 let's ignore the `UP035` rule for the `Iterable` import:
 
-```py
+```python
 from typing import Iterable  # noqa: UP035
 
 
@@ -294,7 +294,7 @@ Found 3 errors.
 If we want to ignore a rule for an entire file, we can add the line `# ruff: noqa: {code}` anywhere
 in the file, preferably towards the top, like so:
 
-```py
+```python
 # ruff: noqa: UP035
 from typing import Iterable
 
@@ -341,17 +341,13 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 [pre-commit](https://pre-commit.com) hook via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit):
 
 ```yaml
-# Run the Ruff linter.
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
   rev: v0.1.4
   hooks:
+    # Run the linter.
     - id: ruff
-# Run the Ruff formatter.
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.1.4
-  hooks:
+    # Run the formatter.
     - id: ruff-format
 ```
 

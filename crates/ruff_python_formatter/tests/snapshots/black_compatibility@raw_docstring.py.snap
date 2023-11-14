@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/raw_docst
 ---
 ## Input
 
-```py
+```python
 # flags: --preview --skip-string-normalization
 class C:
 
@@ -50,7 +50,7 @@ class UpperCaseR:
 
 ## Ruff Output
 
-```py
+```python
 # flags: --preview --skip-string-normalization
 class C:
 
@@ -72,7 +72,7 @@ class UpperCaseR:
 
 ## Black Output
 
-```py
+```python
 class C:
     r"""Raw"""
 

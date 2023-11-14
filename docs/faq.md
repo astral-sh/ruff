@@ -245,14 +245,14 @@ isort treat inline comments in some cases (see: [#1381](https://github.com/astra
 
 For example, Ruff tends to group non-aliased imports from the same module:
 
-```py
+```python
 from numpy import cos, int8, int16, int32, int64, tan, uint8, uint16, uint32, uint64
 from numpy import sin as np_sin
 ```
 
 Whereas isort splits them into separate import statements at each aliased boundary:
 
-```py
+```python
 from numpy import cos, int8, int16, int32, int64
 from numpy import sin as np_sin
 from numpy import tan, uint8, uint16, uint32, uint64
@@ -262,7 +262,7 @@ Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
 them. You can find the supported settings in the [API reference](settings.md#isort).
-For example, you can set [`known-first-party`](settings.md#known-first-party--isort-known-first-party-)
+For example, you can set [`known-first-party`](settings.md#isort-known-first-party)
 like so:
 
 === "pyproject.toml"
@@ -357,14 +357,23 @@ If your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` extends another configura
 will still use the directory containing your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file as
 the project root (as opposed to the directory of the file pointed to via the `extends` option).
 
-For example, if you add a `ruff.toml` to the `tests` directory in the above example, you'll want to
-explicitly set the `src` option in the extended configuration file:
+For example, if you add a configuration file to the `tests` directory in the above example, you'll
+want to explicitly set the `src` option in the extended configuration file:
 
-```toml
-# tests/ruff.toml
-extend = "../pyproject.toml"
-src = ["../src"]
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extend = "../pyproject.toml"
+    src = ["../src"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend = "../pyproject.toml"
+    src = ["../src"]
+    ```
 
 Beyond this `src`-based detection, Ruff will also attempt to determine the current Python package
 for a given Python file, and mark imports from within the same package as first-party. For example,
@@ -417,7 +426,7 @@ Found 3 errors.
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enforce a docstring convention, add a [`convention`](settings.md#convention--pydocstyle-convention-)
+Yes! To enforce a docstring convention, add a [`convention`](settings.md#pydocstyle-convention)
 setting following to your configuration file:
 
 === "pyproject.toml"
@@ -438,8 +447,32 @@ For example, if you're coming from flake8-docstrings, and your originating confi
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
-Alongside [`convention`](settings.md#convention--pydocstyle-convention-), you'll want to
+Alongside [`convention`](settings.md#pydocstyle-convention), you'll want to
 explicitly enable the `D` rule code prefix, since the `D` rules are not enabled by default:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    select = ["D"]
+
+    [tool.ruff.lint.pydocstyle]
+    convention = "google"
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    select = ["D"]
+
+    [lint.pydocstyle]
+    convention = "google"
+    ```
+
+Enabling a [`convention`](settings.md#pydocstyle-convention) will disable any rules that are not
+included in the specified convention. As such, the intended workflow is to enable a convention and
+then selectively enable or disable any additional rules on top of it:
 
 === "pyproject.toml"
 
@@ -447,6 +480,13 @@ explicitly enable the `D` rule code prefix, since the `D` rules are not enabled 
     [tool.ruff.lint]
     select = [
         "D",
+        # Augment the convention by requiring an imperative mood for all docstrings.
+        "D401",
+    ]
+
+    ignore = [
+        # Relax the convention by _not_ requiring documentation for every function parameter.
+        "D417",
     ]
 
     [tool.ruff.lint.pydocstyle]
@@ -459,16 +499,65 @@ explicitly enable the `D` rule code prefix, since the `D` rules are not enabled 
     [lint]
     select = [
         "D",
+        # Augment the convention by requiring an imperative mood for all docstrings.
+        "D401",
+    ]
+
+    ignore = [
+        # Relax the convention by _not_ requiring documentation for every function parameter.
+        "D417",
     ]
 
     [lint.pydocstyle]
     convention = "google"
     ```
 
-Setting a [`convention`](settings.md#convention--pydocstyle-convention-) force-disables any rules
-that are incompatible with that convention, no matter how they're provided, which avoids accidental
-incompatibilities and simplifies configuration. By default, no [`convention`](settings.md#convention--pydocstyle-convention-)
-is set, and so the enabled rules are determined by the [`select`](settings.md#select) setting alone.
+The PEP 257 convention includes all `D` errors apart from:
+[`D203`](rules/one-blank-line-before-class.md),
+[`D212`](rules/multi-line-summary-first-line.md),
+[`D213`](rules/multi-line-summary-second-line.md),
+[`D214`](rules/section-not-over-indented.md),
+[`D215`](rules/section-underline-not-over-indented.md),
+[`D404`](rules/docstring-starts-with-this.md),
+[`D405`](rules/capitalize-section-name.md),
+[`D406`](rules/new-line-after-section-name.md),
+[`D407`](rules/dashed-underline-after-section.md),
+[`D408`](rules/section-underline-after-name.md),
+[`D409`](rules/section-underline-matches-section-length.md),
+[`D410`](rules/no-blank-line-after-section.md),
+[`D411`](rules/no-blank-line-before-section.md),
+[`D413`](rules/no-blank-line-after-section.md),
+[`D415`](rules/ends-in-punctuation.md),
+[`D416`](rules/section-name-ends-in-colon.md), and
+[`D417`](rules/undocumented-param.md).
+
+The NumPy convention includes all `D` errors apart from:
+[`D107`](rules/undocumented-public-init.md),
+[`D203`](rules/one-blank-line-before-class.md),
+[`D212`](rules/multi-line-summary-first-line.md),
+[`D213`](rules/multi-line-summary-second-line.md),
+[`D402`](rules/no-signature.md),
+[`D413`](rules/no-blank-line-after-section.md),
+[`D415`](rules/ends-in-punctuation.md),
+[`D416`](rules/section-name-ends-in-colon.md), and
+[`D417`](rules/undocumented-param.md).
+
+The Google convention includes all `D` errors apart from:
+[`D203`](rules/one-blank-line-before-class.md),
+[`D204`](rules/one-blank-line-after-class.md),
+[`D213`](rules/multi-line-summary-second-line.md),
+[`D215`](rules/section-underline-not-over-indented.md),
+[`D400`](rules/ends-in-period.md),
+[`D401`](rules/non-imperative-mood.md),
+[`D404`](rules/docstring-starts-with-this.md),
+[`D406`](rules/new-line-after-section-name.md),
+[`D407`](rules/dashed-underline-after-section.md),
+[`D408`](rules/section-underline-after-name.md),
+[`D409`](rules/section-underline-matches-section-length.md), and
+[`D413`](rules/no-blank-line-after-section.md).
+
+By default, no [`convention`](settings.md#pydocstyle-convention) is set, and so the enabled rules
+are determined by the [`select`](settings.md#select) setting alone.
 
 ## What is "preview"?
 
@@ -482,11 +571,11 @@ Run `ruff check /path/to/code.py --show-settings` to view the resolved settings 
 
 ## I want to use Ruff, but I don't want to use `pyproject.toml`. What are my options?
 
-Yes! In lieu of a `pyproject.toml` file, you can use a `ruff.toml` file for configuration. The two
+In lieu of a `pyproject.toml` file, you can use a `ruff.toml` file for configuration. The two
 files are functionally equivalent and have an identical schema, with the exception that a `ruff.toml`
-file can omit the `[tool.ruff]` section header.
+file can omit the `[tool.ruff]` section header. For example:
 
-For example, given this `pyproject.toml`:
+=== "pyproject.toml"
 
 ```toml
 [tool.ruff]
@@ -496,7 +585,7 @@ line-length = 88
 convention = "google"
 ```
 
-You could instead use a `ruff.toml` file like so:
+=== "ruff.toml"
 
 ```toml
 line-length = 88

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/set_comp.py
 ---
 ## Input
-```py
+```python
 {i for i in []}
 
 {i for i in [1,]}
@@ -62,7 +62,7 @@ selected_choices = {
 ```
 
 ## Output
-```py
+```python
 {i for i in []}
 
 {

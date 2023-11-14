@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/binary.py
 ---
 ## Input
-```py
+```python
 (aaaaaaaa
     + # trailing operator comment
     b # trailing right comment
@@ -415,7 +415,7 @@ if True:
 ```
 
 ## Output
-```py
+```python
 (
     aaaaaaaa
     +  # trailing operator comment

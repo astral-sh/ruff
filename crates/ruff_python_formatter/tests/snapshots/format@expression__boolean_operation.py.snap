@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/boolean_operation.py
 ---
 ## Input
-```py
+```python
 if (
     self._proc
     # has the child process finished?
@@ -194,7 +194,7 @@ if (self._proc
 ```
 
 ## Output
-```py
+```python
 if (
     self._proc
     # has the child process finished?

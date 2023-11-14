@@ -252,6 +252,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R0915") => (RuleGroup::Stable, rules::pylint::rules::TooManyStatements),
         (Pylint, "R0916") => (RuleGroup::Preview, rules::pylint::rules::TooManyBooleanExpressions),
         (Pylint, "R1701") => (RuleGroup::Stable, rules::pylint::rules::RepeatedIsinstanceCalls),
+        (Pylint, "R1704") => (RuleGroup::Preview, rules::pylint::rules::RedefinedArgumentFromLocal),
         (Pylint, "R1711") => (RuleGroup::Stable, rules::pylint::rules::UselessReturn),
         (Pylint, "R1714") => (RuleGroup::Stable, rules::pylint::rules::RepeatedEqualityComparison),
         (Pylint, "R1706") => (RuleGroup::Preview, rules::pylint::rules::AndOrTernary),
@@ -293,6 +294,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         // flake8-trio
         (Flake8Trio, "100") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioTimeoutWithoutAwait),
         (Flake8Trio, "105") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioSyncCall),
+        (Flake8Trio, "109") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioAsyncFunctionWithTimeout),
+        (Flake8Trio, "110") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioUnneededSleep),
         (Flake8Trio, "115") => (RuleGroup::Preview, rules::flake8_trio::rules::TrioZeroSleepCall),
 
         // flake8-builtins
@@ -400,6 +403,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Quotes, "001") => (RuleGroup::Stable, rules::flake8_quotes::rules::BadQuotesMultilineString),
         (Flake8Quotes, "002") => (RuleGroup::Stable, rules::flake8_quotes::rules::BadQuotesDocstring),
         (Flake8Quotes, "003") => (RuleGroup::Stable, rules::flake8_quotes::rules::AvoidableEscapedQuote),
+        (Flake8Quotes, "004") => (RuleGroup::Preview, rules::flake8_quotes::rules::UnnecessaryEscapedQuote),
 
         // flake8-annotations
         (Flake8Annotations, "001") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeFunctionArgument),
@@ -629,6 +633,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "609") => (RuleGroup::Stable, rules::flake8_bandit::rules::UnixCommandWildcardInjection),
         (Flake8Bandit, "612") => (RuleGroup::Stable, rules::flake8_bandit::rules::LoggingConfigInsecureListen),
         (Flake8Bandit, "701") => (RuleGroup::Stable, rules::flake8_bandit::rules::Jinja2AutoescapeFalse),
+        (Flake8Bandit, "702") => (RuleGroup::Preview, rules::flake8_bandit::rules::MakoTemplates),
 
         // flake8-boolean-trap
         (Flake8BooleanTrap, "001") => (RuleGroup::Stable, rules::flake8_boolean_trap::rules::BooleanTypeHintPositionalArgument),
@@ -764,12 +769,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "027") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestUnittestRaisesAssertion),
 
         // flake8-pie
-        (Flake8Pie, "790") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryPass),
+        (Flake8Pie, "790") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryPlaceholder),
         (Flake8Pie, "794") => (RuleGroup::Stable, rules::flake8_pie::rules::DuplicateClassFieldDefinition),
         (Flake8Pie, "796") => (RuleGroup::Stable, rules::flake8_pie::rules::NonUniqueEnums),
         (Flake8Pie, "800") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessarySpread),
         (Flake8Pie, "804") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryDictKwargs),
-        (Flake8Pie, "807") => (RuleGroup::Stable, rules::flake8_pie::rules::ReimplementedListBuiltin),
+        (Flake8Pie, "807") => (RuleGroup::Stable, rules::flake8_pie::rules::ReimplementedContainerBuiltin),
         (Flake8Pie, "808") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryRangeStart),
         (Flake8Pie, "810") => (RuleGroup::Stable, rules::flake8_pie::rules::MultipleStartsEndsWith),
 
