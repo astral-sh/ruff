@@ -100,6 +100,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
     ///             deprecated: None,
     ///         });
     ///     }
@@ -122,6 +123,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
     ///             deprecated: None
     ///         });
     ///
@@ -138,6 +140,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
     ///             deprecated: None
     ///         });
     ///     }
@@ -169,6 +172,7 @@ impl OptionSet {
     ///     default: "false",
     ///     value_type: "bool",
     ///     example: "",
+    ///     scope: None,
     ///     deprecated: None
     ///  };
     ///
@@ -191,6 +195,7 @@ impl OptionSet {
     ///     default: "false",
     ///     value_type: "bool",
     ///     example: "",
+    ///     scope: None,
     ///     deprecated: None
     /// };
     ///
@@ -203,6 +208,7 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
     ///             deprecated: None
     ///         });
     ///
@@ -319,8 +325,12 @@ impl Debug for OptionSet {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct OptionField {
     pub doc: &'static str,
+    /// Ex) `"false"`
     pub default: &'static str,
+    /// Ex) `"bool"`
     pub value_type: &'static str,
+    /// Ex) `"per-file-ignores"`
+    pub scope: Option<&'static str>,
     pub example: &'static str,
     pub deprecated: Option<Deprecated>,
 }
