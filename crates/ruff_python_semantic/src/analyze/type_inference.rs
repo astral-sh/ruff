@@ -50,8 +50,8 @@ impl ResolvedPythonType {
             }
             (Self::Union(mut a), Self::Union(b)) => {
                 for b_element in b {
-                    // If `type_` is a subtype of any of the types in `a`, then
-                    // `type_` is redundant.
+                    // If `b_element` is a subtype of any of the types in `a`, then
+                    // `b_element` is redundant.
                     if !a
                         .iter()
                         .any(|a_element| b_element.is_subtype_of(*a_element))
