@@ -546,8 +546,8 @@ jobs:
           images: ghcr.io/astral-sh/ruff
 
       - name: Check tag consistency
-        # Unlike validate-tag we don't check if the commit is on the main branch, but given docker is re-tag-able this
-        # seems good enough
+        # Unlike validate-tag we don't check if the commit is on the main branch, but it seems good enough since we can
+        # change docker tags
         if: ${{ inputs.tag }}
         run: |
           version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
