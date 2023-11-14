@@ -77,17 +77,17 @@ pub(crate) fn categorize<'a>(
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
     let (import_type, reason) = {
-        if !no_sections && level.is_some_and(|level| level > 0) {
-            (
-                &ImportSection::Known(ImportType::LocalFolder),
-                Reason::NonZeroLevel,
-            )
-        } else if module_base == "__future__" {
+        if matches!(level, None | Some(0)) && module_base == "__future__" {
             (&ImportSection::Known(ImportType::Future), Reason::Future)
         } else if no_sections {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::NoSections,
+            )
+        } else if level.is_some_and(|level| level > 0) {
+            (
+                &ImportSection::Known(ImportType::LocalFolder),
+                Reason::NonZeroLevel,
             )
         } else if let Some((import_type, reason)) = known_modules.categorize(module_name) {
             (import_type, reason)
