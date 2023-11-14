@@ -572,7 +572,6 @@ jobs:
           tags: ghcr.io/astral-sh/ruff:latest,ghcr.io/astral-sh/ruff:${{ inputs.tag || 'dry-run' }}
           labels: ${{ steps.meta.outputs.labels }}
 
-
   # After the release has been published, we update downstream repositories
   # This is separate because if this fails the release is still fine, we just need to do some manual workflow triggers
   update-dependents:
