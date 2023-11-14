@@ -610,9 +610,11 @@ pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Opti
             },
             Stmt::AnnAssign(ast::StmtAnnAssign {
                 value: Some(value), ..
-            })
-            | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => {
+            }) => {
                 return Some(value.as_ref());
+            }
+            Stmt::AugAssign(_) => {
+                return None
             }
             _ => return None,
         }
