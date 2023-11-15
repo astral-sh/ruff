@@ -101,13 +101,14 @@ PIE800.py:12:7: PIE800 [*] Unnecessary spread `**`
 12    |-    **{
    12 |+    
 13 13 |         # all
-14 14 |         "bar": 10,  # the
-15    |-        # comments
+14    |-        "bar": 10,  # the
+   14 |+        "bar": 10  # the
+15 15 |         # comments
 16    |-    },
-   15 |+        # comments,
-17 16 | }
-18 17 | 
-19 18 | {**foo, **buzz, **{bar: 10}}  # PIE800
+   16 |+    ,
+17 17 | }
+18 18 | 
+19 19 | {**foo, **buzz, **{bar: 10}}  # PIE800
 
 PIE800.py:19:19: PIE800 [*] Unnecessary spread `**`
    |
