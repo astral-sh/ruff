@@ -936,13 +936,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_trio::rules::zero_sleep_call(checker, call);
             }
         }
-        Expr::Dict(
-            dict @ ast::ExprDict {
-                keys,
-                values,
-                range: _,
-            },
-        ) => {
+        Expr::Dict(dict) => {
             if checker.any_enabled(&[
                 Rule::MultiValueRepeatedKeyLiteral,
                 Rule::MultiValueRepeatedKeyVariable,
@@ -950,7 +944,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyflakes::rules::repeated_keys(checker, dict);
             }
             if checker.enabled(Rule::UnnecessarySpread) {
-                flake8_pie::rules::unnecessary_spread(checker, keys, values);
+                flake8_pie::rules::unnecessary_spread(checker, dict);
             }
         }
         Expr::Set(ast::ExprSet { elts, range: _ }) => {
