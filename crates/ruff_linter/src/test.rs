@@ -38,12 +38,13 @@ pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
 }
 
-/// Run [`check_path`] on a file in the `resources/test/fixtures` directory.
+/// Run [`check_path`] on a Python file in the `resources/test/fixtures` directory.
 #[cfg(not(fuzzing))]
 pub(crate) fn test_path(path: impl AsRef<Path>, settings: &LinterSettings) -> Result<Vec<Message>> {
     let path = test_resource_path("fixtures").join(path);
-    let contents = std::fs::read_to_string(&path)?;
-    Ok(test_contents(&SourceKind::Python(contents), &path, settings).0)
+    let source_type = PySourceType::from(&path);
+    let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
+    Ok(test_contents(&source_kind, &path, settings).0)
 }
 
 #[cfg(not(fuzzing))]
@@ -54,7 +55,7 @@ pub(crate) struct TestedNotebook {
 }
 
 #[cfg(not(fuzzing))]
-pub(crate) fn test_notebook_path(
+pub(crate) fn assert_notebook_path(
     path: impl AsRef<Path>,
     expected: impl AsRef<Path>,
     settings: &LinterSettings,

@@ -138,6 +138,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_18.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_19.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_20.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_21.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_22.ipynb"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"))]

@@ -1,7 +1,7 @@
 /// A list of all Python builtins.
 ///
-/// Intended to be kept in sync with [`is_builtin`].
-pub const BUILTINS: &[&str] = &[
+/// Intended to be kept in sync with [`is_python_builtin`].
+pub const PYTHON_BUILTINS: &[&str] = &[
     "ArithmeticError",
     "AssertionError",
     "AttributeError",
@@ -161,6 +161,11 @@ pub const BUILTINS: &[&str] = &[
     "zip",
 ];
 
+/// A list of all builtins that are available in IPython.
+///
+/// Intended to be kept in sync with [`is_ipython_builtin`].
+pub const IPYTHON_BUILTINS: &[&str] = &["display"];
+
 /// Globally defined names which are not attributes of the builtins module, or
 /// are only present on some platforms.
 pub const MAGIC_GLOBALS: &[&str] = &[
@@ -173,8 +178,8 @@ pub const MAGIC_GLOBALS: &[&str] = &[
 
 /// Returns `true` if the given name is that of a Python builtin.
 ///
-/// Intended to be kept in sync with [`BUILTINS`].
-pub fn is_builtin(name: &str) -> bool {
+/// Intended to be kept in sync with [`PYTHON_BUILTINS`].
+pub fn is_python_builtin(name: &str) -> bool {
     // Constructed by converting the `BUILTINS` slice to a `match` expression.
     matches!(
         name,
@@ -344,4 +349,12 @@ pub fn is_iterator(name: &str) -> bool {
         name,
         "enumerate" | "filter" | "map" | "reversed" | "zip" | "iter"
     )
+}
+
+/// Returns `true` if the given name is that of an IPython builtin.
+///
+/// Intended to be kept in sync with [`IPYTHON_BUILTINS`].
+pub fn is_ipython_builtin(name: &str) -> bool {
+    // Constructed by converting the `IPYTHON_BUILTINS` slice to a `match` expression.
+    matches!(name, "display")
 }

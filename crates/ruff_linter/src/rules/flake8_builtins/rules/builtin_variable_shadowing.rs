@@ -60,7 +60,11 @@ impl Violation for BuiltinVariableShadowing {
 
 /// A001
 pub(crate) fn builtin_variable_shadowing(checker: &mut Checker, name: &str, range: TextRange) {
-    if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
+    if shadows_builtin(
+        name,
+        &checker.settings.flake8_builtins.builtins_ignorelist,
+        checker.source_type,
+    ) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinVariableShadowing {
                 name: name.to_string(),
