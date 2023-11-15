@@ -924,7 +924,7 @@ fn format_docstring(normalized: &NormalizedString, f: &mut PyFormatter) -> Forma
     // align it with the docstring statement. Conversely, if all lines are over-indented, we strip
     // the extra indentation. We call this stripped indentation since it's relative to the block
     // indent printer-made indentation.
-    let stripped_indentation = lines
+    let stripped_indentation_length = lines
         .clone()
         // We don't want to count whitespace-only lines as miss-indented
         .filter(|line| !line.trim().is_empty())
@@ -932,19 +932,14 @@ fn format_docstring(normalized: &NormalizedString, f: &mut PyFormatter) -> Forma
         .min()
         .unwrap_or_default();
 
-    while let Some(line) = lines.next() {
-        let is_last = lines.peek().is_none();
-        format_docstring_line(
-            line,
-            is_last,
-            offset,
-            stripped_indentation,
-            already_normalized,
-            f,
-        )?;
-        // We know that the normalized string has \n line endings
-        offset += line.text_len() + "\n".text_len();
+    DocstringLinePrinter {
+        f,
+        offset,
+        is_last: false,
+        stripped_indentation_length,
+        already_normalized,
     }
+    .print(lines)?;
 
     // Same special case in the last line as for the first line
     let trim_end = docstring
@@ -957,74 +952,105 @@ fn format_docstring(normalized: &NormalizedString, f: &mut PyFormatter) -> Forma
     write!(f, [source_position(normalized.end()), normalized.quotes])
 }
 
+/// An abstraction for printing each line of a docstring.
+struct DocstringLinePrinter<'ast, 'buf, 'fmt> {
+    f: &'fmt mut PyFormatter<'ast, 'buf>,
+    /// The source offset of the beginning of the line that is currently being
+    /// printed.
+    offset: TextSize,
+    /// Set to true when adding the last line.
+    is_last: bool,
+    /// Indentation alignment based on the least indented line in the
+    /// docstring.
+    stripped_indentation_length: TextSize,
+    /// Whether the docstring is overall already considered normalized. When it
+    /// is, the formatter can take a fast path.
+    already_normalized: bool,
+}
+
+impl<'ast, 'buf, 'fmt> DocstringLinePrinter<'ast, 'buf, 'fmt> {
+    /// Print all of the lines in the given iterator to this
+    /// printer's formatter.
+    fn print(&mut self, mut lines: std::iter::Peekable<std::str::Lines<'_>>) -> FormatResult<()> {
+        while let Some(line) = lines.next() {
+            self.is_last = lines.peek().is_none();
+            self.add(line)?;
+        }
+        Ok(())
+    }
+
+    /// Adds the given line to this printer.
+    fn add(&mut self, line: &str) -> FormatResult<()> {
+        self.print_one(line)?;
+        // We know that the normalized string has \n line endings.
+        self.offset += line.text_len() + "\n".text_len();
+        Ok(())
+    }
+
+    /// Prints the single line given.
+    fn print_one(&mut self, line: &str) -> FormatResult<()> {
+        let trim_end = line.trim_end();
+        if trim_end.is_empty() {
+            return if self.is_last {
+                // If the doc string ends with `    """`, the last line is
+                // `    `, but we don't want to insert an empty line (but close
+                // the docstring).
+                Ok(())
+            } else {
+                empty_line().fmt(self.f)
+            };
+        }
+
+        let tab_or_non_ascii_space = trim_end
+            .chars()
+            .take_while(|c| c.is_whitespace())
+            .any(|c| c != ' ');
+
+        if tab_or_non_ascii_space {
+            // We strip the indentation that is shared with the docstring
+            // statement, unless a line was indented less than the docstring
+            // statement, in which case we strip only this much indentation to
+            // implicitly pad all lines by the difference, or all lines were
+            // overindented, in which case we strip the additional whitespace
+            // (see example in [`format_docstring`] doc comment). We then
+            // prepend the in-docstring indentation to the string.
+            let indent_len = indentation_length(trim_end) - self.stripped_indentation_length;
+            let in_docstring_indent = " ".repeat(usize::from(indent_len)) + trim_end.trim_start();
+            text(&in_docstring_indent, Some(self.offset)).fmt(self.f)?;
+        } else {
+            // Take the string with the trailing whitespace removed, then also
+            // skip the leading whitespace.
+            let trimmed_line_range = TextRange::at(self.offset, trim_end.text_len())
+                .add_start(self.stripped_indentation_length);
+            if self.already_normalized {
+                source_text_slice(trimmed_line_range).fmt(self.f)?;
+            } else {
+                // All indents are ascii spaces, so the slicing is correct.
+                text(
+                    &trim_end[usize::from(self.stripped_indentation_length)..],
+                    Some(trimmed_line_range.start()),
+                )
+                .fmt(self.f)?;
+            }
+        }
+
+        // We handled the case that the closing quotes are on their own line
+        // above (the last line is empty except for whitespace). If they are on
+        // the same line as content, we don't insert a line break.
+        if !self.is_last {
+            hard_line_break().fmt(self.f)?;
+        }
+
+        Ok(())
+    }
+}
+
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
 fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
     trim_end.ends_with(normalized.quotes.style.as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
-}
-
-/// Format a docstring line that is not the first line
-fn format_docstring_line(
-    line: &str,
-    is_last: bool,
-    offset: TextSize,
-    stripped_indentation_length: TextSize,
-    already_normalized: bool,
-    f: &mut PyFormatter,
-) -> FormatResult<()> {
-    let trim_end = line.trim_end();
-    if trim_end.is_empty() {
-        return if is_last {
-            // If the doc string ends with `    """`, the last line is `    `, but we don't want to
-            // insert an empty line (but close the docstring)
-            Ok(())
-        } else {
-            empty_line().fmt(f)
-        };
-    }
-
-    let tab_or_non_ascii_space = trim_end
-        .chars()
-        .take_while(|c| c.is_whitespace())
-        .any(|c| c != ' ');
-
-    if tab_or_non_ascii_space {
-        // We strip the indentation that is shared with the docstring statement, unless a line
-        // was indented less than the docstring statement, in which we strip only this much
-        // indentation to implicitly pad all lines by the difference, or all lines were
-        // overindented, in which case we strip the additional whitespace (see example in
-        // [`format_docstring`] doc comment). We then prepend the in-docstring indentation to the
-        // string.
-        let indent_len = indentation_length(trim_end) - stripped_indentation_length;
-        let in_docstring_indent = " ".repeat(usize::from(indent_len)) + trim_end.trim_start();
-        text(&in_docstring_indent, Some(offset)).fmt(f)?;
-    } else {
-        // Take the string with the trailing whitespace removed, then also skip the leading
-        // whitespace
-        let trimmed_line_range =
-            TextRange::at(offset, trim_end.text_len()).add_start(stripped_indentation_length);
-        if already_normalized {
-            source_text_slice(trimmed_line_range).fmt(f)?;
-        } else {
-            // All indents are ascii spaces, so the slicing is correct
-            text(
-                &trim_end[usize::from(stripped_indentation_length)..],
-                Some(trimmed_line_range.start()),
-            )
-            .fmt(f)?;
-        }
-    }
-
-    // We handled the case that the closing quotes are on their own line above (the last line is
-    // empty except for whitespace). If they are on the same line as content, we don't insert a line
-    // break.
-    if !is_last {
-        hard_line_break().fmt(f)?;
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]
