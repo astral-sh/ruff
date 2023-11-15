@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for duplicated keyword arguments passed to a function call
+/// Checks for repeated keyword arguments passed to a function call
 ///
 /// ## Why is this bad?
 /// Python does not allow for multiple values to be assigned to the same
@@ -35,7 +35,7 @@ impl Violation for RepeatedKeywords {
     #[derive_message_formats]
     fn message(&self) -> String {
         let dupe = &self.duplicate_keyword;
-        format!("Duplicate keyword argument: `{dupe}`")
+        format!("Repeated keyword argument: `{dupe}`")
     }
 }
 
