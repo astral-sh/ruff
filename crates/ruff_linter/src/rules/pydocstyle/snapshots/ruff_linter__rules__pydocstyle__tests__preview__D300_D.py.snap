@@ -196,5 +196,8 @@ D.py:664:5: D300 [*] Use triple double quotes `"""`
 665     |-    but continuations shouldn't be considered multi-line"
     664 |+    """We enforce a newline after the closing quote for a multi-line docstring \
     665 |+    but continuations shouldn't be considered multi-line"""
+666 666 | 
+667 667 | 
+668 668 | 
 
 
