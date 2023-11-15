@@ -68,7 +68,7 @@ impl Violation for IfExprMinMax {
             ..
         } = self;
         if let Some(replacement) = replacement.full_display() {
-            Some(format!("Replace with `{}`", replacement))
+            Some(format!("Replace with `{replacement}`"))
         } else {
             Some(format!("Replace with `{min_max}` call"))
         }
