@@ -94,9 +94,3 @@ pub(crate) enum EitherImport<'a> {
     Import(Import<'a>),
     ImportFrom(ImportFrom<'a>),
 }
-
-#[derive(Debug, Default)]
-pub(crate) struct OrderedImportBlock<'a> {
-    pub(crate) import: Vec<Import<'a>>,
-    pub(crate) import_from: Vec<ImportFrom<'a>>,
-}
