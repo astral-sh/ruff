@@ -18,3 +18,8 @@ y if x < y else x  # FURB136
 y if x <= y else x  # FURB136
 
 x + y if x > y else y  # OK
+
+x if (
+    x
+    > y
+) else y  # FURB136

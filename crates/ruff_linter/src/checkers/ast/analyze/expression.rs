@@ -1304,7 +1304,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_simplify::rules::twisted_arms_in_ifexpr(checker, expr, test, body, orelse);
             }
             if checker.enabled(Rule::IfExprMinMax) {
-                refurb::rules::if_expr_min_max(checker, expr, if_exp);
+                refurb::rules::if_expr_min_max(checker, if_exp);
             }
         }
         Expr::ListComp(
