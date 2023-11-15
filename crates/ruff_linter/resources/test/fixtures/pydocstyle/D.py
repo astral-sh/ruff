@@ -668,7 +668,7 @@ def newline_after_closing_quote(self):
 
 
 def retain_extra_whitespace():
-    """Summary
+    """Summary.
 
         This is overindented
             And so is this, but it we should preserve the extra space on this line relative
@@ -677,7 +677,7 @@ def retain_extra_whitespace():
 
 
 def retain_extra_whitespace_multiple():
-    """Summary
+    """Summary.
 
         This is overindented
             And so is this, but it we should preserve the extra space on this line relative
@@ -690,7 +690,7 @@ def retain_extra_whitespace_multiple():
 
 
 def retain_extra_whitespace_deeper():
-    """Summary
+    """Summary.
 
         This is overindented
             And so is this, but it we should preserve the extra space on this line relative
@@ -699,7 +699,7 @@ def retain_extra_whitespace_deeper():
     """
 
 def retain_extra_whitespace_followed_by_same_offset():
-    """Summary
+    """Summary.
 
         This is overindented
             And so is this, but it we should preserve the extra space on this line relative
@@ -709,7 +709,7 @@ def retain_extra_whitespace_followed_by_same_offset():
 
 
 def retain_extra_whitespace_not_overindented():
-    """Summary
+    """Summary.
 
     This is not overindented
         This is overindented, but since one line is not overindented this should not raise

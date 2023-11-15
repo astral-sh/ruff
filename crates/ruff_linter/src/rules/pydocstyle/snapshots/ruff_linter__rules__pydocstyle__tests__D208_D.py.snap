@@ -64,7 +64,7 @@ D.py:272:1: D208 [*] Docstring is over-indented
 
 D.py:673:1: D208 [*] Docstring is over-indented
     |
-671 |     """Summary
+671 |     """Summary.
 672 | 
 673 |         This is overindented
     |  D208
@@ -75,7 +75,7 @@ D.py:673:1: D208 [*] Docstring is over-indented
 
 ℹ Safe fix
 670 670 | def retain_extra_whitespace():
-671 671 |     """Summary
+671 671 |     """Summary.
 672 672 | 
 673     |-        This is overindented
     673 |+    This is overindented
@@ -94,7 +94,7 @@ D.py:674:1: D208 [*] Docstring is over-indented
     = help: Remove over-indentation
 
 ℹ Safe fix
-671 671 |     """Summary
+671 671 |     """Summary.
 672 672 | 
 673 673 |         This is overindented
 674     |-            And so is this, but it we should preserve the extra space on this line relative
@@ -125,7 +125,7 @@ D.py:675:1: D208 [*] Docstring is over-indented
 
 D.py:682:1: D208 [*] Docstring is over-indented
     |
-680 |     """Summary
+680 |     """Summary.
 681 | 
 682 |         This is overindented
     |  D208
@@ -136,7 +136,7 @@ D.py:682:1: D208 [*] Docstring is over-indented
 
 ℹ Safe fix
 679 679 | def retain_extra_whitespace_multiple():
-680 680 |     """Summary
+680 680 |     """Summary.
 681 681 | 
 682     |-        This is overindented
     682 |+    This is overindented
@@ -155,7 +155,7 @@ D.py:683:1: D208 [*] Docstring is over-indented
     = help: Remove over-indentation
 
 ℹ Safe fix
-680 680 |     """Summary
+680 680 |     """Summary.
 681 681 | 
 682 682 |         This is overindented
 683     |-            And so is this, but it we should preserve the extra space on this line relative
@@ -249,7 +249,7 @@ D.py:687:1: D208 [*] Docstring is over-indented
 
 D.py:695:1: D208 [*] Docstring is over-indented
     |
-693 |     """Summary
+693 |     """Summary.
 694 | 
 695 |         This is overindented
     |  D208
@@ -260,7 +260,7 @@ D.py:695:1: D208 [*] Docstring is over-indented
 
 ℹ Safe fix
 692 692 | def retain_extra_whitespace_deeper():
-693 693 |     """Summary
+693 693 |     """Summary.
 694 694 | 
 695     |-        This is overindented
     695 |+    This is overindented
@@ -279,7 +279,7 @@ D.py:696:1: D208 [*] Docstring is over-indented
     = help: Remove over-indentation
 
 ℹ Safe fix
-693 693 |     """Summary
+693 693 |     """Summary.
 694 694 | 
 695 695 |         This is overindented
 696     |-            And so is this, but it we should preserve the extra space on this line relative
@@ -331,7 +331,7 @@ D.py:698:1: D208 [*] Docstring is over-indented
 
 D.py:704:1: D208 [*] Docstring is over-indented
     |
-702 |     """Summary
+702 |     """Summary.
 703 | 
 704 |         This is overindented
     |  D208
@@ -342,7 +342,7 @@ D.py:704:1: D208 [*] Docstring is over-indented
 
 ℹ Safe fix
 701 701 | def retain_extra_whitespace_followed_by_same_offset():
-702 702 |     """Summary
+702 702 |     """Summary.
 703 703 | 
 704     |-        This is overindented
     704 |+    This is overindented
@@ -361,7 +361,7 @@ D.py:705:1: D208 [*] Docstring is over-indented
     = help: Remove over-indentation
 
 ℹ Safe fix
-702 702 |     """Summary
+702 702 |     """Summary.
 703 703 | 
 704 704 |         This is overindented
 705     |-            And so is this, but it we should preserve the extra space on this line relative
