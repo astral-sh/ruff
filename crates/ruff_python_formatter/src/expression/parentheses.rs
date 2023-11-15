@@ -14,6 +14,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
+/// From the perspective of the expression, under which circumstances does it need parentheses
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum OptionalParentheses {
     /// Add parentheses if the expression expands over multiple lines
@@ -41,7 +42,8 @@ pub(crate) trait NeedsParentheses {
     ) -> OptionalParentheses;
 }
 
-/// Configures if the expression should be parenthesized.
+/// From the perspective of the parent statement or expression, when should the child expression
+/// get parentheses?
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Parenthesize {
     /// Parenthesizes the expression if it doesn't fit on a line OR if the expression is parenthesized in the source code.
