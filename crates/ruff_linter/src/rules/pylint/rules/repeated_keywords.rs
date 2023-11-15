@@ -7,7 +7,25 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
-/// TODO(Alex): do the docs
+/// ## What it does
+/// Checks for duplicated keyword arguments passed to a function call
+///
+/// ## Why is this bad?
+/// Python does not allow for multiple values to be assigned to the same
+/// keyword argument in a single function call.
+///
+/// ## Example
+/// ```python
+/// func(1, 2, c=3, **{"c": 4})
+/// ```
+///
+/// Use instead:
+/// ```python
+/// func(1, 2, **{"c": 4})
+/// ```
+///
+/// ## References
+/// - [Python documentation: Argument](https://docs.python.org/3/glossary.html#term-argument)
 #[violation]
 pub struct RepeatedKeywords {
     duplicate_keyword: String,
