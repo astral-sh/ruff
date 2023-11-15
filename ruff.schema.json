@@ -1497,6 +1497,13 @@
             "$ref": "#/definitions/ImportSection"
           }
         },
+        "no-sections": {
+          "description": "Put all imports into the same section bucket.\n\nFor example, rather than separating standard library and third-party imports, as in: ```python import os import sys\n\nimport numpy import pandas ```\n\nSetting `no-sections = true` will instead group all imports into a single section: ```python import os import numpy import pandas import sys ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "order-by-type": {
           "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
           "type": [
