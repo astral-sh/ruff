@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -46,7 +47,8 @@ impl Violation for UnnecessarySpread {
 
 /// PIE800
 pub(crate) fn unnecessary_spread(checker: &mut Checker, dict: &ast::ExprDict) {
-    let mut prev_end = dict.range.start() + TextSize::from(1);
+    // The first "end" is the start of the dictionary, immediately following the open bracket.
+    let mut prev_end = dict.start() + TextSize::from(1);
     for item in dict.keys.iter().zip(dict.values.iter()) {
         if let (None, value) = item {
             // We only care about when the key is None which indicates a spread `**`
@@ -54,7 +56,9 @@ pub(crate) fn unnecessary_spread(checker: &mut Checker, dict: &ast::ExprDict) {
             if let Expr::Dict(inner) = value {
                 let mut diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
                 if checker.settings.preview.is_enabled() {
-                    diagnostic.set_fix(unnecessary_spread_fix(checker, inner, prev_end));
+                    if let Some(fix) = unnecessary_spread_fix(inner, prev_end, checker.locator()) {
+                        diagnostic.set_fix(fix);
+                    }
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -63,42 +67,42 @@ pub(crate) fn unnecessary_spread(checker: &mut Checker, dict: &ast::ExprDict) {
     }
 }
 
-fn unnecessary_spread_fix(checker: &mut Checker, inner: &ast::ExprDict, prev_end: TextSize) -> Fix {
-    let tokenizer = SimpleTokenizer::starts_at(prev_end, checker.locator().contents());
-    let mut start = None;
-    for tok in tokenizer {
-        if let SimpleTokenKind::DoubleStar = tok.kind() {
-            start = Some(tok.range.start());
-            break;
-        }
-    }
-    // unwrap is ok, b/c item.0 can't be None without a DoubleStar
-    let doublestar = start.unwrap();
+/// Generate a [`Fix`] to remove an unnecessary dictionary spread.
+fn unnecessary_spread_fix(
+    dict: &ast::ExprDict,
+    prev_end: TextSize,
+    locator: &Locator,
+) -> Option<Fix> {
+    // Find the `**` token preceding the spread.
+    let doublestar = SimpleTokenizer::starts_at(prev_end, locator.contents())
+        .find(|tok| matches!(tok.kind(), SimpleTokenKind::DoubleStar))?;
 
-    if let Some(last) = inner.values.last() {
-        let tokenizer =
-            SimpleTokenizer::starts_at(last.range().end(), checker.locator().contents());
+    if let Some(last) = dict.values.last() {
+        // Ex) `**{a: 1, b: 2}`
         let mut edits = vec![];
-        for tok in tokenizer.skip_trivia() {
+        for tok in SimpleTokenizer::starts_at(last.end(), locator.contents()).skip_trivia() {
             match tok.kind() {
                 SimpleTokenKind::Comma => {
                     edits.push(Edit::range_deletion(tok.range()));
                 }
                 SimpleTokenKind::RBrace => {
-                    edits.push(Edit::range_deletion(tok.range));
+                    edits.push(Edit::range_deletion(tok.range()));
                     break;
                 }
                 _ => {}
             }
         }
-        Fix::safe_edits(
+        Some(Fix::safe_edits(
             // Delete the first `**{`
-            Edit::deletion(doublestar, inner.start() + TextSize::from(1)),
+            Edit::deletion(doublestar.start(), dict.start() + TextSize::from(1)),
             // Delete the trailing `}`
             edits,
-        )
+        ))
     } else {
-        // Can just delete the entire thing
-        Fix::safe_edit(Edit::deletion(doublestar, inner.end()))
+        // Ex) `**{}`
+        Some(Fix::safe_edit(Edit::deletion(
+            doublestar.start(),
+            dict.end(),
+        )))
     }
 }
