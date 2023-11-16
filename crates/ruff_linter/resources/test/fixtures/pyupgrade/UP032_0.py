@@ -226,3 +226,20 @@ raise ValueError(
     "".format(new_dict, d)
 
 )
+
+# The first string will be converted to an f-string and the curly braces in the second should be converted to be unescaped
+(
+    "{}"
+    "{{}}"
+).format(a)
+
+("{}" "{{}}").format(a)
+
+
+# Both strings will be converted to an f-string and the curly braces in the second should left escaped
+(
+    "{}"
+    "{{{}}}"
+).format(a, b)
+
+("{}" "{{{}}}").format(a, b)
