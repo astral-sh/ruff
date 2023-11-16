@@ -354,12 +354,8 @@ pub(crate) fn blank_lines(
 ) {
     let line_is_comment_only = line.is_comment_only();
 
-    if tracked_vars.is_first_logical_line {
-        if !line_is_comment_only {
-            tracked_vars.is_first_logical_line = false;
-        }
-        // Don't expect blank lines before the first line non comment line.
-        return;
+    if tracked_vars.is_first_logical_line && !line_is_comment_only {
+        tracked_vars.is_first_logical_line = false;
     }
 
     let mut follows_class_or_fn = false;
@@ -406,7 +402,9 @@ pub(crate) fn blank_lines(
             continue;
         }
 
-        if token.kind() == TokenKind::Def
+        if tracked_vars.is_first_logical_line {
+            // Don't expect blank lines before the first line non comment line.
+        } else if token.kind() == TokenKind::Def
             // Only applies to method.
             && tracked_vars.is_in_class
             && (
