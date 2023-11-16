@@ -285,6 +285,23 @@ def f(
 # end
 
 
+# no error
+if True:
+    class Class:
+        """Docstring"""
+
+        def function(self):
+            ...
+# end
+
+
+# no error
+if True:
+    def function(self):
+        ...
+# end
+
+
 # E301
 class Class(object):
 

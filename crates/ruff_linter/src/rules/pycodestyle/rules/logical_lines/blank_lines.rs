@@ -452,12 +452,14 @@ pub(crate) fn blank_lines(
                     .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
                 )
                 // Only apply to top level functions.
-                    || tracked_vars.is_in_class
-                    || tracked_vars.is_in_fn
+                || tracked_vars.is_in_class
+                || tracked_vars.is_in_fn
                 // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
-                    || (line.line.preceding_blank_lines >= BlankLinesConfig::TOP_LEVEL && prev_line.map_or(false, LogicalLine::is_comment_only))
+                || (line.line.preceding_blank_lines >= BlankLinesConfig::TOP_LEVEL && prev_line.map_or(false, LogicalLine::is_comment_only))
             )
-        // Allow directly following an except.
+            // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
+            && indent_level == 0
+            // Allow directly following an except.
             && prev_line
             .and_then(|prev_line| prev_line.tokens_trimmed().first())
             .map_or(true, |token| !matches!(token.kind(), TokenKind::Except))
