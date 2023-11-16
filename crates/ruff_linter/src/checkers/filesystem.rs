@@ -1,6 +1,8 @@
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_index::Indexer;
+use ruff_source_file::Locator;
 
 use crate::registry::Rule;
 use crate::rules::flake8_no_pep420::rules::implicit_namespace_package;
@@ -10,15 +12,22 @@ use crate::settings::LinterSettings;
 pub(crate) fn check_file_path(
     path: &Path,
     package: Option<&Path>,
+    locator: &Locator,
+    indexer: &Indexer,
     settings: &LinterSettings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     // flake8-no-pep420
     if settings.rules.enabled(Rule::ImplicitNamespacePackage) {
-        if let Some(diagnostic) =
-            implicit_namespace_package(path, package, &settings.project_root, &settings.src)
-        {
+        if let Some(diagnostic) = implicit_namespace_package(
+            path,
+            package,
+            locator,
+            indexer,
+            &settings.project_root,
+            &settings.src,
+        ) {
             diagnostics.push(diagnostic);
         }
     }
