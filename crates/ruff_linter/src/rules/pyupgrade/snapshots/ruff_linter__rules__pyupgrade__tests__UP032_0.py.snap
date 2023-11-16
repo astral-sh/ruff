@@ -962,6 +962,8 @@ UP032_0.py:209:1: UP032 [*] Use f-string instead of `format` call
 208 | # existing line length, so it's fine.
 209 | "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+210 | 
+211 | # When fixing, trim the trailing empty string.
     |
     = help: Convert to f-string
 
@@ -971,5 +973,98 @@ UP032_0.py:209:1: UP032 [*] Use f-string instead of `format` call
 208 208 | # existing line length, so it's fine.
 209     |-"<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
     209 |+f"<Customer: {self.internal_ids}, {self.external_ids}, {self.properties}, {self.tags}, {self.others}>"
+210 210 | 
+211 211 | # When fixing, trim the trailing empty string.
+212 212 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+
+UP032_0.py:212:18: UP032 [*] Use f-string instead of `format` call
+    |
+211 |   # When fixing, trim the trailing empty string.
+212 |   raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+    |  __________________^
+213 | |                  "".format(new_dict, d))
+    | |_______________________________________^ UP032
+214 |   
+215 |   # When fixing, trim the trailing empty string.
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+209 209 | "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
+210 210 | 
+211 211 | # When fixing, trim the trailing empty string.
+212     |-raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+213     |-                 "".format(new_dict, d))
+    212 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}")
+214 213 | 
+215 214 | # When fixing, trim the trailing empty string.
+216 215 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+
+UP032_0.py:216:18: UP032 [*] Use f-string instead of `format` call
+    |
+215 |   # When fixing, trim the trailing empty string.
+216 |   raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+    |  __________________^
+217 | |                  .format(new_dict, d))
+    | |_____________________________________^ UP032
+218 |   
+219 |   raise ValueError(
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+213 213 |                  "".format(new_dict, d))
+214 214 | 
+215 215 | # When fixing, trim the trailing empty string.
+216     |-raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+217     |-                 .format(new_dict, d))
+    216 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}")
+218 217 | 
+219 218 | raise ValueError(
+220 219 |     "Conflicting configuration dicts: {!r} {!r}"
+
+UP032_0.py:220:5: UP032 [*] Use f-string instead of `format` call
+    |
+219 |   raise ValueError(
+220 |       "Conflicting configuration dicts: {!r} {!r}"
+    |  _____^
+221 | |     "".format(new_dict, d)
+    | |__________________________^ UP032
+222 |   )
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+217 217 |                  .format(new_dict, d))
+218 218 | 
+219 219 | raise ValueError(
+220     |-    "Conflicting configuration dicts: {!r} {!r}"
+221     |-    "".format(new_dict, d)
+    220 |+    f"Conflicting configuration dicts: {new_dict!r} {d!r}"
+222 221 | )
+223 222 | 
+224 223 | raise ValueError(
+
+UP032_0.py:225:5: UP032 [*] Use f-string instead of `format` call
+    |
+224 |   raise ValueError(
+225 |       "Conflicting configuration dicts: {!r} {!r}"
+    |  _____^
+226 | |     "".format(new_dict, d)
+    | |__________________________^ UP032
+227 |   
+228 |   )
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+222 222 | )
+223 223 | 
+224 224 | raise ValueError(
+225     |-    "Conflicting configuration dicts: {!r} {!r}"
+226     |-    "".format(new_dict, d)
+    225 |+    f"Conflicting configuration dicts: {new_dict!r} {d!r}"
+227 226 | 
+228 227 | )
 
 
