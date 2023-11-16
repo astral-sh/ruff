@@ -152,10 +152,12 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::str::FromStr;
 
-    use anyhow::Result;
+    use anyhow::{Context, Result};
     use rustc_hash::FxHashMap;
+    use tempfile::TempDir;
 
     use ruff_linter::codes;
     use ruff_linter::line_width::LineLength;
@@ -163,7 +165,6 @@ mod tests {
 
     use crate::options::{LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
-    use crate::tests::test_resource_path;
 
     #[test]
 
@@ -306,11 +307,32 @@ other-attribute = 1
 
     #[test]
     fn find_and_parse_pyproject_toml() -> Result<()> {
-        let pyproject = find_settings_toml(test_resource_path("fixtures/__init__.py"))?.unwrap();
-        assert_eq!(pyproject, test_resource_path("fixtures/pyproject.toml"));
+        let tempdir = TempDir::new()?;
+        let ruff_toml = tempdir.path().join("pyproject.toml");
+        fs::write(
+            ruff_toml,
+            r#"
+[tool.ruff]
+line-length = 88
+extend-exclude = [
+  "excluded_file.py",
+  "migrations",
+  "with_excluded_file/other_excluded_file.py",
+]
 
-        let pyproject = parse_pyproject_toml(&pyproject)?;
-        let config = pyproject.tool.unwrap().ruff.unwrap();
+[tool.ruff.lint]
+per-file-ignores = { "__init__.py" = ["F401"] }
+"#,
+        )?;
+
+        let pyproject =
+            find_settings_toml(tempdir.path())?.context("Failed to find pyproject.toml")?;
+        let pyproject = parse_pyproject_toml(pyproject)?;
+        let config = pyproject
+            .tool
+            .context("Expected to find [tool] field")?
+            .ruff
+            .context("Expected to find [tool.ruff] field")?;
         assert_eq!(
             config,
             Options {
