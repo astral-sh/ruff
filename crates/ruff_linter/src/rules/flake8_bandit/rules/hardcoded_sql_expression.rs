@@ -13,7 +13,15 @@ use crate::checkers::ast::Checker;
 use super::super::helpers::string_literal;
 
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(select\s.+\sfrom\s|delete\s+from\s|(insert|replace)\s.+\svalues\s|update\s.+\sset\s)")
+    // We pass this generated expression strings like:
+    //  "SELECT " + val + " FROM " + table
+    //  f'delete from table where var = {var}'
+    //  "\n    SELECT *\n    FROM table\n    WHERE var = {}\n    ".format(var)
+    //
+    // To avoid false positives, we:
+    //  - Require the SQL to be at the start of the expression, allowing for tokens that are not a part of the string
+    //  - Require whole-word matches for SQL keywords
+    Regex::new(r#"(?i)\A(\"|f\"|\'|f\'|\\|\\n|\s)*\b(select\s.+\sfrom\s|delete\s+from\s|(insert|replace)\s.+\svalues\s|update\s.+\sset\s)"#)
         .unwrap()
 });
 
@@ -51,7 +59,7 @@ fn has_string_literal(expr: &Expr) -> bool {
 }
 
 fn matches_sql_statement(string: &str) -> bool {
-    SQL_REGEX.is_match(string)
+    SQL_REGEX.is_match(string.trim_start())
 }
 
 fn matches_string_format_expression(expr: &Expr, semantic: &SemanticModel) -> bool {

@@ -101,4 +101,5 @@ query = "INSERT table VALUES (%s)" % (var,)
 query = "REPLACE INTO table VALUES (%s)" % (var,)
 query = "REPLACE table VALUES (%s)" % (var,)
 
-query = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
+not_a_query = "Deselect something that is not SQL even though it has a ' from ' somewhere in %s." % "there"
+not_a_query = f"Please select a value from the list of possible variants: {variants}."
