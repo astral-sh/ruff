@@ -1245,9 +1245,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
             }
         }
-        Expr::NumberLiteral(_) => {
+        Expr::NumberLiteral(number_literal @ ast::ExprNumberLiteral { .. }) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::NumericLiteralTooLong) {
                 flake8_pyi::rules::numeric_literal_too_long(checker, expr);
+            }
+            if checker.enabled(Rule::MathConstant) {
+                refurb::rules::math_constant(checker, number_literal);
             }
         }
         Expr::BytesLiteral(_) => {
