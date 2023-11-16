@@ -384,7 +384,21 @@ pub(crate) fn f_strings(
         contents.push_str(&fstring);
         prev_end = range.end();
     }
-    contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
+
+    // If the remainder is non-empty, add it to the contents.
+    let rest = checker.locator().slice(TextRange::new(prev_end, end));
+    if !lexer::lex_starts_at(rest, Mode::Expression, prev_end)
+        .flatten()
+        .all(|(token, _)| match token {
+            Tok::Comment(_) | Tok::Newline | Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent => {
+                true
+            }
+            Tok::String { value, .. } => value.is_empty(),
+            _ => false,
+        })
+    {
+        contents.push_str(rest);
+    }
 
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.

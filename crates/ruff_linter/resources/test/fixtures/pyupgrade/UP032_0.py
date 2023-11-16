@@ -207,3 +207,22 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 # The fixed string will exceed the line length, but it's still smaller than the
 # existing line length, so it's fine.
 "<Customer: {}, {}, {}, {}, {}>".format(self.internal_ids, self.external_ids, self.properties, self.tags, self.others)
+
+# When fixing, trim the trailing empty string.
+raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+                 "".format(new_dict, d))
+
+# When fixing, trim the trailing empty string.
+raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+                 .format(new_dict, d))
+
+raise ValueError(
+    "Conflicting configuration dicts: {!r} {!r}"
+    "".format(new_dict, d)
+)
+
+raise ValueError(
+    "Conflicting configuration dicts: {!r} {!r}"
+    "".format(new_dict, d)
+
+)
