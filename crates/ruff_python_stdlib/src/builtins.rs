@@ -180,7 +180,7 @@ pub const MAGIC_GLOBALS: &[&str] = &[
 ///
 /// Intended to be kept in sync with [`PYTHON_BUILTINS`].
 pub fn is_python_builtin(name: &str) -> bool {
-    // Constructed by converting the `BUILTINS` slice to a `match` expression.
+    // Constructed by converting the `PYTHON_BUILTINS` slice to a `match` expression.
     matches!(
         name,
         "ArithmeticError"
