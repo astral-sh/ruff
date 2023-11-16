@@ -15,12 +15,12 @@ use ruff_text_size::Ranged;
 ///
 /// ## Example
 /// ```python
-/// A = 3.141592 * r ** 2
+/// A = 3.141592 * r**2
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// A = math.pi * r ** 2
+/// A = math.pi * r**2
 /// ```
 ///
 /// ## References
