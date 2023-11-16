@@ -28,9 +28,13 @@ use ruff_cli::run;
 const BIN_NAME: &str = "ruff";
 const STDIN_BASE_OPTIONS: &[&str] = &["--isolated", "--no-cache", "-", "--output-format", "text"];
 
+fn ruff_cmd() -> Command {
+    Command::new(get_cargo_bin(BIN_NAME))
+}
+
 #[test]
 fn stdin_success() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .pass_stdin(""), @r###"
     success: true
@@ -43,7 +47,7 @@ fn stdin_success() {
 
 #[test]
 fn stdin_error() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .pass_stdin("import os\n"), @r###"
     success: false
@@ -59,7 +63,7 @@ fn stdin_error() {
 
 #[test]
 fn stdin_filename() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(["--stdin-filename", "F401.py"])
         .pass_stdin("import os\n"), @r###"
@@ -77,7 +81,7 @@ fn stdin_filename() {
 /// Raise `TCH` errors in `.py` files ...
 #[test]
 fn stdin_source_type_py() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(["--stdin-filename", "TCH.py"])
         .pass_stdin("import os\n"), @r###"
@@ -96,7 +100,7 @@ fn stdin_source_type_py() {
 #[test]
 fn stdin_source_type_pyi() {
     let args = ["--stdin-filename", "TCH.pyi", "--select", "TCH"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("import os\n"), @r###"
@@ -128,7 +132,7 @@ fn stdin_json() {
     insta::with_settings!({filters => vec![
         (file_path.to_string().as_str(), "/path/to/F401.py"),
     ]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        assert_cmd_snapshot!(ruff_cmd()
             .args(args)
             .pass_stdin("import os\n"));
     });
@@ -137,7 +141,7 @@ fn stdin_json() {
 #[test]
 fn stdin_fix_py() {
     let args = ["--fix"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("import os\nimport sys\n\nprint(sys.version)\n"), @r###"
@@ -156,7 +160,7 @@ fn stdin_fix_py() {
 #[test]
 fn stdin_fix_jupyter() {
     let args = ["--fix", "--stdin-filename", "Jupyter.ipynb"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin(r#"{
@@ -323,7 +327,7 @@ fn stdin_fix_jupyter() {
 #[test]
 fn stdin_override_parser_ipynb() {
     let args = ["--extension", "py:ipynb", "--stdin-filename", "Jupyter.py"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin(r#"{
@@ -419,7 +423,7 @@ fn stdin_override_parser_ipynb() {
 
 #[test]
 fn stdin_override_parser_py() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(["--extension", "ipynb:python", "--stdin-filename", "F401.ipynb"])
         .pass_stdin("import os\n"), @r###"
@@ -437,7 +441,7 @@ fn stdin_override_parser_py() {
 #[test]
 fn stdin_fix_when_not_fixable_should_still_print_contents() {
     let args = ["--fix"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"), @r###"
@@ -458,7 +462,7 @@ fn stdin_fix_when_not_fixable_should_still_print_contents() {
 #[test]
 fn stdin_fix_when_no_issues_should_still_print_contents() {
     let args = ["--fix"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("import sys\n\nprint(sys.version)\n"), @r###"
@@ -476,7 +480,7 @@ fn stdin_fix_when_no_issues_should_still_print_contents() {
 #[test]
 fn stdin_format_jupyter() {
     let args = ["format", "--stdin-filename", "Jupyter.ipynb", "--isolated"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(args)
         .pass_stdin(r#"{
  "cells": [
@@ -604,7 +608,7 @@ fn stdin_format_jupyter() {
 #[test]
 fn show_source() {
     let args = ["--show-source"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("l = 1"), @r###"
@@ -625,11 +629,11 @@ fn show_source() {
 
 #[test]
 fn explain_status_codes_f401() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME)).args(["--explain", "F401"]));
+    assert_cmd_snapshot!(ruff_cmd().args(["--explain", "F401"]));
 }
 #[test]
 fn explain_status_codes_ruf404() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME)).args(["--explain", "RUF404"]), @r###"
+    assert_cmd_snapshot!(ruff_cmd().args(["--explain", "RUF404"]), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -644,7 +648,7 @@ fn explain_status_codes_ruf404() {
 #[test]
 fn show_statistics() {
     let args = ["--select", "F401", "--statistics"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"), @r###"
@@ -661,7 +665,7 @@ fn show_statistics() {
 fn nursery_prefix() {
     // `--select E` should detect E741, but not E225, which is in the nursery.
     let args = ["--select", "E"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -679,7 +683,7 @@ fn nursery_prefix() {
 fn nursery_all() {
     // `--select ALL` should detect E741, but not E225, which is in the nursery.
     let args = ["--select", "ALL"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -700,7 +704,7 @@ fn nursery_all() {
 fn nursery_direct() {
     // `--select E225` should detect E225.
     let args = ["--select", "E225"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -719,7 +723,7 @@ fn nursery_direct() {
 fn nursery_group_selector() {
     // Only nursery rules should be detected e.g. E225 and a warning should be displayed
     let args = ["--select", "NURSERY"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -739,7 +743,7 @@ fn nursery_group_selector() {
 fn nursery_group_selector_preview_enabled() {
     // Only nursery rules should be detected e.g. E225 and a warning should be displayed
     let args = ["--select", "NURSERY", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -760,7 +764,7 @@ fn nursery_group_selector_preview_enabled() {
 fn preview_enabled_prefix() {
     // E741 and E225 (preview) should both be detected
     let args = ["--select", "E", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -779,7 +783,7 @@ fn preview_enabled_prefix() {
 #[test]
 fn preview_enabled_all() {
     let args = ["--select", "ALL", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -803,7 +807,7 @@ fn preview_enabled_all() {
 fn preview_enabled_direct() {
     // E225 should be detected without warning
     let args = ["--select", "E225", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -822,7 +826,7 @@ fn preview_enabled_direct() {
 fn preview_disabled_direct() {
     // FURB145 is preview not nursery so selecting should be empty
     let args = ["--select", "FURB145"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("a = l[:]\n"), @r###"
@@ -839,7 +843,7 @@ fn preview_disabled_direct() {
 fn preview_disabled_prefix_empty() {
     // Warns that the selection is empty since all of the CPY rules are in preview
     let args = ["--select", "CPY"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -856,7 +860,7 @@ fn preview_disabled_prefix_empty() {
 fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
     let args = ["--ignore", "CPY"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -874,7 +878,7 @@ fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
 fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
     let args = ["--fixable", "CPY"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -892,7 +896,7 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
 fn preview_group_selector() {
     // `--select PREVIEW` should error (selector was removed)
     let args = ["--select", "PREVIEW", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -911,7 +915,7 @@ fn preview_group_selector() {
 fn preview_enabled_group_ignore() {
     // `--select E --ignore PREVIEW` should detect E741 and E225, which is in preview but "E" is more specific.
     let args = ["--select", "E", "--ignore", "PREVIEW", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(STDIN_BASE_OPTIONS)
         .args(args)
         .pass_stdin("I=42\n"), @r###"
@@ -965,7 +969,7 @@ fn unreadable_dir() -> Result<()> {
     // We (currently?) have to use a subcommand to check exit status (currently wrong) and logging
     // output
     // TODO(konstin): This should be a failure, but we currently can't track that
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(["--no-cache", "--isolated"])
         .arg(&unreadable_dir), @r###"
     success: true
@@ -1008,7 +1012,7 @@ fn check_input_from_argfile() -> Result<()> {
     insta::with_settings!({filters => vec![
         (file_a_path.display().to_string().as_str(), "/path/to/a.py"),
     ]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        assert_cmd_snapshot!(ruff_cmd()
             .args(args)
             .pass_stdin(""), @r###"
         success: false
@@ -1027,7 +1031,7 @@ fn check_input_from_argfile() -> Result<()> {
 
 #[test]
 fn check_hints_hidden_unsafe_fixes() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args([
             "-",
             "--output-format=text",
@@ -1052,7 +1056,7 @@ fn check_hints_hidden_unsafe_fixes() {
 
 #[test]
 fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(["-", "--output-format", "text", "--no-cache", "--isolated", "--select", "F601"])
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
         @r###"
@@ -1069,7 +1073,7 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
 
 #[test]
 fn check_shows_unsafe_fixes_with_opt_in() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args([
             "-",
             "--output-format=text",
@@ -1096,7 +1100,7 @@ fn check_shows_unsafe_fixes_with_opt_in() {
 #[test]
 fn fix_applies_safe_fixes_by_default() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        ruff_cmd()
             .args([
                 "-",
                 "--output-format",
@@ -1125,7 +1129,7 @@ fn fix_applies_safe_fixes_by_default() {
 #[test]
 fn fix_applies_unsafe_fixes_with_opt_in() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        ruff_cmd()
             .args([
                 "-",
                 "--output-format",
@@ -1153,7 +1157,7 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
 #[test]
 fn fix_does_not_apply_display_only_fixes() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        ruff_cmd()
             .args([
                 "-",
                 "--output-format",
@@ -1179,7 +1183,7 @@ fn fix_does_not_apply_display_only_fixes() {
 #[test]
 fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        ruff_cmd()
             .args([
                 "-",
                 "--output-format",
@@ -1206,7 +1210,7 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
 #[test]
 fn fix_only_unsafe_fixes_available() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        ruff_cmd()
             .args([
                 "-",
                 "--output-format",
@@ -1235,7 +1239,7 @@ fn fix_only_unsafe_fixes_available() {
 #[test]
 fn fix_only_flag_applies_safe_fixes_by_default() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        ruff_cmd()
             .args([
                 "-",
                 "--output-format",
@@ -1262,7 +1266,7 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
 #[test]
 fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        ruff_cmd()
             .args([
                 "-",
                 "--output-format",
@@ -1290,7 +1294,7 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
 #[test]
 fn diff_shows_safe_fixes_by_default() {
     assert_cmd_snapshot!(
-    Command::new(get_cargo_bin(BIN_NAME))
+    ruff_cmd()
         .args([
             "-",
             "--output-format",
@@ -1321,7 +1325,7 @@ fn diff_shows_safe_fixes_by_default() {
 #[test]
 fn diff_shows_unsafe_fixes_with_opt_in() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        ruff_cmd()
             .args([
                 "-",
                 "--output-format",
@@ -1354,7 +1358,7 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
 #[test]
 fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
+        ruff_cmd()
             .args([
                 "-",
                 "--output-format",
@@ -1379,7 +1383,7 @@ fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
 #[test]
 fn diff_only_unsafe_fixes_available() {
     assert_cmd_snapshot!(
-    Command::new(get_cargo_bin(BIN_NAME))
+    ruff_cmd()
         .args([
             "-",
             "--output-format",
@@ -1414,7 +1418,7 @@ extend-unsafe-fixes = ["UP034"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(["check", "--config"])
         .arg(&ruff_toml)
         .arg("-")
@@ -1453,7 +1457,7 @@ extend-safe-fixes = ["F601"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(["check", "--config"])
         .arg(&ruff_toml)
         .arg("-")
@@ -1494,7 +1498,7 @@ extend-safe-fixes = ["UP034"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(["check", "--config"])
         .arg(&ruff_toml)
         .arg("-")
@@ -1536,7 +1540,7 @@ extend-safe-fixes = ["UP03"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(["check", "--config"])
         .arg(&ruff_toml)
         .arg("-")
@@ -1591,7 +1595,7 @@ def log(x, base) -> float:
 "#;
 
     // If we only select the prefix, then everything passes
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(["check", "-", "--config"])
         .arg(&ruff_toml)
         .args(["--output-format", "text", "--no-cache", "--select", "D41"])
@@ -1606,7 +1610,7 @@ def log(x, base) -> float:
     );
 
     // But if we select the exact code, we get an error
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    assert_cmd_snapshot!(ruff_cmd()
         .args(["check", "-", "--config"])
         .arg(&ruff_toml)
         .args(["--output-format", "text", "--no-cache", "--select", "D417"])
