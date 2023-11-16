@@ -163,10 +163,10 @@ mod tests {
 
     #[test]
     fn pass() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     pass
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
@@ -174,13 +174,13 @@ def f():
 
     #[test]
     fn if_else() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     if a:
         print()
     else:
         print()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
@@ -188,14 +188,14 @@ def f():
 
     #[test]
     fn if_else_if_corner() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     if a:
         print()
     else:
         if a:
             print()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 6);
         Ok(())
@@ -203,13 +203,13 @@ def f():
 
     #[test]
     fn if_elif() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     if a:
         print()
     elif a:
         print()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
@@ -217,7 +217,7 @@ def f():
 
     #[test]
     fn if_elif_else() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     if a:
         print()
@@ -227,7 +227,7 @@ def f():
         print()
     else:
         print()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 9);
         Ok(())
@@ -235,7 +235,7 @@ def f():
 
     #[test]
     fn many_statements() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 async def f():
     a = 1
     b = 2
@@ -256,7 +256,7 @@ async def f():
             a -= 1
             import time
             pass
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 19);
         Ok(())
@@ -264,11 +264,11 @@ async def f():
 
     #[test]
     fn for_() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     for i in range(10):
         pass
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())
@@ -276,13 +276,13 @@ def f():
 
     #[test]
     fn for_else() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     for i in range(10):
         print()
     else:
         print()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
@@ -290,14 +290,14 @@ def f():
 
     #[test]
     fn nested_def() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     def g():
         print()
         print()
 
     print()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
@@ -305,7 +305,7 @@ def f():
 
     #[test]
     fn nested_class() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     class A:
         def __init__(self):
@@ -315,7 +315,7 @@ def f():
             pass
 
     print()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 3);
         Ok(())
@@ -323,10 +323,10 @@ def f():
 
     #[test]
     fn return_not_counted() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     return
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 1);
         Ok(())
@@ -334,7 +334,7 @@ def f():
 
     #[test]
     fn with() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     with a:
         if a:
@@ -342,7 +342,7 @@ def f():
         else:
             print()
 
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 6);
         Ok(())
@@ -350,13 +350,13 @@ def f():
 
     #[test]
     fn try_except() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     try:
         print()
     except Exception:
         raise
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 5);
         Ok(())
@@ -364,7 +364,7 @@ def f():
 
     #[test]
     fn try_except_else() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     try:
         print()
@@ -372,7 +372,7 @@ def f():
         pass
     else:
         print()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 7);
         Ok(())
@@ -380,7 +380,7 @@ def f():
 
     #[test]
     fn try_except_else_finally() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     try:
         print()
@@ -390,7 +390,7 @@ def f():
         print()
     finally:
         pass
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 10);
         Ok(())
@@ -398,7 +398,7 @@ def f():
 
     #[test]
     fn try_except_except() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     try:
         print()
@@ -406,7 +406,7 @@ def f():
         pass
     except Exception:
         raise
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 8);
         Ok(())
@@ -414,7 +414,7 @@ def f():
 
     #[test]
     fn try_except_except_finally() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     try:
         print()
@@ -424,7 +424,7 @@ def f():
         pass
     finally:
         print()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 11);
         Ok(())
@@ -432,11 +432,11 @@ def f():
 
     #[test]
     fn yield_() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 def f():
     for i in range(10):
         yield i
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(num_statements(&stmts), 2);
         Ok(())

@@ -660,12 +660,12 @@ impl Display for FormatCommandError {
                 }
             }
             Self::Panic(path, err) => {
-                let message = r#"This indicates a bug in Ruff. If you could open an issue at:
+                let message = r"This indicates a bug in Ruff. If you could open an issue at:
 
     https://github.com/astral-sh/ruff/issues/new?title=%5BFormatter%20panic%5D
 
 ...with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
-"#;
+";
                 if let Some(path) = path {
                     write!(
                         f,

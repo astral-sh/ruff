@@ -17,7 +17,7 @@ use ruff_python_parser::{parse_tokens, Mode};
 
 #[test]
 fn function_arguments() {
-    let source = r#"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass"#;
+    let source = r"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass";
 
     let trace = trace_preorder_visitation(source);
 
@@ -26,7 +26,7 @@ fn function_arguments() {
 
 #[test]
 fn function_positional_only_with_default() {
-    let source = r#"def a(b, c = 34,/, e = 20, *args): pass"#;
+    let source = r"def a(b, c = 34,/, e = 20, *args): pass";
 
     let trace = trace_preorder_visitation(source);
 
@@ -35,7 +35,7 @@ fn function_positional_only_with_default() {
 
 #[test]
 fn compare() {
-    let source = r#"4 < x < 5"#;
+    let source = r"4 < x < 5";
 
     let trace = trace_preorder_visitation(source);
 
@@ -71,13 +71,13 @@ fn set_comprehension() {
 
 #[test]
 fn match_class_pattern() {
-    let source = r#"
+    let source = r"
 match x:
     case Point2D(0, 0):
         ...
     case Point3D(x=0, y=0, z=0):
         ...
-"#;
+";
 
     let trace = trace_preorder_visitation(source);
 
@@ -86,7 +86,7 @@ match x:
 
 #[test]
 fn decorators() {
-    let source = r#"
+    let source = r"
 @decorator
 def a():
     pass
@@ -94,7 +94,7 @@ def a():
 @test
 class A:
     pass
-"#;
+";
 
     let trace = trace_preorder_visitation(source);
 
@@ -103,7 +103,7 @@ class A:
 
 #[test]
 fn type_aliases() {
-    let source = r#"type X[T: str, U, *Ts, **P] = list[T]"#;
+    let source = r"type X[T: str, U, *Ts, **P] = list[T]";
 
     let trace = trace_preorder_visitation(source);
 
@@ -112,7 +112,7 @@ fn type_aliases() {
 
 #[test]
 fn class_type_parameters() {
-    let source = r#"class X[T: str, U, *Ts, **P]: ..."#;
+    let source = r"class X[T: str, U, *Ts, **P]: ...";
 
     let trace = trace_preorder_visitation(source);
 
@@ -121,7 +121,7 @@ fn class_type_parameters() {
 
 #[test]
 fn function_type_parameters() {
-    let source = r#"def X[T: str, U, *Ts, **P](): ..."#;
+    let source = r"def X[T: str, U, *Ts, **P](): ...";
 
     let trace = trace_preorder_visitation(source);
 

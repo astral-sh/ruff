@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn empty_file() {
-        let locator = Locator::new(r#""#);
+        let locator = Locator::new(r"");
         let diagnostics = create_diagnostics([]);
         let FixResult {
             code,
@@ -225,10 +225,10 @@ print("hello world")
     #[test]
     fn apply_one_replacement() {
         let locator = Locator::new(
-            r#"
+            r"
 class A(object):
     ...
-"#
+"
             .trim(),
         );
         let diagnostics = create_diagnostics([Edit::replacement(
@@ -243,10 +243,10 @@ class A(object):
         } = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             code,
-            r#"
+            r"
 class A(Bar):
     ...
-"#
+"
             .trim(),
         );
         assert_eq!(fixes.values().sum::<usize>(), 1);
@@ -262,10 +262,10 @@ class A(Bar):
     #[test]
     fn apply_one_removal() {
         let locator = Locator::new(
-            r#"
+            r"
 class A(object):
     ...
-"#
+"
             .trim(),
         );
         let diagnostics = create_diagnostics([Edit::deletion(TextSize::new(7), TextSize::new(15))]);
@@ -276,10 +276,10 @@ class A(object):
         } = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             code,
-            r#"
+            r"
 class A:
     ...
-"#
+"
             .trim()
         );
         assert_eq!(fixes.values().sum::<usize>(), 1);
@@ -295,10 +295,10 @@ class A:
     #[test]
     fn apply_two_removals() {
         let locator = Locator::new(
-            r#"
+            r"
 class A(object, object, object):
     ...
-"#
+"
             .trim(),
         );
         let diagnostics = create_diagnostics([
@@ -313,10 +313,10 @@ class A(object, object, object):
 
         assert_eq!(
             code,
-            r#"
+            r"
 class A(object):
     ...
-"#
+"
             .trim()
         );
         assert_eq!(fixes.values().sum::<usize>(), 2);
@@ -334,10 +334,10 @@ class A(object):
     #[test]
     fn ignore_overlapping_fixes() {
         let locator = Locator::new(
-            r#"
+            r"
 class A(object):
     ...
-"#
+"
             .trim(),
         );
         let diagnostics = create_diagnostics([
@@ -351,10 +351,10 @@ class A(object):
         } = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             code,
-            r#"
+            r"
 class A:
     ...
-"#
+"
             .trim(),
         );
         assert_eq!(fixes.values().sum::<usize>(), 1);
