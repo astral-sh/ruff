@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 def docstring_almost_at_line_limit():
     """long docstring.................................................................
     """
@@ -76,7 +76,7 @@ def single_quote_docstring_over_line_limit2():
 
 ## Ruff Output
 
-```py
+```python
 def docstring_almost_at_line_limit():
     """long docstring................................................................."""
 
@@ -130,7 +130,7 @@ def single_quote_docstring_over_line_limit2():
 
 ## Black Output
 
-```py
+```python
 def docstring_almost_at_line_limit():
     """long docstring................................................................."""
 

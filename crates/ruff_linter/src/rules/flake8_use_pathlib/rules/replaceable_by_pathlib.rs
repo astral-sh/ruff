@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_python_ast::{Constant, Expr, ExprCall, ExprConstant};
+use ruff_python_ast::{Expr, ExprBooleanLiteral, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -118,24 +118,13 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                         .is_some_and(|expr| {
                             !matches!(
                                 expr,
-                                Expr::Constant(ExprConstant {
-                                    value: Constant::Bool(true),
-                                    ..
-                                })
+                                Expr::BooleanLiteral(ExprBooleanLiteral { value: true, .. })
                             )
                         })
                         || call
                             .arguments
                             .find_argument("opener", 7)
-                            .is_some_and(|expr| {
-                                !matches!(
-                                    expr,
-                                    Expr::Constant(ExprConstant {
-                                        value: Constant::None,
-                                        ..
-                                    })
-                                )
-                            })
+                            .is_some_and(|expr| !expr.is_none_literal_expr())
                     {
                         return None;
                     }

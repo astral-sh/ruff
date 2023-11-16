@@ -114,7 +114,7 @@ such that all crates are contained in a flat `crates` directory.
 The vast majority of the code, including all lint rules, lives in the `ruff` crate (located at
 `crates/ruff_linter`). As a contributor, that's the crate that'll be most relevant to you.
 
-At time of writing, the repository includes the following crates:
+At the time of writing, the repository includes the following crates:
 
 - `crates/ruff_linter`: library crate containing all lint rules and the core logic for running them.
     If you're working on a rule, this is the crate for you.
@@ -315,9 +315,18 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 ### Creating a new release
 
-1. Update the version with `rg 0.0.269 --files-with-matches | xargs sed -i 's/0.0.269/0.0.270/g'`
-1. Update `BREAKING_CHANGES.md`
-1. Create a PR with the version and `BREAKING_CHANGES.md` updated
+We use an experimental in-house tool for managing releases.
+
+1. Install `rooster`: `pip install git+https://github.com/zanieb/rooster@main`
+1. Run `rooster release`; this command will:
+    - Generate a changelog entry in `CHANGELOG.md`
+    - Update versions in `pyproject.toml` and `Cargo.toml`
+    - Update references to versions in the `README.md` and documentation
+1. The changelog should then be editorialized for consistency
+    - Often labels will be missing from pull requests they will need to be manually organized into the proper section
+    - Changes should be edited to be user-facing descriptions, avoiding internal details
+1. Highlight any breaking changes in `BREAKING_CHANGES.md`
+1. Create a pull request with the changelog and version updates
 1. Merge the PR
 1. Run the release workflow with the version number (without starting `v`) as input. Make sure
     main has your merged PR as last commit
@@ -330,23 +339,26 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
-1. Create release notes in GitHub UI and promote from draft.
+1. Publish the GitHub release
+    1. Open the draft release in the GitHub release section
+    1. Copy the changelog for the release into the GitHub release
+        - See previous releases for formatting of section headers
+    1. Generate the contributor list with `rooster contributors` and add to the release notes
 1. If needed, [update the schemastore](https://github.com/charliermarsh/ruff/blob/main/scripts/update_schemastore.py)
 1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
 
 ## Ecosystem CI
 
 GitHub Actions will run your changes against a number of real-world projects from GitHub and
-report on any diagnostic differences. You can also run those checks locally via:
+report on any linter or formatter differences. You can also run those checks locally via:
 
 ```shell
-python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
+pip install -e ./python/ruff-ecosystem
+ruff-ecosystem check ruff "./target/debug/ruff"
+ruff-ecosystem format ruff "./target/debug/ruff"
 ```
 
-You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
-downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
-as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/astral-sh/ruff/blob/main/scripts/Dockerfile.ecosystem).
-Note that this check will take a while to run.
+See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
 
 ## Benchmarking and Profiling
 
@@ -877,5 +889,5 @@ By default, `src` is set to the project root. In the above example, we'd want to
 `src = ["./src"]` to ensure that we locate `./my_project/src/foo` and thus categorize `import foo`
 as first-party in `baz.py`. In practice, for this limited example, setting `src = ["./src"]` is
 unnecessary, as all imports within `./my_project/src/foo` would be categorized as first-party via
-the same-package heuristic; but your project contains multiple packages, you'll want to set `src`
+the same-package heuristic; but if your project contains multiple packages, you'll want to set `src`
 explicitly.

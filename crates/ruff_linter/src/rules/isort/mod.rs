@@ -14,9 +14,8 @@ use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
 use ruff_source_file::Locator;
 use settings::Settings;
-use sorting::cmp_either_import;
 use types::EitherImport::{Import, ImportFrom};
-use types::{AliasData, EitherImport, ImportBlock, TrailingComma};
+use types::{AliasData, ImportBlock, TrailingComma};
 
 use crate::line_width::{LineLength, LineWidthBuilder};
 use crate::settings::types::PythonVersion;
@@ -154,6 +153,7 @@ fn format_import_block(
         settings.detect_same_package,
         &settings.known_modules,
         target_version,
+        settings.no_sections,
     );
 
     let mut output = String::new();
@@ -172,19 +172,6 @@ fn format_import_block(
         };
 
         let imports = order_imports(import_block, settings);
-
-        let imports = {
-            let mut imports = imports
-                .import
-                .into_iter()
-                .map(Import)
-                .chain(imports.import_from.into_iter().map(ImportFrom))
-                .collect::<Vec<EitherImport>>();
-            if settings.force_sort_within_sections {
-                imports.sort_by(|import1, import2| cmp_either_import(import1, import2, settings));
-            };
-            imports
-        };
 
         // Add a blank line between every section.
         if is_first_block {
@@ -248,9 +235,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_text_size::Ranged;
     use rustc_hash::FxHashMap;
     use test_case::test_case;
+
+    use ruff_text_size::Ranged;
 
     use crate::assert_messages;
     use crate::registry::Rule;
@@ -683,6 +671,7 @@ mod tests {
     }
 
     #[test_case(Path::new("force_sort_within_sections.py"))]
+    #[test_case(Path::new("force_sort_within_sections_with_as_names.py"))]
     fn force_sort_within_sections(path: &Path) -> Result<()> {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
@@ -838,6 +827,24 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     relative_imports_order: RelativeImportsOrder::ClosestToFurthest,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_sections.py"))]
+    fn no_sections(path: &Path) -> Result<()> {
+        let snapshot = format!("no_sections_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    no_sections: true,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],

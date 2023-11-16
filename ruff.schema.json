@@ -649,7 +649,7 @@
       ]
     },
     "target-version": {
-      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf omitted, and Ruff is configured via a `pyproject.toml` file, the target version will be inferred from its `project.requires-python` field (e.g., `requires-python = \">=3.8\"`). If Ruff is configured via `ruff.toml` or `.ruff.toml`, no such inference will be performed.",
+      "description": "The minimum Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Ruff will not propose changes using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.10 or ==3.10 specify `target-version = \"py310\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend `project.requires-python` instead, as it's based on Python packaging standards, and will be respected by other tools. For example, Ruff treats the following as identical to `target-version = \"py38\"`:\n\n```toml [project] requires-python = \">=3.8\" ```\n\nIf both are specified, `target-version` takes precedence over `requires-python`.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -1497,6 +1497,13 @@
             "$ref": "#/definitions/ImportSection"
           }
         },
+        "no-sections": {
+          "description": "Put all imports into the same section bucket.\n\nFor example, rather than separating standard library and third-party imports, as in: ```python import os import sys\n\nimport numpy import pandas ```\n\nSetting `no-sections = true` will instead group all imports into a single section: ```python import os import numpy import pandas import sys ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "order-by-type": {
           "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
           "type": [
@@ -2147,7 +2154,7 @@
       "type": "object",
       "properties": {
         "classmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method (in addition to the builtin `@classmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.\n\nExpects to receive a list of fully-qualified names (e.g., `pydantic.validator`, rather than `validator`).",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method (in addition to the builtin `@classmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.\n\nExpects to receive a list of fully-qualified names (e.g., `pydantic.validator`, rather than `validator`) or alternatively a plain name which is then matched against the last segment in case the decorator itself consists of a dotted name.",
           "type": [
             "array",
             "null"
@@ -2177,7 +2184,7 @@
           }
         },
         "staticmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method (in addition to the builtin `@staticmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.\n\nExpects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`, rather than `teardown`).",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method (in addition to the builtin `@staticmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.\n\nExpects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`, rather than `teardown`) or alternatively a plain name which is then matched against the last segment in case the decorator itself consists of a dotted name.",
           "type": [
             "array",
             "null"
@@ -2241,7 +2248,7 @@
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will force-disable any rules that are not included in the specified convention. As such, the intended use is to enable a convention and then selectively disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.pydocstyle] convention = \"google\" ```\n\nAs conventions force-disable all rules not included in the convention, enabling _additional_ rules on top of a convention is currently unsupported.",
+          "description": "Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/) defaults when analyzing docstring sections.\n\nEnabling a convention will disable all rules that are not included in the specified convention. As such, the intended workflow is to enable a convention and then selectively enable or disable any additional rules on top of it.\n\nFor example, to use Google-style conventions but avoid requiring documentation for every function parameter:\n\n```toml [tool.ruff.lint] # Enable all `pydocstyle` rules, limiting to those that adhere to the # Google convention via `convention = \"google\"`, below. select = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires # documentation for every function parameter. ignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle] convention = \"google\" ```\n\nTo enable an additional rule that's excluded from the convention, select the desired rule via its fully qualified rule code (e.g., `D400` instead of `D4` or `D40`):\n\n```toml [tool.ruff.lint] # Enable D400 on top of the Google convention. extend-select = [\"D400\"]\n\n[tool.ruff.lint.pydocstyle] convention = \"google\" ```",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"
@@ -2824,10 +2831,14 @@
         "FURB13",
         "FURB131",
         "FURB132",
+        "FURB136",
         "FURB14",
         "FURB140",
         "FURB145",
         "FURB148",
+        "FURB16",
+        "FURB168",
+        "FURB169",
         "FURB17",
         "FURB171",
         "FURB177",
@@ -2909,6 +2920,9 @@
         "NPY001",
         "NPY002",
         "NPY003",
+        "NPY2",
+        "NPY20",
+        "NPY201",
         "NURSERY",
         "PD",
         "PD0",
@@ -2982,6 +2996,7 @@
         "PLC04",
         "PLC041",
         "PLC0414",
+        "PLC0415",
         "PLC1",
         "PLC19",
         "PLC190",
@@ -3075,6 +3090,7 @@
         "PLR17",
         "PLR170",
         "PLR1701",
+        "PLR1704",
         "PLR1706",
         "PLR171",
         "PLR1711",
@@ -3121,6 +3137,7 @@
         "PLW1",
         "PLW15",
         "PLW150",
+        "PLW1501",
         "PLW1508",
         "PLW1509",
         "PLW151",
@@ -3130,6 +3147,9 @@
         "PLW164",
         "PLW1641",
         "PLW2",
+        "PLW21",
+        "PLW210",
+        "PLW2101",
         "PLW29",
         "PLW290",
         "PLW2901",
@@ -3273,6 +3293,7 @@
         "Q001",
         "Q002",
         "Q003",
+        "Q004",
         "RET",
         "RET5",
         "RET50",
@@ -3383,6 +3404,7 @@
         "S7",
         "S70",
         "S701",
+        "S702",
         "SIM",
         "SIM1",
         "SIM10",
@@ -3466,6 +3488,15 @@
         "TID251",
         "TID252",
         "TID253",
+        "TRIO",
+        "TRIO1",
+        "TRIO10",
+        "TRIO100",
+        "TRIO105",
+        "TRIO109",
+        "TRIO11",
+        "TRIO110",
+        "TRIO115",
         "TRY",
         "TRY0",
         "TRY00",
@@ -3530,6 +3561,7 @@
         "UP039",
         "UP04",
         "UP040",
+        "UP041",
         "W",
         "W1",
         "W19",

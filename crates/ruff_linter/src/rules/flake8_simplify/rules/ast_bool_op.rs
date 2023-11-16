@@ -703,17 +703,15 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
 fn get_short_circuit_edit(
     expr: &Expr,
     range: TextRange,
-    truthiness: Truthiness,
+    truthiness: bool,
     in_boolean_test: bool,
     generator: Generator,
 ) -> Edit {
     let content = if in_boolean_test {
-        match truthiness {
-            Truthiness::Truthy => "True".to_string(),
-            Truthiness::Falsey => "False".to_string(),
-            Truthiness::Unknown => {
-                unreachable!("short_circuit_truthiness should be Truthy or Falsey")
-            }
+        if truthiness {
+            "True".to_string()
+        } else {
+            "False".to_string()
         }
     } else {
         generator.expr(expr)
@@ -746,8 +744,8 @@ fn is_short_circuit(
         return None;
     }
     let short_circuit_truthiness = match op {
-        BoolOp::And => Truthiness::Falsey,
-        BoolOp::Or => Truthiness::Truthy,
+        BoolOp::And => false,
+        BoolOp::Or => true,
     };
 
     let mut furthest = expr;
@@ -773,7 +771,7 @@ fn is_short_circuit(
         // we can return the location of the expression. This should only trigger if the
         // short-circuit expression is the first expression in the list; otherwise, we'll see it
         // as `next_value` before we see it as `value`.
-        if value_truthiness == short_circuit_truthiness {
+        if value_truthiness.into_bool() == Some(short_circuit_truthiness) {
             remove = Some(ContentAround::After);
 
             edit = Some(get_short_circuit_edit(
@@ -798,7 +796,7 @@ fn is_short_circuit(
 
         // If the next expression is a constant, and it matches the short-circuit value, then
         // we can return the location of the expression.
-        if next_value_truthiness == short_circuit_truthiness {
+        if next_value_truthiness.into_bool() == Some(short_circuit_truthiness) {
             remove = Some(if index + 1 == values.len() - 1 {
                 ContentAround::Before
             } else {

@@ -209,7 +209,7 @@ fn is_simple_expr(expr: &Expr) -> bool {
     {
         is_simple_expr(operand)
     } else {
-        matches!(expr, Expr::Constant(_) | Expr::Name(_))
+        expr.is_literal_expr() || expr.is_name_expr()
     }
 }
 

@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 # Control
 def double(a: int) -> int:
     return 2*a
@@ -126,7 +126,7 @@ def foo() -> tuple[int, int, int,]:
 
 ## Ruff Output
 
-```py
+```python
 # Control
 def double(a: int) -> int:
     return 2 * a
@@ -259,7 +259,7 @@ def foo() -> (
 
 ## Black Output
 
-```py
+```python
 # Control
 def double(a: int) -> int:
     return 2 * a

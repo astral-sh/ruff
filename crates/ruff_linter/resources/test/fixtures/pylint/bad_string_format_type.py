@@ -57,3 +57,9 @@ r'\%03o' % (ord(c),)
 '(%r, %r, %r, %r)' % (hostname, address, username, '$PASSWORD')
 '%r' % ({'server_school_roles': server_school_roles, 'is_school_multiserver_domain': is_school_multiserver_domain}, )
 "%d" % (1 if x > 0 else 2)
+
+# Special cases for %c allowing single character strings
+# https://github.com/astral-sh/ruff/issues/8406
+"%c" % ("x",)
+"%c" % "x"
+"%c" % "œ"

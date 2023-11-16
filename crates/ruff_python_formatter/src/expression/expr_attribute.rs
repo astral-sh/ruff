@@ -1,6 +1,6 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
+use ruff_python_ast::{Expr, ExprAttribute, ExprNumberLiteral, Number};
 use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -150,8 +150,6 @@ impl NeedsParentheses for ExprAttribute {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
-        } else if self.value.is_name_expr() {
-            OptionalParentheses::BestFit
         } else if is_expression_parenthesized(
             self.value.as_ref().into(),
             context.comments().ranges(),
@@ -167,17 +165,17 @@ impl NeedsParentheses for ExprAttribute {
 // Non Hex, octal or binary number literals need parentheses to disambiguate the attribute `.` from
 // a decimal point. Floating point numbers don't strictly need parentheses but it reads better (rather than 0.0.test()).
 fn is_base_ten_number_literal(expr: &Expr, source: &str) -> bool {
-    if let Some(ExprConstant { value, range }) = expr.as_constant_expr() {
+    if let Some(ExprNumberLiteral { value, range }) = expr.as_number_literal_expr() {
         match value {
-            Constant::Float(_) => true,
-            Constant::Int(_) => {
+            Number::Float(_) => true,
+            Number::Int(_) => {
                 let text = &source[*range];
                 !matches!(
                     text.as_bytes().get(0..2),
                     Some([b'0', b'x' | b'X' | b'o' | b'O' | b'b' | b'B'])
                 )
             }
-            _ => false,
+            Number::Complex { .. } => false,
         }
     } else {
         false

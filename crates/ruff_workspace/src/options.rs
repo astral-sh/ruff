@@ -298,10 +298,18 @@ pub struct Options {
     /// For example, to represent supporting Python >=3.10 or ==3.10
     /// specify `target-version = "py310"`.
     ///
-    /// If omitted, and Ruff is configured via a `pyproject.toml` file, the
-    /// target version will be inferred from its `project.requires-python`
-    /// field (e.g., `requires-python = ">=3.8"`). If Ruff is configured via
-    /// `ruff.toml` or `.ruff.toml`, no such inference will be performed.
+    /// If you're already using a `pyproject.toml` file, we recommend
+    /// `project.requires-python` instead, as it's based on Python packaging
+    /// standards, and will be respected by other tools. For example, Ruff
+    /// treats the following as identical to `target-version = "py38"`:
+    ///
+    /// ```toml
+    /// [project]
+    /// requires-python = ">=3.8"
+    /// ```
+    ///
+    /// If both are specified, `target-version` takes precedence over
+    /// `requires-python`.
     #[option(
         default = r#""py38""#,
         value_type = r#""py37" | "py38" | "py39" | "py310" | "py311" | "py312""#,
@@ -826,9 +834,9 @@ pub struct LintCommonOptions {
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
+        scope = "per-file-ignores",
         example = r#"
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-            [tool.ruff.per-file-ignores]
             "__init__.py" = ["E402"]
             "path/to/file.py" = ["E402"]
         "#
@@ -840,9 +848,9 @@ pub struct LintCommonOptions {
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
+        scope = "extend-per-file-ignores",
         example = r#"
             # Also ignore `E402` in all `__init__.py` files.
-            [tool.ruff.extend-per-file-ignores]
             "__init__.py" = ["E402"]
         "#
     )]
@@ -1197,8 +1205,8 @@ pub struct Flake8ImportConventionsOptions {
     #[option(
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
         value_type = "dict[str, str]",
+        scope = "aliases",
         example = r#"
-            [tool.ruff.flake8-import-conventions.aliases]
             # Declare the default aliases.
             altair = "alt"
             "matplotlib.pyplot" = "plt"
@@ -1215,8 +1223,8 @@ pub struct Flake8ImportConventionsOptions {
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",
+        scope = "extend-aliases",
         example = r#"
-            [tool.ruff.flake8-import-conventions.extend-aliases]
             # Declare a custom alias for the `matplotlib` module.
             "dask.dataframe" = "dd"
         "#
@@ -1227,8 +1235,8 @@ pub struct Flake8ImportConventionsOptions {
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, list[str]]",
+        scope = "banned-aliases",
         example = r#"
-            [tool.ruff.flake8-import-conventions.banned-aliases]
             # Declare the banned aliases.
             "tensorflow.keras.backend" = ["K"]
     "#
@@ -1540,8 +1548,8 @@ pub struct Flake8TidyImportsOptions {
     #[option(
         default = r#"{}"#,
         value_type = r#"dict[str, { "msg": str }]"#,
+        scope = "banned-api",
         example = r#"
-            [tool.ruff.flake8-tidy-imports.banned-api]
             "cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
             "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
         "#
@@ -1970,6 +1978,33 @@ pub struct IsortOptions {
     )]
     pub section_order: Option<Vec<ImportSection>>,
 
+    /// Put all imports into the same section bucket.
+    ///
+    /// For example, rather than separating standard library and third-party imports, as in:
+    /// ```python
+    /// import os
+    /// import sys
+    ///
+    /// import numpy
+    /// import pandas
+    /// ```
+    ///
+    /// Setting `no-sections = true` will instead group all imports into a single section:
+    /// ```python
+    /// import os
+    /// import numpy
+    /// import pandas
+    /// import sys
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            no-sections = true
+        "#
+    )]
+    pub no_sections: Option<bool>,
+
     /// Whether to automatically mark imports from within the same package as first-party.
     /// For example, when `detect-same-package = true`, then when analyzing files within the
     /// `foo` package, any imports from within the `foo` package will be considered first-party.
@@ -1992,9 +2027,9 @@ pub struct IsortOptions {
     #[option(
         default = "{}",
         value_type = "dict[str, list[str]]",
+        scope = "sections",
         example = r#"
             # Group all Django imports into a separate section.
-            [tool.ruff.isort.sections]
             "django" = ["django"]
         "#
     )]
@@ -2005,6 +2040,15 @@ impl IsortOptions {
     pub fn try_into_settings(
         self,
     ) -> Result<isort::settings::Settings, isort::settings::SettingsError> {
+        // Verify that if `no_sections` is set, then `section_order` is empty.
+        let no_sections = self.no_sections.unwrap_or_default();
+        if no_sections && self.section_order.is_some() {
+            warn_user_once!("`section-order` is ignored when `no-sections` is set to `true`");
+        }
+        if no_sections && self.sections.is_some() {
+            warn_user_once!("`sections` is ignored when `no-sections` is set to `true`");
+        }
+
         // Extract any configuration options that deal with user-defined sections.
         let mut section_order: Vec<_> = self
             .section_order
@@ -2161,6 +2205,7 @@ impl IsortOptions {
             lines_between_types: self.lines_between_types.unwrap_or_default(),
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
+            no_sections,
         })
     }
 }
@@ -2234,13 +2279,20 @@ pub struct Pep8NamingOptions {
     /// in this list takes a `cls` argument as its first argument.
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `pydantic.validator`,
-    /// rather than `validator`).
+    /// rather than `validator`) or alternatively a plain name which is then matched against
+    /// the last segment in case the decorator itself consists of a dotted name.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            # Allow Pydantic's `@validator` decorator to trigger class method treatment.
-            classmethod-decorators = ["pydantic.validator"]
+            classmethod-decorators = [
+                # Allow Pydantic's `@validator` decorator to trigger class method treatment.
+                "pydantic.validator",
+                # Allow SQLAlchemy's dynamic decorators, like `@field.expression`, to trigger class method treatment.
+                "declared_attr",
+                "expression",
+                "comparator",
+            ]
         "#
     )]
     pub classmethod_decorators: Option<Vec<String>>,
@@ -2253,7 +2305,8 @@ pub struct Pep8NamingOptions {
     /// in this list has no `self` or `cls` argument.
     ///
     /// Expects to receive a list of fully-qualified names (e.g., `belay.Device.teardown`,
-    /// rather than `teardown`).
+    /// rather than `teardown`) or alternatively a plain name which is then matched against
+    /// the last segment in case the decorator itself consists of a dotted name.
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -2367,16 +2420,16 @@ pub struct PydocstyleOptions {
     /// Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/)
     /// defaults when analyzing docstring sections.
     ///
-    /// Enabling a convention will force-disable any rules that are not
-    /// included in the specified convention. As such, the intended use is
-    /// to enable a convention and then selectively disable any additional
-    /// rules on top of it.
+    /// Enabling a convention will disable all rules that are not included in
+    /// the specified convention. As such, the intended workflow is to enable a
+    /// convention and then selectively enable or disable any additional rules
+    /// on top of it.
     ///
     /// For example, to use Google-style conventions but avoid requiring
     /// documentation for every function parameter:
     ///
     /// ```toml
-    /// [tool.ruff]
+    /// [tool.ruff.lint]
     /// # Enable all `pydocstyle` rules, limiting to those that adhere to the
     /// # Google convention via `convention = "google"`, below.
     /// select = ["D"]
@@ -2385,13 +2438,22 @@ pub struct PydocstyleOptions {
     /// # documentation for every function parameter.
     /// ignore = ["D417"]
     ///
-    /// [tool.ruff.pydocstyle]
+    /// [tool.ruff.lint.pydocstyle]
     /// convention = "google"
     /// ```
     ///
-    /// As conventions force-disable all rules not included in the convention,
-    /// enabling _additional_ rules on top of a convention is currently
-    /// unsupported.
+    /// To enable an additional rule that's excluded from the convention,
+    /// select the desired rule via its fully qualified rule code (e.g.,
+    /// `D400` instead of `D4` or `D40`):
+    ///
+    /// ```toml
+    /// [tool.ruff.lint]
+    /// # Enable D400 on top of the Google convention.
+    /// extend-select = ["D400"]
+    ///
+    /// [tool.ruff.lint.pydocstyle]
+    /// convention = "google"
+    /// ```
     #[option(
         default = r#"null"#,
         value_type = r#""google" | "numpy" | "pep257""#,

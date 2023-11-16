@@ -25,7 +25,7 @@ use crate::importer::ImportRequest;
 /// lists:
 ///
 /// - `functools.reduce(operator.iconcat, lists, [])`
-/// - `list(itertools.chain.from_iterable(lists)`
+/// - `list(itertools.chain.from_iterable(lists))`
 /// - `[item for sublist in lists for item in sublist]`
 ///
 /// ## Example

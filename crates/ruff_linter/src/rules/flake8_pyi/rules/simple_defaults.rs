@@ -2,8 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation}
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, Operator, ParameterWithDefault, Parameters, Stmt,
-    UnaryOp,
+    self as ast, Arguments, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 use ruff_source_file::Locator;
@@ -282,7 +281,12 @@ fn is_valid_default_value_with_annotation(
     semantic: &SemanticModel,
 ) -> bool {
     match default {
-        Expr::Constant(_) => {
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_) => {
             return true;
         }
         Expr::List(ast::ExprList { elts, .. })
@@ -314,10 +318,7 @@ fn is_valid_default_value_with_annotation(
         }) => {
             match operand.as_ref() {
                 // Ex) `-1`, `-3.14`, `2j`
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(..) | Constant::Float(..) | Constant::Complex { .. },
-                    ..
-                }) => return true,
+                Expr::NumberLiteral(_) => return true,
                 // Ex) `-math.inf`, `-math.pi`, etc.
                 Expr::Attribute(_) => {
                     if semantic
@@ -338,14 +339,14 @@ fn is_valid_default_value_with_annotation(
             range: _,
         }) => {
             // Ex) `1 + 2j`, `1 - 2j`, `-1 - 2j`, `-1 + 2j`
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Complex { .. },
+            if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Complex { .. },
                 ..
             }) = right.as_ref()
             {
                 // Ex) `1 + 2j`, `1 - 2j`
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(..) | Constant::Float(..),
+                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(..) | ast::Number::Float(..),
                     ..
                 }) = left.as_ref()
                 {
@@ -357,8 +358,8 @@ fn is_valid_default_value_with_annotation(
                 }) = left.as_ref()
                 {
                     // Ex) `-1 + 2j`, `-1 - 2j`
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Int(..) | Constant::Float(..),
+                    if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(..) | ast::Number::Float(..),
                         ..
                     }) = operand.as_ref()
                     {
@@ -393,13 +394,7 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
                 right,
                 range: _,
             }) => is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right),
-            Expr::Name(_)
-            | Expr::Subscript(_)
-            | Expr::Attribute(_)
-            | Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                ..
-            }) => true,
+            Expr::Name(_) | Expr::Subscript(_) | Expr::Attribute(_) | Expr::NoneLiteral(_) => true,
             _ => false,
         }
     }
@@ -427,10 +422,8 @@ fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
             | Expr::Name(_)
             | Expr::Attribute(_)
             | Expr::Subscript(_)
-            | Expr::Constant(ast::ExprConstant {
-                value: Constant::Ellipsis | Constant::None,
-                ..
-            })
+            | Expr::EllipsisLiteral(_)
+            | Expr::NoneLiteral(_)
     ) || is_valid_pep_604_union(default)
 }
 
@@ -499,14 +492,8 @@ fn is_enum(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
 /// valid type alias. In particular, this function checks for uses of `typing.Any`, `None`,
 /// parameterized generics, and PEP 604-style unions.
 fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
-    matches!(
-        value,
-        Expr::Subscript(_)
-            | Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                ..
-            }),
-    ) || is_valid_pep_604_union(value)
+    matches!(value, Expr::Subscript(_) | Expr::NoneLiteral(_))
+        || is_valid_pep_604_union(value)
         || semantic.match_typing_expr(value, "Any")
 }
 

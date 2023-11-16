@@ -10,16 +10,12 @@ expression: parse_ast
                 ExprFString {
                     range: 0..11,
                     values: [
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 4..5,
-                                value: Str(
-                                    StringConstant {
-                                        value: "\n",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "\n",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                         FormattedValue(

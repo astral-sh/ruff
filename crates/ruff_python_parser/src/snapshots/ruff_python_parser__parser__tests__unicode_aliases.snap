@@ -15,16 +15,12 @@ expression: parse_ast
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: StringLiteral(
+                ExprStringLiteral {
                     range: 4..37,
-                    value: Str(
-                        StringConstant {
-                            value: "\u{8}another cool trick",
-                            unicode: false,
-                            implicit_concatenated: false,
-                        },
-                    ),
+                    value: "\u{8}another cool trick",
+                    unicode: false,
+                    implicit_concatenated: false,
                 },
             ),
         },

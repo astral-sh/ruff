@@ -82,6 +82,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "unexpected-spaces-around-keyword-parameter-equals",
     "unicode-kind-prefix",
     "unnecessary-class-parentheses",
+    "unnecessary-escaped-quote",
     "useless-semicolon",
     "whitespace-after-open-bracket",
     "whitespace-before-close-bracket",

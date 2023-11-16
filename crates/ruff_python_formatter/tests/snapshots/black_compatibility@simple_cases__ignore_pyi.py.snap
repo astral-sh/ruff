@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 def f():  # type: ignore
     ...
 
@@ -64,7 +64,7 @@ def h():
 
 ## Ruff Output
 
-```py
+```python
 def f():  # type: ignore
     ...
 
@@ -94,7 +94,7 @@ def h():
 
 ## Black Output
 
-```py
+```python
 def f():  # type: ignore
     ...
 

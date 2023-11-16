@@ -6,7 +6,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
@@ -341,7 +341,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         let Some(expr) = stmt.value.as_deref() else {
             continue;
         };
-        if !is_const_none(expr) {
+        if !expr.is_none_literal_expr() {
             continue;
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range);
@@ -682,7 +682,7 @@ pub(crate) fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Ex
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
-            if returns.map_or(true, is_const_none) {
+            if returns.map_or(true, Expr::is_none_literal_expr) {
                 unnecessary_return_none(checker, &stack);
             }
         }

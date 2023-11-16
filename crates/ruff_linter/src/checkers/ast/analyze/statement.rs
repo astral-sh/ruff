@@ -12,8 +12,8 @@ use crate::rules::{
     airflow, flake8_bandit, flake8_boolean_trap, flake8_bugbear, flake8_builtins, flake8_debugger,
     flake8_django, flake8_errmsg, flake8_import_conventions, flake8_pie, flake8_pyi,
     flake8_pytest_style, flake8_raise, flake8_return, flake8_simplify, flake8_slots,
-    flake8_tidy_imports, flake8_type_checking, mccabe, pandas_vet, pep8_naming, perflint,
-    pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
+    flake8_tidy_imports, flake8_trio, flake8_type_checking, mccabe, pandas_vet, pep8_naming,
+    perflint, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 
@@ -356,6 +356,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
+            if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
+                flake8_trio::rules::async_function_with_timeout(checker, function_def);
+            }
             #[cfg(feature = "unreachable-code")]
             if checker.enabled(Rule::UnreachableCode) {
                 checker
@@ -529,6 +532,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ModuleImportNotAtTopOfFile) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
+            }
+            if checker.enabled(Rule::ImportOutsideTopLevel) {
+                pylint::rules::import_outside_top_level(checker, stmt);
             }
             if checker.enabled(Rule::GlobalStatement) {
                 for name in names {
@@ -705,6 +711,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             let module = module.as_deref();
             if checker.enabled(Rule::ModuleImportNotAtTopOfFile) {
                 pycodestyle::rules::module_import_not_at_top_of_file(checker, stmt);
+            }
+            if checker.enabled(Rule::ImportOutsideTopLevel) {
+                pylint::rules::import_outside_top_level(checker, stmt);
             }
             if checker.enabled(Rule::GlobalStatement) {
                 for name in names {
@@ -1000,6 +1009,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pyupgrade::rules::os_error_alias_raise(checker, item);
                 }
             }
+            if checker.enabled(Rule::TimeoutErrorAlias) {
+                if checker.settings.target_version >= PythonVersion::Py310 {
+                    if let Some(item) = exc {
+                        pyupgrade::rules::timeout_error_alias_raise(checker, item);
+                    }
+                }
+            }
             if checker.enabled(Rule::RaiseVanillaClass) {
                 if let Some(expr) = exc {
                     tryceratops::rules::raise_vanilla_class(checker, expr);
@@ -1186,8 +1202,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ReadWholeFile) {
                 refurb::rules::read_whole_file(checker, with_stmt);
             }
+            if checker.enabled(Rule::UselessWithLock) {
+                pylint::rules::useless_with_lock(checker, with_stmt);
+            }
+            if checker.enabled(Rule::TrioTimeoutWithoutAwait) {
+                flake8_trio::rules::timeout_without_await(checker, with_stmt, items);
+            }
         }
-        Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+        Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Stmt(stmt));
             }
@@ -1196,6 +1218,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::TryExceptInLoop) {
                 perflint::rules::try_except_in_loop(checker, body);
+            }
+            if checker.enabled(Rule::TrioUnneededSleep) {
+                flake8_trio::rules::unneeded_sleep(checker, while_stmt);
             }
         }
         Stmt::For(
@@ -1291,6 +1316,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::OSErrorAlias) {
                 pyupgrade::rules::os_error_alias_handlers(checker, handlers);
+            }
+            if checker.enabled(Rule::TimeoutErrorAlias) {
+                if checker.settings.target_version >= PythonVersion::Py310 {
+                    pyupgrade::rules::timeout_error_alias_handlers(checker, handlers);
+                }
             }
             if checker.enabled(Rule::PytestAssertInExcept) {
                 flake8_pytest_style::rules::assert_in_exception_handler(checker, handlers);

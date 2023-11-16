@@ -41,7 +41,7 @@ serde_json = { workspace = true }
 similar = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-tempfile = "3.6.0"
+tempfile = "3.8.1"
 toml = { workspace = true, features = ["parse"] }
 tracing = { workspace = true }
 tracing-indicatif = { workspace = true }

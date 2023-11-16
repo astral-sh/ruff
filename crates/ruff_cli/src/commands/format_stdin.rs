@@ -15,7 +15,7 @@ use crate::commands::format::{
     FormatResult, FormattedSource,
 };
 use crate::resolve::resolve;
-use crate::stdin::read_from_stdin;
+use crate::stdin::{parrot_stdin, read_from_stdin};
 use crate::ExitStatus;
 
 /// Run the formatter over a single file, read from `stdin`.
@@ -31,23 +31,34 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
 
     let mode = FormatMode::from_cli(cli);
 
-    if let Some(filename) = cli.stdin_filename.as_deref() {
-        if !python_file_at_path(filename, &pyproject_config, overrides)? {
-            return Ok(ExitStatus::Success);
-        }
+    if pyproject_config.settings.file_resolver.force_exclude {
+        if let Some(filename) = cli.stdin_filename.as_deref() {
+            if !python_file_at_path(filename, &pyproject_config, overrides)? {
+                if mode.is_write() {
+                    parrot_stdin()?;
+                }
+                return Ok(ExitStatus::Success);
+            }
 
-        let format_settings = &pyproject_config.settings.formatter;
-        if filename
-            .file_name()
-            .is_some_and(|name| match_exclusion(filename, name, &format_settings.exclude))
-        {
-            return Ok(ExitStatus::Success);
+            let format_settings = &pyproject_config.settings.formatter;
+            if filename
+                .file_name()
+                .is_some_and(|name| match_exclusion(filename, name, &format_settings.exclude))
+            {
+                if mode.is_write() {
+                    parrot_stdin()?;
+                }
+                return Ok(ExitStatus::Success);
+            }
         }
     }
 
     let path = cli.stdin_filename.as_deref();
 
     let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
+        if mode.is_write() {
+            parrot_stdin()?;
+        }
         return Ok(ExitStatus::Success);
     };
 

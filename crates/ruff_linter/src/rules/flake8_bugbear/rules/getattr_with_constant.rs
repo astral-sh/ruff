@@ -1,7 +1,7 @@
 use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use ruff_text_size::Ranged;
 
@@ -66,11 +66,7 @@ pub(crate) fn getattr_with_constant(
     if obj.is_starred_expr() {
         return;
     }
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(ast::StringConstant { value, .. }),
-        ..
-    }) = arg
-    else {
+    let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg else {
         return;
     };
     if !is_identifier(value) {

@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 ---
 ## Input
 
-```py
+```python
 @dataclass
 class DebugVisitor(Visitor[T]):
     tree_depth: int = 0
@@ -79,7 +79,7 @@ class DebugVisitor(Visitor[T]):
 
 ## Ruff Output
 
-```py
+```python
 @dataclass
 class DebugVisitor(Visitor[T]):
     tree_depth: int = 0
@@ -116,7 +116,7 @@ class DebugVisitor(Visitor[T]):
 
 ## Black Output
 
-```py
+```python
 @dataclass
 class DebugVisitor(Visitor[T]):
     tree_depth: int = 0

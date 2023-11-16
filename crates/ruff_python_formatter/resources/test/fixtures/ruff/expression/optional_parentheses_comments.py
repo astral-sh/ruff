@@ -1,0 +1,206 @@
+comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
+
+# 88 characters unparenthesized
+____aaa = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvv  # c
+
+# 88 characters
+____aaa = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvv  # c
+
+# 89 characters parenthesized (collapse)
+____aaa = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+
+## Parenthesized
+
+# 88 characters unparenthesized
+____aaa = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvv  # c
+)
+
+# 88 characters
+____aaa = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvv  # c
+)
+
+# 89 characters parenthesized (collapse)
+____aaa = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+)
+
+## Expression and statement comments
+
+# 88 characters unparenthesized
+____aaa = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbb  # c
+)  # d
+
+# 88 characters
+____aaa = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvv  # c
+)  # d
+
+# 89 characters parenthesized (collapse)
+____aaa = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvv  # c
+)  # d
+
+## Strings
+
+# 88 characters unparenthesized
+____aaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvv"  # c
+
+# 88 characters
+____aaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvv"  # c
+
+# 89 characters parenthesized (collapse)
+____aaa = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvv"  # c
+
+# Always parenthesize if implicit concatenated
+____aaa = (
+    "aaaaaaaaaaaaaaaaaaaaa" "aaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvvvvv"
+)  # c
+
+## Numbers
+
+# 88 characters unparenthesized
+____aaa = 1111111111111111111111111111111111111111111111111111111111111111111111111  # c
+
+# 88 characters
+____aaa = 1111111111111111111111111111111111111111111111111111111111111111111111111111111  # c
+
+# 89 characters parenthesized (collapse)
+____aaa = 11111111111111111111111111111111111111111111111111111111111111111111111111111111  # c
+
+## Breaking left
+
+# Should break `[a]` first
+____[a] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
+
+____[
+    a
+] = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # cc
+)
+
+(
+    # some weird comments
+    ____[aaaaaaaaa]
+    # some weird comments 2
+) = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
+
+# Preserve trailing assignment comments when the expression has own line comments
+____aaa = (
+    # leading
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv
+    # trailing
+)  # cc
+
+def setUpTestData(cls):
+    cls.happening = (
+        Happening.objects.create()
+    )  # make sure the defaults are working (#20158)
+
+def setUpTestData(cls):
+    cls.happening = (
+        Happening.objects.create  # make sure the defaults are working (#20158)
+    )
+
+if True:
+    if True:
+        if True:
+            # Black layout
+            model.config.use_cache = (
+                False  # FSTM still requires this hack -> FSTM should probably be refactored s
+            )
+
+## Annotated Assign
+
+# 88 characters unparenthesized
+____a: a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvv  # c
+
+# 88 characters
+____a: a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
+
+# 89 characters parenthesized (collapse)
+____a: a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+
+# 88 characters unparenthesized
+____a : a = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvv  # c
+)
+
+# 88 characters
+____a: a = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
+)
+
+# 89 characters parenthesized (collapse)
+____a: a = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+)
+
+_a: a[b] = (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+)
+
+## Augmented Assign
+
+# 88 characters unparenthesized
+____aa += aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvv  # c
+
+# 88 characters
+____aa += aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvv  # c
+
+# 89 characters parenthesized (collapse)
+____aa += aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+
+# 88 characters unparenthesized
+____aa += (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvv  # c
+)
+
+# 88 characters
+____aa += (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvv  # c
+)
+
+# 89 characters parenthesized (collapse)
+____aa += (
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+)
+
+## Return
+
+def test():
+    # 88 characters unparenthesized
+    return aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvv  # c
+
+def test2():
+    # 88 characters
+    return aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvv  # c
+
+def test3():
+    # 89 characters parenthesized (collapse)
+    return aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvv  # c
+
+## Return Parenthesized
+
+def test4():
+    # 88 characters unparenthesized
+    return (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvv  # c
+    )
+
+def test5():
+    # 88 characters
+    return (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvv  # c
+    )
+
+def test6():
+    # 89 characters parenthesized (collapse)
+    return (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvv  # c
+    )
+
+
+

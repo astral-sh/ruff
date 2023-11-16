@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/empty_file.py
 ---
 ## Input
-```py
+```python
 # fmt: off
 
     # this does not work because there are no statements
@@ -12,7 +12,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off
 ```
 
 ## Output
-```py
+```python
 # fmt: off
 
 # this does not work because there are no statements

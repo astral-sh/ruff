@@ -5,7 +5,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
@@ -223,12 +223,8 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
         for (key, value) in keys.iter().zip(values.iter()) {
             match key {
                 Some(key) => {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value:
-                            Constant::Str(ast::StringConstant {
-                                value: key_string, ..
-                            }),
-                        ..
+                    if let Expr::StringLiteral(ast::ExprStringLiteral {
+                        value: key_string, ..
                     }) = key
                     {
                         // If the dictionary key is not a valid variable name, abort.
@@ -420,9 +416,13 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
 
     // Parse the parameters.
     let params_string = match right {
-        Expr::Constant(_) | Expr::FString(_) => {
-            Cow::Owned(format!("({})", checker.locator().slice(right)))
-        }
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
+        | Expr::FString(_) => Cow::Owned(format!("({})", checker.locator().slice(right))),
         Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) | Expr::Call(_) => {
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.

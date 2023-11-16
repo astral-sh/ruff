@@ -31,9 +31,8 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_ast::{
-    self as ast, Arguments, Comprehension, Constant, ElifElseClause, ExceptHandler, Expr,
-    ExprContext, Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt,
-    Suite, UnaryOp,
+    self as ast, Arguments, Comprehension, ElifElseClause, ExceptHandler, Expr, ExprContext,
+    Keyword, MatchCase, Parameter, ParameterWithDefault, Parameters, Pattern, Stmt, Suite, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -55,7 +54,7 @@ use ruff_python_semantic::{
     ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, Snapshot,
     StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::deferred::Deferred;
@@ -787,11 +786,7 @@ where
             && self.semantic.in_type_definition()
             && self.semantic.future_annotations()
         {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
-                ..
-            }) = expr
-            {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.deferred.string_type_definitions.push((
                     expr.range(),
                     value,
@@ -1186,10 +1181,7 @@ where
                     }
                 }
             }
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
-                range: _,
-            }) => {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 if self.semantic.in_type_definition()
                     && !self.semantic.in_literal()
                     && !self.semantic.in_f_string()
@@ -1423,7 +1415,7 @@ impl<'a> Checker<'a> {
         // subsequent nodes are evaluated in the inner scope.
         //
         // For example, given:
-        // ```py
+        // ```python
         // class A:
         //     T = range(10)
         //
@@ -1431,7 +1423,7 @@ impl<'a> Checker<'a> {
         // ```
         //
         // Conceptually, this is compiled as:
-        // ```py
+        // ```python
         // class A:
         //     T = range(10)
         //
@@ -1600,9 +1592,16 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        for builtin in BUILTINS
+        for builtin in PYTHON_BUILTINS
             .iter()
             .chain(MAGIC_GLOBALS.iter())
+            .chain(
+                self.source_type
+                    .is_ipynb()
+                    .then_some(IPYTHON_BUILTINS)
+                    .into_iter()
+                    .flatten(),
+            )
             .copied()
             .chain(self.settings.builtins.iter().map(String::as_str))
         {
@@ -1623,38 +1622,28 @@ impl<'a> Checker<'a> {
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
         let parent = self.semantic.current_statement();
 
+        let mut flags = BindingFlags::empty();
+        if helpers::is_unpacking_assignment(parent, expr) {
+            flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
+        }
+
         // Match the left-hand side of an annotated assignment, like `x` in `x: int`.
         if matches!(
             parent,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
         ) && !self.semantic.in_annotation()
         {
-            self.add_binding(
-                id,
-                expr.range(),
-                BindingKind::Annotation,
-                BindingFlags::empty(),
-            );
+            self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
             return;
         }
 
         if parent.is_for_stmt() {
-            self.add_binding(
-                id,
-                expr.range(),
-                BindingKind::LoopVar,
-                BindingFlags::empty(),
-            );
+            self.add_binding(id, expr.range(), BindingKind::LoopVar, flags);
             return;
         }
 
-        if helpers::is_unpacking_assignment(parent, expr) {
-            self.add_binding(
-                id,
-                expr.range(),
-                BindingKind::UnpackedAssignment,
-                BindingFlags::empty(),
-            );
+        if parent.is_with_stmt() {
+            self.add_binding(id, expr.range(), BindingKind::WithItemVar, flags);
             return;
         }
 
@@ -1689,7 +1678,6 @@ impl<'a> Checker<'a> {
             let (all_names, all_flags) =
                 extract_all_names(parent, |name| self.semantic.is_builtin(name));
 
-            let mut flags = BindingFlags::empty();
             if all_flags.intersects(DunderAllFlags::INVALID_OBJECT) {
                 flags |= BindingFlags::INVALID_ALL_OBJECT;
             }
@@ -1713,21 +1701,11 @@ impl<'a> Checker<'a> {
             .current_expressions()
             .any(Expr::is_named_expr_expr)
         {
-            self.add_binding(
-                id,
-                expr.range(),
-                BindingKind::NamedExprAssignment,
-                BindingFlags::empty(),
-            );
+            self.add_binding(id, expr.range(), BindingKind::NamedExprAssignment, flags);
             return;
         }
 
-        self.add_binding(
-            id,
-            expr.range(),
-            BindingKind::Assignment,
-            BindingFlags::empty(),
-        );
+        self.add_binding(id, expr.range(), BindingKind::Assignment, flags);
     }
 
     fn handle_node_delete(&mut self, expr: &'a Expr) {

@@ -60,6 +60,7 @@ mod tests {
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"))]
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"))]
     #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
+    #[test_case(Rule::TimeoutErrorAlias, Path::new("UP041.py"))]
     #[test_case(Rule::TypeOfPrimitive, Path::new("UP003.py"))]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_0.py"))]
@@ -92,6 +93,19 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn async_timeout_error_alias_not_applied_py310() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP041.py"),
+            &settings::LinterSettings {
+                target_version: PythonVersion::Py310,
+                ..settings::LinterSettings::for_rule(Rule::TimeoutErrorAlias)
+            },
+        )?;
+        assert_messages!(diagnostics);
         Ok(())
     }
 

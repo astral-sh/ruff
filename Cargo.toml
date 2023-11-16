@@ -13,9 +13,9 @@ license = "MIT"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.69" }
-bitflags = { version = "2.3.1" }
+bitflags = { version = "2.4.1" }
 chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
-clap = { version = "4.4.6", features = ["derive"] }
+clap = { version = "4.4.7", features = ["derive"] }
 colored = { version = "2.0.0" }
 filetime = { version = "0.2.20" }
 glob = { version = "0.3.1" }
@@ -34,15 +34,15 @@ quote = { version = "1.0.23" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "1.1.0" }
 schemars = { version = "0.8.15" }
-serde = { version = "1.0.152", features = ["derive"] }
-serde_json = { version = "1.0.107" }
+serde = { version = "1.0.190", features = ["derive"] }
+serde_json = { version = "1.0.108" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.3.0", features = ["inline"] }
-smallvec = { version = "1.11.1" }
+smallvec = { version = "1.11.2" }
 static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
 strum_macros = { version = "0.25.3" }
-syn = { version = "2.0.38" }
+syn = { version = "2.0.39" }
 test-case = { version = "3.2.1" }
 thiserror = { version = "1.0.50" }
 toml = { version = "0.7.8" }
@@ -52,7 +52,7 @@ tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 unicode-ident = { version = "1.0.12" }
 unicode_names2 = { version = "1.2.0" }
 unicode-width = { version = "0.1.11" }
-uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
+uuid = { version = "1.5.0", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 wsl = { version = "0.1.0" }
 
 [profile.release]

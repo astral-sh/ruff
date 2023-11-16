@@ -252,7 +252,7 @@ pub(crate) enum InParenthesesOnlyLineBreak {
 impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         match f.context().node_level() {
-            NodeLevel::TopLevel | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+            NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
                 match self {
                     InParenthesesOnlyLineBreak::SoftLineBreak => Ok(()),
                     InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => space().fmt(f),
@@ -319,7 +319,7 @@ pub(super) fn write_in_parentheses_only_group_start_tag(f: &mut PyFormatter) {
             // Unconditionally group the content if it is not enclosed by an optional parentheses group.
             f.write_element(FormatElement::Tag(tag::Tag::StartGroup(tag::Group::new())));
         }
-        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+        NodeLevel::Expression(None) | NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement => {
             // No group
         }
     }
@@ -334,7 +334,7 @@ pub(super) fn write_in_parentheses_only_group_end_tag(f: &mut PyFormatter) {
             // Unconditionally group the content if it is not enclosed by an optional parentheses group.
             f.write_element(FormatElement::Tag(tag::Tag::EndGroup));
         }
-        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+        NodeLevel::Expression(None) | NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement => {
             // No group
         }
     }

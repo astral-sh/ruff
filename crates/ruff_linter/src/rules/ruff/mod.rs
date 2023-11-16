@@ -17,7 +17,7 @@ mod tests {
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
     use crate::settings::resolve_per_file_ignores;
-    use crate::settings::types::{PerFileIgnore, PythonVersion};
+    use crate::settings::types::{PerFileIgnore, PreviewMode, PythonVersion};
     use crate::test::{test_path, test_resource_path};
     use crate::{assert_messages, settings};
 
@@ -76,6 +76,24 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
             &settings::LinterSettings {
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::AmbiguousUnicodeCharacterString,
+                    Rule::AmbiguousUnicodeCharacterDocstring,
+                    Rule::AmbiguousUnicodeCharacterComment,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn preview_confusables() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/confusables.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
                 allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
                 ..settings::LinterSettings::for_rules(vec![
                     Rule::AmbiguousUnicodeCharacterString,

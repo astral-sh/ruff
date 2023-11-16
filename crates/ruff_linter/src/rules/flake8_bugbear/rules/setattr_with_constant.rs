@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, ExprContext, Identifier, Stmt};
+use ruff_python_ast::{self as ast, Expr, ExprContext, Identifier, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
@@ -80,11 +80,7 @@ pub(crate) fn setattr_with_constant(
     if obj.is_starred_expr() {
         return;
     }
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(name),
-        ..
-    }) = name
-    else {
+    let Expr::StringLiteral(ast::ExprStringLiteral { value: name, .. }) = name else {
         return;
     };
     if !is_identifier(name) {

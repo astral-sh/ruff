@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -64,7 +64,7 @@ pub(crate) fn request_without_timeout(checker: &mut Checker, call: &ast::ExprCal
         })
     {
         if let Some(keyword) = call.arguments.find_keyword("timeout") {
-            if is_const_none(&keyword.value) {
+            if keyword.value.is_none_literal_expr() {
                 checker.diagnostics.push(Diagnostic::new(
                     RequestWithoutTimeout { implicit: false },
                     keyword.range(),

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/list.py
 ---
 ## Input
-```py
+```python
 # Dangling comment placement in empty lists
 # Regression test for https://github.com/python/cpython/blob/03160630319ca26dcbbad65225da4248e54c45ec/Tools/c-analyzer/c_analyzer/datafiles.py#L14-L16
 a1 = [  # a
@@ -67,7 +67,7 @@ c1 = [ # trailing open bracket
 ```
 
 ## Output
-```py
+```python
 # Dangling comment placement in empty lists
 # Regression test for https://github.com/python/cpython/blob/03160630319ca26dcbbad65225da4248e54c45ec/Tools/c-analyzer/c_analyzer/datafiles.py#L14-L16
 a1 = [  # a

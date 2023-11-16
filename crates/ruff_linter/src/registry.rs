@@ -64,6 +64,9 @@ pub enum Linter {
     /// [flake8-async](https://pypi.org/project/flake8-async/)
     #[prefix = "ASYNC"]
     Flake8Async,
+    /// [flake8-trio](https://pypi.org/project/flake8-trio/)
+    #[prefix = "TRIO"]
+    Flake8Trio,
     /// [flake8-bandit](https://pypi.org/project/flake8-bandit/)
     #[prefix = "S"]
     Flake8Bandit,
@@ -294,6 +297,7 @@ impl Rule {
             | Rule::TabIndentation
             | Rule::TrailingCommaOnBareTuple
             | Rule::TypeCommentInStub
+            | Rule::UnicodeKindPrefix
             | Rule::UselessSemicolon
             | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,

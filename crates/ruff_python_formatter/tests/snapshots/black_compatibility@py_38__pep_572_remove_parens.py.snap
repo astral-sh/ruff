@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_38/pep
 ---
 ## Input
 
-```py
+```python
 if (foo := 0):
     pass
 
@@ -94,7 +94,7 @@ async def await_the_walrus():
 
 ## Ruff Output
 
-```py
+```python
 if foo := 0:
     pass
 
@@ -170,7 +170,7 @@ async def await_the_walrus():
 
 ## Black Output
 
-```py
+```python
 if foo := 0:
     pass
 

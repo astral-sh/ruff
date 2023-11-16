@@ -320,6 +320,119 @@ fn stdin_fix_jupyter() {
     Found 2 errors (2 fixed, 0 remaining).
     "###);
 }
+#[test]
+fn stdin_override_parser_ipynb() {
+    let args = ["--extension", "py:ipynb", "--stdin-filename", "Jupyter.py"];
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(args)
+        .pass_stdin(r#"{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "id": "dccc687c-96e2-4604-b957-a8a89b5bec06",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "19e1b029-f516-4662-a9b9-623b93edac1a",
+   "metadata": {},
+   "source": [
+    "Foo"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "id": "cdce7b92-b0fb-4c02-86f6-e233b26fa84f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import sys"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "id": "e40b33d2-7fe4-46c5-bdf0-8802f3052565",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "1\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a1899bc8-d46f-4ec0-b1d1-e1ca0f04bf60",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.2"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}"#), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Jupyter.py:cell 1:1:8: F401 [*] `os` imported but unused
+    Jupyter.py:cell 3:1:8: F401 [*] `sys` imported but unused
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn stdin_override_parser_py() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--extension", "ipynb:python", "--stdin-filename", "F401.ipynb"])
+        .pass_stdin("import os\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401.ipynb:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+}
 
 #[test]
 fn stdin_fix_when_not_fixable_should_still_print_contents() {
@@ -1405,5 +1518,108 @@ extend-safe-fixes = ["UP034"]
     ----- stderr -----
     "###);
 
+    Ok(())
+}
+
+#[test]
+fn check_extend_unsafe_fixes_conflict_with_extend_safe_fixes_by_specificity() -> Result<()> {
+    // Adding a rule to one option with a more specific selector should override the other option
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+target-version = "py310"
+[lint]
+extend-unsafe-fixes = ["UP", "UP034"]
+extend-safe-fixes = ["UP03"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .args([
+            "--output-format",
+            "text",
+            "--no-cache",
+            "--select",
+            "F601,UP018,UP034,UP038",
+        ])
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\nprint(str('foo'))\nisinstance(x, (int, str))\n"),
+            @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 Avoid extraneous parentheses
+    -:3:7: UP018 Unnecessary `str` call (rewrite as a literal)
+    -:4:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
+    Found 4 errors.
+    [*] 1 fixable with the `--fix` option (3 hidden fixes can be enabled with the `--unsafe-fixes` option).
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn check_docstring_conventions_overrides() -> Result<()> {
+    // But if we explicitly select it, we override the convention
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[lint.pydocstyle]
+convention = "numpy"
+"#,
+    )?;
+
+    let stdin = r#"
+def log(x, base) -> float:
+    """Calculate natural log of a value
+
+    Parameters
+    ----------
+    x :
+        Hello
+    """
+    return math.log(x)
+"#;
+
+    // If we only select the prefix, then everything passes
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "-", "--config"])
+        .arg(&ruff_toml)
+        .args(["--output-format", "text", "--no-cache", "--select", "D41"])
+        .pass_stdin(stdin),
+        @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "###
+    );
+
+    // But if we select the exact code, we get an error
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "-", "--config"])
+        .arg(&ruff_toml)
+        .args(["--output-format", "text", "--no-cache", "--select", "D417"])
+        .pass_stdin(stdin),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:2:5: D417 Missing argument description in the docstring for `log`: `base`
+    Found 1 error.
+
+    ----- stderr -----
+    "###
+    );
     Ok(())
 }

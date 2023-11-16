@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/generator_exp.py
 ---
 ## Input
-```py
+```python
 (a for b in c)
 
 # parens around generator expression not required
@@ -78,7 +78,7 @@ tuple(
 ```
 
 ## Output
-```py
+```python
 (a for b in c)
 
 # parens around generator expression not required

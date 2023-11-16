@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -99,7 +99,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                     if arguments
                         .args
                         .first()
-                        .is_some_and(|arg| !arg.is_name_expr() && !is_const_none(arg))
+                        .is_some_and(|arg| !arg.is_name_expr() && !arg.is_none_literal_expr())
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             TypeComparison {
@@ -138,6 +138,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                         | "list"
                         | "dict"
                         | "set"
+                        | "memoryview"
                 ) && checker.semantic().is_builtin(id)
                 {
                     checker.diagnostics.push(Diagnostic::new(
@@ -191,13 +192,104 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
             arguments
                 .args
                 .first()
-                .is_some_and(|arg| !arg.is_name_expr() && !is_const_none(arg))
+                .is_some_and(|arg| !arg.is_name_expr() && !arg.is_none_literal_expr())
         }
         Expr::Name(ast::ExprName { id, .. }) => {
             // Ex) `type(obj) == int`
             matches!(
                 id.as_str(),
-                "int" | "str" | "float" | "bool" | "complex" | "bytes" | "list" | "dict" | "set"
+                "bool"
+                    | "bytearray"
+                    | "bytes"
+                    | "classmethod"
+                    | "complex"
+                    | "dict"
+                    | "enumerate"
+                    | "filter"
+                    | "float"
+                    | "frozenset"
+                    | "int"
+                    | "list"
+                    | "map"
+                    | "memoryview"
+                    | "object"
+                    | "property"
+                    | "range"
+                    | "reversed"
+                    | "set"
+                    | "slice"
+                    | "staticmethod"
+                    | "str"
+                    | "super"
+                    | "tuple"
+                    | "type"
+                    | "zip"
+                    | "ArithmeticError"
+                    | "AssertionError"
+                    | "AttributeError"
+                    | "BaseException"
+                    | "BlockingIOError"
+                    | "BrokenPipeError"
+                    | "BufferError"
+                    | "BytesWarning"
+                    | "ChildProcessError"
+                    | "ConnectionAbortedError"
+                    | "ConnectionError"
+                    | "ConnectionRefusedError"
+                    | "ConnectionResetError"
+                    | "DeprecationWarning"
+                    | "EnvironmentError"
+                    | "EOFError"
+                    | "Exception"
+                    | "FileExistsError"
+                    | "FileNotFoundError"
+                    | "FloatingPointError"
+                    | "FutureWarning"
+                    | "GeneratorExit"
+                    | "ImportError"
+                    | "ImportWarning"
+                    | "IndentationError"
+                    | "IndexError"
+                    | "InterruptedError"
+                    | "IOError"
+                    | "IsADirectoryError"
+                    | "KeyboardInterrupt"
+                    | "KeyError"
+                    | "LookupError"
+                    | "MemoryError"
+                    | "ModuleNotFoundError"
+                    | "NameError"
+                    | "NotADirectoryError"
+                    | "NotImplementedError"
+                    | "OSError"
+                    | "OverflowError"
+                    | "PendingDeprecationWarning"
+                    | "PermissionError"
+                    | "ProcessLookupError"
+                    | "RecursionError"
+                    | "ReferenceError"
+                    | "ResourceWarning"
+                    | "RuntimeError"
+                    | "RuntimeWarning"
+                    | "StopAsyncIteration"
+                    | "StopIteration"
+                    | "SyntaxError"
+                    | "SyntaxWarning"
+                    | "SystemError"
+                    | "SystemExit"
+                    | "TabError"
+                    | "TimeoutError"
+                    | "TypeError"
+                    | "UnboundLocalError"
+                    | "UnicodeDecodeError"
+                    | "UnicodeEncodeError"
+                    | "UnicodeError"
+                    | "UnicodeTranslateError"
+                    | "UnicodeWarning"
+                    | "UserWarning"
+                    | "ValueError"
+                    | "Warning"
+                    | "ZeroDivisionError"
             ) && semantic.is_builtin(id)
         }
         _ => false,

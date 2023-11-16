@@ -9,8 +9,7 @@ expression: trace
       - ExprBinOp
         - ExprName
         - Pow
-        - ExprConstant
-          - Int(2)
+        - ExprNumberLiteral
       - Comprehension
         - ExprName
         - ExprName

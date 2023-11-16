@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 ---
 ## Input
 
-```py
+```python
 # This file doesn't use the standard decomposition.
 # Decorator syntax test cases are separated by double # comments.
 # Those before the 'output' comment are valid under the old syntax.
@@ -378,7 +378,7 @@ def f():
 
 ## Ruff Output
 
-```py
+```python
 # This file doesn't use the standard decomposition.
 # Decorator syntax test cases are separated by double # comments.
 # Those before the 'output' comment are valid under the old syntax.
@@ -589,7 +589,7 @@ def f():
 
 ## Black Output
 
-```py
+```python
 ##
 
 @decorator()()

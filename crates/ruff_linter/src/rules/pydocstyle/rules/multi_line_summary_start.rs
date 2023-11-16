@@ -49,6 +49,7 @@ use crate::registry::Rule;
 /// ```
 ///
 /// [D213]: https://docs.astral.sh/ruff/rules/multi-line-summary-second-line
+/// [PEP 257]: https://peps.python.org/pep-0257
 #[violation]
 pub struct MultiLineSummaryFirstLine;
 
@@ -103,6 +104,7 @@ impl AlwaysFixableViolation for MultiLineSummaryFirstLine {
 /// ```
 ///
 /// [D212]: https://docs.astral.sh/ruff/rules/multi-line-summary-first-line
+/// [PEP 257]: https://peps.python.org/pep-0257
 #[violation]
 pub struct MultiLineSummarySecondLine;
 

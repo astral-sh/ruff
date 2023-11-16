@@ -1,5 +1,6 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor, Expr, ExprLambda, Parameter, ParameterWithDefault};
 use ruff_text_size::Ranged;
@@ -24,13 +25,28 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// df.apply(str)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe in cases in which the lambda body itself
+/// contains an effect.
+///
+/// For example, replacing `lambda x, y: (func()(x, y))` with `func()` would
+/// lead to a change in behavior, as `func()` would be evaluated eagerly when
+/// defining the lambda, rather than when the lambda is called.
+///
+/// When the lambda body contains no visible effects, the fix is considered
+/// safe.
 #[violation]
 pub struct UnnecessaryLambda;
 
-impl Violation for UnnecessaryLambda {
+impl AlwaysFixableViolation for UnnecessaryLambda {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Lambda may be unnecessary; consider inlining inner function")
+    }
+
+    fn fix_title(&self) -> String {
+        "Inline function call".to_string()
     }
 }
 
@@ -184,9 +200,19 @@ pub(crate) fn unnecessary_lambda(checker: &mut Checker, lambda: &ExprLambda) {
         }
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(UnnecessaryLambda, lambda.range()));
+    let mut diagnostic = Diagnostic::new(UnnecessaryLambda, lambda.range());
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(
+            checker.locator().slice(func.as_ref()).to_string(),
+            lambda.range(),
+        ),
+        if contains_effect(func.as_ref(), |id| checker.semantic().is_builtin(id)) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        },
+    ));
+    checker.diagnostics.push(diagnostic);
 }
 
 /// Identify all `Expr::Name` nodes in an AST.

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -66,10 +66,7 @@ pub(crate) fn jinja2_autoescape_false(checker: &mut Checker, call: &ast::ExprCal
     {
         if let Some(keyword) = call.arguments.find_keyword("autoescape") {
             match &keyword.value {
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Bool(true),
-                    ..
-                }) => (),
+                Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }) => (),
                 Expr::Call(ast::ExprCall { func, .. }) => {
                     if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                         if id != "select_autoescape" {

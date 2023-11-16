@@ -15,8 +15,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 4..13,
                     value: Int(
                         123456789,
@@ -37,8 +37,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 18..24,
                     value: Int(
                         123456,
@@ -59,8 +59,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 29..31,
                     value: Float(
                         0.1,
@@ -81,8 +81,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 36..38,
                     value: Float(
                         1.0,
@@ -103,8 +103,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 43..47,
                     value: Float(
                         10.0,
@@ -125,8 +125,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 52..56,
                     value: Float(
                         0.1,
@@ -147,8 +147,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 61..73,
                     value: Float(
                         1.00000001,
@@ -169,8 +169,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 78..97,
                     value: Float(
                         123456789.12345679,
@@ -191,8 +191,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 102..131,
                     value: Float(
                         inf,
@@ -213,8 +213,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 136..155,
                     value: Float(
                         inf,
@@ -235,8 +235,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 160..170,
                     value: Complex {
                         real: 0.0,
@@ -258,8 +258,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 175..195,
                     value: Complex {
                         real: 0.0,
@@ -281,8 +281,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 200..207,
                     value: Int(
                         727756,
@@ -303,8 +303,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 212..218,
                     value: Int(
                         11,
@@ -325,8 +325,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 223..228,
                     value: Int(
                         511,
@@ -347,8 +347,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 233..244,
                     value: Float(
                         6e-9,
@@ -369,8 +369,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 249..254,
                     value: Int(
                         10000,
@@ -391,8 +391,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 259..265,
                     value: Int(
                         133333,

@@ -11,23 +11,19 @@ expression: parse_ast
                     range: 7..18,
                     keys: [
                         Some(
-                            Constant(
-                                ExprConstant {
+                            StringLiteral(
+                                ExprStringLiteral {
                                     range: 8..14,
-                                    value: Str(
-                                        StringConstant {
-                                            value: "test",
-                                            unicode: false,
-                                            implicit_concatenated: false,
-                                        },
-                                    ),
+                                    value: "test",
+                                    unicode: false,
+                                    implicit_concatenated: false,
                                 },
                             ),
                         ),
                     ],
                     values: [
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 16..17,
                                 value: Int(
                                     1,
@@ -98,31 +94,23 @@ expression: parse_ast
                     range: 80..97,
                     keys: [
                         Some(
-                            Constant(
-                                ExprConstant {
+                            StringLiteral(
+                                ExprStringLiteral {
                                     range: 81..88,
-                                    value: Str(
-                                        StringConstant {
-                                            value: "label",
-                                            unicode: false,
-                                            implicit_concatenated: false,
-                                        },
-                                    ),
+                                    value: "label",
+                                    unicode: false,
+                                    implicit_concatenated: false,
                                 },
                             ),
                         ),
                     ],
                     values: [
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 90..96,
-                                value: Str(
-                                    StringConstant {
-                                        value: "test",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
+                                value: "test",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                     ],
@@ -135,16 +123,12 @@ expression: parse_ast
                         PatternMatchMapping {
                             range: 108..155,
                             keys: [
-                                Constant(
-                                    ExprConstant {
+                                StringLiteral(
+                                    ExprStringLiteral {
                                         range: 118..125,
-                                        value: Str(
-                                            StringConstant {
-                                                value: "label",
-                                                unicode: false,
-                                                implicit_concatenated: false,
-                                            },
-                                        ),
+                                        value: "label",
+                                        unicode: false,
+                                        implicit_concatenated: false,
                                     },
                                 ),
                             ],
@@ -253,8 +237,8 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 197..198,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 197..198,
                                                 value: Int(
                                                     0,
@@ -266,8 +250,8 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 200..201,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 200..201,
                                                 value: Int(
                                                     1,
@@ -293,8 +277,8 @@ expression: parse_ast
                                         },
                                     ),
                                 ],
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 217..218,
                                         value: Int(
                                             0,
@@ -328,8 +312,8 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 238..239,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 238..239,
                                                 value: Int(
                                                     0,
@@ -341,8 +325,8 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 241..242,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 241..242,
                                                 value: Int(
                                                     1,
@@ -368,8 +352,8 @@ expression: parse_ast
                                         },
                                     ),
                                 ],
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 258..259,
                                         value: Int(
                                             0,
@@ -403,8 +387,8 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 279..280,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 279..280,
                                                 value: Int(
                                                     0,
@@ -430,8 +414,8 @@ expression: parse_ast
                                         },
                                     ),
                                 ],
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 296..297,
                                         value: Int(
                                             0,

@@ -26,6 +26,7 @@ mod tests {
     use crate::linter::{check_path, LinterResult};
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
+    use crate::settings::types::PreviewMode;
     use crate::settings::{flags, LinterSettings};
     use crate::source_kind::SourceKind;
     use crate::test::{test_path, test_snippet};
@@ -137,6 +138,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_18.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_19.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_20.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_21.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_22.ipynb"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"))]
@@ -145,6 +148,7 @@ mod tests {
     #[test_case(Rule::UnusedVariable, Path::new("F841_1.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_2.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_3.py"))]
+    #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     #[test_case(Rule::UnusedAnnotation, Path::new("F842.py"))]
     #[test_case(Rule::RaiseNotImplemented, Path::new("F901.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -152,6 +156,24 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -1126,7 +1148,8 @@ mod tests {
 
     #[test]
     fn used_as_star_unpack() {
-        // Star names in unpack are used if RHS is not a tuple/list literal.
+        // In stable, starred names in unpack are used if RHS is not a tuple/list literal.
+        // In preview, these should be marked as unused.
         flakes(
             r#"
         def f():

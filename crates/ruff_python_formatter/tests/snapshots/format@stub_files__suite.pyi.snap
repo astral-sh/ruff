@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/stub_files/suite.pyi
 ---
 ## Input
-```py
+```python
 """Tests for empty line rules in stub files, mostly inspired by typeshed.
 The rules are a list of nested exceptions. See also
 https://github.com/psf/black/blob/c160e4b7ce30c661ac4f2dfa5038becf1b8c5c33/src/black/lines.py#L576-L744
@@ -156,7 +156,7 @@ class ComplexStatements:
 ```
 
 ## Output
-```py
+```python
 """Tests for empty line rules in stub files, mostly inspired by typeshed.
 The rules are a list of nested exceptions. See also
 https://github.com/psf/black/blob/c160e4b7ce30c661ac4f2dfa5038becf1b8c5c33/src/black/lines.py#L576-L744

@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
+use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.
@@ -23,6 +24,9 @@ use crate::fix::edits::delete_stmt;
 /// If a variable is intentionally defined-but-not-used, it should be
 /// prefixed with an underscore, or some other value that adheres to the
 /// [`dummy-variable-rgx`] pattern.
+///
+/// Under [preview mode](https://docs.astral.sh/ruff/preview), this rule also
+/// triggers on unused unpacked assignments (for example, `x, y = foo()`).
 ///
 /// ## Example
 /// ```python
@@ -318,7 +322,11 @@ pub(crate) fn unused_variable(checker: &Checker, scope: &Scope, diagnostics: &mu
         .bindings()
         .map(|(name, binding_id)| (name, checker.semantic().binding(binding_id)))
         .filter_map(|(name, binding)| {
-            if (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
+            if (binding.kind.is_assignment()
+                || binding.kind.is_named_expr_assignment()
+                || binding.kind.is_with_item_var())
+                && (!binding.is_unpacked_assignment()
+                    || matches!(checker.settings.preview, PreviewMode::Enabled))
                 && !binding.is_nonlocal()
                 && !binding.is_global()
                 && !binding.is_used()

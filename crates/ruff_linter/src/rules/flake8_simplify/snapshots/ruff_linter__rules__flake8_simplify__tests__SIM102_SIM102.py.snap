@@ -11,7 +11,7 @@ SIM102.py:2:1: SIM102 [*] Use a single `if` statement instead of nested `if` sta
   |
   = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | # SIM102
 2   |-if a:
 3   |-    if b:
@@ -33,7 +33,7 @@ SIM102.py:7:1: SIM102 [*] Use a single `if` statement instead of nested `if` sta
    |
    = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 4  4  |         c
 5  5  | 
 6  6  | # SIM102
@@ -60,7 +60,7 @@ SIM102.py:8:5: SIM102 [*] Use a single `if` statement instead of nested `if` sta
    |
    = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 5  5  | 
 6  6  | # SIM102
 7  7  | if a:
@@ -84,7 +84,7 @@ SIM102.py:15:1: SIM102 [*] Use a single `if` statement instead of nested `if` st
    |
    = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 12 12 | # SIM102
 13 13 | if a:
 14 14 |     pass
@@ -119,7 +119,7 @@ SIM102.py:26:1: SIM102 [*] Use a single `if` statement instead of nested `if` st
    |
    = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 23 23 |         c
 24 24 | 
 25 25 | # SIM102
@@ -147,7 +147,7 @@ SIM102.py:51:5: SIM102 [*] Use a single `if` statement instead of nested `if` st
    |
    = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 48 48 | 
 49 49 | while x > 0:
 50 50 |     # SIM102
@@ -183,7 +183,7 @@ SIM102.py:67:1: SIM102 [*] Use a single `if` statement instead of nested `if` st
    |
    = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 64 64 | 
 65 65 | 
 66 66 | # SIM102
@@ -222,7 +222,7 @@ SIM102.py:83:5: SIM102 [*] Use a single `if` statement instead of nested `if` st
    |
    = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 80 80 | 
 81 81 | while x > 0:
 82 82 |     # SIM102
@@ -251,7 +251,7 @@ SIM102.py:90:1: SIM102 [*] Use a single `if` statement instead of nested `if` st
    |
    = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 87 87 |             print("Bad module!")
 88 88 | 
 89 89 | # SIM102 (auto-fixable)
@@ -293,7 +293,7 @@ SIM102.py:106:5: SIM102 [*] Use a single `if` statement instead of nested `if` s
     |
     = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 103 103 | # SIM102
 104 104 | # Regression test for https://github.com/apache/airflow/blob/145b16caaa43f0c42bffd97344df916c602cddde/airflow/configuration.py#L1161
 105 105 | if a:
@@ -319,7 +319,7 @@ SIM102.py:132:5: SIM102 [*] Use a single `if` statement instead of nested `if` s
     |
     = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 129 129 | # OK
 130 130 | if a:
 131 131 |     # SIM 102
@@ -344,7 +344,7 @@ SIM102.py:165:5: SIM102 [*] Use a single `if` statement instead of nested `if` s
     |
     = help: Combine `if` statements using `and`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 162 162 | def f():
 163 163 |     if a:
 164 164 |         pass

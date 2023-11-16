@@ -99,16 +99,29 @@ The Ruff Formatter exposes a small set of configuration options, some of which a
 by Black (like line width), some of which are unique to Ruff (like quote and indentation style).
 
 For example, to configure the formatter to use single quotes, a line width of 100, and
-tab indentation, add the following to your `pyproject.toml`:
+tab indentation, add the following to your configuration file:
 
-```toml
-[tool.ruff]
-line-length = 100
+=== "pyproject.toml"
 
-[tool.ruff.format]
-quote-style = "single"
-indent-style = "tab"
-```
+    ```toml
+    [tool.ruff]
+    line-length = 100
+
+    [tool.ruff.format]
+    quote-style = "single"
+    indent-style = "tab"
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    line-length = 100
+
+    [format]
+    quote-style = "single"
+    indent-style = "tab"
+    ```
+
 
 For the full list of supported settings, see [_Settings_](settings.md#format). For more on
 configuring Ruff via `pyproject.toml`, see [_Configuring Ruff_](configuration.md).
@@ -183,7 +196,7 @@ some rules that, when enabled, can cause conflicts with the formatter, leading t
 behavior. When configured appropriately, the goal of Ruff's formatter-linter compatibility is
 such that running the formatter should never introduce new lint errors.
 
-As such, when using Ruff as a formatter, we recommend avoiding the following lint rules:
+When using Ruff as a formatter, we recommend avoiding the following lint rules:
 
 - [`tab-indentation`](rules/tab-indentation.md) (`W191`)
 - [`indentation-with-invalid-multiple`](rules/indentation-with-invalid-multiple.md) (`E111`)
@@ -199,6 +212,11 @@ As such, when using Ruff as a formatter, we recommend avoiding the following lin
 - [`prohibited-trailing-comma`](rules/prohibited-trailing-comma.md) (`COM819`)
 - [`single-line-implicit-string-concatenation`](rules/single-line-implicit-string-concatenation.md) (`ISC001`)
 - [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`)
+
+While the [`line-too-long`](rules/line-too-long.md) (`E501`) rule _can_ be used alongside the
+formatter, the formatter only makes a best-effort attempt to wrap lines at the configured
+[`line-length`](settings.md#line-length). As such, formatted code _may_ exceed the line length,
+leading to [`line-too-long`](rules/line-too-long.md) (`E501`) errors.
 
 None of the above are included in Ruff's default configuration. However, if you've enabled
 any of these rules or their parent categories (like `Q`), we recommend disabling them via the

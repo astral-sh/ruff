@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# **NOTE**
+# This script is being replaced by the ruff-ecosystem package which is no
+# longer focused on black-compatibility but on changes in formatting between
+# ruff versions. ruff-ecosystem does not support instability checks yet.
+#
 # Check black compatibility and check for formatter instabilities and other
 # errors.
 #

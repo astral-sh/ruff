@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/carriage_return/string.py
 ---
 ## Input
-```py
+```python
 'This string will not include \
 backslashes or newline characters.'
 
@@ -13,7 +13,7 @@ String \"
 ```
 
 ## Output
-```py
+```python
 "This string will not include \
 backslashes or newline characters."
 
