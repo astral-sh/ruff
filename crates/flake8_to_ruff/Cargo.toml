@@ -34,3 +34,6 @@ toml = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
+
+[lints]
+workspace = true

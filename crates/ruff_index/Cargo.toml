@@ -17,3 +17,6 @@ ruff_macros = { path = "../ruff_macros" }
 
 [dev-dependencies]
 static_assertions = "1.1.0"
+
+[lints]
+workspace = true
