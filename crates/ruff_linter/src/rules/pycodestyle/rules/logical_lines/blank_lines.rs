@@ -354,10 +354,6 @@ pub(crate) fn blank_lines(
 ) {
     let line_is_comment_only = line.is_comment_only();
 
-    if tracked_vars.is_first_logical_line && !line_is_comment_only {
-        tracked_vars.is_first_logical_line = false;
-    }
-
     let mut follows_class_or_fn = false;
     if indent_level < tracked_vars.class_indent_level && tracked_vars.is_in_class {
         tracked_vars.is_in_class = false;
@@ -584,5 +580,9 @@ pub(crate) fn blank_lines(
                 break;
             }
         }
+    }
+
+    if tracked_vars.is_first_logical_line && !line_is_comment_only {
+        tracked_vars.is_first_logical_line = false;
     }
 }
