@@ -12,7 +12,7 @@ E30.py:285:5: E301 [*] Expected 1 blank line, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 282 282 | 
 283 283 |     def func1():
 284 284 |         pass
@@ -32,7 +32,7 @@ E30.py:296:5: E301 [*] Expected 1 blank line, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 293 293 |     def fn1():
 294 294 |         pass
 295 295 |     # comment

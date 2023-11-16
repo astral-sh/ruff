@@ -12,7 +12,7 @@ E30.py:303:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 300 300 | 
 301 301 | # E302
 302 302 | """Main module."""
@@ -33,7 +33,7 @@ E30.py:310:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 307 307 | 
 308 308 | # E302
 309 309 | import sys
@@ -54,7 +54,7 @@ E30.py:319:1: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 316 316 | def a():
 317 317 |     pass
 318 318 | 
@@ -74,7 +74,7 @@ E30.py:330:1: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 327 327 | 
 328 328 | # comment
 329 329 | 
@@ -94,7 +94,7 @@ E30.py:339:7: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 336 336 | def a():
 337 337 |     pass
 338 338 | 
@@ -114,7 +114,7 @@ E30.py:348:8: E302 [*] Expected 2 blank lines, found 1
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 345 345 | async  def x():
 346 346 |     pass
 347 347 | 
@@ -133,7 +133,7 @@ E30.py:356:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 353 353 | # E302
 354 354 | def bar():
 355 355 |     pass
@@ -154,7 +154,7 @@ E30.py:362:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 359 359 | 
 360 360 | # E302
 361 361 | def bar(): pass
@@ -174,7 +174,7 @@ E30.py:372:1: E302 [*] Expected 2 blank lines, found 0
     |
     = help: Add missing blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 369 369 |     pass
 370 370 | 
 371 371 | # comment

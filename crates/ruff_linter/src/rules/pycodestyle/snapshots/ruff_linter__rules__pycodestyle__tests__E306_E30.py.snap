@@ -12,7 +12,7 @@ E30.py:517:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-ℹ Fix
+ℹ Safe fix
 514 514 | # E306:3:5
 515 515 | def a():
 516 516 |     x = 1
@@ -32,7 +32,7 @@ E30.py:525:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-ℹ Fix
+ℹ Safe fix
 522 522 | #: E306:3:5
 523 523 | async def a():
 524 524 |     x = 1
@@ -52,7 +52,7 @@ E30.py:533:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-ℹ Fix
+ℹ Safe fix
 530 530 | #: E306:3:5 E306:5:9
 531 531 | def a():
 532 532 |     x = 2
@@ -72,7 +72,7 @@ E30.py:535:9: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-ℹ Fix
+ℹ Safe fix
 532 532 |     x = 2
 533 533 |     def b():
 534 534 |         x = 1
@@ -92,7 +92,7 @@ E30.py:543:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-ℹ Fix
+ℹ Safe fix
 540 540 | # E306:3:5 E306:6:5
 541 541 | def a():
 542 542 |     x = 1
@@ -112,7 +112,7 @@ E30.py:546:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-ℹ Fix
+ℹ Safe fix
 543 543 |     class C:
 544 544 |         pass
 545 545 |     x = 2
@@ -131,7 +131,7 @@ E30.py:555:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-ℹ Fix
+ℹ Safe fix
 552 552 | def foo():
 553 553 |     def bar():
 554 554 |         pass
@@ -151,7 +151,7 @@ E30.py:562:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
     = help: Add missing blank line
 
-ℹ Fix
+ℹ Safe fix
 559 559 | # E306:3:5
 560 560 | def foo():
 561 561 |     def bar(): pass

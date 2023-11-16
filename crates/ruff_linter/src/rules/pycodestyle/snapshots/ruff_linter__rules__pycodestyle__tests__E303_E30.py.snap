@@ -10,7 +10,7 @@ E30.py:383:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 379 379 | def fn():
 380 380 |     _ = None
 381 381 | 
@@ -28,7 +28,7 @@ E30.py:395:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 391 391 | def fn():
 392 392 |     _ = None
 393 393 | 
@@ -45,7 +45,7 @@ E30.py:406:1: E303 [*] Too many blank lines (3)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 402 402 | print()
 403 403 | 
 404 404 | 
@@ -63,7 +63,7 @@ E30.py:415:1: E303 [*] Too many blank lines (3)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 411 411 | print()
 412 412 | 
 413 413 | 
@@ -79,7 +79,7 @@ E30.py:426:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 422 422 | def a():
 423 423 |     print()
 424 424 | 
@@ -97,7 +97,7 @@ E30.py:429:5: E303 [*] Too many blank lines (2)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 425 425 | 
 426 426 |     # comment
 427 427 | 
@@ -116,7 +116,7 @@ E30.py:440:1: E303 [*] Too many blank lines (3)
     |
     = help: Remove extraneous blank line(s)
 
-ℹ Fix
+ℹ Safe fix
 436 436 | #!python
 437 437 | 
 438 438 | 
