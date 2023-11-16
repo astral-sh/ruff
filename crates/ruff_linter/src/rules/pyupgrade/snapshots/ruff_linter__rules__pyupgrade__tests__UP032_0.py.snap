@@ -995,10 +995,11 @@ UP032_0.py:212:18: UP032 [*] Use f-string instead of `format` call
 211 211 | # When fixing, trim the trailing empty string.
 212     |-raise ValueError("Conflicting configuration dicts: {!r} {!r}"
 213     |-                 "".format(new_dict, d))
-    212 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}")
-214 213 | 
-215 214 | # When fixing, trim the trailing empty string.
-216 215 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
+    212 |+raise ValueError(f"Conflicting configuration dicts: {new_dict!r} {d!r}"
+    213 |+                 "")
+214 214 | 
+215 215 | # When fixing, trim the trailing empty string.
+216 216 | raise ValueError("Conflicting configuration dicts: {!r} {!r}"
 
 UP032_0.py:216:18: UP032 [*] Use f-string instead of `format` call
     |
@@ -1041,9 +1042,10 @@ UP032_0.py:220:5: UP032 [*] Use f-string instead of `format` call
 220     |-    "Conflicting configuration dicts: {!r} {!r}"
 221     |-    "".format(new_dict, d)
     220 |+    f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-222 221 | )
-223 222 | 
-224 223 | raise ValueError(
+    221 |+    ""
+222 222 | )
+223 223 | 
+224 224 | raise ValueError(
 
 UP032_0.py:225:5: UP032 [*] Use f-string instead of `format` call
     |
@@ -1064,7 +1066,96 @@ UP032_0.py:225:5: UP032 [*] Use f-string instead of `format` call
 225     |-    "Conflicting configuration dicts: {!r} {!r}"
 226     |-    "".format(new_dict, d)
     225 |+    f"Conflicting configuration dicts: {new_dict!r} {d!r}"
-227 226 | 
-228 227 | )
+    226 |+    ""
+227 227 | 
+228 228 | )
+229 229 | 
+
+UP032_0.py:231:1: UP032 [*] Use f-string instead of `format` call
+    |
+230 |   # The first string will be converted to an f-string and the curly braces in the second should be converted to be unescaped
+231 | / (
+232 | |     "{}"
+233 | |     "{{}}"
+234 | | ).format(a)
+    | |___________^ UP032
+235 |   
+236 |   ("{}" "{{}}").format(a)
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+229 229 | 
+230 230 | # The first string will be converted to an f-string and the curly braces in the second should be converted to be unescaped
+231 231 | (
+    232 |+    f"{a}"
+232 233 |     "{}"
+233     |-    "{{}}"
+234     |-).format(a)
+    234 |+)
+235 235 | 
+236 236 | ("{}" "{{}}").format(a)
+237 237 | 
+
+UP032_0.py:236:1: UP032 [*] Use f-string instead of `format` call
+    |
+234 | ).format(a)
+235 | 
+236 | ("{}" "{{}}").format(a)
+    | ^^^^^^^^^^^^^^^^^^^^^^^ UP032
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+233 233 |     "{{}}"
+234 234 | ).format(a)
+235 235 | 
+236     |-("{}" "{{}}").format(a)
+    236 |+(f"{a}" "{}")
+237 237 | 
+238 238 | 
+239 239 | # Both strings will be converted to an f-string and the curly braces in the second should left escaped
+
+UP032_0.py:240:1: UP032 [*] Use f-string instead of `format` call
+    |
+239 |   # Both strings will be converted to an f-string and the curly braces in the second should left escaped
+240 | / (
+241 | |     "{}"
+242 | |     "{{{}}}"
+243 | | ).format(a, b)
+    | |______________^ UP032
+244 |   
+245 |   ("{}" "{{{}}}").format(a, b)
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+238 238 | 
+239 239 | # Both strings will be converted to an f-string and the curly braces in the second should left escaped
+240 240 | (
+241     |-    "{}"
+242     |-    "{{{}}}"
+243     |-).format(a, b)
+    241 |+    f"{a}"
+    242 |+    f"{{{b}}}"
+    243 |+)
+244 244 | 
+245 245 | ("{}" "{{{}}}").format(a, b)
+
+UP032_0.py:245:1: UP032 [*] Use f-string instead of `format` call
+    |
+243 | ).format(a, b)
+244 | 
+245 | ("{}" "{{{}}}").format(a, b)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP032
+    |
+    = help: Convert to f-string
+
+ℹ Safe fix
+242 242 |     "{{{}}}"
+243 243 | ).format(a, b)
+244 244 | 
+245     |-("{}" "{{{}}}").format(a, b)
+    245 |+(f"{a}" f"{{{b}}}")
 
 

@@ -18,7 +18,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::edits::fits_or_shrinks;
 
 use crate::rules::pyflakes::format::FormatSummary;
-use crate::rules::pyupgrade::helpers::curly_escape;
+use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
 
 /// ## What it does
 /// Checks for `str.format` calls that can be replaced with f-strings.
@@ -357,9 +357,11 @@ pub(crate) fn f_strings(
             Some((Tok::String { .. }, range)) => {
                 match try_convert_to_f_string(range, &mut summary, checker.locator()) {
                     Ok(Some(fstring)) => patches.push((range, fstring)),
-                    // Skip any strings that don't require conversion (e.g., literal segments of an
-                    // implicit concatenation).
-                    Ok(None) => continue,
+                    // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
+                    Ok(None) => patches.push((
+                        range,
+                        curly_unescape(checker.locator().slice(range)).to_string(),
+                    )),
                     // If any of the segments fail to convert, then we can't convert the entire
                     // expression.
                     Err(_) => return,
