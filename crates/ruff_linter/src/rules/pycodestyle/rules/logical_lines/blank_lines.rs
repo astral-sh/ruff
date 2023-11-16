@@ -339,6 +339,16 @@ fn is_decorator(line: Option<&LogicalLine>) -> bool {
         .map_or(false, |token| matches!(token.kind(), TokenKind::At))
 }
 
+/// Check if the given line starts with a decorator.
+/// Returns `true` if line is a docstring only line.
+fn is_docstring(line: Option<&LogicalLine>) -> bool {
+    line.is_some_and(|line| {
+        line.tokens_trimmed()
+            .iter()
+            .all(|token| matches!(token.kind(), TokenKind::String))
+    })
+}
+
 /// E301, E302, E303, E304, E305, E306
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn blank_lines(
@@ -403,6 +413,8 @@ pub(crate) fn blank_lines(
         } else if token.kind() == TokenKind::Def
             // Only applies to method.
             && tracked_vars.is_in_class
+            // The class's docstring can directly precede the first function.
+            && !is_docstring(prev_line)
             && (
                 // A comment before the def is allowed (as long as it is preceded by a blank line).
                 (line.line.preceding_blank_lines == 0 && line.line.blank_lines == 0 && prev_line.is_some_and(LogicalLine::is_comment_only))
@@ -523,6 +535,8 @@ pub(crate) fn blank_lines(
             && (tracked_vars.is_in_class || tracked_vars.is_in_fn)
             && line.line.preceding_blank_lines == 0
             && !is_decorator(prev_line)
+            // The class's docstring can directly precede the first function.
+            && !is_docstring(prev_line)
             && !prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level < indent_level)
             // Allow groups of one-liners.
             && !(tracked_vars.follows_def

@@ -12,6 +12,14 @@ class Class:
 
 
 # No error
+class Class:
+    """Docstring"""
+    def __init__(self) -> None:
+        pass
+# end
+
+
+# No error
 def func():
     pass
 # end

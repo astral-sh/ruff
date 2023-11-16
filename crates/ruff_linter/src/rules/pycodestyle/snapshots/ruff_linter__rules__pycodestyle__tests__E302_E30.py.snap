@@ -1,187 +1,187 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:303:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:311:1: E302 [*] Expected 2 blank lines, found 0
     |
-301 | # E302
-302 | """Main module."""
-303 | def fn():
+309 | # E302
+310 | """Main module."""
+311 | def fn():
     | ^^^ E302
-304 |     pass
-305 | # end
+312 |     pass
+313 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-300 300 | 
-301 301 | # E302
-302 302 | """Main module."""
-    303 |+
-    304 |+
-303 305 | def fn():
-304 306 |     pass
-305 307 | # end
-
-E30.py:310:1: E302 [*] Expected 2 blank lines, found 0
-    |
-308 | # E302
-309 | import sys
-310 | def get_sys_path():
-    | ^^^ E302
-311 |     return sys.path
-312 | # end
-    |
-    = help: Add missing blank line(s)
-
-ℹ Safe fix
-307 307 | 
-308 308 | # E302
-309 309 | import sys
-    310 |+
+308 308 | 
+309 309 | # E302
+310 310 | """Main module."""
     311 |+
-310 312 | def get_sys_path():
-311 313 |     return sys.path
-312 314 | # end
+    312 |+
+311 313 | def fn():
+312 314 |     pass
+313 315 | # end
 
-E30.py:319:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:318:1: E302 [*] Expected 2 blank lines, found 0
     |
-317 |     pass
-318 | 
-319 | def b():
+316 | # E302
+317 | import sys
+318 | def get_sys_path():
     | ^^^ E302
-320 |     pass
-321 | # end
+319 |     return sys.path
+320 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-316 316 | def a():
-317 317 |     pass
-318 318 | 
+315 315 | 
+316 316 | # E302
+317 317 | import sys
+    318 |+
     319 |+
-319 320 | def b():
-320 321 |     pass
-321 322 | # end
+318 320 | def get_sys_path():
+319 321 |     return sys.path
+320 322 | # end
 
-E30.py:330:1: E302 [*] Expected 2 blank lines, found 1
+E30.py:327:1: E302 [*] Expected 2 blank lines, found 1
     |
-328 | # comment
-329 | 
-330 | def b():
+325 |     pass
+326 | 
+327 | def b():
     | ^^^ E302
-331 |     pass
-332 | # end
+328 |     pass
+329 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-327 327 | 
-328 328 | # comment
-329 329 | 
-    330 |+
-330 331 | def b():
-331 332 |     pass
-332 333 | # end
+324 324 | def a():
+325 325 |     pass
+326 326 | 
+    327 |+
+327 328 | def b():
+328 329 |     pass
+329 330 | # end
 
-E30.py:339:7: E302 [*] Expected 2 blank lines, found 1
+E30.py:338:1: E302 [*] Expected 2 blank lines, found 1
     |
-337 |     pass
-338 | 
-339 | async def b():
+336 | # comment
+337 | 
+338 | def b():
+    | ^^^ E302
+339 |     pass
+340 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+335 335 | 
+336 336 | # comment
+337 337 | 
+    338 |+
+338 339 | def b():
+339 340 |     pass
+340 341 | # end
+
+E30.py:347:7: E302 [*] Expected 2 blank lines, found 1
+    |
+345 |     pass
+346 | 
+347 | async def b():
     |       ^^^ E302
-340 |     pass
-341 | # end
+348 |     pass
+349 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-336 336 | def a():
-337 337 |     pass
-338 338 | 
-    339 |+
-339 340 | async def b():
-340 341 |     pass
-341 342 | # end
+344 344 | def a():
+345 345 |     pass
+346 346 | 
+    347 |+
+347 348 | async def b():
+348 349 |     pass
+349 350 | # end
 
-E30.py:348:8: E302 [*] Expected 2 blank lines, found 1
+E30.py:356:8: E302 [*] Expected 2 blank lines, found 1
     |
-346 |     pass
-347 | 
-348 | async  def x(y: int = 1):
+354 |     pass
+355 | 
+356 | async  def x(y: int = 1):
     |        ^^^ E302
-349 |     pass
-350 | # end
+357 |     pass
+358 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-345 345 | async  def x():
-346 346 |     pass
-347 347 | 
-    348 |+
-348 349 | async  def x(y: int = 1):
-349 350 |     pass
-350 351 | # end
-
-E30.py:356:1: E302 [*] Expected 2 blank lines, found 0
-    |
-354 | def bar():
-355 |     pass
-356 | def baz(): pass
-    | ^^^ E302
-357 | # end
-    |
-    = help: Add missing blank line(s)
-
-ℹ Safe fix
-353 353 | # E302
-354 354 | def bar():
-355 355 |     pass
+353 353 | async  def x():
+354 354 |     pass
+355 355 | 
     356 |+
-    357 |+
-356 358 | def baz(): pass
-357 359 | # end
-358 360 | 
+356 357 | async  def x(y: int = 1):
+357 358 |     pass
+358 359 | # end
 
-E30.py:362:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:364:1: E302 [*] Expected 2 blank lines, found 0
     |
-360 | # E302
-361 | def bar(): pass
-362 | def baz():
-    | ^^^ E302
+362 | def bar():
 363 |     pass
-364 | # end
+364 | def baz(): pass
+    | ^^^ E302
+365 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-359 359 | 
-360 360 | # E302
-361 361 | def bar(): pass
-    362 |+
-    363 |+
-362 364 | def baz():
-363 365 |     pass
-364 366 | # end
+361 361 | # E302
+362 362 | def bar():
+363 363 |     pass
+    364 |+
+    365 |+
+364 366 | def baz(): pass
+365 367 | # end
+366 368 | 
 
-E30.py:372:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:370:1: E302 [*] Expected 2 blank lines, found 0
     |
-371 | # comment
-372 | @decorator
+368 | # E302
+369 | def bar(): pass
+370 | def baz():
+    | ^^^ E302
+371 |     pass
+372 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+367 367 | 
+368 368 | # E302
+369 369 | def bar(): pass
+    370 |+
+    371 |+
+370 372 | def baz():
+371 373 |     pass
+372 374 | # end
+
+E30.py:380:1: E302 [*] Expected 2 blank lines, found 0
+    |
+379 | # comment
+380 | @decorator
     | ^ E302
-373 | def g():
-374 |     pass
+381 | def g():
+382 |     pass
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-369 369 |     pass
-370 370 | 
-371 371 | # comment
-    372 |+
-    373 |+
-372 374 | @decorator
-373 375 | def g():
-374 376 |     pass
+377 377 |     pass
+378 378 | 
+379 379 | # comment
+    380 |+
+    381 |+
+380 382 | @decorator
+381 383 | def g():
+382 384 |     pass
 
 
