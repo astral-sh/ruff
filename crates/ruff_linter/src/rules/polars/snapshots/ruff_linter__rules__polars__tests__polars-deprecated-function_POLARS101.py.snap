@@ -20,6 +20,7 @@ POLARS101.py:4:5: POLARS101 [*] `pl.avg` is deprecated; use `pl.mean` instead
   4 |+    pl.mean('a')
 5 5 |     pl.map('a')
 6 6 |     pl.apply('a')
+7 7 |     pl.cumsum('a')
 
 POLARS101.py:5:5: POLARS101 [*] `pl.map` is deprecated; use `pl.map_batches` instead
   |
@@ -27,6 +28,7 @@ POLARS101.py:5:5: POLARS101 [*] `pl.map` is deprecated; use `pl.map_batches` ins
 5 |     pl.map('a')
   |     ^^^^^^ POLARS101
 6 |     pl.apply('a')
+7 |     pl.cumsum('a')
   |
   = help: Replace with `pl.map_batches`
 
@@ -37,6 +39,8 @@ POLARS101.py:5:5: POLARS101 [*] `pl.map` is deprecated; use `pl.map_batches` ins
 5   |-    pl.map('a')
   5 |+    pl.map_batches('a')
 6 6 |     pl.apply('a')
+7 7 |     pl.cumsum('a')
+8 8 |     pl.cumfold('a')
 
 POLARS101.py:6:5: POLARS101 [*] `pl.apply` is deprecated; use `pl.map_groups` instead
   |
@@ -44,6 +48,8 @@ POLARS101.py:6:5: POLARS101 [*] `pl.apply` is deprecated; use `pl.map_groups` in
 5 |     pl.map('a')
 6 |     pl.apply('a')
   |     ^^^^^^^^ POLARS101
+7 |     pl.cumsum('a')
+8 |     pl.cumfold('a')
   |
   = help: Replace with `pl.map_groups`
 
@@ -53,5 +59,83 @@ POLARS101.py:6:5: POLARS101 [*] `pl.apply` is deprecated; use `pl.map_groups` in
 5 5 |     pl.map('a')
 6   |-    pl.apply('a')
   6 |+    pl.map_groups('a')
+7 7 |     pl.cumsum('a')
+8 8 |     pl.cumfold('a')
+9 9 |     pl.cumreduce('a')
+
+POLARS101.py:7:5: POLARS101 [*] `pl.cumsum` is deprecated; use `pl.cum_sum` instead
+  |
+5 |     pl.map('a')
+6 |     pl.apply('a')
+7 |     pl.cumsum('a')
+  |     ^^^^^^^^^ POLARS101
+8 |     pl.cumfold('a')
+9 |     pl.cumreduce('a')
+  |
+  = help: Replace with `pl.cum_sum`
+
+ℹ Safe fix
+4 4 |     pl.avg('a')
+5 5 |     pl.map('a')
+6 6 |     pl.apply('a')
+7   |-    pl.cumsum('a')
+  7 |+    pl.cum_sum('a')
+8 8 |     pl.cumfold('a')
+9 9 |     pl.cumreduce('a')
+10 10 |     pl.cumsum_horizontal('a')
+
+POLARS101.py:8:5: POLARS101 [*] `pl.cumfold` is deprecated; use `pl.cum_fold` instead
+   |
+ 6 |     pl.apply('a')
+ 7 |     pl.cumsum('a')
+ 8 |     pl.cumfold('a')
+   |     ^^^^^^^^^^ POLARS101
+ 9 |     pl.cumreduce('a')
+10 |     pl.cumsum_horizontal('a')
+   |
+   = help: Replace with `pl.cum_fold`
+
+ℹ Safe fix
+5 5 |     pl.map('a')
+6 6 |     pl.apply('a')
+7 7 |     pl.cumsum('a')
+8   |-    pl.cumfold('a')
+  8 |+    pl.cum_fold('a')
+9 9 |     pl.cumreduce('a')
+10 10 |     pl.cumsum_horizontal('a')
+
+POLARS101.py:9:5: POLARS101 [*] `pl.cumreduce` is deprecated; use `pl.cum_reduce` instead
+   |
+ 7 |     pl.cumsum('a')
+ 8 |     pl.cumfold('a')
+ 9 |     pl.cumreduce('a')
+   |     ^^^^^^^^^^^^ POLARS101
+10 |     pl.cumsum_horizontal('a')
+   |
+   = help: Replace with `pl.cum_reduce`
+
+ℹ Safe fix
+6  6  |     pl.apply('a')
+7  7  |     pl.cumsum('a')
+8  8  |     pl.cumfold('a')
+9     |-    pl.cumreduce('a')
+   9  |+    pl.cum_reduce('a')
+10 10 |     pl.cumsum_horizontal('a')
+
+POLARS101.py:10:5: POLARS101 [*] `pl.cumsum_horizontal` is deprecated; use `pl.cum_sum_horizontal` instead
+   |
+ 8 |     pl.cumfold('a')
+ 9 |     pl.cumreduce('a')
+10 |     pl.cumsum_horizontal('a')
+   |     ^^^^^^^^^^^^^^^^^^^^ POLARS101
+   |
+   = help: Replace with `pl.cum_sum_horizontal`
+
+ℹ Safe fix
+7  7  |     pl.cumsum('a')
+8  8  |     pl.cumfold('a')
+9  9  |     pl.cumreduce('a')
+10    |-    pl.cumsum_horizontal('a')
+   10 |+    pl.cum_sum_horizontal('a')
 
 

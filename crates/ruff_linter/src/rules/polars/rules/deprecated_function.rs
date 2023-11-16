@@ -7,12 +7,12 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 
 /// ## What it does
-/// Checks for uses of deprecated polars functions.
+/// Replaces deprecated 0.19.x Polars functions with the newer 1.x versions.
 ///
 /// ## Why is this bad?
-/// When polars functions are deprecated, they are usually replaced with
+/// When Polars functions are deprecated, they are usually replaced with
 /// newer, more efficient versions, or with functions that are more
-/// consistent with the rest of the polars API.
+/// consistent with the rest of the Polars API.
 ///
 /// Prefer newer APIs over deprecated ones.
 ///
@@ -28,19 +28,6 @@ use crate::importer::ImportRequest;
 /// import polars as pl
 ///
 /// pl.mean("a")
-/// ```
-/// ## Examples
-/// ```python
-/// import numpy as np
-///
-/// np.alltrue([True, False])
-/// ```
-///
-/// Use instead:
-/// ```python
-/// import numpy as np
-///
-/// np.all([True, False])
 /// ```
 #[violation]
 pub struct PolarsDeprecatedFunction {
@@ -76,6 +63,12 @@ pub(crate) fn deprecated_function(checker: &mut Checker, expr: &Expr) {
                 ["polars", "avg"] => Some(("avg", "mean")),
                 ["polars", "map"] => Some(("map", "map_batches")),
                 ["polars", "apply"] => Some(("apply", "map_groups")),
+                ["polars", "cumsum"] => Some(("cumsum", "cum_sum")),
+                ["polars", "cumfold"] => Some(("cumfold", "cum_fold")),
+                ["polars", "cumreduce"] => Some(("cumreduce", "cum_reduce")),
+                ["polars", "cumsum_horizontal"] => {
+                    Some(("cumsum_horizontal", "cum_sum_horizontal"))
+                }
                 _ => None,
             })
     {
