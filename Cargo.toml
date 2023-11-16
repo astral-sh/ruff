@@ -60,7 +60,7 @@ unsafe_code = "warn"
 unreachable_pub = "warn"
 
 [workspace.lints.clippy]
-pedantic = "warn"
+pedantic = { level = "warn", priority = -1 }
 # Allowed pedantic lints
 char_lit_as_u8 = "allow"
 collapsible_else_if = "allow"
