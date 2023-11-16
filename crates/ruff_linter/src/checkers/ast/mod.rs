@@ -54,7 +54,7 @@ use ruff_python_semantic::{
     ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, Snapshot,
     StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::deferred::Deferred;
@@ -1592,9 +1592,16 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        for builtin in BUILTINS
+        for builtin in PYTHON_BUILTINS
             .iter()
             .chain(MAGIC_GLOBALS.iter())
+            .chain(
+                self.source_type
+                    .is_ipynb()
+                    .then_some(IPYTHON_BUILTINS)
+                    .into_iter()
+                    .flatten(),
+            )
             .copied()
             .chain(self.settings.builtins.iter().map(String::as_str))
         {

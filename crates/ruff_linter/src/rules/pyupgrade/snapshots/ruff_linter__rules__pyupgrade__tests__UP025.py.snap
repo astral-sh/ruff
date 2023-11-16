@@ -248,4 +248,37 @@ UP025.py:19:5: UP025 [*] Remove unicode literals from strings
 21 21 | # These should not change
 22 22 | u = "Hello"
 
+UP025.py:29:7: UP025 [*] Remove unicode literals from strings
+   |
+27 |     return"Hello"
+28 | 
+29 | f"foo"u"bar"
+   |       ^^^^^^ UP025
+30 | f"foo" u"bar"
+   |
+   = help: Remove unicode prefix
+
+ℹ Safe fix
+26 26 | def hello():
+27 27 |     return"Hello"
+28 28 | 
+29    |-f"foo"u"bar"
+   29 |+f"foo""bar"
+30 30 | f"foo" u"bar"
+
+UP025.py:30:8: UP025 [*] Remove unicode literals from strings
+   |
+29 | f"foo"u"bar"
+30 | f"foo" u"bar"
+   |        ^^^^^^ UP025
+   |
+   = help: Remove unicode prefix
+
+ℹ Safe fix
+27 27 |     return"Hello"
+28 28 | 
+29 29 | f"foo"u"bar"
+30    |-f"foo" u"bar"
+   30 |+f"foo" "bar"
+
 

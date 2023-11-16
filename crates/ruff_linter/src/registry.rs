@@ -300,6 +300,7 @@ impl Rule {
             | Rule::TabIndentation
             | Rule::TrailingCommaOnBareTuple
             | Rule::TypeCommentInStub
+            | Rule::UnicodeKindPrefix
             | Rule::UselessSemicolon
             | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
