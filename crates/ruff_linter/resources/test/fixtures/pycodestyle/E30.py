@@ -302,6 +302,15 @@ if True:
 # end
 
 
+# no error
+@decorator
+# comment
+@decorator
+def function():
+    pass
+# end
+
+
 # E301
 class Class(object):
 

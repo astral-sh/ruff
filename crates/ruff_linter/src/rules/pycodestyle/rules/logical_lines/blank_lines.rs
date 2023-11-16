@@ -443,7 +443,7 @@ pub(crate) fn blank_lines(
         } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class | TokenKind::At)
             && !(
                 // Allow decorators.
-                is_decorator(prev_line)
+                tracked_vars.follows_decorator
                 // Allow groups of one-liners.
                 || (tracked_vars.follows_def
                     && line
@@ -589,6 +589,9 @@ pub(crate) fn blank_lines(
             TokenKind::Async => {
                 tracked_vars.follows_decorator = false;
                 tracked_vars.follows_def = false;
+            }
+            TokenKind::Comment => {
+                break;
             }
             _ => {
                 tracked_vars.follows_decorator = false;
