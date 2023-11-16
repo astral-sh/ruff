@@ -46,6 +46,9 @@ ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_python_index = { path = "../ruff_python_index" }
 ruff_python_parser = { path = "../ruff_python_parser" }
 
+[lints]
+workspace = true
+
 [features]
 codspeed = ["codspeed-criterion-compat"]
 

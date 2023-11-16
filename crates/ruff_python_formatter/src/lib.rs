@@ -183,17 +183,17 @@ mod tests {
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
     fn basic() -> Result<()> {
-        let input = r#"
+        let input = r"
 # preceding
 if    True:
     pass
 # trailing
-"#;
-        let expected = r#"# preceding
+";
+        let expected = r"# preceding
 if True:
     pass
 # trailing
-"#;
+";
         let actual = format_module_source(input, PyFormatOptions::default())?
             .as_code()
             .to_string();
@@ -241,11 +241,11 @@ def main() -> None:
 
         assert_eq!(
             printed.as_code(),
-            r#"for converter in connection.ops.get_db_converters(
+            r"for converter in connection.ops.get_db_converters(
     expression
 ) + expression.get_db_converters(connection):
     ...
-"#
+"
         );
     }
 
@@ -304,9 +304,9 @@ def main() -> None:
 
         // 77 after g group (leading quote)
         let fits =
-            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h"#;
+            r"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h";
         let breaks =
-            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg hh"#;
+            r"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg hh";
 
         let output = format!(
             SimpleFormatContext::default(),

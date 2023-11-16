@@ -685,7 +685,7 @@ mod tests {
     use crate::PyFormatOptions;
 
     fn format_suite(level: SuiteKind) -> String {
-        let source = r#"
+        let source = r"
 a = 10
 
 
@@ -704,7 +704,7 @@ def func():
     pass
 def trailing_func():
     pass
-"#;
+";
 
         let statements = parse_suite(source, "test.py").unwrap();
 
@@ -730,7 +730,7 @@ def trailing_func():
 
         assert_eq!(
             formatted,
-            r#"a = 10
+            r"a = 10
 
 
 three_leading_newlines = 80
@@ -755,7 +755,7 @@ def func():
 
 def trailing_func():
     pass
-"#
+"
         );
     }
 
@@ -765,7 +765,7 @@ def trailing_func():
 
         assert_eq!(
             formatted,
-            r#"a = 10
+            r"a = 10
 
 three_leading_newlines = 80
 
@@ -784,7 +784,7 @@ def func():
 
 def trailing_func():
     pass
-"#
+"
         );
     }
 }

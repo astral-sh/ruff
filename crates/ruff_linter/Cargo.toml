@@ -86,3 +86,6 @@ default = []
 schemars = ["dep:schemars"]
 # Enables the UnreachableCode rule
 unreachable-code = []
+
+[lints]
+workspace = true

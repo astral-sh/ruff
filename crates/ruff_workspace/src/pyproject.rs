@@ -169,21 +169,21 @@ mod tests {
     #[test]
 
     fn deserialize() -> Result<()> {
-        let pyproject: Pyproject = toml::from_str(r#""#)?;
+        let pyproject: Pyproject = toml::from_str(r"")?;
         assert_eq!(pyproject.tool, None);
 
         let pyproject: Pyproject = toml::from_str(
-            r#"
+            r"
 [tool.black]
-"#,
+",
         )?;
         assert_eq!(pyproject.tool, Some(Tools { ruff: None }));
 
         let pyproject: Pyproject = toml::from_str(
-            r#"
+            r"
 [tool.black]
 [tool.ruff]
-"#,
+",
         )?;
         assert_eq!(
             pyproject.tool,
@@ -193,11 +193,11 @@ mod tests {
         );
 
         let pyproject: Pyproject = toml::from_str(
-            r#"
+            r"
 [tool.black]
 [tool.ruff]
 line-length = 79
-"#,
+",
         )?;
         assert_eq!(
             pyproject.tool,
@@ -275,11 +275,11 @@ ignore = ["E501"]
         );
 
         assert!(toml::from_str::<Pyproject>(
-            r#"
+            r"
 [tool.black]
 [tool.ruff]
 line_length = 79
-"#,
+",
         )
         .is_err());
 
@@ -293,12 +293,12 @@ select = ["E123"]
         .is_err());
 
         assert!(toml::from_str::<Pyproject>(
-            r#"
+            r"
 [tool.black]
 [tool.ruff]
 line-length = 79
 other-attribute = 1
-"#,
+",
         )
         .is_err());
 

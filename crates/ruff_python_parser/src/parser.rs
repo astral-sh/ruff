@@ -741,12 +741,12 @@ array[3:5, *indexes_to_select]
     #[test]
     fn test_try() {
         let parse_ast = parse_suite(
-            r#"try:
+            r"try:
     raise ValueError(1)
 except TypeError as e:
     print(f'caught {type(e)}')
 except OSError as e:
-    print(f'caught {type(e)}')"#,
+    print(f'caught {type(e)}')",
             "<test>",
         )
         .unwrap();
@@ -865,7 +865,7 @@ x = type = 1
 
     #[test]
     fn numeric_literals() {
-        let source = r#"x = 123456789
+        let source = r"x = 123456789
 x = 123456
 x = .1
 x = 1.
@@ -883,14 +883,14 @@ x = 0O777
 x = 0.000000006
 x = 10000
 x = 133333
-"#;
+";
 
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
     fn numeric_literals_attribute_access() {
-        let source = r#"x = .1.is_integer()
+        let source = r"x = .1.is_integer()
 x = 1. .imag
 x = 1E+1.imag
 x = 1E-1.real
@@ -910,7 +910,7 @@ if 10 .real:
 
 y = 100[no]
 y = 100(no)
-"#;
+";
         assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
@@ -1173,9 +1173,9 @@ match x:
     #[test]
     fn test_variadic_generics() {
         let parse_ast = parse_suite(
-            r#"
+            r"
 def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
-"#,
+",
             "<test>",
         )
         .unwrap();
@@ -1185,7 +1185,7 @@ def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
     #[test]
     fn decorator_ranges() {
         let parse_ast = parse_suite(
-            r#"
+            r"
 @my_decorator
 def test():
     pass
@@ -1193,7 +1193,7 @@ def test():
 @class_decorator
 class Abcd:
     pass
-"#
+"
             .trim(),
             "<test>",
         )
@@ -1280,10 +1280,10 @@ foo.bar[0].baz[2].egg??
 
     #[test]
     fn test_ipython_escape_command_parse_error() {
-        let source = r#"
+        let source = r"
 a = 1
 %timeit a == 1
-    "#
+    "
         .trim();
         let lxr = lexer::lex_starts_at(source, Mode::Ipython, TextSize::default());
         let parse_err = parse_tokens(lxr, source, Mode::Module, "<test>").unwrap_err();

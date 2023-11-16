@@ -16,3 +16,6 @@ ruff_text_size = { path = "../ruff_text_size" }
 shlex = "1.2.0"
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+[lints]
+workspace = true

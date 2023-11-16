@@ -1473,7 +1473,7 @@ mod tests {
         assert_round_trip!("return await (await bar())");
         assert_round_trip!("(5).foo");
         assert_round_trip!(r#"our_dict = {"a": 1, **{"b": 2, "c": 3}}"#);
-        assert_round_trip!(r#"j = [1, 2, 3]"#);
+        assert_round_trip!(r"j = [1, 2, 3]");
         assert_round_trip!(
             r#"def test(a1, a2, b1=j, b2="123", b3={}, b4=[]):
     pass"#
@@ -1511,32 +1511,32 @@ mod tests {
     pass"#
         );
         assert_round_trip!(
-            r#"class Foo(Bar, object):
-    pass"#
+            r"class Foo(Bar, object):
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[T]:
-    pass"#
+            r"class Foo[T]:
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[T](Bar):
-    pass"#
+            r"class Foo[T](Bar):
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[*Ts]:
-    pass"#
+            r"class Foo[*Ts]:
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[**P]:
-    pass"#
+            r"class Foo[**P]:
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[T, U, *Ts, **P]:
-    pass"#
+            r"class Foo[T, U, *Ts, **P]:
+    pass"
         );
         assert_round_trip!(
-            r#"def f() -> (int, str):
-    pass"#
+            r"def f() -> (int, str):
+    pass"
         );
         assert_round_trip!("[await x async for x in y]");
         assert_round_trip!("[await i for i in b if await c]");
@@ -1550,102 +1550,102 @@ mod tests {
             return datum"#
         );
         assert_round_trip!(
-            r#"def f() -> (int, int):
-    pass"#
+            r"def f() -> (int, int):
+    pass"
         );
         assert_round_trip!(
-            r#"def test(a, b, /, c, *, d, **kwargs):
-    pass"#
+            r"def test(a, b, /, c, *, d, **kwargs):
+    pass"
         );
         assert_round_trip!(
-            r#"def test(a=3, b=4, /, c=7):
-    pass"#
+            r"def test(a=3, b=4, /, c=7):
+    pass"
         );
         assert_round_trip!(
-            r#"def test(a, b=4, /, c=8, d=9):
-    pass"#
+            r"def test(a, b=4, /, c=8, d=9):
+    pass"
         );
         assert_round_trip!(
-            r#"def test[T]():
-    pass"#
+            r"def test[T]():
+    pass"
         );
         assert_round_trip!(
-            r#"def test[*Ts]():
-    pass"#
+            r"def test[*Ts]():
+    pass"
         );
         assert_round_trip!(
-            r#"def test[**P]():
-    pass"#
+            r"def test[**P]():
+    pass"
         );
         assert_round_trip!(
-            r#"def test[T, U, *Ts, **P]():
-    pass"#
+            r"def test[T, U, *Ts, **P]():
+    pass"
         );
         assert_round_trip!(
-            r#"def call(*popenargs, timeout=None, **kwargs):
-    pass"#
+            r"def call(*popenargs, timeout=None, **kwargs):
+    pass"
         );
         assert_round_trip!(
-            r#"@functools.lru_cache(maxsize=None)
+            r"@functools.lru_cache(maxsize=None)
 def f(x: int, y: int) -> int:
-    return x + y"#
+    return x + y"
         );
         assert_round_trip!(
-            r#"try:
+            r"try:
     pass
 except Exception as e:
-    pass"#
+    pass"
         );
         assert_round_trip!(
-            r#"try:
+            r"try:
     pass
 except* Exception as e:
-    pass"#
+    pass"
         );
         assert_round_trip!(
-            r#"match x:
+            r"match x:
     case [1, 2, 3]:
         return 2
     case 4 as y:
-        return y"#
+        return y"
         );
-        assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
-        assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);
+        assert_eq!(round_trip(r"x = (1, 2, 3)"), r"x = 1, 2, 3");
+        assert_eq!(round_trip(r"-(1) + ~(2) + +(3)"), r"-1 + ~2 + +3");
         assert_round_trip!(
-            r#"def f():
+            r"def f():
 
     def f():
-        pass"#
+        pass"
         );
         assert_round_trip!(
-            r#"@foo
+            r"@foo
 def f():
 
     @foo
     def f():
-        pass"#
+        pass"
         );
 
         assert_round_trip!(
-            r#"@foo
+            r"@foo
 class Foo:
 
     @foo
     def f():
-        pass"#
+        pass"
         );
 
-        assert_round_trip!(r#"[lambda n: n for n in range(10)]"#);
-        assert_round_trip!(r#"[n[0:2] for n in range(10)]"#);
-        assert_round_trip!(r#"[n[0] for n in range(10)]"#);
-        assert_round_trip!(r#"[(n, n * 2) for n in range(10)]"#);
-        assert_round_trip!(r#"[1 if n % 2 == 0 else 0 for n in range(10)]"#);
-        assert_round_trip!(r#"[n % 2 == 0 or 0 for n in range(10)]"#);
-        assert_round_trip!(r#"[(n := 2) for n in range(10)]"#);
-        assert_round_trip!(r#"((n := 2) for n in range(10))"#);
-        assert_round_trip!(r#"[n * 2 for n in range(10)]"#);
-        assert_round_trip!(r#"{n * 2 for n in range(10)}"#);
-        assert_round_trip!(r#"{i: n * 2 for i, n in enumerate(range(10))}"#);
+        assert_round_trip!(r"[lambda n: n for n in range(10)]");
+        assert_round_trip!(r"[n[0:2] for n in range(10)]");
+        assert_round_trip!(r"[n[0] for n in range(10)]");
+        assert_round_trip!(r"[(n, n * 2) for n in range(10)]");
+        assert_round_trip!(r"[1 if n % 2 == 0 else 0 for n in range(10)]");
+        assert_round_trip!(r"[n % 2 == 0 or 0 for n in range(10)]");
+        assert_round_trip!(r"[(n := 2) for n in range(10)]");
+        assert_round_trip!(r"((n := 2) for n in range(10))");
+        assert_round_trip!(r"[n * 2 for n in range(10)]");
+        assert_round_trip!(r"{n * 2 for n in range(10)}");
+        assert_round_trip!(r"{i: n * 2 for i, n in enumerate(range(10))}");
         assert_round_trip!(
             "class SchemaItem(NamedTuple):
     fields: ((\"property_key\", str),)"
@@ -1659,25 +1659,25 @@ class Foo:
         assert_round_trip!("x += (i := 1)");
 
         // Type aliases
-        assert_round_trip!(r#"type Foo = int | str"#);
-        assert_round_trip!(r#"type Foo[T] = list[T]"#);
-        assert_round_trip!(r#"type Foo[*Ts] = ..."#);
-        assert_round_trip!(r#"type Foo[**P] = ..."#);
-        assert_round_trip!(r#"type Foo[T, U, *Ts, **P] = ..."#);
+        assert_round_trip!(r"type Foo = int | str");
+        assert_round_trip!(r"type Foo[T] = list[T]");
+        assert_round_trip!(r"type Foo[*Ts] = ...");
+        assert_round_trip!(r"type Foo[**P] = ...");
+        assert_round_trip!(r"type Foo[T, U, *Ts, **P] = ...");
         // https://github.com/astral-sh/ruff/issues/6498
-        assert_round_trip!(r#"f(a=1, *args, **kwargs)"#);
-        assert_round_trip!(r#"f(*args, a=1, **kwargs)"#);
-        assert_round_trip!(r#"f(*args, a=1, *args2, **kwargs)"#);
+        assert_round_trip!(r"f(a=1, *args, **kwargs)");
+        assert_round_trip!(r"f(*args, a=1, **kwargs)");
+        assert_round_trip!(r"f(*args, a=1, *args2, **kwargs)");
         assert_round_trip!("class A(*args, a=2, *args2, **kwargs):\n    pass");
     }
 
     #[test]
     fn quote() {
         assert_eq!(round_trip(r#""hello""#), r#""hello""#);
-        assert_eq!(round_trip(r#"'hello'"#), r#""hello""#);
-        assert_eq!(round_trip(r#"u'hello'"#), r#"u"hello""#);
-        assert_eq!(round_trip(r#"r'hello'"#), r#""hello""#);
-        assert_eq!(round_trip(r#"b'hello'"#), r#"b"hello""#);
+        assert_eq!(round_trip(r"'hello'"), r#""hello""#);
+        assert_eq!(round_trip(r"u'hello'"), r#"u"hello""#);
+        assert_eq!(round_trip(r"r'hello'"), r#""hello""#);
+        assert_eq!(round_trip(r"b'hello'"), r#"b"hello""#);
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abcdefghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
@@ -1697,16 +1697,16 @@ class Foo:
     fn indent() {
         assert_eq!(
             round_trip(
-                r#"
+                r"
 if True:
   pass
-"#
+"
                 .trim(),
             ),
-            r#"
+            r"
 if True:
     pass
-"#
+"
             .trim()
             .replace('\n', LineEnding::default().as_str())
         );
@@ -1730,14 +1730,14 @@ if True:
                 LineEnding::default(),
                 r#""hello""#
             ),
-            r#"'hello'"#
+            r"'hello'"
         );
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
                 Quote::Double,
                 LineEnding::default(),
-                r#"'hello'"#
+                r"'hello'"
             ),
             r#""hello""#
         );
@@ -1746,9 +1746,9 @@ if True:
                 &Indentation::default(),
                 Quote::Single,
                 LineEnding::default(),
-                r#"'hello'"#
+                r"'hello'"
             ),
-            r#"'hello'"#
+            r"'hello'"
         );
     }
 
@@ -1759,16 +1759,16 @@ if True:
                 &Indentation::new("    ".to_string()),
                 Quote::default(),
                 LineEnding::default(),
-                r#"
+                r"
 if True:
   pass
-"#
+"
                 .trim(),
             ),
-            r#"
+            r"
 if True:
     pass
-"#
+"
             .trim()
             .replace('\n', LineEnding::default().as_str())
         );
@@ -1777,16 +1777,16 @@ if True:
                 &Indentation::new("  ".to_string()),
                 Quote::default(),
                 LineEnding::default(),
-                r#"
+                r"
 if True:
   pass
-"#
+"
                 .trim(),
             ),
-            r#"
+            r"
 if True:
   pass
-"#
+"
             .trim()
             .replace('\n', LineEnding::default().as_str())
         );
@@ -1795,16 +1795,16 @@ if True:
                 &Indentation::new("\t".to_string()),
                 Quote::default(),
                 LineEnding::default(),
-                r#"
+                r"
 if True:
   pass
-"#
+"
                 .trim(),
             ),
-            r#"
+            r"
 if True:
 	pass
-"#
+"
             .trim()
             .replace('\n', LineEnding::default().as_str())
         );

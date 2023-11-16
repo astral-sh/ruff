@@ -395,9 +395,9 @@ fn deprecated_options() -> Result<()> {
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
-        r#"
+        r"
 tab-size = 2
-"#,
+",
     )?;
 
     insta::with_settings!({filters => vec![
@@ -407,10 +407,10 @@ tab-size = 2
             .args(["format", "--config"])
             .arg(&ruff_toml)
             .arg("-")
-            .pass_stdin(r#"
+            .pass_stdin(r"
 if True:
     pass
-    "#), @r###"
+    "), @r###"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -443,9 +443,9 @@ format = "json"
             .args(["check", "--select", "F401", "--no-cache", "--config"])
             .arg(&ruff_toml)
             .arg("-")
-            .pass_stdin(r#"
+            .pass_stdin(r"
     import os
-    "#), @r###"
+    "), @r###"
         success: false
         exit_code: 2
         ----- stdout -----
