@@ -340,6 +340,7 @@ fn is_decorator(line: Option<&LogicalLine>) -> bool {
 }
 
 /// E301, E302, E303, E304, E305, E306
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn blank_lines(
     line: &LogicalLine,
     prev_line: Option<&LogicalLine>,
@@ -351,8 +352,10 @@ pub(crate) fn blank_lines(
     stylist: &Stylist,
     context: &mut LogicalLinesContext,
 ) {
+    let line_is_comment_only = line.is_comment_only();
+
     if tracked_vars.is_first_logical_line {
-        if !line.is_comment_only() {
+        if !line_is_comment_only {
             tracked_vars.is_first_logical_line = false;
         }
         // Don't expect blank lines before the first line non comment line.
@@ -362,7 +365,7 @@ pub(crate) fn blank_lines(
     let mut follows_class_or_fn = false;
     if indent_level < tracked_vars.class_indent_level && tracked_vars.is_in_class {
         tracked_vars.is_in_class = false;
-        if line.is_comment_only() {
+        if line_is_comment_only {
             tracked_vars.follows_comment_after_class = true;
         } else {
             follows_class_or_fn = true;
@@ -371,14 +374,16 @@ pub(crate) fn blank_lines(
 
     if indent_level < tracked_vars.fn_indent_level && tracked_vars.is_in_fn {
         tracked_vars.is_in_fn = false;
-        if line.is_comment_only() {
+        if line_is_comment_only {
             tracked_vars.follows_comment_after_fn = true;
         } else {
             follows_class_or_fn = true;
         }
     }
 
-    if tracked_vars.follows_comment_after_fn && !line.is_comment_only() {
+    // A comment can be de-indented while still being in a class/function, in that case
+    // we need to revert the variables.
+    if tracked_vars.follows_comment_after_fn && !line_is_comment_only {
         if indent_level == tracked_vars.fn_indent_level {
             tracked_vars.is_in_fn = true;
         } else {
@@ -387,7 +392,7 @@ pub(crate) fn blank_lines(
         tracked_vars.follows_comment_after_fn = false;
     }
 
-    if tracked_vars.follows_comment_after_class && !line.is_comment_only() {
+    if tracked_vars.follows_comment_after_class && !line_is_comment_only {
         if indent_level == tracked_vars.class_indent_level {
             tracked_vars.is_in_class = true;
         } else {
@@ -422,7 +427,7 @@ pub(crate) fn blank_lines(
             // E301
             let mut diagnostic =
                 Diagnostic::new(BlankLineBetweenMethods(line.line.blank_lines), token.range);
-            // TODO: in the case where there is a comment between two methods, make the comment "stick"
+            // TODO: In the case where there is a comment between two methods, make the comment "stick"
             // to the second method instead of the first.
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 stylist.line_ending().as_str().to_string(),
@@ -444,13 +449,13 @@ pub(crate) fn blank_lines(
                     || tracked_vars.is_in_class
                     || tracked_vars.is_in_fn
                 // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
-                    || (line.line.preceding_blank_lines >= 2 && prev_line.map_or(false, LogicalLine::is_comment_only))
+                    || (line.line.preceding_blank_lines >= BlankLinesConfig::TOP_LEVEL && prev_line.map_or(false, LogicalLine::is_comment_only))
             )
         // Allow directly following an except.
             && prev_line
             .and_then(|prev_line| prev_line.tokens_trimmed().first())
             .map_or(true, |token| !matches!(token.kind(), TokenKind::Except))
-            && line.line.blank_lines < 2
+            && line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
             && prev_line.is_some()
         {
             // E302
@@ -461,9 +466,10 @@ pub(crate) fn blank_lines(
                     .line_ending()
                     .as_str()
                     .to_string()
-                    .repeat(2 - line.line.blank_lines as usize),
+                    .repeat((BlankLinesConfig::TOP_LEVEL - line.line.blank_lines) as usize),
                 locator.line_start(token.range.start()),
             )));
+
             context.push_diagnostic(diagnostic);
         } else if line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
             || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
@@ -493,11 +499,12 @@ pub(crate) fn blank_lines(
                     - TextSize::new(line.line.preceding_blank_characters),
                 locator.line_start(range.start()),
             )));
+
             context.push_diagnostic(diagnostic);
         } else if line.line.preceding_blank_lines < BlankLinesConfig::TOP_LEVEL
             && follows_class_or_fn
             && indent_level == 0
-            && !line.is_comment_only()
+            && !line_is_comment_only
             && !matches!(
                 token.kind(),
                 TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async
@@ -508,14 +515,16 @@ pub(crate) fn blank_lines(
                 BlankLinesAfterFunctionOrClass(line.line.blank_lines),
                 token.range,
             );
+
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 stylist
                     .line_ending()
                     .as_str()
                     .to_string()
-                    .repeat(2 - line.line.blank_lines as usize),
+                    .repeat((BlankLinesConfig::TOP_LEVEL - line.line.blank_lines) as usize),
                 locator.line_start(token.range.start()),
             )));
+
             context.push_diagnostic(diagnostic);
         } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
             && (tracked_vars.is_in_class || tracked_vars.is_in_fn)
@@ -535,6 +544,7 @@ pub(crate) fn blank_lines(
                 BlankLinesBeforeNestedDefinition(line.line.blank_lines),
                 token.range,
             );
+
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 stylist.line_ending().as_str().to_string(),
                 locator.line_start(token.range.start()),
