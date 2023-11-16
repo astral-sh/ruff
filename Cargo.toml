@@ -60,7 +60,7 @@ unsafe_code = "warn"
 unreachable_pub = "warn"
 
 [workspace.lints.clippy]
-pedantic = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -2 }
 # Allowed pedantic lints
 char_lit_as_u8 = "allow"
 collapsible_else_if = "allow"
@@ -73,6 +73,8 @@ module_name_repetitions = "allow"
 must_use_candidate = "allow"
 similar_names = "allow"
 too_many_lines = "allow"
+# To allow `#[allow(clippy::all)]` in `crates/ruff_python_parser/src/python.rs`.
+needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
 print_stdout = "warn"
 print_stderr = "warn"
