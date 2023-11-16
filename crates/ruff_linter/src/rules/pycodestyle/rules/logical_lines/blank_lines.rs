@@ -454,7 +454,6 @@ pub(crate) fn blank_lines(
             .and_then(|prev_line| prev_line.tokens_trimmed().first())
             .map_or(true, |token| !matches!(token.kind(), TokenKind::Except))
             && line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
-            && prev_line.is_some()
         {
             // E302
             let mut diagnostic =
