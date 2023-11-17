@@ -1,0 +1,67 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB152.py:3:5: FURB152 [*] Replace `3.14` with `math.pi`
+  |
+1 | r = 3.1  # OK
+2 | 
+3 | A = 3.14 * r ** 2  # FURB152
+  |     ^^^^ FURB152
+4 | 
+5 | C = 6.28 * r  # FURB152
+  |
+  = help: Use `math.pi`
+
+ℹ Safe fix
+  1 |+import math
+1 2 | r = 3.1  # OK
+2 3 | 
+3   |-A = 3.14 * r ** 2  # FURB152
+  4 |+A = math.pi * r ** 2  # FURB152
+4 5 | 
+5 6 | C = 6.28 * r  # FURB152
+6 7 | 
+
+FURB152.py:5:5: FURB152 [*] Replace `6.28` with `math.tau`
+  |
+3 | A = 3.14 * r ** 2  # FURB152
+4 | 
+5 | C = 6.28 * r  # FURB152
+  |     ^^^^ FURB152
+6 | 
+7 | e = 2.71  # FURB152
+  |
+  = help: Use `math.tau`
+
+ℹ Safe fix
+  1 |+import math
+1 2 | r = 3.1  # OK
+2 3 | 
+3 4 | A = 3.14 * r ** 2  # FURB152
+4 5 | 
+5   |-C = 6.28 * r  # FURB152
+  6 |+C = math.tau * r  # FURB152
+6 7 | 
+7 8 | e = 2.71  # FURB152
+
+FURB152.py:7:5: FURB152 [*] Replace `2.71` with `math.e`
+  |
+5 | C = 6.28 * r  # FURB152
+6 | 
+7 | e = 2.71  # FURB152
+  |     ^^^^ FURB152
+  |
+  = help: Use `math.e`
+
+ℹ Safe fix
+  1 |+import math
+1 2 | r = 3.1  # OK
+2 3 | 
+3 4 | A = 3.14 * r ** 2  # FURB152
+4 5 | 
+5 6 | C = 6.28 * r  # FURB152
+6 7 | 
+7   |-e = 2.71  # FURB152
+  8 |+e = math.e  # FURB152
+
+
