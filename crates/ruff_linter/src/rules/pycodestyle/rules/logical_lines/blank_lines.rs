@@ -415,6 +415,8 @@ pub(crate) fn blank_lines(
             && tracked_vars.is_in_class
             // The class's docstring can directly precede the first function.
             && !is_docstring(prev_line)
+            // Do not trigger when then def follows an if/while/etc...
+            && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
             && (
                 // A comment before the def is allowed (as long as it is preceded by a blank line).
                 (line.line.preceding_blank_lines == 0 && line.line.blank_lines == 0 && prev_line.is_some_and(LogicalLine::is_comment_only))
@@ -425,7 +427,7 @@ pub(crate) fn blank_lines(
                     .map_or(false, |token| {
                         !matches!(
                             token.kind(),
-                            TokenKind::Def | TokenKind::Class | TokenKind::At
+                            TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async
                         )
                     })
             )

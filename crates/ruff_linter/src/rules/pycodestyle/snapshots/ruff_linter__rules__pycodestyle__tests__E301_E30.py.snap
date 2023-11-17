@@ -1,24 +1,24 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:319:5: E301 [*] Expected 1 blank line, found 0
+E30.py:328:5: E301 [*] Expected 1 blank line, found 0
     |
-317 |     def func1():
-318 |         pass
-319 |     def func2():
+326 |     def func1():
+327 |         pass
+328 |     def func2():
     |     ^^^ E301
-320 |         pass
-321 | # end
+329 |         pass
+330 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-316 316 | 
-317 317 |     def func1():
-318 318 |         pass
-    319 |+
-319 320 |     def func2():
-320 321 |         pass
-321 322 | # end
+325 325 | 
+326 326 |     def func1():
+327 327 |         pass
+    328 |+
+328 329 |     def func2():
+329 330 |         pass
+330 331 | # end
 
 

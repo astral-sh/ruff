@@ -311,6 +311,15 @@ def function():
 # end
 
 
+# no error
+class Class:
+    def method(self):
+        if True:
+            def function():
+                pass
+# end
+
+
 # E301
 class Class(object):
 
