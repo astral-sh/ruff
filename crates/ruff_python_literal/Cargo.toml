@@ -21,3 +21,6 @@ unic-ucd-category = "0.9"
 
 [dev-dependencies]
 rand = "0.8.5"
+
+[lints]
+workspace = true

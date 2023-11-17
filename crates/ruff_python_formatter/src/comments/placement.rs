@@ -2281,10 +2281,10 @@ mod tests {
 
         assert_eq!(
             max_empty_lines(
-                r#"# This multiline comments section
+                r"# This multiline comments section
 # should be split from the statement
 # above by two lines.
-"#
+"
             ),
             0
         );

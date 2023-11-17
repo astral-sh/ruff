@@ -16,7 +16,7 @@ mod tests {
     #[test_case(Path::new("test_pass_init"), Path::new("example.py"))]
     #[test_case(Path::new("test_fail_empty"), Path::new("example.py"))]
     #[test_case(Path::new("test_fail_nonempty"), Path::new("example.py"))]
-    #[test_case(Path::new("test_fail_shebang"), Path::new("example.py"))]
+    #[test_case(Path::new("test_pass_shebang"), Path::new("example.py"))]
     #[test_case(Path::new("test_ignored"), Path::new("example.py"))]
     #[test_case(Path::new("test_pass_namespace_package"), Path::new("example.py"))]
     #[test_case(Path::new("test_pass_pyi"), Path::new("example.pyi"))]
