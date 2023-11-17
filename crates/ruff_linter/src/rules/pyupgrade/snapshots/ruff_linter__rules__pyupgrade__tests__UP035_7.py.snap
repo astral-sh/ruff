@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP035_7.py:2:1: UP035 [*] Import from `re` instead: `Match`
+  |
+1 | """Members of `typing` that were moved to `typing.re`."""
+2 | from typing import Match
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+3 | from typing import Pattern
+  |
+  = help: Import from `re`
+
+ℹ Safe fix
+1 1 | """Members of `typing` that were moved to `typing.re`."""
+2   |-from typing import Match
+  2 |+from re import Match
+3 3 | from typing import Pattern
+
+UP035_7.py:3:1: UP035 [*] Import from `re` instead: `Pattern`
+  |
+1 | """Members of `typing` that were moved to `typing.re`."""
+2 | from typing import Match
+3 | from typing import Pattern
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  |
+  = help: Import from `re`
+
+ℹ Safe fix
+1 1 | """Members of `typing` that were moved to `typing.re`."""
+2 2 | from typing import Match
+3   |-from typing import Pattern
+  3 |+from re import Pattern
+
+

@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP035_3.py:2:1: UP035 [*] Import from `shlex` instead: `quote`
+  |
+1 | """Things moved from `pipes` to `shlex`."""
+2 | from pipes import quote
+  | ^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  |
+  = help: Import from `shlex`
+
+ℹ Safe fix
+1 1 | """Things moved from `pipes` to `shlex`."""
+2   |-from pipes import quote
+  2 |+from shlex import quote
+
+

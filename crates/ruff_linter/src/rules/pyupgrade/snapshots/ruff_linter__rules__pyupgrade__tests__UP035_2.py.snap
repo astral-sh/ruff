@@ -1,0 +1,1890 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP035_2.py:2:1: UP035 [*] Import from `typing` instead: `AbstractSet`
+  |
+1 | """Things that were moved from `typing_extensions` to `typing`."""
+2 | from typing_extensions import AbstractSet
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+3 | from typing_extensions import AnyStr
+4 | from typing_extensions import AsyncIterable
+  |
+  = help: Import from `typing`
+
+ℹ Safe fix
+1 1 | """Things that were moved from `typing_extensions` to `typing`."""
+2   |-from typing_extensions import AbstractSet
+  2 |+from typing import AbstractSet
+3 3 | from typing_extensions import AnyStr
+4 4 | from typing_extensions import AsyncIterable
+5 5 | from typing_extensions import AsyncIterator
+
+UP035_2.py:3:1: UP035 [*] Import from `typing` instead: `AnyStr`
+  |
+1 | """Things that were moved from `typing_extensions` to `typing`."""
+2 | from typing_extensions import AbstractSet
+3 | from typing_extensions import AnyStr
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+4 | from typing_extensions import AsyncIterable
+5 | from typing_extensions import AsyncIterator
+  |
+  = help: Import from `typing`
+
+ℹ Safe fix
+1 1 | """Things that were moved from `typing_extensions` to `typing`."""
+2 2 | from typing_extensions import AbstractSet
+3   |-from typing_extensions import AnyStr
+  3 |+from typing import AnyStr
+4 4 | from typing_extensions import AsyncIterable
+5 5 | from typing_extensions import AsyncIterator
+6 6 | from typing_extensions import Awaitable
+
+UP035_2.py:4:1: UP035 [*] Import from `typing` instead: `AsyncIterable`
+  |
+2 | from typing_extensions import AbstractSet
+3 | from typing_extensions import AnyStr
+4 | from typing_extensions import AsyncIterable
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+5 | from typing_extensions import AsyncIterator
+6 | from typing_extensions import Awaitable
+  |
+  = help: Import from `typing`
+
+ℹ Safe fix
+1 1 | """Things that were moved from `typing_extensions` to `typing`."""
+2 2 | from typing_extensions import AbstractSet
+3 3 | from typing_extensions import AnyStr
+4   |-from typing_extensions import AsyncIterable
+  4 |+from typing import AsyncIterable
+5 5 | from typing_extensions import AsyncIterator
+6 6 | from typing_extensions import Awaitable
+7 7 | from typing_extensions import BinaryIO
+
+UP035_2.py:5:1: UP035 [*] Import from `typing` instead: `AsyncIterator`
+  |
+3 | from typing_extensions import AnyStr
+4 | from typing_extensions import AsyncIterable
+5 | from typing_extensions import AsyncIterator
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+6 | from typing_extensions import Awaitable
+7 | from typing_extensions import BinaryIO
+  |
+  = help: Import from `typing`
+
+ℹ Safe fix
+2 2 | from typing_extensions import AbstractSet
+3 3 | from typing_extensions import AnyStr
+4 4 | from typing_extensions import AsyncIterable
+5   |-from typing_extensions import AsyncIterator
+  5 |+from typing import AsyncIterator
+6 6 | from typing_extensions import Awaitable
+7 7 | from typing_extensions import BinaryIO
+8 8 | from typing_extensions import Callable
+
+UP035_2.py:6:1: UP035 [*] Import from `typing` instead: `Awaitable`
+  |
+4 | from typing_extensions import AsyncIterable
+5 | from typing_extensions import AsyncIterator
+6 | from typing_extensions import Awaitable
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+7 | from typing_extensions import BinaryIO
+8 | from typing_extensions import Callable
+  |
+  = help: Import from `typing`
+
+ℹ Safe fix
+3 3 | from typing_extensions import AnyStr
+4 4 | from typing_extensions import AsyncIterable
+5 5 | from typing_extensions import AsyncIterator
+6   |-from typing_extensions import Awaitable
+  6 |+from typing import Awaitable
+7 7 | from typing_extensions import BinaryIO
+8 8 | from typing_extensions import Callable
+9 9 | from typing_extensions import ClassVar
+
+UP035_2.py:7:1: UP035 [*] Import from `typing` instead: `BinaryIO`
+  |
+5 | from typing_extensions import AsyncIterator
+6 | from typing_extensions import Awaitable
+7 | from typing_extensions import BinaryIO
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+8 | from typing_extensions import Callable
+9 | from typing_extensions import ClassVar
+  |
+  = help: Import from `typing`
+
+ℹ Safe fix
+4 4 | from typing_extensions import AsyncIterable
+5 5 | from typing_extensions import AsyncIterator
+6 6 | from typing_extensions import Awaitable
+7   |-from typing_extensions import BinaryIO
+  7 |+from typing import BinaryIO
+8 8 | from typing_extensions import Callable
+9 9 | from typing_extensions import ClassVar
+10 10 | from typing_extensions import Collection
+
+UP035_2.py:8:1: UP035 [*] Import from `typing` instead: `Callable`
+   |
+ 6 | from typing_extensions import Awaitable
+ 7 | from typing_extensions import BinaryIO
+ 8 | from typing_extensions import Callable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+ 9 | from typing_extensions import ClassVar
+10 | from typing_extensions import Collection
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+5 5 | from typing_extensions import AsyncIterator
+6 6 | from typing_extensions import Awaitable
+7 7 | from typing_extensions import BinaryIO
+8   |-from typing_extensions import Callable
+  8 |+from typing import Callable
+9 9 | from typing_extensions import ClassVar
+10 10 | from typing_extensions import Collection
+11 11 | from typing_extensions import Container
+
+UP035_2.py:9:1: UP035 [*] Import from `typing` instead: `ClassVar`
+   |
+ 7 | from typing_extensions import BinaryIO
+ 8 | from typing_extensions import Callable
+ 9 | from typing_extensions import ClassVar
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+10 | from typing_extensions import Collection
+11 | from typing_extensions import Container
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+6  6  | from typing_extensions import Awaitable
+7  7  | from typing_extensions import BinaryIO
+8  8  | from typing_extensions import Callable
+9     |-from typing_extensions import ClassVar
+   9  |+from typing import ClassVar
+10 10 | from typing_extensions import Collection
+11 11 | from typing_extensions import Container
+12 12 | from typing_extensions import ContextManager
+
+UP035_2.py:10:1: UP035 [*] Import from `typing` instead: `Collection`
+   |
+ 8 | from typing_extensions import Callable
+ 9 | from typing_extensions import ClassVar
+10 | from typing_extensions import Collection
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+11 | from typing_extensions import Container
+12 | from typing_extensions import ContextManager
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+7  7  | from typing_extensions import BinaryIO
+8  8  | from typing_extensions import Callable
+9  9  | from typing_extensions import ClassVar
+10    |-from typing_extensions import Collection
+   10 |+from typing import Collection
+11 11 | from typing_extensions import Container
+12 12 | from typing_extensions import ContextManager
+13 13 | from typing_extensions import Coroutine
+
+UP035_2.py:11:1: UP035 [*] Import from `typing` instead: `Container`
+   |
+ 9 | from typing_extensions import ClassVar
+10 | from typing_extensions import Collection
+11 | from typing_extensions import Container
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+12 | from typing_extensions import ContextManager
+13 | from typing_extensions import Coroutine
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+8  8  | from typing_extensions import Callable
+9  9  | from typing_extensions import ClassVar
+10 10 | from typing_extensions import Collection
+11    |-from typing_extensions import Container
+   11 |+from typing import Container
+12 12 | from typing_extensions import ContextManager
+13 13 | from typing_extensions import Coroutine
+14 14 | from typing_extensions import DefaultDict
+
+UP035_2.py:12:1: UP035 [*] Import from `typing` instead: `ContextManager`
+   |
+10 | from typing_extensions import Collection
+11 | from typing_extensions import Container
+12 | from typing_extensions import ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 | from typing_extensions import Coroutine
+14 | from typing_extensions import DefaultDict
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+9  9  | from typing_extensions import ClassVar
+10 10 | from typing_extensions import Collection
+11 11 | from typing_extensions import Container
+12    |-from typing_extensions import ContextManager
+   12 |+from typing import ContextManager
+13 13 | from typing_extensions import Coroutine
+14 14 | from typing_extensions import DefaultDict
+15 15 | from typing_extensions import Dict
+
+UP035_2.py:13:1: UP035 [*] Import from `typing` instead: `Coroutine`
+   |
+11 | from typing_extensions import Container
+12 | from typing_extensions import ContextManager
+13 | from typing_extensions import Coroutine
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+14 | from typing_extensions import DefaultDict
+15 | from typing_extensions import Dict
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+10 10 | from typing_extensions import Collection
+11 11 | from typing_extensions import Container
+12 12 | from typing_extensions import ContextManager
+13    |-from typing_extensions import Coroutine
+   13 |+from typing import Coroutine
+14 14 | from typing_extensions import DefaultDict
+15 15 | from typing_extensions import Dict
+16 16 | from typing_extensions import FrozenSet
+
+UP035_2.py:14:1: UP035 [*] Import from `typing` instead: `DefaultDict`
+   |
+12 | from typing_extensions import ContextManager
+13 | from typing_extensions import Coroutine
+14 | from typing_extensions import DefaultDict
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+15 | from typing_extensions import Dict
+16 | from typing_extensions import FrozenSet
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+11 11 | from typing_extensions import Container
+12 12 | from typing_extensions import ContextManager
+13 13 | from typing_extensions import Coroutine
+14    |-from typing_extensions import DefaultDict
+   14 |+from typing import DefaultDict
+15 15 | from typing_extensions import Dict
+16 16 | from typing_extensions import FrozenSet
+17 17 | from typing_extensions import Generator
+
+UP035_2.py:15:1: UP035 [*] Import from `typing` instead: `Dict`
+   |
+13 | from typing_extensions import Coroutine
+14 | from typing_extensions import DefaultDict
+15 | from typing_extensions import Dict
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+16 | from typing_extensions import FrozenSet
+17 | from typing_extensions import Generator
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+12 12 | from typing_extensions import ContextManager
+13 13 | from typing_extensions import Coroutine
+14 14 | from typing_extensions import DefaultDict
+15    |-from typing_extensions import Dict
+   15 |+from typing import Dict
+16 16 | from typing_extensions import FrozenSet
+17 17 | from typing_extensions import Generator
+18 18 | from typing_extensions import Generic
+
+UP035_2.py:16:1: UP035 [*] Import from `typing` instead: `FrozenSet`
+   |
+14 | from typing_extensions import DefaultDict
+15 | from typing_extensions import Dict
+16 | from typing_extensions import FrozenSet
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+17 | from typing_extensions import Generator
+18 | from typing_extensions import Generic
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+13 13 | from typing_extensions import Coroutine
+14 14 | from typing_extensions import DefaultDict
+15 15 | from typing_extensions import Dict
+16    |-from typing_extensions import FrozenSet
+   16 |+from typing import FrozenSet
+17 17 | from typing_extensions import Generator
+18 18 | from typing_extensions import Generic
+19 19 | from typing_extensions import Hashable
+
+UP035_2.py:17:1: UP035 [*] Import from `typing` instead: `Generator`
+   |
+15 | from typing_extensions import Dict
+16 | from typing_extensions import FrozenSet
+17 | from typing_extensions import Generator
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+18 | from typing_extensions import Generic
+19 | from typing_extensions import Hashable
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+14 14 | from typing_extensions import DefaultDict
+15 15 | from typing_extensions import Dict
+16 16 | from typing_extensions import FrozenSet
+17    |-from typing_extensions import Generator
+   17 |+from typing import Generator
+18 18 | from typing_extensions import Generic
+19 19 | from typing_extensions import Hashable
+20 20 | from typing_extensions import IO
+
+UP035_2.py:18:1: UP035 [*] Import from `typing` instead: `Generic`
+   |
+16 | from typing_extensions import FrozenSet
+17 | from typing_extensions import Generator
+18 | from typing_extensions import Generic
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+19 | from typing_extensions import Hashable
+20 | from typing_extensions import IO
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+15 15 | from typing_extensions import Dict
+16 16 | from typing_extensions import FrozenSet
+17 17 | from typing_extensions import Generator
+18    |-from typing_extensions import Generic
+   18 |+from typing import Generic
+19 19 | from typing_extensions import Hashable
+20 20 | from typing_extensions import IO
+21 21 | from typing_extensions import ItemsView
+
+UP035_2.py:19:1: UP035 [*] Import from `typing` instead: `Hashable`
+   |
+17 | from typing_extensions import Generator
+18 | from typing_extensions import Generic
+19 | from typing_extensions import Hashable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+20 | from typing_extensions import IO
+21 | from typing_extensions import ItemsView
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+16 16 | from typing_extensions import FrozenSet
+17 17 | from typing_extensions import Generator
+18 18 | from typing_extensions import Generic
+19    |-from typing_extensions import Hashable
+   19 |+from typing import Hashable
+20 20 | from typing_extensions import IO
+21 21 | from typing_extensions import ItemsView
+22 22 | from typing_extensions import Iterable
+
+UP035_2.py:20:1: UP035 [*] Import from `typing` instead: `IO`
+   |
+18 | from typing_extensions import Generic
+19 | from typing_extensions import Hashable
+20 | from typing_extensions import IO
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+21 | from typing_extensions import ItemsView
+22 | from typing_extensions import Iterable
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+17 17 | from typing_extensions import Generator
+18 18 | from typing_extensions import Generic
+19 19 | from typing_extensions import Hashable
+20    |-from typing_extensions import IO
+   20 |+from typing import IO
+21 21 | from typing_extensions import ItemsView
+22 22 | from typing_extensions import Iterable
+23 23 | from typing_extensions import KeysView
+
+UP035_2.py:21:1: UP035 [*] Import from `typing` instead: `ItemsView`
+   |
+19 | from typing_extensions import Hashable
+20 | from typing_extensions import IO
+21 | from typing_extensions import ItemsView
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+22 | from typing_extensions import Iterable
+23 | from typing_extensions import KeysView
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+18 18 | from typing_extensions import Generic
+19 19 | from typing_extensions import Hashable
+20 20 | from typing_extensions import IO
+21    |-from typing_extensions import ItemsView
+   21 |+from typing import ItemsView
+22 22 | from typing_extensions import Iterable
+23 23 | from typing_extensions import KeysView
+24 24 | from typing_extensions import List
+
+UP035_2.py:22:1: UP035 [*] Import from `typing` instead: `Iterable`
+   |
+20 | from typing_extensions import IO
+21 | from typing_extensions import ItemsView
+22 | from typing_extensions import Iterable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+23 | from typing_extensions import KeysView
+24 | from typing_extensions import List
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+19 19 | from typing_extensions import Hashable
+20 20 | from typing_extensions import IO
+21 21 | from typing_extensions import ItemsView
+22    |-from typing_extensions import Iterable
+   22 |+from typing import Iterable
+23 23 | from typing_extensions import KeysView
+24 24 | from typing_extensions import List
+25 25 | from typing_extensions import Mapping
+
+UP035_2.py:23:1: UP035 [*] Import from `typing` instead: `KeysView`
+   |
+21 | from typing_extensions import ItemsView
+22 | from typing_extensions import Iterable
+23 | from typing_extensions import KeysView
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+24 | from typing_extensions import List
+25 | from typing_extensions import Mapping
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+20 20 | from typing_extensions import IO
+21 21 | from typing_extensions import ItemsView
+22 22 | from typing_extensions import Iterable
+23    |-from typing_extensions import KeysView
+   23 |+from typing import KeysView
+24 24 | from typing_extensions import List
+25 25 | from typing_extensions import Mapping
+26 26 | from typing_extensions import MappingView
+
+UP035_2.py:24:1: UP035 [*] Import from `typing` instead: `List`
+   |
+22 | from typing_extensions import Iterable
+23 | from typing_extensions import KeysView
+24 | from typing_extensions import List
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+25 | from typing_extensions import Mapping
+26 | from typing_extensions import MappingView
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+21 21 | from typing_extensions import ItemsView
+22 22 | from typing_extensions import Iterable
+23 23 | from typing_extensions import KeysView
+24    |-from typing_extensions import List
+   24 |+from typing import List
+25 25 | from typing_extensions import Mapping
+26 26 | from typing_extensions import MappingView
+27 27 | from typing_extensions import Match
+
+UP035_2.py:25:1: UP035 [*] Import from `typing` instead: `Mapping`
+   |
+23 | from typing_extensions import KeysView
+24 | from typing_extensions import List
+25 | from typing_extensions import Mapping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+26 | from typing_extensions import MappingView
+27 | from typing_extensions import Match
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+22 22 | from typing_extensions import Iterable
+23 23 | from typing_extensions import KeysView
+24 24 | from typing_extensions import List
+25    |-from typing_extensions import Mapping
+   25 |+from typing import Mapping
+26 26 | from typing_extensions import MappingView
+27 27 | from typing_extensions import Match
+28 28 | from typing_extensions import MutableMapping
+
+UP035_2.py:26:1: UP035 [*] Import from `typing` instead: `MappingView`
+   |
+24 | from typing_extensions import List
+25 | from typing_extensions import Mapping
+26 | from typing_extensions import MappingView
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+27 | from typing_extensions import Match
+28 | from typing_extensions import MutableMapping
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+23 23 | from typing_extensions import KeysView
+24 24 | from typing_extensions import List
+25 25 | from typing_extensions import Mapping
+26    |-from typing_extensions import MappingView
+   26 |+from typing import MappingView
+27 27 | from typing_extensions import Match
+28 28 | from typing_extensions import MutableMapping
+29 29 | from typing_extensions import MutableSequence
+
+UP035_2.py:27:1: UP035 [*] Import from `typing` instead: `Match`
+   |
+25 | from typing_extensions import Mapping
+26 | from typing_extensions import MappingView
+27 | from typing_extensions import Match
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+28 | from typing_extensions import MutableMapping
+29 | from typing_extensions import MutableSequence
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+24 24 | from typing_extensions import List
+25 25 | from typing_extensions import Mapping
+26 26 | from typing_extensions import MappingView
+27    |-from typing_extensions import Match
+   27 |+from typing import Match
+28 28 | from typing_extensions import MutableMapping
+29 29 | from typing_extensions import MutableSequence
+30 30 | from typing_extensions import MutableSet
+
+UP035_2.py:28:1: UP035 [*] Import from `typing` instead: `MutableMapping`
+   |
+26 | from typing_extensions import MappingView
+27 | from typing_extensions import Match
+28 | from typing_extensions import MutableMapping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+29 | from typing_extensions import MutableSequence
+30 | from typing_extensions import MutableSet
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+25 25 | from typing_extensions import Mapping
+26 26 | from typing_extensions import MappingView
+27 27 | from typing_extensions import Match
+28    |-from typing_extensions import MutableMapping
+   28 |+from typing import MutableMapping
+29 29 | from typing_extensions import MutableSequence
+30 30 | from typing_extensions import MutableSet
+31 31 | from typing_extensions import Optional
+
+UP035_2.py:29:1: UP035 [*] Import from `typing` instead: `MutableSequence`
+   |
+27 | from typing_extensions import Match
+28 | from typing_extensions import MutableMapping
+29 | from typing_extensions import MutableSequence
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+30 | from typing_extensions import MutableSet
+31 | from typing_extensions import Optional
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+26 26 | from typing_extensions import MappingView
+27 27 | from typing_extensions import Match
+28 28 | from typing_extensions import MutableMapping
+29    |-from typing_extensions import MutableSequence
+   29 |+from typing import MutableSequence
+30 30 | from typing_extensions import MutableSet
+31 31 | from typing_extensions import Optional
+32 32 | from typing_extensions import Pattern
+
+UP035_2.py:30:1: UP035 [*] Import from `typing` instead: `MutableSet`
+   |
+28 | from typing_extensions import MutableMapping
+29 | from typing_extensions import MutableSequence
+30 | from typing_extensions import MutableSet
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+31 | from typing_extensions import Optional
+32 | from typing_extensions import Pattern
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+27 27 | from typing_extensions import Match
+28 28 | from typing_extensions import MutableMapping
+29 29 | from typing_extensions import MutableSequence
+30    |-from typing_extensions import MutableSet
+   30 |+from typing import MutableSet
+31 31 | from typing_extensions import Optional
+32 32 | from typing_extensions import Pattern
+33 33 | from typing_extensions import Reversible
+
+UP035_2.py:31:1: UP035 [*] Import from `typing` instead: `Optional`
+   |
+29 | from typing_extensions import MutableSequence
+30 | from typing_extensions import MutableSet
+31 | from typing_extensions import Optional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+32 | from typing_extensions import Pattern
+33 | from typing_extensions import Reversible
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+28 28 | from typing_extensions import MutableMapping
+29 29 | from typing_extensions import MutableSequence
+30 30 | from typing_extensions import MutableSet
+31    |-from typing_extensions import Optional
+   31 |+from typing import Optional
+32 32 | from typing_extensions import Pattern
+33 33 | from typing_extensions import Reversible
+34 34 | from typing_extensions import Sequence
+
+UP035_2.py:32:1: UP035 [*] Import from `typing` instead: `Pattern`
+   |
+30 | from typing_extensions import MutableSet
+31 | from typing_extensions import Optional
+32 | from typing_extensions import Pattern
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+33 | from typing_extensions import Reversible
+34 | from typing_extensions import Sequence
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+29 29 | from typing_extensions import MutableSequence
+30 30 | from typing_extensions import MutableSet
+31 31 | from typing_extensions import Optional
+32    |-from typing_extensions import Pattern
+   32 |+from typing import Pattern
+33 33 | from typing_extensions import Reversible
+34 34 | from typing_extensions import Sequence
+35 35 | from typing_extensions import Set
+
+UP035_2.py:33:1: UP035 [*] Import from `typing` instead: `Reversible`
+   |
+31 | from typing_extensions import Optional
+32 | from typing_extensions import Pattern
+33 | from typing_extensions import Reversible
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+34 | from typing_extensions import Sequence
+35 | from typing_extensions import Set
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+30 30 | from typing_extensions import MutableSet
+31 31 | from typing_extensions import Optional
+32 32 | from typing_extensions import Pattern
+33    |-from typing_extensions import Reversible
+   33 |+from typing import Reversible
+34 34 | from typing_extensions import Sequence
+35 35 | from typing_extensions import Set
+36 36 | from typing_extensions import Sized
+
+UP035_2.py:34:1: UP035 [*] Import from `typing` instead: `Sequence`
+   |
+32 | from typing_extensions import Pattern
+33 | from typing_extensions import Reversible
+34 | from typing_extensions import Sequence
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+35 | from typing_extensions import Set
+36 | from typing_extensions import Sized
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+31 31 | from typing_extensions import Optional
+32 32 | from typing_extensions import Pattern
+33 33 | from typing_extensions import Reversible
+34    |-from typing_extensions import Sequence
+   34 |+from typing import Sequence
+35 35 | from typing_extensions import Set
+36 36 | from typing_extensions import Sized
+37 37 | from typing_extensions import TYPE_CHECKING
+
+UP035_2.py:35:1: UP035 [*] Import from `typing` instead: `Set`
+   |
+33 | from typing_extensions import Reversible
+34 | from typing_extensions import Sequence
+35 | from typing_extensions import Set
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+36 | from typing_extensions import Sized
+37 | from typing_extensions import TYPE_CHECKING
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+32 32 | from typing_extensions import Pattern
+33 33 | from typing_extensions import Reversible
+34 34 | from typing_extensions import Sequence
+35    |-from typing_extensions import Set
+   35 |+from typing import Set
+36 36 | from typing_extensions import Sized
+37 37 | from typing_extensions import TYPE_CHECKING
+38 38 | from typing_extensions import Text
+
+UP035_2.py:36:1: UP035 [*] Import from `typing` instead: `Sized`
+   |
+34 | from typing_extensions import Sequence
+35 | from typing_extensions import Set
+36 | from typing_extensions import Sized
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+37 | from typing_extensions import TYPE_CHECKING
+38 | from typing_extensions import Text
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+33 33 | from typing_extensions import Reversible
+34 34 | from typing_extensions import Sequence
+35 35 | from typing_extensions import Set
+36    |-from typing_extensions import Sized
+   36 |+from typing import Sized
+37 37 | from typing_extensions import TYPE_CHECKING
+38 38 | from typing_extensions import Text
+39 39 | from typing_extensions import TextIO
+
+UP035_2.py:37:1: UP035 [*] Import from `typing` instead: `TYPE_CHECKING`
+   |
+35 | from typing_extensions import Set
+36 | from typing_extensions import Sized
+37 | from typing_extensions import TYPE_CHECKING
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+38 | from typing_extensions import Text
+39 | from typing_extensions import TextIO
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+34 34 | from typing_extensions import Sequence
+35 35 | from typing_extensions import Set
+36 36 | from typing_extensions import Sized
+37    |-from typing_extensions import TYPE_CHECKING
+   37 |+from typing import TYPE_CHECKING
+38 38 | from typing_extensions import Text
+39 39 | from typing_extensions import TextIO
+40 40 | from typing_extensions import Tuple
+
+UP035_2.py:38:1: UP035 [*] Import from `typing` instead: `Text`
+   |
+36 | from typing_extensions import Sized
+37 | from typing_extensions import TYPE_CHECKING
+38 | from typing_extensions import Text
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+39 | from typing_extensions import TextIO
+40 | from typing_extensions import Tuple
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+35 35 | from typing_extensions import Set
+36 36 | from typing_extensions import Sized
+37 37 | from typing_extensions import TYPE_CHECKING
+38    |-from typing_extensions import Text
+   38 |+from typing import Text
+39 39 | from typing_extensions import TextIO
+40 40 | from typing_extensions import Tuple
+41 41 | from typing_extensions import Type
+
+UP035_2.py:39:1: UP035 [*] Import from `typing` instead: `TextIO`
+   |
+37 | from typing_extensions import TYPE_CHECKING
+38 | from typing_extensions import Text
+39 | from typing_extensions import TextIO
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+40 | from typing_extensions import Tuple
+41 | from typing_extensions import Type
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+36 36 | from typing_extensions import Sized
+37 37 | from typing_extensions import TYPE_CHECKING
+38 38 | from typing_extensions import Text
+39    |-from typing_extensions import TextIO
+   39 |+from typing import TextIO
+40 40 | from typing_extensions import Tuple
+41 41 | from typing_extensions import Type
+42 42 | from typing_extensions import Union
+
+UP035_2.py:40:1: UP035 [*] Import from `typing` instead: `Tuple`
+   |
+38 | from typing_extensions import Text
+39 | from typing_extensions import TextIO
+40 | from typing_extensions import Tuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+41 | from typing_extensions import Type
+42 | from typing_extensions import Union
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+37 37 | from typing_extensions import TYPE_CHECKING
+38 38 | from typing_extensions import Text
+39 39 | from typing_extensions import TextIO
+40    |-from typing_extensions import Tuple
+   40 |+from typing import Tuple
+41 41 | from typing_extensions import Type
+42 42 | from typing_extensions import Union
+43 43 | from typing_extensions import ValuesView
+
+UP035_2.py:41:1: UP035 [*] Import from `typing` instead: `Type`
+   |
+39 | from typing_extensions import TextIO
+40 | from typing_extensions import Tuple
+41 | from typing_extensions import Type
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+42 | from typing_extensions import Union
+43 | from typing_extensions import ValuesView
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+38 38 | from typing_extensions import Text
+39 39 | from typing_extensions import TextIO
+40 40 | from typing_extensions import Tuple
+41    |-from typing_extensions import Type
+   41 |+from typing import Type
+42 42 | from typing_extensions import Union
+43 43 | from typing_extensions import ValuesView
+44 44 | from typing_extensions import cast
+
+UP035_2.py:42:1: UP035 [*] Import from `typing` instead: `Union`
+   |
+40 | from typing_extensions import Tuple
+41 | from typing_extensions import Type
+42 | from typing_extensions import Union
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+43 | from typing_extensions import ValuesView
+44 | from typing_extensions import cast
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+39 39 | from typing_extensions import TextIO
+40 40 | from typing_extensions import Tuple
+41 41 | from typing_extensions import Type
+42    |-from typing_extensions import Union
+   42 |+from typing import Union
+43 43 | from typing_extensions import ValuesView
+44 44 | from typing_extensions import cast
+45 45 | from typing_extensions import no_type_check
+
+UP035_2.py:43:1: UP035 [*] Import from `typing` instead: `ValuesView`
+   |
+41 | from typing_extensions import Type
+42 | from typing_extensions import Union
+43 | from typing_extensions import ValuesView
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+44 | from typing_extensions import cast
+45 | from typing_extensions import no_type_check
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+40 40 | from typing_extensions import Tuple
+41 41 | from typing_extensions import Type
+42 42 | from typing_extensions import Union
+43    |-from typing_extensions import ValuesView
+   43 |+from typing import ValuesView
+44 44 | from typing_extensions import cast
+45 45 | from typing_extensions import no_type_check
+46 46 | from typing_extensions import no_type_check_decorator
+
+UP035_2.py:44:1: UP035 [*] Import from `typing` instead: `cast`
+   |
+42 | from typing_extensions import Union
+43 | from typing_extensions import ValuesView
+44 | from typing_extensions import cast
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+45 | from typing_extensions import no_type_check
+46 | from typing_extensions import no_type_check_decorator
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+41 41 | from typing_extensions import Type
+42 42 | from typing_extensions import Union
+43 43 | from typing_extensions import ValuesView
+44    |-from typing_extensions import cast
+   44 |+from typing import cast
+45 45 | from typing_extensions import no_type_check
+46 46 | from typing_extensions import no_type_check_decorator
+47 47 | 
+
+UP035_2.py:45:1: UP035 [*] Import from `typing` instead: `no_type_check`
+   |
+43 | from typing_extensions import ValuesView
+44 | from typing_extensions import cast
+45 | from typing_extensions import no_type_check
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+46 | from typing_extensions import no_type_check_decorator
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+42 42 | from typing_extensions import Union
+43 43 | from typing_extensions import ValuesView
+44 44 | from typing_extensions import cast
+45    |-from typing_extensions import no_type_check
+   45 |+from typing import no_type_check
+46 46 | from typing_extensions import no_type_check_decorator
+47 47 | 
+48 48 | from typing_extensions import AsyncContextManager
+
+UP035_2.py:46:1: UP035 [*] Import from `typing` instead: `no_type_check_decorator`
+   |
+44 | from typing_extensions import cast
+45 | from typing_extensions import no_type_check
+46 | from typing_extensions import no_type_check_decorator
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+47 | 
+48 | from typing_extensions import AsyncContextManager
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+43 43 | from typing_extensions import ValuesView
+44 44 | from typing_extensions import cast
+45 45 | from typing_extensions import no_type_check
+46    |-from typing_extensions import no_type_check_decorator
+   46 |+from typing import no_type_check_decorator
+47 47 | 
+48 48 | from typing_extensions import AsyncContextManager
+49 49 | from typing_extensions import AsyncGenerator
+
+UP035_2.py:48:1: UP035 [*] Import from `typing` instead: `AsyncContextManager`
+   |
+46 | from typing_extensions import no_type_check_decorator
+47 | 
+48 | from typing_extensions import AsyncContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+49 | from typing_extensions import AsyncGenerator
+50 | from typing_extensions import ChainMap
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+45 45 | from typing_extensions import no_type_check
+46 46 | from typing_extensions import no_type_check_decorator
+47 47 | 
+48    |-from typing_extensions import AsyncContextManager
+   48 |+from typing import AsyncContextManager
+49 49 | from typing_extensions import AsyncGenerator
+50 50 | from typing_extensions import ChainMap
+51 51 | from typing_extensions import Counter
+
+UP035_2.py:49:1: UP035 [*] Import from `typing` instead: `AsyncGenerator`
+   |
+48 | from typing_extensions import AsyncContextManager
+49 | from typing_extensions import AsyncGenerator
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+50 | from typing_extensions import ChainMap
+51 | from typing_extensions import Counter
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+46 46 | from typing_extensions import no_type_check_decorator
+47 47 | 
+48 48 | from typing_extensions import AsyncContextManager
+49    |-from typing_extensions import AsyncGenerator
+   49 |+from typing import AsyncGenerator
+50 50 | from typing_extensions import ChainMap
+51 51 | from typing_extensions import Counter
+52 52 | from typing_extensions import Deque
+
+UP035_2.py:50:1: UP035 [*] Import from `typing` instead: `ChainMap`
+   |
+48 | from typing_extensions import AsyncContextManager
+49 | from typing_extensions import AsyncGenerator
+50 | from typing_extensions import ChainMap
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+51 | from typing_extensions import Counter
+52 | from typing_extensions import Deque
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+47 47 | 
+48 48 | from typing_extensions import AsyncContextManager
+49 49 | from typing_extensions import AsyncGenerator
+50    |-from typing_extensions import ChainMap
+   50 |+from typing import ChainMap
+51 51 | from typing_extensions import Counter
+52 52 | from typing_extensions import Deque
+53 53 | from typing_extensions import ForwardRef
+
+UP035_2.py:51:1: UP035 [*] Import from `typing` instead: `Counter`
+   |
+49 | from typing_extensions import AsyncGenerator
+50 | from typing_extensions import ChainMap
+51 | from typing_extensions import Counter
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+52 | from typing_extensions import Deque
+53 | from typing_extensions import ForwardRef
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+48 48 | from typing_extensions import AsyncContextManager
+49 49 | from typing_extensions import AsyncGenerator
+50 50 | from typing_extensions import ChainMap
+51    |-from typing_extensions import Counter
+   51 |+from typing import Counter
+52 52 | from typing_extensions import Deque
+53 53 | from typing_extensions import ForwardRef
+54 54 | from typing_extensions import NoReturn
+
+UP035_2.py:52:1: UP035 [*] Import from `typing` instead: `Deque`
+   |
+50 | from typing_extensions import ChainMap
+51 | from typing_extensions import Counter
+52 | from typing_extensions import Deque
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+53 | from typing_extensions import ForwardRef
+54 | from typing_extensions import NoReturn
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+49 49 | from typing_extensions import AsyncGenerator
+50 50 | from typing_extensions import ChainMap
+51 51 | from typing_extensions import Counter
+52    |-from typing_extensions import Deque
+   52 |+from typing import Deque
+53 53 | from typing_extensions import ForwardRef
+54 54 | from typing_extensions import NoReturn
+55 55 | 
+
+UP035_2.py:53:1: UP035 [*] Import from `typing` instead: `ForwardRef`
+   |
+51 | from typing_extensions import Counter
+52 | from typing_extensions import Deque
+53 | from typing_extensions import ForwardRef
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+54 | from typing_extensions import NoReturn
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+50 50 | from typing_extensions import ChainMap
+51 51 | from typing_extensions import Counter
+52 52 | from typing_extensions import Deque
+53    |-from typing_extensions import ForwardRef
+   53 |+from typing import ForwardRef
+54 54 | from typing_extensions import NoReturn
+55 55 | 
+56 56 | from typing_extensions import Final
+
+UP035_2.py:54:1: UP035 [*] Import from `typing` instead: `NoReturn`
+   |
+52 | from typing_extensions import Deque
+53 | from typing_extensions import ForwardRef
+54 | from typing_extensions import NoReturn
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+55 | 
+56 | from typing_extensions import Final
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+51 51 | from typing_extensions import Counter
+52 52 | from typing_extensions import Deque
+53 53 | from typing_extensions import ForwardRef
+54    |-from typing_extensions import NoReturn
+   54 |+from typing import NoReturn
+55 55 | 
+56 56 | from typing_extensions import Final
+57 57 | from typing_extensions import OrderedDict
+
+UP035_2.py:56:1: UP035 [*] Import from `typing` instead: `Final`
+   |
+54 | from typing_extensions import NoReturn
+55 | 
+56 | from typing_extensions import Final
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+57 | from typing_extensions import OrderedDict
+58 | from typing_extensions import runtime_checkable
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+53 53 | from typing_extensions import ForwardRef
+54 54 | from typing_extensions import NoReturn
+55 55 | 
+56    |-from typing_extensions import Final
+   56 |+from typing import Final
+57 57 | from typing_extensions import OrderedDict
+58 58 | from typing_extensions import runtime_checkable
+59 59 | 
+
+UP035_2.py:57:1: UP035 [*] Import from `typing` instead: `OrderedDict`
+   |
+56 | from typing_extensions import Final
+57 | from typing_extensions import OrderedDict
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+58 | from typing_extensions import runtime_checkable
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+54 54 | from typing_extensions import NoReturn
+55 55 | 
+56 56 | from typing_extensions import Final
+57    |-from typing_extensions import OrderedDict
+   57 |+from typing import OrderedDict
+58 58 | from typing_extensions import runtime_checkable
+59 59 | 
+60 60 | from typing_extensions import Annotated
+
+UP035_2.py:58:1: UP035 [*] Import from `typing` instead: `runtime_checkable`
+   |
+56 | from typing_extensions import Final
+57 | from typing_extensions import OrderedDict
+58 | from typing_extensions import runtime_checkable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+59 | 
+60 | from typing_extensions import Annotated
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+55 55 | 
+56 56 | from typing_extensions import Final
+57 57 | from typing_extensions import OrderedDict
+58    |-from typing_extensions import runtime_checkable
+   58 |+from typing import runtime_checkable
+59 59 | 
+60 60 | from typing_extensions import Annotated
+61 61 | from typing_extensions import get_type_hints
+
+UP035_2.py:60:1: UP035 [*] Import from `typing` instead: `Annotated`
+   |
+58 | from typing_extensions import runtime_checkable
+59 | 
+60 | from typing_extensions import Annotated
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+61 | from typing_extensions import get_type_hints
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+57 57 | from typing_extensions import OrderedDict
+58 58 | from typing_extensions import runtime_checkable
+59 59 | 
+60    |-from typing_extensions import Annotated
+   60 |+from typing import Annotated
+61 61 | from typing_extensions import get_type_hints
+62 62 | 
+63 63 | from typing_extensions import Concatenate
+
+UP035_2.py:61:1: UP035 [*] Import from `typing` instead: `get_type_hints`
+   |
+60 | from typing_extensions import Annotated
+61 | from typing_extensions import get_type_hints
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+62 | 
+63 | from typing_extensions import Concatenate
+   |
+   = help: Import from `typing`
+
+ℹ Unsafe fix
+58 58 | from typing_extensions import runtime_checkable
+59 59 | 
+60 60 | from typing_extensions import Annotated
+61    |-from typing_extensions import get_type_hints
+   61 |+from typing import get_type_hints
+62 62 | 
+63 63 | from typing_extensions import Concatenate
+64 64 | from typing_extensions import Literal
+
+UP035_2.py:63:1: UP035 [*] Import from `typing` instead: `Concatenate`
+   |
+61 | from typing_extensions import get_type_hints
+62 | 
+63 | from typing_extensions import Concatenate
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+64 | from typing_extensions import Literal
+65 | from typing_extensions import NewType
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+60 60 | from typing_extensions import Annotated
+61 61 | from typing_extensions import get_type_hints
+62 62 | 
+63    |-from typing_extensions import Concatenate
+   63 |+from typing import Concatenate
+64 64 | from typing_extensions import Literal
+65 65 | from typing_extensions import NewType
+66 66 | from typing_extensions import ParamSpecArgs
+
+UP035_2.py:64:1: UP035 [*] Import from `typing` instead: `Literal`
+   |
+63 | from typing_extensions import Concatenate
+64 | from typing_extensions import Literal
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+65 | from typing_extensions import NewType
+66 | from typing_extensions import ParamSpecArgs
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+61 61 | from typing_extensions import get_type_hints
+62 62 | 
+63 63 | from typing_extensions import Concatenate
+64    |-from typing_extensions import Literal
+   64 |+from typing import Literal
+65 65 | from typing_extensions import NewType
+66 66 | from typing_extensions import ParamSpecArgs
+67 67 | from typing_extensions import ParamSpecKwargs
+
+UP035_2.py:65:1: UP035 [*] Import from `typing` instead: `NewType`
+   |
+63 | from typing_extensions import Concatenate
+64 | from typing_extensions import Literal
+65 | from typing_extensions import NewType
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+66 | from typing_extensions import ParamSpecArgs
+67 | from typing_extensions import ParamSpecKwargs
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+62 62 | 
+63 63 | from typing_extensions import Concatenate
+64 64 | from typing_extensions import Literal
+65    |-from typing_extensions import NewType
+   65 |+from typing import NewType
+66 66 | from typing_extensions import ParamSpecArgs
+67 67 | from typing_extensions import ParamSpecKwargs
+68 68 | from typing_extensions import TypeAlias
+
+UP035_2.py:66:1: UP035 [*] Import from `typing` instead: `ParamSpecArgs`
+   |
+64 | from typing_extensions import Literal
+65 | from typing_extensions import NewType
+66 | from typing_extensions import ParamSpecArgs
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+67 | from typing_extensions import ParamSpecKwargs
+68 | from typing_extensions import TypeAlias
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+63 63 | from typing_extensions import Concatenate
+64 64 | from typing_extensions import Literal
+65 65 | from typing_extensions import NewType
+66    |-from typing_extensions import ParamSpecArgs
+   66 |+from typing import ParamSpecArgs
+67 67 | from typing_extensions import ParamSpecKwargs
+68 68 | from typing_extensions import TypeAlias
+69 69 | from typing_extensions import TypeGuard
+
+UP035_2.py:67:1: UP035 [*] Import from `typing` instead: `ParamSpecKwargs`
+   |
+65 | from typing_extensions import NewType
+66 | from typing_extensions import ParamSpecArgs
+67 | from typing_extensions import ParamSpecKwargs
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+68 | from typing_extensions import TypeAlias
+69 | from typing_extensions import TypeGuard
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+64 64 | from typing_extensions import Literal
+65 65 | from typing_extensions import NewType
+66 66 | from typing_extensions import ParamSpecArgs
+67    |-from typing_extensions import ParamSpecKwargs
+   67 |+from typing import ParamSpecKwargs
+68 68 | from typing_extensions import TypeAlias
+69 69 | from typing_extensions import TypeGuard
+70 70 | from typing_extensions import get_args
+
+UP035_2.py:68:1: UP035 [*] Import from `typing` instead: `TypeAlias`
+   |
+66 | from typing_extensions import ParamSpecArgs
+67 | from typing_extensions import ParamSpecKwargs
+68 | from typing_extensions import TypeAlias
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+69 | from typing_extensions import TypeGuard
+70 | from typing_extensions import get_args
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+65 65 | from typing_extensions import NewType
+66 66 | from typing_extensions import ParamSpecArgs
+67 67 | from typing_extensions import ParamSpecKwargs
+68    |-from typing_extensions import TypeAlias
+   68 |+from typing import TypeAlias
+69 69 | from typing_extensions import TypeGuard
+70 70 | from typing_extensions import get_args
+71 71 | from typing_extensions import get_origin
+
+UP035_2.py:69:1: UP035 [*] Import from `typing` instead: `TypeGuard`
+   |
+67 | from typing_extensions import ParamSpecKwargs
+68 | from typing_extensions import TypeAlias
+69 | from typing_extensions import TypeGuard
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+70 | from typing_extensions import get_args
+71 | from typing_extensions import get_origin
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+66 66 | from typing_extensions import ParamSpecArgs
+67 67 | from typing_extensions import ParamSpecKwargs
+68 68 | from typing_extensions import TypeAlias
+69    |-from typing_extensions import TypeGuard
+   69 |+from typing import TypeGuard
+70 70 | from typing_extensions import get_args
+71 71 | from typing_extensions import get_origin
+72 72 | from typing_extensions import is_typeddict
+
+UP035_2.py:70:1: UP035 [*] Import from `typing` instead: `get_args`
+   |
+68 | from typing_extensions import TypeAlias
+69 | from typing_extensions import TypeGuard
+70 | from typing_extensions import get_args
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+71 | from typing_extensions import get_origin
+72 | from typing_extensions import is_typeddict
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+67 67 | from typing_extensions import ParamSpecKwargs
+68 68 | from typing_extensions import TypeAlias
+69 69 | from typing_extensions import TypeGuard
+70    |-from typing_extensions import get_args
+   70 |+from typing import get_args
+71 71 | from typing_extensions import get_origin
+72 72 | from typing_extensions import is_typeddict
+73 73 | 
+
+UP035_2.py:71:1: UP035 [*] Import from `typing` instead: `get_origin`
+   |
+69 | from typing_extensions import TypeGuard
+70 | from typing_extensions import get_args
+71 | from typing_extensions import get_origin
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+72 | from typing_extensions import is_typeddict
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+68 68 | from typing_extensions import TypeAlias
+69 69 | from typing_extensions import TypeGuard
+70 70 | from typing_extensions import get_args
+71    |-from typing_extensions import get_origin
+   71 |+from typing import get_origin
+72 72 | from typing_extensions import is_typeddict
+73 73 | 
+74 74 | from typing_extensions import Any
+
+UP035_2.py:72:1: UP035 [*] Import from `typing` instead: `is_typeddict`
+   |
+70 | from typing_extensions import get_args
+71 | from typing_extensions import get_origin
+72 | from typing_extensions import is_typeddict
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+73 | 
+74 | from typing_extensions import Any
+   |
+   = help: Import from `typing`
+
+ℹ Unsafe fix
+69 69 | from typing_extensions import TypeGuard
+70 70 | from typing_extensions import get_args
+71 71 | from typing_extensions import get_origin
+72    |-from typing_extensions import is_typeddict
+   72 |+from typing import is_typeddict
+73 73 | 
+74 74 | from typing_extensions import Any
+75 75 | from typing_extensions import LiteralString
+
+UP035_2.py:74:1: UP035 [*] Import from `typing` instead: `Any`
+   |
+72 | from typing_extensions import is_typeddict
+73 | 
+74 | from typing_extensions import Any
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+75 | from typing_extensions import LiteralString
+76 | from typing_extensions import Never
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+71 71 | from typing_extensions import get_origin
+72 72 | from typing_extensions import is_typeddict
+73 73 | 
+74    |-from typing_extensions import Any
+   74 |+from typing import Any
+75 75 | from typing_extensions import LiteralString
+76 76 | from typing_extensions import Never
+77 77 | from typing_extensions import NotRequired
+
+UP035_2.py:75:1: UP035 [*] Import from `typing` instead: `LiteralString`
+   |
+74 | from typing_extensions import Any
+75 | from typing_extensions import LiteralString
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+76 | from typing_extensions import Never
+77 | from typing_extensions import NotRequired
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+72 72 | from typing_extensions import is_typeddict
+73 73 | 
+74 74 | from typing_extensions import Any
+75    |-from typing_extensions import LiteralString
+   75 |+from typing import LiteralString
+76 76 | from typing_extensions import Never
+77 77 | from typing_extensions import NotRequired
+78 78 | from typing_extensions import Required
+
+UP035_2.py:76:1: UP035 [*] Import from `typing` instead: `Never`
+   |
+74 | from typing_extensions import Any
+75 | from typing_extensions import LiteralString
+76 | from typing_extensions import Never
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+77 | from typing_extensions import NotRequired
+78 | from typing_extensions import Required
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+73 73 | 
+74 74 | from typing_extensions import Any
+75 75 | from typing_extensions import LiteralString
+76    |-from typing_extensions import Never
+   76 |+from typing import Never
+77 77 | from typing_extensions import NotRequired
+78 78 | from typing_extensions import Required
+79 79 | from typing_extensions import Self
+
+UP035_2.py:77:1: UP035 [*] Import from `typing` instead: `NotRequired`
+   |
+75 | from typing_extensions import LiteralString
+76 | from typing_extensions import Never
+77 | from typing_extensions import NotRequired
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+78 | from typing_extensions import Required
+79 | from typing_extensions import Self
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+74 74 | from typing_extensions import Any
+75 75 | from typing_extensions import LiteralString
+76 76 | from typing_extensions import Never
+77    |-from typing_extensions import NotRequired
+   77 |+from typing import NotRequired
+78 78 | from typing_extensions import Required
+79 79 | from typing_extensions import Self
+80 80 | from typing_extensions import assert_never
+
+UP035_2.py:78:1: UP035 [*] Import from `typing` instead: `Required`
+   |
+76 | from typing_extensions import Never
+77 | from typing_extensions import NotRequired
+78 | from typing_extensions import Required
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+79 | from typing_extensions import Self
+80 | from typing_extensions import assert_never
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+75 75 | from typing_extensions import LiteralString
+76 76 | from typing_extensions import Never
+77 77 | from typing_extensions import NotRequired
+78    |-from typing_extensions import Required
+   78 |+from typing import Required
+79 79 | from typing_extensions import Self
+80 80 | from typing_extensions import assert_never
+81 81 | from typing_extensions import assert_type
+
+UP035_2.py:79:1: UP035 [*] Import from `typing` instead: `Self`
+   |
+77 | from typing_extensions import NotRequired
+78 | from typing_extensions import Required
+79 | from typing_extensions import Self
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+80 | from typing_extensions import assert_never
+81 | from typing_extensions import assert_type
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+76 76 | from typing_extensions import Never
+77 77 | from typing_extensions import NotRequired
+78 78 | from typing_extensions import Required
+79    |-from typing_extensions import Self
+   79 |+from typing import Self
+80 80 | from typing_extensions import assert_never
+81 81 | from typing_extensions import assert_type
+82 82 | from typing_extensions import clear_overloads
+
+UP035_2.py:80:1: UP035 [*] Import from `typing` instead: `assert_never`
+   |
+78 | from typing_extensions import Required
+79 | from typing_extensions import Self
+80 | from typing_extensions import assert_never
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+81 | from typing_extensions import assert_type
+82 | from typing_extensions import clear_overloads
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+77 77 | from typing_extensions import NotRequired
+78 78 | from typing_extensions import Required
+79 79 | from typing_extensions import Self
+80    |-from typing_extensions import assert_never
+   80 |+from typing import assert_never
+81 81 | from typing_extensions import assert_type
+82 82 | from typing_extensions import clear_overloads
+83 83 | from typing_extensions import final
+
+UP035_2.py:81:1: UP035 [*] Import from `typing` instead: `assert_type`
+   |
+79 | from typing_extensions import Self
+80 | from typing_extensions import assert_never
+81 | from typing_extensions import assert_type
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+82 | from typing_extensions import clear_overloads
+83 | from typing_extensions import final
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+78 78 | from typing_extensions import Required
+79 79 | from typing_extensions import Self
+80 80 | from typing_extensions import assert_never
+81    |-from typing_extensions import assert_type
+   81 |+from typing import assert_type
+82 82 | from typing_extensions import clear_overloads
+83 83 | from typing_extensions import final
+84 84 | from typing_extensions import get_overloads
+
+UP035_2.py:82:1: UP035 [*] Import from `typing` instead: `clear_overloads`
+   |
+80 | from typing_extensions import assert_never
+81 | from typing_extensions import assert_type
+82 | from typing_extensions import clear_overloads
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+83 | from typing_extensions import final
+84 | from typing_extensions import get_overloads
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+79 79 | from typing_extensions import Self
+80 80 | from typing_extensions import assert_never
+81 81 | from typing_extensions import assert_type
+82    |-from typing_extensions import clear_overloads
+   82 |+from typing import clear_overloads
+83 83 | from typing_extensions import final
+84 84 | from typing_extensions import get_overloads
+85 85 | from typing_extensions import overload
+
+UP035_2.py:83:1: UP035 [*] Import from `typing` instead: `final`
+   |
+81 | from typing_extensions import assert_type
+82 | from typing_extensions import clear_overloads
+83 | from typing_extensions import final
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+84 | from typing_extensions import get_overloads
+85 | from typing_extensions import overload
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+80 80 | from typing_extensions import assert_never
+81 81 | from typing_extensions import assert_type
+82 82 | from typing_extensions import clear_overloads
+83    |-from typing_extensions import final
+   83 |+from typing import final
+84 84 | from typing_extensions import get_overloads
+85 85 | from typing_extensions import overload
+86 86 | from typing_extensions import reveal_type
+
+UP035_2.py:84:1: UP035 [*] Import from `typing` instead: `get_overloads`
+   |
+82 | from typing_extensions import clear_overloads
+83 | from typing_extensions import final
+84 | from typing_extensions import get_overloads
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+85 | from typing_extensions import overload
+86 | from typing_extensions import reveal_type
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+81 81 | from typing_extensions import assert_type
+82 82 | from typing_extensions import clear_overloads
+83 83 | from typing_extensions import final
+84    |-from typing_extensions import get_overloads
+   84 |+from typing import get_overloads
+85 85 | from typing_extensions import overload
+86 86 | from typing_extensions import reveal_type
+87 87 | 
+
+UP035_2.py:85:1: UP035 [*] Import from `typing` instead: `overload`
+   |
+83 | from typing_extensions import final
+84 | from typing_extensions import get_overloads
+85 | from typing_extensions import overload
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+86 | from typing_extensions import reveal_type
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+82 82 | from typing_extensions import clear_overloads
+83 83 | from typing_extensions import final
+84 84 | from typing_extensions import get_overloads
+85    |-from typing_extensions import overload
+   85 |+from typing import overload
+86 86 | from typing_extensions import reveal_type
+87 87 | 
+88 88 | from typing_extensions import Protocol
+
+UP035_2.py:86:1: UP035 [*] Import from `typing` instead: `reveal_type`
+   |
+84 | from typing_extensions import get_overloads
+85 | from typing_extensions import overload
+86 | from typing_extensions import reveal_type
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+87 | 
+88 | from typing_extensions import Protocol
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+83 83 | from typing_extensions import final
+84 84 | from typing_extensions import get_overloads
+85 85 | from typing_extensions import overload
+86    |-from typing_extensions import reveal_type
+   86 |+from typing import reveal_type
+87 87 | 
+88 88 | from typing_extensions import Protocol
+89 89 | from typing_extensions import SupportsAbs
+
+UP035_2.py:88:1: UP035 [*] Import from `typing` instead: `Protocol`
+   |
+86 | from typing_extensions import reveal_type
+87 | 
+88 | from typing_extensions import Protocol
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+89 | from typing_extensions import SupportsAbs
+90 | from typing_extensions import SupportsBytes
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+85 85 | from typing_extensions import overload
+86 86 | from typing_extensions import reveal_type
+87 87 | 
+88    |-from typing_extensions import Protocol
+   88 |+from typing import Protocol
+89 89 | from typing_extensions import SupportsAbs
+90 90 | from typing_extensions import SupportsBytes
+91 91 | from typing_extensions import SupportsComplex
+
+UP035_2.py:89:1: UP035 [*] Import from `typing` instead: `SupportsAbs`
+   |
+88 | from typing_extensions import Protocol
+89 | from typing_extensions import SupportsAbs
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+90 | from typing_extensions import SupportsBytes
+91 | from typing_extensions import SupportsComplex
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+86 86 | from typing_extensions import reveal_type
+87 87 | 
+88 88 | from typing_extensions import Protocol
+89    |-from typing_extensions import SupportsAbs
+   89 |+from typing import SupportsAbs
+90 90 | from typing_extensions import SupportsBytes
+91 91 | from typing_extensions import SupportsComplex
+92 92 | from typing_extensions import SupportsFloat
+
+UP035_2.py:90:1: UP035 [*] Import from `typing` instead: `SupportsBytes`
+   |
+88 | from typing_extensions import Protocol
+89 | from typing_extensions import SupportsAbs
+90 | from typing_extensions import SupportsBytes
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+91 | from typing_extensions import SupportsComplex
+92 | from typing_extensions import SupportsFloat
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+87 87 | 
+88 88 | from typing_extensions import Protocol
+89 89 | from typing_extensions import SupportsAbs
+90    |-from typing_extensions import SupportsBytes
+   90 |+from typing import SupportsBytes
+91 91 | from typing_extensions import SupportsComplex
+92 92 | from typing_extensions import SupportsFloat
+93 93 | from typing_extensions import SupportsInt
+
+UP035_2.py:91:1: UP035 [*] Import from `typing` instead: `SupportsComplex`
+   |
+89 | from typing_extensions import SupportsAbs
+90 | from typing_extensions import SupportsBytes
+91 | from typing_extensions import SupportsComplex
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+92 | from typing_extensions import SupportsFloat
+93 | from typing_extensions import SupportsInt
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+88 88 | from typing_extensions import Protocol
+89 89 | from typing_extensions import SupportsAbs
+90 90 | from typing_extensions import SupportsBytes
+91    |-from typing_extensions import SupportsComplex
+   91 |+from typing import SupportsComplex
+92 92 | from typing_extensions import SupportsFloat
+93 93 | from typing_extensions import SupportsInt
+94 94 | from typing_extensions import SupportsRound
+
+UP035_2.py:92:1: UP035 [*] Import from `typing` instead: `SupportsFloat`
+   |
+90 | from typing_extensions import SupportsBytes
+91 | from typing_extensions import SupportsComplex
+92 | from typing_extensions import SupportsFloat
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+93 | from typing_extensions import SupportsInt
+94 | from typing_extensions import SupportsRound
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+89 89 | from typing_extensions import SupportsAbs
+90 90 | from typing_extensions import SupportsBytes
+91 91 | from typing_extensions import SupportsComplex
+92    |-from typing_extensions import SupportsFloat
+   92 |+from typing import SupportsFloat
+93 93 | from typing_extensions import SupportsInt
+94 94 | from typing_extensions import SupportsRound
+95 95 | from typing_extensions import Unpack
+
+UP035_2.py:93:1: UP035 [*] Import from `typing` instead: `SupportsInt`
+   |
+91 | from typing_extensions import SupportsComplex
+92 | from typing_extensions import SupportsFloat
+93 | from typing_extensions import SupportsInt
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+94 | from typing_extensions import SupportsRound
+95 | from typing_extensions import Unpack
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+90 90 | from typing_extensions import SupportsBytes
+91 91 | from typing_extensions import SupportsComplex
+92 92 | from typing_extensions import SupportsFloat
+93    |-from typing_extensions import SupportsInt
+   93 |+from typing import SupportsInt
+94 94 | from typing_extensions import SupportsRound
+95 95 | from typing_extensions import Unpack
+96 96 | from typing_extensions import dataclass_transform
+
+UP035_2.py:94:1: UP035 [*] Import from `typing` instead: `SupportsRound`
+   |
+92 | from typing_extensions import SupportsFloat
+93 | from typing_extensions import SupportsInt
+94 | from typing_extensions import SupportsRound
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+95 | from typing_extensions import Unpack
+96 | from typing_extensions import dataclass_transform
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+91 91 | from typing_extensions import SupportsComplex
+92 92 | from typing_extensions import SupportsFloat
+93 93 | from typing_extensions import SupportsInt
+94    |-from typing_extensions import SupportsRound
+   94 |+from typing import SupportsRound
+95 95 | from typing_extensions import Unpack
+96 96 | from typing_extensions import dataclass_transform
+97 97 | from typing_extensions import NamedTuple
+
+UP035_2.py:95:1: UP035 [*] Import from `typing` instead: `Unpack`
+   |
+93 | from typing_extensions import SupportsInt
+94 | from typing_extensions import SupportsRound
+95 | from typing_extensions import Unpack
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+96 | from typing_extensions import dataclass_transform
+97 | from typing_extensions import NamedTuple
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+92 92 | from typing_extensions import SupportsFloat
+93 93 | from typing_extensions import SupportsInt
+94 94 | from typing_extensions import SupportsRound
+95    |-from typing_extensions import Unpack
+   95 |+from typing import Unpack
+96 96 | from typing_extensions import dataclass_transform
+97 97 | from typing_extensions import NamedTuple
+98 98 | from typing_extensions import TypedDict
+
+UP035_2.py:96:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
+   |
+94 | from typing_extensions import SupportsRound
+95 | from typing_extensions import Unpack
+96 | from typing_extensions import dataclass_transform
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+97 | from typing_extensions import NamedTuple
+98 | from typing_extensions import TypedDict
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+93 93 | from typing_extensions import SupportsInt
+94 94 | from typing_extensions import SupportsRound
+95 95 | from typing_extensions import Unpack
+96    |-from typing_extensions import dataclass_transform
+   96 |+from typing import dataclass_transform
+97 97 | from typing_extensions import NamedTuple
+98 98 | from typing_extensions import TypedDict
+
+UP035_2.py:97:1: UP035 [*] Import from `typing` instead: `NamedTuple`
+   |
+95 | from typing_extensions import Unpack
+96 | from typing_extensions import dataclass_transform
+97 | from typing_extensions import NamedTuple
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+98 | from typing_extensions import TypedDict
+   |
+   = help: Import from `typing`
+
+ℹ Unsafe fix
+94 94 | from typing_extensions import SupportsRound
+95 95 | from typing_extensions import Unpack
+96 96 | from typing_extensions import dataclass_transform
+97    |-from typing_extensions import NamedTuple
+   97 |+from typing import NamedTuple
+98 98 | from typing_extensions import TypedDict
+
+UP035_2.py:98:1: UP035 [*] Import from `typing` instead: `TypedDict`
+   |
+96 | from typing_extensions import dataclass_transform
+97 | from typing_extensions import NamedTuple
+98 | from typing_extensions import TypedDict
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   |
+   = help: Import from `typing`
+
+ℹ Unsafe fix
+95 95 | from typing_extensions import Unpack
+96 96 | from typing_extensions import dataclass_transform
+97 97 | from typing_extensions import NamedTuple
+98    |-from typing_extensions import TypedDict
+   98 |+from typing import TypedDict
+
+

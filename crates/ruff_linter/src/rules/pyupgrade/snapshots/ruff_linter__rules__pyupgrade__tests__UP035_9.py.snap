@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP035_9.py:2:1: UP035 [*] Import from `enum` instead: `StrEnum`
+  |
+1 | """Members of `backports.strenum` that were moved to `enum`."""
+2 | from backports.strenum import StrEnum
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  |
+  = help: Import from `enum`
+
+ℹ Unsafe fix
+1 1 | """Members of `backports.strenum` that were moved to `enum`."""
+2   |-from backports.strenum import StrEnum
+  2 |+from enum import StrEnum
+
+
