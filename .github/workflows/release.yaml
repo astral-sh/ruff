@@ -516,6 +516,62 @@ jobs:
           files: binaries/*
           tag_name: v${{ inputs.tag }}
 
+  docker-publish:
+    # This action doesn't need to wait on any other task, it's easy to re-tag if something failed and we're validating
+    # the tag here also
+    name: Push Docker image ghcr.io/astral-sh/ruff
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      # For the docker push
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/astral-sh/ruff
+
+      - name: Check tag consistency
+        # Unlike validate-tag we don't check if the commit is on the main branch, but it seems good enough since we can
+        # change docker tags
+        if: ${{ inputs.tag }}
+        run: |
+          version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
+          if [ "${{ inputs.tag }}" != "${version}" ]; then
+            echo "The input tag does not match the version from pyproject.toml:" >&2
+            echo "${{ inputs.tag }}" >&2
+            echo "${version}" >&2
+            exit 1
+          else
+            echo "Releasing ${version}"
+          fi
+
+      - name: "Build and push Docker image"
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          # Reuse the builder
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: ${{ inputs.tag != '' }}
+          tags: ghcr.io/astral-sh/ruff:latest,ghcr.io/astral-sh/ruff:${{ inputs.tag || 'dry-run' }}
+          labels: ${{ steps.meta.outputs.labels }}
+
   # After the release has been published, we update downstream repositories
   # This is separate because if this fails the release is still fine, we just need to do some manual workflow triggers
   update-dependents:
