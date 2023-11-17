@@ -12,7 +12,7 @@ FURB152.py:3:5: FURB152 [*] Replace `3.14` with `math.pi`
   |
   = help: Use `math.pi`
 
-ℹ Unsafe fix
+ℹ Safe fix
   1 |+import math
 1 2 | r = 3.1  # OK
 2 3 | 
@@ -33,7 +33,7 @@ FURB152.py:5:5: FURB152 [*] Replace `6.28` with `math.tau`
   |
   = help: Use `math.tau`
 
-ℹ Unsafe fix
+ℹ Safe fix
   1 |+import math
 1 2 | r = 3.1  # OK
 2 3 | 
@@ -53,7 +53,7 @@ FURB152.py:7:5: FURB152 [*] Replace `2.71` with `math.e`
   |
   = help: Use `math.e`
 
-ℹ Unsafe fix
+ℹ Safe fix
   1 |+import math
 1 2 | r = 3.1  # OK
 2 3 | 

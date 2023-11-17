@@ -1,17 +1,19 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use anyhow::Result;
+
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Number};
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+
 /// ## What it does
 /// Checks for literals that are similar to constants in `math` module.
 ///
 /// ## Why is this bad?
-/// Hard coding mathematical constants like π increases code duplication, reduces readability and
-/// may lack precision.
+/// Hard-coding mathematical constants like π increases code duplication,
+/// reduces readability, and may lead to a lack of precision.
 ///
 /// ## Example
 /// ```python
@@ -46,22 +48,6 @@ impl Violation for MathConstant {
     }
 }
 
-fn convert_to_constant(
-    literal: &ast::ExprNumberLiteral,
-    constant: &'static str,
-    checker: &Checker,
-) -> Result<Fix> {
-    let (edit, binding) = checker.importer().get_or_import_symbol(
-        &ImportRequest::import("math", constant),
-        literal.start(),
-        checker.semantic(),
-    )?;
-    Ok(Fix::unsafe_edits(
-        Edit::range_replacement(binding, literal.range()),
-        [edit],
-    ))
-}
-
 /// FURB152
 pub(crate) fn math_constant(checker: &mut Checker, literal: &ast::ExprNumberLiteral) {
     let Number::Float(value) = literal.value else {
@@ -85,4 +71,20 @@ pub(crate) fn math_constant(checker: &mut Checker, literal: &ast::ExprNumberLite
             return;
         }
     }
+}
+
+fn convert_to_constant(
+    literal: &ast::ExprNumberLiteral,
+    constant: &'static str,
+    checker: &Checker,
+) -> Result<Fix> {
+    let (edit, binding) = checker.importer().get_or_import_symbol(
+        &ImportRequest::import("math", constant),
+        literal.start(),
+        checker.semantic(),
+    )?;
+    Ok(Fix::safe_edits(
+        Edit::range_replacement(binding, literal.range()),
+        [edit],
+    ))
 }
