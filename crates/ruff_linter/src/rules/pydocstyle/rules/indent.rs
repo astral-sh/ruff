@@ -241,7 +241,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
 
     if checker.enabled(Rule::OverIndentation) {
         // If every line (except the last) is over-indented...
-        if is_over_indented && !over_indented_lines.is_empty() {
+        if is_over_indented {
             for line in over_indented_lines {
                 let line_indent = leading_space(line);
                 let indent = clean_space(docstring.indentation);
