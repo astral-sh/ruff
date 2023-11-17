@@ -44,7 +44,7 @@ impl Violation for BadDunderMethodName {
     #[derive_message_formats]
     fn message(&self) -> String {
         let BadDunderMethodName { name } = self;
-        format!("Bad or misspelled dunder method name `{name}`. (bad-dunder-name)")
+        format!("Bad or misspelled dunder method name `{name}`")
     }
 }
 
