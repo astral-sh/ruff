@@ -777,7 +777,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::nested_min_max(checker, expr, func, args, keywords);
             }
             if checker.enabled(Rule::RepeatedKeywords) {
-                pylint::rules::repeated_keywords(checker, keywords);
+                pylint::rules::repeated_keywords(checker, call);
             }
             if checker.enabled(Rule::PytestPatchWithLambda) {
                 if let Some(diagnostic) = flake8_pytest_style::rules::patch_with_lambda(call) {
