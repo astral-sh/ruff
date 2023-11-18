@@ -347,7 +347,7 @@ fn is_decorator(line: Option<&LogicalLine>) -> bool {
 /// Returns `true` if line is a docstring only line.
 fn is_docstring(line: Option<&LogicalLine>) -> bool {
     line.is_some_and(|line| {
-        line.tokens_trimmed().len() > 0
+        !line.tokens_trimmed().is_empty()
             && line
                 .tokens_trimmed()
                 .iter()
