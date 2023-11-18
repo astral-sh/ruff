@@ -21,4 +21,24 @@ E30.py:335:5: E301 [*] Expected 1 blank line, found 0
 336 337 |         pass
 337 338 | # end
 
+E30.py:346:5: E301 [*] Expected 1 blank line, found 0
+    |
+344 |         pass
+345 |     # comment
+346 |     def fn2():
+    |     ^^^ E301
+347 |         pass
+348 | # end
+    |
+    = help: Add missing blank line(s)
+
+ℹ Safe fix
+342 342 | 
+343 343 |     def fn1():
+344 344 |         pass
+    345 |+
+345 346 |     # comment
+346 347 |     def fn2():
+347 348 |         pass
+
 

@@ -31,6 +31,8 @@ pub(crate) struct BlankLinesTrackingVars {
     /// false when a comment is set dedented, but E305 should trigger on the next non-comment line.
     follows_comment_after_fn: bool,
     follows_comment_after_class: bool,
+    /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
+    /// to the second line instead of the first.
     last_non_comment_line_end: TextSize,
 }
 
@@ -345,9 +347,11 @@ fn is_decorator(line: Option<&LogicalLine>) -> bool {
 /// Returns `true` if line is a docstring only line.
 fn is_docstring(line: Option<&LogicalLine>) -> bool {
     line.is_some_and(|line| {
-        line.tokens_trimmed()
-            .iter()
-            .all(|token| matches!(token.kind(), TokenKind::String))
+        line.tokens_trimmed().len() > 0
+            && line
+                .tokens_trimmed()
+                .iter()
+                .all(|token| matches!(token.kind(), TokenKind::String))
     })
 }
 
@@ -437,11 +441,9 @@ pub(crate) fn blank_lines(
             // E301
             let mut diagnostic =
                 Diagnostic::new(BlankLineBetweenMethods(line.line.blank_lines), token.range);
-            // TODO: In the case where there is a comment between two methods, make the comment "stick"
-            // to the second method instead of the first.
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 stylist.line_ending().as_str().to_string(),
-                locator.line_start(token.range.start()),
+                locator.line_start(tracked_vars.last_non_comment_line_end),
             )));
             context.push_diagnostic(diagnostic);
         } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async)
