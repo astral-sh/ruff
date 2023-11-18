@@ -179,9 +179,8 @@ E30.py:422:1: E302 [*] Expected 2 blank lines, found 1
 419 419 |     pass
 420 420 | 
     421 |+
-    422 |+
-421 423 | # comment
-422 424 | @decorator
-423 425 | def g():
+421 422 | # comment
+422 423 | @decorator
+423 424 | def g():
 
 

@@ -477,11 +477,9 @@ pub(crate) fn blank_lines(
                 token.range,
             );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                stylist
-                    .line_ending()
-                    .as_str()
-                    .to_string()
-                    .repeat((BlankLinesConfig::TOP_LEVEL - line.line.blank_lines) as usize),
+                stylist.line_ending().as_str().to_string().repeat(
+                    (BlankLinesConfig::TOP_LEVEL - line.line.preceding_blank_lines) as usize,
+                ),
                 locator.line_start(tracked_vars.last_non_comment_line_end),
             )));
 
