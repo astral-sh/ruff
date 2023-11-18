@@ -75,13 +75,13 @@ E30.py:380:1: E302 [*] Expected 2 blank lines, found 1
     = help: Add missing blank line(s)
 
 ℹ Safe fix
+375 375 | def a():
+376 376 |     pass
 377 377 | 
-378 378 | # comment
-379 379 | 
-    380 |+
+    378 |+
+378 379 | # comment
+379 380 | 
 380 381 | def b():
-381 382 |     pass
-382 383 | # end
 
 E30.py:389:1: E302 [*] Expected 2 blank lines, found 1
     |
@@ -175,13 +175,13 @@ E30.py:422:1: E302 [*] Expected 2 blank lines, found 1
     = help: Add missing blank line(s)
 
 ℹ Safe fix
+418 418 | def f():
 419 419 |     pass
 420 420 | 
-421 421 | # comment
+    421 |+
     422 |+
-    423 |+
+421 423 | # comment
 422 424 | @decorator
 423 425 | def g():
-424 426 |     pass
 
 

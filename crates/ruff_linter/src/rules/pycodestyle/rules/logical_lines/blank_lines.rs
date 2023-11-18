@@ -31,6 +31,7 @@ pub(crate) struct BlankLinesTrackingVars {
     /// false when a comment is set dedented, but E305 should trigger on the next non-comment line.
     follows_comment_after_fn: bool,
     follows_comment_after_class: bool,
+    last_non_comment_line_end: TextSize,
 }
 
 impl Default for BlankLinesTrackingVars {
@@ -45,6 +46,7 @@ impl Default for BlankLinesTrackingVars {
             is_first_logical_line: true,
             follows_comment_after_fn: false,
             follows_comment_after_class: false,
+            last_non_comment_line_end: TextSize::new(0),
         }
     }
 }
@@ -478,7 +480,7 @@ pub(crate) fn blank_lines(
                     .as_str()
                     .to_string()
                     .repeat((BlankLinesConfig::TOP_LEVEL - line.line.blank_lines) as usize),
-                locator.line_start(token.range.start()),
+                locator.line_start(tracked_vars.last_non_comment_line_end),
             )));
 
             context.push_diagnostic(diagnostic);
@@ -603,5 +605,13 @@ pub(crate) fn blank_lines(
 
     if tracked_vars.is_first_logical_line && !line_is_comment_only {
         tracked_vars.is_first_logical_line = false;
+    }
+    if !line_is_comment_only {
+        tracked_vars.last_non_comment_line_end = line
+            .tokens()
+            .last()
+            .expect("Line to contain at least one token.")
+            .range
+            .end();
     }
 }
