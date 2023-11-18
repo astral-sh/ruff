@@ -57,6 +57,7 @@ mod tests {
 
     #[test_case(Rule::InDictKeys, Path::new("SIM118.py"))]
     #[test_case(Rule::IfElseBlockInsteadOfDictGet, Path::new("SIM401.py"))]
+    #[test_case(Rule::DictGetWithNoneDefault, Path::new("SIM910.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
