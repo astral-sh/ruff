@@ -442,7 +442,7 @@ pub(crate) fn blank_lines(
                 locator.line_start(token.range.start()),
             )));
             context.push_diagnostic(diagnostic);
-        } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class | TokenKind::At)
+        } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async)
             && !(
                 // Allow decorators.
                 tracked_vars.follows_decorator
@@ -579,7 +579,7 @@ pub(crate) fn blank_lines(
                 tracked_vars.follows_def = false;
                 break;
             }
-            TokenKind::Def => {
+            TokenKind::Def | TokenKind::Async => {
                 if !tracked_vars.is_in_fn {
                     tracked_vars.fn_indent_level = indent_level + indent_size;
                 }
@@ -587,10 +587,6 @@ pub(crate) fn blank_lines(
                 tracked_vars.follows_def = true;
                 tracked_vars.follows_decorator = false;
                 break;
-            }
-            TokenKind::Async => {
-                tracked_vars.follows_decorator = false;
-                tracked_vars.follows_def = false;
             }
             TokenKind::Comment => {
                 break;

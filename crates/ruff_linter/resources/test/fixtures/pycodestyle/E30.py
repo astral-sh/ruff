@@ -320,6 +320,13 @@ class Class:
 # end
 
 
+# no error
+@decorator
+async def function(data: None) -> None:
+    ...
+# end
+
+
 # E301
 class Class(object):
 
