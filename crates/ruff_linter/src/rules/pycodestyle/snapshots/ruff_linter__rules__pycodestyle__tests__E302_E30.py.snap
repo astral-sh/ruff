@@ -164,7 +164,7 @@ E30.py:412:1: E302 [*] Expected 2 blank lines, found 0
 413 415 |     pass
 414 416 | # end
 
-E30.py:422:1: E302 [*] Expected 2 blank lines, found 0
+E30.py:422:1: E302 [*] Expected 2 blank lines, found 1
     |
 421 | # comment
 422 | @decorator

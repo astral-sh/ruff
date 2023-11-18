@@ -468,8 +468,10 @@ pub(crate) fn blank_lines(
             && line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
         {
             // E302
-            let mut diagnostic =
-                Diagnostic::new(BlankLinesTopLevel(line.line.blank_lines), token.range);
+            let mut diagnostic = Diagnostic::new(
+                BlankLinesTopLevel(line.line.preceding_blank_lines),
+                token.range,
+            );
             diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 stylist
                     .line_ending()
