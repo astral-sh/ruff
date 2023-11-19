@@ -19,6 +19,7 @@ use super::LogicalLine;
 pub(crate) struct BlankLinesTrackingVars {
     follows_decorator: bool,
     follows_def: bool,
+    follows_docstring: bool,
     is_in_class: bool,
     /// The indent level where the class started.
     class_indent_level: usize,
@@ -41,6 +42,7 @@ impl Default for BlankLinesTrackingVars {
         BlankLinesTrackingVars {
             follows_decorator: false,
             follows_def: false,
+            follows_docstring: false,
             is_in_class: false,
             class_indent_level: 0,
             is_in_fn: false,
@@ -419,8 +421,8 @@ pub(crate) fn blank_lines(
         } else if token.kind() == TokenKind::Def
             // Only applies to method.
             && tracked_vars.is_in_class
-            // The class's docstring can directly precede the first function.
-            && !is_docstring(prev_line)
+            // The class/parent method's docstring can directly precede the def.
+            && !tracked_vars.follows_docstring
             // Do not trigger when then def follows an if/while/etc...
             && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
             && (
@@ -544,7 +546,7 @@ pub(crate) fn blank_lines(
             && line.line.preceding_blank_lines == 0
             && !is_decorator(prev_line)
             // The class's docstring can directly precede the first function.
-            && !is_docstring(prev_line)
+            && !tracked_vars.follows_docstring
             && !prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level < indent_level)
             // Allow groups of one-liners.
             && !(tracked_vars.follows_def
@@ -603,10 +605,13 @@ pub(crate) fn blank_lines(
         }
     }
 
-    if tracked_vars.is_first_logical_line && !line_is_comment_only {
-        tracked_vars.is_first_logical_line = false;
-    }
     if !line_is_comment_only {
+        if tracked_vars.is_first_logical_line {
+            tracked_vars.is_first_logical_line = false;
+        }
+
+        tracked_vars.follows_docstring = is_docstring(Some(line));
+
         tracked_vars.last_non_comment_line_end = line
             .tokens()
             .last()

@@ -327,6 +327,16 @@ async def function(data: None) -> None:
 # end
 
 
+# no error
+class Class:
+    def method():
+        """docstring"""
+        # comment
+        def function():
+            pass
+# end
+
+
 # E301
 class Class(object):
 
