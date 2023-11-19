@@ -109,3 +109,13 @@ def fine():
         a = 1
     except Exception:
         error("Context message here", exc_info=sys.exc_info())
+
+
+def nested():
+    try:
+        a = 1
+    except Exception:
+        try:
+            b = 2
+        except Exception:
+            error("Context message here")
