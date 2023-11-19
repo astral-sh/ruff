@@ -442,19 +442,17 @@ pub(crate) fn blank_lines(
             }
 
             if line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
-                && !(
-                    // Allow decorators (if there is an error it will be triggered on the first decorator).
-                    tracked_vars.follows_decorator
-                    // Allow groups of one-liners.
-                    || (tracked_vars.follows_def
-                        && line
-                        .tokens_trimmed()
-                        .last()
-                        .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
-                    )
-                    // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
-                    || (line.line.preceding_blank_lines >= BlankLinesConfig::TOP_LEVEL && prev_line.map_or(false, LogicalLine::is_comment_only))
+                // Allow following a decorator (if there is an error it will be triggered on the first decorator).
+                && !tracked_vars.follows_decorator
+                // Allow groups of one-liners.
+                && !(tracked_vars.follows_def
+                    && line
+                    .tokens_trimmed()
+                    .last()
+                    .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
                 )
+                // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
+                && !(line.line.preceding_blank_lines >= BlankLinesConfig::TOP_LEVEL && prev_line.map_or(false, LogicalLine::is_comment_only))
                 // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
                 && indent_level == 0
                 // Only apply to functions or classes.
@@ -537,7 +535,7 @@ pub(crate) fn blank_lines(
                 // Only apply to nested functions.
                 && tracked_vars.is_in_fn
                 && is_top_level_token_or_decorator(token.kind)
-                // Allow decorators (if there is an error it will be triggered on the first decorator).
+                // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !tracked_vars.follows_decorator
                 // The class's docstring can directly precede the first function.
                 && !tracked_vars.follows_docstring
