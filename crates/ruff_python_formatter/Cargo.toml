@@ -55,3 +55,6 @@ required-features = ["serde"]
 default = ["serde"]
 serde = ["dep:serde", "ruff_formatter/serde", "ruff_source_file/serde", "ruff_python_ast/serde"]
 schemars = ["dep:schemars", "ruff_formatter/schemars"]
+
+[lints]
+workspace = true

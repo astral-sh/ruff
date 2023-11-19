@@ -117,7 +117,7 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
-        diagnostics.extend(check_file_path(path, package, settings));
+        diagnostics.extend(check_file_path(path, package, locator, indexer, settings));
     }
 
     // Run the logical line-based rules.

@@ -543,10 +543,10 @@ mod tests {
     #[test]
     fn multi_line() {
         assert_logical_lines(
-            r#"
+            r"
 x = 1
 y = 2
-z = x + 1"#
+z = x + 1"
                 .trim(),
             &["x = 1", "y = 2", "z = x + 1"],
         );
@@ -555,14 +555,14 @@ z = x + 1"#
     #[test]
     fn indented() {
         assert_logical_lines(
-            r#"
+            r"
 x = [
   1,
   2,
   3,
 ]
 y = 2
-z = x + 1"#
+z = x + 1"
                 .trim(),
             &["x = [\n  1,\n  2,\n  3,\n]", "y = 2", "z = x + 1"],
         );
@@ -576,11 +576,11 @@ z = x + 1"#
     #[test]
     fn function_definition() {
         assert_logical_lines(
-            r#"
+            r"
 def f():
   x = 1
-f()"#
-                .trim(),
+f()"
+            .trim(),
             &["def f():", "x = 1", "f()"],
         );
     }
@@ -608,11 +608,11 @@ f()"#
     #[test]
     fn empty_line() {
         assert_logical_lines(
-            r#"
+            r"
 if False:
 
     print()
-"#
+"
             .trim(),
             &["if False:", "print()", ""],
         );

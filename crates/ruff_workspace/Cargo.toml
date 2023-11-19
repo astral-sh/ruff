@@ -44,8 +44,9 @@ toml = { workspace = true }
 [dev-dependencies]
 tempfile = "3.8.1"
 
-
 [features]
+default = []
 schemars = [ "dep:schemars", "ruff_formatter/schemars", "ruff_python_formatter/schemars" ]
 
-default = []
+[lints]
+workspace = true

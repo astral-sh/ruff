@@ -97,11 +97,12 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
     let mut diagnostic = Diagnostic::new(TrioZeroSleepCall, call.range());
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
-            &ImportRequest::import("trio", "lowlevel.checkpoint"),
+            &ImportRequest::import_from("trio", "lowlevel"),
             call.func.start(),
             checker.semantic(),
         )?;
-        let reference_edit = Edit::range_replacement(binding, call.func.range());
+        let reference_edit =
+            Edit::range_replacement(format!("{binding}.checkpoint"), call.func.range());
         let arg_edit = Edit::range_deletion(call.arguments.range);
         Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
     });

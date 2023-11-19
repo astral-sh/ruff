@@ -98,6 +98,10 @@ mod tests {
         Rule::TypingOnlyStandardLibraryImport,
         Path::new("runtime_evaluated_base_classes_4.py")
     )]
+    #[test_case(
+        Rule::TypingOnlyThirdPartyImport,
+        Path::new("runtime_evaluated_base_classes_5.py")
+    )]
     fn runtime_evaluated_base_classes(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -171,18 +175,18 @@ mod tests {
     }
 
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         import pandas as pd
 
         def f(x: pd.DataFrame):
             pass
-    "#,
+    ",
         "no_typing_import"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from typing import TYPE_CHECKING
@@ -191,11 +195,11 @@ mod tests {
 
         def f(x: pd.DataFrame):
             pass
-    "#,
+    ",
         "typing_import_before_package_import"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         import pandas as pd
@@ -204,11 +208,11 @@ mod tests {
 
         def f(x: pd.DataFrame):
             pass
-    "#,
+    ",
         "typing_import_after_package_import"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         import pandas as pd
@@ -217,11 +221,11 @@ mod tests {
             pass
 
         from typing import TYPE_CHECKING
-    "#,
+    ",
         "typing_import_after_usage"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from typing import TYPE_CHECKING
@@ -233,11 +237,11 @@ mod tests {
 
         def f(x: pd.DataFrame):
             pass
-    "#,
+    ",
         "type_checking_block_own_line"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from typing import TYPE_CHECKING
@@ -248,11 +252,11 @@ mod tests {
 
         def f(x: pd.DataFrame):
             pass
-    "#,
+    ",
         "type_checking_block_inline"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from typing import TYPE_CHECKING
@@ -265,11 +269,11 @@ mod tests {
 
         def f(x: pd.DataFrame):
             pass
-    "#,
+    ",
         "type_checking_block_comment"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from typing import TYPE_CHECKING
@@ -281,11 +285,11 @@ mod tests {
 
         if TYPE_CHECKING:
             import os
-    "#,
+    ",
         "type_checking_block_after_usage"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from pandas import (
@@ -295,11 +299,11 @@ mod tests {
 
         def f(x: DataFrame):
             pass
-    "#,
+    ",
         "import_from"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from typing import TYPE_CHECKING
@@ -314,11 +318,11 @@ mod tests {
 
         def f(x: DataFrame):
             pass
-    "#,
+    ",
         "import_from_type_checking_block"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from typing import TYPE_CHECKING
@@ -330,11 +334,11 @@ mod tests {
 
         def f(x: DataFrame, y: Series):
             pass
-    "#,
+    ",
         "multiple_members"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from typing import TYPE_CHECKING
@@ -343,11 +347,11 @@ mod tests {
 
         def f(x: os, y: sys):
             pass
-    "#,
+    ",
         "multiple_modules_same_type"
     )]
     #[test_case(
-        r#"
+        r"
         from __future__ import annotations
 
         from typing import TYPE_CHECKING
@@ -356,7 +360,7 @@ mod tests {
 
         def f(x: os, y: pandas):
             pass
-    "#,
+    ",
         "multiple_modules_different_types"
     )]
     fn contents(contents: &str, snapshot: &str) {

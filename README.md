@@ -150,7 +150,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.5
+  rev: v0.1.6
   hooks:
     # Run the linter.
     - id: ruff
@@ -428,6 +428,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
 - [Reflex](https://github.com/reflex-dev/reflex)
+- [River](https://github.com/online-ml/river)
 - [Rippling](https://rippling.com)
 - [Robyn](https://github.com/sansyrox/robyn)
 - [Saleor](https://github.com/saleor/saleor)

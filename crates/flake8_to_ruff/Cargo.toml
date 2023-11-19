@@ -1,6 +1,6 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.1.5"
+version = "0.1.6"
 description = """
 Convert Flake8 configuration files to Ruff configuration files.
 """
@@ -34,3 +34,6 @@ toml = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
+
+[lints]
+workspace = true

@@ -44,7 +44,7 @@ impl Violation for TripleSingleQuotes {
         let TripleSingleQuotes { expected_quote } = self;
         match expected_quote {
             Quote::Double => format!(r#"Use triple double quotes `"""`"#),
-            Quote::Single => format!(r#"Use triple single quotes `'''`"#),
+            Quote::Single => format!(r"Use triple single quotes `'''`"),
         }
     }
 

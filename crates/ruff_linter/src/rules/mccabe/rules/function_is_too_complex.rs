@@ -166,10 +166,10 @@ mod tests {
 
     #[test]
     fn trivial() -> Result<()> {
-        let source = r#"
+        let source = r"
 def trivial():
     pass
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
@@ -177,10 +177,10 @@ def trivial():
 
     #[test]
     fn expr_as_statement() -> Result<()> {
-        let source = r#"
+        let source = r"
 def expr_as_statement():
     0xF00D
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
@@ -188,12 +188,12 @@ def expr_as_statement():
 
     #[test]
     fn sequential() -> Result<()> {
-        let source = r#"
+        let source = r"
 def sequential(n):
     k = n + 4
     s = k + n
     return s
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
@@ -234,11 +234,11 @@ def nested_ifs():
 
     #[test]
     fn for_loop() -> Result<()> {
-        let source = r#"
+        let source = r"
 def for_loop():
     for i in range(10):
         print(i)
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
@@ -246,13 +246,13 @@ def for_loop():
 
     #[test]
     fn for_else() -> Result<()> {
-        let source = r#"
+        let source = r"
 def for_else(mylist):
     for i in mylist:
         print(i)
     else:
         print(None)
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
@@ -260,13 +260,13 @@ def for_else(mylist):
 
     #[test]
     fn recursive() -> Result<()> {
-        let source = r#"
+        let source = r"
 def recursive(n):
     if n > 4:
         return f(n - 1)
     else:
         return n
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
@@ -274,7 +274,7 @@ def recursive(n):
 
     #[test]
     fn nested_functions() -> Result<()> {
-        let source = r#"
+        let source = r"
 def nested_functions():
     def a():
         def b():
@@ -283,7 +283,7 @@ def nested_functions():
         b()
 
     a()
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
@@ -291,7 +291,7 @@ def nested_functions():
 
     #[test]
     fn try_else() -> Result<()> {
-        let source = r#"
+        let source = r"
 def try_else():
     try:
         print(1)
@@ -301,7 +301,7 @@ def try_else():
         print(3)
     else:
         print(4)
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 4);
         Ok(())
@@ -309,7 +309,7 @@ def try_else():
 
     #[test]
     fn nested_try_finally() -> Result<()> {
-        let source = r#"
+        let source = r"
 def nested_try_finally():
     try:
         try:
@@ -318,7 +318,7 @@ def nested_try_finally():
             print(2)
     finally:
         print(3)
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
@@ -326,7 +326,7 @@ def nested_try_finally():
 
     #[test]
     fn foobar() -> Result<()> {
-        let source = r#"
+        let source = r"
 async def foobar(a, b, c):
     await whatever(a, b, c)
     if await b:
@@ -335,7 +335,7 @@ async def foobar(a, b, c):
         pass
     async for x in a:
         pass
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 3);
         Ok(())
@@ -343,10 +343,10 @@ async def foobar(a, b, c):
 
     #[test]
     fn annotated_assign() -> Result<()> {
-        let source = r#"
+        let source = r"
 def annotated_assign():
     x: Any = None
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
@@ -354,7 +354,7 @@ def annotated_assign():
 
     #[test]
     fn class() -> Result<()> {
-        let source = r#"
+        let source = r"
 class Class:
     def handle(self, *args, **options):
         if args:
@@ -382,7 +382,7 @@ class Class:
                 pass
 
         return ServiceProvider(Logger())
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 9);
         Ok(())
@@ -390,13 +390,13 @@ class Class:
 
     #[test]
     fn finally() -> Result<()> {
-        let source = r#"
+        let source = r"
 def process_detect_lines():
     try:
         pass
     finally:
         pass
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
@@ -419,12 +419,12 @@ def process_detect_lines():
 
     #[test]
     fn with() -> Result<()> {
-        let source = r#"
+        let source = r"
 def with_lock():
     with lock:
         if foo:
             print('bar')
-"#;
+";
         let stmts = parse_suite(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
