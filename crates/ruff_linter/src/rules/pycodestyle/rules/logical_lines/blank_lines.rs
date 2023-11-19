@@ -424,14 +424,14 @@ pub(crate) fn blank_lines(
             continue;
         }
 
-        // Don't expect blank lines before the first line non comment line.
+        // Don't expect blank lines before the first non comment line.
         if !tracked_vars.is_first_logical_line {
             if token.kind() == TokenKind::Def
                 // Only applies to methods.
                 && tracked_vars.is_in_class
                 // The class/parent method's docstring can directly precede the def.
                 && !tracked_vars.follows_docstring
-                // Do not trigger when then def follows an if/while/etc...
+                // Do not trigger when the def follows an if/while/etc...
                 && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
                 && (
                     // A comment before the def is allowed (as long as it is preceded by a blank line).
