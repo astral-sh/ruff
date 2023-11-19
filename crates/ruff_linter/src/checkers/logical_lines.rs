@@ -41,7 +41,6 @@ pub(crate) fn check_logical_lines(
 
     let mut blank_lines_tracking_vars = BlankLinesTrackingVars::default();
     let mut non_comment_prev_line = None;
-    let mut prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
@@ -106,7 +105,6 @@ pub(crate) fn check_logical_lines(
 
         blank_lines(
             &line,
-            prev_line.as_ref(),
             &mut blank_lines_tracking_vars,
             prev_indent_level,
             indent_level,
@@ -120,7 +118,6 @@ pub(crate) fn check_logical_lines(
             non_comment_prev_line = Some(line.clone());
             prev_indent_level = Some(indent_level);
         }
-        prev_line = Some(line);
     }
     context.diagnostics
 }

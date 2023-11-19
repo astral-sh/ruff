@@ -369,7 +369,6 @@ fn is_top_level_token_or_decorator(token: TokenKind) -> bool {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn blank_lines(
     line: &LogicalLine,
-    prev_line: Option<&LogicalLine>,
     tracked_vars: &mut BlankLinesTrackingVars,
     prev_indent_level: Option<usize>,
     indent_level: usize,
@@ -441,7 +440,7 @@ pub(crate) fn blank_lines(
                 context.push_diagnostic(diagnostic);
             }
 
-            if line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
+            if line.line.preceding_blank_lines < BlankLinesConfig::TOP_LEVEL
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !tracked_vars.follows_decorator
                 // Allow groups of one-liners.
@@ -451,8 +450,6 @@ pub(crate) fn blank_lines(
                     .last()
                     .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
                 )
-                // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
-                && !(line.line.preceding_blank_lines >= BlankLinesConfig::TOP_LEVEL && prev_line.map_or(false, LogicalLine::is_comment_only))
                 // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
                 && indent_level == 0
                 // Only apply to functions or classes.
