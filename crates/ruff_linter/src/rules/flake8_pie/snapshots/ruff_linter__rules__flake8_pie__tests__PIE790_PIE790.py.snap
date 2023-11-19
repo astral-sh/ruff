@@ -473,6 +473,8 @@ PIE790.py:179:5: PIE790 [*] Unnecessary `pass` statement
 178 |     ...
 179 |     pass
     |     ^^^^ PIE790
+180 | 
+181 | from typing import Protocol
     |
     = help: Remove unnecessary `pass`
 
@@ -481,5 +483,8 @@ PIE790.py:179:5: PIE790 [*] Unnecessary `pass` statement
 177 177 | for i in range(10):
 178 178 |     ...
 179     |-    pass
+180 179 | 
+181 180 | from typing import Protocol
+182 181 | 
 
 
