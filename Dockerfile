@@ -16,9 +16,12 @@ RUN case "$TARGETPLATFORM" in \
     "linux/amd64") echo "x86_64-unknown-linux-musl" > rust_target.txt ;; \
     *) exit 1 ;; \
     esac
-# TODO: --default-toolchain none and use rust-toolchain.toml instead
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --target $(cat rust_target.txt) --profile minimal
+# Update rustup whenever we bump the rust version
+COPY rust-toolchain.toml rust-toolchain.toml
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --target $(cat rust_target.txt) --profile minimal --default-toolchain none
 ENV PATH="$HOME/.cargo/bin:$PATH"
+# Installs the correct toolchain version from rust-toolchain.toml and then the musl target
+RUN rustup target add $(cat rust_target.txt)
 
 # Build
 COPY crates crates
