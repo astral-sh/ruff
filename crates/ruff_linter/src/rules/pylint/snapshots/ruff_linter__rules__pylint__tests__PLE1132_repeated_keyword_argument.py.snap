@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-repeated_keywords.py:16:21: PLE1132 Repeated keyword argument: `c`
+repeated_keyword_argument.py:16:21: PLE1132 Repeated keyword argument: `c`
    |
 15 | # Invalid
 16 | func(a=11, c=31, **{"c": 41})
@@ -10,7 +10,7 @@ repeated_keywords.py:16:21: PLE1132 Repeated keyword argument: `c`
 18 | func(a=11, b=21, c=31, **{"b": 22, "c": 41, "a": 51})
    |
 
-repeated_keywords.py:17:21: PLE1132 Repeated keyword argument: `c`
+repeated_keyword_argument.py:17:21: PLE1132 Repeated keyword argument: `c`
    |
 15 | # Invalid
 16 | func(a=11, c=31, **{"c": 41})
@@ -20,7 +20,7 @@ repeated_keywords.py:17:21: PLE1132 Repeated keyword argument: `c`
 19 | func(a=11, b=21, **{"c": 31}, **{"c": 32})
    |
 
-repeated_keywords.py:17:30: PLE1132 Repeated keyword argument: `a`
+repeated_keyword_argument.py:17:30: PLE1132 Repeated keyword argument: `a`
    |
 15 | # Invalid
 16 | func(a=11, c=31, **{"c": 41})
@@ -30,7 +30,7 @@ repeated_keywords.py:17:30: PLE1132 Repeated keyword argument: `a`
 19 | func(a=11, b=21, **{"c": 31}, **{"c": 32})
    |
 
-repeated_keywords.py:18:27: PLE1132 Repeated keyword argument: `b`
+repeated_keyword_argument.py:18:27: PLE1132 Repeated keyword argument: `b`
    |
 16 | func(a=11, c=31, **{"c": 41})
 17 | func(a=11, c=31, **{"c": 41, "a": 51})
@@ -40,7 +40,7 @@ repeated_keywords.py:18:27: PLE1132 Repeated keyword argument: `b`
 20 | func(a=11, b=21, **{"c": 31, "c": 32})
    |
 
-repeated_keywords.py:18:36: PLE1132 Repeated keyword argument: `c`
+repeated_keyword_argument.py:18:36: PLE1132 Repeated keyword argument: `c`
    |
 16 | func(a=11, c=31, **{"c": 41})
 17 | func(a=11, c=31, **{"c": 41, "a": 51})
@@ -50,7 +50,7 @@ repeated_keywords.py:18:36: PLE1132 Repeated keyword argument: `c`
 20 | func(a=11, b=21, **{"c": 31, "c": 32})
    |
 
-repeated_keywords.py:18:45: PLE1132 Repeated keyword argument: `a`
+repeated_keyword_argument.py:18:45: PLE1132 Repeated keyword argument: `a`
    |
 16 | func(a=11, c=31, **{"c": 41})
 17 | func(a=11, c=31, **{"c": 41, "a": 51})
@@ -60,7 +60,7 @@ repeated_keywords.py:18:45: PLE1132 Repeated keyword argument: `a`
 20 | func(a=11, b=21, **{"c": 31, "c": 32})
    |
 
-repeated_keywords.py:19:34: PLE1132 Repeated keyword argument: `c`
+repeated_keyword_argument.py:19:34: PLE1132 Repeated keyword argument: `c`
    |
 17 | func(a=11, c=31, **{"c": 41, "a": 51})
 18 | func(a=11, b=21, c=31, **{"b": 22, "c": 41, "a": 51})
@@ -69,7 +69,7 @@ repeated_keywords.py:19:34: PLE1132 Repeated keyword argument: `c`
 20 | func(a=11, b=21, **{"c": 31, "c": 32})
    |
 
-repeated_keywords.py:20:30: PLE1132 Repeated keyword argument: `c`
+repeated_keyword_argument.py:20:30: PLE1132 Repeated keyword argument: `c`
    |
 18 | func(a=11, b=21, c=31, **{"b": 22, "c": 41, "a": 51})
 19 | func(a=11, b=21, **{"c": 31}, **{"c": 32})

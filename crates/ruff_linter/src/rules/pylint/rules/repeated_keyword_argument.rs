@@ -24,11 +24,11 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Argument](https://docs.python.org/3/glossary.html#term-argument)
 #[violation]
-pub struct RepeatedKeywords {
+pub struct RepeatedKeywordArgument {
     duplicate_keyword: String,
 }
 
-impl Violation for RepeatedKeywords {
+impl Violation for RepeatedKeywordArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { duplicate_keyword } = self;
@@ -36,7 +36,7 @@ impl Violation for RepeatedKeywords {
     }
 }
 
-pub(crate) fn repeated_keywords(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) {
     let ExprCall {
         arguments: Arguments { keywords, .. },
         ..
@@ -50,7 +50,7 @@ pub(crate) fn repeated_keywords(checker: &mut Checker, call: &ExprCall) {
             // Ex) `func(a=1, a=2)`
             if !seen.insert(id.as_str()) {
                 checker.diagnostics.push(Diagnostic::new(
-                    RepeatedKeywords {
+                    RepeatedKeywordArgument {
                         duplicate_keyword: id.to_string(),
                     },
                     keyword.range(),
@@ -62,7 +62,7 @@ pub(crate) fn repeated_keywords(checker: &mut Checker, call: &ExprCall) {
                 if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
                     if !seen.insert(value) {
                         checker.diagnostics.push(Diagnostic::new(
-                            RepeatedKeywords {
+                            RepeatedKeywordArgument {
                                 duplicate_keyword: value.to_string(),
                             },
                             key.range(),
