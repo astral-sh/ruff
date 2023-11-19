@@ -35,6 +35,7 @@ pub(crate) struct BlankLinesTrackingVars {
     /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
     /// to the second line instead of the first.
     last_non_comment_line_end: TextSize,
+    previous_unindented_token: Option<TokenKind>,
 }
 
 impl Default for BlankLinesTrackingVars {
@@ -51,6 +52,7 @@ impl Default for BlankLinesTrackingVars {
             follows_comment_after_fn: false,
             follows_comment_after_class: false,
             last_non_comment_line_end: TextSize::new(0),
+            previous_unindented_token: None,
         }
     }
 }
@@ -357,6 +359,21 @@ fn is_docstring(line: Option<&LogicalLine>) -> bool {
     })
 }
 
+/// Returns `true` if the token is Async, Class or Def
+fn is_top_level_token(token: Option<TokenKind>) -> bool {
+    token.is_some_and(|token| matches!(token, TokenKind::Class | TokenKind::Def | TokenKind::Async))
+}
+
+/// Returns `true` if the token is At, Async, Class or Def
+fn is_top_level_token_or_decorator(token: Option<TokenKind>) -> bool {
+    token.is_some_and(|token| {
+        matches!(
+            token,
+            TokenKind::Class | TokenKind::Def | TokenKind::Async | TokenKind::At
+        )
+    })
+}
+
 /// E301, E302, E303, E304, E305, E306
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn blank_lines(
@@ -372,13 +389,10 @@ pub(crate) fn blank_lines(
 ) {
     let line_is_comment_only = line.is_comment_only();
 
-    let mut follows_class_or_fn = false;
     if indent_level < tracked_vars.class_indent_level && tracked_vars.is_in_class {
         tracked_vars.is_in_class = false;
         if line_is_comment_only {
             tracked_vars.follows_comment_after_class = true;
-        } else {
-            follows_class_or_fn = true;
         }
     }
 
@@ -386,8 +400,6 @@ pub(crate) fn blank_lines(
         tracked_vars.is_in_fn = false;
         if line_is_comment_only {
             tracked_vars.follows_comment_after_fn = true;
-        } else {
-            follows_class_or_fn = true;
         }
     }
 
@@ -396,8 +408,6 @@ pub(crate) fn blank_lines(
     if tracked_vars.follows_comment_after_fn && !line_is_comment_only {
         if indent_level == tracked_vars.fn_indent_level {
             tracked_vars.is_in_fn = true;
-        } else {
-            follows_class_or_fn = true;
         }
         tracked_vars.follows_comment_after_fn = false;
     }
@@ -405,8 +415,6 @@ pub(crate) fn blank_lines(
     if tracked_vars.follows_comment_after_class && !line_is_comment_only {
         if indent_level == tracked_vars.class_indent_level {
             tracked_vars.is_in_class = true;
-        } else {
-            follows_class_or_fn = true;
         }
         tracked_vars.follows_comment_after_class = false;
     }
@@ -517,13 +525,10 @@ pub(crate) fn blank_lines(
 
             context.push_diagnostic(diagnostic);
         } else if line.line.preceding_blank_lines < BlankLinesConfig::TOP_LEVEL
-            && follows_class_or_fn
+            && is_top_level_token(tracked_vars.previous_unindented_token)
             && indent_level == 0
             && !line_is_comment_only
-            && !matches!(
-                token.kind(),
-                TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async
-            )
+            && !is_top_level_token_or_decorator(Some(token.kind))
         {
             // E305
             let mut diagnostic = Diagnostic::new(
@@ -618,5 +623,14 @@ pub(crate) fn blank_lines(
             .expect("Line to contain at least one token.")
             .range
             .end();
+
+        if indent_level == 0 && !line.tokens_trimmed().is_empty() {
+            tracked_vars.previous_unindented_token = Some(
+                line.tokens_trimmed()
+                    .first()
+                    .expect("Previously checked.")
+                    .kind,
+            );
+        }
     }
 }

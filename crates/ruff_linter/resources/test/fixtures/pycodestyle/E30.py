@@ -337,6 +337,18 @@ class Class:
 # end
 
 
+# no error
+try:
+    if True:
+        # comment
+        class Class:
+            pass
+
+except:
+    pass
+# end
+
+
 # E301
 class Class(object):
 

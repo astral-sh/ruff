@@ -1,44 +1,44 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:345:5: E301 [*] Expected 1 blank line, found 0
+E30.py:357:5: E301 [*] Expected 1 blank line, found 0
     |
-343 |     def func1():
-344 |         pass
-345 |     def func2():
+355 |     def func1():
+356 |         pass
+357 |     def func2():
     |     ^^^ E301
-346 |         pass
-347 | # end
+358 |         pass
+359 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-342 342 | 
-343 343 |     def func1():
-344 344 |         pass
-    345 |+
-345 346 |     def func2():
-346 347 |         pass
-347 348 | # end
+354 354 | 
+355 355 |     def func1():
+356 356 |         pass
+    357 |+
+357 358 |     def func2():
+358 359 |         pass
+359 360 | # end
 
-E30.py:356:5: E301 [*] Expected 1 blank line, found 0
+E30.py:368:5: E301 [*] Expected 1 blank line, found 0
     |
-354 |         pass
-355 |     # comment
-356 |     def fn2():
+366 |         pass
+367 |     # comment
+368 |     def fn2():
     |     ^^^ E301
-357 |         pass
-358 | # end
+369 |         pass
+370 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-352 352 | 
-353 353 |     def fn1():
-354 354 |         pass
-    355 |+
-355 356 |     # comment
-356 357 |     def fn2():
-357 358 |         pass
+364 364 | 
+365 365 |     def fn1():
+366 366 |         pass
+    367 |+
+367 368 |     # comment
+368 369 |     def fn2():
+369 370 |         pass
 
 

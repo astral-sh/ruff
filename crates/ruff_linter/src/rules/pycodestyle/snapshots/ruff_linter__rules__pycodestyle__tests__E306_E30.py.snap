@@ -1,163 +1,163 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:577:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:589:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
-575 | def a():
-576 |     x = 1
-577 |     def b():
+587 | def a():
+588 |     x = 1
+589 |     def b():
     |     ^^^ E306
-578 |         pass
-579 | # end
+590 |         pass
+591 | # end
     |
     = help: Add missing blank line
 
 ℹ Safe fix
-574 574 | # E306:3:5
-575 575 | def a():
-576 576 |     x = 1
-    577 |+
-577 578 |     def b():
-578 579 |         pass
-579 580 | # end
+586 586 | # E306:3:5
+587 587 | def a():
+588 588 |     x = 1
+    589 |+
+589 590 |     def b():
+590 591 |         pass
+591 592 | # end
 
-E30.py:585:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:597:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
-583 | async def a():
-584 |     x = 1
-585 |     def b():
+595 | async def a():
+596 |     x = 1
+597 |     def b():
     |     ^^^ E306
-586 |         pass
-587 | # end
+598 |         pass
+599 | # end
     |
     = help: Add missing blank line
 
 ℹ Safe fix
-582 582 | #: E306:3:5
-583 583 | async def a():
-584 584 |     x = 1
-    585 |+
-585 586 |     def b():
-586 587 |         pass
-587 588 | # end
+594 594 | #: E306:3:5
+595 595 | async def a():
+596 596 |     x = 1
+    597 |+
+597 598 |     def b():
+598 599 |         pass
+599 600 | # end
 
-E30.py:593:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:605:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
-591 | def a():
-592 |     x = 2
-593 |     def b():
+603 | def a():
+604 |     x = 2
+605 |     def b():
     |     ^^^ E306
-594 |         x = 1
-595 |         def c():
+606 |         x = 1
+607 |         def c():
     |
     = help: Add missing blank line
 
 ℹ Safe fix
-590 590 | #: E306:3:5 E306:5:9
-591 591 | def a():
-592 592 |     x = 2
-    593 |+
-593 594 |     def b():
-594 595 |         x = 1
-595 596 |         def c():
+602 602 | #: E306:3:5 E306:5:9
+603 603 | def a():
+604 604 |     x = 2
+    605 |+
+605 606 |     def b():
+606 607 |         x = 1
+607 608 |         def c():
 
-E30.py:595:9: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:607:9: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
-593 |     def b():
-594 |         x = 1
-595 |         def c():
+605 |     def b():
+606 |         x = 1
+607 |         def c():
     |         ^^^ E306
-596 |             pass
-597 | # end
+608 |             pass
+609 | # end
     |
     = help: Add missing blank line
 
 ℹ Safe fix
-592 592 |     x = 2
-593 593 |     def b():
-594 594 |         x = 1
-    595 |+
-595 596 |         def c():
-596 597 |             pass
-597 598 | # end
-
-E30.py:603:5: E306 [*] Expected 1 blank line before a nested definition, found 0
-    |
-601 | def a():
-602 |     x = 1
-603 |     class C:
-    |     ^^^^^ E306
-604 |         pass
-605 |     x = 2
-    |
-    = help: Add missing blank line
-
-ℹ Safe fix
-600 600 | # E306:3:5 E306:6:5
-601 601 | def a():
-602 602 |     x = 1
-    603 |+
-603 604 |     class C:
-604 605 |         pass
-605 606 |     x = 2
-
-E30.py:606:5: E306 [*] Expected 1 blank line before a nested definition, found 0
-    |
-604 |         pass
-605 |     x = 2
-606 |     def b():
-    |     ^^^ E306
-607 |         pass
-608 | # end
-    |
-    = help: Add missing blank line
-
-ℹ Safe fix
-603 603 |     class C:
-604 604 |         pass
-605 605 |     x = 2
-    606 |+
-606 607 |     def b():
-607 608 |         pass
-608 609 | # end
+604 604 |     x = 2
+605 605 |     def b():
+606 606 |         x = 1
+    607 |+
+607 608 |         def c():
+608 609 |             pass
+609 610 | # end
 
 E30.py:615:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
-613 |     def bar():
-614 |         pass
-615 |     def baz(): pass
-    |     ^^^ E306
-616 | # end
+613 | def a():
+614 |     x = 1
+615 |     class C:
+    |     ^^^^^ E306
+616 |         pass
+617 |     x = 2
     |
     = help: Add missing blank line
 
 ℹ Safe fix
-612 612 | def foo():
-613 613 |     def bar():
-614 614 |         pass
+612 612 | # E306:3:5 E306:6:5
+613 613 | def a():
+614 614 |     x = 1
     615 |+
-615 616 |     def baz(): pass
-616 617 | # end
-617 618 | 
+615 616 |     class C:
+616 617 |         pass
+617 618 |     x = 2
 
-E30.py:622:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+E30.py:618:5: E306 [*] Expected 1 blank line before a nested definition, found 0
     |
-620 | def foo():
-621 |     def bar(): pass
-622 |     def baz():
+616 |         pass
+617 |     x = 2
+618 |     def b():
     |     ^^^ E306
-623 |         pass
-624 | # end
+619 |         pass
+620 | # end
     |
     = help: Add missing blank line
 
 ℹ Safe fix
-619 619 | # E306:3:5
-620 620 | def foo():
-621 621 |     def bar(): pass
-    622 |+
-622 623 |     def baz():
-623 624 |         pass
-624 625 | # end
+615 615 |     class C:
+616 616 |         pass
+617 617 |     x = 2
+    618 |+
+618 619 |     def b():
+619 620 |         pass
+620 621 | # end
+
+E30.py:627:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+    |
+625 |     def bar():
+626 |         pass
+627 |     def baz(): pass
+    |     ^^^ E306
+628 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+624 624 | def foo():
+625 625 |     def bar():
+626 626 |         pass
+    627 |+
+627 628 |     def baz(): pass
+628 629 | # end
+629 630 | 
+
+E30.py:634:5: E306 [*] Expected 1 blank line before a nested definition, found 0
+    |
+632 | def foo():
+633 |     def bar(): pass
+634 |     def baz():
+    |     ^^^ E306
+635 |         pass
+636 | # end
+    |
+    = help: Add missing blank line
+
+ℹ Safe fix
+631 631 | # E306:3:5
+632 632 | def foo():
+633 633 |     def bar(): pass
+    634 |+
+634 635 |     def baz():
+635 636 |         pass
+636 637 | # end
 
 
