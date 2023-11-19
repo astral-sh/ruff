@@ -341,13 +341,6 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
     }
 }
 
-/// Check if the given line starts with a decorator.
-fn is_decorator(line: Option<&LogicalLine>) -> bool {
-    line.and_then(|line| line.tokens_trimmed().first())
-        .map_or(false, |token| matches!(token.kind(), TokenKind::At))
-}
-
-/// Check if the given line starts with a decorator.
 /// Returns `true` if line is a docstring only line.
 fn is_docstring(line: Option<&LogicalLine>) -> bool {
     line.is_some_and(|line| {
@@ -549,8 +542,9 @@ pub(crate) fn blank_lines(
             if line.line.preceding_blank_lines == 0
                 // Only apply to nested functions.
                 && tracked_vars.is_in_fn
-                && matches!(token.kind(), TokenKind::Def | TokenKind::Class)
-                && !is_decorator(prev_line)
+                && is_top_level_token_or_decorator(token.kind)
+                // Allow decorators (if there is an error it will be triggered on the decorator).
+                && !tracked_vars.follows_decorator
                 // The class's docstring can directly precede the first function.
                 && !tracked_vars.follows_docstring
                 // Do not trigger when the def/class follows an "indenting token" (if/while/etc...), unless that "indenting token" is a def.

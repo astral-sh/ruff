@@ -641,3 +641,29 @@ def f():
     def f():
         pass
 # end
+
+
+# E306
+def a():
+    x = 2
+    @decorator
+    def b():
+        pass
+# end
+
+
+# E306
+def a():
+    x = 2
+    @decorator
+    async def b():
+        pass
+# end
+
+
+# E306
+def a():
+    x = 2
+    async def b():
+        pass
+# end
