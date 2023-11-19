@@ -131,4 +131,11 @@ PYI052.pyi:39:12: PYI052 Need type annotation for `field212`
 41 | field22: Final = {"foo": 5}
    |
 
+PYI052.pyi:114:11: PYI052 Need type annotation for `WIZ`
+    |
+113 | class Bop:
+114 |     WIZ = 4
+    |           ^ PYI052
+    |
+
 
