@@ -166,9 +166,9 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// Checks for extraneous blank lines.
 ///
 /// ## Why is this bad?
-/// PEP 8 recommends the using blank lines as following:
-/// - Two blank lines are expected between functions and classes
-/// - One blank line is expected between methods of a class.
+/// PEP 8 recommends using blank lines as follows:
+/// - Surround top-level function and class definitions with two blank lines.
+/// - Surround method definitions inside a class by a single blank line.
 ///
 /// ## Example
 /// ```python
@@ -424,155 +424,166 @@ pub(crate) fn blank_lines(
             continue;
         }
 
-        if tracked_vars.is_first_logical_line {
-            // Don't expect blank lines before the first line non comment line.
-        } else if token.kind() == TokenKind::Def
-            // Only applies to method.
-            && tracked_vars.is_in_class
-            // The class/parent method's docstring can directly precede the def.
-            && !tracked_vars.follows_docstring
-            // Do not trigger when then def follows an if/while/etc...
-            && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
-            && (
-                // A comment before the def is allowed (as long as it is preceded by a blank line).
-                (line.line.preceding_blank_lines == 0 && line.line.blank_lines == 0 && prev_line.is_some_and(LogicalLine::is_comment_only))
-                // Standard case.
-                || line.line.blank_lines == 0
-                    && prev_line
-                    .and_then(|prev_line| prev_line.tokens_trimmed().first())
-                    .map_or(false, |token| {
-                        !matches!(
-                            token.kind(),
-                            TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async
-                        )
-                    })
-            )
-        {
-            // E301
-            let mut diagnostic =
-                Diagnostic::new(BlankLineBetweenMethods(line.line.blank_lines), token.range);
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                stylist.line_ending().as_str().to_string(),
-                locator.line_start(tracked_vars.last_non_comment_line_end),
-            )));
-            context.push_diagnostic(diagnostic);
-        } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async)
-            && !(
-                // Allow decorators.
-                tracked_vars.follows_decorator
-                // Allow groups of one-liners.
-                || (tracked_vars.follows_def
-                    && line
-                    .tokens_trimmed()
-                    .last()
-                    .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
+        // Don't expect blank lines before the first line non comment line.
+        if !tracked_vars.is_first_logical_line {
+            if token.kind() == TokenKind::Def
+                // Only applies to methods.
+                && tracked_vars.is_in_class
+                // The class/parent method's docstring can directly precede the def.
+                && !tracked_vars.follows_docstring
+                // Do not trigger when then def follows an if/while/etc...
+                && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
+                && (
+                    // A comment before the def is allowed (as long as it is preceded by a blank line).
+                    (line.line.preceding_blank_lines == 0 && line.line.blank_lines == 0 && prev_line.is_some_and(LogicalLine::is_comment_only))
+                    // Standard case.
+                    || line.line.blank_lines == 0
+                        && prev_line
+                        .and_then(|prev_line| prev_line.tokens_trimmed().first())
+                        .map_or(false, |token| {
+                            !matches!(
+                                token.kind(),
+                                TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async
+                            )
+                        })
                 )
-                // Only apply to top level functions.
-                || tracked_vars.is_in_class
-                || tracked_vars.is_in_fn
-                // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
-                || (line.line.preceding_blank_lines >= BlankLinesConfig::TOP_LEVEL && prev_line.map_or(false, LogicalLine::is_comment_only))
-            )
-            // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
-            && indent_level == 0
-            // Allow directly following an except.
-            && prev_line
-            .and_then(|prev_line| prev_line.tokens_trimmed().first())
-            .map_or(true, |token| !matches!(token.kind(), TokenKind::Except))
-            && line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
-        {
-            // E302
-            let mut diagnostic = Diagnostic::new(
-                BlankLinesTopLevel(line.line.preceding_blank_lines),
-                token.range,
-            );
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                stylist.line_ending().as_str().to_string().repeat(
-                    (BlankLinesConfig::TOP_LEVEL - line.line.preceding_blank_lines) as usize,
-                ),
-                locator.line_start(tracked_vars.last_non_comment_line_end),
-            )));
+            {
+                // E301
+                let mut diagnostic =
+                    Diagnostic::new(BlankLineBetweenMethods(line.line.blank_lines), token.range);
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    stylist.line_ending().as_str().to_string(),
+                    locator.line_start(tracked_vars.last_non_comment_line_end),
+                )));
+                context.push_diagnostic(diagnostic);
+            }
 
-            context.push_diagnostic(diagnostic);
-        } else if line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
-            || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
-                && line.line.blank_lines > BlankLinesConfig::METHOD)
-        {
-            // E303
-            let mut diagnostic =
-                Diagnostic::new(TooManyBlankLines(line.line.blank_lines), token.range);
+            if is_top_level_token_or_decorator(Some(token.kind))
+                && !(
+                    // Allow decorators.
+                    tracked_vars.follows_decorator
+                    // Allow groups of one-liners.
+                    || (tracked_vars.follows_def
+                        && line
+                        .tokens_trimmed()
+                        .last()
+                        .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
+                    )
+                    // Only apply to top level functions.
+                    || tracked_vars.is_in_class
+                    || tracked_vars.is_in_fn
+                    // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
+                    || (line.line.preceding_blank_lines >= BlankLinesConfig::TOP_LEVEL && prev_line.map_or(false, LogicalLine::is_comment_only))
+                )
+                // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
+                && indent_level == 0
+                // Allow directly following an except.
+                && prev_line
+                .and_then(|prev_line| prev_line.tokens_trimmed().first())
+                .map_or(true, |token| !matches!(token.kind(), TokenKind::Except))
+                && line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
+            {
+                // E302
+                let mut diagnostic = Diagnostic::new(
+                    BlankLinesTopLevel(line.line.preceding_blank_lines),
+                    token.range,
+                );
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    stylist.line_ending().as_str().to_string().repeat(
+                        (BlankLinesConfig::TOP_LEVEL - line.line.preceding_blank_lines) as usize,
+                    ),
+                    locator.line_start(tracked_vars.last_non_comment_line_end),
+                )));
 
-            let chars_to_remove = if indent_level > 0 {
-                line.line.preceding_blank_characters - BlankLinesConfig::METHOD
-            } else {
-                line.line.preceding_blank_characters - BlankLinesConfig::TOP_LEVEL
-            };
-            let end = locator.line_start(token.range.start());
-            let start = end - TextSize::new(chars_to_remove);
-            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
+                context.push_diagnostic(diagnostic);
+            }
 
-            context.push_diagnostic(diagnostic);
-        } else if tracked_vars.follows_decorator && line.line.blank_lines > 0 {
-            // E304
-            let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range);
+            if line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
+                || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
+                    && line.line.blank_lines > BlankLinesConfig::METHOD)
+            {
+                // E303
+                let mut diagnostic =
+                    Diagnostic::new(TooManyBlankLines(line.line.blank_lines), token.range);
 
-            let range = token.range;
-            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                locator.line_start(range.start())
-                    - TextSize::new(line.line.preceding_blank_characters),
-                locator.line_start(range.start()),
-            )));
+                let chars_to_remove = if indent_level > 0 {
+                    line.line.preceding_blank_characters - BlankLinesConfig::METHOD
+                } else {
+                    line.line.preceding_blank_characters - BlankLinesConfig::TOP_LEVEL
+                };
+                let end = locator.line_start(token.range.start());
+                let start = end - TextSize::new(chars_to_remove);
+                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
 
-            context.push_diagnostic(diagnostic);
-        } else if line.line.preceding_blank_lines < BlankLinesConfig::TOP_LEVEL
-            && is_top_level_token(tracked_vars.previous_unindented_token)
-            && indent_level == 0
-            && !line_is_comment_only
-            && !is_top_level_token_or_decorator(Some(token.kind))
-        {
-            // E305
-            let mut diagnostic = Diagnostic::new(
-                BlankLinesAfterFunctionOrClass(line.line.blank_lines),
-                token.range,
-            );
+                context.push_diagnostic(diagnostic);
+            }
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                stylist
-                    .line_ending()
-                    .as_str()
-                    .to_string()
-                    .repeat((BlankLinesConfig::TOP_LEVEL - line.line.blank_lines) as usize),
-                locator.line_start(token.range.start()),
-            )));
+            if tracked_vars.follows_decorator && line.line.preceding_blank_lines > 0 {
+                // E304
+                let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, token.range);
 
-            context.push_diagnostic(diagnostic);
-        } else if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
-            && (tracked_vars.is_in_class || tracked_vars.is_in_fn)
-            && line.line.preceding_blank_lines == 0
-            && !is_decorator(prev_line)
-            // The class's docstring can directly precede the first function.
-            && !tracked_vars.follows_docstring
-            && !prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level < indent_level)
-            // Allow groups of one-liners.
-            && !(tracked_vars.follows_def
-                && line
-                .tokens_trimmed()
-                .last()
-                .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
-            )
-        {
-            // E306
-            let mut diagnostic = Diagnostic::new(
-                BlankLinesBeforeNestedDefinition(line.line.blank_lines),
-                token.range,
-            );
+                let range = token.range;
+                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                    locator.line_start(range.start())
+                        - TextSize::new(line.line.preceding_blank_characters),
+                    locator.line_start(range.start()),
+                )));
 
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                stylist.line_ending().as_str().to_string(),
-                locator.line_start(token.range.start()),
-            )));
+                context.push_diagnostic(diagnostic);
+            }
 
-            context.push_diagnostic(diagnostic);
+            if line.line.preceding_blank_lines < BlankLinesConfig::TOP_LEVEL
+                && is_top_level_token(tracked_vars.previous_unindented_token)
+                && indent_level == 0
+                && !line_is_comment_only
+                && !is_top_level_token_or_decorator(Some(token.kind))
+            {
+                // E305
+                let mut diagnostic = Diagnostic::new(
+                    BlankLinesAfterFunctionOrClass(line.line.blank_lines),
+                    token.range,
+                );
+
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    stylist
+                        .line_ending()
+                        .as_str()
+                        .to_string()
+                        .repeat((BlankLinesConfig::TOP_LEVEL - line.line.blank_lines) as usize),
+                    locator.line_start(token.range.start()),
+                )));
+
+                context.push_diagnostic(diagnostic);
+            }
+
+            if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
+                && tracked_vars.is_in_fn
+                && line.line.preceding_blank_lines == 0
+                && !is_decorator(prev_line)
+                // The class's docstring can directly precede the first function.
+                && !tracked_vars.follows_docstring
+                && !prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level < indent_level)
+                // Allow groups of one-liners.
+                && !(tracked_vars.follows_def
+                     && line
+                     .tokens_trimmed()
+                     .last()
+                     .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
+                )
+            {
+                // E306
+                let mut diagnostic = Diagnostic::new(
+                    BlankLinesBeforeNestedDefinition(line.line.blank_lines),
+                    token.range,
+                );
+
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    stylist.line_ending().as_str().to_string(),
+                    locator.line_start(token.range.start()),
+                )));
+
+                context.push_diagnostic(diagnostic);
+            }
         }
 
         match token.kind() {
