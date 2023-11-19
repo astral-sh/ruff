@@ -228,6 +228,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0604") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllObject),
         (Pylint, "E0605") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllFormat),
         (Pylint, "E0704") => (RuleGroup::Preview, rules::pylint::rules::MisplacedBareRaise),
+        (Pylint, "E1132") => (RuleGroup::Preview, rules::pylint::rules::RepeatedKeywordArgument),
         (Pylint, "E1142") => (RuleGroup::Stable, rules::pylint::rules::AwaitOutsideAsync),
         (Pylint, "E1205") => (RuleGroup::Stable, rules::pylint::rules::LoggingTooManyArgs),
         (Pylint, "E1206") => (RuleGroup::Stable, rules::pylint::rules::LoggingTooFewArgs),
