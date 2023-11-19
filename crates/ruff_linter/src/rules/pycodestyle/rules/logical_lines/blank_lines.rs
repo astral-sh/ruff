@@ -425,14 +425,8 @@ pub(crate) fn blank_lines(
                 && !tracked_vars.follows_docstring
                 // Do not trigger when the def follows an if/while/etc...
                 && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
-                && (
-                    // A comment before the def is allowed (as long as it is preceded by a blank line).
-                    prev_line.is_some_and(LogicalLine::is_comment_only)
-                    // Standard case.
-                    || prev_line
-                        .and_then(|prev_line| prev_line.tokens_trimmed().first())
-                        .is_some_and(|token| !is_top_level_token_or_decorator(token.kind))
-                )
+                // Allow following a decorator (if there is an error it will be triggered on the first decorator).
+                && !tracked_vars.follows_decorator
             {
                 // E301
                 let mut diagnostic = Diagnostic::new(
@@ -449,7 +443,7 @@ pub(crate) fn blank_lines(
 
             if line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
                 && !(
-                    // Allow decorators (if there is an error it will be triggered on the decorator).
+                    // Allow decorators (if there is an error it will be triggered on the first decorator).
                     tracked_vars.follows_decorator
                     // Allow groups of one-liners.
                     || (tracked_vars.follows_def
@@ -543,7 +537,7 @@ pub(crate) fn blank_lines(
                 // Only apply to nested functions.
                 && tracked_vars.is_in_fn
                 && is_top_level_token_or_decorator(token.kind)
-                // Allow decorators (if there is an error it will be triggered on the decorator).
+                // Allow decorators (if there is an error it will be triggered on the first decorator).
                 && !tracked_vars.follows_decorator
                 // The class's docstring can directly precede the first function.
                 && !tracked_vars.follows_docstring
