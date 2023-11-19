@@ -9,20 +9,16 @@ use rustc_hash::FxHashSet;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for repeated keyword arguments passed to a function call
+/// Checks for repeated keyword arguments in function calls.
 ///
 /// ## Why is this bad?
-/// Python does not allow for multiple values to be assigned to the same
-/// keyword argument in a single function call.
+/// Python does not allow repeated keyword arguments in function calls. If a
+/// function is called with the same keyword argument multiple times, the
+/// interpreter will raise an exception.
 ///
 /// ## Example
 /// ```python
 /// func(1, 2, c=3, **{"c": 4})
-/// ```
-///
-/// Use instead:
-/// ```python
-/// func(1, 2, **{"c": 4})
 /// ```
 ///
 /// ## References
@@ -51,6 +47,7 @@ pub(crate) fn repeated_keywords(checker: &mut Checker, call: &ExprCall) {
 
     for keyword in keywords {
         if let Some(id) = &keyword.arg {
+            // Ex) `func(a=1, a=2)`
             if !seen.insert(id.as_str()) {
                 checker.diagnostics.push(Diagnostic::new(
                     RepeatedKeywords {
@@ -59,8 +56,8 @@ pub(crate) fn repeated_keywords(checker: &mut Checker, call: &ExprCall) {
                     keyword.range(),
                 ));
             }
-        // We only want to check dict keys if there is NO arg associated with them
         } else if let Expr::Dict(ExprDict { keys, .. }) = &keyword.value {
+            // Ex) `func(**{"a": 1, "a": 2})`
             for key in keys.iter().flatten() {
                 if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
                     if !seen.insert(value) {
