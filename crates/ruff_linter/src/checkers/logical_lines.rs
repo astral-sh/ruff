@@ -115,7 +115,7 @@ pub(crate) fn check_logical_lines(
         );
 
         if !line.is_comment_only() {
-            non_comment_prev_line = Some(line.clone());
+            non_comment_prev_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
     }
