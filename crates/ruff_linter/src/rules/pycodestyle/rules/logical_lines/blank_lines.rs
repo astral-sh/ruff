@@ -365,13 +365,11 @@ fn is_top_level_token(token: Option<TokenKind>) -> bool {
 }
 
 /// Returns `true` if the token is At, Async, Class or Def
-fn is_top_level_token_or_decorator(token: Option<TokenKind>) -> bool {
-    token.is_some_and(|token| {
-        matches!(
-            token,
-            TokenKind::Class | TokenKind::Def | TokenKind::Async | TokenKind::At
-        )
-    })
+fn is_top_level_token_or_decorator(token: TokenKind) -> bool {
+    matches!(
+        token,
+        TokenKind::Class | TokenKind::Def | TokenKind::Async | TokenKind::At
+    )
 }
 
 /// E301, E302, E303, E304, E305, E306
@@ -426,8 +424,9 @@ pub(crate) fn blank_lines(
 
         // Don't expect blank lines before the first non comment line.
         if !tracked_vars.is_first_logical_line {
-            if token.kind() == TokenKind::Def
+            if line.line.preceding_blank_lines == 0
                 // Only applies to methods.
+                && token.kind() == TokenKind::Def
                 && tracked_vars.is_in_class
                 // The class/parent method's docstring can directly precede the def.
                 && !tracked_vars.follows_docstring
@@ -435,32 +434,29 @@ pub(crate) fn blank_lines(
                 && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
                 && (
                     // A comment before the def is allowed (as long as it is preceded by a blank line).
-                    (line.line.preceding_blank_lines == 0 && line.line.blank_lines == 0 && prev_line.is_some_and(LogicalLine::is_comment_only))
+                    prev_line.is_some_and(LogicalLine::is_comment_only)
                     // Standard case.
-                    || line.line.blank_lines == 0
-                        && prev_line
+                    || prev_line
                         .and_then(|prev_line| prev_line.tokens_trimmed().first())
-                        .map_or(false, |token| {
-                            !matches!(
-                                token.kind(),
-                                TokenKind::Def | TokenKind::Class | TokenKind::At | TokenKind::Async
-                            )
-                        })
+                        .is_some_and(|token| !is_top_level_token_or_decorator(token.kind))
                 )
             {
                 // E301
-                let mut diagnostic =
-                    Diagnostic::new(BlankLineBetweenMethods(line.line.blank_lines), token.range);
+                let mut diagnostic = Diagnostic::new(
+                    BlankLineBetweenMethods(line.line.preceding_blank_lines),
+                    token.range,
+                );
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     stylist.line_ending().as_str().to_string(),
                     locator.line_start(tracked_vars.last_non_comment_line_end),
                 )));
+
                 context.push_diagnostic(diagnostic);
             }
 
-            if is_top_level_token_or_decorator(Some(token.kind))
+            if line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
                 && !(
-                    // Allow decorators.
+                    // Allow decorators (if there is an error it will be triggered on the decorator).
                     tracked_vars.follows_decorator
                     // Allow groups of one-liners.
                     || (tracked_vars.follows_def
@@ -469,19 +465,13 @@ pub(crate) fn blank_lines(
                         .last()
                         .map_or(false, |token| !matches!(token.kind(), TokenKind::Colon))
                     )
-                    // Only apply to top level functions.
-                    || tracked_vars.is_in_class
-                    || tracked_vars.is_in_fn
                     // If a comment is preceding the def/class, the 2 blank lines can be before that comment.
                     || (line.line.preceding_blank_lines >= BlankLinesConfig::TOP_LEVEL && prev_line.map_or(false, LogicalLine::is_comment_only))
                 )
                 // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
                 && indent_level == 0
-                // Allow directly following an except.
-                && prev_line
-                .and_then(|prev_line| prev_line.tokens_trimmed().first())
-                .map_or(true, |token| !matches!(token.kind(), TokenKind::Except))
-                && line.line.blank_lines < BlankLinesConfig::TOP_LEVEL
+                // Only apply to functions or classes.
+                && is_top_level_token_or_decorator(token.kind)
             {
                 // E302
                 let mut diagnostic = Diagnostic::new(
@@ -536,7 +526,7 @@ pub(crate) fn blank_lines(
                 && is_top_level_token(tracked_vars.previous_unindented_token)
                 && indent_level == 0
                 && !line_is_comment_only
-                && !is_top_level_token_or_decorator(Some(token.kind))
+                && !is_top_level_token_or_decorator(token.kind)
             {
                 // E305
                 let mut diagnostic = Diagnostic::new(
@@ -556,13 +546,15 @@ pub(crate) fn blank_lines(
                 context.push_diagnostic(diagnostic);
             }
 
-            if matches!(token.kind(), TokenKind::Def | TokenKind::Class)
+            if line.line.preceding_blank_lines == 0
+                // Only apply to nested functions.
                 && tracked_vars.is_in_fn
-                && line.line.preceding_blank_lines == 0
+                && matches!(token.kind(), TokenKind::Def | TokenKind::Class)
                 && !is_decorator(prev_line)
                 // The class's docstring can directly precede the first function.
                 && !tracked_vars.follows_docstring
-                && !prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level < indent_level)
+                // Do not trigger when the def/class follows an "indenting token" (if/while/etc...), unless that "indenting token" is a def.
+                && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level || tracked_vars.follows_def)
                 // Allow groups of one-liners.
                 && !(tracked_vars.follows_def
                      && line

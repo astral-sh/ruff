@@ -620,7 +620,7 @@ def a():
 # end
 
 
-# E306:4:5
+# E306
 def foo():
     def bar():
         pass
@@ -632,13 +632,6 @@ def foo():
 def foo():
     def bar(): pass
     def baz():
-        pass
-# end
-
-
-# E306
-class C:
-    def f():
         pass
 # end
 
