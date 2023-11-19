@@ -3,8 +3,9 @@ use rustc_hash::FxHashSet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{
-    self as ast, Arguments, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
+    self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
 use ruff_python_semantic::{BindingId, ScopeKind, SemanticModel};
 use ruff_source_file::Locator;
@@ -476,26 +477,25 @@ fn is_enum(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
         semantic: &SemanticModel,
         seen: &mut FxHashSet<BindingId>,
     ) -> bool {
-        let Some(Arguments { args: bases, .. }) = class_def.arguments.as_deref() else {
-            return false;
-        };
-
-        bases.iter().any(|expr| {
+        class_def.bases().iter().any(|expr| {
             // If the base class is `enum.Enum`, `enum.Flag`, etc., then this is an enum.
-            if semantic.resolve_call_path(expr).is_some_and(|call_path| {
-                matches!(
-                    call_path.as_slice(),
-                    [
-                        "enum",
-                        "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"
-                    ]
-                )
-            }) {
+            if semantic
+                .resolve_call_path(map_subscript(expr))
+                .is_some_and(|call_path| {
+                    matches!(
+                        call_path.as_slice(),
+                        [
+                            "enum",
+                            "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"
+                        ]
+                    )
+                })
+            {
                 return true;
             }
 
             // If the base class extends `enum.Enum`, `enum.Flag`, etc., then this is an enum.
-            if let Some(id) = semantic.lookup_attribute(expr) {
+            if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
                 if seen.insert(id) {
                     let binding = semantic.binding(id);
                     if let Some(base_class) = binding
