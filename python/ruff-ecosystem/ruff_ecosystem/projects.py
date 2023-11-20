@@ -24,8 +24,8 @@ class Project(Serializable):
     """
 
     repo: Repository
-    check_options: CheckOptions = field(default_factory=CheckOptions)
-    format_options: FormatOptions = field(default_factory=FormatOptions)
+    check_options: CheckOptions = field(default_factory=lambda: CheckOptions())
+    format_options: FormatOptions = field(default_factory=lambda: FormatOptions())
 
     def with_preview_enabled(self: Self) -> Self:
         return type(self)(
