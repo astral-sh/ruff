@@ -18,54 +18,6 @@ ruff check . --watch  # Lint all files in the current directory, and re-lint on 
 
 For the full list of supported options, run `ruff check --help`.
 
-## File selection
-
-As of Ruff v0.1.7 the `ruff check` command uses the current working directory (`.`) as the default path to check.
-
-To lint a specific file or directory, pass the path to `ruff check`:
-
-```shell
-ruff check some-subdirectory  #  Lint all files in a specific directory.
-ruff check some-file.py       #  Lint a specific file
-```
-
-By default, Ruff will include all files matching `*.py`, `*.ipy`, or `pyproject.toml`. 
-To lint files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff.lint]
-    extend-include = ["*.ipynb"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    [lint]
-    extend-include = ["*.ipynb"]
-    ```
-
-You can also change the default selection using the [`include`](settings.md#include) setting.
-
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff.lint]
-    include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    [lint]
-    include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
-    ```
-
-Note that paths provided to `include` _must_ match files. For example, `include = ["src"]` will fail since it
-matches a directory.
-
 ## Rule selection
 
 The set of enabled rules is controlled via the [`select`](settings.md#select),
