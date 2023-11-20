@@ -598,7 +598,6 @@ fn stdin_format_jupyter() {
     }
 
     ----- stderr -----
-    warning: Ignoring file . in favor of standard input.
     "###);
 }
 

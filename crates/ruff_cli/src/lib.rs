@@ -85,7 +85,11 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
 fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     // If the user provided a `--stdin-filename`, always read from standard input.
     if stdin_filename.is_some() {
-        if let Some(file) = files.iter().find(|file| file.as_path() != Path::new("-")) {
+        if let Some(file) = files
+            .iter()
+            // We allow `.` in addition to `-` since it is the default file selector
+            .find(|file| file.as_path() != Path::new("-") && file.as_path() != Path::new("."))
+        {
             warn_user_once!(
                 "Ignoring file {} in favor of standard input.",
                 file.display()
