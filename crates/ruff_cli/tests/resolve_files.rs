@@ -17,58 +17,77 @@ fn check_project_include_defaults() {
     //
     // The nested project should all be checked instead of respecting the parent includes
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+    insta::with_settings!({
+        filters => vec![(".*/resources/test/fixtures/", "[BASEPATH]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r###"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    /Users/mz/eng/src/astral-sh/ruff/crates/ruff_cli/resources/test/fixtures/include-test/a.py
-    /Users/mz/eng/src/astral-sh/ruff/crates/ruff_cli/resources/test/fixtures/include-test/nested-project/e.py
-    /Users/mz/eng/src/astral-sh/ruff/crates/ruff_cli/resources/test/fixtures/include-test/nested-project/pyproject.toml
-    /Users/mz/eng/src/astral-sh/ruff/crates/ruff_cli/resources/test/fixtures/include-test/subdirectory/c.py
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        [BASEPATH]/include-test/a.py
+        [BASEPATH]/include-test/nested-project/e.py
+        [BASEPATH]/include-test/nested-project/pyproject.toml
+        [BASEPATH]/include-test/subdirectory/c.py
 
-    ----- stderr -----
-    "###);
+        ----- stderr -----
+        "###);
+    });
 }
 
 #[test]
 fn check_project_respects_direct_paths() {
     // Given a direct path not included in the project `includes`, it should be checked
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files", "b.py"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r###"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    /Users/mz/eng/src/astral-sh/ruff/crates/ruff_cli/resources/test/fixtures/include-test/b.py
 
-    ----- stderr -----
-    "###);
+    insta::with_settings!({
+        filters => vec![(".*/resources/test/fixtures/", "[BASEPATH]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--show-files", "b.py"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        [BASEPATH]/include-test/b.py
+
+        ----- stderr -----
+        "###);
+    });
 }
 
 #[test]
 fn check_project_respects_subdirectory_includes() {
     // Given a direct path to a subdirectory, the include should be respected
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files", "subdirectory"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r###"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    /Users/mz/eng/src/astral-sh/ruff/crates/ruff_cli/resources/test/fixtures/include-test/subdirectory/c.py
 
-    ----- stderr -----
-    "###);
+    insta::with_settings!({
+        filters => vec![(".*/resources/test/fixtures/", "[BASEPATH]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--show-files", "subdirectory"]).current_dir(Path::new("./resources/test/fixtures/include-test")), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        [BASEPATH]/include-test/subdirectory/c.py
+
+        ----- stderr -----
+        "###);
+    });
 }
 
 #[test]
 fn check_project_from_project_subdirectory_respects_includes() {
     // Run from a project subdirectory, the include specified in the parent directory should be respected
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test/subdirectory")), @r###"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    /Users/mz/eng/src/astral-sh/ruff/crates/ruff_cli/resources/test/fixtures/include-test/subdirectory/c.py
 
-    ----- stderr -----
-    "###);
+    insta::with_settings!({
+        filters => vec![(".*/resources/test/fixtures/", "[BASEPATH]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test/subdirectory")), @r###"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        [BASEPATH]/include-test/subdirectory/c.py
+
+        ----- stderr -----
+        "###);
+    });
 }
