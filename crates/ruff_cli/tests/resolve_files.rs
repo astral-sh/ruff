@@ -58,3 +58,17 @@ fn check_project_respects_subdirectory_includes() {
     ----- stderr -----
     "###);
 }
+
+#[test]
+fn check_project_from_project_subdirectory_respects_includes() {
+    // Run from a project subdirectory, the include specified in the parent directory should be respected
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--show-files"]).current_dir(Path::new("./resources/test/fixtures/include-test/subdirectory")), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    /Users/mz/eng/src/astral-sh/ruff/crates/ruff_cli/resources/test/fixtures/include-test/subdirectory/c.py
+
+    ----- stderr -----
+    "###);
+}
