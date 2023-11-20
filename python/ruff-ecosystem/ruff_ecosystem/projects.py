@@ -75,7 +75,7 @@ class CheckOptions(CommandOptions):
             "check",
             "--no-cache",
             "--exit-zero",
-            f"--{'' if self.preview else "no-"}preview"
+            f"--{'' if self.preview else "no-"}preview",
         ]
         if self.select:
             args.extend(["--select", self.select])
