@@ -25,6 +25,8 @@ def assign():
 
     IntOrStr: TypeAlias = int | str
 
+    type MyInt = int
+
 
 def aug_assign(rank, world_size):
     global CURRENT_PORT
