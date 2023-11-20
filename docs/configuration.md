@@ -422,7 +422,7 @@ Run Ruff on the given files or directories (default)
 Usage: ruff check [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to check
+  [FILES]...  List of files or directories to check [default: .]
 
 Options:
       --fix
@@ -518,7 +518,7 @@ Run the Ruff formatter on the given files or directories
 Usage: ruff format [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to format
+  [FILES]...  List of files or directories to format [default: .]
 
 Options:
       --check
