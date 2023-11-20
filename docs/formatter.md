@@ -21,7 +21,7 @@ For the full list of supported options, run `ruff format --help`.
 
 !!! note
     As of Ruff v0.1.7 the `ruff format` command uses the current working directory (`.`) as the default path to format.
-    See [configuration.md#python-file-discovery] for details on configuring file selection.
+    See [the file discovery documentation](configuration.md#python-file-discovery) for details.
 
 ## Philosophy
 

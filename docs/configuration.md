@@ -336,7 +336,8 @@ You can also change the default selection using the [`include`](settings.md#incl
     include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
     ```
 
-Note that paths provided to `include` _must_ match files. For example, `include = ["src"]` will fail since it
+!!! warning
+    Paths provided to `include` _must_ match files. For example, `include = ["src"]` will fail since it
 matches a directory.
 
 ## Jupyter Notebook discovery
