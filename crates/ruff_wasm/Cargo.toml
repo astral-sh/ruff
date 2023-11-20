@@ -37,7 +37,7 @@ log = { workspace = true }
 
 serde = { workspace = true }
 serde-wasm-bindgen = { version = "0.6.1" }
-wasm-bindgen = { version = "0.2.84" }
+wasm-bindgen = { version = "0.2.88" }
 js-sys = { version = "0.3.61" }
 
 [dev-dependencies]
