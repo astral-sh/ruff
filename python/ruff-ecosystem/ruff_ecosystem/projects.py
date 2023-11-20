@@ -24,8 +24,8 @@ class Project(Serializable):
     """
 
     repo: Repository
-    check_options: CheckOptions = field(default_factory=lambda: CheckOptions())
-    format_options: FormatOptions = field(default_factory=lambda: FormatOptions())
+    check_options: CheckOptions = field(default_factory=CheckOptions)
+    format_options: FormatOptions = field(default_factory=FormatOptions)
 
     def with_preview_enabled(self: Self) -> Self:
         return type(self)(
@@ -46,7 +46,7 @@ class CommandOptions(Serializable, abc.ABC):
         """
         Return a copy of self with the given options set.
         """
-        return type(self)(**{**dataclasses.asdict(self), **kwargs})
+        return type(self)(**dataclasses.asdict(self), **kwargs)
 
     @abc.abstractmethod
     def to_ruff_args(self) -> list[str]:
@@ -98,11 +98,9 @@ class FormatOptions(CommandOptions):
     exclude: str = ""
 
     def to_ruff_args(self) -> list[str]:
-        args = ["format"]
+        args = ["format", f"--{'' if self.preview else 'no-'}preview"]
         if self.exclude:
             args.extend(["--exclude", self.exclude])
-        if self.preview:
-            args.append("--preview")
         return args
 
     def to_black_args(self) -> list[str]:
