@@ -46,7 +46,7 @@ class CommandOptions(Serializable, abc.ABC):
         """
         Return a copy of self with the given options set.
         """
-        return type(self)(**dataclasses.asdict(self), **kwargs)
+        return type(self)(**{**dataclasses.asdict(self), **kwargs})
 
     @abc.abstractmethod
     def to_ruff_args(self) -> list[str]:
