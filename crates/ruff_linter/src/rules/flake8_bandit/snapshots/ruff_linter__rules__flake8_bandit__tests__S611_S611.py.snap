@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S611.py:5:27: S611 Use of RawSQL potential SQL attack vector.
+S611.py:5:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
   |
 4 | User.objects.annotate(val=RawSQL('secure', []))
 5 | User.objects.annotate(val=RawSQL('%secure' % 'nos', []))
@@ -10,7 +10,7 @@ S611.py:5:27: S611 Use of RawSQL potential SQL attack vector.
 7 | raw = '"username") AS "val" FROM "auth_user" WHERE "username"="admin" --'
   |
 
-S611.py:6:27: S611 Use of RawSQL potential SQL attack vector.
+S611.py:6:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
   |
 4 | User.objects.annotate(val=RawSQL('secure', []))
 5 | User.objects.annotate(val=RawSQL('%secure' % 'nos', []))
@@ -20,7 +20,7 @@ S611.py:6:27: S611 Use of RawSQL potential SQL attack vector.
 8 | User.objects.annotate(val=RawSQL(raw, []))
   |
 
-S611.py:8:27: S611 Use of RawSQL potential SQL attack vector.
+S611.py:8:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
    |
  6 | User.objects.annotate(val=RawSQL('{}secure'.format('no'), []))
  7 | raw = '"username") AS "val" FROM "auth_user" WHERE "username"="admin" --'
@@ -30,7 +30,7 @@ S611.py:8:27: S611 Use of RawSQL potential SQL attack vector.
 10 |       ' WHERE "username"="admin" OR 1=%s --'
    |
 
-S611.py:11:27: S611 Use of RawSQL potential SQL attack vector.
+S611.py:11:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
    |
  9 | raw = '"username") AS "val" FROM "auth_user"' \
 10 |       ' WHERE "username"="admin" OR 1=%s --'
@@ -40,7 +40,7 @@ S611.py:11:27: S611 Use of RawSQL potential SQL attack vector.
 13 | User.objects.annotate(val=RawSQL(params=[], sql='{}secure'.format('no')))
    |
 
-S611.py:12:27: S611 Use of RawSQL potential SQL attack vector.
+S611.py:12:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
    |
 10 |       ' WHERE "username"="admin" OR 1=%s --'
 11 | User.objects.annotate(val=RawSQL(raw, [0]))
@@ -49,7 +49,7 @@ S611.py:12:27: S611 Use of RawSQL potential SQL attack vector.
 13 | User.objects.annotate(val=RawSQL(params=[], sql='{}secure'.format('no')))
    |
 
-S611.py:13:27: S611 Use of RawSQL potential SQL attack vector.
+S611.py:13:27: S611 Use of `RawSQL` can lead to SQL injection vulnerabilities
    |
 11 | User.objects.annotate(val=RawSQL(raw, [0]))
 12 | User.objects.annotate(val=RawSQL(sql='{}secure'.format('no'), params=[]))
