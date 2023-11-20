@@ -19,6 +19,10 @@ and instead exit with a non-zero status code upon detecting any unformatted file
 
 For the full list of supported options, run `ruff format --help`.
 
+!!! note
+    As of Ruff v0.1.7 the `ruff format` command uses the current working directory (`.`) as the default path to format.
+    See [configuration.md#python-file-discovery] for details on configuring file selection.
+
 ## Philosophy
 
 The initial goal of the Ruff formatter is _not_ to innovate on code style, but rather, to innovate
