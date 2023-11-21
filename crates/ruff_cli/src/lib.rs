@@ -85,11 +85,7 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
 fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     // If the user provided a `--stdin-filename`, always read from standard input.
     if stdin_filename.is_some() {
-        if let Some(file) = files
-            .iter()
-            // We allow `.` in addition to `-` since it is the default file selector
-            .find(|file| file.as_path() != Path::new("-") && file.as_path() != Path::new("."))
-        {
+        if let Some(file) = files.iter().find(|file| file.as_path() != Path::new("-")) {
             warn_user_once!(
                 "Ignoring file {} in favor of standard input.",
                 file.display()
@@ -103,6 +99,19 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     };
     // If the user provided exactly `-`, read from standard input.
     file == Path::new("-")
+}
+
+/// Returns the default set of files if none are provided, otherwise returns `None`.
+fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
+    if files.is_empty() {
+        if is_stdin {
+            vec![Path::new("-").to_path_buf()]
+        } else {
+            vec![Path::new(".").to_path_buf()]
+        }
+    } else {
+        files
+    }
 }
 
 /// Get the actual value of the `format` desired from either `output_format`
@@ -200,7 +209,7 @@ fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &overrides)
     } else {
-        commands::format::format(&cli, &overrides, log_level)
+        commands::format::format(cli, &overrides, log_level)
     }
 }
 
@@ -226,17 +235,15 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     };
     let stderr_writer = Box::new(BufWriter::new(io::stderr()));
 
+    let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
+    let files = resolve_default_files(cli.files, is_stdin);
+
     if cli.show_settings {
-        commands::show_settings::show_settings(
-            &cli.files,
-            &pyproject_config,
-            &overrides,
-            &mut writer,
-        )?;
+        commands::show_settings::show_settings(&files, &pyproject_config, &overrides, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides, &mut writer)?;
+        commands::show_files::show_files(&files, &pyproject_config, &overrides, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
 
@@ -299,8 +306,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         if !fix_mode.is_generate() {
             warn_user!("--fix is incompatible with --add-noqa.");
         }
-        let modifications =
-            commands::add_noqa::add_noqa(&cli.files, &pyproject_config, &overrides)?;
+        let modifications = commands::add_noqa::add_noqa(&files, &pyproject_config, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
@@ -327,7 +333,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         // Configure the file watcher.
         let (tx, rx) = channel();
         let mut watcher = recommended_watcher(tx)?;
-        for file in &cli.files {
+        for file in &files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
         if let Some(file) = pyproject_config.path.as_ref() {
@@ -339,7 +345,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         printer.write_to_user("Starting linter in watch mode...\n");
 
         let messages = commands::check::check(
-            &cli.files,
+            &files,
             &pyproject_config,
             &overrides,
             cache.into(),
@@ -372,7 +378,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     printer.write_to_user("File change detected...\n");
 
                     let messages = commands::check::check(
-                        &cli.files,
+                        &files,
                         &pyproject_config,
                         &overrides,
                         cache.into(),
@@ -386,8 +392,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             }
         }
     } else {
-        let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
-
         // Generate lint violations.
         let diagnostics = if is_stdin {
             commands::check_stdin::check_stdin(
@@ -399,7 +403,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             )?
         } else {
             commands::check::check(
-                &cli.files,
+                &files,
                 &pyproject_config,
                 &overrides,
                 cache.into(),
