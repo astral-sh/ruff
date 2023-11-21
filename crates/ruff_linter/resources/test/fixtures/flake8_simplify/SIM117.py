@@ -135,7 +135,7 @@ with A() as a:
 
         f"foo {f"bar {x}"} baz"
 
-# Allow cascading for some statements
+# Allow cascading for some statements.
 import anyio
 import asyncio
 import trio
@@ -159,7 +159,7 @@ async with asyncio.timeout(1):
                                 async with trio.move_on_at(1):
                                     pass
 
-# Do not surpress combination, if with_item is alreayd combined with another item
+# Do not supress combination, if a context manager is already combined with another.
 async with asyncio.timeout(1), A():
     async with B():
         pass
