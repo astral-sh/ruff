@@ -2695,14 +2695,17 @@ impl AstNode for ast::ExprFString {
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
-        let ast::ExprFString {
-            values,
-            implicit_concatenated: _,
-            range: _,
-        } = self;
+        let ast::ExprFString { value, range: _ } = self;
 
-        for expr in values {
-            visitor.visit_expr(expr);
+        for f_string_part in value.parts() {
+            match f_string_part {
+                ast::FStringPart::Literal(string_literal) => {
+                    visitor.visit_string_literal(string_literal);
+                }
+                ast::FStringPart::FString(f_string) => {
+                    visitor.visit_f_string(f_string);
+                }
+            }
         }
     }
 }
@@ -2734,10 +2737,15 @@ impl AstNode for ast::ExprStringLiteral {
         AnyNode::from(self)
     }
 
-    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
+        let ast::ExprStringLiteral { value, range: _ } = self;
+
+        for string_literal in value.parts() {
+            visitor.visit_string_literal(string_literal);
+        }
     }
 }
 impl AstNode for ast::ExprBytesLiteral {
@@ -2768,10 +2776,15 @@ impl AstNode for ast::ExprBytesLiteral {
         AnyNode::from(self)
     }
 
-    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
     where
         V: PreorderVisitor<'a> + ?Sized,
     {
+        let ast::ExprBytesLiteral { value, range: _ } = self;
+
+        for bytes_literal in value.parts() {
+            visitor.visit_bytes_literal(bytes_literal);
+        }
     }
 }
 impl AstNode for ast::ExprNumberLiteral {
