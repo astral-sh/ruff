@@ -18,13 +18,12 @@ use crate::checkers::ast::Checker;
 /// that diverges from standard Python dunder methods could potentially
 /// confuse someone reading the code.
 ///
-/// Non-standard dunder methods that are required by some library you're
-/// using can be defined using the [`pylint.custom-dunder-method-names`]
-/// configuration option.
-///
 /// This rule will detect all methods starting and ending with at least
 /// one underscore (e.g., `_str_`), but ignores known dunder methods (like
 /// `__init__`), as well as methods that are marked with `@override`.
+///
+/// Additional dunder methods names can be allowed via the
+/// [`pylint.allow-dunder-method-names`] setting.
 ///
 /// ## Example
 /// ```python
@@ -41,7 +40,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `pylint.custom-dunder-method-names`
+/// - `pylint.allow-dunder-method-names`
 #[violation]
 pub struct BadDunderMethodName {
     name: String,
@@ -65,7 +64,7 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt])
                 || checker
                     .settings
                     .pylint
-                    .custom_dunder_method_names
+                    .allow_dunder_method_names
                     .contains(method.name.as_str())
                 || matches!(method.name.as_str(), "_")
             {

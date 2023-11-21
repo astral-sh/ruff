@@ -160,7 +160,7 @@ mod tests {
             Path::new("pylint").join(path).as_path(),
             &LinterSettings {
                 pylint: pylint::settings::Settings {
-                    custom_dunder_method_names: FxHashSet::from_iter([
+                    allow_dunder_method_names: FxHashSet::from_iter([
                         "__special_custom_magic__".to_string()
                     ]),
                     ..pylint::settings::Settings::default()

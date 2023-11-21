@@ -83,7 +83,7 @@ class Apples:
     def _(self):
         pass
 
-    # Allow custom dunder names (via setting)
+    # Allow custom dunder names (via setting).
     def __special_custom_magic__(self):
         pass
 

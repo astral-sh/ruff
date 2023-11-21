@@ -37,7 +37,7 @@ impl ConstantType {
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
-    pub custom_dunder_method_names: FxHashSet<String>,
+    pub allow_dunder_method_names: FxHashSet<String>,
     pub max_args: usize,
     pub max_returns: usize,
     pub max_bool_expr: usize,
@@ -50,7 +50,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
-            custom_dunder_method_names: FxHashSet::default(),
+            allow_dunder_method_names: FxHashSet::default(),
             max_args: 5,
             max_returns: 6,
             max_bool_expr: 5,

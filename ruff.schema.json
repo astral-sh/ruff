@@ -2300,6 +2300,17 @@
     "PylintOptions": {
       "type": "object",
       "properties": {
+        "allow-dunder-method-names": {
+          "description": "Dunder methods name to allow, in addition to the default set from the Python standard library (see: `PLW3201`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "allow-magic-value-types": {
           "description": "Constant types to ignore when used as \"magic values\" (see: `PLR2004`).",
           "type": [
@@ -2309,17 +2320,6 @@
           "items": {
             "$ref": "#/definitions/ConstantType"
           }
-        },
-        "custom-dunder-method-names": {
-          "description": "Custom names to allow for dunder methods (see: `PLW3201`).",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          },
-          "uniqueItems": true
         },
         "max-args": {
           "description": "Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).",
