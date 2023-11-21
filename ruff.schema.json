@@ -2307,6 +2307,17 @@
     "PylintOptions": {
       "type": "object",
       "properties": {
+        "allow-dunder-method-names": {
+          "description": "Dunder methods name to allow, in addition to the default set from the Python standard library (see: `PLW3201`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "allow-magic-value-types": {
           "description": "Constant types to ignore when used as \"magic values\" (see: `PLR2004`).",
           "type": [
