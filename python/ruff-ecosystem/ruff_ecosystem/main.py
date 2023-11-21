@@ -72,12 +72,8 @@ async def main(
     comparisons_by_target = dict(zip(targets, comparisons, strict=True))
 
     # Split comparisons into errored / completed
-    errored, completed = [], []
-    for target, comparison in comparisons_by_target.items():
-        if isinstance(comparison, Exception):
-            errored.append((target, comparison))
-        else:
-            completed.append((target, comparison))
+    errored = [(target, comparison) for target, comparison in comparisons_by_target.items() if isinstance(comparison, Exception)]
+    completed = [(target, comparison) for target, comparison in comparisons_by_target.items() if not isinstance(comparison, Exception)]
 
     result = Result(completed=completed, errored=errored)
 
