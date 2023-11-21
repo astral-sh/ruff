@@ -83,6 +83,8 @@ SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
 26 | # SIM910
 27 | ({}).get(key, None)
    | ^^^^^^^^^^^^^^^^^^^ SIM910
+28 | 
+29 | # SIM910
    |
    = help: Replace `({}).get(key, None)` with `({}).get(key)`
 
@@ -92,5 +94,8 @@ SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
 26 26 | # SIM910
 27    |-({}).get(key, None)
    27 |+({}).get(key)
+28 28 | 
+29 29 | # SIM910
+30 30 | ages = {"Tom": 23, "Maria": 23, "Dog": 11}
 
 

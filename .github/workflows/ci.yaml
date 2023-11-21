@@ -44,6 +44,7 @@ jobs:
               - "!crates/ruff_shrinking/**"
               - scripts/*
               - .github/workflows/ci.yaml
+              - python/**
 
             formatter:
               - Cargo.toml
@@ -58,6 +59,7 @@ jobs:
               - crates/ruff_python_parser/**
               - crates/ruff_dev/**
               - scripts/*
+              - python/**
               - .github/workflows/ci.yaml
 
   cargo-fmt:
@@ -392,7 +394,7 @@ jobs:
         run: mkdocs build --strict -f mkdocs.insiders.yml
       - name: "Build docs"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
-        run: mkdocs build --strict -f mkdocs.generated.yml
+        run: mkdocs build --strict -f mkdocs.public.yml
 
   check-formatter-instability-and-black-similarity:
     name: "formatter instabilities and black similarity"

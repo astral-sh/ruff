@@ -612,6 +612,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 flake8_bandit::rules::shell_injection(checker, call);
             }
+            if checker.enabled(Rule::DjangoRawSql) {
+                flake8_bandit::rules::django_raw_sql(checker, call);
+            }
             if checker.enabled(Rule::UnnecessaryGeneratorList) {
                 flake8_comprehensions::rules::unnecessary_generator_list(
                     checker, expr, func, args, keywords,
@@ -776,6 +779,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::NestedMinMax) {
                 pylint::rules::nested_min_max(checker, expr, func, args, keywords);
             }
+            if checker.enabled(Rule::RepeatedKeywordArgument) {
+                pylint::rules::repeated_keyword_argument(checker, call);
+            }
             if checker.enabled(Rule::PytestPatchWithLambda) {
                 if let Some(diagnostic) = flake8_pytest_style::rules::patch_with_lambda(call) {
                     checker.diagnostics.push(diagnostic);
@@ -936,13 +942,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_trio::rules::zero_sleep_call(checker, call);
             }
         }
-        Expr::Dict(
-            dict @ ast::ExprDict {
-                keys,
-                values,
-                range: _,
-            },
-        ) => {
+        Expr::Dict(dict) => {
             if checker.any_enabled(&[
                 Rule::MultiValueRepeatedKeyLiteral,
                 Rule::MultiValueRepeatedKeyVariable,
@@ -950,7 +950,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pyflakes::rules::repeated_keys(checker, dict);
             }
             if checker.enabled(Rule::UnnecessarySpread) {
-                flake8_pie::rules::unnecessary_spread(checker, keys, values);
+                flake8_pie::rules::unnecessary_spread(checker, dict);
             }
         }
         Expr::Set(ast::ExprSet { elts, range: _ }) => {
@@ -1251,9 +1251,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::single_item_membership_test(checker, expr, left, ops, comparators);
             }
         }
-        Expr::NumberLiteral(_) => {
+        Expr::NumberLiteral(number_literal @ ast::ExprNumberLiteral { .. }) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::NumericLiteralTooLong) {
                 flake8_pyi::rules::numeric_literal_too_long(checker, expr);
+            }
+            if checker.enabled(Rule::MathConstant) {
+                refurb::rules::math_constant(checker, number_literal);
             }
         }
         Expr::BytesLiteral(_) => {
@@ -1272,21 +1275,20 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::HardcodedTempFile) {
                 flake8_bandit::rules::hardcoded_tmp_directory(checker, string);
             }
-            if checker.enabled(Rule::UnicodeKindPrefix) {
-                pyupgrade::rules::unicode_kind_prefix(checker, string);
-            }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StringOrBytesTooLong) {
                     flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
                 }
             }
         }
-        Expr::IfExp(ast::ExprIfExp {
-            test,
-            body,
-            orelse,
-            range: _,
-        }) => {
+        Expr::IfExp(
+            if_exp @ ast::ExprIfExp {
+                test,
+                body,
+                orelse,
+                range: _,
+            },
+        ) => {
             if checker.enabled(Rule::IfElseBlockInsteadOfDictGet) {
                 flake8_simplify::rules::if_exp_instead_of_dict_get(
                     checker, expr, test, body, orelse,
@@ -1300,6 +1302,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::IfExprWithTwistedArms) {
                 flake8_simplify::rules::twisted_arms_in_ifexpr(checker, expr, test, body, orelse);
+            }
+            if checker.enabled(Rule::IfExprMinMax) {
+                refurb::rules::if_expr_min_max(checker, if_exp);
             }
         }
         Expr::ListComp(

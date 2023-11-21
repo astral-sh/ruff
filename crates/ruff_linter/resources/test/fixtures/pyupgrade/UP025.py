@@ -25,3 +25,6 @@ u = u
 
 def hello():
     return"Hello"
+
+f"foo"u"bar"
+f"foo" u"bar"

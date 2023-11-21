@@ -129,12 +129,12 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
     output.push_str("**Example usage**:\n\n");
     output.push_str(&format_tab(
         "pyproject.toml",
-        &format_header(parent_set, ConfigurationFile::PyprojectToml),
+        &format_header(field.scope, parent_set, ConfigurationFile::PyprojectToml),
         field.example,
     ));
     output.push_str(&format_tab(
         "ruff.toml",
-        &format_header(parent_set, ConfigurationFile::RuffToml),
+        &format_header(field.scope, parent_set, ConfigurationFile::RuffToml),
         field.example,
     ));
     output.push('\n');
@@ -149,23 +149,53 @@ fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
     )
 }
 
-fn format_header(parent_set: &Set, configuration: ConfigurationFile) -> String {
-    let fmt = if let Some(set_name) = parent_set.name() {
-        if set_name == "format" {
-            String::from(".format")
-        } else {
-            format!(".lint.{set_name}")
-        }
-    } else {
-        String::new()
-    };
+/// Format the TOML header for the example usage for a given option.
+///
+/// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
+fn format_header(
+    scope: Option<&str>,
+    parent_set: &Set,
+    configuration: ConfigurationFile,
+) -> String {
     match configuration {
-        ConfigurationFile::PyprojectToml => format!("[tool.ruff{fmt}]"),
+        ConfigurationFile::PyprojectToml => {
+            let mut header = if let Some(set_name) = parent_set.name() {
+                if set_name == "format" {
+                    String::from("tool.ruff.format")
+                } else {
+                    format!("tool.ruff.lint.{set_name}")
+                }
+            } else {
+                "tool.ruff".to_string()
+            };
+            if let Some(scope) = scope {
+                if !header.is_empty() {
+                    header.push('.');
+                }
+                header.push_str(scope);
+            }
+            format!("[{header}]")
+        }
         ConfigurationFile::RuffToml => {
-            if fmt.is_empty() {
+            let mut header = if let Some(set_name) = parent_set.name() {
+                if set_name == "format" {
+                    String::from("format")
+                } else {
+                    format!("lint.{set_name}")
+                }
+            } else {
+                String::new()
+            };
+            if let Some(scope) = scope {
+                if !header.is_empty() {
+                    header.push('.');
+                }
+                header.push_str(scope);
+            }
+            if header.is_empty() {
                 String::new()
             } else {
-                format!("[{}]", fmt.strip_prefix('.').unwrap())
+                format!("[{header}]")
             }
         }
     }

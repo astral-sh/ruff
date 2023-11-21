@@ -91,6 +91,10 @@ pub(crate) fn check_tokens(
         pycodestyle::rules::tab_indentation(&mut diagnostics, tokens, locator, indexer);
     }
 
+    if settings.rules.enabled(Rule::UnicodeKindPrefix) {
+        pyupgrade::rules::unicode_kind_prefix(&mut diagnostics, tokens);
+    }
+
     if settings.rules.any_enabled(&[
         Rule::InvalidCharacterBackspace,
         Rule::InvalidCharacterSub,
@@ -113,6 +117,10 @@ pub(crate) fn check_tokens(
 
     if settings.rules.enabled(Rule::AvoidableEscapedQuote) && settings.flake8_quotes.avoid_escape {
         flake8_quotes::rules::avoidable_escaped_quote(&mut diagnostics, tokens, locator, settings);
+    }
+
+    if settings.rules.enabled(Rule::UnnecessaryEscapedQuote) {
+        flake8_quotes::rules::unnecessary_escaped_quote(&mut diagnostics, tokens, locator);
     }
 
     if settings.rules.any_enabled(&[
@@ -159,7 +167,7 @@ pub(crate) fn check_tokens(
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(tokens, path, locator, &mut diagnostics);
+        flake8_executable::rules::from_tokens(&mut diagnostics, path, locator, indexer);
     }
 
     if settings.rules.any_enabled(&[

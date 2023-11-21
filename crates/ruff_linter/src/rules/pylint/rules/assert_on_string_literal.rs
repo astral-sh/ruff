@@ -76,15 +76,11 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                             value.is_empty()
                         }
-                        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
                         _ => false,
                     }) {
                         Kind::Empty
                     } else if values.iter().any(|value| match value {
                         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                            !value.is_empty()
-                        }
-                        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
                             !value.is_empty()
                         }
                         _ => false,

@@ -35,3 +35,6 @@ insta = { workspace = true }
 anyhow = { workspace = true }
 lalrpop = { version = "0.20.0", default-features = false, optional = true }
 tiny-keccak = { version = "2", features = ["sha3"] }
+
+[lints]
+workspace = true

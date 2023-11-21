@@ -18,8 +18,8 @@ pub(crate) fn deferred_lambdas(checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryLambda) {
                 pylint::rules::unnecessary_lambda(checker, lambda);
             }
-            if checker.enabled(Rule::ReimplementedListBuiltin) {
-                flake8_pie::rules::reimplemented_list_builtin(checker, lambda);
+            if checker.enabled(Rule::ReimplementedContainerBuiltin) {
+                flake8_pie::rules::reimplemented_container_builtin(checker, lambda);
             }
         }
     }

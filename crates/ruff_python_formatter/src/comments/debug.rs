@@ -198,11 +198,11 @@ mod tests {
             range: TextRange::default(),
         });
 
-        let source = r#"# leading comment
+        let source = r"# leading comment
 continue; # trailing
 # break leading
 break;
-"#;
+";
 
         let source_code = SourceCode::new(source);
 

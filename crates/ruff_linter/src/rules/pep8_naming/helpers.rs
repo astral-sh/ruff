@@ -63,10 +63,13 @@ pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> b
 
 /// Returns `true` if the statement is an assignment to a `TypeAlias`.
 pub(super) fn is_type_alias_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
-    let Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) = stmt else {
-        return false;
-    };
-    semantic.match_typing_expr(annotation, "TypeAlias")
+    match stmt {
+        Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+            semantic.match_typing_expr(annotation, "TypeAlias")
+        }
+        Stmt::TypeAlias(_) => true,
+        _ => false,
+    }
 }
 
 pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {

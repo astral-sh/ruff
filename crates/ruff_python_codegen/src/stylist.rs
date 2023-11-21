@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn indentation() {
-        let contents = r#"x = 1"#;
+        let contents = r"x = 1";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -198,10 +198,10 @@ mod tests {
             &Indentation::default()
         );
 
-        let contents = r#"
+        let contents = r"
 if True:
   pass
-"#;
+";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -209,10 +209,10 @@ if True:
             &Indentation("  ".to_string())
         );
 
-        let contents = r#"
+        let contents = r"
 if True:
     pass
-"#;
+";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -220,10 +220,10 @@ if True:
             &Indentation("    ".to_string())
         );
 
-        let contents = r#"
+        let contents = r"
 if True:
 	pass
-"#;
+";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -232,13 +232,13 @@ if True:
         );
 
         // TODO(charlie): Should non-significant whitespace be detected?
-        let contents = r#"
+        let contents = r"
 x = (
   1,
   2,
   3,
 )
-"#;
+";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -247,11 +247,11 @@ x = (
         );
 
         // formfeed indent, see `detect_indention` comment.
-        let contents = r#"
+        let contents = r"
 class FormFeedIndent:
    def __init__(self, a=[]):
         print(a)
-"#;
+";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -262,7 +262,7 @@ class FormFeedIndent:
 
     #[test]
     fn quote() {
-        let contents = r#"x = 1"#;
+        let contents = r"x = 1";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -270,7 +270,7 @@ class FormFeedIndent:
             Quote::default()
         );
 
-        let contents = r#"x = '1'"#;
+        let contents = r"x = '1'";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -278,7 +278,7 @@ class FormFeedIndent:
             Quote::Single
         );
 
-        let contents = r#"x = f'1'"#;
+        let contents = r"x = f'1'";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
@@ -373,9 +373,9 @@ a = f"v"
             Quote::Double
         );
 
-        let contents = r#"
+        let contents = r"
 f'''Module docstring.'''
-"#;
+";
         let locator = Locator::new(contents);
         let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(

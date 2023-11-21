@@ -12,11 +12,11 @@ mod tests {
     #[test]
     fn notice() {
         let diagnostics = test_snippet(
-            r#"
+            r"
 # Copyright 2023
 
 import os
-"#
+"
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
@@ -26,11 +26,11 @@ import os
     #[test]
     fn notice_with_c() {
         let diagnostics = test_snippet(
-            r#"
+            r"
 # Copyright (C) 2023
 
 import os
-"#
+"
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
@@ -40,11 +40,11 @@ import os
     #[test]
     fn notice_with_caps() {
         let diagnostics = test_snippet(
-            r#"
+            r"
 # COPYRIGHT (C) 2023
 
 import os
-"#
+"
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
@@ -54,11 +54,11 @@ import os
     #[test]
     fn notice_with_range() {
         let diagnostics = test_snippet(
-            r#"
+            r"
 # Copyright (C) 2021-2023
 
 import os
-"#
+"
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
@@ -68,11 +68,11 @@ import os
     #[test]
     fn valid_author() {
         let diagnostics = test_snippet(
-            r#"
+            r"
 # Copyright (C) 2023 Ruff
 
 import os
-"#
+"
             .trim(),
             &settings::LinterSettings {
                 flake8_copyright: super::settings::Settings {
@@ -88,11 +88,11 @@ import os
     #[test]
     fn invalid_author() {
         let diagnostics = test_snippet(
-            r#"
+            r"
 # Copyright (C) 2023 Some Author
 
 import os
-"#
+"
             .trim(),
             &settings::LinterSettings {
                 flake8_copyright: super::settings::Settings {
@@ -108,9 +108,9 @@ import os
     #[test]
     fn small_file() {
         let diagnostics = test_snippet(
-            r#"
+            r"
 import os
-"#
+"
             .trim(),
             &settings::LinterSettings {
                 flake8_copyright: super::settings::Settings {
@@ -126,7 +126,7 @@ import os
     #[test]
     fn late_notice() {
         let diagnostics = test_snippet(
-            r#"
+            r"
 # Content Content Content Content Content Content Content Content Content Content
 # Content Content Content Content Content Content Content Content Content Content
 # Content Content Content Content Content Content Content Content Content Content
@@ -149,7 +149,7 @@ import os
 # Content Content Content Content Content Content Content Content Content Content
 
 # Copyright 2023
-"#
+"
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );
@@ -159,8 +159,8 @@ import os
     #[test]
     fn char_boundary() {
         let diagnostics = test_snippet(
-            r#"কককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককক
-"#
+            r"কককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককককক
+"
             .trim(),
             &settings::LinterSettings::for_rules(vec![Rule::MissingCopyrightNotice]),
         );

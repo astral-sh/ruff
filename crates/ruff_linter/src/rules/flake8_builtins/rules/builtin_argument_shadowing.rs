@@ -67,6 +67,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &mut Checker, parameter: &Para
     if shadows_builtin(
         parameter.name.as_str(),
         &checker.settings.flake8_builtins.builtins_ignorelist,
+        checker.source_type,
     ) {
         checker.diagnostics.push(Diagnostic::new(
             BuiltinArgumentShadowing {

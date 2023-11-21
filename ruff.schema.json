@@ -1440,6 +1440,13 @@
             "type": "string"
           }
         },
+        "from-first": {
+          "description": "Whether to place `import from` imports before straight imports when sorting.\n\nFor example, by default, imports will be sorted such that straight imports appear before `import from` imports, as in: ```python import os import sys from typing import List ```\n\nSetting `from-first = true` will instead sort such that `import from` imports appear before straight imports, as in: ```python from typing import List import os import sys ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
@@ -1496,6 +1503,13 @@
           "items": {
             "$ref": "#/definitions/ImportSection"
           }
+        },
+        "no-sections": {
+          "description": "Put all imports into the same section bucket.\n\nFor example, rather than separating standard library and third-party imports, as in: ```python import os import sys\n\nimport numpy import pandas ```\n\nSetting `no-sections = true` will instead group all imports into a single section: ```python import os import numpy import pandas import sys ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "order-by-type": {
           "description": "Order imports by type, which is determined by case, in addition to alphabetically.",
@@ -2293,6 +2307,17 @@
     "PylintOptions": {
       "type": "object",
       "properties": {
+        "allow-dunder-method-names": {
+          "description": "Dunder methods name to allow, in addition to the default set from the Python standard library (see: `PLW3201`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "allow-magic-value-types": {
           "description": "Constant types to ignore when used as \"magic values\" (see: `PLR2004`).",
           "type": [
@@ -2816,10 +2841,13 @@
         "FURB13",
         "FURB131",
         "FURB132",
+        "FURB136",
         "FURB14",
         "FURB140",
         "FURB145",
         "FURB148",
+        "FURB15",
+        "FURB152",
         "FURB16",
         "FURB168",
         "FURB169",
@@ -3020,6 +3048,8 @@
         "PLE0704",
         "PLE1",
         "PLE11",
+        "PLE113",
+        "PLE1132",
         "PLE114",
         "PLE1142",
         "PLE12",
@@ -3277,6 +3307,7 @@
         "Q001",
         "Q002",
         "Q003",
+        "Q004",
         "RET",
         "RET5",
         "RET50",
@@ -3383,6 +3414,7 @@
         "S608",
         "S609",
         "S61",
+        "S611",
         "S612",
         "S7",
         "S70",

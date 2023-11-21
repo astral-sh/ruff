@@ -285,6 +285,7 @@ pub(crate) fn typing_only_runtime_import(
                 checker.settings.isort.detect_same_package,
                 &checker.settings.isort.known_modules,
                 checker.settings.target_version,
+                checker.settings.isort.no_sections,
             ) {
                 ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
                     ImportType::FirstParty

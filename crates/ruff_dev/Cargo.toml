@@ -48,9 +48,12 @@ tracing-indicatif = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 imara-diff = "0.1.5"
 
+[dev-dependencies]
+indoc = "2.0.4"
+
 [features]
 # Turn off rayon for profiling
 singlethreaded = []
 
-[dev-dependencies]
-indoc = "2.0.4"
+[lints]
+workspace = true

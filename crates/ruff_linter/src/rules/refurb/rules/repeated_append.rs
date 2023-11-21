@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_list;
-use ruff_python_semantic::{Binding, BindingId, DefinitionId, SemanticModel};
+use ruff_python_semantic::{Binding, BindingId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -183,8 +183,7 @@ fn match_consecutive_appends<'a>(
     let siblings: &[Stmt] = if semantic.at_top_level() {
         // If the statement is at the top level, we should go to the parent module.
         // Module is available in the definitions list.
-        let module = semantic.definitions[DefinitionId::module()].as_module()?;
-        module.python_ast
+        semantic.definitions.python_ast()?
     } else {
         // Otherwise, go to the parent, and take its body as a sequence of siblings.
         semantic

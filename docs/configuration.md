@@ -299,6 +299,47 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria.
 For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
+### Default inclusions
+
+By default, Ruff will discover files matching `*.py`, `*.ipy`, or `pyproject.toml`. 
+
+To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    extend-include = ["*.ipynb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    extend-include = ["*.ipynb"]
+    ```
+
+You can also change the default selection using the [`include`](settings.md#include) setting.
+
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint]
+    include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint]
+    include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
+    ```
+
+!!! warning
+    Paths provided to `include` _must_ match files. For example, `include = ["src"]` will fail since it
+matches a directory.
+
 ## Jupyter Notebook discovery
 
 Ruff has built-in support for [Jupyter Notebooks](https://jupyter.org/).
@@ -422,7 +463,7 @@ Run Ruff on the given files or directories (default)
 Usage: ruff check [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to check
+  [FILES]...  List of files or directories to check [default: .]
 
 Options:
       --fix
@@ -518,7 +559,7 @@ Run the Ruff formatter on the given files or directories
 Usage: ruff format [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to format
+  [FILES]...  List of files or directories to format [default: .]
 
 Options:
       --check

@@ -43,7 +43,7 @@ pub fn resolve(
     {
         let settings = resolve_root_settings(&pyproject, Relativity::Cwd, overrides)?;
         debug!(
-            "Using user specified pyproject.toml at {}",
+            "Using user-specified configuration file at: {}",
             pyproject.display()
         );
         return Ok(PyprojectConfig::new(
@@ -63,7 +63,10 @@ pub fn resolve(
             .as_ref()
             .unwrap_or(&path_dedot::CWD.as_path()),
     )? {
-        debug!("Using pyproject.toml (parent) at {}", pyproject.display());
+        debug!(
+            "Using configuration file (via parent) at: {}",
+            pyproject.display()
+        );
         let settings = resolve_root_settings(&pyproject, Relativity::Parent, overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
@@ -77,7 +80,10 @@ pub fn resolve(
     // end up the "closest" `pyproject.toml` file for every Python file later on, so
     // these act as the "default" settings.)
     if let Some(pyproject) = pyproject::find_user_settings_toml() {
-        debug!("Using pyproject.toml (cwd) at {}", pyproject.display());
+        debug!(
+            "Using configuration file (via cwd) at: {}",
+            pyproject.display()
+        );
         let settings = resolve_root_settings(&pyproject, Relativity::Cwd, overrides)?;
         return Ok(PyprojectConfig::new(
             PyprojectDiscoveryStrategy::Hierarchical,
