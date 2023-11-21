@@ -1043,6 +1043,80 @@ impl<'ast, 'buf, 'fmt> DocstringLinePrinter<'ast, 'buf, 'fmt> {
 
         Ok(())
     }
+
+
+/// Represents a single line in a docstring.
+///
+/// This type is used to both represent the original lines in a docstring
+/// (the line will be borrowed) and also the newly formatted lines from code
+/// snippets (the line will be owned).
+#[derive(Clone, Debug)]
+struct DocstringLine<'src> {
+    /// The actual text of the line, not including the line terminator.
+    line: Cow<'src, str>,
+    /// The offset into the source document which this line corresponds to.
+    offset: TextSize,
+    /// Whether this is the last line in a docstring or not. "Last" lines have
+    /// some special treatment when printing.
+    is_last: bool,
+}
+
+impl<'src> DocstringLine<'src> {
+    /// Return this line, but with the given function applied to the text of
+    /// the line.
+    fn map(self, mut map: impl FnMut(&str) -> String) -> DocstringLine<'static> {
+        DocstringLine {
+            line: Cow::Owned(map(&self.line)),
+            ..self
+        }
+    }
+}
+/// The kind of code example observed in a docstring.
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum CodeExampleKind {
+    /// Code found in Python "doctests."
+    ///
+    /// Documentation describing doctests and how they're recognized can be
+    /// found as part of the Python standard library:
+    /// https://docs.python.org/3/library/doctest.html.
+    ///
+    /// (You'll likely need to read the regex matching used internally by the
+    /// doctest module to determine more precisely how it works.)
+    Doctest(CodeExampleDoctest),
+}
+
+/// State corresponding to a single doctest code example found in a docstring.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct CodeExampleDoctest {
+    /// The indent observed in the first doctest line.
+    ///
+    /// More precisely, this corresponds to the whitespace observed before
+    /// the starting `>>> ` (the "PS1 prompt").
+    indent: String,
+}
+
+/// A single line in a code example found in a docstring.
+///
+/// A code example line exists prior to formatting, and is thus in full
+/// correspondence with the original lines from the docstring. Indeed, a
+/// code example line includes both the original line *and* the actual code
+/// extracted from the line. For example, if a line in a docstring is `>>>
+/// foo(x)`, then the original line is `>>> foo(x)` and the code portion is
+/// `foo(x)`.
+///
+/// The original line is kept for things like offset information, but also
+/// because it may still be needed if it turns out that the code snippet is
+/// not valid or otherwise could not be formatted. In which case, the original
+/// lines are printed as-is.
+#[derive(Debug)]
+struct CodeExampleLine<'src> {
+    /// The normalized (but original) line from the doc string. This might, for
+    /// example, contain a `>>> ` or `... ` prefix if this code example is a
+    /// doctest.
+    original: DocstringLine<'src>,
+    /// The code extracted from the line.
+    code: String,
+}
 }
 
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
