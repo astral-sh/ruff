@@ -1081,17 +1081,18 @@ impl<'a> Generator<'a> {
                 *conversion,
                 format_spec.as_deref(),
             ),
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                self.unparse_f_string(values, false);
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                self.unparse_f_string_value(value, false);
             }
-            Expr::StringLiteral(ast::ExprStringLiteral { value, unicode, .. }) => {
-                if *unicode {
-                    self.p("u");
-                }
-                self.p_str_repr(value);
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                self.unparse_string_literal_value(value);
             }
             Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-                self.p_bytes_repr(value);
+                let mut first = true;
+                for bytes_literal in value.parts() {
+                    self.p_delim(&mut first, " ");
+                    self.p_bytes_repr(&bytes_literal.value);
+                }
             }
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
                 static INF_STR: &str = "1e309";
@@ -1275,6 +1276,36 @@ impl<'a> Generator<'a> {
         }
     }
 
+    fn unparse_string_literal(&mut self, string_literal: &ast::StringLiteral) {
+        if string_literal.unicode {
+            self.p("u");
+        }
+        self.p_str_repr(&string_literal.value);
+    }
+
+    fn unparse_string_literal_value(&mut self, value: &ast::StringLiteralValue) {
+        let mut first = true;
+        for string_literal in value.parts() {
+            self.p_delim(&mut first, " ");
+            self.unparse_string_literal(string_literal);
+        }
+    }
+
+    fn unparse_f_string_value(&mut self, value: &ast::FStringValue, is_spec: bool) {
+        let mut first = true;
+        for f_string_part in value.parts() {
+            self.p_delim(&mut first, " ");
+            match f_string_part {
+                ast::FStringPart::Literal(string_literal) => {
+                    self.unparse_string_literal(string_literal);
+                }
+                ast::FStringPart::FString(f_string) => {
+                    self.unparse_f_string(&f_string.values, is_spec);
+                }
+            }
+        }
+    }
+
     fn unparse_f_string_body(&mut self, values: &[Expr], is_spec: bool) {
         for value in values {
             self.unparse_f_string_elem(value, is_spec);
@@ -1325,10 +1356,10 @@ impl<'a> Generator<'a> {
     fn unparse_f_string_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                self.unparse_f_string_literal(value);
+                self.unparse_f_string_literal(value.as_str());
             }
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                self.unparse_f_string(values, is_spec);
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                self.unparse_f_string_value(value, is_spec);
             }
             Expr::FormattedValue(ast::ExprFormattedValue {
                 value,
@@ -1678,7 +1709,7 @@ class Foo:
         assert_eq!(round_trip(r"u'hello'"), r#"u"hello""#);
         assert_eq!(round_trip(r"r'hello'"), r#""hello""#);
         assert_eq!(round_trip(r"b'hello'"), r#"b"hello""#);
-        assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abcdefghi""#);
+        assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abc" "def" "ghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
         assert_eq!(round_trip(r#"f'abc{"def"}{1}'"#), r#"f"abc{'def'}{1}""#);
@@ -1691,6 +1722,13 @@ class Foo:
         assert_round_trip!(r#"f"{ chr(65)  =   !r}""#);
         assert_round_trip!(r#"f"{ chr(65)  =   :#x}""#);
         assert_round_trip!(r#"f"{a=!r:0.05f}""#);
+    }
+
+    #[test]
+    fn implicit_string_concatenation() {
+        assert_round_trip!(r#""first" "second" "third""#);
+        assert_round_trip!(r#"b"first" b"second" b"third""#);
+        assert_round_trip!(r#""first" "second" f"third {var}""#);
     }
 
     #[test]
