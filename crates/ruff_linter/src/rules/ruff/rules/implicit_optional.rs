@@ -184,7 +184,6 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
         if let Expr::StringLiteral(ast::ExprStringLiteral {
             range,
             value: string,
-            ..
         }) = annotation.as_ref()
         {
             // Quoted annotation.

@@ -111,7 +111,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
 fn as_kwarg(key: &Expr) -> Option<&str> {
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = key {
         if is_identifier(value) {
-            return Some(value);
+            return Some(value.as_str());
         }
     }
     None

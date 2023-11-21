@@ -91,10 +91,6 @@ pub(crate) fn check_tokens(
         pycodestyle::rules::tab_indentation(&mut diagnostics, tokens, locator, indexer);
     }
 
-    if settings.rules.enabled(Rule::UnicodeKindPrefix) {
-        pyupgrade::rules::unicode_kind_prefix(&mut diagnostics, tokens);
-    }
-
     if settings.rules.any_enabled(&[
         Rule::InvalidCharacterBackspace,
         Rule::InvalidCharacterSub,

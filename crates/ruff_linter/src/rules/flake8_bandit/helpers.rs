@@ -10,7 +10,7 @@ static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> = Lazy::new(|| {
 
 pub(super) fn string_literal(expr: &Expr) -> Option<&str> {
     match expr {
-        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => Some(value),
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => Some(value.as_str()),
         _ => None,
     }
 }

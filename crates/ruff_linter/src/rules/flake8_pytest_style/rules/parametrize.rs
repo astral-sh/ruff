@@ -252,7 +252,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
         return None;
     }
 
-    let node = Expr::StringLiteral(ast::ExprStringLiteral {
+    let node = Expr::from(ast::StringLiteral {
         value: elts.iter().fold(String::new(), |mut acc, elt| {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
                 if !acc.is_empty() {
@@ -262,9 +262,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
             }
             acc
         }),
-        unicode: false,
-        implicit_concatenated: false,
-        range: TextRange::default(),
+        ..ast::StringLiteral::default()
     });
     Some(generator.expr(&node))
 }
@@ -324,9 +322,9 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: names
                                 .iter()
                                 .map(|name| {
-                                    Expr::StringLiteral(ast::ExprStringLiteral {
+                                    Expr::from(ast::StringLiteral {
                                         value: (*name).to_string(),
-                                        ..ast::ExprStringLiteral::default()
+                                        ..ast::StringLiteral::default()
                                     })
                                 })
                                 .collect(),
@@ -357,9 +355,9 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: names
                                 .iter()
                                 .map(|name| {
-                                    Expr::StringLiteral(ast::ExprStringLiteral {
+                                    Expr::from(ast::StringLiteral {
                                         value: (*name).to_string(),
-                                        ..ast::ExprStringLiteral::default()
+                                        ..ast::StringLiteral::default()
                                     })
                                 })
                                 .collect(),

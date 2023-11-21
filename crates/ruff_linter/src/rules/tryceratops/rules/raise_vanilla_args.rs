@@ -89,10 +89,21 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
 /// some whitespace).
 fn contains_message(expr: &Expr) -> bool {
     match expr {
-        Expr::FString(ast::ExprFString { values, .. }) => {
-            for value in values {
-                if contains_message(value) {
-                    return true;
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            for f_string_part in value.parts() {
+                match f_string_part {
+                    ast::FStringPart::Literal(literal) => {
+                        if literal.chars().any(char::is_whitespace) {
+                            return true;
+                        }
+                    }
+                    ast::FStringPart::FString(f_string) => {
+                        for value in &f_string.values {
+                            if contains_message(value) {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }

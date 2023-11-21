@@ -35,7 +35,7 @@ impl Violation for HardcodedBindAllInterfaces {
 
 /// S104
 pub(crate) fn hardcoded_bind_all_interfaces(string: &ExprStringLiteral) -> Option<Diagnostic> {
-    if string.value == "0.0.0.0" {
+    if string.value.as_str() == "0.0.0.0" {
         Some(Diagnostic::new(HardcodedBindAllInterfaces, string.range))
     } else {
         None

@@ -508,7 +508,6 @@ fn check_dynamically_typed<F>(
     if let Expr::StringLiteral(ast::ExprStringLiteral {
         range,
         value: string,
-        ..
     }) = annotation
     {
         // Quoted annotations

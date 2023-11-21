@@ -1303,9 +1303,9 @@ where
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
         match format_spec {
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                for value in values {
-                    self.visit_expr(value);
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                for expr in value.elements() {
+                    self.visit_expr(expr);
                 }
             }
             _ => unreachable!("Unexpected expression for format_spec"),
