@@ -46,7 +46,7 @@ impl NeedsParentheses for ExprStringLiteral {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if self.implicit_concatenated {
+        if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
         } else if is_multiline_string(self.into(), context.source()) {
             OptionalParentheses::Never

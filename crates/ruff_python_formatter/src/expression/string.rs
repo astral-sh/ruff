@@ -2,13 +2,11 @@ use std::borrow::Cow;
 
 use bitflags::bitflags;
 
-use ruff_formatter::{format_args, write, FormatError};
+use ruff_formatter::{format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
     self as ast, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExpressionRef,
 };
-use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
-use ruff_python_parser::{Mode, Tok};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -52,7 +50,7 @@ impl<'a> AnyString<'a> {
                     .trim_start_matches(|c| c != '"' && c != '\'');
                 let triple_quoted =
                     unprefixed.starts_with(r#"""""#) || unprefixed.starts_with(r"'''");
-                if f_string.values.iter().any(|value| match value {
+                if f_string.value.elements().any(|value| match value {
                     Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
                         let string_content = locator.slice(*range);
                         if triple_quoted {
@@ -74,18 +72,29 @@ impl<'a> AnyString<'a> {
     /// Returns `true` if the string is implicitly concatenated.
     pub(super) fn is_implicit_concatenated(&self) -> bool {
         match self {
-            Self::String(ExprStringLiteral {
-                implicit_concatenated,
-                ..
-            }) => *implicit_concatenated,
-            Self::Bytes(ExprBytesLiteral {
-                implicit_concatenated,
-                ..
-            }) => *implicit_concatenated,
-            Self::FString(ExprFString {
-                implicit_concatenated,
-                ..
-            }) => *implicit_concatenated,
+            Self::String(ExprStringLiteral { value, .. }) => value.is_implicit_concatenated(),
+            Self::Bytes(ExprBytesLiteral { value, .. }) => value.is_implicit_concatenated(),
+            Self::FString(ExprFString { value, .. }) => value.is_implicit_concatenated(),
+        }
+    }
+
+    fn parts(&self) -> Vec<AnyStringPart<'a>> {
+        match self {
+            Self::String(ExprStringLiteral { value, .. }) => {
+                value.parts().map(AnyStringPart::String).collect()
+            }
+            Self::Bytes(ExprBytesLiteral { value, .. }) => {
+                value.parts().map(AnyStringPart::Bytes).collect()
+            }
+            Self::FString(ExprFString { value, .. }) => value
+                .parts()
+                .map(|f_string_part| match f_string_part {
+                    ast::FStringPart::Literal(string_literal) => {
+                        AnyStringPart::String(string_literal)
+                    }
+                    ast::FStringPart::FString(f_string) => AnyStringPart::FString(f_string),
+                })
+                .collect(),
         }
     }
 }
@@ -116,6 +125,33 @@ impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
             AnyString::String(expr) => ExpressionRef::StringLiteral(expr),
             AnyString::Bytes(expr) => ExpressionRef::BytesLiteral(expr),
             AnyString::FString(expr) => ExpressionRef::FString(expr),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum AnyStringPart<'a> {
+    String(&'a ast::StringLiteral),
+    Bytes(&'a ast::BytesLiteral),
+    FString(&'a ast::FString),
+}
+
+impl<'a> From<&AnyStringPart<'a>> for AnyNodeRef<'a> {
+    fn from(value: &AnyStringPart<'a>) -> Self {
+        match value {
+            AnyStringPart::String(part) => AnyNodeRef::StringLiteral(part),
+            AnyStringPart::Bytes(part) => AnyNodeRef::BytesLiteral(part),
+            AnyStringPart::FString(part) => AnyNodeRef::FString(part),
+        }
+    }
+}
+
+impl Ranged for AnyStringPart<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::String(part) => part.range(),
+            Self::Bytes(part) => part.range(),
+            Self::FString(part) => part.range(),
         }
     }
 }
@@ -185,65 +221,11 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
         // comments.
         if let AnyString::FString(fstring) = self.string {
             let comments = f.context().comments();
-            fstring.values.iter().for_each(|value| {
+            fstring.value.elements().for_each(|value| {
                 comments.mark_verbatim_node_comments_formatted(value.into());
             });
         }
         result
-    }
-}
-
-/// A builder for the f-string range.
-///
-/// For now, this is limited to the outermost f-string and doesn't support
-/// nested f-strings.
-#[derive(Debug, Default)]
-struct FStringRangeBuilder {
-    start_location: TextSize,
-    end_location: TextSize,
-    nesting: u32,
-}
-
-impl FStringRangeBuilder {
-    fn visit_token(&mut self, token: &Tok, range: TextRange) {
-        match token {
-            Tok::FStringStart => {
-                if self.nesting == 0 {
-                    self.start_location = range.start();
-                }
-                self.nesting += 1;
-            }
-            Tok::FStringEnd => {
-                // We can assume that this will never overflow because we know
-                // that the program once parsed to a valid AST which means that
-                // the start and end tokens for f-strings are balanced.
-                self.nesting -= 1;
-                if self.nesting == 0 {
-                    self.end_location = range.end();
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// Returns `true` if the lexer is currently inside of a f-string.
-    ///
-    /// It'll return `false` once the `FStringEnd` token for the outermost
-    /// f-string is visited.
-    const fn in_fstring(&self) -> bool {
-        self.nesting > 0
-    }
-
-    /// Returns the complete range of the previously visited f-string.
-    ///
-    /// This method should only be called once the lexer is outside of any
-    /// f-string otherwise it might return an invalid range.
-    ///
-    /// It doesn't consume the builder because there can be multiple f-strings
-    /// throughout the source code.
-    fn finish(&self) -> TextRange {
-        debug_assert!(!self.in_fstring());
-        TextRange::new(self.start_location, self.end_location)
     }
 }
 
@@ -262,128 +244,23 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
         let quote_style = f.options().quote_style();
-        let mut dangling_comments = comments.dangling(self.string);
-
-        let string_range = self.string.range();
-        let string_content = locator.slice(string_range);
-
-        // The AST parses implicit concatenation as a single string.
-        // Call into the lexer to extract the individual chunks and format each string on its own.
-        // This code does not yet implement the automatic joining of strings that fit on the same line
-        // because this is a black preview style.
-        let lexer = lex_starts_at(string_content, Mode::Expression, string_range.start());
-
-        // The lexer emits multiple tokens for a single f-string literal. Each token
-        // will have it's own range but we require the complete range of the f-string.
-        let mut fstring_range_builder = FStringRangeBuilder::default();
 
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
-        for token in lexer {
-            let (token, token_range) = match token {
-                Ok(spanned) => spanned,
-                Err(LexicalError {
-                    error: LexicalErrorType::IndentationError,
-                    ..
-                }) => {
-                    // This can happen if the string continuation appears anywhere inside of a parenthesized expression
-                    // because the lexer doesn't know about the parentheses. For example, the following snipped triggers an Indentation error
-                    // ```python
-                    // {
-                    //     "key": (
-                    //         [],
-                    //         'a'
-                    //             'b'
-                    //          'c'
-                    //     )
-                    // }
-                    // ```
-                    // Ignoring the error here is *safe* because we know that the program once parsed to a valid AST.
-                    continue;
-                }
-                Err(_) => {
-                    return Err(FormatError::syntax_error(
-                        "Unexpected lexer error in string formatting",
-                    ));
-                }
-            };
+        for part in self.string.parts() {
+            let normalized = StringPart::from_source(part.range(), &locator).normalize(
+                self.string.quoting(&locator),
+                &locator,
+                quote_style,
+            );
 
-            fstring_range_builder.visit_token(&token, token_range);
-
-            // We need to ignore all the tokens within the f-string as there can
-            // be `String` tokens inside it as well. For example,
-            //
-            // ```python
-            // f"foo {'bar'} foo"
-            // #      ^^^^^
-            // #      Ignore any logic for this `String` token
-            // ```
-            //
-            // Here, we're interested in the complete f-string, not the individual
-            // tokens inside it.
-            if fstring_range_builder.in_fstring() {
-                continue;
-            }
-
-            match token {
-                Tok::String { .. } | Tok::FStringEnd => {
-                    let token_range = if token.is_f_string_end() {
-                        fstring_range_builder.finish()
-                    } else {
-                        token_range
-                    };
-
-                    // ```python
-                    // (
-                    //      "a"
-                    //      # leading
-                    //      "the comment above"
-                    // )
-                    // ```
-                    let leading_comments_end = dangling_comments
-                        .partition_point(|comment| comment.start() <= token_range.start());
-
-                    let (leading_part_comments, rest) =
-                        dangling_comments.split_at(leading_comments_end);
-
-                    // ```python
-                    // (
-                    //      "a" # trailing comment
-                    //      "the comment above"
-                    // )
-                    // ```
-                    let trailing_comments_end = rest.partition_point(|comment| {
-                        comment.line_position().is_end_of_line()
-                            && !locator.contains_line_break(TextRange::new(
-                                token_range.end(),
-                                comment.start(),
-                            ))
-                    });
-
-                    let (trailing_part_comments, rest) = rest.split_at(trailing_comments_end);
-                    let part = StringPart::from_source(token_range, &locator);
-                    let normalized =
-                        part.normalize(self.string.quoting(&locator), &locator, quote_style);
-
-                    joiner.entry(&format_args![
-                        line_suffix_boundary(),
-                        leading_comments(leading_part_comments),
-                        normalized,
-                        trailing_comments(trailing_part_comments)
-                    ]);
-
-                    dangling_comments = rest;
-                }
-                Tok::Comment(_)
-                | Tok::NonLogicalNewline
-                | Tok::Newline
-                | Tok::Indent
-                | Tok::Dedent => continue,
-                token => unreachable!("Unexpected token {token:?}"),
-            }
+            joiner.entry(&format_args![
+                line_suffix_boundary(),
+                leading_comments(comments.leading(&part)),
+                normalized,
+                trailing_comments(comments.trailing(&part))
+            ]);
         }
-
-        debug_assert!(dangling_comments.is_empty());
 
         joiner.finish()
     }
