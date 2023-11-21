@@ -54,6 +54,10 @@ for i in itertools.product(foo_int):  # Ok
 for i in list(foo_list):  # Ok
     foo_list.append(i + 1)
 
+for i in list(foo_list):  # PERF101
+    # Make sure we match the correct list
+    other_list.append(i + 1)
+
 for i in list(foo_tuple):  # Ok
     foo_tuple.append(i + 1)
 
