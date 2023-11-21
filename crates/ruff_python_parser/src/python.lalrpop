@@ -11,7 +11,7 @@ use crate::{
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::{StringType, concatenate_strings, parse_fstring_middle, parse_string_literal},
+    string::{StringType, concatenated_strings, parse_fstring_middle, parse_string_literal},
     token::{self, StringKind},
     invalid,
 };
@@ -491,7 +491,7 @@ MatchStatement: ast::Stmt = {
             }
         )
     },
-    <location:@L> "match" <tuple_location:@L> <elts:TwoOrMore<TestOrStarNamedExpr, ",">> ","? <tuple_end_location:@R> ":" "\n" Indent <cases:MatchCase+> Dedent => {
+    <location:@L> "match" <tuple_location:@L> <elts:TwoOrMoreSep<TestOrStarNamedExpr, ",">> ","? <tuple_end_location:@R> ":" "\n" Indent <cases:MatchCase+> Dedent => {
         let end_location = cases
             .last()
             .unwrap()
@@ -542,7 +542,7 @@ Patterns: ast::Pattern = {
             range: (location..end_location).into()
         },
     ),
-    <location:@L> <patterns:TwoOrMore<Pattern, ",">> ","? <end_location:@R> => {
+    <location:@L> <patterns:TwoOrMoreSep<Pattern, ",">> ","? <end_location:@R> => {
         ast::Pattern::MatchSequence(
             ast::PatternMatchSequence {
                 patterns,
@@ -579,7 +579,7 @@ AsPattern: ast::Pattern = {
 
 OrPattern: ast::Pattern = {
     <pattern:ClosedPattern> => pattern,
-    <location:@L> <patterns:TwoOrMore<ClosedPattern, "|">> <end_location:@R> => {
+    <location:@L> <patterns:TwoOrMoreSep<ClosedPattern, "|">> <end_location:@R> => {
         ast::Pattern::MatchOr(
             ast::PatternMatchOr { patterns, range: (location..end_location).into() }
         )
@@ -677,8 +677,12 @@ LiteralPattern: ast::Pattern = {
         value: Box::new(value.into()),
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <strings:StringLiteral+> <end_location:@R> =>? Ok(ast::PatternMatchValue {
-        value: Box::new(concatenate_strings(strings, (location..end_location).into())?),
+    <location:@L> <string:StringLiteral> <end_location:@R> => ast::PatternMatchValue {
+            value: Box::new(string.into()),
+            range: (location..end_location).into()
+        }.into(),
+    <location:@L> <strings:TwoOrMore<StringLiteral>> <end_location:@R> =>? Ok(ast::PatternMatchValue {
+        value: Box::new(concatenated_strings(strings, (location..end_location).into())?),
         range: (location..end_location).into()
     }.into()),
 }
@@ -721,6 +725,7 @@ ValuePattern: ast::Pattern = {
 
 MappingKey: ast::Expr = {
     MatchNameOrAttr,
+    String,
     <e:NumberExpr> => e.into(),
     <e:AddOpExpr> => e.into(),
     <location:@L> "None" <end_location:@R> => ast::ExprNoneLiteral {
@@ -734,7 +739,6 @@ MappingKey: ast::Expr = {
         value: false,
         range: (location..end_location).into()
     }.into(),
-    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?),
 }
 
 MatchMappingEntry: (ast::Expr, ast::Pattern) = {
@@ -1561,7 +1565,7 @@ SubscriptList: ast::ParenthesizedExpr = {
             range: (location..end_location).into(),
         }.into()
     },
-    <location:@L> <elts:TwoOrMore<Subscript, ",">> ","? <end_location:@R> => {
+    <location:@L> <elts:TwoOrMoreSep<Subscript, ",">> ","? <end_location:@R> => {
         let elts = elts.into_iter().map(ast::Expr::from).collect();
         ast::ExprTuple {
             elts,
@@ -1587,23 +1591,29 @@ SliceOp: Option<ast::ParenthesizedExpr> = {
     <location:@L> ":" <e:Test<"all">?> => e,
 }
 
+String: ast::Expr = {
+    <location:@L> <string:StringLiteralOrFString> => string.into(),
+    <location:@L> <strings:TwoOrMore<StringLiteralOrFString>> <end_location:@R> =>? {
+        Ok(concatenated_strings(strings, (location..end_location).into())?)
+    }
+};
+
 StringLiteralOrFString: StringType = {
     StringLiteral,
     FStringExpr,
 };
 
 StringLiteral: StringType = {
-    <start_location:@L> <string:string> =>? {
+    <location:@L> <string:string> <end_location:@R> =>? {
         let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(&source, kind, triple_quoted, start_location)?)
+        Ok(parse_string_literal(&source, kind, triple_quoted, (location..end_location).into())?)
     }
 };
 
 FStringExpr: StringType = {
     <location:@L> FStringStart <values:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
-        StringType::FString(ast::ExprFString {
+        StringType::FString(ast::FString {
             values,
-            implicit_concatenated: false,
             range: (location..end_location).into()
         })
     }
@@ -1611,9 +1621,9 @@ FStringExpr: StringType = {
 
 FStringMiddlePattern: ast::Expr = {
     FStringReplacementField,
-    <start_location:@L> <fstring_middle:fstring_middle> =>? {
+    <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
         let (source, is_raw) = fstring_middle;
-        Ok(parse_fstring_middle(&source, is_raw, start_location)?)
+        Ok(parse_fstring_middle(&source, is_raw, (location..end_location).into())?)
     }
 };
 
@@ -1661,9 +1671,8 @@ FStringFormatSpecSuffix: ast::Expr = {
 
 FStringFormatSpec: ast::Expr = {
     <location:@L> <values:FStringMiddlePattern*> <end_location:@R> => {
-        ast::ExprFString {
+        ast::FString {
             values,
-            implicit_concatenated: false,
             range: (location..end_location).into()
         }.into()
     },
@@ -1685,7 +1694,7 @@ FStringConversion: (TextSize, ast::ConversionFlag) = {
 };
 
 Atom<Goal>: ast::ParenthesizedExpr = {
-    <location:@L> <strings:StringLiteralOrFString+> <end_location:@R> =>? Ok(concatenate_strings(strings, (location..end_location).into())?.into()),
+    <expr:String> => expr.into(),
     <location:@L> <value:Number> <end_location:@R> => ast::ExprNumberLiteral {
         value,
         range: (location..end_location).into(),
@@ -1926,9 +1935,18 @@ OneOrMore<T>: Vec<T> = {
 };
 
 /// Two or more items that are separated by `Sep`
-TwoOrMore<T, Sep>: Vec<T> = {
+TwoOrMoreSep<T, Sep>: Vec<T> = {
     <e1:T> Sep <e2:T> => vec![e1, e2],
-    <mut v: TwoOrMore<T, Sep>> Sep <e:T> => {
+    <mut v: TwoOrMoreSep<T, Sep>> Sep <e:T> => {
+        v.push(e);
+        v
+    }
+};
+
+/// Two or more items that are contiguous.
+TwoOrMore<T>: Vec<T> = {
+    <e1:T> <e2:T> => vec![e1, e2],
+    <mut v: TwoOrMore<T>> <e:T> => {
         v.push(e);
         v
     }
