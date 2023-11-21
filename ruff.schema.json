@@ -2310,6 +2310,17 @@
             "$ref": "#/definitions/ConstantType"
           }
         },
+        "custom-dunder-method-names": {
+          "description": "Custom names to allow for dunder methods (see: `PLW3201`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "max-args": {
           "description": "Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).",
           "type": [

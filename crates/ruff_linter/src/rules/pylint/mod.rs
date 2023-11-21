@@ -9,6 +9,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::assert_messages;
@@ -157,7 +158,15 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
-            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    custom_dunder_method_names: FxHashSet::from_iter([
+                        "__special_custom_magic__".to_string()
+                    ]),
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

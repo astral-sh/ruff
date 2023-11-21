@@ -2545,6 +2545,16 @@ pub struct PylintOptions {
     )]
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
 
+    /// Custom names to allow for dunder methods (see: `PLW3201`).
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            custom-dunder-method-names = ["__tablename__", "__table_args__"]
+        "#
+    )]
+    pub custom_dunder_method_names: Option<FxHashSet<String>>,
+
     /// Maximum number of branches allowed for a function or method body (see:
     /// `PLR0912`).
     #[option(default = r"12", value_type = "int", example = r"max-branches = 12")]
@@ -2586,6 +2596,7 @@ impl PylintOptions {
             allow_magic_value_types: self
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
+            custom_dunder_method_names: self.custom_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
             max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
