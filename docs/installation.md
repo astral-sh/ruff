@@ -27,7 +27,7 @@ For **Conda** users, Ruff is also available as [`ruff`](https://anaconda.org/con
 conda install -c conda-forge ruff
 ```
 
-For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/community/x86_64/ruff/)
+For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/extra/x86_64/ruff/)
 on the official repositories:
 
 ```shell
