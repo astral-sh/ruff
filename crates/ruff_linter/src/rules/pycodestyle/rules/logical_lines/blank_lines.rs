@@ -167,8 +167,8 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 ///
 /// ## Why is this bad?
 /// PEP 8 recommends using blank lines as follows:
-/// - Surround top-level function and class definitions with two blank lines.
-/// - Surround method definitions inside a class by a single blank line.
+/// - No more than two blank lines between top-level statements.
+/// - No more than one blank line between non-top-level statements.
 ///
 /// ## Example
 /// ```python
@@ -471,8 +471,7 @@ pub(crate) fn blank_lines(
             }
 
             if line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
-                || ((tracked_vars.is_in_class || tracked_vars.is_in_fn)
-                    && line.line.blank_lines > BlankLinesConfig::METHOD)
+                || (indent_level > 0 && line.line.blank_lines > BlankLinesConfig::METHOD)
             {
                 // E303
                 let mut diagnostic =

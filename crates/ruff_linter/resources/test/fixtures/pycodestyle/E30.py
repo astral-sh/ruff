@@ -515,6 +515,26 @@ It gives error E303: too many blank lines (3)
 # end
 
 
+# E303
+class Class:
+    def a(self):
+        pass
+
+
+    def b(self):
+        pass
+# end
+
+
+# E303
+if True:
+    a = 1
+
+
+    a = 2
+# end
+
+
 # E304
 @decorator
 

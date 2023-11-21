@@ -125,4 +125,39 @@ E30.py:512:1: E303 [*] Too many blank lines (3)
 513 512 | It gives error E303: too many blank lines (3)
 514 513 | """
 
+E30.py:524:5: E303 [*] Too many blank lines (2)
+    |
+524 |     def b(self):
+    |     ^^^ E303
+525 |         pass
+526 | # end
+    |
+    = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+520 520 |     def a(self):
+521 521 |         pass
+522 522 | 
+523     |-
+524 523 |     def b(self):
+525 524 |         pass
+526 525 | # end
+
+E30.py:534:5: E303 [*] Too many blank lines (2)
+    |
+534 |     a = 2
+    |     ^ E303
+535 | # end
+    |
+    = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+530 530 | if True:
+531 531 |     a = 1
+532 532 | 
+533     |-
+534 533 |     a = 2
+535 534 | # end
+536 535 | 
+
 
