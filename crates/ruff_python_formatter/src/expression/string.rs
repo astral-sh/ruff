@@ -1071,6 +1071,83 @@ impl<'src> DocstringLine<'src> {
         }
     }
 }
+
+/// A single code example extracted from a docstring.
+///
+/// This represents an intermediate state from when the code example was first
+/// found all the way up until the point at which the code example has finished
+/// and is reformatted.
+///
+/// Its default state is "empty." That is, that no code example is currently
+/// being collected.
+#[derive(Debug, Default)]
+struct CodeExample<'src> {
+    /// The kind of code example being collected, or `None` if no code example
+    /// has been observed.
+    kind: Option<CodeExampleKind>,
+    /// The lines that have been seen so far that make up the code example.
+    lines: Vec<CodeExampleLine<'src>>,
+}
+
+impl<'src> CodeExample<'src> {
+    /// Attempt to add an original line from a docstring to this code example.
+    ///
+    /// Based on the line and the internal state of whether a code example is
+    /// currently being collected or not, this will return an "action" for
+    /// the caller to perform. The typical case is a "print" action, which
+    /// instructs the caller to just print the line as though it were not part
+    /// of a code snippet.
+    fn add(&mut self, original: DocstringLine<'src>) -> CodeExampleAddAction<'src> {
+        match self.kind.take() {
+            // There's no existing code example being built, so we look for
+            // the start of one or otherwise tell the caller we couldn't find
+            // anything.
+            None => match self.add_start(original) {
+                None => CodeExampleAddAction::Kept,
+                Some(original) => CodeExampleAddAction::Print { original },
+            },
+            Some(CodeExampleKind::Doctest(doctest)) => {
+                if let Some(code) = doctest_find_ps2_prompt(&doctest.indent, &original.line) {
+                    let code = code.to_string();
+                    self.lines.push(CodeExampleLine { original, code });
+                    // Stay with the doctest kind while we accumulate all
+                    // PS2 prompts.
+                    self.kind = Some(CodeExampleKind::Doctest(doctest));
+                    return CodeExampleAddAction::Kept;
+                }
+                let code = std::mem::take(&mut self.lines);
+                let original = self.add_start(original);
+                CodeExampleAddAction::Format {
+                    code,
+                    kind: CodeExampleKind::Doctest(doctest),
+                    original,
+                }
+            }
+        }
+    }
+
+    /// Looks for the start of a code example. If one was found, then the given
+    /// line is kept and added as part of the code example. Otherwise, the line
+    /// is returned unchanged and no code example was found.
+    ///
+    /// # Panics
+    ///
+    /// This panics when the existing code-example is any non-None value. That
+    /// is, this routine assumes that there is no ongoing code example being
+    /// collected and looks for the beginning of another code example.
+    fn add_start(&mut self, original: DocstringLine<'src>) -> Option<DocstringLine<'src>> {
+        assert_eq!(None, self.kind, "expected no existing code example");
+        if let Some((indent, code)) = doctest_find_ps1_prompt(&original.line) {
+            let indent = indent.to_string();
+            let code = code.to_string();
+            self.lines.push(CodeExampleLine { original, code });
+            self.kind = Some(CodeExampleKind::Doctest(CodeExampleDoctest { indent }));
+            return None;
+        }
+        Some(original)
+    }
+}
+
 /// The kind of code example observed in a docstring.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum CodeExampleKind {
@@ -1116,6 +1193,97 @@ struct CodeExampleLine<'src> {
     original: DocstringLine<'src>,
     /// The code extracted from the line.
     code: String,
+}
+
+/// An action that a caller should perform after attempting to add a line from
+/// a docstring to a code example.
+///
+/// Callers are expected to add every line from a docstring to a code example,
+/// and the state of the code example (and the line itself) will determine
+/// how the caller should react.
+#[derive(Debug)]
+enum CodeExampleAddAction<'src> {
+    /// The line added was ignored by `CodeExample` and the caller should print
+    /// it to the formatter as-is.
+    ///
+    /// This is the common case. That is, most lines in most docstrings are not
+    /// part of a code example.
+    Print { original: DocstringLine<'src> },
+    /// The line added was kept by `CodeExample` as part of a new or existing
+    /// code example.
+    ///
+    /// When this occurs, callers should not try to format the line and instead
+    /// move on to the next line.
+    Kept,
+    /// The line added indicated that the code example is finished and should
+    /// be formatted and printed. The line added is not treated as part of
+    /// the code example. If the line added indicated the start of another
+    /// code example, then is won't be returned to the caller here. Otherwise,
+    /// callers should pass it through to the formatter as-is.
+    Format {
+        /// The kind of code example that was found.
+        kind: CodeExampleKind,
+        /// The Python code that should be formatted, indented and printed.
+        ///
+        /// This is guaranteed to be non-empty.
+        code: Vec<CodeExampleLine<'src>>,
+        /// When set, the line is considered not part of any code example
+        /// and should be formatted as if the `Ignore` action were returned.
+        /// Otherwise, if there is no line, then either one does not exist
+        /// or it is part of another code example and should be treated as a
+        /// `Kept` action.
+        original: Option<DocstringLine<'src>>,
+    },
+}
+
+/// Looks for a valid doctest PS1 prompt in the line given.
+///
+/// If one was found, then the indentation prior to the prompt is returned
+/// along with the code portion of the line.
+fn doctest_find_ps1_prompt(line: &str) -> Option<(&str, &str)> {
+    let trim_start = line.trim_start();
+    // Prompts must be followed by an ASCII space character[1].
+    //
+    // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
+    let code = trim_start.strip_prefix(">>> ")?;
+    let indent_len = line
+        .len()
+        .checked_sub(trim_start.len())
+        .expect("suffix is <= original");
+    let indent = &line[..indent_len];
+    Some((indent, code))
+}
+
+/// Looks for a valid doctest PS2 prompt in the line given.
+///
+/// If one is found, then the code portion of the line following the PS2 prompt
+/// is returned.
+///
+/// Callers must provide a string containing the original indentation of the
+/// PS1 prompt that started the doctest containing the potential PS2 prompt
+/// in the line given. If the line contains a PS2 prompt, its indentation must
+/// match the indentation used for the corresponding PS1 prompt (otherwise
+/// `None` will be returned).
+fn doctest_find_ps2_prompt<'src>(ps1_indent: &str, line: &'src str) -> Option<&'src str> {
+    let (ps2_indent, ps2_after) = line.split_once("...")?;
+    // PS2 prompts must have the same indentation as their
+    // corresponding PS1 prompt.[1] While the 'doctest' Python
+    // module will error in this case, we just treat this line as a
+    // non-doctest line.
+    //
+    // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L733
+    if ps1_indent != ps2_indent {
+        return None;
+    }
+    // PS2 prompts must be followed by an ASCII space character unless
+    // it's an otherwise empty line[1].
+    //
+    // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
+    match ps2_after.strip_prefix(' ') {
+        None if ps2_after.is_empty() => Some(""),
+        None => None,
+        Some(code) => Some(code),
+    }
 }
 }
 
