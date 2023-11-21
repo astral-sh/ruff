@@ -1,3 +1,4 @@
+use ast::Expr;
 use log::error;
 
 use ruff_diagnostics::{Diagnostic, Fix};
@@ -15,6 +16,12 @@ use super::fix_with;
 /// ## What it does
 /// Checks for the unnecessary nesting of multiple consecutive context
 /// managers.
+///
+/// The following context managers are exempt if used standalone:
+///
+///  - `anyio`.{`CancelScope`, `fail_after`, `move_on_after`}
+///  - `asyncio`.{`timeout`, `timeout_at`}
+///  - `trio`.{`fail_after`, `fail_at`, `move_on_after`, `move_on_at`}
 ///
 /// ## Why is this bad?
 /// In Python 3, a single `with` block can include multiple context
@@ -73,6 +80,35 @@ fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
     Some((*is_async, items, body))
 }
 
+/// Check if `with_items` contains a single item which should not necessarily be
+/// grouped with other items
+///
+/// async with asyncio.timeout(1):      # timeout should stand out
+///     with resource1(), resource2():
+///         ...
+fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
+    match with_items {
+        [with_item] => match &with_item.context_expr {
+            Expr::Call(expr_call) => checker
+                .semantic()
+                .resolve_call_path(&expr_call.func)
+                .is_some_and(|call_path| {
+                    matches!(
+                        call_path.as_slice(),
+                        ["asyncio", "timeout" | "timeout_at"]
+                            | ["anyio", "CancelScope" | "fail_after" | "move_on_after"]
+                            | [
+                                "trio",
+                                "fail_after" | "fail_at" | "move_on_after" | "move_on_at"
+                            ]
+                    )
+                }),
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
 /// SIM117
 pub(crate) fn multiple_with_statements(
     checker: &mut Checker,
@@ -108,6 +144,10 @@ pub(crate) fn multiple_with_statements(
         if is_async != with_stmt.is_async {
             // One of the statements is an async with, while the other is not,
             // we can't merge those statements.
+            return;
+        }
+
+        if explicit_with_items(checker, &with_stmt.items) || explicit_with_items(checker, items) {
             return;
         }
 
