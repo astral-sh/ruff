@@ -121,7 +121,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 ///     2
 /// ]
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct LogicalLine<'a> {
     lines: &'a LogicalLines<'a>,
     line: &'a Line,
