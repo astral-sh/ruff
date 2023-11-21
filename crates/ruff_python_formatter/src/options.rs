@@ -43,6 +43,12 @@ pub struct PyFormatOptions {
     /// in the formatted document.
     source_map_generation: SourceMapGeneration,
 
+    /// Whether to format code snippets in docstrings or not.
+    ///
+    /// By default this is disabled (opt-in), but the plan is to make this
+    /// enabled by default (opt-out) in the future.
+    docstring_code: DocstringCode,
+
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
 }
@@ -70,6 +76,7 @@ impl Default for PyFormatOptions {
             line_ending: LineEnding::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
+            docstring_code: DocstringCode::default(),
             preview: PreviewMode::default(),
         }
     }
@@ -106,6 +113,10 @@ impl PyFormatOptions {
 
     pub fn line_ending(&self) -> LineEnding {
         self.line_ending
+    }
+
+    pub fn docstring_code(&self) -> DocstringCode {
+        self.docstring_code
     }
 
     pub fn preview(&self) -> PreviewMode {
@@ -145,6 +156,12 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_line_ending(mut self, line_ending: LineEnding) -> Self {
         self.line_ending = line_ending;
+        self
+    }
+
+    #[must_use]
+    pub fn with_docstring_code(mut self, docstring_code: DocstringCode) -> Self {
+        self.docstring_code = docstring_code;
         self
     }
 
@@ -282,5 +299,22 @@ pub enum PreviewMode {
 impl PreviewMode {
     pub const fn is_enabled(self) -> bool {
         matches!(self, PreviewMode::Enabled)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum DocstringCode {
+    #[default]
+    Disabled,
+
+    Enabled,
+}
+
+impl DocstringCode {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, DocstringCode::Enabled)
     }
 }
