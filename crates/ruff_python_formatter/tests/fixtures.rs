@@ -41,7 +41,7 @@ fn black_compatibility() {
         let formatted_code = printed.as_code();
 
         ensure_unchanged_ast(&content, formatted_code, &options, input_path);
-        ensure_stability_when_formatting_twice(formatted_code, options, input_path);
+        ensure_stability_when_formatting_twice(formatted_code, &options, input_path);
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -120,7 +120,7 @@ fn format() {
         let formatted_code = printed.as_code();
 
         ensure_unchanged_ast(&content, formatted_code, &options, input_path);
-        ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
+        ensure_stability_when_formatting_twice(formatted_code, &options, input_path);
 
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
 
@@ -138,7 +138,7 @@ fn format() {
                 let formatted_code = printed.as_code();
 
                 ensure_unchanged_ast(&content, formatted_code, &options, input_path);
-                ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
+                ensure_stability_when_formatting_twice(formatted_code, &options, input_path);
 
                 writeln!(
                     snapshot,
@@ -157,7 +157,7 @@ fn format() {
             let formatted_preview = printed_preview.as_code();
 
             ensure_unchanged_ast(&content, formatted_preview, &options_preview, input_path);
-            ensure_stability_when_formatting_twice(formatted_preview, options_preview, input_path);
+            ensure_stability_when_formatting_twice(formatted_preview, &options_preview, input_path);
 
             if formatted_code == formatted_preview {
                 writeln!(
@@ -203,10 +203,10 @@ fn format() {
 /// Format another time and make sure that there are no changes anymore
 fn ensure_stability_when_formatting_twice(
     formatted_code: &str,
-    options: PyFormatOptions,
+    options: &PyFormatOptions,
     input_path: &Path,
 ) {
-    let reformatted = match format_module_source(formatted_code, options) {
+    let reformatted = match format_module_source(formatted_code, options.clone()) {
         Ok(reformatted) => reformatted,
         Err(err) => {
             panic!(
@@ -223,7 +223,10 @@ fn ensure_stability_when_formatting_twice(
             .header("Formatted once", "Formatted twice")
             .to_string();
         panic!(
-            r#"Reformatting the formatted code of {} a second time resulted in formatting changes.
+            r#"Reformatting the formatted code of {input_path} a second time resulted in formatting changes.
+
+Options:
+{options}
 ---
 {diff}---
 
@@ -233,9 +236,10 @@ Formatted once:
 
 Formatted twice:
 ---
-{}---"#,
-            input_path.display(),
-            reformatted.as_code(),
+{reformatted}---"#,
+            input_path = input_path.display(),
+            options = &DisplayPyOptions(options),
+            reformatted = reformatted.as_code(),
         );
     }
 }
