@@ -9,32 +9,46 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..8,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 2..4,
-                                value: "\n",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..8,
+                                    values: [
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 2..4,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 2..4,
+                                                            value: "\n",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 4..7,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 5..6,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
                         ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 4..7,
-                                value: Name(
-                                    ExprName {
-                                        range: 5..6,
-                                        id: "x",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
-                        ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

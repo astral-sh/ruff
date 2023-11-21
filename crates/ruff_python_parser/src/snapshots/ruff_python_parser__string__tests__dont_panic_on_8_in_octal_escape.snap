@@ -18,9 +18,15 @@ expression: parse_ast
             value: StringLiteral(
                 ExprStringLiteral {
                     range: 7..16,
-                    value: "\u{3}8[1m",
-                    unicode: false,
-                    implicit_concatenated: false,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 7..16,
+                                value: "\u{3}8[1m",
+                                unicode: false,
+                            },
+                        ),
+                    },
                 },
             ),
         },

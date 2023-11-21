@@ -81,9 +81,15 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     right: StringLiteral(
                         ExprStringLiteral {
                             range: 48..61,
-                            value: "ForwardRefY",
-                            unicode: false,
-                            implicit_concatenated: false,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 48..61,
+                                        value: "ForwardRefY",
+                                        unicode: false,
+                                    },
+                                ),
+                            },
                         },
                     ),
                 },

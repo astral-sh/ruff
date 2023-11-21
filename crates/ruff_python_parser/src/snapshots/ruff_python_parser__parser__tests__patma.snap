@@ -501,9 +501,15 @@ expression: parse_ast
                                     StringLiteral(
                                         ExprStringLiteral {
                                             range: 484..489,
-                                            value: "seq",
-                                            unicode: false,
-                                            implicit_concatenated: false,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 484..489,
+                                                        value: "seq",
+                                                        unicode: false,
+                                                    },
+                                                ),
+                                            },
                                         },
                                     ),
                                 ),
@@ -530,9 +536,15 @@ expression: parse_ast
                                     StringLiteral(
                                         ExprStringLiteral {
                                             range: 518..523,
-                                            value: "map",
-                                            unicode: false,
-                                            implicit_concatenated: false,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 518..523,
+                                                        value: "map",
+                                                        unicode: false,
+                                                    },
+                                                ),
+                                            },
                                         },
                                     ),
                                 ),
@@ -821,9 +833,15 @@ expression: parse_ast
                                         value: StringLiteral(
                                             ExprStringLiteral {
                                                 range: 664..667,
-                                                value: "X",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 664..667,
+                                                            value: "X",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     },
@@ -1551,9 +1569,15 @@ expression: parse_ast
                                 StringLiteral(
                                     ExprStringLiteral {
                                         range: 1287..1292,
-                                        value: "foo",
-                                        unicode: false,
-                                        implicit_concatenated: false,
+                                        value: StringLiteralValue {
+                                            inner: Single(
+                                                StringLiteral {
+                                                    range: 1287..1292,
+                                                    value: "foo",
+                                                    unicode: false,
+                                                },
+                                            ),
+                                        },
                                     },
                                 ),
                             ],
@@ -2469,9 +2493,15 @@ expression: parse_ast
                                         value: StringLiteral(
                                             ExprStringLiteral {
                                                 range: 2036..2038,
-                                                value: "",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 2036..2038,
+                                                            value: "",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     },
@@ -2513,9 +2543,15 @@ expression: parse_ast
                             value: StringLiteral(
                                 ExprStringLiteral {
                                     range: 2064..2066,
-                                    value: "",
-                                    unicode: false,
-                                    implicit_concatenated: false,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 2064..2066,
+                                                value: "",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                         },
@@ -3131,9 +3167,15 @@ expression: parse_ast
                                         value: StringLiteral(
                                             ExprStringLiteral {
                                                 range: 2449..2452,
-                                                value: "X",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 2449..2452,
+                                                            value: "X",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     },

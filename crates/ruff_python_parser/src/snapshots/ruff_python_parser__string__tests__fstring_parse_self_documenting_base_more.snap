@@ -9,65 +9,85 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..38,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 2..6,
-                                value: "mix ",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..38,
+                                    values: [
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 2..6,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 2..6,
+                                                            value: "mix ",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 6..13,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 7..11,
+                                                        id: "user",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: Some(
+                                                    DebugText {
+                                                        leading: "",
+                                                        trailing: "=",
+                                                    },
+                                                ),
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 13..28,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 13..28,
+                                                            value: " with text and ",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 28..37,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 29..35,
+                                                        id: "second",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: Some(
+                                                    DebugText {
+                                                        leading: "",
+                                                        trailing: "=",
+                                                    },
+                                                ),
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
                         ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 6..13,
-                                value: Name(
-                                    ExprName {
-                                        range: 7..11,
-                                        id: "user",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: Some(
-                                    DebugText {
-                                        leading: "",
-                                        trailing: "=",
-                                    },
-                                ),
-                                conversion: None,
-                                format_spec: None,
-                            },
-                        ),
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 13..28,
-                                value: " with text and ",
-                                unicode: false,
-                                implicit_concatenated: false,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 28..37,
-                                value: Name(
-                                    ExprName {
-                                        range: 29..35,
-                                        id: "second",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: Some(
-                                    DebugText {
-                                        leading: "",
-                                        trailing: "=",
-                                    },
-                                ),
-                                conversion: None,
-                                format_spec: None,
-                            },
-                        ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },
