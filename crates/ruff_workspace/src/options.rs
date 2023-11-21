@@ -2021,6 +2021,32 @@ pub struct IsortOptions {
     )]
     pub detect_same_package: Option<bool>,
 
+    /// Whether to place `import from` imports before straight imports when sorting.
+    ///
+    /// For example, by default, imports will be sorted such that straight imports appear
+    /// before `import from` imports, as in:
+    /// ```python
+    /// import os
+    /// import sys
+    /// from typing import List
+    /// ```
+    ///
+    /// Setting `from-first = true` will instead sort such that `import from` imports appear
+    /// before straight imports, as in:
+    /// ```python
+    /// from typing import List
+    /// import os
+    /// import sys
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            from-first = true
+        "#
+    )]
+    pub from_first: Option<bool>,
+
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
     /// By default custom sections are output last, but this can be overridden with `section-order`.
@@ -2098,6 +2124,7 @@ impl IsortOptions {
             .map_err(isort::settings::SettingsError::InvalidExtraStandardLibrary)?
             .unwrap_or_default();
         let no_lines_before = self.no_lines_before.unwrap_or_default();
+        let from_first = self.from_first.unwrap_or_default();
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
@@ -2206,6 +2233,7 @@ impl IsortOptions {
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
             no_sections,
+            from_first,
         })
     }
 }
