@@ -145,6 +145,15 @@ fn format_import_block(
     target_version: PythonVersion,
     settings: &Settings,
 ) -> String {
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    enum LineInsertion {
+        /// A blank line should be inserted as soon as the next import is
+        /// of a different type (i.e., direct vs. `from`).
+        Necessary,
+        /// A blank line has already been inserted.
+        Inserted,
+    }
+
     // Categorize by type (e.g., first-party vs. third-party).
     let mut block_by_type = categorize_imports(
         block,
@@ -182,24 +191,22 @@ fn format_import_block(
             pending_lines_before = false;
         }
 
-        let mut lines_inserted = false;
-        let mut needs_lines_inserted = false;
+        let mut line_insertion = None;
         let mut is_first_statement = true;
         let lines_between_types = settings.lines_between_types;
         for import in imports {
             match import {
                 Import((alias, comments)) => {
-                    // Add a blank lines between direct and from imports
+                    // Add a blank lines between direct and from imports.
                     if settings.from_first
                         && lines_between_types > 0
-                        && needs_lines_inserted
-                        && !lines_inserted
+                        && line_insertion == Some(LineInsertion::Necessary)
                     {
                         for _ in 0..lines_between_types {
                             output.push_str(&stylist.line_ending());
                         }
 
-                        lines_inserted = true;
+                        line_insertion = Some(LineInsertion::Inserted);
                     }
 
                     output.push_str(&format::format_import(
@@ -210,22 +217,21 @@ fn format_import_block(
                     ));
 
                     if !settings.from_first {
-                        needs_lines_inserted = true;
+                        line_insertion = Some(LineInsertion::Necessary);
                     }
                 }
 
                 ImportFrom((import_from, comments, trailing_comma, aliases)) => {
-                    // Add a blank lines between direct and from imports
+                    // Add a blank lines between direct and from imports.
                     if !settings.from_first
                         && lines_between_types > 0
-                        && needs_lines_inserted
-                        && !lines_inserted
+                        && line_insertion == Some(LineInsertion::Necessary)
                     {
                         for _ in 0..lines_between_types {
                             output.push_str(&stylist.line_ending());
                         }
 
-                        lines_inserted = true;
+                        line_insertion = Some(LineInsertion::Inserted);
                     }
 
                     output.push_str(&format::format_import_from(
@@ -242,7 +248,7 @@ fn format_import_block(
                     ));
 
                     if settings.from_first {
-                        needs_lines_inserted = true;
+                        line_insertion = Some(LineInsertion::Necessary);
                     }
                 }
             }

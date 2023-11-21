@@ -1441,7 +1441,7 @@
           }
         },
         "from-first": {
-          "description": "Sort \"from .. import ..\" imports before straight imports",
+          "description": "Whether to place `import from` imports before straight imports when sorting.\n\nFor example, by default, imports will be sorted such that straight imports appear before `import from` imports, as in: ```python import os import sys from typing import List ```\n\nSetting `from-first = true` will instead sort such that `import from` imports appear before straight imports, as in: ```python from typing import List import os import sys ```",
           "type": [
             "boolean",
             "null"

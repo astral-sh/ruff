@@ -2021,7 +2021,23 @@ pub struct IsortOptions {
     )]
     pub detect_same_package: Option<bool>,
 
-    /// Sort "from .. import .." imports before straight imports
+    /// Whether to place `import from` imports before straight imports when sorting.
+    ///
+    /// For example, by default, imports will be sorted such that straight imports appear
+    /// before `import from` imports, as in:
+    /// ```python
+    /// import os
+    /// import sys
+    /// from typing import List
+    /// ```
+    ///
+    /// Setting `from-first = true` will instead sort such that `import from` imports appear
+    /// before straight imports, as in:
+    /// ```python
+    /// from typing import List
+    /// import os
+    /// import sys
+    /// ```
     #[option(
         default = r#"false"#,
         value_type = "bool",
