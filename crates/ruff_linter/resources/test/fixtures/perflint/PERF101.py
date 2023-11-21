@@ -50,3 +50,12 @@ import itertools
 
 for i in itertools.product(foo_int):  # Ok
     pass
+
+for i in list(foo_list):  # Ok
+    foo_list.append(i + 1)
+
+for i in list(foo_tuple):  # Ok
+    foo_tuple.append(i + 1)
+
+for i in list(foo_set):  # Ok
+    foo_set.append(i + 1)
