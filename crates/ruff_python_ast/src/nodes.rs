@@ -655,24 +655,6 @@ impl Expr {
             _ => None,
         }
     }
-
-    pub fn is_implicit_concatenated_string(&self) -> bool {
-        match self {
-            Expr::StringLiteral(ExprStringLiteral {
-                implicit_concatenated,
-                ..
-            })
-            | Expr::BytesLiteral(ExprBytesLiteral {
-                implicit_concatenated,
-                ..
-            })
-            | Expr::FString(ExprFString {
-                implicit_concatenated,
-                ..
-            }) => *implicit_concatenated,
-            _ => false,
-        }
-    }
 }
 
 /// An AST node used to represent a IPython escape command at the expression level.
