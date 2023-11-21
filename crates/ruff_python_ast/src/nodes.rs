@@ -643,6 +643,7 @@ impl Expr {
         )
     }
 
+    /// Returns [`LiteralExpressionRef`] if the expression is a literal expression.
     pub fn as_literal_expr(&self) -> Option<LiteralExpressionRef<'_>> {
         match self {
             Expr::StringLiteral(expr) => Some(LiteralExpressionRef::StringLiteral(expr)),
@@ -3544,12 +3545,12 @@ impl Ranged for crate::Expr {
             Self::Call(node) => node.range(),
             Self::FormattedValue(node) => node.range(),
             Self::FString(node) => node.range(),
-            Expr::StringLiteral(node) => node.range(),
-            Expr::BytesLiteral(node) => node.range(),
-            Expr::NumberLiteral(node) => node.range(),
-            Expr::BooleanLiteral(node) => node.range(),
-            Expr::NoneLiteral(node) => node.range(),
-            Expr::EllipsisLiteral(node) => node.range(),
+            Self::StringLiteral(node) => node.range(),
+            Self::BytesLiteral(node) => node.range(),
+            Self::NumberLiteral(node) => node.range(),
+            Self::BooleanLiteral(node) => node.range(),
+            Self::NoneLiteral(node) => node.range(),
+            Self::EllipsisLiteral(node) => node.range(),
             Self::Attribute(node) => node.range(),
             Self::Subscript(node) => node.range(),
             Self::Starred(node) => node.range(),
@@ -3557,7 +3558,7 @@ impl Ranged for crate::Expr {
             Self::List(node) => node.range(),
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
-            Expr::IpyEscapeCommand(node) => node.range(),
+            Self::IpyEscapeCommand(node) => node.range(),
         }
     }
 }
