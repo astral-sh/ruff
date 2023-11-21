@@ -7,7 +7,7 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_python_ast::{self as ast, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
@@ -26,7 +26,7 @@ mod insertion;
 
 pub(crate) struct Importer<'a> {
     /// The Python AST to which we are adding imports.
-    python_ast: &'a Suite,
+    python_ast: &'a [Stmt],
     /// The [`Locator`] for the Python AST.
     locator: &'a Locator<'a>,
     /// The [`Stylist`] for the Python AST.
@@ -39,7 +39,7 @@ pub(crate) struct Importer<'a> {
 
 impl<'a> Importer<'a> {
     pub(crate) fn new(
-        python_ast: &'a Suite,
+        python_ast: &'a [Stmt],
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
     ) -> Self {

@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.1.5"
+version = "0.1.6"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -76,3 +76,6 @@ mimalloc = "0.1.39"
 
 [target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
 tikv-jemallocator = "0.5.0"
+
+[lints]
+workspace = true

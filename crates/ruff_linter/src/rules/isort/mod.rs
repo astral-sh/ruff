@@ -1075,6 +1075,30 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("main_first_party.py"))]
+    fn main_is_first_party(path: &Path) -> Result<()> {
+        let snapshot = format!("sections_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![pattern("first_party")],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn detect_same_package() -> Result<()> {
         let diagnostics = test_path(

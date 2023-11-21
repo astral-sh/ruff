@@ -106,6 +106,11 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
             )
+        } else if matches!(level, None | Some(0)) && module_name == "__main__" {
+            (
+                &ImportSection::Known(ImportType::FirstParty),
+                Reason::KnownFirstParty,
+            )
         } else {
             (
                 &ImportSection::Known(ImportType::ThirdParty),

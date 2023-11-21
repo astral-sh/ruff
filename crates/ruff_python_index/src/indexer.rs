@@ -238,18 +238,18 @@ mod tests {
 
     #[test]
     fn continuation() {
-        let contents = r#"x = 1"#;
+        let contents = r"x = 1";
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
         assert_eq!(indexer.continuation_line_starts(), &[]);
 
-        let contents = r#"
+        let contents = r"
         # Hello, world!
 
 x = 1
 
 y = 2
-        "#
+        "
         .trim();
 
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();

@@ -337,10 +337,10 @@ mod tests {
 
     #[test]
     fn dedent_non_python_whitespace() {
-        let text = r#"        C = int(f.rea1,0],[-1,0,1]],
+        let text = r"        C = int(f.rea1,0],[-1,0,1]],
               [[-1,-1,1],[1,1,-1],[0,-1,0]],
               [[-1,-1,-1],[1,1,0],[1,0,1]]
-             ]"#;
+             ]";
         assert_eq!(dedent(text), text);
     }
 }

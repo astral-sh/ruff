@@ -117,7 +117,7 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
-        diagnostics.extend(check_file_path(path, package, settings));
+        diagnostics.extend(check_file_path(path, package, locator, indexer, settings));
     }
 
     // Run the logical line-based rules.
@@ -639,7 +639,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::source_kind::SourceKind;
-    use crate::test::{test_contents, test_notebook_path, TestedNotebook};
+    use crate::test::{assert_notebook_path, test_contents, TestedNotebook};
     use crate::{assert_messages, settings};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
@@ -655,7 +655,7 @@ mod tests {
             messages,
             source_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             &actual,
             expected,
             &settings::LinterSettings::for_rule(Rule::UnsortedImports),
@@ -672,7 +672,7 @@ mod tests {
             messages,
             source_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             &actual,
             expected,
             &settings::LinterSettings::for_rule(Rule::UnusedImport),
@@ -689,7 +689,7 @@ mod tests {
             messages,
             source_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             &actual,
             expected,
             &settings::LinterSettings::for_rule(Rule::UnusedVariable),
@@ -706,7 +706,7 @@ mod tests {
         let TestedNotebook {
             linted_notebook: fixed_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             actual_path,
             &expected_path,
             &settings::LinterSettings::for_rule(Rule::UnusedImport),

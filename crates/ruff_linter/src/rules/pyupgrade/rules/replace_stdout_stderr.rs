@@ -43,7 +43,7 @@ impl Violation for ReplaceStdoutStderr {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`")
+        format!("Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`")
     }
 
     fn fix_title(&self) -> Option<String> {

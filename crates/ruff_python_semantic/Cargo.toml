@@ -26,3 +26,6 @@ smallvec = { workspace = true }
 
 [dev-dependencies]
 ruff_python_parser = { path = "../ruff_python_parser" }
+
+[lints]
+workspace = true
