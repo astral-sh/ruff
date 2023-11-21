@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use bitflags::bitflags;
 
-use ruff_formatter::{format_args, write};
+use ruff_formatter::{format_args, write, Printed};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
     self as ast, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExpressionRef,
@@ -16,9 +16,10 @@ use crate::expression::parentheses::{
 };
 use crate::expression::Expr;
 use crate::prelude::*;
+use crate::FormatModuleError;
 use crate::QuoteStyle;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 enum Quoting {
     CanChange,
     Preserve,
@@ -189,6 +190,7 @@ impl<'a> FormatString<'a> {
 
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let parent_docstring_quote_style = f.context().docstring();
         let locator = f.context().locator();
         let result = match self.layout {
             StringLayout::Default => {
@@ -200,14 +202,19 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
                             self.string.quoting(&locator),
                             &locator,
                             f.options().quote_style(),
+                            parent_docstring_quote_style,
                         )
                         .fmt(f)
                 }
             }
             StringLayout::DocString => {
                 let string_part = StringPart::from_source(self.string.range(), &locator);
-                let normalized =
-                    string_part.normalize(Quoting::CanChange, &locator, f.options().quote_style());
+                let normalized = string_part.normalize(
+                    Quoting::CanChange,
+                    &locator,
+                    f.options().quote_style(),
+                    parent_docstring_quote_style,
+                );
                 format_docstring(&normalized, f)
             }
             StringLayout::ImplicitConcatenatedStringInBinaryLike => {
@@ -243,6 +250,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
+        let in_docstring = f.context().docstring();
         let quote_style = f.options().quote_style();
 
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
@@ -252,6 +260,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                 self.string.quoting(&locator),
                 &locator,
                 quote_style,
+                in_docstring,
             );
 
             joiner.entry(&format_args![
@@ -301,16 +310,72 @@ impl StringPart {
     }
 
     /// Computes the strings preferred quotes and normalizes its content.
+    ///
+    /// The parent docstring quote style should be set when formatting a code
+    /// snippet within the docstring. The quote style should correspond to the
+    /// style of quotes used by said docstring. Normalization will ensure the
+    /// quoting styles don't conflict.
     fn normalize<'a>(
         self,
         quoting: Quoting,
         locator: &'a Locator,
         configured_style: QuoteStyle,
+        parent_docstring_quote_style: Option<QuoteStyle>,
     ) -> NormalizedString<'a> {
-        // Per PEP 8 and PEP 257, always prefer double quotes for docstrings and triple-quoted
-        // strings. (We assume docstrings are always triple-quoted.)
+        // Per PEP 8 and PEP 257, always prefer double quotes for docstrings
+        // and triple-quoted strings. (We assume docstrings are always
+        // triple-quoted.)
         let preferred_style = if self.quotes.triple {
-            QuoteStyle::Double
+            // ... unless we're formatting a code snippet inside a docstring,
+            // then we specifically want to invert our quote style to avoid
+            // writing out invalid Python.
+            //
+            // It's worth pointing out that we can actually wind up being
+            // somewhat out of sync with PEP8 in this case. Consider this
+            // example:
+            //
+            //     def foo():
+            //         '''
+            //         Something.
+            //
+            //         >>> """tricksy"""
+            //         '''
+            //         pass
+            //
+            // Ideally, this would be reformatted as:
+            //
+            //     def foo():
+            //         """
+            //         Something.
+            //
+            //         >>> '''tricksy'''
+            //         """
+            //         pass
+            //
+            // But the logic here results in the original quoting being
+            // preserved. This is because the quoting style of the outer
+            // docstring is determined, in part, by looking at its contents. In
+            // this case, it notices that it contains a `"""` and thus infers
+            // that using `'''` would overall read better because it avoids
+            // the need to escape the interior `"""`. Except... in this case,
+            // the `"""` is actually part of a code snippet that could get
+            // reformatted to using a different quoting style itself.
+            //
+            // Fixing this would, I believe, require some fairly seismic
+            // changes to how formatting strings works. Namely, we would need
+            // to look for code snippets before normalizing the docstring, and
+            // then figure out the quoting style more holistically by looking
+            // at the various kinds of quotes used in the code snippets and
+            // what reformatting them might look like.
+            //
+            // Overall this is a bit of a corner case and just inverting the
+            // style from what the parent ultimately decided upon works, even
+            // if it doesn't have perfect alignment with PEP8.
+            if let Some(style) = parent_docstring_quote_style {
+                style.invert()
+            } else {
+                QuoteStyle::Double
+            }
         } else {
             configured_style
         };
@@ -935,11 +1000,12 @@ fn format_docstring(normalized: &NormalizedString, f: &mut PyFormatter) -> Forma
     DocstringLinePrinter {
         f,
         offset,
-        is_last: false,
         stripped_indentation_length,
         already_normalized,
+        quote_style: normalized.quotes.style,
+        code_example: CodeExample::default(),
     }
-    .print(lines)?;
+    .add_iter(lines)?;
 
     // Same special case in the last line as for the first line
     let trim_end = docstring
@@ -953,45 +1019,115 @@ fn format_docstring(normalized: &NormalizedString, f: &mut PyFormatter) -> Forma
 }
 
 /// An abstraction for printing each line of a docstring.
-struct DocstringLinePrinter<'ast, 'buf, 'fmt> {
+struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     f: &'fmt mut PyFormatter<'ast, 'buf>,
     /// The source offset of the beginning of the line that is currently being
     /// printed.
     offset: TextSize,
-    /// Set to true when adding the last line.
-    is_last: bool,
     /// Indentation alignment based on the least indented line in the
     /// docstring.
     stripped_indentation_length: TextSize,
     /// Whether the docstring is overall already considered normalized. When it
     /// is, the formatter can take a fast path.
     already_normalized: bool,
+    /// The quote style used by the docstring being printed.
+    quote_style: QuoteStyle,
+    /// The current code example detected in the docstring.
+    code_example: CodeExample<'src>,
 }
 
-impl<'ast, 'buf, 'fmt> DocstringLinePrinter<'ast, 'buf, 'fmt> {
+impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// Print all of the lines in the given iterator to this
     /// printer's formatter.
-    fn print(&mut self, mut lines: std::iter::Peekable<std::str::Lines<'_>>) -> FormatResult<()> {
+    ///
+    /// Note that callers may treat the first line specially, such that the
+    /// iterator given contains all lines except for the first.
+    fn add_iter(
+        &mut self,
+        mut lines: std::iter::Peekable<std::str::Lines<'src>>,
+    ) -> FormatResult<()> {
         while let Some(line) = lines.next() {
-            self.is_last = lines.peek().is_none();
-            self.add(line)?;
+            let line = DocstringLine {
+                line: Cow::Borrowed(line),
+                offset: self.offset,
+                is_last: lines.peek().is_none(),
+            };
+            // We know that the normalized string has \n line endings.
+            self.offset += line.line.text_len() + "\n".text_len();
+            self.add_one(line)?;
         }
         Ok(())
     }
 
     /// Adds the given line to this printer.
-    fn add(&mut self, line: &str) -> FormatResult<()> {
-        self.print_one(line)?;
-        // We know that the normalized string has \n line endings.
-        self.offset += line.text_len() + "\n".text_len();
+    ///
+    /// Depending on what's in the line, this may or may not print the line
+    /// immediately to the underlying buffer. If the line starts or is part
+    /// of an existing code snippet, then the lines will get buffered until
+    /// the code snippet is complete.
+    fn add_one(&mut self, line: DocstringLine<'src>) -> FormatResult<()> {
+        // Just pass through the line as-is without looking for a code snippet
+        // when docstring code formatting is disabled. And also when we are
+        // formatting a code snippet so as to avoid arbitrarily nested code
+        // snippet formatting. We avoid this because it's likely quite tricky
+        // to get right 100% of the time, although perhaps not impossible. It's
+        // not clear that it's worth the effort to support.
+        if !self.f.options().docstring_code().is_enabled() || self.f.context().docstring().is_some()
+        {
+            return self.print_one(&line);
+        }
+        match self.code_example.add(line) {
+            CodeExampleAddAction::Print { original } => self.print_one(&original)?,
+            CodeExampleAddAction::Kept => {}
+            CodeExampleAddAction::Format {
+                kind,
+                code,
+                original,
+            } => {
+                let Some(formatted_lines) = self.format(&code)? else {
+                    // If formatting failed in a way that should not be
+                    // allowed, we back out what we're doing and print the
+                    // original lines we found as-is as if we did nothing.
+                    for codeline in code {
+                        self.print_one(&codeline.original)?;
+                    }
+                    if let Some(original) = original {
+                        self.print_one(&original)?;
+                    }
+                    return Ok(());
+                };
+
+                self.already_normalized = false;
+                match kind {
+                    CodeExampleKind::Doctest(CodeExampleDoctest { indent }) => {
+                        let mut lines = formatted_lines.into_iter();
+                        if let Some(first) = lines.next() {
+                            self.print_one(&first.map(|line| std::format!("{indent}>>> {line}")))?;
+                            for docline in lines {
+                                self.print_one(
+                                    &docline.map(|line| std::format!("{indent}... {line}")),
+                                )?;
+                            }
+                        }
+                    }
+                }
+                if let Some(original) = original {
+                    self.print_one(&original)?;
+                }
+            }
+        }
         Ok(())
     }
 
     /// Prints the single line given.
-    fn print_one(&mut self, line: &str) -> FormatResult<()> {
-        let trim_end = line.trim_end();
+    ///
+    /// This mostly just handles indentation and ensuring line breaks are
+    /// inserted as appropriate before passing it on to the formatter to
+    /// print to the buffer.
+    fn print_one(&mut self, line: &DocstringLine<'_>) -> FormatResult<()> {
+        let trim_end = line.line.trim_end();
         if trim_end.is_empty() {
-            return if self.is_last {
+            return if line.is_last {
                 // If the doc string ends with `    """`, the last line is
                 // `    `, but we don't want to insert an empty line (but close
                 // the docstring).
@@ -1016,11 +1152,11 @@ impl<'ast, 'buf, 'fmt> DocstringLinePrinter<'ast, 'buf, 'fmt> {
             // prepend the in-docstring indentation to the string.
             let indent_len = indentation_length(trim_end) - self.stripped_indentation_length;
             let in_docstring_indent = " ".repeat(usize::from(indent_len)) + trim_end.trim_start();
-            text(&in_docstring_indent, Some(self.offset)).fmt(self.f)?;
+            text(&in_docstring_indent, Some(line.offset)).fmt(self.f)?;
         } else {
             // Take the string with the trailing whitespace removed, then also
             // skip the leading whitespace.
-            let trimmed_line_range = TextRange::at(self.offset, trim_end.text_len())
+            let trimmed_line_range = TextRange::at(line.offset, trim_end.text_len())
                 .add_start(self.stripped_indentation_length);
             if self.already_normalized {
                 source_text_slice(trimmed_line_range).fmt(self.f)?;
@@ -1037,13 +1173,99 @@ impl<'ast, 'buf, 'fmt> DocstringLinePrinter<'ast, 'buf, 'fmt> {
         // We handled the case that the closing quotes are on their own line
         // above (the last line is empty except for whitespace). If they are on
         // the same line as content, we don't insert a line break.
-        if !self.is_last {
+        if !line.is_last {
             hard_line_break().fmt(self.f)?;
         }
 
         Ok(())
     }
 
+    /// Given a sequence of lines from a code snippet, format them and return
+    /// the formatted code as a sequence of owned docstring lines.
+    ///
+    /// This routine generally only returns an error when the recursive call
+    /// to the formatter itself returns a `FormatError`. In all other cases
+    /// (for example, if the code snippet is invalid Python or even if the
+    /// resulting reformatted code snippet is invalid Python), then `Ok(None)`
+    /// is returned. In this case, callers should assume that a reformatted
+    /// code snippet is unavailable and bail out of trying to format it.
+    ///
+    /// Currently, when the above cases happen and `Ok(None)` is returned, the
+    /// routine is silent about it. So from the user's perspective, this will
+    /// fail silently. Ideally, this would at least emit a warning message,
+    /// but at time of writing, it wasn't clear to me how to best do that.
+    fn format(
+        &mut self,
+        code: &[CodeExampleLine<'src>],
+    ) -> FormatResult<Option<Vec<DocstringLine<'static>>>> {
+        use ruff_python_parser::AsMode;
+
+        let offset = code
+            .get(0)
+            .expect("code blob must be non-empty")
+            .original
+            .offset;
+        let last_line_is_last = code
+            .last()
+            .expect("code blob must be non-empty")
+            .original
+            .is_last;
+        let codeblob = code
+            .iter()
+            .map(|line| &*line.code)
+            .collect::<Vec<&str>>()
+            .join("\n");
+        let printed = match docstring_format_source(self.f.options(), self.quote_style, &codeblob) {
+            Ok(printed) => printed,
+            Err(FormatModuleError::FormatError(err)) => return Err(err),
+            Err(
+                FormatModuleError::LexError(_)
+                | FormatModuleError::ParseError(_)
+                | FormatModuleError::PrintError(_),
+            ) => {
+                return Ok(None);
+            }
+        };
+        // This is a little hokey, but we want to determine whether the
+        // reformatted code snippet will lead to an overall invalid docstring.
+        // So attempt to parse it as Python code, but ensure it is wrapped
+        // within a docstring using the same quotes as the docstring we're in
+        // right now.
+        //
+        // This is an unfortunate stop-gap to attempt to prevent us from
+        // writing invalid Python due to some oddity of the code snippet within
+        // a docstring. As we fix corner cases over time, we can perhaps
+        // remove this check. See the `doctest_invalid_skipped` tests in
+        // `docstring_code_examples.py` for when this check is relevant.
+        let wrapped = match self.quote_style {
+            QuoteStyle::Single => std::format!("'''{}'''", printed.as_code()),
+            QuoteStyle::Double => std::format!(r#""""{}""""#, printed.as_code()),
+        };
+        let result = ruff_python_parser::parse(
+            &wrapped,
+            self.f.options().source_type().as_mode(),
+            "<filename>",
+        );
+        // If the resulting code is not valid, then reset and pass through
+        // the docstring lines as-is.
+        if result.is_err() {
+            return Ok(None);
+        }
+        let mut lines = printed
+            .as_code()
+            .lines()
+            .map(|line| DocstringLine {
+                line: Cow::Owned(line.into()),
+                offset,
+                is_last: false,
+            })
+            .collect::<Vec<_>>();
+        if let Some(last) = lines.last_mut() {
+            last.is_last = last_line_is_last;
+        }
+        Ok(Some(lines))
+    }
+}
 
 /// Represents a single line in a docstring.
 ///
@@ -1285,6 +1507,40 @@ fn doctest_find_ps2_prompt<'src>(ps1_indent: &str, line: &'src str) -> Option<&'
         Some(code) => Some(code),
     }
 }
+
+/// Formats the given source code using the given options.
+///
+/// The given quote style should correspond to the style used by the docstring
+/// containing the code snippet being formatted. The formatter will use this
+/// information to invert the quote style of any such strings contained within
+/// the code snippet in order to avoid writing invalid Python code.
+///
+/// This is similar to the top-level formatting entrypoint, except this
+/// explicitly sets the context to indicate that formatting is taking place
+/// inside of a docstring.
+fn docstring_format_source(
+    options: &crate::PyFormatOptions,
+    docstring_quote_style: QuoteStyle,
+    source: &str,
+) -> Result<Printed, FormatModuleError> {
+    use ruff_python_parser::AsMode;
+
+    let source_type = options.source_type();
+    let (tokens, comment_ranges) = ruff_python_index::tokens_and_ranges(source, source_type)?;
+    let module =
+        ruff_python_parser::parse_ok_tokens(tokens, source, source_type.as_mode(), "<filename>")?;
+    let source_code = ruff_formatter::SourceCode::new(source);
+    let comments = crate::Comments::from_ast(&module, source_code, &comment_ranges);
+    let locator = Locator::new(source);
+
+    let ctx = PyFormatContext::new(options.clone(), locator.contents(), comments)
+        .in_docstring(docstring_quote_style);
+    let formatted = crate::format!(ctx, [module.format()])?;
+    formatted
+        .context()
+        .comments()
+        .assert_all_formatted(source_code);
+    Ok(formatted.print()?)
 }
 
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
