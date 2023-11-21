@@ -33,6 +33,7 @@ line-width              = 88
 indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
+docstring-code          = Disabled
 preview                 = Disabled
 ```
 
@@ -66,6 +67,7 @@ line-width              = 88
 indent-width            = 2
 quote-style             = Double
 magic-trailing-comma    = Respect
+docstring-code          = Disabled
 preview                 = Disabled
 ```
 

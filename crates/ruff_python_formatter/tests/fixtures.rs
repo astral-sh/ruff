@@ -339,12 +339,14 @@ line-width              = {line_width}
 indent-width            = {indent_width}
 quote-style             = {quote_style:?}
 magic-trailing-comma    = {magic_trailing_comma:?}
+docstring-code          = {docstring_code:?}
 preview                 = {preview:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
             quote_style = self.0.quote_style(),
             magic_trailing_comma = self.0.magic_trailing_comma(),
+            docstring_code = self.0.docstring_code(),
             preview = self.0.preview()
         )
     }
