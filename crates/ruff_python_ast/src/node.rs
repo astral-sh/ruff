@@ -113,6 +113,9 @@ pub enum AnyNode {
     TypeParamTypeVar(TypeParamTypeVar),
     TypeParamTypeVarTuple(TypeParamTypeVarTuple),
     TypeParamParamSpec(TypeParamParamSpec),
+    FString(ast::FString),
+    StringLiteral(ast::StringLiteral),
+    BytesLiteral(ast::BytesLiteral),
 }
 
 impl AnyNode {
@@ -204,6 +207,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -296,6 +302,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -388,6 +397,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -480,6 +492,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -572,6 +587,9 @@ impl AnyNode {
             | AnyNode::TypeParamTypeVar(_)
             | AnyNode::TypeParamTypeVarTuple(_)
             | AnyNode::TypeParamParamSpec(_)
+            | AnyNode::FString(_)
+            | AnyNode::StringLiteral(_)
+            | AnyNode::BytesLiteral(_)
             | AnyNode::ElifElseClause(_) => None,
         }
     }
@@ -683,6 +701,9 @@ impl AnyNode {
             Self::TypeParamTypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
             Self::TypeParamTypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
             Self::TypeParamParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
+            Self::FString(node) => AnyNodeRef::FString(node),
+            Self::StringLiteral(node) => AnyNodeRef::StringLiteral(node),
+            Self::BytesLiteral(node) => AnyNodeRef::BytesLiteral(node),
             Self::ElifElseClause(node) => AnyNodeRef::ElifElseClause(node),
         }
     }
@@ -4273,6 +4294,114 @@ impl AstNode for ast::TypeParamParamSpec {
         let ast::TypeParamParamSpec { range: _, name: _ } = self;
     }
 }
+impl AstNode for ast::FString {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::FString(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::FString(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+        let ast::FString { values, range: _ } = self;
+
+        for expr in values {
+            visitor.visit_expr(expr);
+        }
+    }
+}
+impl AstNode for ast::StringLiteral {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::StringLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::StringLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
+}
+impl AstNode for ast::BytesLiteral {
+    fn cast(kind: AnyNode) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        if let AnyNode::BytesLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn cast_ref(kind: AnyNodeRef) -> Option<&Self> {
+        if let AnyNodeRef::BytesLiteral(node) = kind {
+            Some(node)
+        } else {
+            None
+        }
+    }
+
+    fn as_any_node_ref(&self) -> AnyNodeRef {
+        AnyNodeRef::from(self)
+    }
+
+    fn into_any_node(self) -> AnyNode {
+        AnyNode::from(self)
+    }
+
+    fn visit_preorder<'a, V>(&'a self, _visitor: &mut V)
+    where
+        V: PreorderVisitor<'a> + ?Sized,
+    {
+    }
+}
+
 impl From<Stmt> for AnyNode {
     fn from(stmt: Stmt) -> Self {
         match stmt {
@@ -4882,6 +5011,24 @@ impl From<TypeParamParamSpec> for AnyNode {
     }
 }
 
+impl From<ast::FString> for AnyNode {
+    fn from(node: ast::FString) -> Self {
+        AnyNode::FString(node)
+    }
+}
+
+impl From<ast::StringLiteral> for AnyNode {
+    fn from(node: ast::StringLiteral) -> Self {
+        AnyNode::StringLiteral(node)
+    }
+}
+
+impl From<ast::BytesLiteral> for AnyNode {
+    fn from(node: ast::BytesLiteral) -> Self {
+        AnyNode::BytesLiteral(node)
+    }
+}
+
 impl Ranged for AnyNode {
     fn range(&self) -> TextRange {
         match self {
@@ -4970,6 +5117,9 @@ impl Ranged for AnyNode {
             AnyNode::TypeParamTypeVar(node) => node.range(),
             AnyNode::TypeParamTypeVarTuple(node) => node.range(),
             AnyNode::TypeParamParamSpec(node) => node.range(),
+            AnyNode::FString(node) => node.range(),
+            AnyNode::StringLiteral(node) => node.range(),
+            AnyNode::BytesLiteral(node) => node.range(),
             AnyNode::ElifElseClause(node) => node.range(),
         }
     }
@@ -5062,6 +5212,9 @@ pub enum AnyNodeRef<'a> {
     TypeParamTypeVar(&'a TypeParamTypeVar),
     TypeParamTypeVarTuple(&'a TypeParamTypeVarTuple),
     TypeParamParamSpec(&'a TypeParamParamSpec),
+    FString(&'a ast::FString),
+    StringLiteral(&'a ast::StringLiteral),
+    BytesLiteral(&'a ast::BytesLiteral),
     ElifElseClause(&'a ast::ElifElseClause),
 }
 
@@ -5153,6 +5306,9 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::TypeParamTypeVar(node) => NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => NonNull::from(*node).cast(),
             AnyNodeRef::TypeParamParamSpec(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::FString(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::StringLiteral(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::BytesLiteral(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ElifElseClause(node) => NonNull::from(*node).cast(),
         }
     }
@@ -5250,6 +5406,9 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::TypeParamTypeVar(_) => NodeKind::TypeParamTypeVar,
             AnyNodeRef::TypeParamTypeVarTuple(_) => NodeKind::TypeParamTypeVarTuple,
             AnyNodeRef::TypeParamParamSpec(_) => NodeKind::TypeParamParamSpec,
+            AnyNodeRef::FString(_) => NodeKind::FString,
+            AnyNodeRef::StringLiteral(_) => NodeKind::StringLiteral,
+            AnyNodeRef::BytesLiteral(_) => NodeKind::BytesLiteral,
             AnyNodeRef::ElifElseClause(_) => NodeKind::ElifElseClause,
         }
     }
@@ -5342,6 +5501,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -5434,6 +5596,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -5525,6 +5690,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -5617,6 +5785,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -5709,6 +5880,9 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::TypeParamTypeVar(_)
             | AnyNodeRef::TypeParamTypeVarTuple(_)
             | AnyNodeRef::TypeParamParamSpec(_)
+            | AnyNodeRef::FString(_)
+            | AnyNodeRef::StringLiteral(_)
+            | AnyNodeRef::BytesLiteral(_)
             | AnyNodeRef::ElifElseClause(_) => false,
         }
     }
@@ -5829,6 +6003,9 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::TypeParamTypeVar(node) => node.visit_preorder(visitor),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.visit_preorder(visitor),
             AnyNodeRef::TypeParamParamSpec(node) => node.visit_preorder(visitor),
+            AnyNodeRef::FString(node) => node.visit_preorder(visitor),
+            AnyNodeRef::StringLiteral(node) => node.visit_preorder(visitor),
+            AnyNodeRef::BytesLiteral(node) => node.visit_preorder(visitor),
             AnyNodeRef::ElifElseClause(node) => node.visit_preorder(visitor),
         }
     }
@@ -6355,6 +6532,24 @@ impl<'a> From<&'a TypeParamParamSpec> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> From<&'a ast::FString> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::FString) -> Self {
+        AnyNodeRef::FString(node)
+    }
+}
+
+impl<'a> From<&'a ast::StringLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::StringLiteral) -> Self {
+        AnyNodeRef::StringLiteral(node)
+    }
+}
+
+impl<'a> From<&'a ast::BytesLiteral> for AnyNodeRef<'a> {
+    fn from(node: &'a ast::BytesLiteral) -> Self {
+        AnyNodeRef::BytesLiteral(node)
+    }
+}
+
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(stmt: &'a Stmt) -> Self {
         match stmt {
@@ -6606,6 +6801,9 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::TypeParamTypeVar(node) => node.range(),
             AnyNodeRef::TypeParamTypeVarTuple(node) => node.range(),
             AnyNodeRef::TypeParamParamSpec(node) => node.range(),
+            AnyNodeRef::FString(node) => node.range(),
+            AnyNodeRef::StringLiteral(node) => node.range(),
+            AnyNodeRef::BytesLiteral(node) => node.range(),
         }
     }
 }
@@ -6701,4 +6899,7 @@ pub enum NodeKind {
     TypeParamTypeVar,
     TypeParamTypeVarTuple,
     TypeParamParamSpec,
+    FString,
+    StringLiteral,
+    BytesLiteral,
 }
