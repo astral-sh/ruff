@@ -36,6 +36,11 @@ async def func():
     trio.sleep(m_a)  # TRIO115
     trio.sleep(m_b)  # TRIO115
 
+    m_c = (m_d, m_e) = (0, 0)
+    trio.sleep(m_c)  # OK
+    trio.sleep(m_d)  # TRIO115
+    trio.sleep(m_e)  # TRIO115
+
 
 def func():
     trio.run(trio.sleep(0))  # TRIO115
