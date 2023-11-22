@@ -569,9 +569,9 @@ pub fn resolve_assignment<'a>(
     }
 }
 
-/// Get the assigned [`Expr`] value of a given id, if any.
+/// Find the assigned [`Expr`] for a given symbol, if any.
 ///
-/// For example given
+/// For example given:
 /// ```python
 ///  foo = 42
 ///  (bar, bla) = 1, "str"
@@ -579,9 +579,8 @@ pub fn resolve_assignment<'a>(
 ///
 /// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
 /// `StringLiteral` with value `"str"` when called with `bla`.
-pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
-    let scope = semantic.current_scope();
-    let binding_id = scope.get(id)?;
+pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
+    let binding_id = semantic.lookup_symbol(symbol)?;
     let binding = semantic.binding(binding_id);
     if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
         let parent_id = binding.source?;
@@ -601,7 +600,7 @@ pub fn get_assigned_value<'a>(id: &str, semantic: &'a SemanticModel<'a>) -> Opti
                             })
                             | Expr::Set(ast::ExprSet {
                                 elts: target_elts, ..
-                            }) => get_value_by_id(id, target_elts, elts),
+                            }) => get_value_by_id(symbol, target_elts, elts),
                             _ => Some(value.as_ref()),
                         };
                     }

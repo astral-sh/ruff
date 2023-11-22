@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
-use ruff_python_semantic::analyze::typing::get_assigned_value;
+use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -110,7 +110,7 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[
             if body.iter().any(|stmt| match_append(stmt, id)) {
                 return;
             }
-            let Some(value) = get_assigned_value(id, checker.semantic()) else {
+            let Some(value) = find_assigned_value(id, checker.semantic()) else {
                 return;
             };
             if matches!(value, Expr::Tuple(_) | Expr::List(_) | Expr::Set(_)) {
