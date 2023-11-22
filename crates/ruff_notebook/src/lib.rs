@@ -4,6 +4,7 @@ pub use index::*;
 pub use notebook::*;
 pub use schema::*;
 
+mod cell;
 mod index;
 mod notebook;
 mod schema;
