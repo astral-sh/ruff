@@ -1,5 +1,5 @@
 #![cfg(not(target_family = "wasm"))]
-use std::ffi::OsStr;
+
 use std::fs;
 #[cfg(unix)]
 use std::fs::Permissions;
@@ -30,11 +30,13 @@ fn ruff_cmd() -> Command {
     Command::new(get_cargo_bin(BIN_NAME))
 }
 
+/// Builder for `ruff check` commands.
+#[derive(Debug)]
 struct RuffCheck<'a> {
     output_format: &'a str,
     config: Option<&'a Path>,
-    input: &'a OsStr,
-    explicit: bool,
+    filename: Option<&'a str>,
+    args: Vec<&'a str>,
 }
 
 impl<'a> Default for RuffCheck<'a> {
@@ -42,57 +44,64 @@ impl<'a> Default for RuffCheck<'a> {
         RuffCheck {
             output_format: "text",
             config: None,
-            input: "-".as_ref(),
-            explicit: false,
+            filename: None,
+            args: vec![],
         }
     }
 }
 
 impl<'a> RuffCheck<'a> {
-    fn explicit(mut self) -> Self {
-        self.explicit = true;
-        self
-    }
+    /// Set the `--config` option.
+    #[must_use]
     fn config(mut self, config: &'a Path) -> Self {
         self.config = Some(config);
         self
     }
+
+    /// Set the `--output-format` option.
+    #[must_use]
     fn output_format(mut self, format: &'a str) -> Self {
         self.output_format = format;
         self
     }
-    fn input(mut self, input: &'a OsStr) -> Self {
-        self.input = input;
+
+    /// Set the input file to pass to `ruff check`.
+    #[must_use]
+    fn filename(mut self, filename: &'a str) -> Self {
+        self.filename = Some(filename);
         self
     }
 
-    fn args<I>(self, args: I) -> Command
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
+    /// Set the list of positional arguments.
+    #[must_use]
+    fn args(mut self, args: impl IntoIterator<Item = &'a str>) -> Self {
+        self.args = args.into_iter().collect();
+        self
+    }
+
+    /// Generate a [`Command`] for the `ruff check` command.
+    fn build(self) -> Command {
         let mut cmd = ruff_cmd();
-        if self.explicit {
-            cmd.arg("check");
-        }
         cmd.args(["--output-format", self.output_format, "--no-cache"]);
-        match self.config {
-            Some(path) => {
-                cmd.arg("--config");
-                cmd.arg(path);
-            }
-            None => {
-                cmd.arg("--isolated");
-            }
+        if let Some(path) = self.config {
+            cmd.arg("--config");
+            cmd.arg(path);
+        } else {
+            cmd.arg("--isolated");
         }
-        cmd.arg(self.input);
-        cmd.args(args);
+        if let Some(filename) = self.filename {
+            cmd.arg(filename);
+        } else {
+            cmd.arg("-");
+        }
+        cmd.args(self.args);
         cmd
     }
 }
 
 #[test]
 fn stdin_success() {
-    let mut cmd = RuffCheck::default().args([]);
+    let mut cmd = RuffCheck::default().args([]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin(""), @r###"
     success: true
@@ -105,7 +114,7 @@ fn stdin_success() {
 
 #[test]
 fn stdin_error() {
-    let mut cmd = RuffCheck::default().args([]);
+    let mut cmd = RuffCheck::default().args([]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: false
@@ -121,7 +130,9 @@ fn stdin_error() {
 
 #[test]
 fn stdin_filename() {
-    let mut cmd = RuffCheck::default().args(["--stdin-filename", "F401.py"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "F401.py"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: false
@@ -169,10 +180,11 @@ import bar   # unused import
 
 #[test]
 fn check_warn_stdin_filename_with_files() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    let mut cmd = RuffCheck::default()
         .args(["--stdin-filename", "F401.py"])
-        .arg("foo.py")
+        .filename("foo.py")
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: false
     exit_code: 1
@@ -189,7 +201,9 @@ fn check_warn_stdin_filename_with_files() {
 /// Raise `TCH` errors in `.py` files ...
 #[test]
 fn stdin_source_type_py() {
-    let mut cmd = RuffCheck::default().args(["--stdin-filename", "TCH.py"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "TCH.py"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: false
@@ -206,7 +220,9 @@ fn stdin_source_type_py() {
 /// ... but not in `.pyi` files.
 #[test]
 fn stdin_source_type_pyi() {
-    let mut cmd = RuffCheck::default().args(["--stdin-filename", "TCH.pyi", "--select", "TCH"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "TCH.pyi", "--select", "TCH"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: true
@@ -226,7 +242,8 @@ fn stdin_json() {
 
     let mut cmd = RuffCheck::default()
         .output_format("json")
-        .args(["--stdin-filename", "F401.py"]);
+        .args(["--stdin-filename", "F401.py"])
+        .build();
 
     insta::with_settings!({filters => vec![
         (file_path.to_string().as_str(), "/path/to/F401.py"),
@@ -237,7 +254,7 @@ fn stdin_json() {
 
 #[test]
 fn stdin_fix_py() {
-    let mut cmd = RuffCheck::default().args(["--fix"]);
+    let mut cmd = RuffCheck::default().args(["--fix"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("import os\nimport sys\n\nprint(sys.version)\n"), @r###"
     success: true
@@ -254,7 +271,9 @@ fn stdin_fix_py() {
 
 #[test]
 fn stdin_fix_jupyter() {
-    let mut cmd = RuffCheck::default().args(["--fix", "--stdin-filename", "Jupyter.ipynb"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--fix", "--stdin-filename", "Jupyter.ipynb"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin(r#"{
  "cells": [
@@ -420,8 +439,9 @@ fn stdin_fix_jupyter() {
 
 #[test]
 fn stdin_override_parser_ipynb() {
-    let mut cmd =
-        RuffCheck::default().args(["--extension", "py:ipynb", "--stdin-filename", "Jupyter.py"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--extension", "py:ipynb", "--stdin-filename", "Jupyter.py"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin(r#"{
  "cells": [
@@ -516,12 +536,14 @@ fn stdin_override_parser_ipynb() {
 
 #[test]
 fn stdin_override_parser_py() {
-    let mut cmd = RuffCheck::default().args([
-        "--extension",
-        "ipynb:python",
-        "--stdin-filename",
-        "F401.ipynb",
-    ]);
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--extension",
+            "ipynb:python",
+            "--stdin-filename",
+            "F401.ipynb",
+        ])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: false
@@ -537,7 +559,7 @@ fn stdin_override_parser_py() {
 
 #[test]
 fn stdin_fix_when_not_fixable_should_still_print_contents() {
-    let mut cmd = RuffCheck::default().args(["--fix"]);
+    let mut cmd = RuffCheck::default().args(["--fix"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"), @r###"
     success: false
@@ -556,7 +578,7 @@ fn stdin_fix_when_not_fixable_should_still_print_contents() {
 
 #[test]
 fn stdin_fix_when_no_issues_should_still_print_contents() {
-    let mut cmd = RuffCheck::default().args(["--fix"]);
+    let mut cmd = RuffCheck::default().args(["--fix"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("import sys\n\nprint(sys.version)\n"), @r###"
     success: true
@@ -699,7 +721,7 @@ fn stdin_format_jupyter() {
 
 #[test]
 fn show_source() {
-    let mut cmd = RuffCheck::default().args(["--show-source"]);
+    let mut cmd = RuffCheck::default().args(["--show-source"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @r###"
     success: false
@@ -737,7 +759,9 @@ fn explain_status_codes_ruf404() {
 
 #[test]
 fn show_statistics() {
-    let mut cmd = RuffCheck::default().args(["--select", "F401", "--statistics"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F401", "--statistics"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"), @r###"
     success: false
@@ -752,7 +776,7 @@ fn show_statistics() {
 #[test]
 fn nursery_prefix() {
     // `--select E` should detect E741, but not E225, which is in the nursery.
-    let mut cmd = RuffCheck::default().args(["--select", "E"]);
+    let mut cmd = RuffCheck::default().args(["--select", "E"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -768,7 +792,7 @@ fn nursery_prefix() {
 #[test]
 fn nursery_all() {
     // `--select ALL` should detect E741, but not E225, which is in the nursery.
-    let mut cmd = RuffCheck::default().args(["--select", "ALL"]);
+    let mut cmd = RuffCheck::default().args(["--select", "ALL"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -787,7 +811,7 @@ fn nursery_all() {
 #[test]
 fn nursery_direct() {
     // `--select E225` should detect E225.
-    let mut cmd = RuffCheck::default().args(["--select", "E225"]);
+    let mut cmd = RuffCheck::default().args(["--select", "E225"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -804,7 +828,7 @@ fn nursery_direct() {
 #[test]
 fn nursery_group_selector() {
     // Only nursery rules should be detected e.g. E225 and a warning should be displayed
-    let mut cmd = RuffCheck::default().args(["--select", "NURSERY"]);
+    let mut cmd = RuffCheck::default().args(["--select", "NURSERY"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -822,7 +846,9 @@ fn nursery_group_selector() {
 #[test]
 fn nursery_group_selector_preview_enabled() {
     // Only nursery rules should be detected e.g. E225 and a warning should be displayed
-    let mut cmd = RuffCheck::default().args(["--select", "NURSERY", "--preview"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "NURSERY", "--preview"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -841,7 +867,9 @@ fn nursery_group_selector_preview_enabled() {
 #[test]
 fn preview_enabled_prefix() {
     // E741 and E225 (preview) should both be detected
-    let mut cmd = RuffCheck::default().args(["--select", "E", "--preview"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "E", "--preview"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -858,7 +886,9 @@ fn preview_enabled_prefix() {
 
 #[test]
 fn preview_enabled_all() {
-    let mut cmd = RuffCheck::default().args(["--select", "ALL", "--preview"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "ALL", "--preview"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -880,7 +910,9 @@ fn preview_enabled_all() {
 #[test]
 fn preview_enabled_direct() {
     // E225 should be detected without warning
-    let mut cmd = RuffCheck::default().args(["--select", "E225", "--preview"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "E225", "--preview"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -897,7 +929,7 @@ fn preview_enabled_direct() {
 #[test]
 fn preview_disabled_direct() {
     // FURB145 is preview not nursery so selecting should be empty
-    let mut cmd = RuffCheck::default().args(["--select", "FURB145"]);
+    let mut cmd = RuffCheck::default().args(["--select", "FURB145"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("a = l[:]\n"), @r###"
     success: true
@@ -912,7 +944,7 @@ fn preview_disabled_direct() {
 #[test]
 fn preview_disabled_prefix_empty() {
     // Warns that the selection is empty since all of the CPY rules are in preview
-    let mut cmd = RuffCheck::default().args(["--select", "CPY"]);
+    let mut cmd = RuffCheck::default().args(["--select", "CPY"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: true
@@ -927,7 +959,7 @@ fn preview_disabled_prefix_empty() {
 #[test]
 fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
-    let mut cmd = RuffCheck::default().args(["--ignore", "CPY"]);
+    let mut cmd = RuffCheck::default().args(["--ignore", "CPY"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -943,7 +975,7 @@ fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
 #[test]
 fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
-    let mut cmd = RuffCheck::default().args(["--fixable", "CPY"]);
+    let mut cmd = RuffCheck::default().args(["--fixable", "CPY"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -959,7 +991,9 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
 #[test]
 fn preview_group_selector() {
     // `--select PREVIEW` should error (selector was removed)
-    let mut cmd = RuffCheck::default().args(["--select", "PREVIEW", "--preview"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "PREVIEW", "--preview"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -976,7 +1010,9 @@ fn preview_group_selector() {
 #[test]
 fn preview_enabled_group_ignore() {
     // `--select E --ignore PREVIEW` should detect E741 and E225, which is in preview but "E" is more specific.
-    let mut cmd = RuffCheck::default().args(["--select", "E", "--ignore", "PREVIEW", "--preview"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "E", "--ignore", "PREVIEW", "--preview"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
@@ -1029,7 +1065,10 @@ fn unreadable_dir() -> Result<()> {
     // We (currently?) have to use a subcommand to check exit status (currently wrong) and logging
     // output
     // TODO(konstin): This should be a failure, but we currently can't track that
-    let mut cmd = RuffCheck::default().input(unreadable_dir.as_ref()).args([]);
+    let mut cmd = RuffCheck::default()
+        .filename(unreadable_dir.to_str().unwrap())
+        .args([])
+        .build();
     assert_cmd_snapshot!(cmd, @r###"
     success: true
     exit_code: 0
@@ -1062,10 +1101,7 @@ fn check_input_from_argfile() -> Result<()> {
 
     // Generate the args with the argfile notation
     let argfile = format!("@{}", &input_file_path.display());
-    let mut cmd = RuffCheck::default()
-        .explicit()
-        .input(argfile.as_ref())
-        .args([]);
+    let mut cmd = RuffCheck::default().filename(argfile.as_ref()).build();
     insta::with_settings!({filters => vec![
         (file_a_path.display().to_string().as_str(), "/path/to/a.py"),
     ]}, {
@@ -1087,7 +1123,9 @@ fn check_input_from_argfile() -> Result<()> {
 
 #[test]
 fn check_hints_hidden_unsafe_fixes() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601,UP034"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1105,7 +1143,7 @@ fn check_hints_hidden_unsafe_fixes() {
 
 #[test]
 fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601"]);
+    let mut cmd = RuffCheck::default().args(["--select", "F601"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
         @r###"
@@ -1122,7 +1160,9 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
 
 #[test]
 fn check_shows_unsafe_fixes_with_opt_in() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601,UP034", "--unsafe-fixes"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--unsafe-fixes"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1140,7 +1180,9 @@ fn check_shows_unsafe_fixes_with_opt_in() {
 
 #[test]
 fn fix_applies_safe_fixes_by_default() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601,UP034", "--fix"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--fix"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1159,7 +1201,9 @@ fn fix_applies_safe_fixes_by_default() {
 
 #[test]
 fn fix_applies_unsafe_fixes_with_opt_in() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601,UP034", "--fix", "--unsafe-fixes"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--fix", "--unsafe-fixes"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1176,7 +1220,9 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
 
 #[test]
 fn fix_does_not_apply_display_only_fixes() {
-    let mut cmd = RuffCheck::default().args(["--select", "B006", "--fix"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "B006", "--fix"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("def add_to_list(item, some_list=[]): ..."),
         @r###"
@@ -1192,7 +1238,9 @@ fn fix_does_not_apply_display_only_fixes() {
 
 #[test]
 fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
-    let mut cmd = RuffCheck::default().args(["--select", "B006", "--fix", "--unsafe-fixes"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "B006", "--fix", "--unsafe-fixes"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("def add_to_list(item, some_list=[]): ..."),
         @r###"
@@ -1208,7 +1256,9 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
 
 #[test]
 fn fix_only_unsafe_fixes_available() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601", "--fix"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601", "--fix"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1227,7 +1277,9 @@ fn fix_only_unsafe_fixes_available() {
 
 #[test]
 fn fix_only_flag_applies_safe_fixes_by_default() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601,UP034", "--fix-only"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--fix-only"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1244,8 +1296,9 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
 
 #[test]
 fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
-    let mut cmd =
-        RuffCheck::default().args(["--select", "F601,UP034", "--fix-only", "--unsafe-fixes"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--fix-only", "--unsafe-fixes"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1262,7 +1315,9 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
 
 #[test]
 fn diff_shows_safe_fixes_by_default() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601,UP034", "--diff"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--diff"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1283,7 +1338,9 @@ fn diff_shows_safe_fixes_by_default() {
 
 #[test]
 fn diff_shows_unsafe_fixes_with_opt_in() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601,UP034", "--diff", "--unsafe-fixes"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--diff", "--unsafe-fixes"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1305,7 +1362,9 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
 
 #[test]
 fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
-    let mut cmd = RuffCheck::default().args(["--select", "B006", "--diff", "--unsafe-fixes"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "B006", "--diff", "--unsafe-fixes"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("def add_to_list(item, some_list=[]): ..."),
         @r###"
@@ -1319,7 +1378,9 @@ fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
 
 #[test]
 fn diff_only_unsafe_fixes_available() {
-    let mut cmd = RuffCheck::default().args(["--select", "F601", "--diff"]);
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601", "--diff"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
@@ -1347,7 +1408,8 @@ extend-unsafe-fixes = ["UP034"]
 
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "F601,UP034"]);
+        .args(["--select", "F601,UP034"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
             @r###"
@@ -1379,7 +1441,8 @@ extend-safe-fixes = ["F601"]
 
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "F601,UP034"]);
+        .args(["--select", "F601,UP034"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
             @r###"
@@ -1413,7 +1476,8 @@ extend-safe-fixes = ["UP034"]
 
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "F601,UP034"]);
+        .args(["--select", "F601,UP034"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
             @r###"
@@ -1448,7 +1512,8 @@ extend-safe-fixes = ["UP03"]
 
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "F601,UP018,UP034,UP038"]);
+        .args(["--select", "F601,UP018,UP034,UP038"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\nprint(str('foo'))\nisinstance(x, (int, str))\n"),
             @r###"
@@ -1496,7 +1561,8 @@ def log(x, base) -> float:
     // If we only select the prefix, then everything passes
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "D41"]);
+        .args(["--select", "D41"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin(stdin), @r###"
     success: true
@@ -1510,7 +1576,8 @@ def log(x, base) -> float:
     // But if we select the exact code, we get an error
     let mut cmd = RuffCheck::default()
         .config(&ruff_toml)
-        .args(["--select", "D417"]);
+        .args(["--select", "D417"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin(stdin), @r###"
     success: false
