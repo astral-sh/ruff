@@ -1014,33 +1014,54 @@ where
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
+
                         for arg in args {
-                            if let Expr::List(ast::ExprList { elts, .. })
-                            | Expr::Tuple(ast::ExprTuple { elts, .. }) = arg
-                            {
-                                for elt in elts {
-                                    match elt {
-                                        Expr::List(ast::ExprList { elts, .. })
-                                        | Expr::Tuple(ast::ExprTuple { elts, .. })
-                                            if elts.len() == 2 =>
-                                        {
-                                            self.visit_non_type_definition(&elts[0]);
-                                            self.visit_type_definition(&elts[1]);
-                                        }
-                                        _ => {
-                                            self.visit_non_type_definition(elt);
+                            match arg {
+                                // Ex) NamedTuple("a", [("a", int)])
+                                Expr::List(ast::ExprList { elts, .. })
+                                | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                                    for elt in elts {
+                                        match elt {
+                                            Expr::List(ast::ExprList { elts, .. })
+                                            | Expr::Tuple(ast::ExprTuple { elts, .. })
+                                                if elts.len() == 2 =>
+                                            {
+                                                self.visit_non_type_definition(&elts[0]);
+                                                self.visit_type_definition(&elts[1]);
+                                            }
+                                            _ => {
+                                                self.visit_non_type_definition(elt);
+                                            }
                                         }
                                     }
                                 }
-                            } else {
-                                self.visit_non_type_definition(arg);
+                                _ => self.visit_non_type_definition(arg),
                             }
                         }
 
-                        // Ex) NamedTuple("a", a=int)
                         for keyword in keywords {
-                            let Keyword { value, .. } = keyword;
-                            self.visit_type_definition(value);
+                            let Keyword { arg, value, .. } = keyword;
+                            match (arg.as_ref(), value) {
+                                // Ex) NamedTuple("a", **{"a": int})
+                                (None, Expr::Dict(ast::ExprDict { keys, values, .. })) => {
+                                    for (key, value) in keys.iter().zip(values) {
+                                        if let Some(key) = key.as_ref() {
+                                            self.visit_non_type_definition(key);
+                                            self.visit_type_definition(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
+                                }
+                                // Ex) NamedTuple("a", **obj)
+                                (None, _) => {
+                                    self.visit_non_type_definition(value);
+                                }
+                                // Ex) NamedTuple("a", a=int)
+                                _ => {
+                                    self.visit_type_definition(value);
+                                }
+                            }
                         }
                     }
                     Some(typing::Callable::TypedDict) => {
