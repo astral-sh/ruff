@@ -1269,7 +1269,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 perflint::rules::manual_dict_comprehension(checker, target, body);
             }
             if checker.enabled(Rule::UnnecessaryListCast) {
-                perflint::rules::unnecessary_list_cast(checker, iter);
+                perflint::rules::unnecessary_list_cast(checker, iter, body);
             }
             if !is_async {
                 if checker.enabled(Rule::ReimplementedBuiltin) {

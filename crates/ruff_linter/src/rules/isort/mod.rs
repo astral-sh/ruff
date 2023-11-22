@@ -145,6 +145,15 @@ fn format_import_block(
     target_version: PythonVersion,
     settings: &Settings,
 ) -> String {
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    enum LineInsertion {
+        /// A blank line should be inserted as soon as the next import is
+        /// of a different type (i.e., direct vs. `from`).
+        Necessary,
+        /// A blank line has already been inserted.
+        Inserted,
+    }
+
     // Categorize by type (e.g., first-party vs. third-party).
     let mut block_by_type = categorize_imports(
         block,
@@ -182,13 +191,24 @@ fn format_import_block(
             pending_lines_before = false;
         }
 
-        let mut lines_inserted = false;
-        let mut has_direct_import = false;
+        let mut line_insertion = None;
         let mut is_first_statement = true;
         let lines_between_types = settings.lines_between_types;
         for import in imports {
             match import {
                 Import((alias, comments)) => {
+                    // Add a blank lines between direct and from imports.
+                    if settings.from_first
+                        && lines_between_types > 0
+                        && line_insertion == Some(LineInsertion::Necessary)
+                    {
+                        for _ in 0..lines_between_types {
+                            output.push_str(&stylist.line_ending());
+                        }
+
+                        line_insertion = Some(LineInsertion::Inserted);
+                    }
+
                     output.push_str(&format::format_import(
                         &alias,
                         &comments,
@@ -196,17 +216,22 @@ fn format_import_block(
                         stylist,
                     ));
 
-                    has_direct_import = true;
+                    if !settings.from_first {
+                        line_insertion = Some(LineInsertion::Necessary);
+                    }
                 }
 
                 ImportFrom((import_from, comments, trailing_comma, aliases)) => {
-                    // Add a blank lines between direct and from imports
-                    if lines_between_types > 0 && has_direct_import && !lines_inserted {
+                    // Add a blank lines between direct and from imports.
+                    if !settings.from_first
+                        && lines_between_types > 0
+                        && line_insertion == Some(LineInsertion::Necessary)
+                    {
                         for _ in 0..lines_between_types {
                             output.push_str(&stylist.line_ending());
                         }
 
-                        lines_inserted = true;
+                        line_insertion = Some(LineInsertion::Inserted);
                     }
 
                     output.push_str(&format::format_import_from(
@@ -221,6 +246,10 @@ fn format_import_block(
                         settings.split_on_trailing_comma
                             && matches!(trailing_comma, TrailingComma::Present),
                     ));
+
+                    if settings.from_first {
+                        line_insertion = Some(LineInsertion::Necessary);
+                    }
                 }
             }
             is_first_statement = false;
@@ -819,6 +848,25 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("from_first.py"))]
+    fn from_first(path: &Path) -> Result<()> {
+        let snapshot = format!("from_first_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    from_first: true,
+                    lines_between_types: 1,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Path::new("relative_imports_order.py"))]
     fn closest_to_furthest(path: &Path) -> Result<()> {
         let snapshot = format!("closest_to_furthest_{}", path.to_string_lossy());
@@ -1024,6 +1072,30 @@ mod tests {
                         ImportSection::Known(ImportType::FirstParty),
                         ImportSection::Known(ImportType::LocalFolder),
                     ],
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("main_first_party.py"))]
+    fn main_is_first_party(path: &Path) -> Result<()> {
+        let snapshot = format!("sections_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![pattern("first_party")],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
                     ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::UnsortedImports)

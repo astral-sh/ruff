@@ -98,6 +98,10 @@ mod tests {
         Rule::TypingOnlyStandardLibraryImport,
         Path::new("runtime_evaluated_base_classes_4.py")
     )]
+    #[test_case(
+        Rule::TypingOnlyThirdPartyImport,
+        Path::new("runtime_evaluated_base_classes_5.py")
+    )]
     fn runtime_evaluated_base_classes(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

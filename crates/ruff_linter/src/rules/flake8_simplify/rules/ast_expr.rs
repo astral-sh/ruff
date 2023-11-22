@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
 
@@ -62,26 +63,32 @@ impl Violation for UncapitalizedEnvironmentVariables {
 }
 
 /// ## What it does
-/// Check for `dict.get()` calls that pass `None` as the default value.
+/// Checks for `dict.get()` calls that pass `None` as the default value.
 ///
 /// ## Why is this bad?
 /// `None` is the default value for `dict.get()`, so it is redundant to pass it
 /// explicitly.
 ///
+/// In [preview], this rule applies to variables that are inferred to be
+/// dictionaries; in stable, it's limited to dictionary literals (e.g.,
+/// `{"foo": 1}.get("foo", None)`).
+///
 /// ## Example
 /// ```python
 /// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
-/// age = ages.get("Cat", None)  # None
+/// age = ages.get("Cat", None)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
-/// age = ages.get("Cat")  # None
+/// age = ages.get("Cat")
 /// ```
 ///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
@@ -244,9 +251,6 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
         return;
     };
-    if !value.is_dict_expr() {
-        return;
-    }
     if attr != "get" {
         return;
     }
@@ -263,6 +267,28 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
+    // Check if the value is a dictionary.
+    match value.as_ref() {
+        Expr::Dict(_) | Expr::DictComp(_) => {}
+        Expr::Name(name) => {
+            if checker.settings.preview.is_disabled() {
+                return;
+            }
+
+            let Some(binding) = checker
+                .semantic()
+                .only_binding(name)
+                .map(|id| checker.semantic().binding(id))
+            else {
+                return;
+            };
+            if !is_dict(binding, checker.semantic()) {
+                return;
+            }
+        }
+        _ => return,
+    }
+
     let expected = format!(
         "{}({})",
         checker.locator().slice(func.as_ref()),
@@ -277,7 +303,6 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
         },
         expr.range(),
     );
-
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         expected,
         expr.range(),

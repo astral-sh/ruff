@@ -135,6 +135,57 @@ fn stdin_filename() {
     "###);
 }
 
+#[test]
+fn check_default_files() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(
+        tempdir.path().join("foo.py"),
+        r#"
+import foo   # unused import
+"#,
+    )?;
+    fs::write(
+        tempdir.path().join("bar.py"),
+        r#"
+import bar   # unused import
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--isolated", "--no-cache", "--select", "F401"]).current_dir(tempdir.path()), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    bar.py:2:8: F401 [*] `bar` imported but unused
+    foo.py:2:8: F401 [*] `foo` imported but unused
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn check_warn_stdin_filename_with_files() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--stdin-filename", "F401.py"])
+        .arg("foo.py")
+        .pass_stdin("import os\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Ignoring file foo.py in favor of standard input.
+    "###);
+}
+
 /// Raise `TCH` errors in `.py` files ...
 #[test]
 fn stdin_source_type_py() {
@@ -366,6 +417,7 @@ fn stdin_fix_jupyter() {
     Found 2 errors (2 fixed, 0 remaining).
     "###);
 }
+
 #[test]
 fn stdin_override_parser_ipynb() {
     let mut cmd =

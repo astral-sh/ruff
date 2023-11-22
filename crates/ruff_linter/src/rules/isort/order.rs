@@ -82,11 +82,19 @@ pub(crate) fn order_imports<'a>(
                     settings,
                 )
             });
-        ordered_straight_imports
-            .into_iter()
-            .map(Import)
-            .chain(ordered_from_imports.into_iter().map(ImportFrom))
-            .collect()
+        if settings.from_first {
+            ordered_from_imports
+                .into_iter()
+                .map(ImportFrom)
+                .chain(ordered_straight_imports.into_iter().map(Import))
+                .collect()
+        } else {
+            ordered_straight_imports
+                .into_iter()
+                .map(Import)
+                .chain(ordered_from_imports.into_iter().map(ImportFrom))
+                .collect()
+        }
     };
 
     ordered_imports

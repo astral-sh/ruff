@@ -1,6 +1,6 @@
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::logging::LoggingLevel;
@@ -49,5 +49,10 @@ impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a, 'b> {
             }
         }
         visitor::walk_expr(self, expr);
+    }
+
+    fn visit_except_handler(&mut self, _except_handler: &'b ExceptHandler) {
+        // Don't recurse into exception handlers, since we'll re-run the visitor on any such
+        // handlers.
     }
 }

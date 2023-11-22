@@ -612,6 +612,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 flake8_bandit::rules::shell_injection(checker, call);
             }
+            if checker.enabled(Rule::DjangoRawSql) {
+                flake8_bandit::rules::django_raw_sql(checker, call);
+            }
             if checker.enabled(Rule::UnnecessaryGeneratorList) {
                 flake8_comprehensions::rules::unnecessary_generator_list(
                     checker, expr, func, args, keywords,
@@ -775,6 +778,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::NestedMinMax) {
                 pylint::rules::nested_min_max(checker, expr, func, args, keywords);
+            }
+            if checker.enabled(Rule::RepeatedKeywordArgument) {
+                pylint::rules::repeated_keyword_argument(checker, call);
             }
             if checker.enabled(Rule::PytestPatchWithLambda) {
                 if let Some(diagnostic) = flake8_pytest_style::rules::patch_with_lambda(call) {
