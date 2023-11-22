@@ -342,6 +342,7 @@ impl fmt::Display for DisplayPyOptions<'_> {
 line-width              = {line_width}
 indent-width            = {indent_width}
 quote-style             = {quote_style:?}
+line-ending             = {line_ending:?}
 magic-trailing-comma    = {magic_trailing_comma:?}
 docstring-code          = {docstring_code:?}
 preview                 = {preview:?}"#,
@@ -349,6 +350,7 @@ preview                 = {preview:?}"#,
             indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
             quote_style = self.0.quote_style(),
+            line_ending = self.0.line_ending(),
             magic_trailing_comma = self.0.magic_trailing_comma(),
             docstring_code = self.0.docstring_code(),
             preview = self.0.preview()
