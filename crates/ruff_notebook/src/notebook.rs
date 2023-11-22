@@ -15,6 +15,7 @@ use ruff_diagnostics::{SourceMap, SourceMarker};
 use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
 use ruff_text_size::TextSize;
 
+use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
 
@@ -65,7 +66,7 @@ pub struct Notebook {
     raw: RawNotebook,
     /// The offsets of each cell in the concatenated source code. This includes
     /// the first and last character offsets as well.
-    cell_offsets: Vec<TextSize>,
+    cell_offsets: CellOffsets,
     /// The cell index of all valid code cells in the notebook.
     valid_code_cells: Vec<u32>,
     /// Flag to indicate if the JSON string of the notebook has a trailing newline.
@@ -128,7 +129,7 @@ impl Notebook {
 
         let mut contents = Vec::with_capacity(valid_code_cells.len());
         let mut current_offset = TextSize::from(0);
-        let mut cell_offsets = Vec::with_capacity(valid_code_cells.len());
+        let mut cell_offsets = CellOffsets::with_capacity(valid_code_cells.len());
         cell_offsets.push(TextSize::from(0));
 
         for &idx in &valid_code_cells {
@@ -324,9 +325,9 @@ impl Notebook {
         self.index.take().unwrap_or_else(|| self.build_index())
     }
 
-    /// Return the cell offsets for the concatenated source code corresponding
+    /// Return the [`CellOffsets`] for the concatenated source code corresponding
     /// the Jupyter notebook.
-    pub fn cell_offsets(&self) -> &[TextSize] {
+    pub fn cell_offsets(&self) -> &CellOffsets {
         &self.cell_offsets
     }
 
@@ -503,7 +504,7 @@ print("after empty cells")
             }
         );
         assert_eq!(
-            notebook.cell_offsets(),
+            notebook.cell_offsets().as_ref(),
             &[
                 0.into(),
                 90.into(),

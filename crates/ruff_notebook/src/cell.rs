@@ -1,4 +1,7 @@
 use std::fmt;
+use std::ops::{Deref, DerefMut};
+
+use ruff_text_size::TextSize;
 
 use crate::schema::{Cell, SourceValue};
 
@@ -166,5 +169,36 @@ impl Cell {
 
         // Detect cell magics (which operate on multiple lines).
         lines.any(|line| line.trim_start().starts_with("%%"))
+    }
+}
+
+/// Cell offsets are used to keep track of the start and end offsets of each
+/// cell in the concatenated source code.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CellOffsets(Vec<TextSize>);
+
+impl CellOffsets {
+    /// Create a new [`CellOffsets`] with the given capacity.
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
+        Self(Vec::with_capacity(capacity))
+    }
+
+    /// Push a new offset to the end of the [`CellOffsets`].
+    pub(crate) fn push(&mut self, offset: TextSize) {
+        self.0.push(offset);
+    }
+}
+
+impl Deref for CellOffsets {
+    type Target = [TextSize];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for CellOffsets {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
