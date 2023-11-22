@@ -29,10 +29,12 @@ async def func():
     trio.sleep(e)  # TRIO115
 
     m_x, m_y = 0
-    trio.sleep(m_y)
-    trio.sleep(m_x)
+    trio.sleep(m_y)  # TRIO115
+    trio.sleep(m_x)  # TRIO115
 
-
+    m_a = m_b = 0
+    trio.sleep(m_a)  # TRIO115
+    trio.sleep(m_b)  # TRIO115
 
 
 def func():
@@ -40,6 +42,7 @@ def func():
 
 
 from trio import Event, sleep
+
 
 def func():
     sleep(0)  # TRIO115
