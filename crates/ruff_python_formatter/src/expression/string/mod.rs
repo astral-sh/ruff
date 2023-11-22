@@ -385,7 +385,9 @@ impl StringPart {
         let quotes = match quoting {
             Quoting::Preserve => self.quotes,
             Quoting::CanChange => {
-                if self.prefix.is_raw_string() {
+                if preferred_style == QuoteStyle::Preserve {
+                    self.quotes
+                } else if self.prefix.is_raw_string() {
                     choose_quotes_raw(raw_content, self.quotes, preferred_style)
                 } else {
                     choose_quotes(raw_content, self.quotes, preferred_style)
@@ -664,7 +666,7 @@ fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle)
                     QuoteStyle::Single
                 }
             }
-            QuoteStyle::Double => {
+            QuoteStyle::Double | QuoteStyle::Preserve => {
                 if double_quotes > single_quotes {
                     QuoteStyle::Single
                 } else {
@@ -716,8 +718,8 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
         let quotes = match (self.style, self.triple) {
             (QuoteStyle::Single, false) => "'",
             (QuoteStyle::Single, true) => "'''",
-            (QuoteStyle::Double, false) => "\"",
-            (QuoteStyle::Double, true) => "\"\"\"",
+            (QuoteStyle::Double | QuoteStyle::Preserve, false) => "\"",
+            (QuoteStyle::Double | QuoteStyle::Preserve, true) => "\"\"\"",
         };
 
         token(quotes).fmt(f)

@@ -2441,7 +2441,8 @@
       "type": "string",
       "enum": [
         "single",
-        "double"
+        "double",
+        "preserve"
       ]
     },
     "RelativeImportsOrder": {

@@ -207,6 +207,7 @@ pub enum QuoteStyle {
     Single,
     #[default]
     Double,
+    Preserve,
 }
 
 impl QuoteStyle {
@@ -214,6 +215,7 @@ impl QuoteStyle {
         match self {
             QuoteStyle::Single => '\'',
             QuoteStyle::Double => '"',
+            QuoteStyle::Preserve => '"', // not used
         }
     }
 
@@ -222,6 +224,7 @@ impl QuoteStyle {
         match self {
             QuoteStyle::Single => QuoteStyle::Double,
             QuoteStyle::Double => QuoteStyle::Single,
+            QuoteStyle::Preserve => QuoteStyle::Preserve,
         }
     }
 }
@@ -245,6 +248,7 @@ impl FromStr for QuoteStyle {
         match s {
             "\"" | "double" | "Double" => Ok(Self::Double),
             "'" | "single" | "Single" => Ok(Self::Single),
+            "preserve" | "Preserve" => Ok(Self::Preserve),
             // TODO: replace this error with a diagnostic
             _ => Err("Value not supported for QuoteStyle"),
         }

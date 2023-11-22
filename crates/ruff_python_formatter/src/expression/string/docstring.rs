@@ -490,7 +490,9 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         // `docstring_code_examples.py` for when this check is relevant.
         let wrapped = match self.quote_style {
             QuoteStyle::Single => std::format!("'''{}'''", printed.as_code()),
-            QuoteStyle::Double => std::format!(r#""""{}""""#, printed.as_code()),
+            QuoteStyle::Double | QuoteStyle::Preserve => {
+                std::format!(r#""""{}""""#, printed.as_code())
+            }
         };
         let result = ruff_python_parser::parse(
             &wrapped,
