@@ -1,6 +1,6 @@
 use ruff_text_size::TextSize;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
@@ -43,14 +43,14 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct SubprocessRunWithoutCheck;
 
-impl AlwaysAutofixableViolation for SubprocessRunWithoutCheck {
+impl AlwaysFixableViolation for SubprocessRunWithoutCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`subprocess.run` without explicit `check` argument")
     }
 
-    fn autofix_title(&self) -> String {
-        "Add an explicit check=False".to_string()
+    fn fix_title(&self) -> String {
+        "Add explicit `check=False`".to_string()
     }
 }
 
@@ -65,7 +65,7 @@ pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::Ex
             let mut diagnostic = Diagnostic::new(SubprocessRunWithoutCheck, call.func.range());
             let text: &str = checker.locator().slice(call.range());
             let ends_with_comma = text[..text.len() - 1].trim_end().ends_with(',');
-            diagnostic.set_fix(Fix::automatic(Edit::insertion(
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 {
                     if ends_with_comma {
                         "check=False"
