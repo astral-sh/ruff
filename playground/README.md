@@ -4,10 +4,11 @@ In-browser playground for Ruff. Available [https://play.ruff.rs/](https://play.r
 
 ## Getting started
 
-First, build the WASM module by running `npm run build:wasm` from the `./playground` directory.
+In order to build the WASM module install [`wasm-pack`](https://rustwasm.github.io/wasm-pack/).
 
-Then, install TypeScript dependencies with `npm install`, and run the development server with
-`npm run dev`.
+Next, build the WASM module by running `npm run build:wasm` (release build) or `npm run dev:wasm` (debug build) from the `./playground` directory.
+
+Finally, install TypeScript dependencies with `npm install`, and run the development server with `npm run dev`.
 
 To run the datastore, which is based on [Workers KV](https://developers.cloudflare.com/workers/runtime-apis/kv/),
 install the [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/),
@@ -21,7 +22,7 @@ The playground is implemented as a single-page React application powered by
 [Vite](https://vitejs.dev/), with the editor experience itself powered by
 [Monaco](https://github.com/microsoft/monaco-editor).
 
-The playground stores state in `localStorage`, but can supports persisting code snippets to
+The playground stores state in `localStorage`, but supports persisting code snippets to
 a persistent datastore based on [Workers KV](https://developers.cloudflare.com/workers/runtime-apis/kv/)
 and exposed via a [Cloudflare Worker](https://developers.cloudflare.com/workers/learning/how-workers-works/).
 

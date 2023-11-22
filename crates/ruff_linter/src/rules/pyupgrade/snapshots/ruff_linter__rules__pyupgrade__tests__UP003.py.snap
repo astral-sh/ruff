@@ -1,0 +1,114 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP003.py:1:1: UP003 [*] Use `str` instead of `type(...)`
+  |
+1 | type("")
+  | ^^^^^^^^ UP003
+2 | type(b"")
+3 | type(0)
+  |
+  = help: Replace `type(...)` with `str`
+
+ℹ Safe fix
+1   |-type("")
+  1 |+str
+2 2 | type(b"")
+3 3 | type(0)
+4 4 | type(0.0)
+
+UP003.py:2:1: UP003 [*] Use `bytes` instead of `type(...)`
+  |
+1 | type("")
+2 | type(b"")
+  | ^^^^^^^^^ UP003
+3 | type(0)
+4 | type(0.0)
+  |
+  = help: Replace `type(...)` with `bytes`
+
+ℹ Safe fix
+1 1 | type("")
+2   |-type(b"")
+  2 |+bytes
+3 3 | type(0)
+4 4 | type(0.0)
+5 5 | type(0j)
+
+UP003.py:3:1: UP003 [*] Use `int` instead of `type(...)`
+  |
+1 | type("")
+2 | type(b"")
+3 | type(0)
+  | ^^^^^^^ UP003
+4 | type(0.0)
+5 | type(0j)
+  |
+  = help: Replace `type(...)` with `int`
+
+ℹ Safe fix
+1 1 | type("")
+2 2 | type(b"")
+3   |-type(0)
+  3 |+int
+4 4 | type(0.0)
+5 5 | type(0j)
+6 6 | 
+
+UP003.py:4:1: UP003 [*] Use `float` instead of `type(...)`
+  |
+2 | type(b"")
+3 | type(0)
+4 | type(0.0)
+  | ^^^^^^^^^ UP003
+5 | type(0j)
+  |
+  = help: Replace `type(...)` with `float`
+
+ℹ Safe fix
+1 1 | type("")
+2 2 | type(b"")
+3 3 | type(0)
+4   |-type(0.0)
+  4 |+float
+5 5 | type(0j)
+6 6 | 
+7 7 | # OK
+
+UP003.py:5:1: UP003 [*] Use `complex` instead of `type(...)`
+  |
+3 | type(0)
+4 | type(0.0)
+5 | type(0j)
+  | ^^^^^^^^ UP003
+6 | 
+7 | # OK
+  |
+  = help: Replace `type(...)` with `complex`
+
+ℹ Safe fix
+2 2 | type(b"")
+3 3 | type(0)
+4 4 | type(0.0)
+5   |-type(0j)
+  5 |+complex
+6 6 | 
+7 7 | # OK
+8 8 | type(arg)(" ")
+
+UP003.py:14:29: UP003 [*] Use `str` instead of `type(...)`
+   |
+13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459841
+14 | assert isinstance(fullname, type("")is not True)
+   |                             ^^^^^^^^ UP003
+   |
+   = help: Replace `type(...)` with `str`
+
+ℹ Safe fix
+11 11 | y = x.dtype.type(0.0)
+12 12 | 
+13 13 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722459841
+14    |-assert isinstance(fullname, type("")is not True)
+   14 |+assert isinstance(fullname, str is not True)
+
+

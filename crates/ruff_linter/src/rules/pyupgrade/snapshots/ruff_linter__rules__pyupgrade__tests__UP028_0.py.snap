@@ -1,0 +1,302 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+  |
+1 |   def f():
+2 |       for x in y:
+  |  _____^
+3 | |         yield x
+  | |_______________^ UP028
+  |
+  = help: Replace with `yield from`
+
+ℹ Unsafe fix
+1 1 | def f():
+2   |-    for x in y:
+3   |-        yield x
+  2 |+    yield from y
+4 3 | 
+5 4 | 
+6 5 | def g():
+
+UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+  |
+6 |   def g():
+7 |       for x, y in z:
+  |  _____^
+8 | |         yield (x, y)
+  | |____________________^ UP028
+  |
+  = help: Replace with `yield from`
+
+ℹ Unsafe fix
+4 4 | 
+5 5 | 
+6 6 | def g():
+7   |-    for x, y in z:
+8   |-        yield (x, y)
+  7 |+    yield from z
+9 8 | 
+10 9 | 
+11 10 | def h():
+
+UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+11 |   def h():
+12 |       for x in [1, 2, 3]:
+   |  _____^
+13 | |         yield x
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+9  9  | 
+10 10 | 
+11 11 | def h():
+12    |-    for x in [1, 2, 3]:
+13    |-        yield x
+   12 |+    yield from [1, 2, 3]
+14 13 | 
+15 14 | 
+16 15 | def i():
+
+UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+16 |   def i():
+17 |       for x in {x for x in y}:
+   |  _____^
+18 | |         yield x
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+14 14 | 
+15 15 | 
+16 16 | def i():
+17    |-    for x in {x for x in y}:
+18    |-        yield x
+   17 |+    yield from {x for x in y}
+19 18 | 
+20 19 | 
+21 20 | def j():
+
+UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+21 |   def j():
+22 |       for x in (1, 2, 3):
+   |  _____^
+23 | |         yield x
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+19 19 | 
+20 20 | 
+21 21 | def j():
+22    |-    for x in (1, 2, 3):
+23    |-        yield x
+   22 |+    yield from (1, 2, 3)
+24 23 | 
+25 24 | 
+26 25 | def k():
+
+UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+26 |   def k():
+27 |       for x, y in {3: "x", 6: "y"}:
+   |  _____^
+28 | |         yield x, y
+   | |__________________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+24 24 | 
+25 25 | 
+26 26 | def k():
+27    |-    for x, y in {3: "x", 6: "y"}:
+28    |-        yield x, y
+   27 |+    yield from {3: "x", 6: "y"}
+29 28 | 
+30 29 | 
+31 30 | def f():  # Comment one\n'
+
+UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+31 |   def f():  # Comment one\n'
+32 |       # Comment two\n'
+33 |       for x, y in {  # Comment three\n'
+   |  _____^
+34 | |         3: "x",  # Comment four\n'
+35 | |         # Comment five\n'
+36 | |         6: "y",  # Comment six\n'
+37 | |     }:  # Comment seven\n'
+38 | |         # Comment eight\n'
+39 | |         yield x, y  # Comment nine\n'
+   | |__________________^ UP028
+40 |           # Comment ten',
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+30 30 | 
+31 31 | def f():  # Comment one\n'
+32 32 |     # Comment two\n'
+33    |-    for x, y in {  # Comment three\n'
+   33 |+    yield from {  # Comment three\n'
+34 34 |         3: "x",  # Comment four\n'
+35 35 |         # Comment five\n'
+36 36 |         6: "y",  # Comment six\n'
+37    |-    }:  # Comment seven\n'
+38    |-        # Comment eight\n'
+39    |-        yield x, y  # Comment nine\n'
+   37 |+    }  # Comment nine\n'
+40 38 |         # Comment ten',
+41 39 | 
+42 40 | 
+
+UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+43 |   def f():
+44 |       for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
+   |  _____^
+45 | |         yield x, y
+   | |__________________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+41 41 | 
+42 42 | 
+43 43 | def f():
+44    |-    for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
+45    |-        yield x, y
+   44 |+    yield from [{3: (3, [44, "long ss"]), 6: "y"}]
+46 45 | 
+47 46 | 
+48 47 | def f():
+
+UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+48 |   def f():
+49 |       for x, y in z():
+   |  _____^
+50 | |         yield x, y
+   | |__________________^ UP028
+51 |   
+52 |   def f():
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+46 46 | 
+47 47 | 
+48 48 | def f():
+49    |-    for x, y in z():
+50    |-        yield x, y
+   49 |+    yield from z()
+51 50 | 
+52 51 | def f():
+53 52 |     def func():
+
+UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+53 |       def func():
+54 |           # This comment is preserved\n'
+55 |           for x, y in z():  # Comment one\n'
+   |  _________^
+56 | |             # Comment two\n'
+57 | |             yield x, y  # Comment three\n'
+   | |______________________^ UP028
+58 |               # Comment four\n'
+59 |   # Comment\n'
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+52 52 | def f():
+53 53 |     def func():
+54 54 |         # This comment is preserved\n'
+55    |-        for x, y in z():  # Comment one\n'
+56    |-            # Comment two\n'
+57    |-            yield x, y  # Comment three\n'
+   55 |+        yield from z()  # Comment three\n'
+58 56 |             # Comment four\n'
+59 57 | # Comment\n'
+60 58 | def g():
+
+UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+65 |       for x in y:
+66 |           yield x
+67 |       for z in x:
+   |  _____^
+68 | |         yield z
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+64 64 | def f():
+65 65 |     for x in y:
+66 66 |         yield x
+67    |-    for z in x:
+68    |-        yield z
+   67 |+    yield from x
+69 68 | 
+70 69 | 
+71 70 | def f():
+
+UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+71 |   def f():
+72 |       for x, y in z():
+   |  _____^
+73 | |         yield x, y
+   | |__________________^ UP028
+74 |       x = 1
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+69 69 | 
+70 70 | 
+71 71 | def f():
+72    |-    for x, y in z():
+73    |-        yield x, y
+   72 |+    yield from z()
+74 73 |     x = 1
+75 74 | 
+76 75 | 
+
+UP028_0.py:79:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+77 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7103
+78 |   def _serve_method(fn):
+79 |       for h in (
+   |  _____^
+80 | |         TaggedText.from_file(args.input)
+81 | |             .markup(highlight=args.region)
+82 | |     ):
+83 | |         yield h
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Unsafe fix
+76 76 | 
+77 77 | # Regression test for: https://github.com/astral-sh/ruff/issues/7103
+78 78 | def _serve_method(fn):
+79    |-    for h in (
+   79 |+    yield from (
+80 80 |         TaggedText.from_file(args.input)
+81 81 |             .markup(highlight=args.region)
+82    |-    ):
+83    |-        yield h
+   82 |+    )
+
+

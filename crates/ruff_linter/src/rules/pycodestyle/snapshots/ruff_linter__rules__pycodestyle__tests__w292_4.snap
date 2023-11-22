@@ -1,0 +1,15 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+W292_4.py:1:2: W292 [*] No newline at end of file
+  |
+1 |  
+  |   W292
+  |
+  = help: Add trailing newline
+
+ℹ Safe fix
+1   |- 
+  1 |+ 
+
+

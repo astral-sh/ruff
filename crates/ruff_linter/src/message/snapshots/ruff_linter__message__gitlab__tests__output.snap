@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/message/gitlab.rs
+expression: redact_fingerprint(&content)
+---
+[
+  {
+    "description": "(F401) `os` imported but unused",
+    "fingerprint": "<redacted>",
+    "location": {
+      "lines": {
+        "begin": 1,
+        "end": 1
+      },
+      "path": "fib.py"
+    },
+    "severity": "major"
+  },
+  {
+    "description": "(F841) Local variable `x` is assigned to but never used",
+    "fingerprint": "<redacted>",
+    "location": {
+      "lines": {
+        "begin": 6,
+        "end": 6
+      },
+      "path": "fib.py"
+    },
+    "severity": "major"
+  },
+  {
+    "description": "(F821) Undefined name `a`",
+    "fingerprint": "<redacted>",
+    "location": {
+      "lines": {
+        "begin": 1,
+        "end": 1
+      },
+      "path": "undef.py"
+    },
+    "severity": "major"
+  }
+]

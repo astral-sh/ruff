@@ -1,16 +1,12 @@
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
-use ruff_python_ast::{ExprUnaryOp, Ranged};
-use ruff_text_size::{TextLen, TextRange};
 
-use ruff_formatter::prelude::{hard_line_break, space, text};
-use ruff_formatter::{Format, FormatContext, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-
-use crate::comments::trailing_comments;
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::comments::{trailing_comments, SourceComment};
+use crate::expression::parentheses::{
+    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
+};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprUnaryOp;
@@ -30,24 +26,17 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
             UnaryOp::USub => "-",
         };
 
-        text(operator).fmt(f)?;
+        token(operator).fmt(f)?;
 
         let comments = f.context().comments().clone();
+        let dangling = comments.dangling(item);
 
         // Split off the comments that follow after the operator and format them as trailing comments.
         // ```python
         // (not # comment
         //      a)
         // ```
-        let leading_operand_comments = comments.leading_comments(operand.as_ref());
-        let trailing_operator_comments_end =
-            leading_operand_comments.partition_point(|p| p.line_position().is_end_of_line());
-        let (trailing_operator_comments, leading_operand_comments) =
-            leading_operand_comments.split_at(trailing_operator_comments_end);
-
-        if !trailing_operator_comments.is_empty() {
-            trailing_comments(trailing_operator_comments).fmt(f)?;
-        }
+        trailing_comments(dangling).fmt(f)?;
 
         // Insert a line break if the operand has comments but itself is not parenthesized.
         // ```python
@@ -56,50 +45,55 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
         //  # comment
         //  a)
         // ```
-        if !leading_operand_comments.is_empty()
-            && !is_operand_parenthesized(item, f.context().source_code().as_str())
+        if comments.has_leading(operand.as_ref())
+            && !is_expression_parenthesized(
+                operand.as_ref().into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            )
         {
             hard_line_break().fmt(f)?;
         } else if op.is_not() {
             space().fmt(f)?;
         }
 
-        operand.format().fmt(f)
+        if operand
+            .as_bin_op_expr()
+            .is_some_and(|bin_op| bin_op.op.is_pow())
+        {
+            operand.format().with_options(Parentheses::Always).fmt(f)
+        } else {
+            operand.format().fmt(f)
+        }
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        Ok(())
     }
 }
 
 impl NeedsParentheses for ExprUnaryOp {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        // We preserve the parentheses of the operand. It should not be necessary to break this expression.
-        if is_operand_parenthesized(self, context.source()) {
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else if is_expression_parenthesized(
+            self.operand.as_ref().into(),
+            context.comments().ranges(),
+            context.source(),
+        ) {
             OptionalParentheses::Never
+        } else if context.comments().has(self.operand.as_ref()) {
+            OptionalParentheses::Always
         } else {
-            OptionalParentheses::Multiline
+            self.operand.needs_parentheses(self.into(), context)
         }
-    }
-}
-
-fn is_operand_parenthesized(unary: &ExprUnaryOp, source: &str) -> bool {
-    let operator_len = match unary.op {
-        UnaryOp::Invert => '~'.text_len(),
-        UnaryOp::Not => "not".text_len(),
-        UnaryOp::UAdd => '+'.text_len(),
-        UnaryOp::USub => '-'.text_len(),
-    };
-
-    let trivia_range = TextRange::new(unary.start() + operator_len, unary.operand.start());
-
-    if let Some(token) = SimpleTokenizer::new(source, trivia_range)
-        .skip_trivia()
-        .next()
-    {
-        debug_assert_eq!(token.kind(), SimpleTokenKind::LParen);
-        true
-    } else {
-        false
     }
 }

@@ -63,8 +63,11 @@ pub enum Tag {
     StartEntry,
     EndEntry,
 
-    /// Delay the printing of its content until the next line break
-    StartLineSuffix,
+    /// Delay the printing of its content until the next line break. Using reserved width will include
+    /// the associated line suffix during measurement.
+    StartLineSuffix {
+        reserved_width: u32,
+    },
     EndLineSuffix,
 
     /// A token that tracks tokens/nodes that are printed as verbatim.
@@ -80,6 +83,19 @@ pub enum Tag {
 
     StartFitsExpanded(FitsExpanded),
     EndFitsExpanded,
+
+    /// Marks the start and end of a best-fitting variant.
+    StartBestFittingEntry,
+    EndBestFittingEntry,
+
+    /// Parenthesizes the content but only if adding the parentheses and indenting the content
+    /// makes the content fit in the configured line width.
+    ///
+    /// See [`crate::builders::best_fit_parenthesize`] for an in-depth explanation.
+    StartBestFitParenthesize {
+        id: Option<GroupId>,
+    },
+    EndBestFitParenthesize,
 }
 
 impl Tag {
@@ -96,10 +112,12 @@ impl Tag {
                 | Tag::StartIndentIfGroupBreaks(_)
                 | Tag::StartFill
                 | Tag::StartEntry
-                | Tag::StartLineSuffix
+                | Tag::StartLineSuffix { .. }
                 | Tag::StartVerbatim(_)
                 | Tag::StartLabelled(_)
                 | Tag::StartFitsExpanded(_)
+                | Tag::StartBestFittingEntry
+                | Tag::StartBestFitParenthesize { .. }
         )
     }
 
@@ -122,10 +140,14 @@ impl Tag {
             StartIndentIfGroupBreaks(_) | EndIndentIfGroupBreaks => TagKind::IndentIfGroupBreaks,
             StartFill | EndFill => TagKind::Fill,
             StartEntry | EndEntry => TagKind::Entry,
-            StartLineSuffix | EndLineSuffix => TagKind::LineSuffix,
+            StartLineSuffix { reserved_width: _ } | EndLineSuffix => TagKind::LineSuffix,
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
             StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,
+            StartBestFittingEntry { .. } | EndBestFittingEntry => TagKind::BestFittingEntry,
+            StartBestFitParenthesize { .. } | EndBestFitParenthesize => {
+                TagKind::BestFitParenthesize
+            }
         }
     }
 }
@@ -149,6 +171,8 @@ pub enum TagKind {
     Verbatim,
     Labelled,
     FitsExpanded,
+    BestFittingEntry,
+    BestFitParenthesize,
 }
 
 #[derive(Debug, Copy, Default, Clone, Eq, PartialEq)]

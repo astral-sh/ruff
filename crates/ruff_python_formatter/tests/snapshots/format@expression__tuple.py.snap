@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/tuple.py
 ---
 ## Input
-```py
+```python
 # Non-wrapping parentheses checks
 a1 = 1, 2
 a2 = (1, 2)
@@ -72,10 +72,13 @@ g2 = ( # a
 h1 = ((((1, 2))))
 h2 = ((((1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"))))
 h3 = 1, "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq"
+
+i1 = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # This should break
+
 ```
 
 ## Output
-```py
+```python
 # Non-wrapping parentheses checks
 a1 = 1, 2
 a2 = (1, 2)
@@ -275,6 +278,10 @@ h3 = (
     1,
     "qweiurpoiqwurepqiurpqirpuqoiwrupqoirupqoirupqoiurpqiorupwqiourpqurpqurpqurpqurpqurpqurüqurqpuriq",
 )
+
+i1 = (
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+)  # This should break
 ```
 
 

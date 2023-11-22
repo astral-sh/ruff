@@ -1,70 +1,30 @@
-use crate::comments::{leading_comments, SourceComment};
-use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space, NeedsParentheses,
-    OptionalParentheses,
-};
-use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::{write, FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{CmpOp, ExprCompare};
+
+use crate::comments::SourceComment;
+use crate::expression::binary_like::BinaryLike;
+use crate::expression::expr_string_literal::is_multiline_string;
+use crate::expression::has_parentheses;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprCompare;
 
 impl FormatNodeRule<ExprCompare> for FormatExprCompare {
+    #[inline]
     fn fmt_fields(&self, item: &ExprCompare, f: &mut PyFormatter) -> FormatResult<()> {
-        let ExprCompare {
-            range: _,
-            left,
-            ops,
-            comparators,
-        } = item;
-
-        let comments = f.context().comments().clone();
-
-        let inner = format_with(|f| {
-            write!(f, [in_parentheses_only_group(&left.format())])?;
-
-            assert_eq!(comparators.len(), ops.len());
-
-            for (operator, comparator) in ops.iter().zip(comparators) {
-                let leading_comparator_comments = comments.leading_comments(comparator);
-                if leading_comparator_comments.is_empty() {
-                    write!(f, [in_parentheses_only_soft_line_break_or_space()])?;
-                } else {
-                    // Format the expressions leading comments **before** the operator
-                    write!(
-                        f,
-                        [
-                            hard_line_break(),
-                            leading_comments(leading_comparator_comments)
-                        ]
-                    )?;
-                }
-
-                write!(
-                    f,
-                    [
-                        operator.format(),
-                        space(),
-                        in_parentheses_only_group(&comparator.format())
-                    ]
-                )?;
-            }
-
-            Ok(())
-        });
-
-        in_parentheses_only_group(&inner).fmt(f)
+        BinaryLike::Compare(item).fmt(f)
     }
 
     fn fmt_dangling_comments(
         &self,
-        _dangling_comments: &[SourceComment],
+        dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Node can not have dangling comments
+        debug_assert!(dangling_comments.is_empty());
         Ok(())
     }
 }
@@ -72,10 +32,27 @@ impl FormatNodeRule<ExprCompare> for FormatExprCompare {
 impl NeedsParentheses for ExprCompare {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        parent: AnyNodeRef,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Multiline
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else if self.left.is_literal_expr() {
+            // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
+            if !self.left.is_implicit_concatenated_string()
+                && is_multiline_string(self.left.as_ref().into(), context.source())
+                && !context.comments().has(self.left.as_ref())
+                && self.comparators.first().is_some_and(|right| {
+                    has_parentheses(right, context).is_some() && !context.comments().has(right)
+                })
+            {
+                OptionalParentheses::Never
+            } else {
+                OptionalParentheses::Multiline
+            }
+        } else {
+            OptionalParentheses::Multiline
+        }
     }
 }
 
@@ -113,6 +90,6 @@ impl FormatRule<CmpOp, PyFormatContext<'_>> for FormatCmpOp {
             CmpOp::NotIn => "not in",
         };
 
-        text(operator).fmt(f)
+        token(operator).fmt(f)
     }
 }

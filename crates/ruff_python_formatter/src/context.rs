@@ -19,7 +19,7 @@ impl<'a> PyFormatContext<'a> {
             options,
             contents,
             comments,
-            node_level: NodeLevel::TopLevel,
+            node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
         }
     }
 
@@ -68,12 +68,21 @@ impl Debug for PyFormatContext<'_> {
     }
 }
 
-/// What's the enclosing level of the outer node.
+/// The position of a top-level statement in the module.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+pub(crate) enum TopLevelStatementPosition {
+    /// This is the last top-level statement in the module.
+    Last,
+    /// Any other top-level statement.
+    #[default]
+    Other,
+}
+
+/// What's the enclosing level of the outer node.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum NodeLevel {
     /// Formatting statements on the module level.
-    #[default]
-    TopLevel,
+    TopLevel(TopLevelStatementPosition),
 
     /// Formatting the body statements of a [compound statement](https://docs.python.org/3/reference/compound_stmts.html#compound-statements)
     /// (`if`, `while`, `match`, etc.).
@@ -86,6 +95,12 @@ pub(crate) enum NodeLevel {
     ParenthesizedExpression,
 }
 
+impl Default for NodeLevel {
+    fn default() -> Self {
+        Self::TopLevel(TopLevelStatementPosition::Other)
+    }
+}
+
 impl NodeLevel {
     /// Returns `true` if the expression is in a parenthesized context.
     pub(crate) const fn is_parenthesized(self) -> bool {
@@ -93,6 +108,11 @@ impl NodeLevel {
             self,
             NodeLevel::Expression(Some(_)) | NodeLevel::ParenthesizedExpression
         )
+    }
+
+    /// Returns `true` if this is the last top-level statement in the module.
+    pub(crate) const fn is_last_top_level_statement(self) -> bool {
+        matches!(self, NodeLevel::TopLevel(TopLevelStatementPosition::Last))
     }
 }
 

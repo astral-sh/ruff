@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+docstring.py:1:1: I002 [*] Missing required import: `from __future__ import annotations`
+  |
+1 | """Hello, world!"""
+  |  I002
+2 | 
+3 | x = 1
+  |
+  = help: Insert required import: `from __future__ import annotations`
+
+ℹ Safe fix
+1 1 | """Hello, world!"""
+  2 |+from __future__ import annotations
+2 3 | 
+3 4 | x = 1
+
+docstring.py:1:1: I002 [*] Missing required import: `from __future__ import generator_stop`
+  |
+1 | """Hello, world!"""
+  |  I002
+2 | 
+3 | x = 1
+  |
+  = help: Insert required import: `from __future__ import generator_stop`
+
+ℹ Safe fix
+1 1 | """Hello, world!"""
+  2 |+from __future__ import generator_stop
+2 3 | 
+3 4 | x = 1
+
+

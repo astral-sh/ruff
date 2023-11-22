@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-"""See Docs.md"""
+"""See CONTRIBUTING.md"""
 
 # %%
 
@@ -89,9 +89,10 @@ for group, group_nodes in nodes_grouped.items():
             continue
 
         code = f"""
-            use crate::{{verbatim_text, FormatNodeRule, PyFormatter}};
-            use ruff_formatter::{{write, Buffer, FormatResult}};
+            use ruff_formatter::write;
             use ruff_python_ast::{node};
+            use crate::verbatim_text;
+            use crate::prelude::*;
 
             #[derive(Default)]
             pub struct Format{node};

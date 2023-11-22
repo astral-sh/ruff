@@ -1,0 +1,34 @@
+[package]
+name = "ruff_notebook"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+
+[dependencies]
+ruff_diagnostics = { path = "../ruff_diagnostics" }
+ruff_source_file = { path = "../ruff_source_file", features = ["serde"] }
+ruff_text_size = { path = "../ruff_text_size" }
+
+anyhow = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { version = "3.4.0", default-features = false, features = ["macros"] }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+test-case = { workspace = true }
+
+[lints]
+workspace = true

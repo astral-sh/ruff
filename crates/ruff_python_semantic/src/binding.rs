@@ -5,14 +5,14 @@ use bitflags::bitflags;
 
 use ruff_index::{newtype_index, IndexSlice, IndexVec};
 use ruff_python_ast::call_path::format_call_path;
-use ruff_python_ast::Ranged;
+use ruff_python_ast::Stmt;
 use ruff_source_file::Locator;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::context::ExecutionContext;
 use crate::model::SemanticModel;
+use crate::nodes::NodeId;
 use crate::reference::ResolvedReferenceId;
-use crate::statements::StatementId;
 use crate::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,7 @@ pub struct Binding<'a> {
     /// The context in which the [`Binding`] was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
-    pub source: Option<StatementId>,
+    pub source: Option<NodeId>,
     /// The references to the [`Binding`].
     pub references: Vec<ResolvedReferenceId>,
     /// The exceptions that were handled when the [`Binding`] was defined.
@@ -85,6 +85,12 @@ impl<'a> Binding<'a> {
     /// invalid member (e.g., `__all__ = ["Foo", 1]`).
     pub const fn is_invalid_all_object(&self) -> bool {
         self.flags.intersects(BindingFlags::INVALID_ALL_OBJECT)
+    }
+
+    /// Return `true` if this [`Binding`] represents an unpacked assignment (e.g., `x` in
+    /// `(x, y) = 1, 2`).
+    pub const fn is_unpacked_assignment(&self) -> bool {
+        self.flags.intersects(BindingFlags::UNPACKED_ASSIGNMENT)
     }
 
     /// Return `true` if this [`Binding`] represents an unbound variable
@@ -182,17 +188,21 @@ impl<'a> Binding<'a> {
         locator.slice(self.range)
     }
 
-    /// Returns the range of the binding's parent.
-    pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
+    /// Returns the statement in which the binding was defined.
+    pub fn statement<'b>(&self, semantic: &'b SemanticModel) -> Option<&'b Stmt> {
         self.source
             .map(|statement_id| semantic.statement(statement_id))
-            .and_then(|parent| {
-                if parent.is_import_from_stmt() {
-                    Some(parent.range())
-                } else {
-                    None
-                }
-            })
+    }
+
+    /// Returns the range of the binding's parent.
+    pub fn parent_range(&self, semantic: &SemanticModel) -> Option<TextRange> {
+        self.statement(semantic).and_then(|parent| {
+            if parent.is_import_from_stmt() {
+                Some(parent.range())
+            } else {
+                None
+            }
+        })
     }
 
     pub fn as_any_import(&'a self) -> Option<AnyImport<'a>> {
@@ -208,7 +218,7 @@ impl<'a> Binding<'a> {
 bitflags! {
     /// Flags on a [`Binding`].
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-    pub struct BindingFlags: u8 {
+    pub struct BindingFlags: u16 {
         /// The binding represents an explicit re-export.
         ///
         /// For example, the binding could be `FastAPI` in:
@@ -280,6 +290,14 @@ bitflags! {
         /// _T = "This is a private variable"
         /// ```
         const PRIVATE_DECLARATION = 1 << 7;
+
+        /// The binding represents an unpacked assignment.
+        ///
+        /// For example, the binding could be `x` in:
+        /// ```python
+        /// (x, y) = 1, 2
+        /// ```
+        const UNPACKED_ASSIGNMENT = 1 << 8;
     }
 }
 
@@ -389,12 +407,6 @@ pub enum BindingKind<'a> {
     /// ```
     NamedExprAssignment,
 
-    /// A binding for a unpacking-based assignment, like `x` in:
-    /// ```python
-    /// x, y = (1, 2)
-    /// ```
-    UnpackedAssignment,
-
     /// A binding for a "standard" assignment, like `x` in:
     /// ```python
     /// x = 1
@@ -419,6 +431,13 @@ pub enum BindingKind<'a> {
     ///     ...
     /// ```
     LoopVar,
+
+    /// A binding for a with statement variable, like `x` in:
+    /// ```python
+    /// with open('foo.py') as x:
+    ///     ...
+    /// ```
+    WithItemVar,
 
     /// A binding for a global variable, like `x` in:
     /// ```python

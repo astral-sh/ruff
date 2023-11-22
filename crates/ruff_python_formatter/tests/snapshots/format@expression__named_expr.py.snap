@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/named_expr.py
 ---
 ## Input
-```py
+```python
 y = 1
 
 if (
@@ -11,6 +11,52 @@ if (
     x # 2
     := # 3
     y # 4
+):
+    pass
+
+if (
+    # 1
+    x # 2
+    := # 3
+    (y) # 4
+):
+    pass
+
+if (
+    # 1
+    x # 2
+    := # 3
+    (y) # 4
+    # 5
+):
+    pass
+
+if (
+    # 1
+    x # 2
+    # 2.5
+    := # 3
+    # 3.5
+    y # 4
+):
+    pass
+
+if (
+    # 1
+    x # 2
+    # 2.5
+    := # 3
+    # 3.5
+    (  # 4
+        y # 5
+    )  # 6
+):
+    pass
+
+if (
+    x # 2
+    := # 3
+    y
 ):
     pass
 
@@ -60,12 +106,60 @@ async def f():
 ```
 
 ## Output
-```py
+```python
 y = 1
 
 if (
     # 1
-    x := y  # 2  # 3  # 4
+    x  # 2
+    :=  # 3
+    y  # 4
+):
+    pass
+
+if (
+    # 1
+    x  # 2
+    :=  # 3
+    (y)  # 4
+):
+    pass
+
+if (
+    # 1
+    x  # 2
+    :=  # 3
+    (y)  # 4
+    # 5
+):
+    pass
+
+if (
+    # 1
+    x  # 2
+    # 2.5
+    :=  # 3
+    # 3.5
+    y  # 4
+):
+    pass
+
+if (
+    # 1
+    x  # 2
+    # 2.5
+    :=  # 3
+    # 3.5
+    (  # 4
+        y  # 5
+    )  # 6
+):
+    pass
+
+if (
+    x  # 2
+    :=  # 3
+    y
 ):
     pass
 

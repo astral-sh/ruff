@@ -1,16 +1,18 @@
+use ruff_formatter::{write, Argument, Arguments, FormatError};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{
+    ElifElseClause, ExceptHandlerExceptHandler, MatchCase, StmtClassDef, StmtFor, StmtFunctionDef,
+    StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith, Suite,
+};
+use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange, TextSize};
+
 use crate::comments::{
     leading_alternate_branch_comments, trailing_comments, SourceComment, SuppressionKind,
 };
 use crate::prelude::*;
+use crate::statement::suite::{contains_only_an_ellipsis, SuiteKind};
 use crate::verbatim::write_suppressed_clause_header;
-use ruff_formatter::{Argument, Arguments, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{
-    ElifElseClause, ExceptHandlerExceptHandler, MatchCase, Ranged, StmtClassDef, StmtFor,
-    StmtFunctionDef, StmtIf, StmtMatch, StmtTry, StmtWhile, StmtWith,
-};
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{TextRange, TextSize};
 
 /// The header of a compound statement clause.
 ///
@@ -58,11 +60,9 @@ impl<'a> ClauseHeader<'a> {
             | ClauseHeader::With(_)
             | ClauseHeader::OrElse(_) => last_child_end,
 
-            ClauseHeader::ExceptHandler(handler) => handler
-                .name
-                .as_ref()
-                .map(ruff_python_ast::Ranged::end)
-                .or(last_child_end),
+            ClauseHeader::ExceptHandler(handler) => {
+                handler.name.as_ref().map(Ranged::end).or(last_child_end)
+            }
         };
 
         let colon = colon_range(end.unwrap_or(keyword_range.end()), source)?;
@@ -107,13 +107,17 @@ impl<'a> ClauseHeader<'a> {
                 is_async: _,
                 decorator_list: _,
                 name: _,
-                returns: _,
+                returns,
                 body: _,
             }) => {
                 if let Some(type_params) = type_params.as_ref() {
                     visit(type_params, visitor);
                 }
                 visit(parameters.as_ref(), visitor);
+
+                if let Some(returns) = returns.as_deref() {
+                    visit(returns, visitor);
+                }
             }
             ClauseHeader::If(StmtIf {
                 test,
@@ -199,15 +203,23 @@ impl<'a> ClauseHeader<'a> {
     fn first_keyword_range(self, source: &str) -> FormatResult<TextRange> {
         match self {
             ClauseHeader::Class(header) => {
-                find_keyword(header.start(), SimpleTokenKind::Class, source)
+                let start_position = header
+                    .decorator_list
+                    .last()
+                    .map_or_else(|| header.start(), Ranged::end);
+                find_keyword(start_position, SimpleTokenKind::Class, source)
             }
             ClauseHeader::Function(header) => {
+                let start_position = header
+                    .decorator_list
+                    .last()
+                    .map_or_else(|| header.start(), Ranged::end);
                 let keyword = if header.is_async {
                     SimpleTokenKind::Async
                 } else {
                     SimpleTokenKind::Def
                 };
-                find_keyword(header.start(), keyword, source)
+                find_keyword(start_position, keyword, source)
             }
             ClauseHeader::If(header) => find_keyword(header.start(), SimpleTokenKind::If, source),
             ClauseHeader::ElifElse(ElifElseClause {
@@ -345,10 +357,63 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatClauseHeader<'_, 'ast> {
             write_suppressed_clause_header(self.header, f)?;
         } else {
             f.write_fmt(Arguments::from(&self.formatter))?;
-            text(":").fmt(f)?;
+            token(":").fmt(f)?;
         }
 
         trailing_comments(self.trailing_colon_comment).fmt(f)
+    }
+}
+
+pub(crate) struct FormatClauseBody<'a> {
+    body: &'a Suite,
+    kind: SuiteKind,
+    trailing_comments: &'a [SourceComment],
+}
+
+impl<'a> FormatClauseBody<'a> {
+    #[must_use]
+    pub(crate) fn with_kind(mut self, kind: SuiteKind) -> Self {
+        self.kind = kind;
+        self
+    }
+}
+
+pub(crate) fn clause_body<'a>(
+    body: &'a Suite,
+    trailing_comments: &'a [SourceComment],
+) -> FormatClauseBody<'a> {
+    FormatClauseBody {
+        body,
+        kind: SuiteKind::default(),
+        trailing_comments,
+    }
+}
+
+impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        // In stable, stubs are only collapsed in stub files, in preview this is consistently
+        // applied everywhere
+        if (f.options().source_type().is_stub() || f.options().preview().is_enabled())
+            && contains_only_an_ellipsis(self.body, f.context().comments())
+            && self.trailing_comments.is_empty()
+        {
+            write!(
+                f,
+                [
+                    space(),
+                    self.body.format().with_options(self.kind),
+                    hard_line_break()
+                ]
+            )
+        } else {
+            write!(
+                f,
+                [
+                    trailing_comments(self.trailing_comments),
+                    block_indent(&self.body.format().with_options(self.kind))
+                ]
+            )
+        }
     }
 }
 

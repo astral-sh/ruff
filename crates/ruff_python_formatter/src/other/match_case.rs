@@ -1,13 +1,12 @@
-use ruff_formatter::{format_args, write, Buffer, FormatResult};
-use ruff_python_ast::{MatchCase, Pattern, Ranged};
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::TextRange;
+use ruff_formatter::write;
+use ruff_python_ast::AstNode;
+use ruff_python_ast::MatchCase;
 
-use crate::comments::{leading_comments, SourceComment};
-use crate::expression::parentheses::parenthesized;
+use crate::builders::parenthesize_if_expands;
+use crate::comments::SourceComment;
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
-use crate::statement::clause::{clause_header, ClauseHeader};
-use crate::{FormatError, FormatNodeRule, PyFormatter};
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 
 #[derive(Default)]
 pub struct FormatMatchCase;
@@ -22,7 +21,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling_item_comments = comments.dangling_comments(item);
+        let dangling_item_comments = comments.dangling(item);
 
         write!(
             f,
@@ -31,33 +30,41 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                     ClauseHeader::MatchCase(item),
                     dangling_item_comments,
                     &format_with(|f| {
-                        write!(f, [text("case"), space()])?;
+                        write!(f, [token("case"), space()])?;
 
-                        let leading_pattern_comments = comments.leading_comments(pattern);
-                        if !leading_pattern_comments.is_empty() {
-                            parenthesized(
-                                "(",
-                                &format_args![
-                                    leading_comments(leading_pattern_comments),
-                                    pattern.format()
-                                ],
-                                ")",
-                            )
-                            .fmt(f)?;
-                        } else if is_match_case_pattern_parenthesized(item, pattern, f.context())? {
-                            parenthesized("(", &pattern.format(), ")").fmt(f)?;
+                        let has_comments = comments.has_leading(pattern)
+                            || comments.has_trailing_own_line(pattern);
+
+                        if has_comments {
+                            pattern.format().with_options(Parentheses::Always).fmt(f)?;
                         } else {
-                            pattern.format().fmt(f)?;
+                            match pattern.needs_parentheses(item.as_any_node_ref(), f.context()) {
+                                OptionalParentheses::Multiline => {
+                                    parenthesize_if_expands(
+                                        &pattern.format().with_options(Parentheses::Never),
+                                    )
+                                    .fmt(f)?;
+                                }
+                                OptionalParentheses::Always => {
+                                    pattern.format().with_options(Parentheses::Always).fmt(f)?;
+                                }
+                                OptionalParentheses::Never => {
+                                    pattern.format().with_options(Parentheses::Never).fmt(f)?;
+                                }
+                                OptionalParentheses::BestFit => {
+                                    pattern.format().with_options(Parentheses::Never).fmt(f)?;
+                                }
+                            }
                         }
 
                         if let Some(guard) = guard {
-                            write!(f, [space(), text("if"), space(), guard.format()])?;
+                            write!(f, [space(), token("if"), space(), guard.format()])?;
                         }
 
                         Ok(())
                     }),
                 ),
-                block_indent(&body.format())
+                clause_body(body, dangling_item_comments),
             ]
         )
     }
@@ -69,35 +76,5 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
     ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`
         Ok(())
-    }
-}
-
-fn is_match_case_pattern_parenthesized(
-    case: &MatchCase,
-    pattern: &Pattern,
-    context: &PyFormatContext,
-) -> FormatResult<bool> {
-    let mut tokenizer = SimpleTokenizer::new(
-        context.source(),
-        TextRange::new(case.start(), pattern.start()),
-    )
-    .skip_trivia();
-
-    let case_keyword = tokenizer.next().ok_or(FormatError::syntax_error(
-        "Expected a `case` keyword, didn't find any token",
-    ))?;
-
-    debug_assert_eq!(
-        case_keyword.kind(),
-        SimpleTokenKind::Case,
-        "Expected `case` keyword but at {case_keyword:?}"
-    );
-
-    match tokenizer.next() {
-        Some(left_paren) => {
-            debug_assert_eq!(left_paren.kind(), SimpleTokenKind::LParen);
-            Ok(true)
-        }
-        None => Ok(false),
     }
 }

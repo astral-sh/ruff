@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/parentheses/nested.py
 ---
 ## Input
-```py
+```python
 a1 = f(  # 1
     g(  # 2
     )
@@ -60,7 +60,7 @@ b3 = (
 ```
 
 ## Output
-```py
+```python
 a1 = f(  # 1
     g(  # 2
     )
@@ -90,8 +90,7 @@ a = (
     + b
     + c
     + d
-    +
-    (  # Hello
+    + (  # Hello
         e + f + g
     )
 )

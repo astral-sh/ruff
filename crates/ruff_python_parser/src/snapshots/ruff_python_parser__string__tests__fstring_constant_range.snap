@@ -10,16 +10,12 @@ expression: parse_ast
                 ExprFString {
                     range: 0..22,
                     values: [
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 2..5,
-                                value: Str(
-                                    StringConstant {
-                                        value: "aaa",
-                                        implicit_concatenated: false,
-                                    },
-                                ),
-                                kind: None,
+                                value: "aaa",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                         FormattedValue(
@@ -37,16 +33,12 @@ expression: parse_ast
                                 format_spec: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 10..13,
-                                value: Str(
-                                    StringConstant {
-                                        value: "ccc",
-                                        implicit_concatenated: false,
-                                    },
-                                ),
-                                kind: None,
+                                value: "ccc",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                         FormattedValue(
@@ -64,16 +56,12 @@ expression: parse_ast
                                 format_spec: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 18..21,
-                                value: Str(
-                                    StringConstant {
-                                        value: "eee",
-                                        implicit_concatenated: false,
-                                    },
-                                ),
-                                kind: None,
+                                value: "eee",
+                                unicode: false,
+                                implicit_concatenated: false,
                             },
                         ),
                     ],

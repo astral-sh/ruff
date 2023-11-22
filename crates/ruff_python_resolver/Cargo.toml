@@ -18,5 +18,8 @@ log = { workspace = true }
 
 [dev-dependencies]
 env_logger = "0.10.0"
-tempfile = "3.6.0"
+tempfile = "3.8.1"
 insta = { workspace = true }
+
+[lints]
+workspace = true

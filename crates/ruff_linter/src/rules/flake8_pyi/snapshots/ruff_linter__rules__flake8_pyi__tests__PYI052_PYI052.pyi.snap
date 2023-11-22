@@ -1,0 +1,141 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI052.pyi:14:10: PYI052 Need type annotation for `field5`
+   |
+12 | field43: int = -0xFFFFFFFF
+13 | field44: int = -1234567890
+14 | field5 = 0  # type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")  # Y052 Need type annotation for "field5"
+   |          ^ PYI052
+15 | field6 = 0  # Y052 Need type annotation for "field6"
+16 | field7 = b""  # Y052 Need type annotation for "field7"
+   |
+
+PYI052.pyi:15:10: PYI052 Need type annotation for `field6`
+   |
+13 | field44: int = -1234567890
+14 | field5 = 0  # type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")  # Y052 Need type annotation for "field5"
+15 | field6 = 0  # Y052 Need type annotation for "field6"
+   |          ^ PYI052
+16 | field7 = b""  # Y052 Need type annotation for "field7"
+17 | field71 = "foo"  # Y052 Need type annotation for "field71"
+   |
+
+PYI052.pyi:16:10: PYI052 Need type annotation for `field7`
+   |
+14 | field5 = 0  # type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")  # Y052 Need type annotation for "field5"
+15 | field6 = 0  # Y052 Need type annotation for "field6"
+16 | field7 = b""  # Y052 Need type annotation for "field7"
+   |          ^^^ PYI052
+17 | field71 = "foo"  # Y052 Need type annotation for "field71"
+18 | field72: str = "foo"
+   |
+
+PYI052.pyi:17:11: PYI052 Need type annotation for `field71`
+   |
+15 | field6 = 0  # Y052 Need type annotation for "field6"
+16 | field7 = b""  # Y052 Need type annotation for "field7"
+17 | field71 = "foo"  # Y052 Need type annotation for "field71"
+   |           ^^^^^ PYI052
+18 | field72: str = "foo"
+19 | field8 = False  # Y052 Need type annotation for "field8"
+   |
+
+PYI052.pyi:19:10: PYI052 Need type annotation for `field8`
+   |
+17 | field71 = "foo"  # Y052 Need type annotation for "field71"
+18 | field72: str = "foo"
+19 | field8 = False  # Y052 Need type annotation for "field8"
+   |          ^^^^^ PYI052
+20 | field81 = -1  # Y052 Need type annotation for "field81"
+21 | field82: float = -98.43
+   |
+
+PYI052.pyi:20:11: PYI052 Need type annotation for `field81`
+   |
+18 | field72: str = "foo"
+19 | field8 = False  # Y052 Need type annotation for "field8"
+20 | field81 = -1  # Y052 Need type annotation for "field81"
+   |           ^^ PYI052
+21 | field82: float = -98.43
+22 | field83 = -42j  # Y052 Need type annotation for "field83"
+   |
+
+PYI052.pyi:22:11: PYI052 Need type annotation for `field83`
+   |
+20 | field81 = -1  # Y052 Need type annotation for "field81"
+21 | field82: float = -98.43
+22 | field83 = -42j  # Y052 Need type annotation for "field83"
+   |           ^^^^ PYI052
+23 | field84 = 5 + 42j  # Y052 Need type annotation for "field84"
+24 | field85 = -5 - 42j  # Y052 Need type annotation for "field85"
+   |
+
+PYI052.pyi:23:11: PYI052 Need type annotation for `field84`
+   |
+21 | field82: float = -98.43
+22 | field83 = -42j  # Y052 Need type annotation for "field83"
+23 | field84 = 5 + 42j  # Y052 Need type annotation for "field84"
+   |           ^^^^^^^ PYI052
+24 | field85 = -5 - 42j  # Y052 Need type annotation for "field85"
+25 | field9 = None  # Y026 Use typing_extensions.TypeAlias for type aliases, e.g. "field9: TypeAlias = None"
+   |
+
+PYI052.pyi:24:11: PYI052 Need type annotation for `field85`
+   |
+22 | field83 = -42j  # Y052 Need type annotation for "field83"
+23 | field84 = 5 + 42j  # Y052 Need type annotation for "field84"
+24 | field85 = -5 - 42j  # Y052 Need type annotation for "field85"
+   |           ^^^^^^^^ PYI052
+25 | field9 = None  # Y026 Use typing_extensions.TypeAlias for type aliases, e.g. "field9: TypeAlias = None"
+26 | Field95: TypeAlias = None
+   |
+
+PYI052.pyi:33:11: PYI052 Need type annotation for `field19`
+   |
+31 | Field100 = TypeVarTuple('Field100')
+32 | Field101 = ParamSpec('Field101')
+33 | field19 = [1, 2, 3]  # Y052 Need type annotation for "field19"
+   |           ^^^^^^^^^ PYI052
+34 | field191: list[int] = [1, 2, 3]
+35 | field20 = (1, 2, 3)  # Y052 Need type annotation for "field20"
+   |
+
+PYI052.pyi:35:11: PYI052 Need type annotation for `field20`
+   |
+33 | field19 = [1, 2, 3]  # Y052 Need type annotation for "field19"
+34 | field191: list[int] = [1, 2, 3]
+35 | field20 = (1, 2, 3)  # Y052 Need type annotation for "field20"
+   |           ^^^^^^^^^ PYI052
+36 | field201: tuple[int, ...] = (1, 2, 3)
+37 | field21 = {1, 2, 3}  # Y052 Need type annotation for "field21"
+   |
+
+PYI052.pyi:37:11: PYI052 Need type annotation for `field21`
+   |
+35 | field20 = (1, 2, 3)  # Y052 Need type annotation for "field20"
+36 | field201: tuple[int, ...] = (1, 2, 3)
+37 | field21 = {1, 2, 3}  # Y052 Need type annotation for "field21"
+   |           ^^^^^^^^^ PYI052
+38 | field211: set[int] = {1, 2, 3}
+39 | field212 = {"foo": "bar"}  # Y052 Need type annotation for "field212"
+   |
+
+PYI052.pyi:39:12: PYI052 Need type annotation for `field212`
+   |
+37 | field21 = {1, 2, 3}  # Y052 Need type annotation for "field21"
+38 | field211: set[int] = {1, 2, 3}
+39 | field212 = {"foo": "bar"}  # Y052 Need type annotation for "field212"
+   |            ^^^^^^^^^^^^^^ PYI052
+40 | field213: dict[str, str] = {"foo": "bar"}
+41 | field22: Final = {"foo": 5}
+   |
+
+PYI052.pyi:114:11: PYI052 Need type annotation for `WIZ`
+    |
+113 | class Bop:
+114 |     WIZ = 4
+    |           ^ PYI052
+    |
+
+

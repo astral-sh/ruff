@@ -1,13 +1,15 @@
 use ruff_formatter::write;
-use ruff_python_ast::{Decorator, Ranged, StmtClassDef};
-use ruff_python_trivia::lines_after_ignoring_trivia;
+use ruff_python_ast::{Decorator, StmtClassDef};
+use ruff_python_trivia::lines_after_ignoring_end_of_line_trivia;
+use ruff_text_size::Ranged;
 
+use crate::comments::format::{
+    empty_lines_after_leading_comments, empty_lines_before_trailing_comments,
+};
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::prelude::*;
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 use crate::statement::suite::SuiteKind;
-
-use crate::statement::clause::{clause_header, ClauseHeader};
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatStmtClassDef;
@@ -25,12 +27,35 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
 
         let comments = f.context().comments().clone();
 
-        let dangling_comments = comments.dangling_comments(item);
+        let dangling_comments = comments.dangling(item);
         let trailing_definition_comments_start =
             dangling_comments.partition_point(|comment| comment.line_position().is_own_line());
 
         let (leading_definition_comments, trailing_definition_comments) =
             dangling_comments.split_at(trailing_definition_comments_start);
+
+        // If the class contains leading comments, insert newlines before them.
+        // For example, given:
+        // ```python
+        // # comment
+        //
+        // class Class:
+        //     ...
+        // ```
+        //
+        // At the top-level in a non-stub file, reformat as:
+        // ```python
+        // # comment
+        //
+        //
+        // class Class:
+        //     ...
+        // ```
+        // Note that this is only really relevant for the specific case in which there's a single
+        // newline between the comment and the node, but we _require_ two newlines. If there are
+        // _no_ newlines between the comment and the node, we don't insert _any_ newlines; if there
+        // are more than two, then `leading_comments` will preserve the correct number of newlines.
+        empty_lines_after_leading_comments(f, comments.leading(item)).fmt(f)?;
 
         write!(
             f,
@@ -43,7 +68,7 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                     ClauseHeader::Class(item),
                     trailing_definition_comments,
                     &format_with(|f| {
-                        write!(f, [text("class"), space(), name.format()])?;
+                        write!(f, [token("class"), space(), name.format()])?;
 
                         if let Some(type_params) = type_params.as_deref() {
                             write!(f, [type_params.format()])?;
@@ -93,11 +118,11 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                             // ```
                             if arguments.is_empty()
                                 && comments
-                                    .dangling_comments(arguments)
+                                    .dangling(arguments)
                                     .iter()
                                     .all(|comment| comment.line_position().is_end_of_line())
                             {
-                                let dangling = comments.dangling_comments(arguments);
+                                let dangling = comments.dangling(arguments);
                                 write!(f, [trailing_comments(dangling)])?;
                             } else {
                                 write!(f, [arguments.format()])?;
@@ -107,9 +132,27 @@ impl FormatNodeRule<StmtClassDef> for FormatStmtClassDef {
                         Ok(())
                     }),
                 ),
-                block_indent(&body.format().with_options(SuiteKind::Class))
+                clause_body(body, trailing_definition_comments).with_kind(SuiteKind::Class),
             ]
-        )
+        )?;
+
+        // If the class contains trailing comments, insert newlines before them.
+        // For example, given:
+        // ```python
+        // class Class:
+        //     ...
+        // # comment
+        // ```
+        //
+        // At the top-level in a non-stub file, reformat as:
+        // ```python
+        // class Class:
+        //     ...
+        //
+        //
+        // # comment
+        // ```
+        empty_lines_before_trailing_comments(f, comments.trailing(item)).fmt(f)
     }
 
     fn fmt_dangling_comments(
@@ -140,13 +183,15 @@ impl Format<PyFormatContext<'_>> for FormatDecorators<'_> {
                 // Write any leading definition comments (between last decorator and the header)
                 // while maintaining the right amount of empty lines between the comment
                 // and the last decorator.
-                let leading_line =
-                    if lines_after_ignoring_trivia(last_decorator.end(), f.context().source()) <= 1
-                    {
-                        hard_line_break()
-                    } else {
-                        empty_line()
-                    };
+                let leading_line = if lines_after_ignoring_end_of_line_trivia(
+                    last_decorator.end(),
+                    f.context().source(),
+                ) <= 1
+                {
+                    hard_line_break()
+                } else {
+                    empty_line()
+                };
 
                 write!(
                     f,

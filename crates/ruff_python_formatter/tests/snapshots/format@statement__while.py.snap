@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/while.py
 ---
 ## Input
-```py
+```python
 while 34: # trailing test comment
     pass # trailing last statement comment
 
@@ -21,7 +21,7 @@ while aVeryLongConditionThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGo
     pass
 
 else:
-    ...
+    pass
 
 while (
     some_condition(unformatted, args) and anotherCondition or aThirdCondition
@@ -37,7 +37,7 @@ while (
 ```
 
 ## Output
-```py
+```python
 while 34:  # trailing test comment
     pass  # trailing last statement comment
 
@@ -55,9 +55,11 @@ while aVeryLongConditionThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGo
     pass
 
 else:
-    ...
+    pass
 
-while some_condition(unformatted, args) and anotherCondition or aThirdCondition:  # comment
+while (
+    some_condition(unformatted, args) and anotherCondition or aThirdCondition
+):  # comment
     print("Do something")
 
 

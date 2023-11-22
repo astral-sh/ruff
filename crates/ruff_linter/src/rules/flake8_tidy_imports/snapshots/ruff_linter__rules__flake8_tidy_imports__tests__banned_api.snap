@@ -1,0 +1,120 @@
+---
+source: crates/ruff_linter/src/rules/flake8_tidy_imports/mod.rs
+---
+TID251.py:2:8: TID251 `cgi` is banned: The cgi module is deprecated.
+  |
+1 | ## Banned modules ##
+2 | import cgi
+  |        ^^^ TID251
+3 | 
+4 | from cgi import *
+  |
+
+TID251.py:4:1: TID251 `cgi` is banned: The cgi module is deprecated.
+  |
+2 | import cgi
+3 | 
+4 | from cgi import *
+  | ^^^^^^^^^^^^^^^^^ TID251
+5 | 
+6 | from cgi import a, b, c
+  |
+
+TID251.py:6:1: TID251 `cgi` is banned: The cgi module is deprecated.
+  |
+4 | from cgi import *
+5 | 
+6 | from cgi import a, b, c
+  | ^^^^^^^^^^^^^^^^^^^^^^^ TID251
+7 | 
+8 | # banning a module also bans any submodules
+  |
+
+TID251.py:9:8: TID251 `cgi` is banned: The cgi module is deprecated.
+   |
+ 8 | # banning a module also bans any submodules
+ 9 | import cgi.foo.bar
+   |        ^^^^^^^^^^^ TID251
+10 | 
+11 | from cgi.foo import bar
+   |
+
+TID251.py:11:1: TID251 `cgi` is banned: The cgi module is deprecated.
+   |
+ 9 | import cgi.foo.bar
+10 | 
+11 | from cgi.foo import bar
+   | ^^^^^^^^^^^^^^^^^^^^^^^ TID251
+12 | 
+13 | from cgi.foo.bar import *
+   |
+
+TID251.py:13:1: TID251 `cgi` is banned: The cgi module is deprecated.
+   |
+11 | from cgi.foo import bar
+12 | 
+13 | from cgi.foo.bar import *
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ TID251
+14 | 
+15 | ## Banned module members ##
+   |
+
+TID251.py:17:20: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+   |
+15 | ## Banned module members ##
+16 | 
+17 | from typing import TypedDict
+   |                    ^^^^^^^^^ TID251
+18 | 
+19 | import typing
+   |
+
+TID251.py:22:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+   |
+21 | # attribute access is checked
+22 | typing.TypedDict
+   | ^^^^^^^^^^^^^^^^ TID251
+23 | 
+24 | typing.TypedDict.anything
+   |
+
+TID251.py:24:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+   |
+22 | typing.TypedDict
+23 | 
+24 | typing.TypedDict.anything
+   | ^^^^^^^^^^^^^^^^ TID251
+25 | 
+26 | # function calls are checked
+   |
+
+TID251.py:27:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+   |
+26 | # function calls are checked
+27 | typing.TypedDict()
+   | ^^^^^^^^^^^^^^^^ TID251
+28 | 
+29 | typing.TypedDict.anything()
+   |
+
+TID251.py:29:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+   |
+27 | typing.TypedDict()
+28 | 
+29 | typing.TypedDict.anything()
+   | ^^^^^^^^^^^^^^^^ TID251
+30 | 
+31 | # import aliases are resolved
+   |
+
+TID251.py:33:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+   |
+31 | # import aliases are resolved
+32 | import typing as totally_not_typing
+33 | totally_not_typing.TypedDict
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID251
+34 | 
+35 | # relative imports are respected
+   |
+
+

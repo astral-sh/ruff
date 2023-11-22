@@ -1,9 +1,9 @@
-use crate::node::{AnyNodeRef, AstNode};
 use crate::{
-    Alias, Arguments, BoolOp, CmpOp, Comprehension, Constant, Decorator, ElifElseClause,
-    ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault,
-    Parameters, Pattern, Stmt, TypeParam, TypeParams, UnaryOp, WithItem,
+    Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr,
+    Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault, Parameters, Pattern,
+    PatternArguments, PatternKeyword, Singleton, Stmt, TypeParam, TypeParams, UnaryOp, WithItem,
 };
+use crate::{AnyNodeRef, AstNode};
 
 /// Visitor that traverses all nodes recursively in pre-order.
 pub trait PreorderVisitor<'a> {
@@ -41,7 +41,7 @@ pub trait PreorderVisitor<'a> {
     }
 
     #[inline]
-    fn visit_constant(&mut self, _constant: &'a Constant) {}
+    fn visit_singleton(&mut self, _singleton: &'a Singleton) {}
 
     #[inline]
     fn visit_bool_op(&mut self, bool_op: &'a BoolOp) {
@@ -130,6 +130,17 @@ pub trait PreorderVisitor<'a> {
     #[inline]
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         walk_pattern(self, pattern);
+    }
+
+    #[inline]
+    fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments) {
+        walk_pattern_arguments(self, pattern_arguments);
+    }
+
+    #[inline]
+
+    fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword) {
+        walk_pattern_keyword(self, pattern_keyword);
     }
 
     #[inline]
@@ -265,7 +276,12 @@ where
             Expr::Call(expr) => expr.visit_preorder(visitor),
             Expr::FormattedValue(expr) => expr.visit_preorder(visitor),
             Expr::FString(expr) => expr.visit_preorder(visitor),
-            Expr::Constant(expr) => expr.visit_preorder(visitor),
+            Expr::StringLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::BytesLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::NumberLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::BooleanLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::NoneLiteral(expr) => expr.visit_preorder(visitor),
+            Expr::EllipsisLiteral(expr) => expr.visit_preorder(visitor),
             Expr::Attribute(expr) => expr.visit_preorder(visitor),
             Expr::Subscript(expr) => expr.visit_preorder(visitor),
             Expr::Starred(expr) => expr.visit_preorder(visitor),
@@ -456,6 +472,33 @@ where
             Pattern::MatchAs(pattern) => pattern.visit_preorder(visitor),
             Pattern::MatchOr(pattern) => pattern.visit_preorder(visitor),
         }
+    }
+    visitor.leave_node(node);
+}
+
+pub fn walk_pattern_arguments<'a, V>(visitor: &mut V, pattern_arguments: &'a PatternArguments)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(pattern_arguments);
+    if visitor.enter_node(node).is_traverse() {
+        for pattern in &pattern_arguments.patterns {
+            visitor.visit_pattern(pattern);
+        }
+        for keyword in &pattern_arguments.keywords {
+            visitor.visit_pattern_keyword(keyword);
+        }
+    }
+    visitor.leave_node(node);
+}
+
+pub fn walk_pattern_keyword<'a, V>(visitor: &mut V, pattern_keyword: &'a PatternKeyword)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(pattern_keyword);
+    if visitor.enter_node(node).is_traverse() {
+        visitor.visit_pattern(&pattern_keyword.pattern);
     }
     visitor.leave_node(node);
 }

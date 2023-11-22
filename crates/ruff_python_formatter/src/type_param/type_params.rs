@@ -1,12 +1,12 @@
+use ruff_formatter::FormatResult;
+use ruff_python_ast::AstNode;
+use ruff_python_ast::TypeParams;
+use ruff_text_size::Ranged;
+
 use crate::builders::PyFormatterExtensions;
-use crate::comments::{trailing_comments, SourceComment};
+use crate::comments::SourceComment;
 use crate::expression::parentheses::parenthesized;
 use crate::prelude::*;
-use ruff_formatter::write;
-use ruff_formatter::FormatResult;
-use ruff_python_ast::node::AstNode;
-
-use ruff_python_ast::{Ranged, TypeParams};
 
 #[derive(Default)]
 pub struct FormatTypeParams;
@@ -22,8 +22,7 @@ impl FormatNodeRule<TypeParams> for FormatTypeParams {
         //     c,
         // ] = ...
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
-        write!(f, [trailing_comments(dangling_comments)])?;
+        let dangling_comments = comments.dangling(item.as_any_node_ref());
 
         let items = format_with(|f| {
             f.join_comma_separated(item.end())
@@ -31,7 +30,9 @@ impl FormatNodeRule<TypeParams> for FormatTypeParams {
                 .finish()
         });
 
-        parenthesized("[", &items, "]").fmt(f)
+        parenthesized("[", &items, "]")
+            .with_dangling_comments(dangling_comments)
+            .fmt(f)
     }
 
     fn fmt_dangling_comments(

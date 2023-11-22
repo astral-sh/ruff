@@ -1,11 +1,13 @@
 [
   {
-    "indent_style": { "Space": 4 }
+    "indent_style": "space",
+    "indent_width": 4
   },
   {
-    "indent_style": { "Space": 1 }
+    "indent_style": "space",
+    "indent_width": 1
   },
   {
-    "indent_style": "Tab"
+    "indent_style": "tab"
   }
 ]

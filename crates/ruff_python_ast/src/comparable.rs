@@ -1,25 +1,21 @@
 //! An equivalent object hierarchy to the `RustPython` AST hierarchy, but with the
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
+//!
+//! Two [`ComparableExpr`]s are considered equal if the underlying AST nodes have the
+//! same shape, ignoring trivia (e.g., parentheses, comments, and whitespace), the
+//! location in the source code, and other contextual information (e.g., whether they
+//! represent reads or writes, which is typically encoded in the Python AST).
+//!
+//! For example, in `[(a, b) for a, b in c]`, the `(a, b)` and `a, b` expressions are
+//! considered equal, despite the former being parenthesized, and despite the former
+//! being a write ([`ast::ExprContext::Store`]) and the latter being a read
+//! ([`ast::ExprContext::Load`]).
+//!
+//! Similarly, `"a" "b"` and `"ab"` would be considered equal, despite the former being
+//! an implicit concatenation of string literals, as these expressions are considered to
+//! have the same shape in that they evaluate to the same value.
 
 use crate as ast;
-use num_bigint::BigInt;
-
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
-pub enum ComparableExprContext {
-    Load,
-    Store,
-    Del,
-}
-
-impl From<&ast::ExprContext> for ComparableExprContext {
-    fn from(ctx: &ast::ExprContext) -> Self {
-        match ctx {
-            ast::ExprContext::Load => Self::Load,
-            ast::ExprContext::Store => Self::Store,
-            ast::ExprContext::Del => Self::Del,
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableBoolOp {
@@ -154,13 +150,43 @@ impl<'a> From<&'a ast::WithItem> for ComparableWithItem<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparablePatternArguments<'a> {
+    patterns: Vec<ComparablePattern<'a>>,
+    keywords: Vec<ComparablePatternKeyword<'a>>,
+}
+
+impl<'a> From<&'a ast::PatternArguments> for ComparablePatternArguments<'a> {
+    fn from(parameters: &'a ast::PatternArguments) -> Self {
+        Self {
+            patterns: parameters.patterns.iter().map(Into::into).collect(),
+            keywords: parameters.keywords.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparablePatternKeyword<'a> {
+    attr: &'a str,
+    pattern: ComparablePattern<'a>,
+}
+
+impl<'a> From<&'a ast::PatternKeyword> for ComparablePatternKeyword<'a> {
+    fn from(keyword: &'a ast::PatternKeyword) -> Self {
+        Self {
+            attr: keyword.attr.as_str(),
+            pattern: (&keyword.pattern).into(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct PatternMatchValue<'a> {
     value: ComparableExpr<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PatternMatchSingleton<'a> {
-    value: ComparableConstant<'a>,
+pub struct PatternMatchSingleton {
+    value: ComparableSingleton,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -178,9 +204,7 @@ pub struct PatternMatchMapping<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct PatternMatchClass<'a> {
     cls: ComparableExpr<'a>,
-    patterns: Vec<ComparablePattern<'a>>,
-    kwd_attrs: Vec<&'a str>,
-    kwd_patterns: Vec<ComparablePattern<'a>>,
+    arguments: ComparablePatternArguments<'a>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -203,7 +227,7 @@ pub struct PatternMatchOr<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparablePattern<'a> {
     MatchValue(PatternMatchValue<'a>),
-    MatchSingleton(PatternMatchSingleton<'a>),
+    MatchSingleton(PatternMatchSingleton),
     MatchSequence(PatternMatchSequence<'a>),
     MatchMapping(PatternMatchMapping<'a>),
     MatchClass(PatternMatchClass<'a>),
@@ -240,18 +264,12 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
                 patterns: patterns.iter().map(Into::into).collect(),
                 rest: rest.as_deref(),
             }),
-            ast::Pattern::MatchClass(ast::PatternMatchClass {
-                cls,
-                patterns,
-                kwd_attrs,
-                kwd_patterns,
-                ..
-            }) => Self::MatchClass(PatternMatchClass {
-                cls: cls.into(),
-                patterns: patterns.iter().map(Into::into).collect(),
-                kwd_attrs: kwd_attrs.iter().map(ast::Identifier::as_str).collect(),
-                kwd_patterns: kwd_patterns.iter().map(Into::into).collect(),
-            }),
+            ast::Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
+                Self::MatchClass(PatternMatchClass {
+                    cls: cls.into(),
+                    arguments: arguments.into(),
+                })
+            }
             ast::Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
                 Self::MatchStar(PatternMatchStar {
                     name: name.as_deref(),
@@ -309,47 +327,43 @@ impl<'a> From<&'a ast::Decorator> for ComparableDecorator<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub enum ComparableConstant<'a> {
+pub enum ComparableSingleton {
     None,
-    Bool(&'a bool),
-    Str(&'a str),
-    Bytes(&'a [u8]),
-    Int(&'a BigInt),
-    Tuple(Vec<ComparableConstant<'a>>),
-    Float(u64),
-    Complex { real: u64, imag: u64 },
-    Ellipsis,
+    True,
+    False,
 }
 
-impl<'a> From<&'a ast::Constant> for ComparableConstant<'a> {
-    fn from(constant: &'a ast::Constant) -> Self {
-        match constant {
-            ast::Constant::None => Self::None,
-            ast::Constant::Bool(value) => Self::Bool(value),
-            ast::Constant::Str(ast::StringConstant {
-                value,
-                // Compare strings based on resolved value, not representation (i.e., ignore whether
-                // the string was implicitly concatenated).
-                implicit_concatenated: _,
-            }) => Self::Str(value),
-            ast::Constant::Bytes(ast::BytesConstant {
-                value,
-                // Compare bytes based on resolved value, not representation (i.e., ignore whether
-                // the bytes were implicitly concatenated).
-                implicit_concatenated: _,
-            }) => Self::Bytes(value),
-            ast::Constant::Int(value) => Self::Int(value),
-            ast::Constant::Float(value) => Self::Float(value.to_bits()),
-            ast::Constant::Complex { real, imag } => Self::Complex {
-                real: real.to_bits(),
-                imag: imag.to_bits(),
-            },
-            ast::Constant::Ellipsis => Self::Ellipsis,
+impl From<&ast::Singleton> for ComparableSingleton {
+    fn from(singleton: &ast::Singleton) -> Self {
+        match singleton {
+            ast::Singleton::None => Self::None,
+            ast::Singleton::True => Self::True,
+            ast::Singleton::False => Self::False,
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ComparableNumber<'a> {
+    Int(&'a ast::Int),
+    Float(u64),
+    Complex { real: u64, imag: u64 },
+}
+
+impl<'a> From<&'a ast::Number> for ComparableNumber<'a> {
+    fn from(number: &'a ast::Number) -> Self {
+        match number {
+            ast::Number::Int(value) => Self::Int(value),
+            ast::Number::Float(value) => Self::Float(value.to_bits()),
+            ast::Number::Complex { real, imag } => Self::Complex {
+                real: real.to_bits(),
+                imag: imag.to_bits(),
+            },
+        }
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Eq, Hash)]
 pub struct ComparableArguments<'a> {
     args: Vec<ComparableExpr<'a>>,
     keywords: Vec<ComparableKeyword<'a>>,
@@ -542,7 +556,7 @@ pub struct ExprUnaryOp<'a> {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprLambda<'a> {
-    parameters: ComparableParameters<'a>,
+    parameters: Option<ComparableParameters<'a>>,
     body: Box<ComparableExpr<'a>>,
 }
 
@@ -631,47 +645,86 @@ pub struct ExprFString<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ExprConstant<'a> {
-    value: ComparableConstant<'a>,
-    kind: Option<&'a str>,
+pub enum ComparableLiteral<'a> {
+    None,
+    Ellipsis,
+    Bool(&'a bool),
+    Str(&'a str),
+    Bytes(&'a [u8]),
+    Number(ComparableNumber<'a>),
+}
+
+impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
+    fn from(literal: ast::LiteralExpressionRef<'a>) -> Self {
+        match literal {
+            ast::LiteralExpressionRef::NoneLiteral(_) => Self::None,
+            ast::LiteralExpressionRef::EllipsisLiteral(_) => Self::Ellipsis,
+            ast::LiteralExpressionRef::BooleanLiteral(ast::ExprBooleanLiteral {
+                value, ..
+            }) => Self::Bool(value),
+            ast::LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                Self::Str(value)
+            }
+            ast::LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+                Self::Bytes(value)
+            }
+            ast::LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+                Self::Number(value.into())
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprStringLiteral<'a> {
+    value: &'a str,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprBytesLiteral<'a> {
+    value: &'a [u8],
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprNumberLiteral<'a> {
+    value: ComparableNumber<'a>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ExprBoolLiteral<'a> {
+    value: &'a bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprAttribute<'a> {
     value: Box<ComparableExpr<'a>>,
     attr: &'a str,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprSubscript<'a> {
     value: Box<ComparableExpr<'a>>,
     slice: Box<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprStarred<'a> {
     value: Box<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprName<'a> {
     id: &'a str,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprList<'a> {
     elts: Vec<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ExprTuple<'a> {
     elts: Vec<ComparableExpr<'a>>,
-    ctx: ComparableExprContext,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -708,7 +761,12 @@ pub enum ComparableExpr<'a> {
     Call(ExprCall<'a>),
     FormattedValue(ExprFormattedValue<'a>),
     FString(ExprFString<'a>),
-    Constant(ExprConstant<'a>),
+    StringLiteral(ExprStringLiteral<'a>),
+    BytesLiteral(ExprBytesLiteral<'a>),
+    NumberLiteral(ExprNumberLiteral<'a>),
+    BoolLiteral(ExprBoolLiteral<'a>),
+    NoneLiteral,
+    EllispsisLiteral,
     Attribute(ExprAttribute<'a>),
     Subscript(ExprSubscript<'a>),
     Starred(ExprStarred<'a>),
@@ -773,7 +831,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 body,
                 range: _,
             }) => Self::Lambda(ExprLambda {
-                parameters: (parameters.as_ref()).into(),
+                parameters: parameters.as_ref().map(Into::into),
                 body: body.into(),
             }),
             ast::Expr::IfExp(ast::ExprIfExp {
@@ -882,61 +940,70 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }) => Self::FString(ExprFString {
                 values: values.iter().map(Into::into).collect(),
             }),
-            ast::Expr::Constant(ast::ExprConstant {
+            ast::Expr::StringLiteral(ast::ExprStringLiteral {
                 value,
-                kind,
+                // Compare strings based on resolved value, not representation (i.e., ignore whether
+                // the string was implicitly concatenated).
+                implicit_concatenated: _,
+                unicode: _,
                 range: _,
-            }) => Self::Constant(ExprConstant {
-                value: value.into(),
-                kind: kind.as_ref().map(String::as_str),
-            }),
+            }) => Self::StringLiteral(ExprStringLiteral { value }),
+            ast::Expr::BytesLiteral(ast::ExprBytesLiteral {
+                value,
+                // Compare bytes based on resolved value, not representation (i.e., ignore whether
+                // the bytes was implicitly concatenated).
+                implicit_concatenated: _,
+                range: _,
+            }) => Self::BytesLiteral(ExprBytesLiteral { value }),
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, range: _ }) => {
+                Self::NumberLiteral(ExprNumberLiteral {
+                    value: value.into(),
+                })
+            }
+            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, range: _ }) => {
+                Self::BoolLiteral(ExprBoolLiteral { value })
+            }
+            ast::Expr::NoneLiteral(_) => Self::NoneLiteral,
+            ast::Expr::EllipsisLiteral(_) => Self::EllispsisLiteral,
             ast::Expr::Attribute(ast::ExprAttribute {
                 value,
                 attr,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::Attribute(ExprAttribute {
                 value: value.into(),
                 attr: attr.as_str(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Subscript(ast::ExprSubscript {
                 value,
                 slice,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::Subscript(ExprSubscript {
                 value: value.into(),
                 slice: slice.into(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Starred(ast::ExprStarred {
                 value,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::Starred(ExprStarred {
                 value: value.into(),
-                ctx: ctx.into(),
             }),
-            ast::Expr::Name(ast::ExprName { id, ctx, range: _ }) => Self::Name(ExprName {
-                id: id.as_str(),
-                ctx: ctx.into(),
-            }),
+            ast::Expr::Name(name) => name.into(),
             ast::Expr::List(ast::ExprList {
                 elts,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::List(ExprList {
                 elts: elts.iter().map(Into::into).collect(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Tuple(ast::ExprTuple {
                 elts,
-                ctx,
+                ctx: _,
                 range: _,
             }) => Self::Tuple(ExprTuple {
                 elts: elts.iter().map(Into::into).collect(),
-                ctx: ctx.into(),
             }),
             ast::Expr::Slice(ast::ExprSlice {
                 lower,
@@ -960,6 +1027,14 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
     }
 }
 
+impl<'a> From<&'a ast::ExprName> for ComparableExpr<'a> {
+    fn from(expr: &'a ast::ExprName) -> Self {
+        Self::Name(ExprName {
+            id: expr.id.as_str(),
+        })
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StmtFunctionDef<'a> {
     is_async: bool,
@@ -976,7 +1051,7 @@ pub struct StmtClassDef<'a> {
     decorator_list: Vec<ComparableDecorator<'a>>,
     name: &'a str,
     type_params: Option<ComparableTypeParams<'a>>,
-    arguments: Option<ComparableArguments<'a>>,
+    arguments: ComparableArguments<'a>,
     body: Vec<ComparableStmt<'a>>,
 }
 
@@ -1151,7 +1226,7 @@ pub struct StmtImport<'a> {
 pub struct StmtImportFrom<'a> {
     module: Option<&'a str>,
     names: Vec<ComparableAlias<'a>>,
-    level: Option<ast::Int>,
+    level: Option<u32>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1234,7 +1309,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 range: _,
             }) => Self::ClassDef(StmtClassDef {
                 name: name.as_str(),
-                arguments: arguments.as_ref().map(Into::into),
+                arguments: arguments.as_ref().map(Into::into).unwrap_or_default(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 type_params: type_params.as_ref().map(Into::into),
@@ -1402,6 +1477,47 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::Pass(_) => Self::Pass,
             ast::Stmt::Break(_) => Self::Break,
             ast::Stmt::Continue(_) => Self::Continue,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ComparableMod<'a> {
+    Module(ComparableModModule<'a>),
+    Expression(ComparableModExpression<'a>),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableModModule<'a> {
+    body: Vec<ComparableStmt<'a>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableModExpression<'a> {
+    body: Box<ComparableExpr<'a>>,
+}
+
+impl<'a> From<&'a ast::Mod> for ComparableMod<'a> {
+    fn from(mod_: &'a ast::Mod) -> Self {
+        match mod_ {
+            ast::Mod::Module(module) => Self::Module(module.into()),
+            ast::Mod::Expression(expr) => Self::Expression(expr.into()),
+        }
+    }
+}
+
+impl<'a> From<&'a ast::ModModule> for ComparableModModule<'a> {
+    fn from(module: &'a ast::ModModule) -> Self {
+        Self {
+            body: module.body.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
+    fn from(expr: &'a ast::ModExpression) -> Self {
+        Self {
+            body: (&expr.body).into(),
         }
     }
 }

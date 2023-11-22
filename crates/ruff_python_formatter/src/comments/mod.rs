@@ -87,28 +87,27 @@
 //!
 //! It is possible to add an additional optional label to [`SourceComment`] If ever the need arises to distinguish two *dangling comments* in the formatting logic,
 
-use ruff_text_size::TextRange;
 use std::cell::Cell;
 use std::fmt::Debug;
 use std::rc::Rc;
 
-use ruff_python_ast::{Mod, Ranged};
-
 pub(crate) use format::{
     dangling_comments, dangling_node_comments, dangling_open_parenthesis_comments,
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
-    trailing_node_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
-use ruff_python_index::CommentRanges;
-use ruff_python_trivia::PythonWhitespace;
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::Mod;
+use ruff_python_trivia::{CommentRanges, PythonWhitespace};
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
 use crate::comments::node_key::NodeRefEqualityKey;
-use crate::comments::visitor::CommentsVisitor;
+use crate::comments::visitor::{CommentsMapBuilder, CommentsVisitor};
+pub(crate) use visitor::collect_comments;
 
 mod debug;
 pub(crate) mod format;
@@ -281,7 +280,7 @@ type CommentsMap<'a> = MultiMap<NodeRefEqualityKey<'a>, SourceComment>;
 /// The comments of a syntax tree stored by node.
 ///
 /// Cloning `comments` is cheap as it only involves bumping a reference counter.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct Comments<'a> {
     /// The implementation uses an [Rc] so that [Comments] has a lifetime independent from the [crate::Formatter].
     /// Independent lifetimes are necessary to support the use case where a (formattable object)[crate::Format]
@@ -309,10 +308,28 @@ pub(crate) struct Comments<'a> {
 }
 
 impl<'a> Comments<'a> {
-    fn new(comments: CommentsMap<'a>) -> Self {
+    fn new(comments: CommentsMap<'a>, comment_ranges: &'a CommentRanges) -> Self {
         Self {
-            data: Rc::new(CommentsData { comments }),
+            data: Rc::new(CommentsData {
+                comments,
+                comment_ranges,
+            }),
         }
+    }
+
+    /// Effectively a [`Default`] implementation that works around the lifetimes for tests
+    #[cfg(test)]
+    pub(crate) fn from_ranges(comment_ranges: &'a CommentRanges) -> Self {
+        Self {
+            data: Rc::new(CommentsData {
+                comments: CommentsMap::default(),
+                comment_ranges,
+            }),
+        }
+    }
+
+    pub(crate) fn ranges(&self) -> &'a CommentRanges {
+        self.data.comment_ranges
     }
 
     /// Extracts the comments from the AST.
@@ -324,24 +341,38 @@ impl<'a> Comments<'a> {
         let map = if comment_ranges.is_empty() {
             CommentsMap::new()
         } else {
-            CommentsVisitor::new(source_code, comment_ranges).visit(root)
+            let mut builder =
+                CommentsMapBuilder::new(Locator::new(source_code.as_str()), comment_ranges);
+            CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
+            builder.finish()
         };
 
-        Self::new(map)
+        Self::new(map, comment_ranges)
+    }
+
+    /// Returns `true` if the given `node` has any comments.
+    #[inline]
+    pub(crate) fn has<T>(&self, node: T) -> bool
+    where
+        T: Into<AnyNodeRef<'a>>,
+    {
+        self.data
+            .comments
+            .has(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
     /// Returns `true` if the given `node` has any [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn has_leading_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_leading<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        !self.leading_comments(node).is_empty()
+        !self.leading(node).is_empty()
     }
 
     /// Returns the `node`'s [leading comments](self#leading-comments).
     #[inline]
-    pub(crate) fn leading_comments<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn leading<T>(&self, node: T) -> &[SourceComment]
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -351,15 +382,15 @@ impl<'a> Comments<'a> {
     }
 
     /// Returns `true` if node has any [dangling comments](self#dangling-comments).
-    pub(crate) fn has_dangling_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_dangling<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        !self.dangling_comments(node).is_empty()
+        !self.dangling(node).is_empty()
     }
 
     /// Returns the [dangling comments](self#dangling-comments) of `node`
-    pub(crate) fn dangling_comments<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn dangling<T>(&self, node: T) -> &[SourceComment]
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -370,7 +401,7 @@ impl<'a> Comments<'a> {
 
     /// Returns the `node`'s [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn trailing_comments<T>(&self, node: T) -> &[SourceComment]
+    pub(crate) fn trailing<T>(&self, node: T) -> &[SourceComment]
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -381,43 +412,35 @@ impl<'a> Comments<'a> {
 
     /// Returns `true` if the given `node` has any [trailing comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_trailing<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        !self.trailing_comments(node).is_empty()
+        !self.trailing(node).is_empty()
     }
 
     /// Returns `true` if the given `node` has any [trailing own line comments](self#trailing-comments).
     #[inline]
-    pub(crate) fn has_trailing_own_line_comments<T>(&self, node: T) -> bool
+    pub(crate) fn has_trailing_own_line<T>(&self, node: T) -> bool
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        self.trailing_comments(node)
+        self.trailing(node)
             .iter()
             .any(|comment| comment.line_position().is_own_line())
     }
 
     /// Returns an iterator over the [leading](self#leading-comments) and [trailing comments](self#trailing-comments) of `node`.
-    pub(crate) fn leading_trailing_comments<T>(
-        &self,
-        node: T,
-    ) -> impl Iterator<Item = &SourceComment>
+    pub(crate) fn leading_trailing<T>(&self, node: T) -> impl Iterator<Item = &SourceComment>
     where
         T: Into<AnyNodeRef<'a>>,
     {
-        let node = node.into();
-        self.leading_comments(node)
-            .iter()
-            .chain(self.trailing_comments(node).iter())
+        let comments = self.leading_dangling_trailing(node);
+        comments.leading.iter().chain(comments.trailing)
     }
 
     /// Returns an iterator over the [leading](self#leading-comments), [dangling](self#dangling-comments), and [trailing](self#trailing) comments of `node`.
-    pub(crate) fn leading_dangling_trailing_comments<T>(
-        &self,
-        node: T,
-    ) -> LeadingDanglingTrailingComments
+    pub(crate) fn leading_dangling_trailing<T>(&self, node: T) -> LeadingDanglingTrailingComments
     where
         T: Into<AnyNodeRef<'a>>,
     {
@@ -426,30 +449,12 @@ impl<'a> Comments<'a> {
             .leading_dangling_trailing(&NodeRefEqualityKey::from_ref(node.into()))
     }
 
-    /// Returns any comments on the open parenthesis of a `node`.
-    ///
-    /// For example, `# comment` in:
-    /// ```python
-    /// (  # comment
-    ///    foo.bar
-    /// )
-    /// ```
-    #[inline]
-    pub(crate) fn open_parenthesis_comment<T>(&self, node: T) -> Option<&SourceComment>
-    where
-        T: Into<AnyNodeRef<'a>>,
-    {
-        self.leading_comments(node)
-            .first()
-            .filter(|comment| comment.line_position.is_end_of_line())
-    }
-
     #[inline(always)]
     #[cfg(not(debug_assertions))]
-    pub(crate) fn assert_formatted_all_comments(&self, _source_code: SourceCode) {}
+    pub(crate) fn assert_all_formatted(&self, _source_code: SourceCode) {}
 
     #[cfg(debug_assertions)]
-    pub(crate) fn assert_formatted_all_comments(&self, source_code: SourceCode) {
+    pub(crate) fn assert_all_formatted(&self, source_code: SourceCode) {
         use std::fmt::Write;
 
         let mut output = String::new();
@@ -481,7 +486,7 @@ impl<'a> Comments<'a> {
     /// normally if `node` is the first or last node of a suppression range.
     #[cfg(debug_assertions)]
     pub(crate) fn mark_verbatim_node_comments_formatted(&self, node: AnyNodeRef) {
-        for dangling in self.dangling_comments(node) {
+        for dangling in self.dangling(node) {
             dangling.mark_formatted();
         }
 
@@ -496,16 +501,41 @@ impl<'a> Comments<'a> {
 
 pub(crate) type LeadingDanglingTrailingComments<'a> = LeadingDanglingTrailing<'a, SourceComment>;
 
-#[derive(Debug, Default)]
+impl LeadingDanglingTrailingComments<'_> {
+    /// Returns `true` if the struct has any [leading comments](self#leading-comments).
+    #[inline]
+    pub(crate) fn has_leading(&self) -> bool {
+        !self.leading.is_empty()
+    }
+
+    /// Returns `true` if the struct has any [trailing comments](self#trailing-comments).
+    #[inline]
+    pub(crate) fn has_trailing(&self) -> bool {
+        !self.trailing.is_empty()
+    }
+
+    /// Returns `true` if the struct has any [trailing own line comments](self#trailing-comments).
+    #[inline]
+    pub(crate) fn has_trailing_own_line(&self) -> bool {
+        self.trailing
+            .iter()
+            .any(|comment| comment.line_position().is_own_line())
+    }
+}
+
+#[derive(Debug)]
 struct CommentsData<'a> {
     comments: CommentsMap<'a>,
+
+    /// We need those for backwards lexing
+    comment_ranges: &'a CommentRanges,
 }
 
 struct MarkVerbatimCommentsAsFormattedVisitor<'a>(&'a Comments<'a>);
 
 impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
-        for comment in self.0.leading_dangling_trailing_comments(node) {
+        for comment in self.0.leading_dangling_trailing(node) {
             comment.mark_formatted();
         }
 
@@ -516,12 +546,13 @@ impl<'a> PreorderVisitor<'a> for MarkVerbatimCommentsAsFormattedVisitor<'a> {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use ruff_python_ast::Mod;
-    use ruff_python_parser::lexer::lex;
-    use ruff_python_parser::{parse_tokens, Mode};
 
     use ruff_formatter::SourceCode;
-    use ruff_python_index::{CommentRanges, CommentRangesBuilder};
+    use ruff_python_ast::{Mod, PySourceType};
+    use ruff_python_index::tokens_and_ranges;
+
+    use ruff_python_parser::{parse_ok_tokens, AsMode};
+    use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
 
@@ -532,19 +563,12 @@ mod tests {
     }
 
     impl<'a> CommentsTestCase<'a> {
-        fn from_code(code: &'a str) -> Self {
-            let source_code = SourceCode::new(code);
-            let tokens: Vec<_> = lex(code, Mode::Module).collect();
-
-            let mut comment_ranges = CommentRangesBuilder::default();
-
-            for (token, range) in tokens.iter().flatten() {
-                comment_ranges.visit_token(token, *range);
-            }
-
-            let comment_ranges = comment_ranges.finish();
-
-            let parsed = parse_tokens(tokens, Mode::Module, "test.py")
+        fn from_code(source: &'a str) -> Self {
+            let source_code = SourceCode::new(source);
+            let source_type = PySourceType::Python;
+            let (tokens, comment_ranges) =
+                tokens_and_ranges(source, source_type).expect("Expect source to be valid Python");
+            let parsed = parse_ok_tokens(tokens, source, source_type.as_mode(), "test.py")
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {
@@ -586,11 +610,11 @@ test(10, 20)
 
     #[test]
     fn only_comments() {
-        let source = r#"
+        let source = r"
 # Some comment
 
 # another comment
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -600,7 +624,7 @@ test(10, 20)
 
     #[test]
     fn empty_file() {
-        let source = r#""#;
+        let source = r"";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -610,12 +634,12 @@ test(10, 20)
 
     #[test]
     fn dangling_comment() {
-        let source = r#"
+        let source = r"
 def test(
         # Some comment
     ):
     pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -625,12 +649,12 @@ def test(
 
     #[test]
     fn parenthesized_expression() {
-        let source = r#"
+        let source = r"
 a = ( # Trailing comment
     10 + # More comments
      3
     )
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -640,11 +664,11 @@ a = ( # Trailing comment
 
     #[test]
     fn parenthesized_trailing_comment() {
-        let source = r#"(
+        let source = r"(
     a
     # comment
 )
-"#;
+";
 
         let test_case = CommentsTestCase::from_code(source);
         let comments = test_case.to_comments();
@@ -704,7 +728,7 @@ print("test")
 
     #[test]
     fn if_elif_else_comments() {
-        let source = r#"
+        let source = r"
 if x == y:
     pass # trailing `pass` comment
     # Root `if` trailing comment
@@ -717,7 +741,7 @@ elif x < y:
 else:
     pass
     # `else` trailing comment
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -727,7 +751,7 @@ else:
 
     #[test]
     fn if_elif_if_else_comments() {
-        let source = r#"
+        let source = r"
 if x == y:
     pass
 elif x < y:
@@ -737,7 +761,7 @@ elif x < y:
 # Leading else comment
 else:
     pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -831,10 +855,10 @@ print("Next statement");
 
     #[test]
     fn leading_most_outer() {
-        let source = r#"
+        let source = r"
 # leading comment
 x
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -845,10 +869,10 @@ x
     // Comment should be attached to the statement
     #[test]
     fn trailing_most_outer() {
-        let source = r#"
+        let source = r"
 x # trailing comment
 y # trailing last node
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -858,11 +882,11 @@ y # trailing last node
 
     #[test]
     fn trailing_most_outer_nested() {
-        let source = r#"
+        let source = r"
 x + (
     3 # trailing comment
 ) # outer
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -872,12 +896,12 @@ x + (
 
     #[test]
     fn trailing_after_comma() {
-        let source = r#"
+        let source = r"
 def test(
     a, # Trailing comment for argument `a`
     b,
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -887,7 +911,7 @@ def test(
 
     #[test]
     fn positional_argument_only_comment() {
-        let source = r#"
+        let source = r"
 def test(
     a, # trailing positional comment
     # Positional arguments only after here
@@ -895,7 +919,7 @@ def test(
     # leading b comment
     b,
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -905,7 +929,7 @@ def test(
 
     #[test]
     fn positional_argument_only_leading_comma_comment() {
-        let source = r#"
+        let source = r"
 def test(
     a # trailing positional comment
     # Positional arguments only after here
@@ -913,7 +937,7 @@ def test(
     # leading b comment
     b,
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -923,14 +947,14 @@ def test(
 
     #[test]
     fn positional_argument_only_comment_without_following_node() {
-        let source = r#"
+        let source = r"
 def test(
     a, # trailing positional comment
     # Positional arguments only after here
     /, # trailing positional argument comment.
     # Trailing on new line
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -940,7 +964,7 @@ def test(
 
     #[test]
     fn non_positional_arguments_with_defaults() {
-        let source = r#"
+        let source = r"
 def test(
     a=10 # trailing positional comment
     # Positional arguments only after here
@@ -948,7 +972,7 @@ def test(
     # leading comment for b
     b=20
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -958,12 +982,12 @@ def test(
 
     #[test]
     fn non_positional_arguments_slash_on_same_line() {
-        let source = r#"
+        let source = r"
 def test(a=10,/, # trailing positional argument comment.
     # leading comment for b
     b=20
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -973,7 +997,7 @@ def test(a=10,/, # trailing positional argument comment.
 
     #[test]
     fn binary_expression_left_operand_comment() {
-        let source = r#"
+        let source = r"
 a = (
     5
     # trailing left comment
@@ -981,7 +1005,7 @@ a = (
     # leading right comment
     3
 )
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -991,14 +1015,14 @@ a = (
 
     #[test]
     fn binary_expression_left_operand_trailing_end_of_line_comment() {
-        let source = r#"
+        let source = r"
 a = (
     5 # trailing left comment
     + # trailing operator comment
     # leading right comment
     3
 )
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -1008,7 +1032,7 @@ a = (
 
     #[test]
     fn nested_binary_expression() {
-        let source = r#"
+        let source = r"
 a = (
     (5 # trailing left comment
         *
@@ -1017,7 +1041,7 @@ a = (
     # leading right comment
     3
 )
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -1027,10 +1051,10 @@ a = (
 
     #[test]
     fn while_trailing_end_of_line_comment() {
-        let source = r#"while True:
+        let source = r"while True:
     if something.changed:
         do.stuff()  # trailing comment
-"#;
+";
 
         let test_case = CommentsTestCase::from_code(source);
 
@@ -1041,11 +1065,11 @@ a = (
 
     #[test]
     fn while_trailing_else_end_of_line_comment() {
-        let source = r#"while True:
+        let source = r"while True:
     pass
 else: # trailing comment
     pass
-"#;
+";
 
         let test_case = CommentsTestCase::from_code(source);
 

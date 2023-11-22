@@ -2,22 +2,22 @@ use std::fmt::{Debug, Write};
 
 use insta::assert_snapshot;
 
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{
     walk_alias, walk_comprehension, walk_except_handler, walk_expr, walk_keyword, walk_match_case,
     walk_module, walk_parameter, walk_parameters, walk_pattern, walk_stmt, walk_type_param,
     walk_with_item, PreorderVisitor,
 };
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
-    Alias, BoolOp, CmpOp, Comprehension, Constant, ExceptHandler, Expr, Keyword, MatchCase, Mod,
-    Operator, Parameter, Parameters, Pattern, Stmt, TypeParam, UnaryOp, WithItem,
+    Alias, BoolOp, CmpOp, Comprehension, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator,
+    Parameter, Parameters, Pattern, Singleton, Stmt, TypeParam, UnaryOp, WithItem,
 };
 use ruff_python_parser::lexer::lex;
 use ruff_python_parser::{parse_tokens, Mode};
 
 #[test]
 fn function_arguments() {
-    let source = r#"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass"#;
+    let source = r"def a(b, c,/, d, e = 20, *args, named=5, other=20, **kwargs): pass";
 
     let trace = trace_preorder_visitation(source);
 
@@ -26,7 +26,7 @@ fn function_arguments() {
 
 #[test]
 fn function_positional_only_with_default() {
-    let source = r#"def a(b, c = 34,/, e = 20, *args): pass"#;
+    let source = r"def a(b, c = 34,/, e = 20, *args): pass";
 
     let trace = trace_preorder_visitation(source);
 
@@ -35,7 +35,7 @@ fn function_positional_only_with_default() {
 
 #[test]
 fn compare() {
-    let source = r#"4 < x < 5"#;
+    let source = r"4 < x < 5";
 
     let trace = trace_preorder_visitation(source);
 
@@ -71,13 +71,13 @@ fn set_comprehension() {
 
 #[test]
 fn match_class_pattern() {
-    let source = r#"
+    let source = r"
 match x:
     case Point2D(0, 0):
         ...
     case Point3D(x=0, y=0, z=0):
         ...
-"#;
+";
 
     let trace = trace_preorder_visitation(source);
 
@@ -86,7 +86,7 @@ match x:
 
 #[test]
 fn decorators() {
-    let source = r#"
+    let source = r"
 @decorator
 def a():
     pass
@@ -94,7 +94,7 @@ def a():
 @test
 class A:
     pass
-"#;
+";
 
     let trace = trace_preorder_visitation(source);
 
@@ -103,7 +103,7 @@ class A:
 
 #[test]
 fn type_aliases() {
-    let source = r#"type X[T: str, U, *Ts, **P] = list[T]"#;
+    let source = r"type X[T: str, U, *Ts, **P] = list[T]";
 
     let trace = trace_preorder_visitation(source);
 
@@ -112,7 +112,7 @@ fn type_aliases() {
 
 #[test]
 fn class_type_parameters() {
-    let source = r#"class X[T: str, U, *Ts, **P]: ..."#;
+    let source = r"class X[T: str, U, *Ts, **P]: ...";
 
     let trace = trace_preorder_visitation(source);
 
@@ -121,7 +121,7 @@ fn class_type_parameters() {
 
 #[test]
 fn function_type_parameters() {
-    let source = r#"def X[T: str, U, *Ts, **P](): ..."#;
+    let source = r"def X[T: str, U, *Ts, **P](): ...";
 
     let trace = trace_preorder_visitation(source);
 
@@ -130,7 +130,7 @@ fn function_type_parameters() {
 
 fn trace_preorder_visitation(source: &str) -> String {
     let tokens = lex(source, Mode::Module);
-    let parsed = parse_tokens(tokens, Mode::Module, "test.py").unwrap();
+    let parsed = parse_tokens(tokens, source, Mode::Module, "test.py").unwrap();
 
     let mut visitor = RecordVisitor::default();
     visitor.visit_mod(&parsed);
@@ -193,8 +193,8 @@ impl PreorderVisitor<'_> for RecordVisitor {
         self.exit_node();
     }
 
-    fn visit_constant(&mut self, constant: &Constant) {
-        self.emit(&constant);
+    fn visit_singleton(&mut self, singleton: &Singleton) {
+        self.emit(&singleton);
     }
 
     fn visit_bool_op(&mut self, bool_op: &BoolOp) {

@@ -1,0 +1,61 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+bad_dunder_method_name.py:5:9: PLW3201 Bad or misspelled dunder method name `_init_`
+  |
+4 | class Apples:
+5 |     def _init_(self):  # [bad-dunder-name]
+  |         ^^^^^^ PLW3201
+6 |         pass
+  |
+
+bad_dunder_method_name.py:8:9: PLW3201 Bad or misspelled dunder method name `__hello__`
+  |
+6 |         pass
+7 | 
+8 |     def __hello__(self):  # [bad-dunder-name]
+  |         ^^^^^^^^^ PLW3201
+9 |         print("hello")
+  |
+
+bad_dunder_method_name.py:11:9: PLW3201 Bad or misspelled dunder method name `__init_`
+   |
+ 9 |         print("hello")
+10 | 
+11 |     def __init_(self):  # [bad-dunder-name]
+   |         ^^^^^^^ PLW3201
+12 |         # author likely unintentionally misspelled the correct init dunder.
+13 |         pass
+   |
+
+bad_dunder_method_name.py:15:9: PLW3201 Bad or misspelled dunder method name `_init_`
+   |
+13 |         pass
+14 | 
+15 |     def _init_(self):  # [bad-dunder-name]
+   |         ^^^^^^ PLW3201
+16 |         # author likely unintentionally misspelled the correct init dunder.
+17 |         pass
+   |
+
+bad_dunder_method_name.py:19:9: PLW3201 Bad or misspelled dunder method name `___neg__`
+   |
+17 |         pass
+18 | 
+19 |     def ___neg__(self):  # [bad-dunder-name]
+   |         ^^^^^^^^ PLW3201
+20 |         # author likely accidentally added an additional `_`
+21 |         pass
+   |
+
+bad_dunder_method_name.py:23:9: PLW3201 Bad or misspelled dunder method name `__inv__`
+   |
+21 |         pass
+22 | 
+23 |     def __inv__(self):  # [bad-dunder-name]
+   |         ^^^^^^^ PLW3201
+24 |         # author likely meant to call the invert dunder method
+25 |         pass
+   |
+
+

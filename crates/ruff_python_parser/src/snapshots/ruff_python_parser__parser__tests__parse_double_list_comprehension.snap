@@ -78,13 +78,12 @@ ListComp(
                                 Lt,
                             ],
                             comparators: [
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 36..37,
                                         value: Int(
                                             5,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -104,13 +103,12 @@ ListComp(
                                 Gt,
                             ],
                             comparators: [
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 45..47,
                                         value: Int(
                                             10,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],

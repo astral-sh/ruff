@@ -7,12 +7,15 @@ on:
         description: "The version to tag, without the leading 'v'. If omitted, will initiate a dry run (no uploads)."
         type: string
       sha:
-        description: "Optionally, the full sha of the commit to be released"
+        description: "The full sha of the commit to be released. If omitted, the latest commit on the default branch will be used."
+        default: ""
         type: string
   pull_request:
     paths:
       # When we change pyproject.toml, we want to ensure that the maturin builds still work
       - pyproject.toml
+      # And when we change this workflow itself...
+      - .github/workflows/release.yaml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -30,7 +33,9 @@ jobs:
   sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -43,7 +48,6 @@ jobs:
           args: --out dist
       - name: "Test sdist"
         run: |
-          rustup default $(cat rust-toolchain)
           pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
           ruff --help
           python -m ruff --help
@@ -56,7 +60,9 @@ jobs:
   macos-x86_64:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -94,7 +100,9 @@ jobs:
   macos-universal:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -140,7 +148,9 @@ jobs:
           - target: aarch64-pc-windows-msvc
             arch: x64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -186,7 +196,9 @@ jobs:
           - x86_64-unknown-linux-gnu
           - i686-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -243,7 +255,9 @@ jobs:
             arch: ppc64
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -296,7 +310,9 @@ jobs:
           - x86_64-unknown-linux-musl
           - i686-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -350,7 +366,9 @@ jobs:
             arch: armv7
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -398,9 +416,22 @@ jobs:
     # If you don't set an input tag, it's a dry run (no uploads).
     if: ${{ inputs.tag }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: main # We checkout the main branch to check for the commit
+      - name: Check main branch
+        if: ${{ inputs.sha }}
+        run: |
+          # Fetch the main branch since a shallow checkout is used by default
+          git fetch origin main --unshallow
+          if ! git branch --contains ${{ inputs.sha }} | grep -E '(^|\s)main$'; then
+            echo "The specified sha is not on the main branch" >&2
+            exit 1
+          fi
       - name: Check tag consistency
         run: |
+          # Switch to the commit we want to release
+          git checkout ${{ inputs.sha }}
           version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
           if [ "${{ inputs.tag }}" != "${version}" ]; then
             echo "The input tag does not match the version from pyproject.toml:" >&2
@@ -409,18 +440,6 @@ jobs:
             exit 1
           else
             echo "Releasing ${version}"
-          fi
-      - name: Check SHA consistency
-        if: ${{ inputs.sha }}
-        run: |
-          git_sha=$(git rev-parse HEAD)
-          if [ "${{ inputs.sha }}" != "${git_sha}" ]; then
-            echo "The specified sha does not match the git checkout" >&2
-            echo "${{ inputs.sha }}" >&2
-            echo "${git_sha}" >&2
-            exit 1
-          else
-            echo "Releasing ${git_sha}"
           fi
 
   upload-release:
@@ -464,7 +483,9 @@ jobs:
       # For git tag
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - name: git tag
         run: |
           git config user.email "hey@astral.sh"
@@ -495,6 +516,62 @@ jobs:
           files: binaries/*
           tag_name: v${{ inputs.tag }}
 
+  docker-publish:
+    # This action doesn't need to wait on any other task, it's easy to re-tag if something failed and we're validating
+    # the tag here also
+    name: Push Docker image ghcr.io/astral-sh/ruff
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    permissions:
+      # For the docker push
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/astral-sh/ruff
+
+      - name: Check tag consistency
+        # Unlike validate-tag we don't check if the commit is on the main branch, but it seems good enough since we can
+        # change docker tags
+        if: ${{ inputs.tag }}
+        run: |
+          version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
+          if [ "${{ inputs.tag }}" != "${version}" ]; then
+            echo "The input tag does not match the version from pyproject.toml:" >&2
+            echo "${{ inputs.tag }}" >&2
+            echo "${version}" >&2
+            exit 1
+          else
+            echo "Releasing ${version}"
+          fi
+
+      - name: "Build and push Docker image"
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          # Reuse the builder
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: ${{ inputs.tag != '' }}
+          tags: ghcr.io/astral-sh/ruff:latest,ghcr.io/astral-sh/ruff:${{ inputs.tag || 'dry-run' }}
+          labels: ${{ steps.meta.outputs.labels }}
+
   # After the release has been published, we update downstream repositories
   # This is separate because if this fails the release is still fine, we just need to do some manual workflow triggers
   update-dependents:
@@ -503,7 +580,7 @@ jobs:
     needs: publish-release
     steps:
       - name: "Update pre-commit mirror"
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.RUFF_PRE_COMMIT_PAT }}
           script: |

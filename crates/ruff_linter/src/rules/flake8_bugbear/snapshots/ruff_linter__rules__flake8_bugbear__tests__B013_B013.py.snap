@@ -1,0 +1,64 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B013.py:5:8: B013 [*] A length-one tuple literal is redundant in exception handlers
+  |
+3 | try:
+4 |     pass
+5 | except (ValueError,):
+  |        ^^^^^^^^^^^^^ B013
+6 |     pass
+7 | except AttributeError:
+  |
+  = help: Replace with `except ValueError`
+
+ℹ Safe fix
+2 2 | 
+3 3 | try:
+4 4 |     pass
+5   |-except (ValueError,):
+  5 |+except ValueError:
+6 6 |     pass
+7 7 | except AttributeError:
+8 8 |     pass
+
+B013.py:11:8: B013 [*] A length-one tuple literal is redundant in exception handlers
+   |
+ 9 | except (ImportError, TypeError):
+10 |     pass
+11 | except (*retriable_exceptions,):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ B013
+12 |     pass
+13 | except(ValueError,):
+   |
+   = help: Replace with `except retriable_exceptions`
+
+ℹ Safe fix
+8  8  |     pass
+9  9  | except (ImportError, TypeError):
+10 10 |     pass
+11    |-except (*retriable_exceptions,):
+   11 |+except retriable_exceptions:
+12 12 |     pass
+13 13 | except(ValueError,):
+14 14 |     pass
+
+B013.py:13:7: B013 [*] A length-one tuple literal is redundant in exception handlers
+   |
+11 | except (*retriable_exceptions,):
+12 |     pass
+13 | except(ValueError,):
+   |       ^^^^^^^^^^^^^ B013
+14 |     pass
+   |
+   = help: Replace with `except ValueError`
+
+ℹ Safe fix
+10 10 |     pass
+11 11 | except (*retriable_exceptions,):
+12 12 |     pass
+13    |-except(ValueError,):
+   13 |+except ValueError:
+14 14 |     pass
+
+

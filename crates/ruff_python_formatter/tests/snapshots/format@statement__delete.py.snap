@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/delete.py
 ---
 ## Input
-```py
+```python
 x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
 a, b, c, d = 1, 2, 3, 4
@@ -86,7 +86,7 @@ del (  # dangling end of line comment
 ```
 
 ## Output
-```py
+```python
 x = 1
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 1
 a, b, c, d = 1, 2, 3, 4
@@ -204,7 +204,13 @@ del (
 
 # NOTE: This shouldn't format. See https://github.com/astral-sh/ruff/issues/5630.
 # Delete something
-del x, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, b, c, d  # Delete these
+del (
+    x,
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    b,
+    c,
+    d,
+)  # Delete these
 # Ready to delete
 
 # Delete something

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/binary_implicit_string.py
 ---
 ## Input
-```py
+```python
 
 raise ImproperlyConfigured(
     "The app module %r has multiple filesystem locations (%r); "
@@ -91,6 +91,15 @@ self._assert_skipping(
 )
 
 (
+    b + c + d +
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    f"bbbbbb{z}bbbbbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccccccc"
+    % aaaaaaaaaaaa
+    + x
+)
+
+(
     b < c > d <
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -124,10 +133,72 @@ def test3():
                "(CASE WHEN JSON_TYPE(%s, %%s) IN (%s) "
                "THEN JSON_TYPE(%s, %%s) ELSE JSON_EXTRACT(%s, %%s) END)"
            ) % (lhs, datatype_values, lhs, lhs), (tuple(params) + (json_path,)) * 3
+
+c = (a +
+    # test leading binary comment
+    "a" "b" * b
+)
+
+c = (a *
+     # test leading comment
+     "a" "b" + b
+     )
+
+c = (a
+     + # test trailing comment
+     "a" "b" * b
+     )
+
+c = (a
+     +
+     "a" "b" # test trailing comment
+     * b
+     )
+
+c = (a
+     *
+     "a" "b" # test trailing binary comment
+     + b
+     )
+
+c = (a
+     *
+     "a" "b"
+     + # test trailing operator comment
+     b
+     )
+
+c = (a
+     *
+     "a" "b"
+     +
+     # test trailing operator comment
+     b
+     )
+
+c = ("a" "b" +
+     # test leading binary comment
+     "a" "b"
+ )
+
+(
+    b + c + d +
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" +
+    "cccccccccccccccccccccccccc"
+    "dddddddddddddddddddddddddd"
+    % aaaaaaaaaaaa
+    + x
+)
+
+"a" "b" "c" + "d" "e" + "f" "g" + "h" "i" "j"
+class EC2REPATH:
+    f.write ("Pathway name" + "\t" "Database Identifier" + "\t" "Source database" + "\n")
+
 ```
 
 ## Output
-```py
+```python
 raise ImproperlyConfigured(
     "The app module %r has multiple filesystem locations (%r); "
     "you must configure this app with an AppConfig subclass "
@@ -215,70 +286,123 @@ self._assert_skipping(
 (
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    "cccccccccccccccccccccccccc"
-    % aaaaaaaaaaaa
-    + x
+    "cccccccccccccccccccccccccc" % aaaaaaaaaaaa + x
 )
 
 (
-    b
-    + c
-    + d
-    + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    b + c + d + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    "cccccccccccccccccccccccccc" % aaaaaaaaaaaa
-    + x
+    "cccccccccccccccccccccccccc" % aaaaaaaaaaaa + x
 )
 
 (
-    b
-    < c
-    > d
-    < "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    b + c + d + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    f"bbbbbb{z}bbbbbbbbbbbbbbbbbbbbbbb"
+    "cccccccccccccccccccccccccc" % aaaaaaaaaaaa + x
+)
+
+(
+    b < c > d < "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-    "cccccccccccccccccccccccccc" % aaaaaaaaaaaa
-    > x
+    "cccccccccccccccccccccccccc" % aaaaaaaaaaaa > x
 )
 
 
 self.assertEqual(
     response.status_code,
     status_code,
-    msg_prefix
-    + "Couldn't retrieve content: Response code was %d"
+    msg_prefix + "Couldn't retrieve content: Response code was %d"
     " (expected %d)" % (response.status_code, status_code),
 )
 
 
 def test():
     return (
-        (
-            "((TIME_TO_SEC(%(lhs)s) * 1000000 + MICROSECOND(%(lhs)s)) -"
-            " (TIME_TO_SEC(%(rhs)s) * 1000000 + MICROSECOND(%(rhs)s)))"
-        ) % {"lhs": lhs_sql, "rhs": rhs_sql},
-        tuple(lhs_params) * 2 + tuple(rhs_params) * 2,
-    )
+        "((TIME_TO_SEC(%(lhs)s) * 1000000 + MICROSECOND(%(lhs)s)) -"
+        " (TIME_TO_SEC(%(rhs)s) * 1000000 + MICROSECOND(%(rhs)s)))"
+    ) % {"lhs": lhs_sql, "rhs": rhs_sql}, tuple(lhs_params) * 2 + tuple(rhs_params) * 2
 
 
 def test2():
-    return (
-        "RETURNING %s INTO %s"
-        % (
-            ", ".join(field_names),
-            ", ".join(["%s"] * len(params)),
-        ),
-        tuple(params),
-    )
+    return "RETURNING %s INTO %s" % (
+        ", ".join(field_names),
+        ", ".join(["%s"] * len(params)),
+    ), tuple(params)
 
 
 def test3():
     return (
-        (
-            "(CASE WHEN JSON_TYPE(%s, %%s) IN (%s) "
-            "THEN JSON_TYPE(%s, %%s) ELSE JSON_EXTRACT(%s, %%s) END)"
-        ) % (lhs, datatype_values, lhs, lhs),
-        (tuple(params) + (json_path,)) * 3,
-    )
+        "(CASE WHEN JSON_TYPE(%s, %%s) IN (%s) "
+        "THEN JSON_TYPE(%s, %%s) ELSE JSON_EXTRACT(%s, %%s) END)"
+    ) % (lhs, datatype_values, lhs, lhs), (tuple(params) + (json_path,)) * 3
+
+
+c = (
+    a +
+    # test leading binary comment
+    "a"
+    "b" * b
+)
+
+c = (
+    a *
+    # test leading comment
+    "a"
+    "b" + b
+)
+
+c = (
+    a
+    +  # test trailing comment
+    "a"
+    "b" * b
+)
+
+c = (
+    a + "a"
+    "b"  # test trailing comment
+     * b
+)
+
+c = (
+    a * "a"
+    "b"  # test trailing binary comment
+     + b
+)
+
+c = (
+    a * "a"
+    "b"
+    +  # test trailing operator comment
+    b
+)
+
+c = (
+    a * "a"
+    "b" +
+    # test trailing operator comment
+    b
+)
+
+c = (
+    "a"
+    "b" +
+    # test leading binary comment
+    "a"
+    "b"
+)
+
+(
+    b + c + d + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbb" + "cccccccccccccccccccccccccc"
+    "dddddddddddddddddddddddddd" % aaaaaaaaaaaa + x
+)
+
+"a" "b" "c" + "d" "e" + "f" "g" + "h" "i" "j"
+
+
+class EC2REPATH:
+    f.write("Pathway name" + "\t" "Database Identifier" + "\t" "Source database" + "\n")
 ```
 
 

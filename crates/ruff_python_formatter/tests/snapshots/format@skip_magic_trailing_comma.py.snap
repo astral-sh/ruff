@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/skip_magic_trailing_comma.py
 ---
 ## Input
-```py
+```python
 (
     "First entry",
     "Second entry",
@@ -33,18 +33,24 @@ def g(a,): pass
 
 x1 = lambda y: 1
 x2 = lambda y,: 1
+
+# Ignore trailing comma.
+with (a,):  # magic trailing comma
+    ...
 ```
 
 ## Outputs
 ### Output 1
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
-```py
+```python
 (
     "First entry",
     "Second entry",
@@ -78,18 +84,26 @@ def g(
 
 x1 = lambda y: 1
 x2 = lambda y,: 1
+
+# Ignore trailing comma.
+with (
+    a,
+):  # magic trailing comma
+    ...
 ```
 
 
 ### Output 2
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Ignore
+preview                 = Disabled
 ```
 
-```py
+```python
 ("First entry", "Second entry", "last with trailing comma")
 
 ("First entry", "Second entry", "last without trailing comma")
@@ -117,6 +131,10 @@ def g(a):
 
 x1 = lambda y: 1
 x2 = lambda y,: 1
+
+# Ignore trailing comma.
+with a:  # magic trailing comma
+    ...
 ```
 
 

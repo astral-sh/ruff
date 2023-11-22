@@ -1,0 +1,28 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/number.py
+---
+## Input
+```python
+.1
+1.
+1E+1
+1E-1
+1.E+1
+1.0E+1
+1.1E+1
+```
+
+## Output
+```python
+0.1
+1.0
+1e1
+1e-1
+1.0e1
+1.0e1
+1.1e1
+```
+
+
+

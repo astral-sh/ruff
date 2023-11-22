@@ -1,9 +1,9 @@
 use std::fmt::{Debug, Formatter, Write};
 
 use itertools::Itertools;
-use ruff_python_ast::Ranged;
 
 use ruff_formatter::SourceCode;
+use ruff_text_size::Ranged;
 
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::{CommentsMap, SourceComment};
@@ -178,11 +178,12 @@ impl Debug for DebugNodeCommentSlice<'_> {
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use ruff_python_ast::{StmtBreak, StmtContinue};
-    use ruff_text_size::{TextRange, TextSize};
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::node::AnyNode;
+    use ruff_python_ast::AnyNode;
+    use ruff_python_ast::{StmtBreak, StmtContinue};
+    use ruff_python_trivia::CommentRanges;
+    use ruff_text_size::{TextRange, TextSize};
 
     use crate::comments::map::MultiMap;
     use crate::comments::{CommentLinePosition, Comments, CommentsMap, SourceComment};
@@ -197,11 +198,11 @@ mod tests {
             range: TextRange::default(),
         });
 
-        let source = r#"# leading comment
+        let source = r"# leading comment
 continue; # trailing
 # break leading
 break;
-"#;
+";
 
         let source_code = SourceCode::new(source);
 
@@ -231,7 +232,8 @@ break;
             ),
         );
 
-        let comments = Comments::new(comments_map);
+        let comment_ranges = CommentRanges::default();
+        let comments = Comments::new(comments_map, &comment_ranges);
 
         assert_debug_snapshot!(comments.debug(source_code));
     }

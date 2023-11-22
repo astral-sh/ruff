@@ -1,0 +1,47 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+---
+G004.py:4:14: G004 Logging statement uses f-string
+  |
+3 | name = "world"
+4 | logging.info(f"Hello {name}")
+  |              ^^^^^^^^^^^^^^^ G004
+5 | logging.log(logging.INFO, f"Hello {name}")
+  |
+
+G004.py:5:27: G004 Logging statement uses f-string
+  |
+3 | name = "world"
+4 | logging.info(f"Hello {name}")
+5 | logging.log(logging.INFO, f"Hello {name}")
+  |                           ^^^^^^^^^^^^^^^ G004
+6 | 
+7 | _LOGGER = logging.getLogger()
+  |
+
+G004.py:8:14: G004 Logging statement uses f-string
+   |
+ 7 | _LOGGER = logging.getLogger()
+ 8 | _LOGGER.info(f"{__name__}")
+   |              ^^^^^^^^^^^^^ G004
+ 9 | 
+10 | from logging import info
+   |
+
+G004.py:11:6: G004 Logging statement uses f-string
+   |
+10 | from logging import info
+11 | info(f"{name}")
+   |      ^^^^^^^^^ G004
+12 | info(f"{__name__}")
+   |
+
+G004.py:12:6: G004 Logging statement uses f-string
+   |
+10 | from logging import info
+11 | info(f"{name}")
+12 | info(f"{__name__}")
+   |      ^^^^^^^^^^^^^ G004
+   |
+
+

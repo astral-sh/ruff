@@ -1,10 +1,10 @@
-use crate::comments::SourceComment;
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{ExprSet, Ranged};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::ExprSet;
+use ruff_text_size::Ranged;
 
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprSet;
@@ -22,7 +22,7 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         parenthesized("{", &joined, "}")
             .with_dangling_comments(dangling)

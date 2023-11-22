@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP040.pyi:6:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+  |
+4 | # UP040
+5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
+6 | x: typing.TypeAlias = int
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
+7 | x: TypeAlias = int
+  |
+  = help: Use the `type` keyword
+
+ℹ Safe fix
+3 3 | 
+4 4 | # UP040
+5 5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
+6   |-x: typing.TypeAlias = int
+  6 |+type x = int
+7 7 | x: TypeAlias = int
+
+UP040.pyi:7:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
+  |
+5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
+6 | x: typing.TypeAlias = int
+7 | x: TypeAlias = int
+  | ^^^^^^^^^^^^^^^^^^ UP040
+  |
+  = help: Use the `type` keyword
+
+ℹ Safe fix
+4 4 | # UP040
+5 5 | # Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
+6 6 | x: typing.TypeAlias = int
+7   |-x: TypeAlias = int
+  7 |+type x = int
+
+

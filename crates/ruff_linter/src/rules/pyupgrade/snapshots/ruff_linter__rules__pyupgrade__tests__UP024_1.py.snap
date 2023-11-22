@@ -1,0 +1,72 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP024_1.py:5:8: UP024 [*] Replace aliased errors with `OSError`
+  |
+3 | try:
+4 |     pass
+5 | except (OSError, mmap.error, IOError):
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP024
+6 |     pass
+7 | except (OSError, socket.error, KeyError):
+  |
+  = help: Replace with builtin `OSError`
+
+ℹ Safe fix
+2 2 | 
+3 3 | try:
+4 4 |     pass
+5   |-except (OSError, mmap.error, IOError):
+  5 |+except OSError:
+6 6 |     pass
+7 7 | except (OSError, socket.error, KeyError):
+8 8 |     pass
+
+UP024_1.py:7:8: UP024 [*] Replace aliased errors with `OSError`
+  |
+5 | except (OSError, mmap.error, IOError):
+6 |     pass
+7 | except (OSError, socket.error, KeyError):
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP024
+8 |     pass
+  |
+  = help: Replace with builtin `OSError`
+
+ℹ Safe fix
+4 4 |     pass
+5 5 | except (OSError, mmap.error, IOError):
+6 6 |     pass
+7   |-except (OSError, socket.error, KeyError):
+  7 |+except (OSError, KeyError):
+8 8 |     pass
+9 9 | 
+10 10 | try:
+
+UP024_1.py:12:8: UP024 [*] Replace aliased errors with `OSError`
+   |
+10 |   try:
+11 |       pass
+12 |   except (
+   |  ________^
+13 | |     OSError,
+14 | |     select.error,
+15 | |     IOError,
+16 | | ):
+   | |_^ UP024
+17 |       pass
+   |
+   = help: Replace with builtin `OSError`
+
+ℹ Safe fix
+9  9  | 
+10 10 | try:
+11 11 |     pass
+12    |-except (
+13    |-    OSError,
+14    |-    select.error,
+15    |-    IOError,
+16    |-):
+   12 |+except OSError:
+17 13 |     pass
+
+

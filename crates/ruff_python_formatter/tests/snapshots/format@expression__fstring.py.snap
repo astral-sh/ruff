@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/fstring.py
 ---
 ## Input
-```py
+```python
 (
     f'{one}'
     f'{two}'
@@ -39,14 +39,43 @@ result_f = (
     # comment
     ''
 )
+
+(
+    f'{1}'  # comment
+    f'{2}'
+)
+
+(
+    f'{1}'
+    f'{2}'  # comment
+)
+
+(
+    1, (  # comment
+        f'{2}'
+    )
+)
+
+(
+    (
+        f'{1}'
+        # comment
+    ),
+    2
+)
+
+# https://github.com/astral-sh/ruff/issues/6841
+x = f'''a{""}b'''
+y = f'''c{1}d"""e'''
+z = f'''a{""}b''' f'''c{1}d"""e'''
 ```
 
 ## Output
-```py
+```python
 (f"{one}" f"{two}")
 
 
-rf'Not-so-tricky "quote'
+rf"Not-so-tricky \"quote"
 
 # Regression test for fstrings dropping comments
 result_f = (
@@ -76,6 +105,35 @@ result_f = (
     # comment
     ""
 )
+
+(
+    f"{1}"  # comment
+    f"{2}"
+)
+
+(
+    f"{1}" f"{2}"  # comment
+)
+
+(
+    1,
+    (  # comment
+        f"{2}"
+    ),
+)
+
+(
+    (
+        f"{1}"
+        # comment
+    ),
+    2,
+)
+
+# https://github.com/astral-sh/ruff/issues/6841
+x = f"""a{""}b"""
+y = f'''c{1}d"""e'''
+z = f"""a{""}b""" f'''c{1}d"""e'''
 ```
 
 

@@ -1,0 +1,171 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E22.py:3:6: E221 [*] Multiple spaces before operator
+  |
+1 | #: E221
+2 | a = 12 + 3
+3 | b = 4  + 5
+  |      ^^ E221
+4 | #: E221 E221
+5 | x             = 1
+  |
+  = help: Replace with single space
+
+ℹ Safe fix
+1 1 | #: E221
+2 2 | a = 12 + 3
+3   |-b = 4  + 5
+  3 |+b = 4 + 5
+4 4 | #: E221 E221
+5 5 | x             = 1
+6 6 | y             = 2
+
+E22.py:5:2: E221 [*] Multiple spaces before operator
+  |
+3 | b = 4  + 5
+4 | #: E221 E221
+5 | x             = 1
+  |  ^^^^^^^^^^^^^ E221
+6 | y             = 2
+7 | long_variable = 3
+  |
+  = help: Replace with single space
+
+ℹ Safe fix
+2 2 | a = 12 + 3
+3 3 | b = 4  + 5
+4 4 | #: E221 E221
+5   |-x             = 1
+  5 |+x = 1
+6 6 | y             = 2
+7 7 | long_variable = 3
+8 8 | #: E221 E221
+
+E22.py:6:2: E221 [*] Multiple spaces before operator
+  |
+4 | #: E221 E221
+5 | x             = 1
+6 | y             = 2
+  |  ^^^^^^^^^^^^^ E221
+7 | long_variable = 3
+8 | #: E221 E221
+  |
+  = help: Replace with single space
+
+ℹ Safe fix
+3 3 | b = 4  + 5
+4 4 | #: E221 E221
+5 5 | x             = 1
+6   |-y             = 2
+  6 |+y = 2
+7 7 | long_variable = 3
+8 8 | #: E221 E221
+9 9 | x[0]          = 1
+
+E22.py:9:5: E221 [*] Multiple spaces before operator
+   |
+ 7 | long_variable = 3
+ 8 | #: E221 E221
+ 9 | x[0]          = 1
+   |     ^^^^^^^^^^ E221
+10 | x[1]          = 2
+11 | long_variable = 3
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+6  6  | y             = 2
+7  7  | long_variable = 3
+8  8  | #: E221 E221
+9     |-x[0]          = 1
+   9  |+x[0] = 1
+10 10 | x[1]          = 2
+11 11 | long_variable = 3
+12 12 | #: E221 E221
+
+E22.py:10:5: E221 [*] Multiple spaces before operator
+   |
+ 8 | #: E221 E221
+ 9 | x[0]          = 1
+10 | x[1]          = 2
+   |     ^^^^^^^^^^ E221
+11 | long_variable = 3
+12 | #: E221 E221
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+7  7  | long_variable = 3
+8  8  | #: E221 E221
+9  9  | x[0]          = 1
+10    |-x[1]          = 2
+   10 |+x[1] = 2
+11 11 | long_variable = 3
+12 12 | #: E221 E221
+13 13 | x = f(x)          + 1
+
+E22.py:13:9: E221 [*] Multiple spaces before operator
+   |
+11 | long_variable = 3
+12 | #: E221 E221
+13 | x = f(x)          + 1
+   |         ^^^^^^^^^^ E221
+14 | y = long_variable + 2
+15 | z = x[0]          + 3
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+10 10 | x[1]          = 2
+11 11 | long_variable = 3
+12 12 | #: E221 E221
+13    |-x = f(x)          + 1
+   13 |+x = f(x) + 1
+14 14 | y = long_variable + 2
+15 15 | z = x[0]          + 3
+16 16 | #: E221:3:14
+
+E22.py:15:9: E221 [*] Multiple spaces before operator
+   |
+13 | x = f(x)          + 1
+14 | y = long_variable + 2
+15 | z = x[0]          + 3
+   |         ^^^^^^^^^^ E221
+16 | #: E221:3:14
+17 | text = """
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+12 12 | #: E221 E221
+13 13 | x = f(x)          + 1
+14 14 | y = long_variable + 2
+15    |-z = x[0]          + 3
+   15 |+z = x[0] + 3
+16 16 | #: E221:3:14
+17 17 | text = """
+18 18 |     bar
+
+E22.py:19:14: E221 [*] Multiple spaces before operator
+   |
+17 | text = """
+18 |     bar
+19 |     foo %s"""  % rofl
+   |              ^^ E221
+20 | #: Okay
+21 | x = 1
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+16 16 | #: E221:3:14
+17 17 | text = """
+18 18 |     bar
+19    |-    foo %s"""  % rofl
+   19 |+    foo %s""" % rofl
+20 20 | #: Okay
+21 21 | x = 1
+22 22 | y = 2
+
+

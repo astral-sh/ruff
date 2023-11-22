@@ -3,76 +3,76 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/try.py
 ---
 ## Input
-```py
+```python
 try:
-    ...
+    pass
 except:
-    ...
+    pass
 
 try:
-    ...
+    pass
 except (KeyError):  # should remove brackets and be a single line
-    ...
+    pass
 
 
 try: # try
-    ...
+    pass
     # end of body
 # before except
 except (Exception, ValueError) as exc:  # except line
-    ...
+    pass
 # before except 2
 except KeyError as key:  # except line 2
-    ...
+    pass
     # in body 2
 # before else
 else:
-    ...
+    pass
 # before finally
 finally:
-    ...
+    pass
 
 
 
 # with line breaks
 try: # try
-    ...
+    pass
     # end of body
 
 # before except
 except (Exception, ValueError) as exc:  # except line
-    ...
+    pass
 
 # before except 2
 except KeyError as key:  # except line 2
-    ...
+    pass
     # in body 2
 
 # before else
 else:
-    ...
+    pass
 
 # before finally
 finally:
-    ...
+    pass
 
 
 # with line breaks
 try:
-    ...
+    pass
 
 except:
-    ...
+    pass
 
 
 try:
-    ...
+    pass
 except (Exception, Exception, Exception, Exception, Exception, Exception, Exception) as exc:  # splits exception over multiple lines
-    ...
+    pass
 
 
 try:
-    ...
+    pass
 except:
     a = 10 # trailing comment1
     b = 11 # trailing comment2
@@ -80,21 +80,21 @@ except:
 
 # try/except*, mostly the same as try
 try: # try
-    ...
+    pass
     # end of body
 # before except
 except* (Exception, ValueError) as exc:  # except line
-    ...
+    pass
 # before except 2
 except* KeyError as key:  # except line 2
-    ...
+    pass
     # in body 2
 # before else
 else:
-    ...
+    pass
 # before finally
 finally:
-    ...
+    pass
 
 # try and try star are statements with body
 # Minimized from https://github.com/python/cpython/blob/99b00efd5edfd5b26bf9e2a35cbfc96277fdcbb1/Lib/getpass.py#L68-L91
@@ -152,72 +152,92 @@ except (
     # comment
 ):
     pass
+
+
+try:
+    pass
+
+finally:
+    pass
+
+
+try:
+    pass
+
+except ZeroDivisonError:
+    pass
+
+else:
+    pass
+
+finally:
+    pass
 ```
 
 ## Output
-```py
+```python
 try:
-    ...
+    pass
 except:
-    ...
+    pass
 
 try:
-    ...
+    pass
 except KeyError:  # should remove brackets and be a single line
-    ...
+    pass
 
 
 try:  # try
-    ...
+    pass
     # end of body
 # before except
 except (Exception, ValueError) as exc:  # except line
-    ...
+    pass
 # before except 2
 except KeyError as key:  # except line 2
-    ...
+    pass
     # in body 2
 # before else
 else:
-    ...
+    pass
 # before finally
 finally:
-    ...
+    pass
 
 
 # with line breaks
 try:  # try
-    ...
+    pass
     # end of body
 
 # before except
 except (Exception, ValueError) as exc:  # except line
-    ...
+    pass
 
 # before except 2
 except KeyError as key:  # except line 2
-    ...
+    pass
     # in body 2
 
 # before else
 else:
-    ...
+    pass
 
 # before finally
 finally:
-    ...
+    pass
 
 
 # with line breaks
 try:
-    ...
+    pass
 
 except:
-    ...
+    pass
 
 
 try:
-    ...
+    pass
 except (
     Exception,
     Exception,
@@ -227,11 +247,11 @@ except (
     Exception,
     Exception,
 ) as exc:  # splits exception over multiple lines
-    ...
+    pass
 
 
 try:
-    ...
+    pass
 except:
     a = 10  # trailing comment1
     b = 11  # trailing comment2
@@ -239,21 +259,21 @@ except:
 
 # try/except*, mostly the same as try
 try:  # try
-    ...
+    pass
     # end of body
 # before except
 except* (Exception, ValueError) as exc:  # except line
-    ...
+    pass
 # before except 2
 except* KeyError as key:  # except line 2
-    ...
+    pass
     # in body 2
 # before else
 else:
-    ...
+    pass
 # before finally
 finally:
-    ...
+    pass
 
 # try and try star are statements with body
 # Minimized from https://github.com/python/cpython/blob/99b00efd5edfd5b26bf9e2a35cbfc96277fdcbb1/Lib/getpass.py#L68-L91
@@ -291,6 +311,7 @@ finally:
         pass
         # d
 
+
 try:
     pass  # a
 except ZeroDivisionError:
@@ -304,7 +325,9 @@ finally:
 
 try:  # 1 preceding: any, following: first in body, enclosing: try
     print(1)  # 2 preceding: last in body, following: fist in alt body, enclosing: try
-except ZeroDivisionError:  # 3 preceding: test, following: fist in alt body, enclosing: try
+except (
+    ZeroDivisionError
+):  # 3 preceding: test, following: fist in alt body, enclosing: try
     print(2)  # 4 preceding: last in body, following: fist in alt body, enclosing: exc
 except:  # 5 preceding: last in body, following: fist in alt body, enclosing: try
     print(2)  # 6 preceding: last in body, following: fist in alt body, enclosing: exc
@@ -319,6 +342,26 @@ except (
     ZeroDivisionError
     # comment
 ):
+    pass
+
+
+try:
+    pass
+
+finally:
+    pass
+
+
+try:
+    pass
+
+except ZeroDivisonError:
+    pass
+
+else:
+    pass
+
+finally:
     pass
 ```
 

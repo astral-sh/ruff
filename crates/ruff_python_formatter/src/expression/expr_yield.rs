@@ -1,12 +1,13 @@
-use crate::context::PyFormatContext;
-use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parenthesize};
-use crate::prelude::*;
-use crate::{FormatNodeRule, PyFormatter};
 use ruff_formatter::write;
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom, Ranged};
-use ruff_text_size::TextRange;
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom};
+use ruff_text_size::{Ranged, TextRange};
+
+use crate::expression::maybe_parenthesize_expression;
+use crate::expression::parentheses::{
+    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parenthesize,
+};
+use crate::prelude::*;
 
 pub(super) enum AnyExpressionYield<'a> {
     Yield(&'a ExprYield),
@@ -39,7 +40,7 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
     fn needs_parentheses(
         &self,
         parent: AnyNodeRef,
-        _context: &PyFormatContext,
+        context: &PyFormatContext,
     ) -> OptionalParentheses {
         // According to https://docs.python.org/3/reference/grammar.html There are two situations
         // where we do not want to always parenthesize a yield expression:
@@ -48,8 +49,27 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
         // We catch situation 1 below. Situation 2 does not need to be handled here as
         // FormatStmtExpr, does not add parenthesis
         if parent.is_stmt_assign() || parent.is_stmt_ann_assign() || parent.is_stmt_aug_assign() {
-            OptionalParentheses::Multiline
+            if let Some(value) = self.value() {
+                if is_expression_parenthesized(
+                    value.into(),
+                    context.comments().ranges(),
+                    context.source(),
+                ) {
+                    // Ex) `x = yield (1)`
+                    OptionalParentheses::Never
+                } else {
+                    // Ex) `x = yield f(1, 2, 3)`
+                    match value.needs_parentheses(self.into(), context) {
+                        OptionalParentheses::BestFit => OptionalParentheses::Never,
+                        parentheses => parentheses,
+                    }
+                }
+            } else {
+                // Ex) `x = yield`
+                OptionalParentheses::Never
+            }
         } else {
+            // Ex) `print((yield))`
             OptionalParentheses::Always
         }
     }
@@ -88,14 +108,14 @@ impl Format<PyFormatContext<'_>> for AnyExpressionYield<'_> {
             write!(
                 f,
                 [
-                    text(keyword),
+                    token(keyword),
                     space(),
-                    maybe_parenthesize_expression(val, self, Parenthesize::IfRequired)
+                    maybe_parenthesize_expression(val, self, Parenthesize::Optional)
                 ]
             )?;
         } else {
             // ExprYieldFrom always has Some(value) so we should never get a bare `yield from`
-            write!(f, [&text(keyword)])?;
+            write!(f, [token(keyword)])?;
         }
         Ok(())
     }

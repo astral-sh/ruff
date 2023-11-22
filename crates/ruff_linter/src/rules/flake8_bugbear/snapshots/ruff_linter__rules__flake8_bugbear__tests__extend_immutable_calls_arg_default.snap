@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B008_extended.py:24:51: B008 Do not perform function call `Depends` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+   |
+24 | def error_due_to_missing_import(data: List[str] = Depends(None)):
+   |                                                   ^^^^^^^^^^^^^ B008
+25 |     ...
+   |
+
+

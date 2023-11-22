@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/dict.py
 ---
 ## Input
-```py
+```python
 # before
 {  # open
  key# key
@@ -65,13 +65,88 @@ a = {
 
 x={  # dangling end of line comment
 }
+
+# Comments between keys and values.
+query = {
+    "must":
+    # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ],
+}
+
+query = {
+    "must":  # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ],
+}
+
+query = {
+    "must": (
+    # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    )
+}
+
+query = {
+    "must": ( # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    )
+}
+
+query = {
+    "must": (
+    # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    )
+}
+
+query = {
+    (
+        "must"  # queries => map(pluck("fragment")) => flatten()
+    ) : [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+}
+
+query = {
+    (
+        "must"
+        # queries => map(pluck("fragment")) => flatten()
+    ) : [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+}
 ```
 
 ## Output
-```py
+```python
 # before
 {  # open
-    key: value  # key  # colon  # value
+    key:  # key
+    # colon
+    value  # value
 }  # close
 # after
 
@@ -80,22 +155,26 @@ x={  # dangling end of line comment
 
 {
     **a,  #  leading
-    **b,  # middle  # trailing
+    # middle
+    **b,  # trailing
 }
 
 {
-    **b  # middle with single item
+    # middle with single item
+    **b
 }
 
 {
     # before
-    **b,  # between
+    # between
+    **b,
 }
 
 {
     **a,  # comment before preceding node's comma
     # before
-    **b,  # between
+    # between
+    **b,
 }
 
 {}
@@ -130,6 +209,51 @@ a = {
 }
 
 x = {  # dangling end of line comment
+}
+
+# Comments between keys and values.
+query = {
+    "must":
+    # queries => map(pluck("fragment")) => flatten()
+    [clause for kf_pair in queries for clause in kf_pair["fragment"]],
+}
+
+query = {
+    "must":  # queries => map(pluck("fragment")) => flatten()
+    [clause for kf_pair in queries for clause in kf_pair["fragment"]],
+}
+
+query = {
+    "must": (
+        # queries => map(pluck("fragment")) => flatten()
+        [clause for kf_pair in queries for clause in kf_pair["fragment"]]
+    )
+}
+
+query = {
+    "must": (  # queries => map(pluck("fragment")) => flatten()
+        [clause for kf_pair in queries for clause in kf_pair["fragment"]]
+    )
+}
+
+query = {
+    "must": (
+        # queries => map(pluck("fragment")) => flatten()
+        [clause for kf_pair in queries for clause in kf_pair["fragment"]]
+    )
+}
+
+query = {
+    (
+        "must"  # queries => map(pluck("fragment")) => flatten()
+    ): [clause for kf_pair in queries for clause in kf_pair["fragment"]]
+}
+
+query = {
+    (
+        "must"
+        # queries => map(pluck("fragment")) => flatten()
+    ): [clause for kf_pair in queries for clause in kf_pair["fragment"]]
 }
 ```
 

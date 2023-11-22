@@ -1,6 +1,6 @@
-use crate::{ElifElseClause, Expr, Ranged, Stmt, StmtIf};
+use crate::{ElifElseClause, Expr, Stmt, StmtIf};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use std::iter;
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.

@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_310/pa
 ---
 ## Input
 
-```py
+```python
 import match
 
 match something:
@@ -131,170 +131,48 @@ match bar1:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,13 +1,13 @@
- import match
- 
- match something:
--    case [a as b]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
-         print(b)
--    case [a as b, c, d, e as f]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
-         print(f)
--    case Point(a as b):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         print(b)
--    case Point(int() as x, int() as y):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         print(x, y)
- 
- 
-@@ -15,40 +15,43 @@
- case: int = re.match(something)
- 
- match re.match(case):
--    case type("match", match):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         pass
--    case match:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-         pass
- 
- 
- def func(match: case, case: match) -> case:
-     match Something():
--        case func(match, case):
-+        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-             ...
--        case another:
-+        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-             ...
- 
- 
+@@ -32,14 +32,23 @@
  match maybe, multiple:
--    case perhaps, 5:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+     case perhaps, 5:
          pass
 -    case perhaps, 6,:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case (
++        perhaps,
++        6,
++    ):
          pass
  
  
 -match more := (than, one), indeed,:
--    case _, (5, 6):
 +match (
 +    more := (than, one),
 +    indeed,
 +):
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+     case _, (5, 6):
          pass
 -    case [[5], (6)], [7],:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
++    case [
++        [[5], (6)],
++        [7],
++    ]:
          pass
--    case _:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-         pass
- 
- 
- match a, *b, c:
--    case [*_]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
-         assert "seq" == _
--    case {}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         assert "map" == b
- 
- 
-@@ -59,61 +62,51 @@
-     ),
-     case,
- ):
--    case case(
--        match=case,
--        case=re.match(
--            loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
--        ),
--    ):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         pass
- 
--    case [a as match]:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
-         pass
- 
--    case case:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-         pass
- 
- 
- match match:
--    case case:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-         pass
- 
- 
- match a, *b(), c:
--    case d, *f, g:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
-         pass
- 
- 
- match something:
--    case {
--        "key": key as key_1,
--        "password": PASS.ONE | PASS.TWO | PASS.THREE as password,
--    }:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         pass
--    case {"maybe": something(complicated as this) as that}:
-+    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
-         pass
- 
- 
- match something:
--    case 1 as a:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-         pass
- 
--    case 2 as b, 3 as c:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
-         pass
- 
--    case 4 as d, (5 as e), (6 | 7 as g), *h:
-+    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
-         pass
- 
- 
- match bar1:
--    case Foo(aa=Callable() as aa, bb=int()):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
-         print(bar1.aa, bar1.bb)
--    case _:
-+    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
-         print("no match", "\n")
- 
- 
- match bar1:
--    case Foo(
--        normal=x, perhaps=[list, {"x": d, "y": 1.0}] as y, otherwise=something, q=t as u
--    ):
-+    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+     case _:
          pass
 ```
 
 ## Ruff Output
 
-```py
+```python
 import match
 
 match something:
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [a as b]:
         print(b)
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [a as b, c, d, e as f]:
         print(f)
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case Point(a as b):
         print(b)
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case Point(int() as x, int() as y):
         print(x, y)
 
 
@@ -302,24 +180,27 @@ match = 1
 case: int = re.match(something)
 
 match re.match(case):
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case type("match", match):
         pass
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case match:
         pass
 
 
 def func(match: case, case: match) -> case:
     match Something():
-        case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+        case func(match, case):
             ...
-        case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+        case another:
             ...
 
 
 match maybe, multiple:
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case perhaps, 5:
         pass
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case (
+        perhaps,
+        6,
+    ):
         pass
 
 
@@ -327,18 +208,21 @@ match (
     more := (than, one),
     indeed,
 ):
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case _, (5, 6):
         pass
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [
+        [[5], (6)],
+        [7],
+    ]:
         pass
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         pass
 
 
 match a, *b, c:
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [*_]:
         assert "seq" == _
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {}:
         assert "map" == b
 
 
@@ -349,59 +233,69 @@ match match(
     ),
     case,
 ):
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case case(
+        match=case,
+        case=re.match(
+            loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong
+        ),
+    ):
         pass
 
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case [a as match]:
         pass
 
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case case:
         pass
 
 
 match match:
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case case:
         pass
 
 
 match a, *b(), c:
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case d, *f, g:
         pass
 
 
 match something:
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {
+        "key": key as key_1,
+        "password": PASS.ONE | PASS.TWO | PASS.THREE as password,
+    }:
         pass
-    case {"NOT_YET_IMPLEMENTED_PatternMatchMapping": _, 2: _}:
+    case {"maybe": something(complicated as this) as that}:
         pass
 
 
 match something:
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case 1 as a:
         pass
 
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case 2 as b, 3 as c:
         pass
 
-    case [NOT_YET_IMPLEMENTED_PatternMatchSequence, 2]:
+    case 4 as d, (5 as e), (6 | 7 as g), *h:
         pass
 
 
 match bar1:
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case Foo(aa=Callable() as aa, bb=int()):
         print(bar1.aa, bar1.bb)
-    case x as NOT_YET_IMPLEMENTED_PatternMatchAs:
+    case _:
         print("no match", "\n")
 
 
 match bar1:
-    case NOT_YET_IMPLEMENTED_PatternMatchClass(0, 0):
+    case Foo(
+        normal=x, perhaps=[list, {"x": d, "y": 1.0}] as y, otherwise=something, q=t as u
+    ):
         pass
 ```
 
 ## Black Output
 
-```py
+```python
 import match
 
 match something:

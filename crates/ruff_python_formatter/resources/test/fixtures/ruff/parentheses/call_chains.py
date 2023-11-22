@@ -161,3 +161,58 @@ max_message_id = (
 max_message_id = (
     Message.objects.filter(recipient=recipient).order_by("id").reverse()[0].id()
 )
+
+# Parentheses with fluent style within and outside of the parentheses.
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+    )
+    .groupby(1,)
+    .sum()
+)
+
+(
+    ( # foo
+        df1_aaaaaaaaaaaa.merge()
+    )
+    .groupby(1,)
+    .sum()
+)
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(1,)
+    )
+    .sum()
+)
+
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(1,)
+    )
+    .sum()
+    .bar()
+)
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(1,)
+        .bar()
+    )
+    .sum()
+)
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(1,)
+        .bar()
+    )
+    .sum()
+    .baz()
+)
+

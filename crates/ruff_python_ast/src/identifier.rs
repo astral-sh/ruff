@@ -10,8 +10,8 @@
 //!
 //! This module can be used to identify the [`TextRange`] of the `except` token.
 
-use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Ranged, Stmt};
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Stmt};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_python_trivia::{is_python_whitespace, Cursor};
 
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn extract_global_names() {
-        let contents = r#"global X,Y, Z"#.trim();
+        let contents = r"global X,Y, Z".trim();
 
         let mut names = IdentifierTokenizer::new(
             contents,

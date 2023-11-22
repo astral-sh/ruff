@@ -33,3 +33,32 @@ result_f = (
     # comment
     ''
 )
+
+(
+    f'{1}'  # comment
+    f'{2}'
+)
+
+(
+    f'{1}'
+    f'{2}'  # comment
+)
+
+(
+    1, (  # comment
+        f'{2}'
+    )
+)
+
+(
+    (
+        f'{1}'
+        # comment
+    ),
+    2
+)
+
+# https://github.com/astral-sh/ruff/issues/6841
+x = f'''a{""}b'''
+y = f'''c{1}d"""e'''
+z = f'''a{""}b''' f'''c{1}d"""e'''

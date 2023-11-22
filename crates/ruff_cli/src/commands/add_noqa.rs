@@ -6,22 +6,23 @@ use log::{debug, error};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 
-use ruff::linter::add_noqa_to_path;
-use ruff::resolver::PyprojectConfig;
-use ruff::{packaging, resolver, warn_user_once};
-use ruff_python_stdlib::path::{is_jupyter_notebook, is_project_toml};
+use ruff_linter::linter::add_noqa_to_path;
+use ruff_linter::source_kind::SourceKind;
+use ruff_linter::warn_user_once;
+use ruff_python_ast::{PySourceType, SourceType};
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile};
 
-use crate::args::Overrides;
+use crate::args::CliOverrides;
 
 /// Add `noqa` directives to a collection of files.
 pub(crate) fn add_noqa(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
-    overrides: &Overrides,
+    overrides: &CliOverrides,
 ) -> Result<usize> {
     // Collect all the files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
+    let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -31,13 +32,12 @@ pub(crate) fn add_noqa(
     }
 
     // Discover the package root for each Python file.
-    let package_roots = packaging::detect_package_roots(
+    let package_roots = resolver.package_roots(
         &paths
             .iter()
             .flatten()
-            .map(ignore::DirEntry::path)
+            .map(ResolvedFile::path)
             .collect::<Vec<_>>(),
-        &resolver,
         pyproject_config,
     );
 
@@ -45,17 +45,28 @@ pub(crate) fn add_noqa(
     let modifications: usize = paths
         .par_iter()
         .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
-            if is_project_toml(path) || is_jupyter_notebook(path) {
+        .filter_map(|resolved_file| {
+            let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
+                SourceType::from(resolved_file.path())
+            else {
                 return None;
-            }
-            let package = path
+            };
+            let path = resolved_file.path();
+            let package = resolved_file
+                .path()
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
             let settings = resolver.resolve(path, pyproject_config);
-            match add_noqa_to_path(path, package, settings) {
+            let source_kind = match SourceKind::from_path(path, source_type) {
+                Ok(Some(source_kind)) => source_kind,
+                Ok(None) => return None,
+                Err(e) => {
+                    error!("Failed to extract source from {}: {e}", path.display());
+                    return None;
+                }
+            };
+            match add_noqa_to_path(path, package, &source_kind, source_type, &settings.linter) {
                 Ok(count) => Some(count),
                 Err(e) => {
                     error!("Failed to add noqa to {}: {e}", path.display());

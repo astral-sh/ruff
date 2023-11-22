@@ -1,0 +1,95 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+magic_trailing_comma.py:2:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 1 |   # This has a magic trailing comma, will be sorted, but not rolled into one line
+ 2 | / from sys import (
+ 3 | |     stderr,
+ 4 | |     argv,
+ 5 | |     stdout,
+ 6 | |     exit,
+ 7 | | )
+ 8 | | 
+ 9 | | # No magic comma, this will be rolled into one line.
+10 | | from os import (
+11 | |     path,
+12 | |     environ,
+13 | |     execl,
+14 | |     execv
+15 | | )
+16 | | 
+17 | | from glob import (
+18 | |     glob,
+19 | |     iglob,
+20 | |     escape,  # Ends with a comment, should still treat as magic trailing comma.
+21 | | )
+22 | | 
+23 | | # These will be combined, but without a trailing comma.
+24 | | from foo import bar
+25 | | from foo import baz
+26 | | 
+27 | | # These will be combined, _with_ a trailing comma.
+28 | | from module1 import member1
+29 | | from module1 import (
+30 | |     member2,
+31 | |     member3,
+32 | | )
+33 | | 
+34 | | # These will be combined, _with_ a trailing comma.
+35 | | from module2 import member1, member2
+36 | | from module2 import (
+37 | |     member3,
+38 | | )
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+1  1  | # This has a magic trailing comma, will be sorted, but not rolled into one line
+2     |-from sys import (
+3     |-    stderr,
+4     |-    argv,
+5     |-    stdout,
+6     |-    exit,
+7     |-)
+8     |-
+9     |-# No magic comma, this will be rolled into one line.
+10    |-from os import (
+11    |-    path,
+12    |-    environ,
+13    |-    execl,
+14    |-    execv
+15    |-)
+16    |-
+17 2  | from glob import (
+   3  |+    escape,  # Ends with a comment, should still treat as magic trailing comma.
+18 4  |     glob,
+19 5  |     iglob,
+20    |-    escape,  # Ends with a comment, should still treat as magic trailing comma.
+21 6  | )
+22 7  | 
+   8  |+# No magic comma, this will be rolled into one line.
+   9  |+from os import environ, execl, execv, path
+   10 |+from sys import argv, exit, stderr, stdout
+   11 |+
+23 12 | # These will be combined, but without a trailing comma.
+24    |-from foo import bar
+25    |-from foo import baz
+   13 |+from foo import bar, baz
+26 14 | 
+27 15 | # These will be combined, _with_ a trailing comma.
+28    |-from module1 import member1
+29    |-from module1 import (
+30    |-    member2,
+31    |-    member3,
+32    |-)
+   16 |+from module1 import member1, member2, member3
+33 17 | 
+34 18 | # These will be combined, _with_ a trailing comma.
+35    |-from module2 import member1, member2
+36    |-from module2 import (
+37    |-    member3,
+38    |-)
+   19 |+from module2 import member1, member2, member3
+
+

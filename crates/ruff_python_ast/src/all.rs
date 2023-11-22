@@ -1,5 +1,5 @@
 use crate::helpers::map_subscript;
-use crate::{self as ast, Constant, Expr, Stmt};
+use crate::{self as ast, Expr, Stmt};
 use bitflags::bitflags;
 
 bitflags! {
@@ -23,11 +23,7 @@ where
 {
     fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut DunderAllFlags) {
         for elt in elts {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(ast::StringConstant { value, .. }),
-                ..
-            }) = elt
-            {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
                 names.push(value);
             } else {
                 *flags |= DunderAllFlags::INVALID_OBJECT;
@@ -81,16 +77,20 @@ where
                                 | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                                     return (Some(elts), DunderAllFlags::empty());
                                 }
-                                Expr::ListComp(_) | Expr::SetComp(_) | Expr::GeneratorExp(_) => {
-                                    // Allow comprehensions, even though we can't statically analyze
-                                    // them.
+                                _ => {
+                                    // We can't analyze other expressions, but they must be
+                                    // valid, since the `list` or `tuple` call will ultimately
+                                    // evaluate to a list or tuple.
                                     return (None, DunderAllFlags::empty());
                                 }
-                                _ => {}
                             }
                         }
                     }
                 }
+            }
+            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => {
+                // Allow, e.g., `__all__ += (value := ["A", "B"])`.
+                return extract_elts(value, is_builtin);
             }
             _ => {}
         }

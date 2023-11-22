@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+<filename>:6:18: TCH002 [*] Move third-party import `pandas` into a type-checking block
+  |
+4 | from typing import TYPE_CHECKING
+5 | 
+6 | import pandas as pd
+  |                  ^^ TCH002
+7 | 
+8 | def f(x: pd.DataFrame):
+  |
+  = help: Move into type-checking block
+
+ℹ Unsafe fix
+3  3  | 
+4  4  | from typing import TYPE_CHECKING
+5  5  | 
+6     |-import pandas as pd
+7  6  | 
+   7  |+if TYPE_CHECKING:
+   8  |+    import pandas as pd
+   9  |+
+8  10 | def f(x: pd.DataFrame):
+9  11 |     pass
+10 12 | 
+
+

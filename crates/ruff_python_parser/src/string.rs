@@ -1,60 +1,57 @@
-use ruff_python_ast::{self as ast, BytesConstant, Constant, Expr, StringConstant};
-use ruff_python_ast::{ConversionFlag, Ranged};
-use ruff_text_size::{TextLen, TextRange, TextSize};
+//! Parsing of string literals, bytes literals, and implicit string concatenation.
 
-// Contains the logic for parsing string literals (mostly concerned with f-strings.)
-//
-// The lexer doesn't do any special handling of f-strings, it just treats them as
-// regular strings. Since the ruff_python_parser has no definition of f-string formats (Pending PEP 701)
-// we have to do the parsing here, manually.
-use crate::{
-    lexer::{LexicalError, LexicalErrorType},
-    parse_expression_starts_at,
-    parser::{ParseError, ParseErrorType},
-    token::{StringKind, Tok},
-};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-// unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
-const MAX_UNICODE_NAME: usize = 88;
+use crate::lexer::{LexicalError, LexicalErrorType};
+use crate::token::{StringKind, Tok};
+
+pub(crate) enum StringType {
+    Str(ast::ExprStringLiteral),
+    Bytes(ast::ExprBytesLiteral),
+    FString(ast::ExprFString),
+}
+
+impl Ranged for StringType {
+    fn range(&self) -> TextRange {
+        match self {
+            Self::Str(node) => node.range(),
+            Self::Bytes(node) => node.range(),
+            Self::FString(node) => node.range(),
+        }
+    }
+}
+
+impl StringType {
+    fn is_unicode(&self) -> bool {
+        match self {
+            Self::Str(ast::ExprStringLiteral { unicode, .. }) => *unicode,
+            _ => false,
+        }
+    }
+}
 
 struct StringParser<'a> {
-    chars: std::str::Chars<'a>,
+    rest: &'a str,
     kind: StringKind,
     location: TextSize,
 }
 
 impl<'a> StringParser<'a> {
-    fn new(source: &'a str, kind: StringKind, triple_quoted: bool, start: TextSize) -> Self {
-        let offset = kind.prefix_len()
-            + if triple_quoted {
-                TextSize::from(3)
-            } else {
-                TextSize::from(1)
-            };
+    fn new(source: &'a str, kind: StringKind, start: TextSize) -> Self {
         Self {
-            chars: source.chars(),
+            rest: source,
             kind,
-            location: start + offset,
+            location: start,
         }
     }
 
     #[inline]
-    fn next_char(&mut self) -> Option<char> {
-        let c = self.chars.next()?;
-        self.location += c.text_len();
-        Some(c)
-    }
-
-    #[inline]
-    fn peek(&mut self) -> Option<char> {
-        self.chars.clone().next()
-    }
-
-    #[inline]
-    fn peek2(&mut self) -> Option<char> {
-        let mut chars = self.chars.clone();
-        chars.next();
-        chars.next()
+    fn skip_bytes(&mut self, bytes: usize) -> &'a str {
+        let skipped_str = &self.rest[..bytes];
+        self.rest = &self.rest[bytes..];
+        self.location += skipped_str.text_len();
+        skipped_str
     }
 
     #[inline]
@@ -65,6 +62,34 @@ impl<'a> StringParser<'a> {
     #[inline]
     fn range(&self, start_location: TextSize) -> TextRange {
         TextRange::new(start_location, self.location)
+    }
+
+    /// Returns the next byte in the string, if there is one.
+    ///
+    /// # Panics
+    ///
+    /// When the next byte is a part of a multi-byte character.
+    #[inline]
+    fn next_byte(&mut self) -> Option<u8> {
+        self.rest.as_bytes().first().map(|&byte| {
+            self.rest = &self.rest[1..];
+            self.location += TextSize::new(1);
+            byte
+        })
+    }
+
+    #[inline]
+    fn next_char(&mut self) -> Option<char> {
+        self.rest.chars().next().map(|c| {
+            self.rest = &self.rest[c.len_utf8()..];
+            self.location += c.text_len();
+            c
+        })
+    }
+
+    #[inline]
+    fn peek_byte(&self) -> Option<u8> {
+        self.rest.as_bytes().first().copied()
     }
 
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
@@ -84,417 +109,156 @@ impl<'a> StringParser<'a> {
             _ => std::char::from_u32(p).ok_or(unicode_error),
         }
     }
+    fn parse_octet(&mut self, o: u8) -> char {
+        let mut radix_bytes = [o, 0, 0];
+        let mut len = 1;
 
-    fn parse_octet(&mut self, first: char) -> char {
-        let mut octet_content = String::new();
-        octet_content.push(first);
-        while octet_content.len() < 3 {
-            if let Some('0'..='7') = self.peek() {
-                octet_content.push(self.next_char().unwrap());
-            } else {
+        while len < 3 {
+            let Some(b'0'..=b'7') = self.peek_byte() else {
                 break;
-            }
+            };
+
+            radix_bytes[len] = self.next_byte().unwrap();
+            len += 1;
         }
-        let value = u32::from_str_radix(&octet_content, 8).unwrap();
+
+        // SAFETY: radix_bytes is always going to be in the ASCII range.
+        #[allow(unsafe_code)]
+        let radix_str = unsafe { std::str::from_utf8_unchecked(&radix_bytes[..len]) };
+
+        let value = u32::from_str_radix(radix_str, 8).unwrap();
         char::from_u32(value).unwrap()
     }
 
     fn parse_unicode_name(&mut self) -> Result<char, LexicalError> {
         let start_pos = self.get_pos();
-        match self.next_char() {
-            Some('{') => {}
-            _ => return Err(LexicalError::new(LexicalErrorType::StringError, start_pos)),
-        }
-        let start_pos = self.get_pos();
-        let mut name = String::new();
-        loop {
-            match self.next_char() {
-                Some('}') => break,
-                Some(c) => name.push(c),
-                None => {
-                    return Err(LexicalError::new(
-                        LexicalErrorType::StringError,
-                        self.get_pos(),
-                    ))
-                }
-            }
-        }
 
-        if name.len() > MAX_UNICODE_NAME {
+        let Some('{') = self.next_char() else {
+            return Err(LexicalError::new(LexicalErrorType::StringError, start_pos));
+        };
+
+        let start_pos = self.get_pos();
+        let Some(close_idx) = self.rest.find('}') else {
             return Err(LexicalError::new(
-                LexicalErrorType::UnicodeError,
+                LexicalErrorType::StringError,
                 self.get_pos(),
             ));
-        }
+        };
 
-        unicode_names2::character(&name)
+        let name_and_ending = self.skip_bytes(close_idx + 1);
+        let name = &name_and_ending[..name_and_ending.len() - 1];
+
+        unicode_names2::character(name)
             .ok_or_else(|| LexicalError::new(LexicalErrorType::UnicodeError, start_pos))
     }
 
-    fn parse_escaped_char(&mut self) -> Result<String, LexicalError> {
-        match self.next_char() {
-            Some(c) => {
-                let char = match c {
-                    '\\' => '\\',
-                    '\'' => '\'',
-                    '\"' => '"',
-                    'a' => '\x07',
-                    'b' => '\x08',
-                    'f' => '\x0c',
-                    'n' => '\n',
-                    'r' => '\r',
-                    't' => '\t',
-                    'v' => '\x0b',
-                    o @ '0'..='7' => self.parse_octet(o),
-                    'x' => self.parse_unicode_literal(2)?,
-                    'u' if !self.kind.is_any_bytes() => self.parse_unicode_literal(4)?,
-                    'U' if !self.kind.is_any_bytes() => self.parse_unicode_literal(8)?,
-                    'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
-                    // Special cases where the escape sequence is not a single character
-                    '\n' => return Ok(String::new()),
-                    c => {
-                        if self.kind.is_any_bytes() && !c.is_ascii() {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::OtherError(
-                                    "bytes can only contain ASCII literal characters".to_owned(),
-                                ),
-                                location: self.get_pos(),
-                            });
-                        }
-                        return Ok(format!("\\{c}"));
-                    }
-                };
-                Ok(char.to_string())
-            }
-            None => Err(LexicalError {
+    fn parse_escaped_char(&mut self, string: &mut String) -> Result<(), LexicalError> {
+        let Some(first_char) = self.next_char() else {
+            return Err(LexicalError {
                 error: LexicalErrorType::StringError,
                 location: self.get_pos(),
-            }),
-        }
-    }
-
-    fn parse_formatted_value(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
-        use FStringErrorType::{
-            EmptyExpression, InvalidConversionFlag, InvalidExpression, MismatchedDelimiter,
-            UnclosedLbrace, Unmatched, UnterminatedString,
+            });
         };
 
-        let mut expression = String::new();
-        // for self-documenting strings we also store the `=` and any trailing space inside
-        // expression (because we want to combine it with any trailing spaces before the equal
-        // sign). the expression_length is the length of the actual expression part that we pass to
-        // `parse_fstring_expr`
-        let mut expression_length = 0;
-        let mut spec = None;
-        let mut delimiters = Vec::new();
-        let mut conversion = ConversionFlag::None;
-        let mut self_documenting = false;
+        let new_char = match first_char {
+            '\\' => '\\',
+            '\'' => '\'',
+            '\"' => '"',
+            'a' => '\x07',
+            'b' => '\x08',
+            'f' => '\x0c',
+            'n' => '\n',
+            'r' => '\r',
+            't' => '\t',
+            'v' => '\x0b',
+            o @ '0'..='7' => self.parse_octet(o as u8),
+            'x' => self.parse_unicode_literal(2)?,
+            'u' if !self.kind.is_any_bytes() => self.parse_unicode_literal(4)?,
+            'U' if !self.kind.is_any_bytes() => self.parse_unicode_literal(8)?,
+            'N' if !self.kind.is_any_bytes() => self.parse_unicode_name()?,
+            // Special cases where the escape sequence is not a single character
+            '\n' => return Ok(()),
+            '\r' => {
+                if self.peek_byte() == Some(b'\n') {
+                    self.next_byte();
+                }
+
+                return Ok(());
+            }
+            _ => {
+                if self.kind.is_any_bytes() && !first_char.is_ascii() {
+                    return Err(LexicalError {
+                        error: LexicalErrorType::OtherError(
+                            "bytes can only contain ASCII literal characters".to_owned(),
+                        ),
+                        location: self.get_pos(),
+                    });
+                }
+
+                string.push('\\');
+
+                first_char
+            }
+        };
+
+        string.push(new_char);
+
+        Ok(())
+    }
+
+    fn parse_fstring_middle(&mut self) -> Result<Expr, LexicalError> {
+        let mut value = String::new();
         let start_location = self.get_pos();
-
-        assert_eq!(self.next_char(), Some('{'));
-
         while let Some(ch) = self.next_char() {
             match ch {
-                // can be integrated better with the remaining code, but as a starting point ok
-                // in general I would do here a tokenizing of the fstrings to omit this peeking.
-                '!' | '=' | '>' | '<' if self.peek() == Some('=') => {
-                    expression.push(ch);
-                    expression.push('=');
-                    self.next_char();
+                // We can encounter a `\` as the last character in a `FStringMiddle`
+                // token which is valid in this context. For example,
+                //
+                // ```python
+                // f"\{foo} \{bar:\}"
+                // # ^     ^^     ^
+                // ```
+                //
+                // Here, the `FStringMiddle` token content will be "\" and " \"
+                // which is invalid if we look at the content in isolation:
+                //
+                // ```python
+                // "\"
+                // ```
+                //
+                // However, the content is syntactically valid in the context of
+                // the f-string because it's a substring of the entire f-string.
+                // This is still an invalid escape sequence, but we don't want to
+                // raise a syntax error as is done by the CPython parser. It might
+                // be supported in the future, refer to point 3: https://peps.python.org/pep-0701/#rejected-ideas
+                '\\' if !self.kind.is_raw() && self.peek_byte().is_some() => {
+                    self.parse_escaped_char(&mut value)?;
                 }
-                '!' if delimiters.is_empty() && self.peek() != Some('=') => {
-                    if expression.trim().is_empty() {
-                        return Err(FStringError::new(EmptyExpression, self.get_pos()).into());
-                    }
-
-                    conversion = match self.next_char() {
-                        Some('s') => ConversionFlag::Str,
-                        Some('a') => ConversionFlag::Ascii,
-                        Some('r') => ConversionFlag::Repr,
-                        Some(_) => {
-                            return Err(
-                                FStringError::new(InvalidConversionFlag, self.get_pos()).into()
-                            );
-                        }
-                        None => {
-                            return Err(FStringError::new(UnclosedLbrace, self.get_pos()).into());
-                        }
-                    };
-
-                    match self.peek() {
-                        Some('}' | ':') => {}
-                        Some(_) | None => {
-                            return Err(FStringError::new(UnclosedLbrace, self.get_pos()).into());
-                        }
-                    }
+                // If there are any curly braces inside a `FStringMiddle` token,
+                // then they were escaped (i.e. `{{` or `}}`). This means that
+                // we need increase the location by 2 instead of 1.
+                ch @ ('{' | '}') => {
+                    self.location += ch.text_len();
+                    value.push(ch);
                 }
-
-                // match a python 3.8 self documenting expression
-                // format '{' PYTHON_EXPRESSION '=' FORMAT_SPECIFIER? '}'
-                '=' if self.peek() != Some('=') && delimiters.is_empty() => {
-                    expression_length = expression.len();
-                    expression.push(ch);
-                    self_documenting = true;
-                }
-
-                ':' if delimiters.is_empty() => {
-                    let start_location = self.get_pos();
-                    let parsed_spec = self.parse_spec(nested)?;
-
-                    spec = Some(Box::new(Expr::from(ast::ExprFString {
-                        values: parsed_spec,
-                        implicit_concatenated: false,
-                        range: self.range(start_location),
-                    })));
-                }
-                '(' | '{' | '[' => {
-                    expression.push(ch);
-                    delimiters.push(ch);
-                }
-                ')' => {
-                    let last_delim = delimiters.pop();
-                    match last_delim {
-                        Some('(') => {
-                            expression.push(ch);
-                        }
-                        Some(c) => {
-                            return Err(FStringError::new(
-                                MismatchedDelimiter(c, ')'),
-                                self.get_pos(),
-                            )
-                            .into());
-                        }
-                        None => {
-                            return Err(FStringError::new(Unmatched(')'), self.get_pos()).into());
-                        }
-                    }
-                }
-                ']' => {
-                    let last_delim = delimiters.pop();
-                    match last_delim {
-                        Some('[') => {
-                            expression.push(ch);
-                        }
-                        Some(c) => {
-                            return Err(FStringError::new(
-                                MismatchedDelimiter(c, ']'),
-                                self.get_pos(),
-                            )
-                            .into());
-                        }
-                        None => {
-                            return Err(FStringError::new(Unmatched(']'), self.get_pos()).into());
-                        }
-                    }
-                }
-                '}' if !delimiters.is_empty() => {
-                    let last_delim = delimiters.pop();
-                    match last_delim {
-                        Some('{') => {
-                            expression.push(ch);
-                        }
-                        Some(c) => {
-                            return Err(FStringError::new(
-                                MismatchedDelimiter(c, '}'),
-                                self.get_pos(),
-                            )
-                            .into());
-                        }
-                        None => {}
-                    }
-                }
-                '}' => {
-                    if expression.trim().is_empty() {
-                        return Err(FStringError::new(EmptyExpression, self.get_pos()).into());
-                    }
-
-                    let ret = if self_documenting {
-                        let value =
-                            parse_fstring_expr(&expression[..expression_length], start_location)
-                                .map_err(|e| {
-                                    FStringError::new(
-                                        InvalidExpression(Box::new(e.error)),
-                                        start_location,
-                                    )
-                                })?;
-                        let leading =
-                            &expression[..usize::from(value.start() - start_location) - 1];
-                        let trailing = &expression[usize::from(value.end() - start_location) - 1..];
-                        vec![Expr::from(ast::ExprFormattedValue {
-                            value: Box::new(value),
-                            debug_text: Some(ast::DebugText {
-                                leading: leading.to_string(),
-                                trailing: trailing.to_string(),
-                            }),
-                            conversion,
-                            format_spec: spec,
-                            range: self.range(start_location),
-                        })]
-                    } else {
-                        vec![Expr::from(ast::ExprFormattedValue {
-                            value: Box::new(
-                                parse_fstring_expr(&expression, start_location).map_err(|e| {
-                                    FStringError::new(
-                                        InvalidExpression(Box::new(e.error)),
-                                        start_location,
-                                    )
-                                })?,
-                            ),
-                            debug_text: None,
-                            conversion,
-                            format_spec: spec,
-                            range: self.range(start_location),
-                        })]
-                    };
-                    return Ok(ret);
-                }
-                '"' | '\'' => {
-                    expression.push(ch);
-                    loop {
-                        let Some(c) = self.next_char() else {
-                            return Err(
-                                FStringError::new(UnterminatedString, self.get_pos()).into()
-                            );
-                        };
-                        expression.push(c);
-                        if c == ch {
-                            break;
-                        }
-                    }
-                }
-                ' ' if self_documenting => expression.push(ch),
-                '\\' => return Err(FStringError::new(UnterminatedString, self.get_pos()).into()),
-                _ => {
-                    if self_documenting {
-                        return Err(FStringError::new(UnclosedLbrace, self.get_pos()).into());
-                    }
-
-                    expression.push(ch);
-                }
+                ch => value.push(ch),
             }
         }
-        Err(FStringError::new(UnclosedLbrace, self.get_pos()).into())
+        Ok(Expr::from(ast::ExprStringLiteral {
+            value,
+            unicode: false,
+            implicit_concatenated: false,
+            range: self.range(start_location),
+        }))
     }
 
-    fn parse_spec(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
-        let mut spec_constructor = Vec::new();
-        let mut constant_piece = String::new();
-        let mut start_location = self.get_pos();
-        while let Some(next) = self.peek() {
-            match next {
-                '{' => {
-                    if !constant_piece.is_empty() {
-                        spec_constructor.push(Expr::from(ast::ExprConstant {
-                            value: std::mem::take(&mut constant_piece).into(),
-                            kind: None,
-                            range: self.range(start_location),
-                        }));
-                    }
-                    let parsed_expr = self.parse_fstring(nested + 1)?;
-                    spec_constructor.extend(parsed_expr);
-                    start_location = self.get_pos();
-                    continue;
-                }
-                '}' => {
-                    break;
-                }
-                _ => {
-                    constant_piece.push(next);
-                }
-            }
-            self.next_char();
-        }
-        if !constant_piece.is_empty() {
-            spec_constructor.push(Expr::from(ast::ExprConstant {
-                value: std::mem::take(&mut constant_piece).into(),
-                kind: None,
-                range: self.range(start_location),
-            }));
-        }
-        Ok(spec_constructor)
-    }
-
-    fn parse_fstring(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
-        use FStringErrorType::{ExpressionNestedTooDeeply, SingleRbrace, UnclosedLbrace};
-
-        if nested >= 2 {
-            return Err(FStringError::new(ExpressionNestedTooDeeply, self.get_pos()).into());
-        }
-
-        let mut content = String::new();
-        let mut start_location = self.get_pos();
-        let mut values = vec![];
-
-        while let Some(ch) = self.peek() {
-            match ch {
-                '{' => {
-                    if nested == 0 {
-                        match self.peek2() {
-                            Some('{') => {
-                                self.next_char();
-                                self.next_char();
-                                content.push('{');
-                                continue;
-                            }
-                            None => {
-                                return Err(FStringError::new(UnclosedLbrace, self.get_pos()).into())
-                            }
-                            _ => {}
-                        }
-                    }
-                    if !content.is_empty() {
-                        values.push(Expr::from(ast::ExprConstant {
-                            value: std::mem::take(&mut content).into(),
-                            kind: None,
-                            range: self.range(start_location),
-                        }));
-                    }
-
-                    let parsed_values = self.parse_formatted_value(nested)?;
-                    values.extend(parsed_values);
-                    start_location = self.get_pos();
-                }
-                '}' => {
-                    if nested > 0 {
-                        break;
-                    }
-                    self.next_char();
-                    if let Some('}') = self.peek() {
-                        self.next_char();
-                        content.push('}');
-                    } else {
-                        return Err(FStringError::new(SingleRbrace, self.get_pos()).into());
-                    }
-                }
-                '\\' if !self.kind.is_raw() => {
-                    self.next_char();
-                    content.push_str(&self.parse_escaped_char()?);
-                }
-                _ => {
-                    content.push(ch);
-                    self.next_char();
-                }
-            }
-        }
-
-        if !content.is_empty() {
-            values.push(Expr::from(ast::ExprConstant {
-                value: content.into(),
-                kind: None,
-                range: self.range(start_location),
-            }));
-        }
-
-        Ok(values)
-    }
-
-    fn parse_bytes(&mut self) -> Result<Expr, LexicalError> {
+    fn parse_bytes(&mut self) -> Result<StringType, LexicalError> {
         let mut content = String::new();
         let start_location = self.get_pos();
         while let Some(ch) = self.next_char() {
             match ch {
                 '\\' if !self.kind.is_raw() => {
-                    content.push_str(&self.parse_escaped_char()?);
+                    self.parse_escaped_char(&mut content)?;
                 }
                 ch => {
                     if !ch.is_ascii() {
@@ -510,180 +274,217 @@ impl<'a> StringParser<'a> {
             }
         }
 
-        Ok(Expr::from(ast::ExprConstant {
-            value: content.chars().map(|c| c as u8).collect::<Vec<u8>>().into(),
-            kind: None,
+        Ok(StringType::Bytes(ast::ExprBytesLiteral {
+            value: content.chars().map(|c| c as u8).collect::<Vec<u8>>(),
+            implicit_concatenated: false,
             range: self.range(start_location),
         }))
     }
 
-    fn parse_string(&mut self) -> Result<Expr, LexicalError> {
-        let mut value = String::new();
+    fn parse_string(&mut self) -> Result<StringType, LexicalError> {
         let start_location = self.get_pos();
-        while let Some(ch) = self.next_char() {
-            match ch {
-                '\\' if !self.kind.is_raw() => {
-                    value.push_str(&self.parse_escaped_char()?);
-                }
-                ch => value.push(ch),
+        let mut value = String::new();
+
+        if self.kind.is_raw() {
+            value.push_str(self.skip_bytes(self.rest.len()));
+        } else {
+            loop {
+                let Some(escape_idx) = self.rest.find('\\') else {
+                    value.push_str(self.skip_bytes(self.rest.len()));
+                    break;
+                };
+
+                let before_with_slash = self.skip_bytes(escape_idx + 1);
+                let before = &before_with_slash[..before_with_slash.len() - 1];
+
+                value.push_str(before);
+                self.parse_escaped_char(&mut value)?;
             }
         }
-        Ok(Expr::from(ast::ExprConstant {
-            value: value.into(),
-            kind: self.kind.is_unicode().then(|| "u".to_string()),
+        Ok(StringType::Str(ast::ExprStringLiteral {
+            value,
+            unicode: self.kind.is_unicode(),
+            implicit_concatenated: false,
             range: self.range(start_location),
         }))
     }
 
-    fn parse(&mut self) -> Result<Vec<Expr>, LexicalError> {
-        if self.kind.is_any_fstring() {
-            self.parse_fstring(0)
-        } else if self.kind.is_any_bytes() {
-            self.parse_bytes().map(|expr| vec![expr])
+    fn parse(&mut self) -> Result<StringType, LexicalError> {
+        if self.kind.is_any_bytes() {
+            self.parse_bytes()
         } else {
-            self.parse_string().map(|expr| vec![expr])
+            self.parse_string()
         }
     }
 }
 
-fn parse_fstring_expr(source: &str, location: TextSize) -> Result<Expr, ParseError> {
-    let fstring_body = format!("({source})");
-    parse_expression_starts_at(&fstring_body, "<fstring>", location)
-}
-
-fn parse_string(
+pub(crate) fn parse_string_literal(
     source: &str,
     kind: StringKind,
     triple_quoted: bool,
-    start: TextSize,
-) -> Result<Vec<Expr>, LexicalError> {
-    StringParser::new(source, kind, triple_quoted, start).parse()
+    start_location: TextSize,
+) -> Result<StringType, LexicalError> {
+    let start_location = start_location
+        + kind.prefix_len()
+        + if triple_quoted {
+            TextSize::from(3)
+        } else {
+            TextSize::from(1)
+        };
+    StringParser::new(source, kind, start_location).parse()
 }
 
-pub(crate) fn parse_strings(
-    values: Vec<(TextSize, (String, StringKind, bool), TextSize)>,
+pub(crate) fn parse_fstring_middle(
+    source: &str,
+    is_raw: bool,
+    start_location: TextSize,
 ) -> Result<Expr, LexicalError> {
-    // Preserve the initial location and kind.
-    let initial_start = values[0].0;
-    let last_end = values.last().unwrap().2;
-    let initial_kind = (values[0].1 .1 == StringKind::Unicode).then(|| "u".to_owned());
-    let has_fstring = values
-        .iter()
-        .any(|(_, (_, kind, ..), _)| kind.is_any_fstring());
-    let num_bytes = values
-        .iter()
-        .filter(|(_, (_, kind, ..), _)| kind.is_any_bytes())
-        .count();
-    let has_bytes = num_bytes > 0;
-    let implicit_concatenated = values.len() > 1;
+    let kind = if is_raw {
+        StringKind::RawString
+    } else {
+        StringKind::String
+    };
+    StringParser::new(source, kind, start_location).parse_fstring_middle()
+}
 
-    if has_bytes && num_bytes < values.len() {
+/// Concatenate a list of string literals into a single string expression.
+pub(crate) fn concatenate_strings(
+    strings: Vec<StringType>,
+    range: TextRange,
+) -> Result<Expr, LexicalError> {
+    #[cfg(debug_assertions)]
+    debug_assert!(!strings.is_empty());
+
+    let mut has_fstring = false;
+    let mut byte_literal_count = 0;
+    for string in &strings {
+        match string {
+            StringType::FString(_) => has_fstring = true,
+            StringType::Bytes(_) => byte_literal_count += 1,
+            StringType::Str(_) => {}
+        }
+    }
+    let has_bytes = byte_literal_count > 0;
+    let implicit_concatenated = strings.len() > 1;
+
+    if has_bytes && byte_literal_count < strings.len() {
         return Err(LexicalError {
             error: LexicalErrorType::OtherError(
                 "cannot mix bytes and nonbytes literals".to_owned(),
             ),
-            location: initial_start,
+            location: range.start(),
         });
     }
 
     if has_bytes {
         let mut content: Vec<u8> = vec![];
-        for (start, (source, kind, triple_quoted), _) in values {
-            for value in parse_string(&source, kind, triple_quoted, start)? {
-                match value {
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::Bytes(BytesConstant { value, .. }),
-                        ..
-                    }) => content.extend(value),
-                    _ => unreachable!("Unexpected non-bytes expression."),
-                }
+        for string in strings {
+            match string {
+                StringType::Bytes(ast::ExprBytesLiteral { value, .. }) => content.extend(value),
+                _ => unreachable!("Unexpected non-bytes literal."),
             }
         }
-        return Ok(ast::ExprConstant {
-            value: Constant::Bytes(BytesConstant {
-                value: content,
-                implicit_concatenated,
-            }),
-            kind: None,
-            range: TextRange::new(initial_start, last_end),
+        return Ok(ast::ExprBytesLiteral {
+            value: content,
+            implicit_concatenated,
+            range,
         }
         .into());
     }
 
     if !has_fstring {
-        let mut content: Vec<String> = vec![];
-        for (start, (source, kind, triple_quoted), _) in values {
-            for value in parse_string(&source, kind, triple_quoted, start)? {
-                match value {
-                    Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(StringConstant { value, .. }),
-                        ..
-                    }) => content.push(value),
-                    _ => unreachable!("Unexpected non-string expression."),
-                }
+        let mut content = String::new();
+        let is_unicode = strings.first().map_or(false, StringType::is_unicode);
+        for string in strings {
+            match string {
+                StringType::Str(ast::ExprStringLiteral { value, .. }) => content.push_str(&value),
+                _ => unreachable!("Unexpected non-string literal."),
             }
         }
-        return Ok(ast::ExprConstant {
-            value: Constant::Str(StringConstant {
-                value: content.join(""),
-                implicit_concatenated,
-            }),
-            kind: initial_kind,
-            range: TextRange::new(initial_start, last_end),
+        return Ok(ast::ExprStringLiteral {
+            value: content,
+            unicode: is_unicode,
+            implicit_concatenated,
+            range,
         }
         .into());
     }
 
     // De-duplicate adjacent constants.
     let mut deduped: Vec<Expr> = vec![];
-    let mut current: Vec<String> = vec![];
-    let mut current_start = initial_start;
-    let mut current_end = last_end;
+    let mut current = String::new();
+    let mut current_start = range.start();
+    let mut current_end = range.end();
+    let mut is_unicode = false;
 
-    let take_current = |current: &mut Vec<String>, start, end| -> Expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(StringConstant {
-                value: current.drain(..).collect::<String>(),
-                implicit_concatenated,
-            }),
-            kind: initial_kind.clone(),
+    let take_current = |current: &mut String, start, end, unicode| -> Expr {
+        Expr::StringLiteral(ast::ExprStringLiteral {
+            value: std::mem::take(current),
+            unicode,
+            implicit_concatenated,
             range: TextRange::new(start, end),
         })
     };
 
-    for (start, (source, kind, triple_quoted), _) in values {
-        for value in parse_string(&source, kind, triple_quoted, start)? {
-            let value_range = value.range();
-            match value {
-                Expr::FormattedValue { .. } => {
-                    if !current.is_empty() {
-                        deduped.push(take_current(&mut current, current_start, current_end));
+    for string in strings {
+        let string_range = string.range();
+        match string {
+            StringType::FString(ast::ExprFString { values, .. }) => {
+                for value in values {
+                    let value_range = value.range();
+                    match value {
+                        Expr::FormattedValue { .. } => {
+                            if !current.is_empty() {
+                                deduped.push(take_current(
+                                    &mut current,
+                                    current_start,
+                                    current_end,
+                                    is_unicode,
+                                ));
+                            }
+                            deduped.push(value);
+                            is_unicode = false;
+                        }
+                        Expr::StringLiteral(ast::ExprStringLiteral { value, unicode, .. }) => {
+                            if current.is_empty() {
+                                is_unicode |= unicode;
+                                current_start = value_range.start();
+                            }
+                            current_end = value_range.end();
+                            current.push_str(&value);
+                        }
+                        _ => {
+                            unreachable!("Expected `Expr::FormattedValue` or `Expr::StringLiteral`")
+                        }
                     }
-                    deduped.push(value);
                 }
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(StringConstant { value, .. }),
-                    ..
-                }) => {
-                    if current.is_empty() {
-                        current_start = value_range.start();
-                    }
-                    current_end = value_range.end();
-                    current.push(value);
-                }
-                _ => unreachable!("Unexpected non-string expression."),
             }
+            StringType::Str(ast::ExprStringLiteral { value, unicode, .. }) => {
+                if current.is_empty() {
+                    is_unicode |= unicode;
+                    current_start = string_range.start();
+                }
+                current_end = string_range.end();
+                current.push_str(&value);
+            }
+            StringType::Bytes(_) => unreachable!("Unexpected bytes literal."),
         }
     }
     if !current.is_empty() {
-        deduped.push(take_current(&mut current, current_start, current_end));
+        deduped.push(take_current(
+            &mut current,
+            current_start,
+            current_end,
+            is_unicode,
+        ));
     }
 
-    Ok(Expr::FString(ast::ExprFString {
+    Ok(ast::ExprFString {
         values: deduped,
         implicit_concatenated,
-        range: TextRange::new(initial_start, last_end),
-    }))
+        range,
+    }
+    .into())
 }
 
 // TODO: consolidate these with ParseError
@@ -694,13 +495,6 @@ struct FStringError {
     pub(crate) error: FStringErrorType,
     /// The location of the error.
     pub(crate) location: TextSize,
-}
-
-impl FStringError {
-    /// Creates a new `FStringError` with the given error type and location.
-    pub(crate) fn new(error: FStringErrorType, location: TextSize) -> Self {
-        Self { error, location }
-    }
 }
 
 impl From<FStringError> for LexicalError {
@@ -717,65 +511,34 @@ impl From<FStringError> for LexicalError {
 pub enum FStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
-    /// Expected a left brace after an ending right brace.
-    UnopenedRbrace,
-    /// Expected a right brace after a conversion flag.
-    ExpectedRbrace,
-    /// An error occurred while parsing an f-string expression.
-    InvalidExpression(Box<ParseErrorType>),
     /// An invalid conversion flag was encountered.
     InvalidConversionFlag,
-    /// An empty expression was encountered.
-    EmptyExpression,
-    /// An opening delimiter was not closed properly.
-    MismatchedDelimiter(char, char),
-    /// Too many nested expressions in an f-string.
-    ExpressionNestedTooDeeply,
-    /// The f-string expression cannot include the given character.
-    ExpressionCannotInclude(char),
     /// A single right brace was encountered.
     SingleRbrace,
-    /// A closing delimiter was not opened properly.
-    Unmatched(char),
-    // TODO: Test this case.
     /// Unterminated string.
     UnterminatedString,
+    /// Unterminated triple-quoted string.
+    UnterminatedTripleQuotedString,
+    // TODO(dhruvmanila): The parser can't catch all cases of this error, but
+    // wherever it can, we'll display the correct error message.
+    /// A lambda expression without parentheses was encountered.
+    LambdaWithoutParentheses,
 }
 
 impl std::fmt::Display for FStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use FStringErrorType::{
-            EmptyExpression, ExpectedRbrace, ExpressionCannotInclude, ExpressionNestedTooDeeply,
-            InvalidConversionFlag, InvalidExpression, MismatchedDelimiter, SingleRbrace,
-            UnclosedLbrace, Unmatched, UnopenedRbrace, UnterminatedString,
+            InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
+            UnterminatedString, UnterminatedTripleQuotedString,
         };
         match self {
             UnclosedLbrace => write!(f, "expecting '}}'"),
-            UnopenedRbrace => write!(f, "Unopened '}}'"),
-            ExpectedRbrace => write!(f, "Expected '}}' after conversion flag."),
-            InvalidExpression(error) => {
-                write!(f, "{error}")
-            }
             InvalidConversionFlag => write!(f, "invalid conversion character"),
-            EmptyExpression => write!(f, "empty expression not allowed"),
-            MismatchedDelimiter(first, second) => write!(
-                f,
-                "closing parenthesis '{second}' does not match opening parenthesis '{first}'"
-            ),
             SingleRbrace => write!(f, "single '}}' is not allowed"),
-            Unmatched(delim) => write!(f, "unmatched '{delim}'"),
-            ExpressionNestedTooDeeply => {
-                write!(f, "expressions nested too deeply")
-            }
-            UnterminatedString => {
-                write!(f, "unterminated string")
-            }
-            ExpressionCannotInclude(c) => {
-                if *c == '\\' {
-                    write!(f, "f-string expression part cannot include a backslash")
-                } else {
-                    write!(f, "f-string expression part cannot include '{c}'s")
-                }
+            UnterminatedString => write!(f, "unterminated string"),
+            UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
+            LambdaWithoutParentheses => {
+                write!(f, "lambda expressions are not allowed without parentheses")
             }
         }
     }
@@ -794,70 +557,96 @@ impl From<FStringError> for crate::parser::LalrpopError<TextSize, Tok, LexicalEr
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::lexer::LexicalErrorType;
     use crate::parser::parse_suite;
+    use crate::{ParseErrorType, Suite};
 
-    fn parse_fstring(source: &str) -> Result<Vec<Expr>, LexicalError> {
-        StringParser::new(source, StringKind::FString, false, TextSize::default()).parse()
+    use super::*;
+
+    const WINDOWS_EOL: &str = "\r\n";
+    const MAC_EOL: &str = "\r";
+    const UNIX_EOL: &str = "\n";
+
+    fn string_parser_escaped_eol(eol: &str) -> Suite {
+        let source = format!(r"'text \{eol}more text'");
+        parse_suite(&source, "<test>").unwrap()
+    }
+
+    #[test]
+    fn test_string_parser_escaped_unix_eol() {
+        let parse_ast = string_parser_escaped_eol(UNIX_EOL);
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_string_parser_escaped_mac_eol() {
+        let parse_ast = string_parser_escaped_eol(MAC_EOL);
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_string_parser_escaped_windows_eol() {
+        let parse_ast = string_parser_escaped_eol(WINDOWS_EOL);
+        insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_fstring() {
-        let source = "{a}{ b }{{foo}}";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{a}{ b }{{foo}}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_fstring_nested_spec() {
-        let source = "{foo:{spec}}";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{foo:{spec}}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_fstring_not_nested_spec() {
-        let source = "{foo:spec}";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{foo:spec}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_empty_fstring() {
-        insta::assert_debug_snapshot!(parse_fstring("").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(r#"f"""#, "<test>").unwrap());
     }
 
     #[test]
     fn test_fstring_parse_self_documenting_base() {
-        let src = "{user=}";
-        let parse_ast = parse_fstring(src).unwrap();
+        let source = r#"f"{user=}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_fstring_parse_self_documenting_base_more() {
-        let src = "mix {user=} with text and {second=}";
-        let parse_ast = parse_fstring(src).unwrap();
+        let source = r#"f"mix {user=} with text and {second=}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_fstring_parse_self_documenting_format() {
-        let src = "{user=:>10}";
-        let parse_ast = parse_fstring(src).unwrap();
+        let source = r#"f"{user=:>10}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     fn parse_fstring_error(source: &str) -> FStringErrorType {
-        parse_fstring(source)
+        parse_suite(source, "<test>")
             .map_err(|e| match e.error {
-                LexicalErrorType::FStringError(e) => e,
+                ParseErrorType::Lexical(LexicalErrorType::FStringError(e)) => e,
                 e => unreachable!("Expected FStringError: {:?}", e),
             })
             .expect_err("Expected error")
@@ -865,68 +654,52 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_fstring() {
-        use FStringErrorType::{
-            EmptyExpression, ExpressionNestedTooDeeply, InvalidConversionFlag, SingleRbrace,
-            UnclosedLbrace,
-        };
-        assert_eq!(parse_fstring_error("{5!a"), UnclosedLbrace);
-        assert_eq!(parse_fstring_error("{5!a1}"), UnclosedLbrace);
-        assert_eq!(parse_fstring_error("{5!"), UnclosedLbrace);
-        assert_eq!(parse_fstring_error("abc{!a 'cat'}"), EmptyExpression);
-        assert_eq!(parse_fstring_error("{!a"), EmptyExpression);
-        assert_eq!(parse_fstring_error("{ !a}"), EmptyExpression);
+        use FStringErrorType::{InvalidConversionFlag, LambdaWithoutParentheses};
 
-        assert_eq!(parse_fstring_error("{5!}"), InvalidConversionFlag);
-        assert_eq!(parse_fstring_error("{5!x}"), InvalidConversionFlag);
-
+        assert_eq!(parse_fstring_error(r#"f"{5!x}""#), InvalidConversionFlag);
         assert_eq!(
-            parse_fstring_error("{a:{a:{b}}}"),
-            ExpressionNestedTooDeeply
+            parse_fstring_error("f'{lambda x:{x}}'"),
+            LambdaWithoutParentheses
         );
-
-        assert_eq!(parse_fstring_error("{a:b}}"), SingleRbrace);
-        assert_eq!(parse_fstring_error("}"), SingleRbrace);
-        assert_eq!(parse_fstring_error("{a:{b}"), UnclosedLbrace);
-        assert_eq!(parse_fstring_error("{"), UnclosedLbrace);
-
-        assert_eq!(parse_fstring_error("{}"), EmptyExpression);
-
-        // TODO: check for InvalidExpression enum?
-        assert!(parse_fstring("{class}").is_err());
+        assert_eq!(
+            parse_fstring_error("f'{lambda x: {x}}'"),
+            LambdaWithoutParentheses
+        );
+        assert!(parse_suite(r#"f"{class}""#, "<test>").is_err());
     }
 
     #[test]
     fn test_parse_fstring_not_equals() {
-        let source = "{1 != 2}";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{1 != 2}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_fstring_equals() {
-        let source = "{42 == 42}";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{42 == 42}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_fstring_self_doc_prec_space() {
-        let source = "{x   =}";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{x   =}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_fstring_self_doc_trailing_space() {
-        let source = "{x=   }";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{x=   }""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_fstring_yield_expr() {
-        let source = "{yield}";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{yield}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -1098,16 +871,25 @@ mod tests {
 
     #[test]
     fn test_parse_fstring_nested_string_spec() {
-        let source = "{foo:{''}}";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{foo:{''}}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_fstring_nested_concatenation_string_spec() {
-        let source = "{foo:{'' ''}}";
-        let parse_ast = parse_fstring(source).unwrap();
+        let source = r#"f"{foo:{'' ''}}""#;
+        let parse_ast = parse_suite(source, "<test>").unwrap();
+
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    /// <https://github.com/astral-sh/ruff/issues/8355>
+    #[test]
+    fn test_dont_panic_on_8_in_octal_escape() {
+        let source = r"bold = '\038[1m'";
+        let parse_ast = parse_suite(source, "<test>").unwrap();
 
         insta::assert_debug_snapshot!(parse_ast);
     }

@@ -1,0 +1,102 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT023.py:46:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+46 | @pytest.mark.foo()
+   | ^^^^^^^^^^^^^^^^^^ PT023
+47 | def test_something():
+48 |     pass
+   |
+   = help: Add/remove parentheses
+
+ℹ Safe fix
+43 43 | # With parentheses
+44 44 | 
+45 45 | 
+46    |-@pytest.mark.foo()
+   46 |+@pytest.mark.foo
+47 47 | def test_something():
+48 48 |     pass
+49 49 | 
+
+PT023.py:51:1: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+51 | @pytest.mark.foo()
+   | ^^^^^^^^^^^^^^^^^^ PT023
+52 | class TestClass:
+53 |     def test_something():
+   |
+   = help: Add/remove parentheses
+
+ℹ Safe fix
+48 48 |     pass
+49 49 | 
+50 50 | 
+51    |-@pytest.mark.foo()
+   51 |+@pytest.mark.foo
+52 52 | class TestClass:
+53 53 |     def test_something():
+54 54 |         pass
+
+PT023.py:58:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+57 | class TestClass:
+58 |     @pytest.mark.foo()
+   |     ^^^^^^^^^^^^^^^^^^ PT023
+59 |     def test_something():
+60 |         pass
+   |
+   = help: Add/remove parentheses
+
+ℹ Safe fix
+55 55 | 
+56 56 | 
+57 57 | class TestClass:
+58    |-    @pytest.mark.foo()
+   58 |+    @pytest.mark.foo
+59 59 |     def test_something():
+60 60 |         pass
+61 61 | 
+
+PT023.py:64:5: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+63 | class TestClass:
+64 |     @pytest.mark.foo()
+   |     ^^^^^^^^^^^^^^^^^^ PT023
+65 |     class TestNestedClass:
+66 |         def test_something():
+   |
+   = help: Add/remove parentheses
+
+ℹ Safe fix
+61 61 | 
+62 62 | 
+63 63 | class TestClass:
+64    |-    @pytest.mark.foo()
+   64 |+    @pytest.mark.foo
+65 65 |     class TestNestedClass:
+66 66 |         def test_something():
+67 67 |             pass
+
+PT023.py:72:9: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+70 | class TestClass:
+71 |     class TestNestedClass:
+72 |         @pytest.mark.foo()
+   |         ^^^^^^^^^^^^^^^^^^ PT023
+73 |         def test_something():
+74 |             pass
+   |
+   = help: Add/remove parentheses
+
+ℹ Safe fix
+69 69 | 
+70 70 | class TestClass:
+71 71 |     class TestNestedClass:
+72    |-        @pytest.mark.foo()
+   72 |+        @pytest.mark.foo
+73 73 |         def test_something():
+74 74 |             pass
+
+

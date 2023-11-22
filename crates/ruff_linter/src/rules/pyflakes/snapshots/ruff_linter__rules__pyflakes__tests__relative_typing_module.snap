@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+bar.py:26:17: F821 Undefined name `foo`
+   |
+25 |     # F821
+26 |     x: Literal["foo"]
+   |                 ^^^ F821
+   |
+
+

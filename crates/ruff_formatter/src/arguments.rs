@@ -61,8 +61,8 @@ impl<'fmt, Context> Argument<'fmt, Context> {
 ///
 /// The [`format_args!`] macro will safely create an instance of this structure.
 ///
-/// You can use the `Arguments<a>` that [`format_args!]` return in `Format` context as seen below.
-/// It will call the `format` function for every of it's objects.
+/// You can use the `Arguments<a>` that [`format_args!`] return in `Format` context as seen below.
+/// It will call the `format` function for each of its objects.
 ///
 /// ```rust
 /// use ruff_formatter::prelude::*;
@@ -70,7 +70,7 @@ impl<'fmt, Context> Argument<'fmt, Context> {
 ///
 /// # fn main() -> FormatResult<()> {
 /// let formatted = format!(SimpleFormatContext::default(), [
-///     format_args!(text("a"), space(), text("b"))
+///     format_args!(token("a"), space(), token("b"))
 /// ])?;
 ///
 /// assert_eq!("a b", formatted.print()?.as_code());
@@ -129,17 +129,17 @@ mod tests {
 
     #[test]
     fn test_nesting() {
-        let mut context = FormatState::new(());
+        let mut context = FormatState::new(SimpleFormatContext::default());
         let mut buffer = VecBuffer::new(&mut context);
 
         write!(
             &mut buffer,
             [
-                text("function"),
+                token("function"),
                 space(),
-                text("a"),
+                token("a"),
                 space(),
-                group(&format_args!(text("("), text(")")))
+                group(&format_args!(token("("), token(")")))
             ]
         )
         .unwrap();
@@ -147,14 +147,14 @@ mod tests {
         assert_eq!(
             buffer.into_vec(),
             vec![
-                FormatElement::StaticText { text: "function" },
+                FormatElement::Token { text: "function" },
                 FormatElement::Space,
-                FormatElement::StaticText { text: "a" },
+                FormatElement::Token { text: "a" },
                 FormatElement::Space,
                 // Group
                 FormatElement::Tag(Tag::StartGroup(tag::Group::new())),
-                FormatElement::StaticText { text: "(" },
-                FormatElement::StaticText { text: ")" },
+                FormatElement::Token { text: "(" },
+                FormatElement::Token { text: ")" },
                 FormatElement::Tag(Tag::EndGroup)
             ]
         );

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring.py
 ---
 ## Input
-```py
+```python
 def single_line_backslashes1():
   """ content\     """
   return
@@ -99,6 +99,56 @@ def docstring_that_ends_with_quote_and_a_line_break3():
     """
 
 
+class ByteDocstring:
+    b"""   has leading whitespace"""
+    first_statement = 1
+
+class CommentAfterDocstring1:
+    """Browse module classes and functions in IDLE."""
+    # This class is also the base class for pathbrowser.PathBrowser.
+
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring2:
+    """Browse module classes and functions in IDLE."""
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring3:
+    """Browse module classes and functions in IDLE."""
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring4:
+    """Browse module classes and functions in IDLE."""
+
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring5:
+    """Browse module classes and functions in IDLE."""
+    # This class is also the base class for pathbrowser.PathBrowser.
+
+
+def f():
+    """Browse module classes and functions in IDLE."""
+    # ^ Do not insert a newline above here
+
+    pass
+
+
 class TabbedIndent:
 	def tabbed_indent(self):
 		"""check for correct tabbed formatting
@@ -111,13 +161,15 @@ class TabbedIndent:
 ## Outputs
 ### Output 1
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
     """content\ """
     return
@@ -211,6 +263,58 @@ def docstring_that_ends_with_quote_and_a_line_break3():
     """he said "the news of my death have been greatly exaggerated" """
 
 
+class ByteDocstring:
+    b"""   has leading whitespace"""
+    first_statement = 1
+
+
+class CommentAfterDocstring1:
+    """Browse module classes and functions in IDLE."""
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring2:
+    """Browse module classes and functions in IDLE."""
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring3:
+    """Browse module classes and functions in IDLE."""
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring4:
+    """Browse module classes and functions in IDLE."""
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring5:
+    """Browse module classes and functions in IDLE."""
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+
+
+def f():
+    """Browse module classes and functions in IDLE."""
+    # ^ Do not insert a newline above here
+
+    pass
+
+
 class TabbedIndent:
     def tabbed_indent(self):
         """check for correct tabbed formatting
@@ -223,13 +327,15 @@ class TabbedIndent:
 
 ### Output 2
 ```
-indent-style            = Spaces, size: 2
+indent-style            = space
 line-width              = 88
+indent-width            = 2
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
   """content\ """
   return
@@ -323,6 +429,58 @@ def docstring_that_ends_with_quote_and_a_line_break3():
   """he said "the news of my death have been greatly exaggerated" """
 
 
+class ByteDocstring:
+  b"""   has leading whitespace"""
+  first_statement = 1
+
+
+class CommentAfterDocstring1:
+  """Browse module classes and functions in IDLE."""
+
+  # This class is also the base class for pathbrowser.PathBrowser.
+
+  def __init__(self):
+    pass
+
+
+class CommentAfterDocstring2:
+  """Browse module classes and functions in IDLE."""
+
+  # This class is also the base class for pathbrowser.PathBrowser.
+
+  def __init__(self):
+    pass
+
+
+class CommentAfterDocstring3:
+  """Browse module classes and functions in IDLE."""
+
+  # This class is also the base class for pathbrowser.PathBrowser.
+  def __init__(self):
+    pass
+
+
+class CommentAfterDocstring4:
+  """Browse module classes and functions in IDLE."""
+
+  # This class is also the base class for pathbrowser.PathBrowser.
+  def __init__(self):
+    pass
+
+
+class CommentAfterDocstring5:
+  """Browse module classes and functions in IDLE."""
+
+  # This class is also the base class for pathbrowser.PathBrowser.
+
+
+def f():
+  """Browse module classes and functions in IDLE."""
+  # ^ Do not insert a newline above here
+
+  pass
+
+
 class TabbedIndent:
   def tabbed_indent(self):
     """check for correct tabbed formatting
@@ -335,13 +493,15 @@ class TabbedIndent:
 
 ### Output 3
 ```
-indent-style            = Tab
+indent-style            = tab
 line-width              = 88
+indent-width            = 8
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
 	"""content\ """
 	return
@@ -433,6 +593,224 @@ def docstring_that_ends_with_quote_and_a_line_break2():
 
 def docstring_that_ends_with_quote_and_a_line_break3():
 	"""he said "the news of my death have been greatly exaggerated" """
+
+
+class ByteDocstring:
+	b"""   has leading whitespace"""
+	first_statement = 1
+
+
+class CommentAfterDocstring1:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+
+	def __init__(self):
+		pass
+
+
+class CommentAfterDocstring2:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+
+	def __init__(self):
+		pass
+
+
+class CommentAfterDocstring3:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+	def __init__(self):
+		pass
+
+
+class CommentAfterDocstring4:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+	def __init__(self):
+		pass
+
+
+class CommentAfterDocstring5:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+
+
+def f():
+	"""Browse module classes and functions in IDLE."""
+	# ^ Do not insert a newline above here
+
+	pass
+
+
+class TabbedIndent:
+	def tabbed_indent(self):
+		"""check for correct tabbed formatting
+		                            ^^^^^^^^^^
+		Normal indented line
+		        - autor
+		"""
+```
+
+
+### Output 4
+```
+indent-style            = tab
+line-width              = 88
+indent-width            = 4
+quote-style             = Double
+magic-trailing-comma    = Respect
+preview                 = Disabled
+```
+
+```python
+def single_line_backslashes1():
+	"""content\ """
+	return
+
+
+def single_line_backslashes2():
+	"""content\\"""
+	return
+
+
+def single_line_backslashes3():
+	"""content\\\ """
+	return
+
+
+def multiline_backslashes1():
+	"""This is a docstring with
+	some lines of text\ """
+	return
+
+
+def multiline_backslashes2():
+	"""This is a docstring with
+	some lines of text\\"""
+	return
+
+
+def multiline_backslashes3():
+	"""This is a docstring with
+	some lines of text\\\ """
+	return
+
+
+def multiple_negatively_indented_docstring_lines():
+	"""a
+	b
+	 c
+	  d
+	   e
+	"""
+
+
+def overindentend_docstring():
+	"""a
+	over-indented
+	"""
+
+
+def comment_before_docstring():
+	# don't lose this function comment ...
+	"""Does nothing.
+
+	But it has comments
+	"""  # ... neither lose this function comment
+
+
+class CommentBeforeDocstring:
+	# don't lose this class comment ...
+	"""Empty class.
+
+	But it has comments
+	"""  # ... neither lose this class comment
+
+
+class IndentMeSome:
+	def doc_string_without_linebreak_after_colon(self):
+		"""This is somewhat strange
+		   a
+		b
+		   We format this a is the docstring had started properly indented on the next
+		   line if the target indentation. This may we incorrect since source and target
+		   indentation can be incorrect, but this is also an edge case.
+		"""
+
+
+class IgnoreImplicitlyConcatenatedStrings:
+	"""""" ""
+
+
+def docstring_that_ends_with_quote_and_a_line_break1():
+	"""
+	he said "the news of my death have been greatly exaggerated"
+	"""
+
+
+def docstring_that_ends_with_quote_and_a_line_break2():
+	"""he said "the news of my death have been greatly exaggerated" """
+
+
+def docstring_that_ends_with_quote_and_a_line_break3():
+	"""he said "the news of my death have been greatly exaggerated" """
+
+
+class ByteDocstring:
+	b"""   has leading whitespace"""
+	first_statement = 1
+
+
+class CommentAfterDocstring1:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+
+	def __init__(self):
+		pass
+
+
+class CommentAfterDocstring2:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+
+	def __init__(self):
+		pass
+
+
+class CommentAfterDocstring3:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+	def __init__(self):
+		pass
+
+
+class CommentAfterDocstring4:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+	def __init__(self):
+		pass
+
+
+class CommentAfterDocstring5:
+	"""Browse module classes and functions in IDLE."""
+
+	# This class is also the base class for pathbrowser.PathBrowser.
+
+
+def f():
+	"""Browse module classes and functions in IDLE."""
+	# ^ Do not insert a newline above here
+
+	pass
 
 
 class TabbedIndent:

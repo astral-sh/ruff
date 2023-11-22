@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+if_elif_else.py:6:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+4 |       from setuptools.command.sdist import sdist as _sdist
+5 |   else:
+6 | /     from setuptools.command.sdist import sdist as _sdist
+7 | |     from distutils.command.sdist import sdist as _sdist
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+3 3 | elif "setuptools" in sys.modules:
+4 4 |     from setuptools.command.sdist import sdist as _sdist
+5 5 | else:
+  6 |+    from distutils.command.sdist import sdist as _sdist
+6 7 |     from setuptools.command.sdist import sdist as _sdist
+7   |-    from distutils.command.sdist import sdist as _sdist
+
+

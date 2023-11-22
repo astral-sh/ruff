@@ -1,0 +1,27 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM105_1.py:5:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+  |
+4 |   # SIM105
+5 | / try:
+6 | |     math.sqrt(-1)
+7 | | except ValueError:
+8 | |     pass
+  | |________^ SIM105
+  |
+  = help: Replace with `contextlib.suppress(ValueError)`
+
+ℹ Unsafe fix
+1 1 | """Case: There's a random import, so it should add `contextlib` after it."""
+2 2 | import math
+  3 |+import contextlib
+3 4 | 
+4 5 | # SIM105
+5   |-try:
+  6 |+with contextlib.suppress(ValueError):
+6 7 |     math.sqrt(-1)
+7   |-except ValueError:
+8   |-    pass
+
+

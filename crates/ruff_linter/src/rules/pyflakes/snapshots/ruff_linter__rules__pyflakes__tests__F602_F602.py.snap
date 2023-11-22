@@ -1,0 +1,245 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F602.py:5:5: F602 Dictionary key `a` repeated
+  |
+3 | x = {
+4 |     a: 1,
+5 |     a: 2,
+  |     ^ F602
+6 |     b: 3,
+7 | }
+  |
+  = help: Remove repeated key `a`
+
+F602.py:11:5: F602 Dictionary key `a` repeated
+   |
+ 9 | x = {
+10 |     a: 1,
+11 |     a: 2,
+   |     ^ F602
+12 |     a: 3,
+13 |     a: 3,
+   |
+   = help: Remove repeated key `a`
+
+F602.py:12:5: F602 Dictionary key `a` repeated
+   |
+10 |     a: 1,
+11 |     a: 2,
+12 |     a: 3,
+   |     ^ F602
+13 |     a: 3,
+14 | }
+   |
+   = help: Remove repeated key `a`
+
+F602.py:13:5: F602 [*] Dictionary key `a` repeated
+   |
+11 |     a: 2,
+12 |     a: 3,
+13 |     a: 3,
+   |     ^ F602
+14 | }
+   |
+   = help: Remove repeated key `a`
+
+ℹ Unsafe fix
+10 10 |     a: 1,
+11 11 |     a: 2,
+12 12 |     a: 3,
+13    |-    a: 3,
+14 13 | }
+15 14 | 
+16 15 | x = {
+
+F602.py:18:5: F602 Dictionary key `a` repeated
+   |
+16 | x = {
+17 |     a: 1,
+18 |     a: 2,
+   |     ^ F602
+19 |     a: 3,
+20 |     a: 3,
+   |
+   = help: Remove repeated key `a`
+
+F602.py:19:5: F602 Dictionary key `a` repeated
+   |
+17 |     a: 1,
+18 |     a: 2,
+19 |     a: 3,
+   |     ^ F602
+20 |     a: 3,
+21 |     a: 4,
+   |
+   = help: Remove repeated key `a`
+
+F602.py:20:5: F602 [*] Dictionary key `a` repeated
+   |
+18 |     a: 2,
+19 |     a: 3,
+20 |     a: 3,
+   |     ^ F602
+21 |     a: 4,
+22 | }
+   |
+   = help: Remove repeated key `a`
+
+ℹ Unsafe fix
+17 17 |     a: 1,
+18 18 |     a: 2,
+19 19 |     a: 3,
+20    |-    a: 3,
+21 20 |     a: 4,
+22 21 | }
+23 22 | 
+
+F602.py:21:5: F602 Dictionary key `a` repeated
+   |
+19 |     a: 3,
+20 |     a: 3,
+21 |     a: 4,
+   |     ^ F602
+22 | }
+   |
+   = help: Remove repeated key `a`
+
+F602.py:26:5: F602 [*] Dictionary key `a` repeated
+   |
+24 | x = {
+25 |     a: 1,
+26 |     a: 1,
+   |     ^ F602
+27 |     a: 2,
+28 |     a: 3,
+   |
+   = help: Remove repeated key `a`
+
+ℹ Unsafe fix
+23 23 | 
+24 24 | x = {
+25 25 |     a: 1,
+26    |-    a: 1,
+27 26 |     a: 2,
+28 27 |     a: 3,
+29 28 |     a: 4,
+
+F602.py:27:5: F602 Dictionary key `a` repeated
+   |
+25 |     a: 1,
+26 |     a: 1,
+27 |     a: 2,
+   |     ^ F602
+28 |     a: 3,
+29 |     a: 4,
+   |
+   = help: Remove repeated key `a`
+
+F602.py:28:5: F602 Dictionary key `a` repeated
+   |
+26 |     a: 1,
+27 |     a: 2,
+28 |     a: 3,
+   |     ^ F602
+29 |     a: 4,
+30 | }
+   |
+   = help: Remove repeated key `a`
+
+F602.py:29:5: F602 Dictionary key `a` repeated
+   |
+27 |     a: 2,
+28 |     a: 3,
+29 |     a: 4,
+   |     ^ F602
+30 | }
+   |
+   = help: Remove repeated key `a`
+
+F602.py:35:5: F602 [*] Dictionary key `a` repeated
+   |
+33 |     a: 1,
+34 |     "a": 1,
+35 |     a: 1,
+   |     ^ F602
+36 |     "a": 2,
+37 |     a: 2,
+   |
+   = help: Remove repeated key `a`
+
+ℹ Unsafe fix
+32 32 | x = {
+33 33 |     a: 1,
+34 34 |     "a": 1,
+35    |-    a: 1,
+36 35 |     "a": 2,
+37 36 |     a: 2,
+38 37 |     "a": 3,
+
+F602.py:37:5: F602 Dictionary key `a` repeated
+   |
+35 |     a: 1,
+36 |     "a": 2,
+37 |     a: 2,
+   |     ^ F602
+38 |     "a": 3,
+39 |     a: 3,
+   |
+   = help: Remove repeated key `a`
+
+F602.py:39:5: F602 Dictionary key `a` repeated
+   |
+37 |     a: 2,
+38 |     "a": 3,
+39 |     a: 3,
+   |     ^ F602
+40 |     "a": 3,
+41 |     a: 4,
+   |
+   = help: Remove repeated key `a`
+
+F602.py:41:5: F602 Dictionary key `a` repeated
+   |
+39 |     a: 3,
+40 |     "a": 3,
+41 |     a: 4,
+   |     ^ F602
+42 | }
+   |
+   = help: Remove repeated key `a`
+
+F602.py:44:12: F602 [*] Dictionary key `a` repeated
+   |
+42 | }
+43 | 
+44 | x = {a: 1, a: 1}
+   |            ^ F602
+45 | x = {a: 1, b: 2, a: 1}
+   |
+   = help: Remove repeated key `a`
+
+ℹ Unsafe fix
+41 41 |     a: 4,
+42 42 | }
+43 43 | 
+44    |-x = {a: 1, a: 1}
+   44 |+x = {a: 1}
+45 45 | x = {a: 1, b: 2, a: 1}
+
+F602.py:45:18: F602 [*] Dictionary key `a` repeated
+   |
+44 | x = {a: 1, a: 1}
+45 | x = {a: 1, b: 2, a: 1}
+   |                  ^ F602
+   |
+   = help: Remove repeated key `a`
+
+ℹ Unsafe fix
+42 42 | }
+43 43 | 
+44 44 | x = {a: 1, a: 1}
+45    |-x = {a: 1, b: 2, a: 1}
+   45 |+x = {a: 1, b: 2}
+
+

@@ -21,13 +21,12 @@ expression: parse_ast
                 },
             ),
             value: Some(
-                Constant(
-                    ExprConstant {
+                NumberLiteral(
+                    ExprNumberLiteral {
                         range: 9..10,
                         value: Int(
                             1,
                         ),
-                        kind: None,
                     },
                 ),
             ),

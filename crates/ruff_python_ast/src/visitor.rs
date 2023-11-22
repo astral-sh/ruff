@@ -1,11 +1,13 @@
 //! AST visitor trait and walk functions.
 
 pub mod preorder;
+pub mod transformer;
 
 use crate::{
     self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
     ExceptHandler, Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
-    Stmt, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
+    PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp,
+    WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -13,8 +15,10 @@ use crate::{
 /// Prefer [`crate::statement_visitor::StatementVisitor`] for visitors that only need to visit
 /// statements.
 ///
-/// Use the [`PreorderVisitor`](self::preorder::PreorderVisitor) if you want to visit the nodes
+/// Use the [`PreorderVisitor`](preorder::PreorderVisitor) if you want to visit the nodes
 /// in pre-order rather than evaluation order.
+///
+/// Use the [`Transformer`](transformer::Transformer) if you want to modify the nodes.
 pub trait Visitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         walk_stmt(self, stmt);
@@ -81,6 +85,12 @@ pub trait Visitor<'a> {
     }
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         walk_pattern(self, pattern);
+    }
+    fn visit_pattern_arguments(&mut self, pattern_arguments: &'a PatternArguments) {
+        walk_pattern_arguments(self, pattern_arguments);
+    }
+    fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword) {
+        walk_pattern_keyword(self, pattern_keyword);
     }
     fn visit_body(&mut self, body: &'a [Stmt]) {
         walk_body(self, body);
@@ -354,7 +364,9 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             body,
             range: _,
         }) => {
-            visitor.visit_parameters(parameters);
+            if let Some(parameters) = parameters {
+                visitor.visit_parameters(parameters);
+            }
             visitor.visit_expr(body);
         }
         Expr::IfExp(ast::ExprIfExp {
@@ -468,7 +480,12 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::Constant(_) => {}
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_) => {}
         Expr::Attribute(ast::ExprAttribute { value, ctx, .. }) => {
             visitor.visit_expr(value);
             visitor.visit_expr_context(ctx);
@@ -564,6 +581,9 @@ pub fn walk_format_spec<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, format_spe
 }
 
 pub fn walk_arguments<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, arguments: &'a Arguments) {
+    // Note that the there might be keywords before the last arg, e.g. in
+    // f(*args, a=2, *args2, **kwargs)`, but we follow Python in evaluating first `args` and then
+    // `keywords`. See also [Arguments::arguments_source_order`].
     for arg in &arguments.args {
         visitor.visit_expr(arg);
     }
@@ -672,20 +692,9 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
                 visitor.visit_pattern(pattern);
             }
         }
-        Pattern::MatchClass(ast::PatternMatchClass {
-            cls,
-            patterns,
-            kwd_patterns,
-            ..
-        }) => {
+        Pattern::MatchClass(ast::PatternMatchClass { cls, arguments, .. }) => {
             visitor.visit_expr(cls);
-            for pattern in patterns {
-                visitor.visit_pattern(pattern);
-            }
-
-            for pattern in kwd_patterns {
-                visitor.visit_pattern(pattern);
-            }
+            visitor.visit_pattern_arguments(arguments);
         }
         Pattern::MatchStar(_) => {}
         Pattern::MatchAs(ast::PatternMatchAs { pattern, .. }) => {
@@ -699,6 +708,25 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
             }
         }
     }
+}
+
+pub fn walk_pattern_arguments<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    pattern_arguments: &'a PatternArguments,
+) {
+    for pattern in &pattern_arguments.patterns {
+        visitor.visit_pattern(pattern);
+    }
+    for keyword in &pattern_arguments.keywords {
+        visitor.visit_pattern_keyword(keyword);
+    }
+}
+
+pub fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    pattern_keyword: &'a PatternKeyword,
+) {
+    visitor.visit_pattern(&pattern_keyword.pattern);
 }
 
 #[allow(unused_variables)]

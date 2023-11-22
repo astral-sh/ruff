@@ -1,0 +1,357 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM102.py:2:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+  |
+1 |   # SIM102
+2 | / if a:
+3 | |     if b:
+  | |_________^ SIM102
+4 |           c
+  |
+  = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+1 1 | # SIM102
+2   |-if a:
+3   |-    if b:
+4   |-        c
+  2 |+if a and b:
+  3 |+    c
+5 4 | 
+6 5 | # SIM102
+7 6 | if a:
+
+SIM102.py:7:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+ 6 |   # SIM102
+ 7 | / if a:
+ 8 | |     if b:
+ 9 | |         if c:
+   | |_____________^ SIM102
+10 |               d
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+4  4  |         c
+5  5  | 
+6  6  | # SIM102
+7     |-if a:
+8     |-    if b:
+9     |-        if c:
+10    |-            d
+   7  |+if a and b:
+   8  |+    if c:
+   9  |+        d
+11 10 | 
+12 11 | # SIM102
+13 12 | if a:
+
+SIM102.py:8:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+ 6 |   # SIM102
+ 7 |   if a:
+ 8 |       if b:
+   |  _____^
+ 9 | |         if c:
+   | |_____________^ SIM102
+10 |               d
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+5  5  | 
+6  6  | # SIM102
+7  7  | if a:
+8     |-    if b:
+9     |-        if c:
+10    |-            d
+   8  |+    if b and c:
+   9  |+        d
+11 10 | 
+12 11 | # SIM102
+13 12 | if a:
+
+SIM102.py:15:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+13 |   if a:
+14 |       pass
+15 | / elif b:
+16 | |     if c:
+   | |_________^ SIM102
+17 |           d
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+12 12 | # SIM102
+13 13 | if a:
+14 14 |     pass
+15    |-elif b:
+16    |-    if c:
+17    |-        d
+   15 |+elif b and c:
+   16 |+    d
+18 17 | 
+19 18 | # SIM102
+20 19 | if a:
+
+SIM102.py:20:1: SIM102 Use a single `if` statement instead of nested `if` statements
+   |
+19 |   # SIM102
+20 | / if a:
+21 | |     # Unfixable due to placement of this comment.
+22 | |     if b:
+   | |_________^ SIM102
+23 |           c
+   |
+   = help: Combine `if` statements using `and`
+
+SIM102.py:26:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+25 |   # SIM102
+26 | / if a:
+27 | |     if b:
+   | |_________^ SIM102
+28 |           # Fixable due to placement of this comment.
+29 |           c
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+23 23 |         c
+24 24 | 
+25 25 | # SIM102
+26    |-if a:
+27    |-    if b:
+28    |-        # Fixable due to placement of this comment.
+29    |-        c
+   26 |+if a and b:
+   27 |+    # Fixable due to placement of this comment.
+   28 |+    c
+30 29 | 
+31 30 | # OK
+32 31 | if a:
+
+SIM102.py:51:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+49 |   while x > 0:
+50 |       # SIM102
+51 |       if y > 0:
+   |  _____^
+52 | |         if z > 0:
+   | |_________________^ SIM102
+53 |               """this
+54 |   is valid"""
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+48 48 | 
+49 49 | while x > 0:
+50 50 |     # SIM102
+51    |-    if y > 0:
+52    |-        if z > 0:
+53    |-            """this
+   51 |+    if y > 0 and z > 0:
+   52 |+        """this
+54 53 | is valid"""
+55 54 | 
+56    |-            """the indentation on
+   55 |+        """the indentation on
+57 56 |             this line is significant"""
+58 57 | 
+59    |-            "this is" \
+   58 |+        "this is" \
+60 59 | "allowed too"
+61 60 | 
+62    |-            ("so is"
+   61 |+        ("so is"
+63 62 | "this for some reason")
+64 63 | 
+65 64 | 
+
+SIM102.py:67:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+66 |   # SIM102
+67 | / if x > 0:
+68 | |     if y > 0:
+   | |_____________^ SIM102
+69 |           """this
+70 |   is valid"""
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+64 64 | 
+65 65 | 
+66 66 | # SIM102
+67    |-if x > 0:
+68    |-    if y > 0:
+69    |-        """this
+   67 |+if x > 0 and y > 0:
+   68 |+    """this
+70 69 | is valid"""
+71 70 | 
+72    |-        """the indentation on
+   71 |+    """the indentation on
+73 72 |         this line is significant"""
+74 73 | 
+75    |-        "this is" \
+   74 |+    "this is" \
+76 75 | "allowed too"
+77 76 | 
+78    |-        ("so is"
+   77 |+    ("so is"
+79 78 | "this for some reason")
+80 79 | 
+81 80 | while x > 0:
+
+SIM102.py:83:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+81 |   while x > 0:
+82 |       # SIM102
+83 |       if node.module:
+   |  _____^
+84 | |         if node.module == "multiprocessing" or node.module.startswith(
+85 | |             "multiprocessing."
+86 | |         ):
+   | |__________^ SIM102
+87 |               print("Bad module!")
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+80 80 | 
+81 81 | while x > 0:
+82 82 |     # SIM102
+83    |-    if node.module:
+84    |-        if node.module == "multiprocessing" or node.module.startswith(
+85    |-            "multiprocessing."
+86    |-        ):
+87    |-            print("Bad module!")
+   83 |+    if node.module and (node.module == "multiprocessing" or node.module.startswith(
+   84 |+        "multiprocessing."
+   85 |+    )):
+   86 |+        print("Bad module!")
+88 87 | 
+89 88 | # SIM102 (auto-fixable)
+90 89 | if node.module012345678:
+
+SIM102.py:90:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+89 |   # SIM102 (auto-fixable)
+90 | / if node.module012345678:
+91 | |     if node.module == "multiprocß9💣2ℝ" or node.module.startswith(
+92 | |         "multiprocessing."
+93 | |     ):
+   | |______^ SIM102
+94 |           print("Bad module!")
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+87 87 |             print("Bad module!")
+88 88 | 
+89 89 | # SIM102 (auto-fixable)
+90    |-if node.module012345678:
+91    |-    if node.module == "multiprocß9💣2ℝ" or node.module.startswith(
+92    |-        "multiprocessing."
+93    |-    ):
+94    |-        print("Bad module!")
+   90 |+if node.module012345678 and (node.module == "multiprocß9💣2ℝ" or node.module.startswith(
+   91 |+    "multiprocessing."
+   92 |+)):
+   93 |+    print("Bad module!")
+95 94 | 
+96 95 | # SIM102 (not auto-fixable)
+97 96 | if node.module0123456789:
+
+SIM102.py:97:1: SIM102 Use a single `if` statement instead of nested `if` statements
+    |
+ 96 |   # SIM102 (not auto-fixable)
+ 97 | / if node.module0123456789:
+ 98 | |     if node.module == "multiprocß9💣2ℝ" or node.module.startswith(
+ 99 | |         "multiprocessing."
+100 | |     ):
+    | |______^ SIM102
+101 |           print("Bad module!")
+    |
+    = help: Combine `if` statements using `and`
+
+SIM102.py:106:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+    |
+104 |   # Regression test for https://github.com/apache/airflow/blob/145b16caaa43f0c42bffd97344df916c602cddde/airflow/configuration.py#L1161
+105 |   if a:
+106 |       if b:
+    |  _____^
+107 | |         if c:
+    | |_____________^ SIM102
+108 |               print("if")
+109 |   elif d:
+    |
+    = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+103 103 | # SIM102
+104 104 | # Regression test for https://github.com/apache/airflow/blob/145b16caaa43f0c42bffd97344df916c602cddde/airflow/configuration.py#L1161
+105 105 | if a:
+106     |-    if b:
+107     |-        if c:
+108     |-            print("if")
+    106 |+    if b and c:
+    107 |+        print("if")
+109 108 | elif d:
+110 109 |     print("elif")
+111 110 | 
+
+SIM102.py:132:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+    |
+130 |   if a:
+131 |       # SIM 102
+132 |       if b:
+    |  _____^
+133 | |         if c:
+    | |_____________^ SIM102
+134 |               print("foo")
+135 |   else:
+    |
+    = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+129 129 | # OK
+130 130 | if a:
+131 131 |     # SIM 102
+132     |-    if b:
+133     |-        if c:
+134     |-            print("foo")
+    132 |+    if b and c:
+    133 |+        print("foo")
+135 134 | else:
+136 135 |     print("bar")
+137 136 | 
+
+SIM102.py:165:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+    |
+163 |       if a:
+164 |           pass
+165 |       elif b:
+    |  _____^
+166 | |         if c:
+    | |_____________^ SIM102
+167 |               d
+    |
+    = help: Combine `if` statements using `and`
+
+ℹ Unsafe fix
+162 162 | def f():
+163 163 |     if a:
+164 164 |         pass
+165     |-    elif b:
+166     |-        if c:
+167     |-            d
+    165 |+    elif b and c:
+    166 |+        d
+
+

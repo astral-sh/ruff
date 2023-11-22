@@ -3,6 +3,7 @@ use crate::{self as ast, ExceptHandler, Stmt, Suite};
 
 /// Given a [`Stmt`] and its parent, return the [`Suite`] that contains the [`Stmt`].
 pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<&'a Suite> {
+    // TODO: refactor this to work without a parent, ie when `stmt` is at the top level
     match parent {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => Some(body),
         Stmt::ClassDef(ast::StmtClassDef { body, .. }) => Some(body),

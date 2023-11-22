@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/fmt_off_docstring.py
 ---
 ## Input
-```py
+```python
 def test():
     # fmt: off
     """ This docstring does not
@@ -28,13 +28,15 @@ def test():
 ## Outputs
 ### Output 1
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
-```py
+```python
 def test():
     # fmt: off
     """ This docstring does not
@@ -59,13 +61,15 @@ def test():
 
 ### Output 2
 ```
-indent-style            = Spaces, size: 2
+indent-style            = space
 line-width              = 88
+indent-width            = 2
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
-```py
+```python
 def test():
   # fmt: off
   """ This docstring does not

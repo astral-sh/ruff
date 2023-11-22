@@ -9,15 +9,12 @@ expression: trace
       - Parameter
       - Parameter
       - Parameter
-      - ExprConstant
-        - Int(20)
+      - ExprNumberLiteral
       - Parameter
       - Parameter
-      - ExprConstant
-        - Int(5)
+      - ExprNumberLiteral
       - Parameter
-      - ExprConstant
-        - Int(20)
+      - ExprNumberLiteral
       - Parameter
     - StmtPass
 

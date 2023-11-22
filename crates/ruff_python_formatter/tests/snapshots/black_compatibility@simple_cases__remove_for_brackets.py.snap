@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 # Only remove tuple brackets after `for`
 for (k, v) in d.items():
     print(k, v)
@@ -46,7 +46,7 @@ for (((((k, v))))) in d.items():
 
 ## Ruff Output
 
-```py
+```python
 # Only remove tuple brackets after `for`
 for k, v in d.items():
     print(k, v)
@@ -76,7 +76,7 @@ for k, v in d.items():
 
 ## Black Output
 
-```py
+```python
 # Only remove tuple brackets after `for`
 for k, v in d.items():
     print(k, v)

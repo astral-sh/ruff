@@ -3,12 +3,14 @@ use std::borrow::Cow;
 use bitflags::bitflags;
 
 use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, ExprConstant, ExprFString, Ranged};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{
+    self as ast, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExpressionRef,
+};
 use ruff_python_parser::lexer::{lex_starts_at, LexicalError, LexicalErrorType};
 use ruff_python_parser::{Mode, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::{
@@ -24,20 +26,40 @@ enum Quoting {
     Preserve,
 }
 
+#[derive(Clone, Debug)]
 pub(super) enum AnyString<'a> {
-    Constant(&'a ExprConstant),
+    String(&'a ExprStringLiteral),
+    Bytes(&'a ExprBytesLiteral),
     FString(&'a ExprFString),
 }
 
 impl<'a> AnyString<'a> {
+    pub(crate) fn from_expression(expression: &'a Expr) -> Option<AnyString<'a>> {
+        match expression {
+            Expr::StringLiteral(string) => Some(AnyString::String(string)),
+            Expr::BytesLiteral(bytes) => Some(AnyString::Bytes(bytes)),
+            Expr::FString(fstring) => Some(AnyString::FString(fstring)),
+            _ => None,
+        }
+    }
+
     fn quoting(&self, locator: &Locator) -> Quoting {
         match self {
-            Self::Constant(_) => Quoting::CanChange,
+            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
             Self::FString(f_string) => {
+                let unprefixed = locator
+                    .slice(f_string.range)
+                    .trim_start_matches(|c| c != '"' && c != '\'');
+                let triple_quoted =
+                    unprefixed.starts_with(r#"""""#) || unprefixed.starts_with(r"'''");
                 if f_string.values.iter().any(|value| match value {
                     Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
                         let string_content = locator.slice(*range);
-                        string_content.contains(['"', '\''])
+                        if triple_quoted {
+                            string_content.contains(r#"""""#) || string_content.contains("'''")
+                        } else {
+                            string_content.contains(['"', '\''])
+                        }
                     }
                     _ => false,
                 }) {
@@ -50,9 +72,16 @@ impl<'a> AnyString<'a> {
     }
 
     /// Returns `true` if the string is implicitly concatenated.
-    fn implicit_concatenated(&self) -> bool {
+    pub(super) fn is_implicit_concatenated(&self) -> bool {
         match self {
-            Self::Constant(ExprConstant { value, .. }) => value.is_implicit_concatenated(),
+            Self::String(ExprStringLiteral {
+                implicit_concatenated,
+                ..
+            }) => *implicit_concatenated,
+            Self::Bytes(ExprBytesLiteral {
+                implicit_concatenated,
+                ..
+            }) => *implicit_concatenated,
             Self::FString(ExprFString {
                 implicit_concatenated,
                 ..
@@ -64,7 +93,8 @@ impl<'a> AnyString<'a> {
 impl Ranged for AnyString<'_> {
     fn range(&self) -> TextRange {
         match self {
-            Self::Constant(expr) => expr.range(),
+            Self::String(expr) => expr.range(),
+            Self::Bytes(expr) => expr.range(),
             Self::FString(expr) => expr.range(),
         }
     }
@@ -73,8 +103,19 @@ impl Ranged for AnyString<'_> {
 impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
     fn from(value: &AnyString<'a>) -> Self {
         match value {
-            AnyString::Constant(expr) => AnyNodeRef::ExprConstant(expr),
+            AnyString::String(expr) => AnyNodeRef::ExprStringLiteral(expr),
+            AnyString::Bytes(expr) => AnyNodeRef::ExprBytesLiteral(expr),
             AnyString::FString(expr) => AnyNodeRef::ExprFString(expr),
+        }
+    }
+}
+
+impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
+    fn from(value: &AnyString<'a>) -> Self {
+        match value {
+            AnyString::String(expr) => ExpressionRef::StringLiteral(expr),
+            AnyString::Bytes(expr) => ExpressionRef::BytesLiteral(expr),
+            AnyString::FString(expr) => ExpressionRef::FString(expr),
         }
     }
 }
@@ -89,14 +130,15 @@ pub enum StringLayout {
     #[default]
     Default,
     DocString,
-    ImplicitConcatenatedBinaryLeftSide,
+    /// An implicit concatenated string in a binary like (e.g. `a + b` or `a < b`) expression.
+    ///
+    /// Formats the implicit concatenated string parts without the enclosing group because the group
+    /// is added by the binary like formatting.
+    ImplicitConcatenatedStringInBinaryLike,
 }
 
 impl<'a> FormatString<'a> {
-    pub(super) fn new(string: &'a AnyString) -> Self {
-        if let AnyString::Constant(constant) = string {
-            debug_assert!(constant.value.is_str() || constant.value.is_bytes());
-        }
+    pub(super) fn new(string: &'a AnyString<'a>) -> Self {
         Self {
             string,
             layout: StringLayout::Default,
@@ -111,34 +153,97 @@ impl<'a> FormatString<'a> {
 
 impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        match self.layout {
+        let locator = f.context().locator();
+        let result = match self.layout {
             StringLayout::Default => {
-                if self.string.implicit_concatenated() {
+                if self.string.is_implicit_concatenated() {
                     in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
                 } else {
-                    FormatStringPart::new(
-                        self.string.range(),
-                        self.string.quoting(&f.context().locator()),
-                        &f.context().locator(),
-                        f.options().quote_style(),
-                    )
-                    .fmt(f)
+                    StringPart::from_source(self.string.range(), &locator)
+                        .normalize(
+                            self.string.quoting(&locator),
+                            &locator,
+                            f.options().quote_style(),
+                        )
+                        .fmt(f)
                 }
             }
             StringLayout::DocString => {
-                let string_part = FormatStringPart::new(
-                    self.string.range(),
-                    // f-strings can't be docstrings
-                    Quoting::CanChange,
-                    &f.context().locator(),
-                    f.options().quote_style(),
-                );
-                format_docstring(&string_part, f)
+                let string_part = StringPart::from_source(self.string.range(), &locator);
+                let normalized =
+                    string_part.normalize(Quoting::CanChange, &locator, f.options().quote_style());
+                format_docstring(&normalized, f)
             }
-            StringLayout::ImplicitConcatenatedBinaryLeftSide => {
+            StringLayout::ImplicitConcatenatedStringInBinaryLike => {
                 FormatStringContinuation::new(self.string).fmt(f)
             }
+        };
+        // TODO(dhruvmanila): With PEP 701, comments can be inside f-strings.
+        // This is to mark all of those comments as formatted but we need to
+        // figure out how to handle them. Note that this needs to be done only
+        // after the f-string is formatted, so only for all the non-formatted
+        // comments.
+        if let AnyString::FString(fstring) = self.string {
+            let comments = f.context().comments();
+            fstring.values.iter().for_each(|value| {
+                comments.mark_verbatim_node_comments_formatted(value.into());
+            });
         }
+        result
+    }
+}
+
+/// A builder for the f-string range.
+///
+/// For now, this is limited to the outermost f-string and doesn't support
+/// nested f-strings.
+#[derive(Debug, Default)]
+struct FStringRangeBuilder {
+    start_location: TextSize,
+    end_location: TextSize,
+    nesting: u32,
+}
+
+impl FStringRangeBuilder {
+    fn visit_token(&mut self, token: &Tok, range: TextRange) {
+        match token {
+            Tok::FStringStart => {
+                if self.nesting == 0 {
+                    self.start_location = range.start();
+                }
+                self.nesting += 1;
+            }
+            Tok::FStringEnd => {
+                // We can assume that this will never overflow because we know
+                // that the program once parsed to a valid AST which means that
+                // the start and end tokens for f-strings are balanced.
+                self.nesting -= 1;
+                if self.nesting == 0 {
+                    self.end_location = range.end();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Returns `true` if the lexer is currently inside of a f-string.
+    ///
+    /// It'll return `false` once the `FStringEnd` token for the outermost
+    /// f-string is visited.
+    const fn in_fstring(&self) -> bool {
+        self.nesting > 0
+    }
+
+    /// Returns the complete range of the previously visited f-string.
+    ///
+    /// This method should only be called once the lexer is outside of any
+    /// f-string otherwise it might return an invalid range.
+    ///
+    /// It doesn't consume the builder because there can be multiple f-strings
+    /// throughout the source code.
+    fn finish(&self) -> TextRange {
+        debug_assert!(!self.in_fstring());
+        TextRange::new(self.start_location, self.end_location)
     }
 }
 
@@ -148,9 +253,6 @@ struct FormatStringContinuation<'a> {
 
 impl<'a> FormatStringContinuation<'a> {
     fn new(string: &'a AnyString<'a>) -> Self {
-        if let AnyString::Constant(constant) = string {
-            debug_assert!(constant.value.is_str() || constant.value.is_bytes());
-        }
         Self { string }
     }
 }
@@ -160,7 +262,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         let comments = f.context().comments().clone();
         let locator = f.context().locator();
         let quote_style = f.options().quote_style();
-        let mut dangling_comments = comments.dangling_comments(self.string);
+        let mut dangling_comments = comments.dangling(self.string);
 
         let string_range = self.string.range();
         let string_content = locator.slice(string_range);
@@ -170,6 +272,10 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
         // This code does not yet implement the automatic joining of strings that fit on the same line
         // because this is a black preview style.
         let lexer = lex_starts_at(string_content, Mode::Expression, string_range.start());
+
+        // The lexer emits multiple tokens for a single f-string literal. Each token
+        // will have it's own range but we require the complete range of the f-string.
+        let mut fstring_range_builder = FStringRangeBuilder::default();
 
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
@@ -202,8 +308,31 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                 }
             };
 
+            fstring_range_builder.visit_token(&token, token_range);
+
+            // We need to ignore all the tokens within the f-string as there can
+            // be `String` tokens inside it as well. For example,
+            //
+            // ```python
+            // f"foo {'bar'} foo"
+            // #      ^^^^^
+            // #      Ignore any logic for this `String` token
+            // ```
+            //
+            // Here, we're interested in the complete f-string, not the individual
+            // tokens inside it.
+            if fstring_range_builder.in_fstring() {
+                continue;
+            }
+
             match token {
-                Tok::String { .. } => {
+                Tok::String { .. } | Tok::FStringEnd => {
+                    let token_range = if token.is_f_string_end() {
+                        fstring_range_builder.finish()
+                    } else {
+                        token_range
+                    };
+
                     // ```python
                     // (
                     //      "a"
@@ -212,7 +341,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                     // )
                     // ```
                     let leading_comments_end = dangling_comments
-                        .partition_point(|comment| comment.slice().start() <= token_range.start());
+                        .partition_point(|comment| comment.start() <= token_range.start());
 
                     let (leading_part_comments, rest) =
                         dangling_comments.split_at(leading_comments_end);
@@ -227,21 +356,19 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
                         comment.line_position().is_end_of_line()
                             && !locator.contains_line_break(TextRange::new(
                                 token_range.end(),
-                                comment.slice().start(),
+                                comment.start(),
                             ))
                     });
 
                     let (trailing_part_comments, rest) = rest.split_at(trailing_comments_end);
+                    let part = StringPart::from_source(token_range, &locator);
+                    let normalized =
+                        part.normalize(self.string.quoting(&locator), &locator, quote_style);
 
                     joiner.entry(&format_args![
                         line_suffix_boundary(),
                         leading_comments(leading_part_comments),
-                        FormatStringPart::new(
-                            token_range,
-                            self.string.quoting(&locator),
-                            &locator,
-                            quote_style,
-                        ),
+                        normalized,
                         trailing_comments(trailing_part_comments)
                     ]);
 
@@ -262,21 +389,20 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     }
 }
 
-struct FormatStringPart {
+#[derive(Debug)]
+struct StringPart {
+    /// The prefix.
     prefix: StringPrefix,
-    preferred_quotes: StringQuotes,
-    range: TextRange,
-    is_raw_string: bool,
+
+    /// The actual quotes of the string in the source
+    quotes: StringQuotes,
+
+    /// The range of the string's content (full range minus quotes and prefix)
+    content_range: TextRange,
 }
 
-impl Ranged for FormatStringPart {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-
-impl FormatStringPart {
-    fn new(range: TextRange, quoting: Quoting, locator: &Locator, quote_style: QuoteStyle) -> Self {
+impl StringPart {
+    fn from_source(range: TextRange, locator: &Locator) -> Self {
         let string_content = locator.slice(range);
 
         let prefix = StringPrefix::parse(string_content);
@@ -290,46 +416,84 @@ impl FormatStringPart {
         );
         let raw_content_range = relative_raw_content_range + range.start();
 
-        let raw_content = &string_content[relative_raw_content_range];
-        let is_raw_string = prefix.is_raw_string();
-        let preferred_quotes = match quoting {
-            Quoting::Preserve => quotes,
+        Self {
+            prefix,
+            content_range: raw_content_range,
+            quotes,
+        }
+    }
+
+    /// Computes the strings preferred quotes and normalizes its content.
+    fn normalize<'a>(
+        self,
+        quoting: Quoting,
+        locator: &'a Locator,
+        configured_style: QuoteStyle,
+    ) -> NormalizedString<'a> {
+        // Per PEP 8 and PEP 257, always prefer double quotes for docstrings and triple-quoted
+        // strings. (We assume docstrings are always triple-quoted.)
+        let preferred_style = if self.quotes.triple {
+            QuoteStyle::Double
+        } else {
+            configured_style
+        };
+
+        let raw_content = locator.slice(self.content_range);
+
+        let quotes = match quoting {
+            Quoting::Preserve => self.quotes,
             Quoting::CanChange => {
-                if is_raw_string {
-                    preferred_quotes_raw(raw_content, quotes, quote_style)
+                if self.prefix.is_raw_string() {
+                    choose_quotes_raw(raw_content, self.quotes, preferred_style)
                 } else {
-                    preferred_quotes(raw_content, quotes, quote_style)
+                    choose_quotes(raw_content, self.quotes, preferred_style)
                 }
             }
         };
 
-        Self {
-            prefix,
-            range: raw_content_range,
-            preferred_quotes,
-            is_raw_string,
+        let normalized = normalize_string(locator.slice(self.content_range), quotes, self.prefix);
+
+        NormalizedString {
+            prefix: self.prefix,
+            content_range: self.content_range,
+            text: normalized,
+            quotes,
         }
     }
 }
 
-impl Format<PyFormatContext<'_>> for FormatStringPart {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let (normalized, contains_newlines) = normalize_string(
-            f.context().locator().slice(self.range),
-            self.preferred_quotes,
-            self.is_raw_string,
-        );
+#[derive(Debug)]
+struct NormalizedString<'a> {
+    prefix: StringPrefix,
 
-        write!(f, [self.prefix, self.preferred_quotes])?;
-        match normalized {
+    /// The quotes of the normalized string (preferred quotes)
+    quotes: StringQuotes,
+
+    /// The range of the string's content in the source (minus prefix and quotes).
+    content_range: TextRange,
+
+    /// The normalized text
+    text: Cow<'a, str>,
+}
+
+impl Ranged for NormalizedString<'_> {
+    fn range(&self) -> TextRange {
+        self.content_range
+    }
+}
+
+impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        write!(f, [self.prefix, self.quotes])?;
+        match &self.text {
             Cow::Borrowed(_) => {
-                source_text_slice(self.range(), contains_newlines).fmt(f)?;
+                source_text_slice(self.range()).fmt(f)?;
             }
             Cow::Owned(normalized) => {
-                dynamic_text(&normalized, Some(self.start())).fmt(f)?;
+                text(normalized, Some(self.start())).fmt(f)?;
             }
         }
-        self.preferred_quotes.fmt(f)
+        self.quotes.fmt(f)
     }
 }
 
@@ -377,7 +541,11 @@ impl StringPrefix {
     }
 
     pub(super) const fn is_raw_string(self) -> bool {
-        matches!(self, StringPrefix::RAW | StringPrefix::RAW_UPPER)
+        self.contains(StringPrefix::RAW) || self.contains(StringPrefix::RAW_UPPER)
+    }
+
+    pub(super) const fn is_fstring(self) -> bool {
+        self.contains(StringPrefix::F_STRING)
     }
 }
 
@@ -386,17 +554,17 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
         // Retain the casing for the raw prefix:
         // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
         if self.contains(StringPrefix::RAW) {
-            text("r").fmt(f)?;
+            token("r").fmt(f)?;
         } else if self.contains(StringPrefix::RAW_UPPER) {
-            text("R").fmt(f)?;
+            token("R").fmt(f)?;
         }
 
         if self.contains(StringPrefix::BYTE) {
-            text("b").fmt(f)?;
+            token("b").fmt(f)?;
         }
 
         if self.contains(StringPrefix::F_STRING) {
-            text("f").fmt(f)?;
+            token("f").fmt(f)?;
         }
 
         // Remove the unicode prefix `u` if any because it is meaningless in Python 3+.
@@ -405,16 +573,17 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
     }
 }
 
-/// Detects the preferred quotes for raw string `input`.
-/// The configured quote style is preferred unless `input` contains unescaped quotes of the
-/// configured style. For example, `r"foo"` is preferred over `r'foo'` if the configured
-/// quote style is double quotes.
-fn preferred_quotes_raw(
+/// Choose the appropriate quote style for a raw string.
+///
+/// The preferred quote style is chosen unless the string contains unescaped quotes of the
+/// preferred style. For example, `r"foo"` is chosen over `r'foo'` if the preferred quote
+/// style is double quotes.
+fn choose_quotes_raw(
     input: &str,
     quotes: StringQuotes,
-    configured_style: QuoteStyle,
+    preferred_style: QuoteStyle,
 ) -> StringQuotes {
-    let configured_quote_char = configured_style.as_char();
+    let preferred_quote_char = preferred_style.as_char();
     let mut chars = input.chars().peekable();
     let contains_unescaped_configured_quotes = loop {
         match chars.next() {
@@ -423,7 +592,7 @@ fn preferred_quotes_raw(
                 chars.next();
             }
             // `"` or `'`
-            Some(c) if c == configured_quote_char => {
+            Some(c) if c == preferred_quote_char => {
                 if !quotes.triple {
                     break true;
                 }
@@ -432,13 +601,13 @@ fn preferred_quotes_raw(
                     // We can't turn `r'''\""'''` into `r"""\"""""`, this would confuse the parser
                     // about where the closing triple quotes start
                     None => break true,
-                    Some(next) if *next == configured_quote_char => {
+                    Some(next) if *next == preferred_quote_char => {
                         // `""` or `''`
                         chars.next();
 
                         // We can't turn `r'''""'''` into `r""""""""`, nor can we have
                         // `"""` or `'''` respectively inside the string
-                        if chars.peek().is_none() || chars.peek() == Some(&configured_quote_char) {
+                        if chars.peek().is_none() || chars.peek() == Some(&preferred_quote_char) {
                             break true;
                         }
                     }
@@ -455,26 +624,27 @@ fn preferred_quotes_raw(
         style: if contains_unescaped_configured_quotes {
             quotes.style
         } else {
-            configured_style
+            preferred_style
         },
     }
 }
 
-/// Detects the preferred quotes for `input`.
-/// * single quoted strings: The preferred quote style is the one that requires less escape sequences.
-/// * triple quoted strings: Use double quotes except the string contains a sequence of `"""`.
-fn preferred_quotes(
-    input: &str,
-    quotes: StringQuotes,
-    configured_style: QuoteStyle,
-) -> StringQuotes {
-    let preferred_style = if quotes.triple {
+/// Choose the appropriate quote style for a string.
+///
+/// For single quoted strings, the preferred quote style is used, unless the alternative quote style
+/// would require fewer escapes.
+///
+/// For triple quoted strings, the preferred quote style is always used, unless the string contains
+/// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
+/// used unless the string contains `"""`).
+fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle) -> StringQuotes {
+    let style = if quotes.triple {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
         let mut chars = input.chars().peekable();
 
         while let Some(c) = chars.next() {
-            let configured_quote_char = configured_style.as_char();
+            let preferred_quote_char = preferred_style.as_char();
             match c {
                 '\\' => {
                     if matches!(chars.peek(), Some('"' | '\\')) {
@@ -482,16 +652,27 @@ fn preferred_quotes(
                     }
                 }
                 // `"` or `'`
-                c if c == configured_quote_char => {
+                c if c == preferred_quote_char => {
                     match chars.peek().copied() {
-                        Some(c) if c == configured_quote_char => {
+                        Some(c) if c == preferred_quote_char => {
                             // `""` or `''`
                             chars.next();
 
-                            if chars.peek().copied() == Some(configured_quote_char) {
-                                // `"""` or `'''`
-                                chars.next();
-                                uses_triple_quotes = true;
+                            match chars.peek().copied() {
+                                Some(c) if c == preferred_quote_char => {
+                                    // `"""` or `'''`
+                                    chars.next();
+                                    uses_triple_quotes = true;
+                                    break;
+                                }
+                                Some(_) => {}
+                                None => {
+                                    // Handle `''' ""'''`. At this point we have consumed both
+                                    // double quotes, so on the next iteration the iterator is empty
+                                    // and we'd miss the string ending with a preferred quote
+                                    uses_triple_quotes = true;
+                                    break;
+                                }
                             }
                         }
                         Some(_) => {
@@ -500,6 +681,7 @@ fn preferred_quotes(
                         None => {
                             // Trailing quote at the end of the comment
                             uses_triple_quotes = true;
+                            break;
                         }
                     }
                 }
@@ -512,7 +694,7 @@ fn preferred_quotes(
             // Keep the existing quote style.
             quotes.style
         } else {
-            configured_style
+            preferred_style
         }
     } else {
         let mut single_quotes = 0u32;
@@ -532,7 +714,7 @@ fn preferred_quotes(
             }
         }
 
-        match configured_style {
+        match preferred_style {
             QuoteStyle::Single => {
                 if single_quotes > double_quotes {
                     QuoteStyle::Double
@@ -552,7 +734,7 @@ fn preferred_quotes(
 
     StringQuotes {
         triple: quotes.triple,
-        style: preferred_style,
+        style,
     }
 }
 
@@ -596,19 +778,15 @@ impl Format<PyFormatContext<'_>> for StringQuotes {
             (QuoteStyle::Double, true) => "\"\"\"",
         };
 
-        text(quotes).fmt(f)
+        token(quotes).fmt(f)
     }
 }
 
 /// Adds the necessary quote escapes and removes unnecessary escape sequences when quoting `input`
-/// with the provided `style`.
+/// with the provided [`StringQuotes`] style.
 ///
 /// Returns the normalized string and whether it contains new lines.
-fn normalize_string(
-    input: &str,
-    quotes: StringQuotes,
-    is_raw: bool,
-) -> (Cow<str>, ContainsNewlines) {
+fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -616,20 +794,34 @@ fn normalize_string(
     // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
     let mut last_index = 0;
 
-    let mut newlines = ContainsNewlines::No;
-
     let style = quotes.style;
     let preferred_quote = style.as_char();
     let opposite_quote = style.invert().as_char();
 
-    let mut chars = input.char_indices();
+    let mut chars = input.char_indices().peekable();
+
+    let is_raw = prefix.is_raw_string();
+    let is_fstring = prefix.is_fstring();
+    let mut formatted_value_nesting = 0u32;
 
     while let Some((index, c)) = chars.next() {
+        if is_fstring && matches!(c, '{' | '}') {
+            if chars.peek().copied().is_some_and(|(_, next)| next == c) {
+                // Skip over the second character of the double braces
+                chars.next();
+            } else if c == '{' {
+                formatted_value_nesting += 1;
+            } else {
+                // Safe to assume that `c == '}'` here because of the matched pattern above
+                formatted_value_nesting = formatted_value_nesting.saturating_sub(1);
+            }
+            continue;
+        }
         if c == '\r' {
             output.push_str(&input[last_index..index]);
 
             // Skip over the '\r' character, keep the `\n`
-            if input.as_bytes().get(index + 1).copied() == Some(b'\n') {
+            if chars.peek().copied().is_some_and(|(_, next)| next == '\n') {
                 chars.next();
             }
             // Replace the `\r` with a `\n`
@@ -638,14 +830,11 @@ fn normalize_string(
             }
 
             last_index = index + '\r'.len_utf8();
-            newlines = ContainsNewlines::Yes;
-        } else if c == '\n' {
-            newlines = ContainsNewlines::Yes;
         } else if !quotes.triple && !is_raw {
             if c == '\\' {
-                if let Some(next) = input.as_bytes().get(index + 1).copied().map(char::from) {
+                if let Some((_, next)) = chars.peek().copied() {
                     #[allow(clippy::if_same_then_else)]
-                    if next == opposite_quote {
+                    if next == opposite_quote && formatted_value_nesting == 0 {
                         // Remove the escape by ending before the backslash and starting again with the quote
                         chars.next();
                         output.push_str(&input[last_index..index]);
@@ -658,7 +847,7 @@ fn normalize_string(
                         chars.next();
                     }
                 }
-            } else if c == preferred_quote {
+            } else if c == preferred_quote && formatted_value_nesting == 0 {
                 // Escape the quote
                 output.push_str(&input[last_index..index]);
                 output.push('\\');
@@ -675,27 +864,26 @@ fn normalize_string(
         Cow::Owned(output)
     };
 
-    (normalized, newlines)
+    normalized
 }
 
 /// For docstring indentation, black counts spaces as 1 and tabs by increasing the indentation up
 /// to the next multiple of 8. This is effectively a port of
 /// [`str.expandtabs`](https://docs.python.org/3/library/stdtypes.html#str.expandtabs),
-/// which black [calls with the default tab width of 8](https://github.com/psf/black/blob/c36e468794f9256d5e922c399240d49782ba04f1/src/black/strings.py#L61)
-fn count_indentation_like_black(line: &str) -> TextSize {
-    let tab_width: u32 = 8;
-    let mut indentation = TextSize::default();
+/// which black [calls with the default tab width of 8](https://github.com/psf/black/blob/c36e468794f9256d5e922c399240d49782ba04f1/src/black/strings.py#L61).
+fn indentation_length(line: &str) -> TextSize {
+    let mut indentation = 0u32;
     for char in line.chars() {
         if char == '\t' {
             // Pad to the next multiple of tab_width
-            indentation += TextSize::from(tab_width - (indentation.to_u32().rem_euclid(tab_width)));
+            indentation += 8 - (indentation.rem_euclid(8));
         } else if char.is_whitespace() {
-            indentation += char.text_len();
+            indentation += u32::from(char.text_len());
         } else {
-            return indentation;
+            break;
         }
     }
-    indentation
+    TextSize::new(indentation)
 }
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
@@ -783,35 +971,30 @@ fn count_indentation_like_black(line: &str) -> TextSize {
 ///         line c
 ///    """
 /// ```
-fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> FormatResult<()> {
-    let locator = f.context().locator();
+fn format_docstring(normalized: &NormalizedString, f: &mut PyFormatter) -> FormatResult<()> {
+    let docstring = &normalized.text;
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline
-    if locator.slice(string_part.range()).contains("\\\n") {
-        return string_part.fmt(f);
+    if docstring.contains("\\\n") {
+        return normalized.fmt(f);
     }
 
-    let (normalized, _) = normalize_string(
-        locator.slice(string_part.range()),
-        string_part.preferred_quotes,
-        string_part.is_raw_string,
-    );
     // is_borrowed is unstable :/
-    let already_normalized = matches!(normalized, Cow::Borrowed(_));
+    let already_normalized = matches!(docstring, Cow::Borrowed(_));
 
-    let mut lines = normalized.lines().peekable();
+    let mut lines = docstring.lines().peekable();
 
     // Start the string
     write!(
         f,
         [
-            source_position(string_part.start()),
-            string_part.prefix,
-            string_part.preferred_quotes
+            normalized.prefix,
+            normalized.quotes,
+            source_position(normalized.start()),
         ]
     )?;
     // We track where in the source docstring we are (in source code byte offsets)
-    let mut offset = string_part.start();
+    let mut offset = normalized.start();
 
     // The first line directly after the opening quotes has different rules than the rest, mainly
     // that we remove all leading whitespace as there's no indentation
@@ -825,7 +1008,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
 
     // Edge case: The first line is `""" "content`, so we need to insert chaperone space that keep
     // inner quotes and closing quotes from getting to close to avoid `""""content`
-    if trim_both.starts_with(string_part.preferred_quotes.style.as_char()) {
+    if trim_both.starts_with(normalized.quotes.style.as_char()) {
         space().fmt(f)?;
     }
 
@@ -836,23 +1019,23 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
         let trimmed_line_range =
             TextRange::at(offset, trim_end.text_len()).add_start(leading_whitespace);
         if already_normalized {
-            source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+            source_text_slice(trimmed_line_range).fmt(f)?;
         } else {
-            dynamic_text(trim_both, Some(trimmed_line_range.start())).fmt(f)?;
+            text(trim_both, Some(trimmed_line_range.start())).fmt(f)?;
         }
     }
     offset += first.text_len();
 
     // Check if we have a single line (or empty) docstring
-    if normalized[first.len()..].trim().is_empty() {
+    if docstring[first.len()..].trim().is_empty() {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
-        if needs_chaperone_space(string_part, trim_end)
-            || (trim_end.is_empty() && !normalized.is_empty())
+        if needs_chaperone_space(normalized, trim_end)
+            || (trim_end.is_empty() && !docstring.is_empty())
         {
             space().fmt(f)?;
         }
-        string_part.preferred_quotes.fmt(f)?;
+        normalized.quotes.fmt(f)?;
         return Ok(());
     }
 
@@ -868,7 +1051,7 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
         .clone()
         // We don't want to count whitespace-only lines as miss-indented
         .filter(|line| !line.trim().is_empty())
-        .map(count_indentation_like_black)
+        .map(indentation_length)
         .min()
         .unwrap_or_default();
 
@@ -887,27 +1070,21 @@ fn format_docstring(string_part: &FormatStringPart, f: &mut PyFormatter) -> Form
     }
 
     // Same special case in the last line as for the first line
-    let trim_end = normalized
+    let trim_end = docstring
         .as_ref()
         .trim_end_matches(|c: char| c.is_whitespace() && c != '\n');
-    if needs_chaperone_space(string_part, trim_end) {
+    if needs_chaperone_space(normalized, trim_end) {
         space().fmt(f)?;
     }
 
-    write!(
-        f,
-        [
-            string_part.preferred_quotes,
-            source_position(string_part.end())
-        ]
-    )
+    write!(f, [source_position(normalized.end()), normalized.quotes])
 }
 
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
-fn needs_chaperone_space(string_part: &FormatStringPart, trim_end: &str) -> bool {
-    trim_end.ends_with(string_part.preferred_quotes.style.as_char())
+fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
+    trim_end.ends_with(normalized.quotes.style.as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 
@@ -916,7 +1093,7 @@ fn format_docstring_line(
     line: &str,
     is_last: bool,
     offset: TextSize,
-    stripped_indentation: TextSize,
+    stripped_indentation_length: TextSize,
     already_normalized: bool,
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
@@ -943,20 +1120,20 @@ fn format_docstring_line(
         // overindented, in which case we strip the additional whitespace (see example in
         // [`format_docstring`] doc comment). We then prepend the in-docstring indentation to the
         // string.
-        let indent_len = count_indentation_like_black(trim_end) - stripped_indentation;
-        let in_docstring_indent = " ".repeat(indent_len.to_usize()) + trim_end.trim_start();
-        dynamic_text(&in_docstring_indent, Some(offset)).fmt(f)?;
+        let indent_len = indentation_length(trim_end) - stripped_indentation_length;
+        let in_docstring_indent = " ".repeat(usize::from(indent_len)) + trim_end.trim_start();
+        text(&in_docstring_indent, Some(offset)).fmt(f)?;
     } else {
         // Take the string with the trailing whitespace removed, then also skip the leading
         // whitespace
         let trimmed_line_range =
-            TextRange::at(offset, trim_end.text_len()).add_start(stripped_indentation);
+            TextRange::at(offset, trim_end.text_len()).add_start(stripped_indentation_length);
         if already_normalized {
-            source_text_slice(trimmed_line_range, ContainsNewlines::No).fmt(f)?;
+            source_text_slice(trimmed_line_range).fmt(f)?;
         } else {
             // All indents are ascii spaces, so the slicing is correct
-            dynamic_text(
-                &trim_end[stripped_indentation.to_usize()..],
+            text(
+                &trim_end[usize::from(stripped_indentation_length)..],
                 Some(trimmed_line_range.start()),
             )
             .fmt(f)?;
@@ -975,13 +1152,14 @@ fn format_docstring_line(
 
 #[cfg(test)]
 mod tests {
-    use crate::expression::string::count_indentation_like_black;
+    use crate::expression::string::indentation_length;
+    use ruff_text_size::TextSize;
 
     #[test]
     fn test_indentation_like_black() {
-        assert_eq!(count_indentation_like_black("\t \t  \t").to_u32(), 24);
-        assert_eq!(count_indentation_like_black("\t        \t").to_u32(), 24);
-        assert_eq!(count_indentation_like_black("\t\t\t").to_u32(), 24);
-        assert_eq!(count_indentation_like_black("    ").to_u32(), 4);
+        assert_eq!(indentation_length("\t \t  \t"), TextSize::new(24));
+        assert_eq!(indentation_length("\t        \t"), TextSize::new(24));
+        assert_eq!(indentation_length("\t\t\t"), TextSize::new(24));
+        assert_eq!(indentation_length("    "), TextSize::new(4));
     }
 }

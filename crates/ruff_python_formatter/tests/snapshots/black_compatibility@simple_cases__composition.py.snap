@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 class C:
     def test(self) -> None:
         with patch("black.out", print):
@@ -227,32 +227,22 @@ class C:
  
          assert expected(
              value, is_going_to_be="too long to fit in a single line", srsly=True
-@@ -153,7 +154,8 @@
-             " because it's too long"
-         )
- 
--        dis_c_instance_method = """\
-+        dis_c_instance_method = (
-+            """\
-         %3d           0 LOAD_FAST                1 (x)
-                       2 LOAD_CONST               1 (1)
-                       4 COMPARE_OP               2 (==)
-@@ -161,8 +163,8 @@
+@@ -161,9 +162,7 @@
                        8 STORE_ATTR               0 (x)
                       10 LOAD_CONST               0 (None)
                       12 RETURN_VALUE
 -        """ % (
 -            _C.__init__.__code__.co_firstlineno + 1,
-+        """
-+            % (_C.__init__.__code__.co_firstlineno + 1,)
-         )
+-        )
++        """ % (_C.__init__.__code__.co_firstlineno + 1,)
  
          assert (
+             expectedexpectedexpectedexpectedexpectedexpectedexpectedexpectedexpect
 ```
 
 ## Ruff Output
 
-```py
+```python
 class C:
     def test(self) -> None:
         with patch("black.out", print):
@@ -409,8 +399,7 @@ class C:
             " because it's too long"
         )
 
-        dis_c_instance_method = (
-            """\
+        dis_c_instance_method = """\
         %3d           0 LOAD_FAST                1 (x)
                       2 LOAD_CONST               1 (1)
                       4 COMPARE_OP               2 (==)
@@ -418,9 +407,7 @@ class C:
                       8 STORE_ATTR               0 (x)
                      10 LOAD_CONST               0 (None)
                      12 RETURN_VALUE
-        """
-            % (_C.__init__.__code__.co_firstlineno + 1,)
-        )
+        """ % (_C.__init__.__code__.co_firstlineno + 1,)
 
         assert (
             expectedexpectedexpectedexpectedexpectedexpectedexpectedexpectedexpect
@@ -440,7 +427,7 @@ class C:
 
 ## Black Output
 
-```py
+```python
 class C:
     def test(self) -> None:
         with patch("black.out", print):

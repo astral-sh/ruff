@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 zero(one,).two(three,).four(five,)
 
 func1(arg1).func2(arg2,).func3(arg3).func4(arg4,).func5(arg5)
@@ -56,19 +56,23 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
  
  
  # Example from https://github.com/psf/black/issues/3229
-@@ -45,6 +43,4 @@
+@@ -43,8 +41,6 @@
+ )
+ 
  # Regression test for https://github.com/psf/black/issues/3414.
- assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
-     xxxxxxxxx
+-assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
+-    xxxxxxxxx
 -).xxxxxxxxxxxxxxxxxx(), (
 -    "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 -)
-+).xxxxxxxxxxxxxxxxxx(), "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
++assert (
++    xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx()
++), "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ## Ruff Output
 
-```py
+```python
 zero(
     one,
 ).two(
@@ -112,14 +116,14 @@ assert (
 )
 
 # Regression test for https://github.com/psf/black/issues/3414.
-assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
-    xxxxxxxxx
-).xxxxxxxxxxxxxxxxxx(), "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+assert (
+    xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx()
+), "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 ## Black Output
 
-```py
+```python
 zero(
     one,
 ).two(

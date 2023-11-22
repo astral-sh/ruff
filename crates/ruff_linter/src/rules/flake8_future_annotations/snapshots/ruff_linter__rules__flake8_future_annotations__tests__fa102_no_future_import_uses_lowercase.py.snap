@@ -1,0 +1,33 @@
+---
+source: crates/ruff_linter/src/rules/flake8_future_annotations/mod.rs
+---
+no_future_import_uses_lowercase.py:2:13: FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  |
+1 | def main() -> None:
+2 |     a_list: list[str] = []
+  |             ^^^^^^^^^ FA102
+3 |     a_list.append("hello")
+  |
+  = help: Add `from __future__ import annotations`
+
+ℹ Unsafe fix
+  1 |+from __future__ import annotations
+1 2 | def main() -> None:
+2 3 |     a_list: list[str] = []
+3 4 |     a_list.append("hello")
+
+no_future_import_uses_lowercase.py:6:14: FA102 [*] Missing `from __future__ import annotations`, but uses PEP 585 collection
+  |
+6 | def hello(y: dict[str, int]) -> None:
+  |              ^^^^^^^^^^^^^^ FA102
+7 |     del y
+  |
+  = help: Add `from __future__ import annotations`
+
+ℹ Unsafe fix
+  1 |+from __future__ import annotations
+1 2 | def main() -> None:
+2 3 |     a_list: list[str] = []
+3 4 |     a_list.append("hello")
+
+

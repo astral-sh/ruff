@@ -10,13 +10,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 5..6,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 5..6,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: None,
@@ -38,13 +37,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 18..24,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 18..19,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(
@@ -74,26 +72,24 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 36..37,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 36..37,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: None,
                 },
                 WithItem {
                     range: 39..40,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 39..40,
                             value: Int(
                                 1,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: None,
@@ -115,13 +111,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 52..58,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 52..53,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(
@@ -136,13 +131,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 },
                 WithItem {
                     range: 60..66,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 60..61,
                             value: Int(
                                 1,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(
@@ -175,31 +169,28 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     context_expr: IfExp(
                         ExprIfExp {
                             range: 78..91,
-                            test: Constant(
-                                ExprConstant {
+                            test: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 83..84,
                                     value: Int(
                                         1,
                                     ),
-                                    kind: None,
                                 },
                             ),
-                            body: Constant(
-                                ExprConstant {
+                            body: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 78..79,
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
-                            orelse: Constant(
-                                ExprConstant {
+                            orelse: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 90..91,
                                     value: Int(
                                         2,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -226,31 +217,28 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     context_expr: IfExp(
                         ExprIfExp {
                             range: 103..116,
-                            test: Constant(
-                                ExprConstant {
+                            test: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 108..109,
                                     value: Int(
                                         1,
                                     ),
-                                    kind: None,
                                 },
                             ),
-                            body: Constant(
-                                ExprConstant {
+                            body: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 103..104,
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
-                            orelse: Constant(
-                                ExprConstant {
+                            orelse: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 115..116,
                                     value: Int(
                                         2,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -342,13 +330,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 167..168,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 167..168,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: None,
@@ -370,13 +357,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 181..189,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 182..183,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(
@@ -406,13 +392,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 202..203,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 202..203,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: None,
@@ -438,13 +423,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprTuple {
                             range: 217..221,
                             elts: [
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 218..219,
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -477,27 +461,25 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             is_async: false,
             items: [
                 WithItem {
-                    range: 239..243,
-                    context_expr: Constant(
-                        ExprConstant {
+                    range: 239..240,
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 239..240,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: None,
                 },
                 WithItem {
-                    range: 239..243,
-                    context_expr: Constant(
-                        ExprConstant {
+                    range: 242..243,
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 242..243,
                             value: Int(
                                 1,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: None,
@@ -523,22 +505,20 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprTuple {
                             range: 256..262,
                             elts: [
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 257..258,
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 260..261,
                                         value: Int(
                                             1,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ],
@@ -664,13 +644,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprTuple {
                             range: 318..325,
                             elts: [
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 319..320,
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                                 Starred(
@@ -713,13 +692,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         ExprTuple {
                             range: 337..344,
                             elts: [
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 338..339,
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                                 Starred(
@@ -765,7 +743,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             is_async: false,
             items: [
                 WithItem {
-                    range: 361..369,
+                    range: 362..368,
                     context_expr: NamedExpr(
                         ExprNamedExpr {
                             range: 362..368,
@@ -776,13 +754,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Store,
                                 },
                             ),
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 367..368,
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -805,7 +782,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             is_async: false,
             items: [
                 WithItem {
-                    range: 381..394,
+                    range: 382..393,
                     context_expr: NamedExpr(
                         ExprNamedExpr {
                             range: 382..388,
@@ -816,13 +793,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     ctx: Store,
                                 },
                             ),
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 387..388,
                                     value: Int(
                                         0,
                                     ),
-                                    kind: None,
                                 },
                             ),
                         },
@@ -868,13 +844,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 ctx: Store,
                                             },
                                         ),
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 412..413,
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -889,13 +864,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 ctx: Store,
                                             },
                                         ),
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 420..421,
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -937,13 +911,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 ctx: Store,
                                             },
                                         ),
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 440..441,
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -958,13 +931,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                                 ctx: Store,
                                             },
                                         ),
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 448..449,
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -1000,13 +972,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 468..474,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 468..469,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(
@@ -1036,13 +1007,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 488..494,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 488..489,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(
@@ -1072,13 +1042,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 509..515,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 509..510,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(
@@ -1093,13 +1062,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 },
                 WithItem {
                     range: 517..523,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 517..518,
                             value: Int(
                                 1,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(
@@ -1129,13 +1097,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             items: [
                 WithItem {
                     range: 537..543,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 537..538,
                             value: Int(
                                 0,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(
@@ -1150,13 +1117,12 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 },
                 WithItem {
                     range: 545..551,
-                    context_expr: Constant(
-                        ExprConstant {
+                    context_expr: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 545..546,
                             value: Int(
                                 1,
                             ),
-                            kind: None,
                         },
                     ),
                     optional_vars: Some(

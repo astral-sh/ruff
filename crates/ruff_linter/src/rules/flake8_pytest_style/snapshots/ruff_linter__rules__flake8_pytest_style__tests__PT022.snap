@@ -1,0 +1,64 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT022.py:17:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+   |
+15 | def error():
+16 |     resource = acquire_resource()
+17 |     yield resource
+   |     ^^^^^^^^^^^^^^ PT022
+   |
+   = help: Replace `yield` with `return`
+
+ℹ Safe fix
+14 14 | @pytest.fixture()
+15 15 | def error():
+16 16 |     resource = acquire_resource()
+17    |-    yield resource
+   17 |+    return resource
+18 18 | 
+19 19 | 
+20 20 | import typing
+
+PT022.py:37:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+   |
+35 | def error() -> typing.Generator[typing.Any, None, None]:
+36 |     resource = acquire_resource()
+37 |     yield resource
+   |     ^^^^^^^^^^^^^^ PT022
+   |
+   = help: Replace `yield` with `return`
+
+ℹ Safe fix
+32 32 | 
+33 33 | 
+34 34 | @pytest.fixture()
+35    |-def error() -> typing.Generator[typing.Any, None, None]:
+   35 |+def error() -> typing.Any:
+36 36 |     resource = acquire_resource()
+37    |-    yield resource
+   37 |+    return resource
+38 38 | 
+39 39 | 
+40 40 | @pytest.fixture()
+
+PT022.py:43:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+   |
+41 | def error() -> Generator[Resource, None, None]:
+42 |     resource = acquire_resource()
+43 |     yield resource
+   |     ^^^^^^^^^^^^^^ PT022
+   |
+   = help: Replace `yield` with `return`
+
+ℹ Safe fix
+38 38 | 
+39 39 | 
+40 40 | @pytest.fixture()
+41    |-def error() -> Generator[Resource, None, None]:
+   41 |+def error() -> Resource:
+42 42 |     resource = acquire_resource()
+43    |-    yield resource
+   43 |+    return resource
+
+

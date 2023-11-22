@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+comment.py:1:1: I002 [*] Missing required import: `from __future__ import annotations as _annotations`
+  |
+1 | #!/usr/bin/env python3
+  |  I002
+2 | 
+3 | x = 1
+  |
+  = help: Insert required import: `from __future__ import annotations as _annotations`
+
+ℹ Safe fix
+1 1 | #!/usr/bin/env python3
+  2 |+from __future__ import annotations as _annotations
+2 3 | 
+3 4 | x = 1
+
+

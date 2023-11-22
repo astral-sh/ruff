@@ -1,13 +1,13 @@
-use crate::comments::SourceComment;
 use ruff_formatter::prelude::format_with;
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{ExprList, Ranged};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::ExprList;
+use ruff_text_size::Ranged;
 
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     empty_parenthesized, parenthesized, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprList;
@@ -21,7 +21,7 @@ impl FormatNodeRule<ExprList> for FormatExprList {
         } = item;
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         if elts.is_empty() {
             return empty_parenthesized("[", dangling, "]").fmt(f);

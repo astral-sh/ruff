@@ -1,0 +1,294 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM105_0.py:6:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+  |
+5 |   # SIM105
+6 | / try:
+7 | |     foo()
+8 | | except ValueError:
+9 | |     pass
+  | |________^ SIM105
+  |
+  = help: Replace with `contextlib.suppress(ValueError)`
+
+ℹ Unsafe fix
+   1  |+import contextlib
+1  2  | def foo():
+2  3  |     pass
+3  4  | 
+4  5  | 
+5  6  | # SIM105
+6     |-try:
+   7  |+with contextlib.suppress(ValueError):
+7  8  |     foo()
+8     |-except ValueError:
+9     |-    pass
+10 9  | 
+11 10 | 
+12 11 | # SIM105
+
+SIM105_0.py:13:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+   |
+12 |   # SIM105
+13 | / try:
+14 | |     foo()
+15 | | except (ValueError, OSError):
+16 | |     pass
+   | |________^ SIM105
+17 |   
+18 |   # SIM105
+   |
+   = help: Replace with `contextlib.suppress(ValueError, OSError)`
+
+ℹ Unsafe fix
+   1  |+import contextlib
+1  2  | def foo():
+2  3  |     pass
+3  4  | 
+--------------------------------------------------------------------------------
+10 11 | 
+11 12 | 
+12 13 | # SIM105
+13    |-try:
+   14 |+with contextlib.suppress(ValueError, OSError):
+14 15 |     foo()
+15    |-except (ValueError, OSError):
+16    |-    pass
+17 16 | 
+18 17 | # SIM105
+19 18 | try:
+
+SIM105_0.py:19:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+   |
+18 |   # SIM105
+19 | / try:
+20 | |     foo()
+21 | | except (ValueError, OSError) as e:
+22 | |     pass
+   | |________^ SIM105
+23 |   
+24 |   # SIM105
+   |
+   = help: Replace with `contextlib.suppress(ValueError, OSError)`
+
+ℹ Unsafe fix
+   1  |+import contextlib
+1  2  | def foo():
+2  3  |     pass
+3  4  | 
+--------------------------------------------------------------------------------
+16 17 |     pass
+17 18 | 
+18 19 | # SIM105
+19    |-try:
+   20 |+with contextlib.suppress(ValueError, OSError):
+20 21 |     foo()
+21    |-except (ValueError, OSError) as e:
+22    |-    pass
+23 22 | 
+24 23 | # SIM105
+25 24 | try:
+
+SIM105_0.py:25:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `try`-`except`-`pass`
+   |
+24 |   # SIM105
+25 | / try:
+26 | |     foo()
+27 | | except:
+28 | |     pass
+   | |________^ SIM105
+29 |   
+30 |   # SIM105
+   |
+   = help: Replace with `contextlib.suppress(Exception)`
+
+ℹ Unsafe fix
+   1  |+import contextlib
+1  2  | def foo():
+2  3  |     pass
+3  4  | 
+--------------------------------------------------------------------------------
+22 23 |     pass
+23 24 | 
+24 25 | # SIM105
+25    |-try:
+   26 |+with contextlib.suppress(Exception):
+26 27 |     foo()
+27    |-except:
+28    |-    pass
+29 28 | 
+30 29 | # SIM105
+31 30 | try:
+
+SIM105_0.py:31:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
+   |
+30 |   # SIM105
+31 | / try:
+32 | |     foo()
+33 | | except (a.Error, b.Error):
+34 | |     pass
+   | |________^ SIM105
+35 |   
+36 |   # OK
+   |
+   = help: Replace with `contextlib.suppress(a.Error, b.Error)`
+
+ℹ Unsafe fix
+   1  |+import contextlib
+1  2  | def foo():
+2  3  |     pass
+3  4  | 
+--------------------------------------------------------------------------------
+28 29 |     pass
+29 30 | 
+30 31 | # SIM105
+31    |-try:
+   32 |+with contextlib.suppress(a.Error, b.Error):
+32 33 |     foo()
+33    |-except (a.Error, b.Error):
+34    |-    pass
+35 34 | 
+36 35 | # OK
+37 36 | try:
+
+SIM105_0.py:85:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
+   |
+83 |   def with_ellipsis():
+84 |       # OK
+85 |       try:
+   |  _____^
+86 | |         foo()
+87 | |     except ValueError:
+88 | |         ...
+   | |___________^ SIM105
+   |
+   = help: Replace with `contextlib.suppress(ValueError)`
+
+ℹ Unsafe fix
+   1  |+import contextlib
+1  2  | def foo():
+2  3  |     pass
+3  4  | 
+--------------------------------------------------------------------------------
+82 83 | 
+83 84 | def with_ellipsis():
+84 85 |     # OK
+85    |-    try:
+   86 |+    with contextlib.suppress(ValueError):
+86 87 |         foo()
+87    |-    except ValueError:
+88    |-        ...
+89 88 | 
+90 89 | 
+91 90 | def with_ellipsis_and_return():
+
+SIM105_0.py:100:5: SIM105 Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`
+    |
+ 99 |   def with_comment():
+100 |       try:
+    |  _____^
+101 | |         foo()
+102 | |     except (ValueError, OSError):
+103 | |         pass  # Trailing comment.
+    | |____________^ SIM105
+104 |   
+105 |   try:
+    |
+    = help: Replace with `contextlib.suppress(ValueError, OSError)`
+
+SIM105_0.py:117:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
+    |
+115 |   # Regression test for: https://github.com/astral-sh/ruff/issues/7123
+116 |   def write_models(directory, Models):
+117 |       try:
+    |  _____^
+118 | |         os.makedirs(model_dir);
+119 | |     except OSError:
+120 | |         pass;
+    | |____________^ SIM105
+121 |   
+122 |       try: os.makedirs(model_dir);
+    |
+    = help: Replace with `contextlib.suppress(OSError)`
+
+ℹ Unsafe fix
+    1   |+import contextlib
+1   2   | def foo():
+2   3   |     pass
+3   4   | 
+--------------------------------------------------------------------------------
+114 115 | 
+115 116 | # Regression test for: https://github.com/astral-sh/ruff/issues/7123
+116 117 | def write_models(directory, Models):
+117     |-    try:
+    118 |+    with contextlib.suppress(OSError):
+118 119 |         os.makedirs(model_dir);
+119     |-    except OSError:
+120     |-        pass;
+121 120 | 
+122 121 |     try: os.makedirs(model_dir);
+123 122 |     except OSError:
+
+SIM105_0.py:122:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
+    |
+120 |           pass;
+121 |   
+122 |       try: os.makedirs(model_dir);
+    |  _____^
+123 | |     except OSError:
+124 | |         pass;
+    | |____________^ SIM105
+125 |   
+126 |       try: os.makedirs(model_dir);
+    |
+    = help: Replace with `contextlib.suppress(OSError)`
+
+ℹ Unsafe fix
+    1   |+import contextlib
+1   2   | def foo():
+2   3   |     pass
+3   4   | 
+--------------------------------------------------------------------------------
+119 120 |     except OSError:
+120 121 |         pass;
+121 122 | 
+122     |-    try: os.makedirs(model_dir);
+123     |-    except OSError:
+124     |-        pass;
+    123 |+    with contextlib.suppress(OSError): os.makedirs(model_dir);
+125 124 | 
+126 125 |     try: os.makedirs(model_dir);
+127 126 |     except OSError:
+
+SIM105_0.py:126:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try`-`except`-`pass`
+    |
+124 |           pass;
+125 |   
+126 |       try: os.makedirs(model_dir);
+    |  _____^
+127 | |     except OSError:
+128 | |         pass; \
+    | |____________^ SIM105
+129 |               \
+130 |               #
+    |
+    = help: Replace with `contextlib.suppress(OSError)`
+
+ℹ Unsafe fix
+    1   |+import contextlib
+1   2   | def foo():
+2   3   |     pass
+3   4   | 
+--------------------------------------------------------------------------------
+123 124 |     except OSError:
+124 125 |         pass;
+125 126 | 
+126     |-    try: os.makedirs(model_dir);
+127     |-    except OSError:
+128     |-        pass; \
+    127 |+    with contextlib.suppress(OSError): os.makedirs(model_dir);
+129 128 |             \
+130 129 |             #
+
+

@@ -1,0 +1,131 @@
+---
+source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+---
+docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quotes preferred
+  |
+3 |   """
+4 |   
+5 | / """
+6 | | this is not a docstring
+7 | | """
+  | |___^ Q001
+8 |   
+9 |   l = []
+  |
+  = help: Replace double multiline quotes with single quotes
+
+ℹ Safe fix
+2 2 | Double quotes multiline module docstring
+3 3 | """
+4 4 | 
+5   |-"""
+  5 |+'''
+6 6 | this is not a docstring
+7   |-"""
+  7 |+'''
+8 8 | 
+9 9 | l = []
+10 10 | 
+
+docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quotes preferred
+   |
+14 |       """
+15 |   
+16 |       """
+   |  _____^
+17 | |     this is not a docstring
+18 | |     """
+   | |_______^ Q001
+19 |   
+20 |       # The colon in the list indexing below is an edge case for the docstring scanner
+   |
+   = help: Replace double multiline quotes with single quotes
+
+ℹ Safe fix
+13 13 |     Double quotes multiline class docstring
+14 14 |     """
+15 15 | 
+16    |-    """
+   16 |+    '''
+17 17 |     this is not a docstring
+18    |-    """
+   18 |+    '''
+19 19 | 
+20 20 |     # The colon in the list indexing below is an edge case for the docstring scanner
+21 21 |     def f(self, bar="""
+
+docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quotes preferred
+   |
+20 |       # The colon in the list indexing below is an edge case for the docstring scanner
+21 |       def f(self, bar="""
+   |  _____________________^
+22 | |         definitely not a docstring""",
+   | |_____________________________________^ Q001
+23 |           val=l[Cls():3]):
+24 |           """
+   |
+   = help: Replace double multiline quotes with single quotes
+
+ℹ Safe fix
+18 18 |     """
+19 19 | 
+20 20 |     # The colon in the list indexing below is an edge case for the docstring scanner
+21    |-    def f(self, bar="""
+22    |-        definitely not a docstring""",
+   21 |+    def f(self, bar='''
+   22 |+        definitely not a docstring''',
+23 23 |         val=l[Cls():3]):
+24 24 |         """
+25 25 |         Double quotes multiline function docstring
+
+docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quotes preferred
+   |
+28 |           some_expression = 'hello world'
+29 |   
+30 |           """
+   |  _________^
+31 | |         this is not a docstring
+32 | |         """
+   | |___________^ Q001
+33 |   
+34 |           if l:
+   |
+   = help: Replace double multiline quotes with single quotes
+
+ℹ Safe fix
+27 27 | 
+28 28 |         some_expression = 'hello world'
+29 29 | 
+30    |-        """
+   30 |+        '''
+31 31 |         this is not a docstring
+32    |-        """
+   32 |+        '''
+33 33 | 
+34 34 |         if l:
+35 35 |             """
+
+docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quotes preferred
+   |
+34 |           if l:
+35 |               """
+   |  _____________^
+36 | |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
+37 | |             """
+   | |_______________^ Q001
+38 |               pass
+   |
+   = help: Replace double multiline quotes with single quotes
+
+ℹ Safe fix
+32 32 |         """
+33 33 | 
+34 34 |         if l:
+35    |-            """
+   35 |+            '''
+36 36 |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
+37    |-            """
+   37 |+            '''
+38 38 |             pass
+
+

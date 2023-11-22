@@ -15,23 +15,23 @@ for aVeryLongNameThatSpillsOverToTheNextLineBecauseItIsExtremelyLongAndGoesOnAnd
     pass
 
 else:
-    ...
+    pass
 
 for (
     x,
     y,
     ) in z: # comment
-    ...
+    pass
 
 
 # remove brackets around x,y but keep them around z,w
 for (x, y) in (z, w):
-    ...
+    pass
 
 
 # type comment
 for x in (): # type: int
-    ...
+    pass
 
 # Tuple parentheses for iterable.
 for x in 1, 2, 3:
@@ -42,3 +42,31 @@ for x in (1, 2, 3):
 
 for x in 1, 2, 3,:
     pass
+
+# Don't keep parentheses around right target if it can made fit by breaking sub expressions
+for column_name, (
+    referenced_column_name,
+    referenced_table_name,
+) in relations.items():
+    pass
+
+for column_name, [
+    referenced_column_name,
+    referenced_table_name,
+] in relations.items():
+    pass
+
+for column_name, [
+    referenced_column_name,
+    referenced_table_name,
+], in relations.items():
+    pass
+
+for (
+    # leading comment
+    column_name, [
+    referenced_column_name,
+    referenced_table_name,
+]) in relations.items():
+    pass
+

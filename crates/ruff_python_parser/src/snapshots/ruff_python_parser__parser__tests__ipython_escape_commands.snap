@@ -221,13 +221,12 @@ Module(
                             arguments: Arguments {
                                 range: 725..728,
                                 args: [
-                                    Constant(
-                                        ExprConstant {
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
                                             range: 726..727,
                                             value: Int(
                                                 5,
                                             ),
-                                            kind: None,
                                         },
                                     ),
                                 ],

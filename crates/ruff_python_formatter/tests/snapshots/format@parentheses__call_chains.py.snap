@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/parentheses/call_chains.py
 ---
 ## Input
-```py
+```python
 # Test cases for call chains and optional parentheses, with and without fluent style
 
 raise OsError("") from a.aaaaa(
@@ -167,10 +167,65 @@ max_message_id = (
 max_message_id = (
     Message.objects.filter(recipient=recipient).order_by("id").reverse()[0].id()
 )
+
+# Parentheses with fluent style within and outside of the parentheses.
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+    )
+    .groupby(1,)
+    .sum()
+)
+
+(
+    ( # foo
+        df1_aaaaaaaaaaaa.merge()
+    )
+    .groupby(1,)
+    .sum()
+)
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(1,)
+    )
+    .sum()
+)
+
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(1,)
+    )
+    .sum()
+    .bar()
+)
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(1,)
+        .bar()
+    )
+    .sum()
+)
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(1,)
+        .bar()
+    )
+    .sum()
+    .baz()
+)
+
 ```
 
 ## Output
-```py
+```python
 # Test cases for call chains and optional parentheses, with and without fluent style
 
 raise OsError("") from a.aaaaa(
@@ -268,7 +323,9 @@ d13 = (
 )
 
 # Doesn't fit, default
-d2 = x.e().esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkfsdddd()  #
+d2 = (
+    x.e().esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkfsdddd()  #
+)
 
 # Doesn't fit, fluent style
 d3 = (
@@ -347,6 +404,66 @@ max_message_id = (
 
 max_message_id = (
     Message.objects.filter(recipient=recipient).order_by("id").reverse()[0].id()
+)
+
+# Parentheses with fluent style within and outside of the parentheses.
+(
+    (df1_aaaaaaaaaaaa.merge())
+    .groupby(
+        1,
+    )
+    .sum()
+)
+
+(
+    (  # foo
+        df1_aaaaaaaaaaaa.merge()
+    )
+    .groupby(
+        1,
+    )
+    .sum()
+)
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge().groupby(
+            1,
+        )
+    ).sum()
+)
+
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge().groupby(
+            1,
+        )
+    )
+    .sum()
+    .bar()
+)
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(
+            1,
+        )
+        .bar()
+    ).sum()
+)
+
+(
+    (
+        df1_aaaaaaaaaaaa.merge()
+        .groupby(
+            1,
+        )
+        .bar()
+    )
+    .sum()
+    .baz()
 )
 ```
 

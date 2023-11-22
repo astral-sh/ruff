@@ -1,0 +1,74 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+sys_exit_alias_4.py:3:1: PLR1722 [*] Use `sys.exit()` instead of `exit`
+  |
+1 | from sys import exit as exit2
+2 | 
+3 | exit(0)
+  | ^^^^ PLR1722
+4 | quit(0)
+  |
+  = help: Replace `exit` with `sys.exit()`
+
+ℹ Unsafe fix
+1 1 | from sys import exit as exit2
+2 2 | 
+3   |-exit(0)
+  3 |+exit2(0)
+4 4 | quit(0)
+5 5 | 
+6 6 | 
+
+sys_exit_alias_4.py:4:1: PLR1722 [*] Use `sys.exit()` instead of `quit`
+  |
+3 | exit(0)
+4 | quit(0)
+  | ^^^^ PLR1722
+  |
+  = help: Replace `quit` with `sys.exit()`
+
+ℹ Unsafe fix
+1 1 | from sys import exit as exit2
+2 2 | 
+3 3 | exit(0)
+4   |-quit(0)
+  4 |+exit2(0)
+5 5 | 
+6 6 | 
+7 7 | def main():
+
+sys_exit_alias_4.py:8:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
+  |
+7 | def main():
+8 |     exit(1)
+  |     ^^^^ PLR1722
+9 |     quit(1)
+  |
+  = help: Replace `exit` with `sys.exit()`
+
+ℹ Unsafe fix
+5 5 | 
+6 6 | 
+7 7 | def main():
+8   |-    exit(1)
+  8 |+    exit2(1)
+9 9 |     quit(1)
+
+sys_exit_alias_4.py:9:5: PLR1722 [*] Use `sys.exit()` instead of `quit`
+  |
+7 | def main():
+8 |     exit(1)
+9 |     quit(1)
+  |     ^^^^ PLR1722
+  |
+  = help: Replace `quit` with `sys.exit()`
+
+ℹ Unsafe fix
+6 6 | 
+7 7 | def main():
+8 8 |     exit(1)
+9   |-    quit(1)
+  9 |+    exit2(1)
+
+

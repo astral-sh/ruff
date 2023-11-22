@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 ---
 ## Input
 
-```py
+```python
 def do_not_touch_this_prefix():
     R"""There was a bug where docstring prefixes would be normalized even with -S."""
 
@@ -37,7 +37,7 @@ def do_not_touch_this_prefix3():
 
 ## Ruff Output
 
-```py
+```python
 def do_not_touch_this_prefix():
     R"""There was a bug where docstring prefixes would be normalized even with -S."""
 
@@ -52,7 +52,7 @@ def do_not_touch_this_prefix3():
 
 ## Black Output
 
-```py
+```python
 def do_not_touch_this_prefix():
     R"""There was a bug where docstring prefixes would be normalized even with -S."""
 

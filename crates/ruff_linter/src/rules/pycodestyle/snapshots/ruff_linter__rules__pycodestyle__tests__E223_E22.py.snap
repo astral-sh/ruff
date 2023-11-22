@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E22.py:43:2: E223 [*] Tab before operator
+   |
+41 | #: E223
+42 | foobart = 4
+43 | a   = 3  # aligned with tab
+   |  ^^^ E223
+44 | #:
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+40 40 | 
+41 41 | #: E223
+42 42 | foobart = 4
+43    |-a	= 3  # aligned with tab
+   43 |+a = 3  # aligned with tab
+44 44 | #:
+45 45 | 
+46 46 | 
+
+

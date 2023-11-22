@@ -1,0 +1,129 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT001.py:14:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+14 | @pytest.fixture()
+   | ^^^^^^^^^^^^^^^^^ PT001
+15 | def parentheses_no_params():
+16 |     return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+11 11 |     return 42
+12 12 | 
+13 13 | 
+14    |-@pytest.fixture()
+   14 |+@pytest.fixture
+15 15 | def parentheses_no_params():
+16 16 |     return 42
+17 17 | 
+
+PT001.py:24:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+24 | / @pytest.fixture(
+25 | | 
+26 | | )
+   | |_^ PT001
+27 |   def parentheses_no_params_multiline():
+28 |       return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+21 21 |     return 42
+22 22 | 
+23 23 | 
+24    |-@pytest.fixture(
+25    |-
+26    |-)
+   24 |+@pytest.fixture
+27 25 | def parentheses_no_params_multiline():
+28 26 |     return 42
+29 27 | 
+
+PT001.py:39:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+39 | @fixture()
+   | ^^^^^^^^^^ PT001
+40 | def imported_from_parentheses_no_params():
+41 |     return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+36 36 |     return 42
+37 37 | 
+38 38 | 
+39    |-@fixture()
+   39 |+@fixture
+40 40 | def imported_from_parentheses_no_params():
+41 41 |     return 42
+42 42 | 
+
+PT001.py:49:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+49 | / @fixture(
+50 | | 
+51 | | )
+   | |_^ PT001
+52 |   def imported_from_parentheses_no_params_multiline():
+53 |       return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+46 46 |     return 42
+47 47 | 
+48 48 | 
+49    |-@fixture(
+50    |-
+51    |-)
+   49 |+@fixture
+52 50 | def imported_from_parentheses_no_params_multiline():
+53 51 |     return 42
+54 52 | 
+
+PT001.py:64:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+64 | @aliased()
+   | ^^^^^^^^^^ PT001
+65 | def aliased_parentheses_no_params():
+66 |     return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+61 61 |     return 42
+62 62 | 
+63 63 | 
+64    |-@aliased()
+   64 |+@aliased
+65 65 | def aliased_parentheses_no_params():
+66 66 |     return 42
+67 67 | 
+
+PT001.py:74:1: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+   |
+74 | / @aliased(
+75 | | 
+76 | | )
+   | |_^ PT001
+77 |   def aliased_parentheses_no_params_multiline():
+78 |       return 42
+   |
+   = help: Remove parentheses
+
+ℹ Safe fix
+71 71 |     return 42
+72 72 | 
+73 73 | 
+74    |-@aliased(
+75    |-
+76    |-)
+   74 |+@aliased
+77 75 | def aliased_parentheses_no_params_multiline():
+78 76 |     return 42
+
+

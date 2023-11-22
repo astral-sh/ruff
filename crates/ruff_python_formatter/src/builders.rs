@@ -1,11 +1,9 @@
 use ruff_formatter::{format_args, write, Argument, Arguments};
-use ruff_python_ast::Ranged;
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::other::commas::has_magic_trailing_comma;
 use crate::prelude::*;
-use crate::MagicTrailingComma;
 
 /// Adds parentheses and indents `content` if it doesn't fit on a line.
 pub(crate) fn parenthesize_if_expands<'ast, T>(content: &T) -> ParenthesizeIfExpands<'_, 'ast>
@@ -29,9 +27,9 @@ impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
             write!(
                 f,
                 [group(&format_args![
-                    if_group_breaks(&text("(")),
+                    if_group_breaks(&token("(")),
                     soft_block_indent(&Arguments::from(&self.inner)),
-                    if_group_breaks(&text(")")),
+                    if_group_breaks(&token(")")),
                 ])]
             )
         }
@@ -152,9 +150,9 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         N: Ranged,
         Separator: Format<PyFormatContext<'ast>>,
     {
-        self.result = self.result.and_then(|_| {
+        self.result = self.result.and_then(|()| {
             if self.entries.is_one_or_more() {
-                write!(self.fmt, [text(","), separator])?;
+                write!(self.fmt, [token(","), separator])?;
             }
 
             self.entries = self.entries.next(node.end());
@@ -192,28 +190,13 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     }
 
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
-        self.result.and_then(|_| {
+        self.result.and_then(|()| {
             if let Some(last_end) = self.entries.position() {
-                let magic_trailing_comma = match self.fmt.options().magic_trailing_comma() {
-                    MagicTrailingComma::Respect => {
-                        let first_token = SimpleTokenizer::new(
-                            self.fmt.context().source(),
-                            TextRange::new(last_end, self.sequence_end),
-                        )
-                        .skip_trivia()
-                        // Skip over any closing parentheses belonging to the expression
-                        .find(|token| token.kind() != SimpleTokenKind::RParen);
-
-                        matches!(
-                            first_token,
-                            Some(SimpleToken {
-                                kind: SimpleTokenKind::Comma,
-                                ..
-                            })
-                        )
-                    }
-                    MagicTrailingComma::Ignore => false,
-                };
+                let magic_trailing_comma = has_magic_trailing_comma(
+                    TextRange::new(last_end, self.sequence_end),
+                    self.fmt.options(),
+                    self.fmt.context(),
+                );
 
                 // If there is a single entry, only keep the magic trailing comma, don't add it if
                 // it wasn't there -- unless the trailing comma behavior is set to one-or-more.
@@ -221,7 +204,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
                     || self.trailing_comma == TrailingComma::OneOrMore
                     || self.entries.is_more_than_one()
                 {
-                    if_group_breaks(&text(",")).fmt(self.fmt)?;
+                    if_group_breaks(&token(",")).fmt(self.fmt)?;
                 }
 
                 if magic_trailing_comma {

@@ -11,14 +11,16 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+ruff_cache = { path = "../ruff_cache" }
+ruff_macros = { path = "../ruff_macros" }
 ruff_text_size = { path = "../ruff_text_size" }
 
 drop_bomb = { version = "0.1.5" }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
-static_assertions = "1.1.0"
-tracing = { version = "0.1.37", default-features = false, features = ["std"] }
+static_assertions = { workspace = true }
+tracing = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]
@@ -27,3 +29,6 @@ insta = { workspace = true }
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]
 schemars = ["dep:schemars", "ruff_text_size/schemars"]
+
+[lints]
+workspace = true

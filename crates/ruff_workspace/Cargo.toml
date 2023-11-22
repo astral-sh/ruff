@@ -1,0 +1,52 @@
+[package]
+name = "ruff_workspace"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+
+[dependencies]
+ruff_linter = { path = "../ruff_linter" }
+ruff_formatter = { path = "../ruff_formatter" }
+ruff_python_formatter = { path = "../ruff_python_formatter", features = ["serde"] }
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_source_file = { path = "../ruff_source_file" }
+ruff_cache = { path = "../ruff_cache" }
+ruff_macros = { path = "../ruff_macros" }
+
+anyhow = { workspace = true }
+colored = { workspace = true }
+dirs = { version = "5.0.0" }
+ignore = { workspace = true }
+is-macro = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+glob = { workspace = true }
+globset = { workspace = true }
+once_cell = { workspace = true }
+path-absolutize = { workspace = true }
+pep440_rs = { version = "0.3.12", features = ["serde"] }
+regex = { workspace = true }
+rustc-hash = { workspace = true }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true}
+shellexpand = { workspace = true }
+strum = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.8.1"
+
+[features]
+default = []
+schemars = [ "dep:schemars", "ruff_formatter/schemars", "ruff_python_formatter/schemars" ]
+
+[lints]
+workspace = true

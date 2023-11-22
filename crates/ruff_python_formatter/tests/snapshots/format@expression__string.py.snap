@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/string.py
 ---
 ## Input
-```py
+```python
 "' test"
 '" test'
 
@@ -130,18 +130,29 @@ test_particular = [
     'c'
     )
 }
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5893
+x = ("""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" """bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
+x = (f"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" f"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
+x = (b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb""")
+
+# https://github.com/astral-sh/ruff/issues/7460
+trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
 ```
 
 ## Outputs
 ### Output 1
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Double
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
-```py
+```python
 "' test"
 '" test'
 
@@ -233,8 +244,7 @@ String \"\"\"
 )
 
 if (
-    a
-    + "Let's"
+    a + "Let's"
     "start"
     "with"
     "a"
@@ -284,18 +294,38 @@ test_particular = [
 
 # Parenthesized string continuation with messed up indentation
 {"key": ([], "a" "b" "c")}
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5893
+x = (
+    """aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    """bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
+)
+x = (
+    f"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    f"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
+)
+x = (
+    b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
+)
+
+# https://github.com/astral-sh/ruff/issues/7460
+trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
 ```
 
 
 ### Output 2
 ```
-indent-style            = Spaces, size: 4
+indent-style            = space
 line-width              = 88
+indent-width            = 4
 quote-style             = Single
 magic-trailing-comma    = Respect
+preview                 = Disabled
 ```
 
-```py
+```python
 "' test"
 '" test'
 
@@ -335,17 +365,17 @@ if True:
     'This string will not include \
         backslashes or newline characters.'
 
-'''Multiline
+"""Multiline
 String \"
-'''
+"""
 
-'''Multiline
+"""Multiline
 String \'
-'''
+"""
 
-'''Multiline
+"""Multiline
 String ""
-'''
+"""
 
 '''Multiline
 String """
@@ -361,9 +391,9 @@ String '''
 """Multiline
 String '"""
 
-'''Multiline
+"""Multiline
 String \"\"\"
-'''
+"""
 
 # String continuation
 
@@ -387,8 +417,7 @@ String \"\"\"
 )
 
 if (
-    a
-    + "Let's"
+    a + "Let's"
     'start'
     'with'
     'a'
@@ -438,6 +467,24 @@ test_particular = [
 
 # Parenthesized string continuation with messed up indentation
 {'key': ([], 'a' 'b' 'c')}
+
+
+# Regression test for https://github.com/astral-sh/ruff/issues/5893
+x = (
+    """aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    """bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
+)
+x = (
+    f"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    f"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
+)
+x = (
+    b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"""
+    b"""bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"""
+)
+
+# https://github.com/astral-sh/ruff/issues/7460
+trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
 ```
 
 

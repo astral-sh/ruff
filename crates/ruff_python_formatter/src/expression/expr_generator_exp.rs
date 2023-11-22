@@ -1,25 +1,25 @@
-use ruff_formatter::{format_args, write, Buffer, FormatResult, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_formatter::{format_args, write, FormatRuleWithOptions};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprGeneratorExp;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::SourceComment;
-use crate::context::PyFormatContext;
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::AsFormat;
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Eq, PartialEq, Debug, Default)]
 pub enum GeneratorExpParentheses {
     #[default]
     Default,
 
-    /// Skip parens if the generator is the only argument to a function and doesn't contain any
-    /// dangling comments. For example:
+    /// Skips the parentheses if they aren't present in the source code. Used when formatting call expressions
+    /// because the parentheses are optional if the generator is the **only** argument:
+    ///
     /// ```python
     /// all(x for y in z)`
     /// ```
-    StripIfOnlyFunctionArg,
+    Preserve,
 }
 
 impl FormatRuleWithOptions<ExprGeneratorExp, PyFormatContext<'_>> for FormatExprGeneratorExp {
@@ -51,10 +51,11 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
-        if self.parentheses == GeneratorExpParentheses::StripIfOnlyFunctionArg
+        if self.parentheses == GeneratorExpParentheses::Preserve
             && dangling.is_empty()
+            && !is_generator_parenthesized(item, f.context().source())
         {
             write!(
                 f,
@@ -68,7 +69,7 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
                     &group(&format_args!(
                         group(&elt.format()),
                         soft_line_break_or_space(),
-                        &joined
+                        joined
                     )),
                     ")"
                 )
@@ -90,9 +91,47 @@ impl FormatNodeRule<ExprGeneratorExp> for FormatExprGeneratorExp {
 impl NeedsParentheses for ExprGeneratorExp {
     fn needs_parentheses(
         &self,
-        _parent: AnyNodeRef,
+        parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Never
+        if parent.is_expr_await() {
+            OptionalParentheses::Always
+        } else {
+            OptionalParentheses::Never
+        }
     }
+}
+
+/// Return `true` if a generator is parenthesized in the source code.
+pub(crate) fn is_generator_parenthesized(generator: &ExprGeneratorExp, source: &str) -> bool {
+    // Count the number of open parentheses between the start of the generator and the first element.
+    let open_parentheses_count = SimpleTokenizer::new(
+        source,
+        TextRange::new(generator.start(), generator.elt.start()),
+    )
+    .skip_trivia()
+    .filter(|token| token.kind() == SimpleTokenKind::LParen)
+    .count();
+    if open_parentheses_count == 0 {
+        return false;
+    }
+
+    // Count the number of parentheses between the end of the generator and its trailing comma.
+    let close_parentheses_count = SimpleTokenizer::new(
+        source,
+        TextRange::new(
+            generator.elt.end(),
+            generator
+                .generators
+                .first()
+                .map_or(generator.end(), Ranged::start),
+        ),
+    )
+    .skip_trivia()
+    .filter(|token| token.kind() == SimpleTokenKind::RParen)
+    .count();
+
+    // If the number of open parentheses is greater than the number of close parentheses, the
+    // generator is parenthesized.
+    open_parentheses_count > close_parentheses_count
 }

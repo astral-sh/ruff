@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Check two versions of ruff against a corpus of open-source code.
+"""
+**DEPRECATED** This script is being replaced by the ruff-ecosystem package.
+
+
+Check two versions of ruff against a corpus of open-source code.
 
 Example usage:
 
@@ -105,14 +109,35 @@ class Repository(NamedTuple):
         return git_sha_stdout.decode().strip()
 
 
+# Repositories to check
+# We check most repositories with the default ruleset instead of all rules to avoid
+# noisy reports when new rules are added; see https://github.com/astral-sh/ruff/pull/3590
 REPOSITORIES: list[Repository] = [
     Repository("DisnakeDev", "disnake", "master"),
+    Repository("PostHog", "HouseWatch", "main"),
+    Repository("RasaHQ", "rasa", "main"),
+    Repository("Snowflake-Labs", "snowcli", "main"),
+    Repository("aiven", "aiven-client", "main"),
+    Repository("alteryx", "featuretools", "main"),
     Repository("apache", "airflow", "main", select="ALL"),
+    Repository("aws", "aws-sam-cli", "develop"),
+    Repository("bloomberg", "pytest-memray", "main"),
     Repository("bokeh", "bokeh", "branch-3.3", select="ALL"),
     Repository("commaai", "openpilot", "master"),
+    Repository("demisto", "content", "master"),
+    Repository("docker", "docker-py", "main"),
     Repository("freedomofpress", "securedrop", "develop"),
+    Repository("fronzbot", "blinkpy", "dev"),
     Repository("ibis-project", "ibis", "master"),
+    Repository("ing-bank", "probatus", "main"),
     Repository("jrnl-org", "jrnl", "develop"),
+    Repository("latchbio", "latch", "main"),
+    Repository("lnbits", "lnbits", "main"),
+    Repository("milvus-io", "pymilvus", "master"),
+    Repository("mlflow", "mlflow", "master"),
+    Repository("model-bakers", "model_bakery", "main"),
+    Repository("pandas-dev", "pandas", "main"),
+    Repository("prefecthq", "prefect", "main"),
     Repository("pypa", "build", "main"),
     Repository("pypa", "cibuildwheel", "main"),
     Repository("pypa", "pip", "main"),
@@ -120,10 +145,14 @@ REPOSITORIES: list[Repository] = [
     Repository("python", "mypy", "master"),
     Repository("python", "typeshed", "main", select="PYI"),
     Repository("python-poetry", "poetry", "master"),
+    Repository("reflex-dev", "reflex", "main"),
+    Repository("rotki", "rotki", "develop"),
     Repository("scikit-build", "scikit-build", "main"),
     Repository("scikit-build", "scikit-build-core", "main"),
     Repository("sphinx-doc", "sphinx", "master"),
+    Repository("spruceid", "siwe-py", "main"),
     Repository("tiangolo", "fastapi", "master"),
+    Repository("yandex", "ch-backup", "main"),
     Repository("zulip", "zulip", "main", select="ALL"),
 ]
 

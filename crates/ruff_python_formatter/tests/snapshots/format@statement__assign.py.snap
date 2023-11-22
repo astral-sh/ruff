@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/assign.py
 ---
 ## Input
-```py
+```python
 # break left hand side
 a1akjdshflkjahdslkfjlasfdahjlfds = bakjdshflkjahdslkfjlasfdahjlfds = cakjdshflkjahdslkfjlasfdahjlfds = kjaödkjaföjfahlfdalfhaöfaöfhaöfha = fkjaödkjaföjfahlfdalfhaöfaöfhaöfha = g = 3
 
@@ -60,10 +60,23 @@ x = (
         c,
     ]
 ) = 1
+
+def main() -> None:
+    if True:
+        some_very_long_variable_name_abcdefghijk = some_very_long_variable_name_abcdefghijk[
+            some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
+            == "This is a very long string abcdefghijk"
+        ]
+
+        organization_application = (
+            organization_service.get_organization_applications_by_name(
+                db_request.POST["name"]
+            )
+        )[0]
 ```
 
 ## Output
-```py
+```python
 # break left hand side
 a1akjdshflkjahdslkfjlasfdahjlfds = (
     bakjdshflkjahdslkfjlasfdahjlfds
@@ -122,6 +135,22 @@ x = [  # comment
     b,
     c,
 ] = 1
+
+
+def main() -> None:
+    if True:
+        some_very_long_variable_name_abcdefghijk = (
+            some_very_long_variable_name_abcdefghijk[
+                some_very_long_variable_name_abcdefghijk.some_very_long_attribute_name
+                == "This is a very long string abcdefghijk"
+            ]
+        )
+
+        organization_application = (
+            organization_service.get_organization_applications_by_name(
+                db_request.POST["name"]
+            )
+        )[0]
 ```
 
 

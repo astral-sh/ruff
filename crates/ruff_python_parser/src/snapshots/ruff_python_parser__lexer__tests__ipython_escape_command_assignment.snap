@@ -1,0 +1,90 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_jupyter_source(source)
+---
+[
+    (
+        Name {
+            name: "pwd",
+        },
+        0..3,
+    ),
+    (
+        Equal,
+        4..5,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "pwd",
+            kind: Shell,
+        },
+        6..10,
+    ),
+    (
+        Newline,
+        10..11,
+    ),
+    (
+        Name {
+            name: "foo",
+        },
+        11..14,
+    ),
+    (
+        Equal,
+        15..16,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "timeit a = b",
+            kind: Magic,
+        },
+        17..30,
+    ),
+    (
+        Newline,
+        30..31,
+    ),
+    (
+        Name {
+            name: "bar",
+        },
+        31..34,
+    ),
+    (
+        Equal,
+        35..36,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "timeit a % 3",
+            kind: Magic,
+        },
+        37..50,
+    ),
+    (
+        Newline,
+        50..51,
+    ),
+    (
+        Name {
+            name: "baz",
+        },
+        51..54,
+    ),
+    (
+        Equal,
+        55..56,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "matplotlib         inline",
+            kind: Magic,
+        },
+        57..85,
+    ),
+    (
+        Newline,
+        85..85,
+    ),
+]

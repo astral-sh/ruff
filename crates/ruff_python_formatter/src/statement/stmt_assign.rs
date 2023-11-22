@@ -1,12 +1,12 @@
-use crate::comments::{SourceComment, SuppressionKind};
 use ruff_formatter::{format_args, write, FormatError};
 use ruff_python_ast::{Expr, StmtAssign};
 
+use crate::comments::{SourceComment, SuppressionKind};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{Parentheses, Parenthesize};
 use crate::expression::{has_own_parentheses, maybe_parenthesize_expression};
 use crate::prelude::*;
-use crate::FormatNodeRule;
+use crate::statement::trailing_semicolon;
 
 #[derive(Default)]
 pub struct FormatStmtAssign;
@@ -28,7 +28,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
             [
                 first.format(),
                 space(),
-                text("="),
+                token("="),
                 space(),
                 FormatTargets { targets: rest }
             ]
@@ -41,7 +41,18 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
                 item,
                 Parenthesize::IfBreaks
             )]
-        )
+        )?;
+
+        if f.options().source_type().is_ipynb()
+            && f.context().node_level().is_last_top_level_statement()
+            && rest.is_empty()
+            && first.is_name_expr()
+            && trailing_semicolon(item.into(), f.context().source()).is_some()
+        {
+            token(";").fmt(f)?;
+        }
+
+        Ok(())
     }
 
     fn is_suppressed(
@@ -63,7 +74,7 @@ impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
         if let Some((first, rest)) = self.targets.split_first() {
             let comments = f.context().comments();
 
-            let parenthesize = if comments.has_leading_comments(first) {
+            let parenthesize = if comments.has_leading(first) {
                 ParenthesizeTarget::Always
             } else if has_own_parentheses(first, f.context()).is_some() {
                 ParenthesizeTarget::Never
@@ -90,9 +101,9 @@ impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
                         write!(
                             f,
                             [
-                                if_group_breaks(&text("(")),
+                                if_group_breaks(&token("(")),
                                 soft_block_indent(&first.format().with_options(Parentheses::Never)),
-                                if_group_breaks(&text(")"))
+                                if_group_breaks(&token(")"))
                             ]
                         )
                     }
@@ -104,7 +115,7 @@ impl Format<PyFormatContext<'_>> for FormatTargets<'_> {
                 [group(&format_args![
                     format_first,
                     space(),
-                    text("="),
+                    token("="),
                     space(),
                     FormatTargets { targets: rest }
                 ])

@@ -15,8 +15,8 @@ mod rule_code_prefix;
 mod rule_namespace;
 mod violation;
 
-#[proc_macro_derive(ConfigurationOptions, attributes(option, doc, option_group))]
-pub fn derive_config(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(OptionsMetadata, attributes(option, doc, option_group))]
+pub fn derive_options_metadata(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     config::derive_impl(input)
@@ -33,7 +33,11 @@ pub fn derive_combine_options(input: TokenStream) -> TokenStream {
         .into()
 }
 
-#[proc_macro_derive(CacheKey)]
+/// Generates a [`CacheKey`] implementation for the attributed type.
+///
+/// Struct fields can be attributed with the `cache_key` field-attribute that supports:
+/// * `ignore`: Ignore the attributed field in the cache key
+#[proc_macro_derive(CacheKey, attributes(cache_key))]
 pub fn cache_key(input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as DeriveInput);
 

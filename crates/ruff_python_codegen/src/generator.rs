@@ -1,20 +1,21 @@
 //! Generate Python source code from an abstract syntax tree (AST).
 
-use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use std::ops::Deref;
 
 use ruff_python_ast::{
-    self as ast, Alias, BoolOp, CmpOp, Comprehension, Constant, ConversionFlag, DebugText,
-    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern, Stmt,
-    Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, WithItem,
+    self as ast, Alias, ArgOrKeyword, BoolOp, CmpOp, Comprehension, ConversionFlag, DebugText,
+    ExceptHandler, Expr, Identifier, MatchCase, Operator, Parameter, Parameters, Pattern,
+    Singleton, Stmt, Suite, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    WithItem,
 };
+use ruff_python_ast::{ParameterWithDefault, TypeParams};
 use ruff_python_literal::escape::{AsciiEscape, Escape, UnicodeEscape};
-
 use ruff_source_file::LineEnding;
 
 use super::stylist::{Indentation, Quote, Stylist};
 
 mod precedence {
+    pub(crate) const NAMED_EXPR: u8 = 1;
     pub(crate) const ASSIGN: u8 = 3;
     pub(crate) const ANN_ASSIGN: u8 = 5;
     pub(crate) const AUG_ASSIGN: u8 = 5;
@@ -31,7 +32,6 @@ mod precedence {
     pub(crate) const TUPLE: u8 = 19;
     pub(crate) const FORMATTED_VALUE: u8 = 19;
     pub(crate) const COMMA: u8 = 21;
-    pub(crate) const NAMED_EXPR: u8 = 23;
     pub(crate) const ASSERT: u8 = 23;
     pub(crate) const COMPREHENSION_ELEMENT: u8 = 27;
     pub(crate) const LAMBDA: u8 = 27;
@@ -112,12 +112,6 @@ impl<'a> Generator<'a> {
     /// Generate source code from an [`Expr`].
     pub fn expr(mut self, expr: &Expr) -> String {
         self.unparse_expr(expr, 0);
-        self.generate()
-    }
-
-    /// Generate source code from a [`Constant`].
-    pub fn constant(mut self, constant: &Constant) -> String {
-        self.unparse_constant(constant);
         self.generate()
     }
 
@@ -266,19 +260,23 @@ impl<'a> Generator<'a> {
                     if let Some(arguments) = arguments {
                         self.p("(");
                         let mut first = true;
-                        for base in &arguments.args {
-                            self.p_delim(&mut first, ", ");
-                            self.unparse_expr(base, precedence::MAX);
-                        }
-                        for keyword in &arguments.keywords {
-                            self.p_delim(&mut first, ", ");
-                            if let Some(arg) = &keyword.arg {
-                                self.p_id(arg);
-                                self.p("=");
-                            } else {
-                                self.p("**");
+                        for arg_or_keyword in arguments.arguments_source_order() {
+                            match arg_or_keyword {
+                                ArgOrKeyword::Arg(arg) => {
+                                    self.p_delim(&mut first, ", ");
+                                    self.unparse_expr(arg, precedence::MAX);
+                                }
+                                ArgOrKeyword::Keyword(keyword) => {
+                                    self.p_delim(&mut first, ", ");
+                                    if let Some(arg) = &keyword.arg {
+                                        self.p_id(arg);
+                                        self.p("=");
+                                    } else {
+                                        self.p("**");
+                                    }
+                                    self.unparse_expr(&keyword.value, precedence::MAX);
+                                }
                             }
-                            self.unparse_expr(&keyword.value, precedence::MAX);
                         }
                         self.p(")");
                     }
@@ -359,7 +357,7 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(target, precedence::ANN_ASSIGN);
                     self.p_if(need_parens, ")");
                     self.p(": ");
-                    self.unparse_expr(annotation, precedence::ANN_ASSIGN);
+                    self.unparse_expr(annotation, precedence::COMMA);
                     if let Some(value) = value {
                         self.p(" = ");
                         self.unparse_expr(value, precedence::COMMA);
@@ -573,7 +571,9 @@ impl<'a> Generator<'a> {
                 statement!({
                     self.p("from ");
                     if let Some(level) = level {
-                        self.p(&".".repeat(level.to_usize()));
+                        for _ in 0..*level {
+                            self.p(".");
+                        }
                     }
                     if let Some(module) = module {
                         self.p_id(module);
@@ -666,7 +666,7 @@ impl<'a> Generator<'a> {
                 self.unparse_expr(value, precedence::MAX);
             }
             Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range: _ }) => {
-                self.unparse_constant(value);
+                self.unparse_singleton(value);
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => {
                 self.p("[");
@@ -878,9 +878,11 @@ impl<'a> Generator<'a> {
                 range: _,
             }) => {
                 group_if!(precedence::LAMBDA, {
-                    let npos = parameters.args.len() + parameters.posonlyargs.len();
-                    self.p(if npos > 0 { "lambda " } else { "lambda" });
-                    self.unparse_parameters(parameters);
+                    self.p("lambda");
+                    if let Some(parameters) = parameters {
+                        self.p(" ");
+                        self.unparse_parameters(parameters);
+                    }
                     self.p(": ");
                     self.unparse_expr(body, precedence::LAMBDA);
                 });
@@ -1044,19 +1046,24 @@ impl<'a> Generator<'a> {
                     self.unparse_comp(generators);
                 } else {
                     let mut first = true;
-                    for arg in &arguments.args {
-                        self.p_delim(&mut first, ", ");
-                        self.unparse_expr(arg, precedence::COMMA);
-                    }
-                    for kw in &arguments.keywords {
-                        self.p_delim(&mut first, ", ");
-                        if let Some(arg) = &kw.arg {
-                            self.p_id(arg);
-                            self.p("=");
-                            self.unparse_expr(&kw.value, precedence::COMMA);
-                        } else {
-                            self.p("**");
-                            self.unparse_expr(&kw.value, precedence::MAX);
+
+                    for arg_or_keyword in arguments.arguments_source_order() {
+                        match arg_or_keyword {
+                            ArgOrKeyword::Arg(arg) => {
+                                self.p_delim(&mut first, ", ");
+                                self.unparse_expr(arg, precedence::COMMA);
+                            }
+                            ArgOrKeyword::Keyword(keyword) => {
+                                self.p_delim(&mut first, ", ");
+                                if let Some(arg) = &keyword.arg {
+                                    self.p_id(arg);
+                                    self.p("=");
+                                    self.unparse_expr(&keyword.value, precedence::COMMA);
+                                } else {
+                                    self.p("**");
+                                    self.unparse_expr(&keyword.value, precedence::MAX);
+                                }
+                            }
                         }
                     }
                 }
@@ -1077,19 +1084,56 @@ impl<'a> Generator<'a> {
             Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, false);
             }
-            Expr::Constant(ast::ExprConstant {
-                value,
-                kind,
-                range: _,
-            }) => {
-                if let Some(kind) = kind {
-                    self.p(kind);
+            Expr::StringLiteral(ast::ExprStringLiteral { value, unicode, .. }) => {
+                if *unicode {
+                    self.p("u");
                 }
-                self.unparse_constant(value);
+                self.p_str_repr(value);
+            }
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+                self.p_bytes_repr(value);
+            }
+            Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+                static INF_STR: &str = "1e309";
+                assert_eq!(f64::MAX_10_EXP, 308);
+
+                match value {
+                    ast::Number::Int(i) => {
+                        self.p(&format!("{i}"));
+                    }
+                    ast::Number::Float(fp) => {
+                        if fp.is_infinite() {
+                            self.p(INF_STR);
+                        } else {
+                            self.p(&ruff_python_literal::float::to_string(*fp));
+                        }
+                    }
+                    ast::Number::Complex { real, imag } => {
+                        let value = if *real == 0.0 {
+                            format!("{imag}j")
+                        } else {
+                            format!("({real}{imag:+}j)")
+                        };
+                        if real.is_infinite() || imag.is_infinite() {
+                            self.p(&value.replace("inf", INF_STR));
+                        } else {
+                            self.p(&value);
+                        }
+                    }
+                }
+            }
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                self.p(if *value { "True" } else { "False" });
+            }
+            Expr::NoneLiteral(_) => {
+                self.p("None");
+            }
+            Expr::EllipsisLiteral(_) => {
+                self.p("...");
             }
             Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(_),
+                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(_),
                     ..
                 }) = value.as_ref()
                 {
@@ -1160,39 +1204,11 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_constant(&mut self, constant: &Constant) {
-        assert_eq!(f64::MAX_10_EXP, 308);
-        let inf_str = "1e309";
-        match constant {
-            Constant::Bytes(b) => {
-                self.p_bytes_repr(b);
-            }
-            Constant::Str(ast::StringConstant { value, .. }) => {
-                self.p_str_repr(value);
-            }
-            Constant::None => self.p("None"),
-            Constant::Bool(b) => self.p(if *b { "True" } else { "False" }),
-            Constant::Int(i) => self.p(&format!("{i}")),
-            Constant::Float(fp) => {
-                if fp.is_infinite() {
-                    self.p(inf_str);
-                } else {
-                    self.p(&ruff_python_literal::float::to_string(*fp));
-                }
-            }
-            Constant::Complex { real, imag } => {
-                let value = if *real == 0.0 {
-                    format!("{imag}j")
-                } else {
-                    format!("({real}{imag:+}j)")
-                };
-                if real.is_infinite() || imag.is_infinite() {
-                    self.p(&value.replace("inf", inf_str));
-                } else {
-                    self.p(&value);
-                }
-            }
-            Constant::Ellipsis => self.p("..."),
+    pub(crate) fn unparse_singleton(&mut self, singleton: &Singleton) {
+        match singleton {
+            Singleton::None => self.p("None"),
+            Singleton::True => self.p("True"),
+            Singleton::False => self.p("False"),
         }
     }
 
@@ -1308,12 +1324,8 @@ impl<'a> Generator<'a> {
 
     fn unparse_f_string_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
-            Expr::Constant(ast::ExprConstant { value, .. }) => {
-                if let Constant::Str(ast::StringConstant { value, .. }) = value {
-                    self.unparse_f_string_literal(value);
-                } else {
-                    unreachable!()
-                }
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                self.unparse_f_string_literal(value);
             }
             Expr::FString(ast::ExprFString { values, .. }) => {
                 self.unparse_f_string(values, is_spec);
@@ -1379,11 +1391,11 @@ impl<'a> Generator<'a> {
 mod tests {
     use ruff_python_ast::{Mod, ModModule};
     use ruff_python_parser::{self, parse_suite, Mode};
-
     use ruff_source_file::LineEnding;
 
-    use super::Generator;
     use crate::stylist::{Indentation, Quote};
+
+    use super::Generator;
 
     fn round_trip(contents: &str) -> String {
         let indentation = Indentation::default();
@@ -1411,7 +1423,7 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let ast = ruff_python_parser::parse(contents, Mode::Jupyter, "<filename>").unwrap();
+        let ast = ruff_python_parser::parse(contents, Mode::Ipython, "<filename>").unwrap();
         let Mod::Module(ModModule { body, .. }) = ast else {
             panic!("Source code didn't return ModModule")
         };
@@ -1461,7 +1473,7 @@ mod tests {
         assert_round_trip!("return await (await bar())");
         assert_round_trip!("(5).foo");
         assert_round_trip!(r#"our_dict = {"a": 1, **{"b": 2, "c": 3}}"#);
-        assert_round_trip!(r#"j = [1, 2, 3]"#);
+        assert_round_trip!(r"j = [1, 2, 3]");
         assert_round_trip!(
             r#"def test(a1, a2, b1=j, b2="123", b3={}, b4=[]):
     pass"#
@@ -1499,32 +1511,32 @@ mod tests {
     pass"#
         );
         assert_round_trip!(
-            r#"class Foo(Bar, object):
-    pass"#
+            r"class Foo(Bar, object):
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[T]:
-    pass"#
+            r"class Foo[T]:
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[T](Bar):
-    pass"#
+            r"class Foo[T](Bar):
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[*Ts]:
-    pass"#
+            r"class Foo[*Ts]:
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[**P]:
-    pass"#
+            r"class Foo[**P]:
+    pass"
         );
         assert_round_trip!(
-            r#"class Foo[T, U, *Ts, **P]:
-    pass"#
+            r"class Foo[T, U, *Ts, **P]:
+    pass"
         );
         assert_round_trip!(
-            r#"def f() -> (int, str):
-    pass"#
+            r"def f() -> (int, str):
+    pass"
         );
         assert_round_trip!("[await x async for x in y]");
         assert_round_trip!("[await i for i in b if await c]");
@@ -1538,118 +1550,134 @@ mod tests {
             return datum"#
         );
         assert_round_trip!(
-            r#"def f() -> (int, int):
-    pass"#
+            r"def f() -> (int, int):
+    pass"
         );
         assert_round_trip!(
-            r#"def test(a, b, /, c, *, d, **kwargs):
-    pass"#
+            r"def test(a, b, /, c, *, d, **kwargs):
+    pass"
         );
         assert_round_trip!(
-            r#"def test(a=3, b=4, /, c=7):
-    pass"#
+            r"def test(a=3, b=4, /, c=7):
+    pass"
         );
         assert_round_trip!(
-            r#"def test(a, b=4, /, c=8, d=9):
-    pass"#
+            r"def test(a, b=4, /, c=8, d=9):
+    pass"
         );
         assert_round_trip!(
-            r#"def test[T]():
-    pass"#
+            r"def test[T]():
+    pass"
         );
         assert_round_trip!(
-            r#"def test[*Ts]():
-    pass"#
+            r"def test[*Ts]():
+    pass"
         );
         assert_round_trip!(
-            r#"def test[**P]():
-    pass"#
+            r"def test[**P]():
+    pass"
         );
         assert_round_trip!(
-            r#"def test[T, U, *Ts, **P]():
-    pass"#
+            r"def test[T, U, *Ts, **P]():
+    pass"
         );
         assert_round_trip!(
-            r#"def call(*popenargs, timeout=None, **kwargs):
-    pass"#
+            r"def call(*popenargs, timeout=None, **kwargs):
+    pass"
         );
         assert_round_trip!(
-            r#"@functools.lru_cache(maxsize=None)
+            r"@functools.lru_cache(maxsize=None)
 def f(x: int, y: int) -> int:
-    return x + y"#
+    return x + y"
         );
         assert_round_trip!(
-            r#"try:
+            r"try:
     pass
 except Exception as e:
-    pass"#
+    pass"
         );
         assert_round_trip!(
-            r#"try:
+            r"try:
     pass
 except* Exception as e:
-    pass"#
+    pass"
         );
         assert_round_trip!(
-            r#"match x:
+            r"match x:
     case [1, 2, 3]:
         return 2
     case 4 as y:
-        return y"#
+        return y"
         );
-        assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
-        assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);
+        assert_eq!(round_trip(r"x = (1, 2, 3)"), r"x = 1, 2, 3");
+        assert_eq!(round_trip(r"-(1) + ~(2) + +(3)"), r"-1 + ~2 + +3");
         assert_round_trip!(
-            r#"def f():
+            r"def f():
 
     def f():
-        pass"#
+        pass"
         );
         assert_round_trip!(
-            r#"@foo
+            r"@foo
 def f():
 
     @foo
     def f():
-        pass"#
+        pass"
         );
 
         assert_round_trip!(
-            r#"@foo
+            r"@foo
 class Foo:
 
     @foo
     def f():
-        pass"#
+        pass"
         );
 
-        assert_round_trip!(r#"[lambda n: n for n in range(10)]"#);
-        assert_round_trip!(r#"[n[0:2] for n in range(10)]"#);
-        assert_round_trip!(r#"[n[0] for n in range(10)]"#);
-        assert_round_trip!(r#"[(n, n * 2) for n in range(10)]"#);
-        assert_round_trip!(r#"[1 if n % 2 == 0 else 0 for n in range(10)]"#);
-        assert_round_trip!(r#"[n % 2 == 0 or 0 for n in range(10)]"#);
-        assert_round_trip!(r#"[(n := 2) for n in range(10)]"#);
-        assert_round_trip!(r#"((n := 2) for n in range(10))"#);
-        assert_round_trip!(r#"[n * 2 for n in range(10)]"#);
-        assert_round_trip!(r#"{n * 2 for n in range(10)}"#);
-        assert_round_trip!(r#"{i: n * 2 for i, n in enumerate(range(10))}"#);
+        assert_round_trip!(r"[lambda n: n for n in range(10)]");
+        assert_round_trip!(r"[n[0:2] for n in range(10)]");
+        assert_round_trip!(r"[n[0] for n in range(10)]");
+        assert_round_trip!(r"[(n, n * 2) for n in range(10)]");
+        assert_round_trip!(r"[1 if n % 2 == 0 else 0 for n in range(10)]");
+        assert_round_trip!(r"[n % 2 == 0 or 0 for n in range(10)]");
+        assert_round_trip!(r"[(n := 2) for n in range(10)]");
+        assert_round_trip!(r"((n := 2) for n in range(10))");
+        assert_round_trip!(r"[n * 2 for n in range(10)]");
+        assert_round_trip!(r"{n * 2 for n in range(10)}");
+        assert_round_trip!(r"{i: n * 2 for i, n in enumerate(range(10))}");
+        assert_round_trip!(
+            "class SchemaItem(NamedTuple):
+    fields: ((\"property_key\", str),)"
+        );
+        assert_round_trip!(
+            "def func():
+    return (i := 1)"
+        );
+        assert_round_trip!("yield (i := 1)");
+        assert_round_trip!("x = (i := 1)");
+        assert_round_trip!("x += (i := 1)");
 
         // Type aliases
-        assert_round_trip!(r#"type Foo = int | str"#);
-        assert_round_trip!(r#"type Foo[T] = list[T]"#);
-        assert_round_trip!(r#"type Foo[*Ts] = ..."#);
-        assert_round_trip!(r#"type Foo[**P] = ..."#);
-        assert_round_trip!(r#"type Foo[T, U, *Ts, **P] = ..."#);
+        assert_round_trip!(r"type Foo = int | str");
+        assert_round_trip!(r"type Foo[T] = list[T]");
+        assert_round_trip!(r"type Foo[*Ts] = ...");
+        assert_round_trip!(r"type Foo[**P] = ...");
+        assert_round_trip!(r"type Foo[T, U, *Ts, **P] = ...");
+        // https://github.com/astral-sh/ruff/issues/6498
+        assert_round_trip!(r"f(a=1, *args, **kwargs)");
+        assert_round_trip!(r"f(*args, a=1, **kwargs)");
+        assert_round_trip!(r"f(*args, a=1, *args2, **kwargs)");
+        assert_round_trip!("class A(*args, a=2, *args2, **kwargs):\n    pass");
     }
 
     #[test]
     fn quote() {
         assert_eq!(round_trip(r#""hello""#), r#""hello""#);
-        assert_eq!(round_trip(r#"'hello'"#), r#""hello""#);
-        assert_eq!(round_trip(r#"u'hello'"#), r#"u"hello""#);
-        assert_eq!(round_trip(r#"r'hello'"#), r#""hello""#);
-        assert_eq!(round_trip(r#"b'hello'"#), r#"b"hello""#);
+        assert_eq!(round_trip(r"'hello'"), r#""hello""#);
+        assert_eq!(round_trip(r"u'hello'"), r#"u"hello""#);
+        assert_eq!(round_trip(r"r'hello'"), r#""hello""#);
+        assert_eq!(round_trip(r"b'hello'"), r#"b"hello""#);
         assert_eq!(round_trip(r#"("abc" "def" "ghi")"#), r#""abcdefghi""#);
         assert_eq!(round_trip(r#""he\"llo""#), r#"'he"llo'"#);
         assert_eq!(round_trip(r#"f"abc{'def'}{1}""#), r#"f"abc{'def'}{1}""#);
@@ -1669,16 +1697,16 @@ class Foo:
     fn indent() {
         assert_eq!(
             round_trip(
-                r#"
+                r"
 if True:
   pass
-"#
+"
                 .trim(),
             ),
-            r#"
+            r"
 if True:
     pass
-"#
+"
             .trim()
             .replace('\n', LineEnding::default().as_str())
         );
@@ -1702,14 +1730,14 @@ if True:
                 LineEnding::default(),
                 r#""hello""#
             ),
-            r#"'hello'"#
+            r"'hello'"
         );
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
                 Quote::Double,
                 LineEnding::default(),
-                r#"'hello'"#
+                r"'hello'"
             ),
             r#""hello""#
         );
@@ -1718,9 +1746,9 @@ if True:
                 &Indentation::default(),
                 Quote::Single,
                 LineEnding::default(),
-                r#"'hello'"#
+                r"'hello'"
             ),
-            r#"'hello'"#
+            r"'hello'"
         );
     }
 
@@ -1731,16 +1759,16 @@ if True:
                 &Indentation::new("    ".to_string()),
                 Quote::default(),
                 LineEnding::default(),
-                r#"
+                r"
 if True:
   pass
-"#
+"
                 .trim(),
             ),
-            r#"
+            r"
 if True:
     pass
-"#
+"
             .trim()
             .replace('\n', LineEnding::default().as_str())
         );
@@ -1749,16 +1777,16 @@ if True:
                 &Indentation::new("  ".to_string()),
                 Quote::default(),
                 LineEnding::default(),
-                r#"
+                r"
 if True:
   pass
-"#
+"
                 .trim(),
             ),
-            r#"
+            r"
 if True:
   pass
-"#
+"
             .trim()
             .replace('\n', LineEnding::default().as_str())
         );
@@ -1767,16 +1795,16 @@ if True:
                 &Indentation::new("\t".to_string()),
                 Quote::default(),
                 LineEnding::default(),
-                r#"
+                r"
 if True:
   pass
-"#
+"
                 .trim(),
             ),
-            r#"
+            r"
 if True:
 	pass
-"#
+"
             .trim()
             .replace('\n', LineEnding::default().as_str())
         );

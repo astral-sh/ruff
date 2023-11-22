@@ -1,14 +1,11 @@
-use ruff_formatter::prelude::{
-    format_args, format_with, group, soft_line_break_or_space, space, text,
-};
-use ruff_formatter::{write, Buffer, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_formatter::write;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprDictComp;
+use ruff_text_size::Ranged;
 
-use crate::context::PyFormatContext;
+use crate::comments::{dangling_comments, SourceComment};
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
-use crate::AsFormat;
-use crate::{FormatNodeRule, FormattedIterExt, PyFormatter};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatExprDictComp;
@@ -22,31 +19,53 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
             generators,
         } = item;
 
-        let joined = format_with(|f| {
-            f.join_with(soft_line_break_or_space())
-                .entries(generators.iter().formatted())
-                .finish()
-        });
-
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
+
+        // Dangling comments can either appear after the open bracket, or around the key-value
+        // pairs:
+        // ```python
+        // {  # open_parenthesis_comments
+        //     x:  # key_value_comments
+        //     y
+        //     for (x, y) in z
+        // }
+        // ```
+        let (open_parenthesis_comments, key_value_comments) =
+            dangling.split_at(dangling.partition_point(|comment| comment.end() < key.start()));
 
         write!(
             f,
             [parenthesized(
                 "{",
-                &group(&format_args!(
-                    group(&key.format()),
-                    text(":"),
-                    space(),
-                    value.format(),
-                    soft_line_break_or_space(),
-                    &joined
-                )),
+                &group(&format_with(|f| {
+                    write!(f, [group(&key.format()), token(":")])?;
+
+                    if key_value_comments.is_empty() {
+                        space().fmt(f)?;
+                    } else {
+                        dangling_comments(key_value_comments).fmt(f)?;
+                    }
+
+                    write!(f, [value.format(), soft_line_break_or_space()])?;
+
+                    f.join_with(soft_line_break_or_space())
+                        .entries(generators.iter().formatted())
+                        .finish()
+                })),
                 "}"
             )
-            .with_dangling_comments(dangling)]
+            .with_dangling_comments(open_parenthesis_comments)]
         )
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_node_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled as part of `fmt_fields`
+        Ok(())
     }
 }
 

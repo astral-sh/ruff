@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/flake8_gettext/mod.rs
+---
+INT001.py:1:3: INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+  |
+1 | _(f"{'value'}")
+  |   ^^^^^^^^^^^^ INT001
+  |
+
+

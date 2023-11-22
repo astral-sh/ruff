@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/raise.py
 ---
 ## Input
-```py
+```python
 raise a from aksjdhflsakhdflkjsadlfajkslhf
 raise a from (aksjdhflsakhdflkjsadlfajkslhf,)
 raise (aaaaa.aaa(a).a) from (aksjdhflsakhdflkjsadlfajkslhf)
@@ -92,7 +92,7 @@ raise hello( # sould I stay here
 ```
 
 ## Output
-```py
+```python
 raise a from aksjdhflsakhdflkjsadlfajkslhf
 raise a from (aksjdhflsakhdflkjsadlfajkslhf,)
 raise (aaaaa.aaa(a).a) from (aksjdhflsakhdflkjsadlfajkslhf)

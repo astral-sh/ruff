@@ -4,19 +4,20 @@ use std::iter::FusedIterator;
 use unicode_width::UnicodeWidthStr;
 
 use ruff_formatter::{write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Ranged, Stmt};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::Stmt;
 use ruff_python_parser::lexer::{lex_starts_at, LexResult};
 use ruff_python_parser::{Mode, Tok};
 use ruff_python_trivia::lines_before;
 use ruff_source_file::Locator;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::format::{empty_lines, format_comment};
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::prelude::*;
 use crate::statement::clause::ClauseHeader;
 use crate::statement::suite::SuiteChildStatement;
+use crate::statement::trailing_semicolon;
 
 /// Disables formatting for all statements between the `first_suppressed` that has a leading `fmt: off` comment
 /// and the first trailing or leading `fmt: on` comment. The statements are formatted as they appear in the source code.
@@ -36,7 +37,7 @@ pub(crate) fn write_suppressed_statements_starting_with_leading_comment<'a>(
     let source = f.context().source();
 
     let mut leading_comment_ranges =
-        CommentRangeIter::outside_suppression(comments.leading_comments(first_suppressed), source);
+        CommentRangeIter::outside_suppression(comments.leading(first_suppressed), source);
 
     let before_format_off = leading_comment_ranges
         .next()
@@ -88,7 +89,7 @@ pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
     let source = f.context().source();
     let indentation = Indentation::from_stmt(last_formatted.statement(), source);
 
-    let trailing_node_comments = comments.trailing_comments(last_formatted);
+    let trailing_node_comments = comments.trailing(last_formatted);
     let mut trailing_comment_ranges =
         CommentRangeIter::outside_suppression(trailing_node_comments, source);
 
@@ -192,7 +193,7 @@ pub(crate) fn write_suppressed_statements_starting_with_trailing_comment<'a>(
         write_suppressed_statements(
             format_off_comment,
             SuiteChildStatement::Other(first_suppressed),
-            comments.leading_comments(first_suppressed),
+            comments.leading(first_suppressed),
             statements,
             f,
         )
@@ -300,7 +301,7 @@ fn write_suppressed_statements<'a>(
                         // Suppression ends here. Test if the node has a trailing suppression comment and, if so,
                         // recurse and format the trailing comments and the following statements as suppressed.
                         return if comments
-                            .trailing_comments(statement)
+                            .trailing(statement)
                             .iter()
                             .any(|comment| comment.is_suppression_off_comment(source))
                         {
@@ -325,10 +326,9 @@ fn write_suppressed_statements<'a>(
 
         comments.mark_verbatim_node_comments_formatted(AnyNodeRef::from(statement));
 
-        for range in CommentRangeIter::in_suppression(comments.trailing_comments(statement), source)
-        {
+        for range in CommentRangeIter::in_suppression(comments.trailing(statement), source) {
             match range {
-                // All leading comments are suppressed
+                // All trailing comments are suppressed
                 // ```python
                 // statement
                 // # suppressed
@@ -393,12 +393,20 @@ fn write_suppressed_statements<'a>(
 
         if let Some(next_statement) = statements.next() {
             statement = SuiteChildStatement::Other(next_statement);
-            leading_node_comments = comments.leading_comments(next_statement);
+            leading_node_comments = comments.leading(next_statement);
         } else {
-            let end = comments
-                .trailing_comments(statement)
-                .last()
-                .map_or(statement.end(), Ranged::end);
+            let mut current = AnyNodeRef::from(statement.statement());
+            // Expand the range of the statement to include any trailing comments or semicolons.
+            let end = loop {
+                if let Some(comment) = comments.trailing(current).last() {
+                    break comment.end();
+                } else if let Some(child) = current.last_child_in_body() {
+                    current = child;
+                } else {
+                    break trailing_semicolon(current, source)
+                        .map_or(statement.end(), TextRange::end);
+                }
+            };
 
             FormatVerbatimStatementRange {
                 verbatim_range: TextRange::new(format_off_comment.end(), end),
@@ -710,7 +718,7 @@ impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
                 }
             } else {
                 // Non empty line, write the text of the line
-                verbatim_text(trimmed_line_range, logical_line.contains_newlines).fmt(f)?;
+                verbatim_text(trimmed_line_range).fmt(f)?;
 
                 // Write the line separator that terminates the line, except if it is the last line (that isn't separated by a hard line break).
                 if logical_line.has_trailing_newline {
@@ -761,7 +769,6 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut parens = 0u32;
-        let mut contains_newlines = ContainsNewlines::No;
 
         let (content_end, full_end) = loop {
             match self.lexer.next() {
@@ -769,17 +776,11 @@ where
                     Tok::Newline => break (range.start(), range.end()),
                     // Ignore if inside an expression
                     Tok::NonLogicalNewline if parens == 0 => break (range.start(), range.end()),
-                    Tok::NonLogicalNewline => {
-                        contains_newlines = ContainsNewlines::Yes;
-                    }
                     Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
                         parens = parens.saturating_add(1);
                     }
                     Tok::Rbrace | Tok::Rpar | Tok::Rsqb => {
                         parens = parens.saturating_sub(1);
-                    }
-                    Tok::String { value, .. } if value.contains(['\n', '\r']) => {
-                        contains_newlines = ContainsNewlines::Yes;
                     }
                     _ => {}
                 },
@@ -791,7 +792,6 @@ where
                         self.last_line_end = self.content_end;
                         Some(Ok(LogicalLine {
                             content_range: TextRange::new(content_start, self.content_end),
-                            contains_newlines: ContainsNewlines::No,
                             has_trailing_newline: false,
                         }))
                     } else {
@@ -811,7 +811,6 @@ where
 
         Some(Ok(LogicalLine {
             content_range: TextRange::new(line_start, content_end),
-            contains_newlines,
             has_trailing_newline: true,
         }))
     }
@@ -823,8 +822,6 @@ impl<I> FusedIterator for LogicalLinesIter<I> where I: Iterator<Item = LexResult
 struct LogicalLine {
     /// The range of this lines content (excluding the trailing newline)
     content_range: TextRange,
-    /// Whether the content in `content_range` contains any newlines.
-    contains_newlines: ContainsNewlines,
     /// Does this logical line have a trailing newline or does it just happen to be the last line.
     has_trailing_newline: bool,
 }
@@ -837,16 +834,14 @@ impl Ranged for LogicalLine {
 
 struct VerbatimText {
     verbatim_range: TextRange,
-    contains_newlines: ContainsNewlines,
 }
 
-fn verbatim_text<T>(item: T, contains_newlines: ContainsNewlines) -> VerbatimText
+fn verbatim_text<T>(item: T) -> VerbatimText
 where
     T: Ranged,
 {
     VerbatimText {
         verbatim_range: item.range(),
-        contains_newlines,
     }
 }
 
@@ -860,19 +855,13 @@ impl Format<PyFormatContext<'_>> for VerbatimText {
 
         match normalize_newlines(f.context().locator().slice(self.verbatim_range), ['\r']) {
             Cow::Borrowed(_) => {
-                write!(
-                    f,
-                    [source_text_slice(
-                        self.verbatim_range,
-                        self.contains_newlines
-                    )]
-                )?;
+                write!(f, [source_text_slice(self.verbatim_range,)])?;
             }
             Cow::Owned(cleaned) => {
                 write!(
                     f,
                     [
-                        dynamic_text(&cleaned, Some(self.verbatim_range.start())),
+                        text(&cleaned, Some(self.verbatim_range.start())),
                         source_position(self.verbatim_range.end())
                     ]
                 )?;
@@ -903,7 +892,7 @@ pub(crate) struct FormatSuppressedNode<'a> {
 impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let node_comments = comments.leading_dangling_trailing_comments(self.node);
+        let node_comments = comments.leading_dangling_trailing(self.node);
 
         // Mark all comments as formatted that fall into the node range
         for comment in node_comments.leading {
@@ -918,6 +907,15 @@ impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
             }
         }
 
+        // Some statements may end with a semicolon. Preserve the semicolon
+        let semicolon_range = self
+            .node
+            .is_statement()
+            .then(|| trailing_semicolon(self.node, f.context().source()))
+            .flatten();
+        let verbatim_range = semicolon_range.map_or(self.node.range(), |semicolon| {
+            TextRange::new(self.node.start(), semicolon.end())
+        });
         comments.mark_verbatim_node_comments_formatted(self.node);
 
         // Write the outer comments and format the node as verbatim
@@ -925,7 +923,7 @@ impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
             f,
             [
                 leading_comments(node_comments.leading),
-                verbatim_text(self.node, ContainsNewlines::Detect),
+                verbatim_text(verbatim_range),
                 trailing_comments(node_comments.trailing)
             ]
         )
@@ -938,17 +936,11 @@ pub(crate) fn write_suppressed_clause_header(
     f: &mut PyFormatter,
 ) -> FormatResult<()> {
     // Write the outer comments and format the node as verbatim
-    write!(
-        f,
-        [verbatim_text(
-            header.range(f.context().source())?,
-            ContainsNewlines::Detect
-        ),]
-    )?;
+    write!(f, [verbatim_text(header.range(f.context().source())?)])?;
 
     let comments = f.context().comments();
     header.visit(&mut |child| {
-        for comment in comments.leading_trailing_comments(child) {
+        for comment in comments.leading_trailing(child) {
             comment.mark_formatted();
         }
         comments.mark_verbatim_node_comments_formatted(child);

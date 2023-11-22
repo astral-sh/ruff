@@ -1,13 +1,11 @@
 use ruff_formatter::{format_args, write, Buffer, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprSetComp;
 
 use crate::comments::SourceComment;
-use crate::context::PyFormatContext;
+
 use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::AsFormat;
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatExprSetComp;
@@ -27,7 +25,7 @@ impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         write!(
             f,
@@ -36,7 +34,7 @@ impl FormatNodeRule<ExprSetComp> for FormatExprSetComp {
                 &group(&format_args!(
                     group(&elt.format()),
                     soft_line_break_or_space(),
-                    &joined
+                    joined
                 )),
                 "}"
             )

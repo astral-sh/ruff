@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 # Regression test for https://github.com/psf/black/issues/3129.
 setup(
     entry_points={
@@ -110,15 +110,7 @@ elif   unformatted:
      },
  )
  
-@@ -74,7 +73,6 @@
- class Factory(t.Protocol):
-     def this_will_be_formatted(self, **kwargs) -> Named:
-         ...
--
-     # fmt: on
- 
- 
-@@ -82,6 +80,6 @@
+@@ -82,6 +81,6 @@
  if x:
      return x
  # fmt: off
@@ -130,7 +122,7 @@ elif   unformatted:
 
 ## Ruff Output
 
-```py
+```python
 # Regression test for https://github.com/psf/black/issues/3129.
 setup(
     entry_points={
@@ -206,6 +198,7 @@ class Named(t.Protocol):
 class Factory(t.Protocol):
     def this_will_be_formatted(self, **kwargs) -> Named:
         ...
+
     # fmt: on
 
 
@@ -220,7 +213,7 @@ elif unformatted:
 
 ## Black Output
 
-```py
+```python
 # Regression test for https://github.com/psf/black/issues/3129.
 setup(
     entry_points={

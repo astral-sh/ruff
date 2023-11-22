@@ -1,3 +1,5 @@
+# comment
+
 class Test(
     Aaaaaaaaaaaaaaaaa,
     Bbbbbbbbbbbbbbbb,
@@ -206,3 +208,19 @@ class TestTypeParams[Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 class TestTypeParams[A, B, C](meta=Aaaaaaaaaaaaaaaaaaaaaa):
     pass
+
+
+# Regression test for: https://github.com/astral-sh/ruff/pull/7001
+class QuerySet(AltersData):
+    """Represent a lazy database lookup for a set of objects."""
+
+    def as_manager(cls):
+        # Address the circular dependency between `Queryset` and `Manager`.
+        from django.db.models.manager import Manager
+
+        manager = Manager.from_queryset(cls)()
+        manager._built_with_as_manager = True
+        return manager
+
+    as_manager.queryset_only = True
+    as_manager = classmethod(as_manager)

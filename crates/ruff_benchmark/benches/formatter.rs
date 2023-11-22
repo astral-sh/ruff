@@ -1,9 +1,10 @@
 use std::path::Path;
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-
+use ruff_benchmark::criterion::{
+    criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
+};
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
-use ruff_python_formatter::{format_node, PyFormatOptions};
+use ruff_python_formatter::{format_module_ast, PyFormatOptions};
 use ruff_python_index::CommentRangesBuilder;
 use ruff_python_parser::lexer::lex;
 use ruff_python_parser::{parse_tokens, Mode};
@@ -27,6 +28,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     Ok(vec![
         TestCase::fast(TestFile::try_download("numpy/globals.py", "https://raw.githubusercontent.com/numpy/numpy/89d64415e349ca75a25250f22b874aa16e5c0973/numpy/_globals.py")?),
+        TestCase::fast(TestFile::try_download("unicode/pypinyin.py", "https://raw.githubusercontent.com/mozillazg/python-pinyin/9521e47d96e3583a5477f5e43a2e82d513f27a3f/pypinyin/standard.py")?),
         TestCase::normal(TestFile::try_download(
             "pydantic/types.py",
             "https://raw.githubusercontent.com/pydantic/pydantic/83b3c49e99ceb4599d9286a3d793cea44ac36d4b/pydantic/types.py",
@@ -63,13 +65,14 @@ fn benchmark_formatter(criterion: &mut Criterion) {
                 let comment_ranges = comment_ranges.finish();
 
                 // Parse the AST.
-                let python_ast = parse_tokens(tokens, Mode::Module, "<filename>")
+                let module = parse_tokens(tokens, case.code(), Mode::Module, "<filename>")
                     .expect("Input to be a valid python program");
 
                 b.iter(|| {
                     let options = PyFormatOptions::from_extension(Path::new(case.name()));
-                    let formatted = format_node(&python_ast, &comment_ranges, case.code(), options)
-                        .expect("Formatting to succeed");
+                    let formatted =
+                        format_module_ast(&module, &comment_ranges, case.code(), options)
+                            .expect("Formatting to succeed");
 
                     formatted.print().expect("Printing to succeed")
                 });

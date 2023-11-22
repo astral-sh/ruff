@@ -1,0 +1,70 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP036_5.py:3:4: UP036 [*] Version block is outdated for minimum Python version
+  |
+1 | import sys
+2 | 
+3 | if sys.version_info < (3, 8):
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+4 | 
+5 |     def a():
+  |
+  = help: Remove outdated version block
+
+ℹ Unsafe fix
+1  1  | import sys
+2  2  | 
+3     |-if sys.version_info < (3, 8):
+4     |-
+5     |-    def a():
+6     |-        if b:
+7     |-            print(1)
+8     |-        elif c:
+9     |-            print(2)
+10    |-        return None
+11    |-
+12    |-else:
+13    |-    pass
+   3  |+pass
+14 4  | 
+15 5  | 
+16 6  | import sys
+
+UP036_5.py:18:4: UP036 [*] Version block is outdated for minimum Python version
+   |
+16 | import sys
+17 | 
+18 | if sys.version_info < (3, 8):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+19 |     pass
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+15 15 | 
+16 16 | import sys
+17 17 | 
+18    |-if sys.version_info < (3, 8):
+19    |-    pass
+20    |-
+21    |-else:
+22    |-
+23    |-    def a():
+24    |-        if b:
+25    |-            print(1)
+26    |-        elif c:
+27    |-            print(2)
+28    |-        else:
+29    |-            print(3)
+30    |-        return None
+   18 |+def a():
+   19 |+    if b:
+   20 |+        print(1)
+   21 |+    elif c:
+   22 |+        print(2)
+   23 |+    else:
+   24 |+        print(3)
+   25 |+    return None
+
+

@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP009_7.py:1:2: UP009 [*] UTF-8 encoding declaration is unnecessary
+  |
+1 |     # coding=utf8
+  |     ^^^^^^^^^^^^^ UP009
+2 | print("Hello world")
+  |
+  = help: Remove unnecessary coding comment
+
+ℹ Safe fix
+1   |-	# coding=utf8
+2 1 | print("Hello world")
+3 2 | 
+4 3 | """
+
+
