@@ -55,3 +55,4 @@ mod try_except_continue;
 mod try_except_pass;
 mod unsafe_yaml_load;
 mod weak_cryptographic_key;
+mod suspicious_imports;
