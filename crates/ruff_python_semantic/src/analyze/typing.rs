@@ -588,8 +588,7 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
         match parent {
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => match value.as_ref() {
                 Expr::Tuple(ast::ExprTuple { elts, .. })
-                | Expr::List(ast::ExprList { elts, .. })
-                | Expr::Set(ast::ExprSet { elts, .. }) => {
+                | Expr::List(ast::ExprList { elts, .. }) => {
                     if let Some(target) = targets.iter().next() {
                         return match target {
                             Expr::Tuple(ast::ExprTuple {
