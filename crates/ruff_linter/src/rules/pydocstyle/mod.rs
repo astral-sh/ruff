@@ -62,6 +62,7 @@ mod tests {
     #[test_case(Rule::UndocumentedPublicMethod, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicMethod, Path::new("setter.py"))]
     #[test_case(Rule::UndocumentedPublicModule, Path::new("D.py"))]
+    #[test_case(Rule::UndocumentedPublicModule, Path::new("D100.ipynb"))]
     #[test_case(
         Rule::UndocumentedPublicModule,
         Path::new("_unrelated/pkg/D100_pub.py")

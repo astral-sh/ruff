@@ -2021,6 +2021,32 @@ pub struct IsortOptions {
     )]
     pub detect_same_package: Option<bool>,
 
+    /// Whether to place `import from` imports before straight imports when sorting.
+    ///
+    /// For example, by default, imports will be sorted such that straight imports appear
+    /// before `import from` imports, as in:
+    /// ```python
+    /// import os
+    /// import sys
+    /// from typing import List
+    /// ```
+    ///
+    /// Setting `from-first = true` will instead sort such that `import from` imports appear
+    /// before straight imports, as in:
+    /// ```python
+    /// from typing import List
+    /// import os
+    /// import sys
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            from-first = true
+        "#
+    )]
+    pub from_first: Option<bool>,
+
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
     /// By default custom sections are output last, but this can be overridden with `section-order`.
@@ -2098,6 +2124,7 @@ impl IsortOptions {
             .map_err(isort::settings::SettingsError::InvalidExtraStandardLibrary)?
             .unwrap_or_default();
         let no_lines_before = self.no_lines_before.unwrap_or_default();
+        let from_first = self.from_first.unwrap_or_default();
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
@@ -2206,6 +2233,7 @@ impl IsortOptions {
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
             no_sections,
+            from_first,
         })
     }
 }
@@ -2545,6 +2573,17 @@ pub struct PylintOptions {
     )]
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
 
+    /// Dunder methods name to allow, in addition to the default set from the
+    /// Python standard library (see: `PLW3201`).
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            allow-dunder-method-names = ["__tablename__", "__table_args__"]
+        "#
+    )]
+    pub allow_dunder_method_names: Option<FxHashSet<String>>,
+
     /// Maximum number of branches allowed for a function or method body (see:
     /// `PLR0912`).
     #[option(default = r"12", value_type = "int", example = r"max-branches = 12")]
@@ -2586,6 +2625,7 @@ impl PylintOptions {
             allow_magic_value_types: self
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
+            allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
             max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),

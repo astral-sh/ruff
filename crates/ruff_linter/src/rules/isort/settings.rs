@@ -57,6 +57,7 @@ pub struct Settings {
     pub forced_separate: Vec<String>,
     pub section_order: Vec<ImportSection>,
     pub no_sections: bool,
+    pub from_first: bool,
 }
 
 impl Default for Settings {
@@ -84,6 +85,7 @@ impl Default for Settings {
             forced_separate: Vec::new(),
             section_order: ImportType::iter().map(ImportSection::Known).collect(),
             no_sections: false,
+            from_first: false,
         }
     }
 }
