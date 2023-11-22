@@ -37,6 +37,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
+use ruff_notebook::CellOffsets;
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{
     collect_import_from_member, extract_handled_exceptions, to_module_path,
@@ -78,6 +79,8 @@ pub(crate) struct Checker<'a> {
     module_path: Option<&'a [String]>,
     /// The [`PySourceType`] of the current file.
     pub(crate) source_type: PySourceType,
+    /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
+    cell_offsets: Option<&'a CellOffsets>,
     /// The [`flags::Noqa`] for the current analysis (i.e., whether to respect suppression
     /// comments).
     noqa: flags::Noqa,
@@ -120,6 +123,7 @@ impl<'a> Checker<'a> {
         indexer: &'a Indexer,
         importer: Importer<'a>,
         source_type: PySourceType,
+        cell_offsets: Option<&'a CellOffsets>,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -137,6 +141,7 @@ impl<'a> Checker<'a> {
             deferred: Deferred::default(),
             diagnostics: Vec::default(),
             flake8_bugbear_seen: Vec::default(),
+            cell_offsets,
         }
     }
 }
@@ -223,6 +228,11 @@ impl<'a> Checker<'a> {
     /// The [`Path`] to the package containing the current file.
     pub(crate) const fn package(&self) -> Option<&'a Path> {
         self.package
+    }
+
+    /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
+    pub(crate) const fn cell_offsets(&self) -> Option<&'a CellOffsets> {
+        self.cell_offsets
     }
 
     /// Returns whether the given rule should be checked.
@@ -1942,6 +1952,7 @@ pub(crate) fn check_ast(
     path: &Path,
     package: Option<&Path>,
     source_type: PySourceType,
+    cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {
     let module_path = package.and_then(|package| to_module_path(package, path));
     let module = Module {
@@ -1970,6 +1981,7 @@ pub(crate) fn check_ast(
         indexer,
         Importer::new(python_ast, locator, stylist),
         source_type,
+        cell_offsets,
     );
     checker.bind_builtins();
 

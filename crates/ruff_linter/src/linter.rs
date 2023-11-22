@@ -163,6 +163,7 @@ pub fn check_path(
                         path,
                         package,
                         source_type,
+                        cell_offsets,
                     ));
                 }
                 if use_imports {

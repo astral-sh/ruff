@@ -1,7 +1,9 @@
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
-use ruff_text_size::TextSize;
+use itertools::Itertools;
+
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::schema::{Cell, SourceValue};
 
@@ -186,6 +188,17 @@ impl CellOffsets {
     /// Push a new offset to the end of the [`CellOffsets`].
     pub(crate) fn push(&mut self, offset: TextSize) {
         self.0.push(offset);
+    }
+
+    /// Returns the range of the cell containing the given offset, if any.
+    pub fn containing_range(&self, offset: TextSize) -> Option<TextRange> {
+        self.iter().tuple_windows().find_map(|(start, end)| {
+            if *start <= offset && offset < *end {
+                Some(TextRange::new(*start, *end))
+            } else {
+                None
+            }
+        })
     }
 }
 
