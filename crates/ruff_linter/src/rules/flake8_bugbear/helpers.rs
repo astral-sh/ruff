@@ -7,7 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// Return `true` if the statement containing the current expression is the last
 /// top-level expression in the cell. This assumes that the source is a Jupyter
 /// Notebook.
-pub(crate) fn at_last_top_level_expression_in_cell(
+pub(super) fn at_last_top_level_expression_in_cell(
     semantic: &SemanticModel,
     locator: &Locator,
     cell_offsets: Option<&CellOffsets>,
@@ -19,10 +19,10 @@ pub(crate) fn at_last_top_level_expression_in_cell(
     cell_offsets
         .and_then(|cell_offsets| cell_offsets.containing_range(current_statement_end))
         .is_some_and(|cell_range| {
-            !SimpleTokenizer::new(
+            SimpleTokenizer::new(
                 locator.contents(),
                 TextRange::new(current_statement_end, cell_range.end()),
             )
-            .any(|token| token.kind() != SimpleTokenKind::Semi && !token.kind().is_trivia())
+            .all(|token| token.kind() == SimpleTokenKind::Semi || token.kind().is_trivia())
         })
 }
