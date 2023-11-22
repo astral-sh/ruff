@@ -77,7 +77,7 @@ bar =     "needs formatting"
 #[test]
 fn format_warn_stdin_filename_with_files() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["format", "--stdin-filename", "foo.py"])
+        .args(["format", "--isolated", "--stdin-filename", "foo.py"])
         .arg("foo.py")
         .pass_stdin("foo =     1"), @r###"
     success: true
