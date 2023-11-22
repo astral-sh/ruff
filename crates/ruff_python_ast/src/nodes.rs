@@ -1306,7 +1306,7 @@ impl From<StringLiteral> for Expr {
 
 /// An internal representation of [`StringLiteral`] that represents an
 /// implicitly concatenated string.
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 struct ConcatenatedStringLiteral {
     /// Each string literal that makes up the concatenated string.
     strings: Vec<StringLiteral>,
@@ -1319,6 +1319,19 @@ impl ConcatenatedStringLiteral {
     fn as_str(&self) -> &str {
         self.value
             .get_or_init(|| self.strings.iter().map(StringLiteral::as_str).collect())
+    }
+}
+
+impl PartialEq for ConcatenatedStringLiteral {
+    fn eq(&self, other: &Self) -> bool {
+        if self.strings.len() != other.strings.len() {
+            return false;
+        }
+        // The `zip` here is safe because we have checked the length of both parts.
+        self.strings
+            .iter()
+            .zip(other.strings.iter())
+            .all(|(s1, s2)| s1 == s2)
     }
 }
 
