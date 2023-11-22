@@ -1,6 +1,6 @@
 [package]
 name = "ruff_shrinking"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-fs-err = "2.9.0"
+fs-err = "2.10.0"
 regex = { workspace = true }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_parser = { path = "../ruff_python_parser" }
@@ -16,3 +16,6 @@ ruff_text_size = { path = "../ruff_text_size" }
 shlex = "1.2.0"
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+
+[lints]
+workspace = true

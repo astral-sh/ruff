@@ -50,7 +50,7 @@ UP007.py:14:10: UP007 [*] Use `X | Y` for type annotations
 12 12 | 
 13 13 | 
 14    |-def f(x: Union[str, int, Union[float, bytes]]) -> None:
-   14 |+def f(x: str | (int | Union[float, bytes])) -> None:
+   14 |+def f(x: str | int | Union[float, bytes]) -> None:
 15 15 |     ...
 16 16 | 
 17 17 | 
@@ -176,7 +176,7 @@ UP007.py:38:11: UP007 [*] Use `X | Y` for type annotations
 36 36 | 
 37 37 | 
 38    |-def f(x: "Union[str, int, Union[float, bytes]]") -> None:
-   38 |+def f(x: "str | (int | Union[float, bytes])") -> None:
+   38 |+def f(x: "str | int | Union[float, bytes]") -> None:
 39 39 |     ...
 40 40 | 
 41 41 | 
@@ -413,5 +413,22 @@ UP007.py:110:28: UP007 [*] Use `X | Y` for type annotations
 111 111 | 
 112 112 | 
 113 113 | # Regression test for: https://github.com/astral-sh/ruff/issues/7452
+
+UP007.py:120:10: UP007 [*] Use `X | Y` for type annotations
+    |
+119 | # Regression test for: https://github.com/astral-sh/ruff/issues/8609
+120 | def f(x: Union[int, str, bytes]) -> None:
+    |          ^^^^^^^^^^^^^^^^^^^^^^ UP007
+121 |     ...
+    |
+    = help: Convert to `X | Y`
+
+ℹ Unsafe fix
+117 117 | 
+118 118 | 
+119 119 | # Regression test for: https://github.com/astral-sh/ruff/issues/8609
+120     |-def f(x: Union[int, str, bytes]) -> None:
+    120 |+def f(x: int | str | bytes) -> None:
+121 121 |     ...
 
 

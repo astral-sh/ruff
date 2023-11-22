@@ -9,6 +9,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::assert_messages;
@@ -86,6 +87,10 @@ mod tests {
     )]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"))]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"))]
+    #[test_case(
+        Rule::RedefinedArgumentFromLocal,
+        Path::new("redefined_argument_from_local.py")
+    )]
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
@@ -145,11 +150,23 @@ mod tests {
     #[test_case(Rule::UnnecessaryLambda, Path::new("unnecessary_lambda.py"))]
     #[test_case(Rule::NonAsciiImportName, Path::new("non_ascii_module_import.py"))]
     #[test_case(Rule::NonAsciiName, Path::new("non_ascii_name.py"))]
+    #[test_case(
+        Rule::RepeatedKeywordArgument,
+        Path::new("repeated_keyword_argument.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
-            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    allow_dunder_method_names: FxHashSet::from_iter([
+                        "__special_custom_magic__".to_string()
+                    ]),
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

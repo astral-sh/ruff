@@ -17,15 +17,18 @@ use crate::settings::LinterSettings;
 ///
 /// ## Why is this bad?
 /// Some Unicode characters are visually similar to ASCII characters, but have
-/// different code points. For example, `LATIN CAPITAL LETTER A` (`U+0041`) is
-/// visually similar, but not identical, to the ASCII character `A`.
+/// different code points. For example, `GREEK CAPITAL LETTER ALPHA` (`U+0391`)
+/// is visually similar, but not identical, to the ASCII character `A`.
 ///
-/// The use of ambiguous Unicode characters can confuse readers and cause
-/// subtle bugs.
+/// The use of ambiguous Unicode characters can confuse readers, cause subtle
+/// bugs, and even make malicious code look harmless.
 ///
 /// In [preview], this rule will also flag Unicode characters that are
 /// confusable with other, non-preferred Unicode characters. For example, the
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
+///
+/// You can omit characters from being flagged as ambiguous via the
+/// [`allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -36,6 +39,9 @@ use crate::settings::LinterSettings;
 /// ```python
 /// print("Hello, world!")  # "H" is the Latin capital H (`U+0048`).
 /// ```
+///
+/// ## Options
+/// - `allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
@@ -64,15 +70,18 @@ impl Violation for AmbiguousUnicodeCharacterString {
 ///
 /// ## Why is this bad?
 /// Some Unicode characters are visually similar to ASCII characters, but have
-/// different code points. For example, `LATIN CAPITAL LETTER A` (`U+0041`) is
-/// visually similar, but not identical, to the ASCII character `A`.
+/// different code points. For example, `GREEK CAPITAL LETTER ALPHA` (`U+0391`)
+/// is visually similar, but not identical, to the ASCII character `A`.
 ///
-/// The use of ambiguous Unicode characters can confuse readers and cause
-/// subtle bugs.
+/// The use of ambiguous Unicode characters can confuse readers, cause subtle
+/// bugs, and even make malicious code look harmless.
 ///
 /// In [preview], this rule will also flag Unicode characters that are
 /// confusable with other, non-preferred Unicode characters. For example, the
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
+///
+/// You can omit characters from being flagged as ambiguous via the
+/// [`allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -83,6 +92,9 @@ impl Violation for AmbiguousUnicodeCharacterString {
 /// ```python
 /// """A lovely docstring (with no strange parentheses)."""
 /// ```
+///
+/// ## Options
+/// - `allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
@@ -111,15 +123,18 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 ///
 /// ## Why is this bad?
 /// Some Unicode characters are visually similar to ASCII characters, but have
-/// different code points. For example, `LATIN CAPITAL LETTER A` (`U+0041`) is
-/// visually similar, but not identical, to the ASCII character `A`.
+/// different code points. For example, `GREEK CAPITAL LETTER ALPHA` (`U+0391`)
+/// is visually similar, but not identical, to the ASCII character `A`.
 ///
-/// The use of ambiguous Unicode characters can confuse readers and cause
-/// subtle bugs.
+/// The use of ambiguous Unicode characters can confuse readers, cause subtle
+/// bugs, and even make malicious code look harmless.
 ///
 /// In [preview], this rule will also flag Unicode characters that are
 /// confusable with other, non-preferred Unicode characters. For example, the
 /// spec recommends `GREEK CAPITAL LETTER OMEGA` over `OHM SIGN`.
+///
+/// You can omit characters from being flagged as ambiguous via the
+/// [`allowed-confusables`] setting.
 ///
 /// ## Example
 /// ```python
@@ -130,6 +145,9 @@ impl Violation for AmbiguousUnicodeCharacterDocstring {
 /// ```python
 /// foo()  # noqa  # "o" is Latin (`U+006F`)
 /// ```
+///
+/// ## Options
+/// - `allowed-confusables`
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]

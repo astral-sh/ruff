@@ -20,3 +20,6 @@ seahash = "4.1.0"
 
 [dev-dependencies]
 ruff_macros = { path = "../ruff_macros" }
+
+[lints]
+workspace = true

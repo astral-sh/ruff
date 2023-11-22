@@ -248,6 +248,12 @@ impl<'a> Definitions<'a> {
 
         ContextualizedDefinitions(definitions.raw)
     }
+
+    /// Returns a reference to the Python AST.
+    pub fn python_ast(&self) -> Option<&'a [Stmt]> {
+        let module = self[DefinitionId::module()].as_module()?;
+        Some(module.python_ast)
+    }
 }
 
 impl<'a> Deref for Definitions<'a> {

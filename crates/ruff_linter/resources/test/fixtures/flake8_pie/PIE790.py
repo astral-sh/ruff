@@ -148,3 +148,62 @@ for i in range(10):
 for i in range(10):
     pass  # comment
     pass
+
+
+def foo():
+    print("foo")
+    ...
+
+
+def foo():
+    """A docstring."""
+    print("foo")
+    ...
+
+
+for i in range(10):
+    ...
+    ...
+
+for i in range(10):
+    ...
+
+    ...
+
+for i in range(10):
+    ...  # comment
+    ...
+
+for i in range(10):
+    ...
+    pass
+
+from typing import Protocol
+
+
+class Repro(Protocol):
+    def func(self) -> str:
+        """Docstring"""
+        ...
+
+    def impl(self) -> str:
+        """Docstring"""
+        return self.func()
+
+
+import abc
+
+
+class Repro:
+    @abc.abstractmethod
+    def func(self) -> str:
+        """Docstring"""
+        ...
+
+    def impl(self) -> str:
+        """Docstring"""
+        return self.func()
+
+    def stub(self) -> str:
+        """Docstring"""
+        ...

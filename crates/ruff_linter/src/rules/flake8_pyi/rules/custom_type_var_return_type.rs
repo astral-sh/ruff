@@ -15,9 +15,10 @@ use crate::checkers::ast::Checker;
 /// annotation instead of using `typing_extensions.Self`.
 ///
 /// ## Why is this bad?
-/// If certain methods are annotated with a custom `TypeVar` type, and the
-/// class is subclassed, type checkers will not be able to infer the correct
-/// return type.
+/// While the semantics are often identical, using `typing_extensions.Self` is
+/// more intuitive and succinct (per [PEP 673]) than a custom `TypeVar`. For
+/// example, the use of `Self` will typically allow for the omission of type
+/// parameters on the `self` and `cls` arguments.
 ///
 /// This check currently applies to instance methods that return `self`, class
 /// methods that return an instance of `cls`, and `__new__` methods.
@@ -42,16 +43,18 @@ use crate::checkers::ast::Checker;
 ///
 ///
 /// class Foo:
-///     def __new__(cls: type[Self], *args: str, **kwargs: int) -> Self:
+///     def __new__(cls, *args: str, **kwargs: int) -> Self:
 ///         ...
 ///
-///     def foo(self: Self, arg: bytes) -> Self:
+///     def foo(self, arg: bytes) -> Self:
 ///         ...
 ///
 ///     @classmethod
-///     def bar(cls: type[Self], arg: int) -> Self:
+///     def bar(cls, arg: int) -> Self:
 ///         ...
 /// ```
+///
+/// [PEP 673]: https://peps.python.org/pep-0673/#motivation
 #[violation]
 pub struct CustomTypeVarReturnType {
     method_name: String,

@@ -88,6 +88,7 @@ pub enum Command {
 #[allow(clippy::struct_excessive_bools)]
 pub struct CheckCommand {
     /// List of files or directories to check.
+    #[clap(help = "List of files or directories to check [default: .]")]
     pub files: Vec<PathBuf>,
     /// Apply fixes to resolve lint violations.
     /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
@@ -363,6 +364,7 @@ pub struct CheckCommand {
 #[allow(clippy::struct_excessive_bools)]
 pub struct FormatCommand {
     /// List of files or directories to format.
+    #[clap(help = "List of files or directories to format [default: .]")]
     pub files: Vec<PathBuf>,
     /// Avoid writing any formatted files back; instead, exit with a non-zero status code if any
     /// files would have been modified, and zero otherwise.

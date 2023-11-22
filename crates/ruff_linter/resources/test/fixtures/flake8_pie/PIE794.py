@@ -38,3 +38,15 @@ class User:
     foo: bool = BooleanField()
     # ...
     bar = StringField()  # PIE794
+
+
+class Person:
+    name = "Foo"
+    name = name + " Bar"
+    name = "Bar"  # PIE794
+
+
+class Person:
+    name: str = "Foo"
+    name: str = name + " Bar"
+    name: str = "Bar"  # PIE794

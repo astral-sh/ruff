@@ -1,8 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
+use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
@@ -80,7 +81,7 @@ pub(crate) fn use_pep604_annotation(
                     _ => {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             pad(
-                                checker.generator().expr(&optional(slice)),
+                                checker.generator().expr(&pep_604_optional(slice)),
                                 expr.range(),
                                 checker.locator(),
                             ),
@@ -101,7 +102,7 @@ pub(crate) fn use_pep604_annotation(
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             pad(
-                                checker.generator().expr(&union(elts)),
+                                checker.generator().expr(&pep_604_union(elts)),
                                 expr.range(),
                                 checker.locator(),
                             ),
@@ -123,36 +124,6 @@ pub(crate) fn use_pep604_annotation(
             }
             checker.diagnostics.push(diagnostic);
         }
-    }
-}
-
-/// Format the expression as a PEP 604-style optional.
-fn optional(expr: &Expr) -> Expr {
-    ast::ExprBinOp {
-        left: Box::new(expr.clone()),
-        op: Operator::BitOr,
-        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
-        range: TextRange::default(),
-    }
-    .into()
-}
-
-/// Format the expressions as a PEP 604-style union.
-fn union(elts: &[Expr]) -> Expr {
-    match elts {
-        [] => Expr::Tuple(ast::ExprTuple {
-            elts: vec![],
-            ctx: ExprContext::Load,
-            range: TextRange::default(),
-        }),
-        [Expr::Tuple(ast::ExprTuple { elts, .. })] => union(elts),
-        [elt] => elt.clone(),
-        [elt, rest @ ..] => Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(union(&[elt.clone()])),
-            op: Operator::BitOr,
-            right: Box::new(union(rest)),
-            range: TextRange::default(),
-        }),
     }
 }
 

@@ -199,7 +199,7 @@ def fibonacci(n):
             TextSize::from(99),
         )));
 
-        let file_2 = r#"if a == 1: pass"#;
+        let file_2 = r"if a == 1: pass";
 
         let undefined_name = Diagnostic::new(
             DiagnosticKind {

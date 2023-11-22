@@ -363,7 +363,7 @@ impl<'a> From<&'a ast::Number> for ComparableNumber<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, PartialEq, Eq, Hash)]
 pub struct ComparableArguments<'a> {
     args: Vec<ComparableExpr<'a>>,
     keywords: Vec<ComparableKeyword<'a>>,
@@ -1051,7 +1051,7 @@ pub struct StmtClassDef<'a> {
     decorator_list: Vec<ComparableDecorator<'a>>,
     name: &'a str,
     type_params: Option<ComparableTypeParams<'a>>,
-    arguments: Option<ComparableArguments<'a>>,
+    arguments: ComparableArguments<'a>,
     body: Vec<ComparableStmt<'a>>,
 }
 
@@ -1309,7 +1309,7 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
                 range: _,
             }) => Self::ClassDef(StmtClassDef {
                 name: name.as_str(),
-                arguments: arguments.as_ref().map(Into::into),
+                arguments: arguments.as_ref().map(Into::into).unwrap_or_default(),
                 body: body.iter().map(Into::into).collect(),
                 decorator_list: decorator_list.iter().map(Into::into).collect(),
                 type_params: type_params.as_ref().map(Into::into),
@@ -1477,6 +1477,47 @@ impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
             ast::Stmt::Pass(_) => Self::Pass,
             ast::Stmt::Break(_) => Self::Break,
             ast::Stmt::Continue(_) => Self::Continue,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ComparableMod<'a> {
+    Module(ComparableModModule<'a>),
+    Expression(ComparableModExpression<'a>),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableModModule<'a> {
+    body: Vec<ComparableStmt<'a>>,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableModExpression<'a> {
+    body: Box<ComparableExpr<'a>>,
+}
+
+impl<'a> From<&'a ast::Mod> for ComparableMod<'a> {
+    fn from(mod_: &'a ast::Mod) -> Self {
+        match mod_ {
+            ast::Mod::Module(module) => Self::Module(module.into()),
+            ast::Mod::Expression(expr) => Self::Expression(expr.into()),
+        }
+    }
+}
+
+impl<'a> From<&'a ast::ModModule> for ComparableModModule<'a> {
+    fn from(module: &'a ast::ModModule) -> Self {
+        Self {
+            body: module.body.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
+    fn from(expr: &'a ast::ModExpression) -> Self {
+        Self {
+            body: (&expr.body).into(),
         }
     }
 }

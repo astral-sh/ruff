@@ -1,8 +1,20 @@
 {"foo": 1, **{"bar": 1}}  # PIE800
 
+{**{"bar": 10}, "a": "b"}  # PIE800
+
 foo({**foo, **{"bar": True}})  # PIE800
 
 {**foo, **{"bar": 10}}  # PIE800
+
+{ # PIE800
+    "a": "b",
+    # Preserve
+    **{
+        # all
+        "bar": 10,  # the
+        # comments
+    },
+}
 
 {**foo, **buzz, **{bar: 10}}  # PIE800
 

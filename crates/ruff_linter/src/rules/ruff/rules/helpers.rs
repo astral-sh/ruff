@@ -65,7 +65,9 @@ pub(super) fn has_default_copy_semantics(
         semantic.resolve_call_path(expr).is_some_and(|call_path| {
             matches!(
                 call_path.as_slice(),
-                ["pydantic", "BaseModel" | "BaseSettings"] | ["msgspec", "Struct"]
+                ["pydantic", "BaseModel" | "BaseSettings"]
+                    | ["pydantic_settings", "BaseSettings"]
+                    | ["msgspec", "Struct"]
             )
         })
     })

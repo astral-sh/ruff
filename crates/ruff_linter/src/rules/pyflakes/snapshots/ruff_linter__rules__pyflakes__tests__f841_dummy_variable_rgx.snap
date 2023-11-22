@@ -106,7 +106,7 @@ F841_0.py:36:5: F841 [*] Local variable `__` is assigned to but never used
    |     ^^ F841
 37 |     _discarded = 1
    |
-   = help: Remove assignment to unused variable ``
+   = help: Remove assignment to unused variable `__`
 
 ℹ Unsafe fix
 33 33 | 

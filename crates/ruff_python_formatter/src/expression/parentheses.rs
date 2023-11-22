@@ -14,6 +14,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
+/// From the perspective of the expression, under which circumstances does it need parentheses
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum OptionalParentheses {
     /// Add parentheses if the expression expands over multiple lines
@@ -41,7 +42,8 @@ pub(crate) trait NeedsParentheses {
     ) -> OptionalParentheses;
 }
 
-/// Configures if the expression should be parenthesized.
+/// From the perspective of the parent statement or expression, when should the child expression
+/// get parentheses?
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Parenthesize {
     /// Parenthesizes the expression if it doesn't fit on a line OR if the expression is parenthesized in the source code.
@@ -252,7 +254,7 @@ pub(crate) enum InParenthesesOnlyLineBreak {
 impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         match f.context().node_level() {
-            NodeLevel::TopLevel | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+            NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
                 match self {
                     InParenthesesOnlyLineBreak::SoftLineBreak => Ok(()),
                     InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => space().fmt(f),
@@ -319,7 +321,7 @@ pub(super) fn write_in_parentheses_only_group_start_tag(f: &mut PyFormatter) {
             // Unconditionally group the content if it is not enclosed by an optional parentheses group.
             f.write_element(FormatElement::Tag(tag::Tag::StartGroup(tag::Group::new())));
         }
-        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+        NodeLevel::Expression(None) | NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement => {
             // No group
         }
     }
@@ -334,7 +336,7 @@ pub(super) fn write_in_parentheses_only_group_end_tag(f: &mut PyFormatter) {
             // Unconditionally group the content if it is not enclosed by an optional parentheses group.
             f.write_element(FormatElement::Tag(tag::Tag::EndGroup));
         }
-        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+        NodeLevel::Expression(None) | NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement => {
             // No group
         }
     }

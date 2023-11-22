@@ -48,3 +48,14 @@ class E(Struct):
     without_annotation = []
     class_variable: ClassVar[list[int]] = []
     final_variable: Final[list[int]] = []
+
+
+from pydantic_settings import BaseSettings
+
+
+class F(BaseSettings):
+    mutable_default: list[int] = []
+    immutable_annotation: Sequence[int] = []
+    without_annotation = []
+    class_variable: ClassVar[list[int]] = []
+    final_variable: Final[list[int]] = []

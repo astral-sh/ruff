@@ -1,6 +1,7 @@
 //! AST visitor trait and walk functions.
 
 pub mod preorder;
+pub mod transformer;
 
 use crate::{
     self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
@@ -14,8 +15,10 @@ use crate::{
 /// Prefer [`crate::statement_visitor::StatementVisitor`] for visitors that only need to visit
 /// statements.
 ///
-/// Use the [`PreorderVisitor`](self::preorder::PreorderVisitor) if you want to visit the nodes
+/// Use the [`PreorderVisitor`](preorder::PreorderVisitor) if you want to visit the nodes
 /// in pre-order rather than evaluation order.
+///
+/// Use the [`Transformer`](transformer::Transformer) if you want to modify the nodes.
 pub trait Visitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         walk_stmt(self, stmt);

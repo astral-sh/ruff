@@ -295,7 +295,7 @@ To preview any changes to the documentation locally:
 
     ```shell
     # For contributors.
-    mkdocs serve -f mkdocs.generated.yml
+    mkdocs serve -f mkdocs.public.yml
 
     # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
     mkdocs serve -f mkdocs.insiders.yml

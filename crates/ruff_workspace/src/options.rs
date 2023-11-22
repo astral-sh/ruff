@@ -834,9 +834,9 @@ pub struct LintCommonOptions {
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
+        scope = "per-file-ignores",
         example = r#"
             # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-            [tool.ruff.lint.per-file-ignores]
             "__init__.py" = ["E402"]
             "path/to/file.py" = ["E402"]
         "#
@@ -848,9 +848,9 @@ pub struct LintCommonOptions {
     #[option(
         default = "{}",
         value_type = "dict[str, list[RuleSelector]]",
+        scope = "extend-per-file-ignores",
         example = r#"
             # Also ignore `E402` in all `__init__.py` files.
-            [tool.ruff.lint.extend-per-file-ignores]
             "__init__.py" = ["E402"]
         "#
     )]
@@ -1205,8 +1205,8 @@ pub struct Flake8ImportConventionsOptions {
     #[option(
         default = r#"{"altair": "alt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa"}"#,
         value_type = "dict[str, str]",
+        scope = "aliases",
         example = r#"
-            [tool.ruff.lint.flake8-import-conventions.aliases]
             # Declare the default aliases.
             altair = "alt"
             "matplotlib.pyplot" = "plt"
@@ -1223,8 +1223,8 @@ pub struct Flake8ImportConventionsOptions {
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, str]",
+        scope = "extend-aliases",
         example = r#"
-            [tool.ruff.lint.flake8-import-conventions.extend-aliases]
             # Declare a custom alias for the `matplotlib` module.
             "dask.dataframe" = "dd"
         "#
@@ -1235,8 +1235,8 @@ pub struct Flake8ImportConventionsOptions {
     #[option(
         default = r#"{}"#,
         value_type = "dict[str, list[str]]",
+        scope = "banned-aliases",
         example = r#"
-            [tool.ruff.lint.flake8-import-conventions.banned-aliases]
             # Declare the banned aliases.
             "tensorflow.keras.backend" = ["K"]
     "#
@@ -1548,8 +1548,8 @@ pub struct Flake8TidyImportsOptions {
     #[option(
         default = r#"{}"#,
         value_type = r#"dict[str, { "msg": str }]"#,
+        scope = "banned-api",
         example = r#"
-            [tool.ruff.lint.flake8-tidy-imports.banned-api]
             "cgi".msg = "The cgi module is deprecated, see https://peps.python.org/pep-0594/#cgi."
             "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
         "#
@@ -1978,6 +1978,33 @@ pub struct IsortOptions {
     )]
     pub section_order: Option<Vec<ImportSection>>,
 
+    /// Put all imports into the same section bucket.
+    ///
+    /// For example, rather than separating standard library and third-party imports, as in:
+    /// ```python
+    /// import os
+    /// import sys
+    ///
+    /// import numpy
+    /// import pandas
+    /// ```
+    ///
+    /// Setting `no-sections = true` will instead group all imports into a single section:
+    /// ```python
+    /// import os
+    /// import numpy
+    /// import pandas
+    /// import sys
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            no-sections = true
+        "#
+    )]
+    pub no_sections: Option<bool>,
+
     /// Whether to automatically mark imports from within the same package as first-party.
     /// For example, when `detect-same-package = true`, then when analyzing files within the
     /// `foo` package, any imports from within the `foo` package will be considered first-party.
@@ -1994,15 +2021,41 @@ pub struct IsortOptions {
     )]
     pub detect_same_package: Option<bool>,
 
+    /// Whether to place `import from` imports before straight imports when sorting.
+    ///
+    /// For example, by default, imports will be sorted such that straight imports appear
+    /// before `import from` imports, as in:
+    /// ```python
+    /// import os
+    /// import sys
+    /// from typing import List
+    /// ```
+    ///
+    /// Setting `from-first = true` will instead sort such that `import from` imports appear
+    /// before straight imports, as in:
+    /// ```python
+    /// from typing import List
+    /// import os
+    /// import sys
+    /// ```
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+            from-first = true
+        "#
+    )]
+    pub from_first: Option<bool>,
+
     // Tables are required to go last.
     /// A list of mappings from section names to modules.
     /// By default custom sections are output last, but this can be overridden with `section-order`.
     #[option(
         default = "{}",
         value_type = "dict[str, list[str]]",
+        scope = "sections",
         example = r#"
             # Group all Django imports into a separate section.
-            [tool.ruff.lint.isort.sections]
             "django" = ["django"]
         "#
     )]
@@ -2013,6 +2066,15 @@ impl IsortOptions {
     pub fn try_into_settings(
         self,
     ) -> Result<isort::settings::Settings, isort::settings::SettingsError> {
+        // Verify that if `no_sections` is set, then `section_order` is empty.
+        let no_sections = self.no_sections.unwrap_or_default();
+        if no_sections && self.section_order.is_some() {
+            warn_user_once!("`section-order` is ignored when `no-sections` is set to `true`");
+        }
+        if no_sections && self.sections.is_some() {
+            warn_user_once!("`sections` is ignored when `no-sections` is set to `true`");
+        }
+
         // Extract any configuration options that deal with user-defined sections.
         let mut section_order: Vec<_> = self
             .section_order
@@ -2062,6 +2124,7 @@ impl IsortOptions {
             .map_err(isort::settings::SettingsError::InvalidExtraStandardLibrary)?
             .unwrap_or_default();
         let no_lines_before = self.no_lines_before.unwrap_or_default();
+        let from_first = self.from_first.unwrap_or_default();
         let sections = self.sections.unwrap_or_default();
 
         // Verify that `sections` doesn't contain any built-in sections.
@@ -2169,6 +2232,8 @@ impl IsortOptions {
             lines_between_types: self.lines_between_types.unwrap_or_default(),
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
+            no_sections,
+            from_first,
         })
     }
 }
@@ -2383,10 +2448,10 @@ pub struct PydocstyleOptions {
     /// Whether to use Google-style or NumPy-style conventions or the [PEP 257](https://peps.python.org/pep-0257/)
     /// defaults when analyzing docstring sections.
     ///
-    /// Enabling a convention will force-disable any rules that are not
-    /// included in the specified convention. As such, the intended use is
-    /// to enable a convention and then selectively disable any additional
-    /// rules on top of it.
+    /// Enabling a convention will disable all rules that are not included in
+    /// the specified convention. As such, the intended workflow is to enable a
+    /// convention and then selectively enable or disable any additional rules
+    /// on top of it.
     ///
     /// For example, to use Google-style conventions but avoid requiring
     /// documentation for every function parameter:
@@ -2405,9 +2470,18 @@ pub struct PydocstyleOptions {
     /// convention = "google"
     /// ```
     ///
-    /// As conventions force-disable all rules not included in the convention,
-    /// enabling _additional_ rules on top of a convention is currently
-    /// unsupported.
+    /// To enable an additional rule that's excluded from the convention,
+    /// select the desired rule via its fully qualified rule code (e.g.,
+    /// `D400` instead of `D4` or `D40`):
+    ///
+    /// ```toml
+    /// [tool.ruff.lint]
+    /// # Enable D400 on top of the Google convention.
+    /// extend-select = ["D400"]
+    ///
+    /// [tool.ruff.lint.pydocstyle]
+    /// convention = "google"
+    /// ```
     #[option(
         default = r#"null"#,
         value_type = r#""google" | "numpy" | "pep257""#,
@@ -2499,6 +2573,17 @@ pub struct PylintOptions {
     )]
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
 
+    /// Dunder methods name to allow, in addition to the default set from the
+    /// Python standard library (see: `PLW3201`).
+    #[option(
+        default = r#"[]"#,
+        value_type = r#"list[str]"#,
+        example = r#"
+            allow-dunder-method-names = ["__tablename__", "__table_args__"]
+        "#
+    )]
+    pub allow_dunder_method_names: Option<FxHashSet<String>>,
+
     /// Maximum number of branches allowed for a function or method body (see:
     /// `PLR0912`).
     #[option(default = r"12", value_type = "int", example = r"max-branches = 12")]
@@ -2540,6 +2625,7 @@ impl PylintOptions {
             allow_magic_value_types: self
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
+            allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
             max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),

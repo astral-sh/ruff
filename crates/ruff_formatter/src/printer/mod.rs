@@ -1711,14 +1711,14 @@ mod tests {
         ));
 
         assert_eq!(
-            r#"a
+            "a
   b
     c
       d
       d
     c
   b
-a"#,
+a",
             formatted.as_code()
         );
     }
@@ -2047,10 +2047,10 @@ two lines`,
 
         assert_eq!(
             printed.as_code(),
-            r#"Group with id-2
+            "Group with id-2
 Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by
 Group 2 fits
-Group 1 breaks"#
+Group 1 breaks"
         );
     }
 
