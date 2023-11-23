@@ -615,6 +615,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::DjangoRawSql) {
                 flake8_bandit::rules::django_raw_sql(checker, call);
             }
+            if checker.enabled(Rule::TarfileUnsafeMembers) {
+                flake8_bandit::rules::tarfile_unsafe_members(checker, call);
+            }
             if checker.enabled(Rule::UnnecessaryGeneratorList) {
                 flake8_comprehensions::rules::unnecessary_generator_list(
                     checker, expr, func, args, keywords,

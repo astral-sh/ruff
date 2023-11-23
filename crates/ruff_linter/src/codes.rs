@@ -595,6 +595,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "112") => (RuleGroup::Stable, rules::flake8_bandit::rules::TryExceptContinue),
         (Flake8Bandit, "113") => (RuleGroup::Stable, rules::flake8_bandit::rules::RequestWithoutTimeout),
         (Flake8Bandit, "201") => (RuleGroup::Preview, rules::flake8_bandit::rules::FlaskDebugTrue),
+        (Flake8Bandit, "202") => (RuleGroup::Stable, rules::flake8_bandit::rules::TarfileUnsafeMembers),
         (Flake8Bandit, "301") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousPickleUsage),
         (Flake8Bandit, "302") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousMarshalUsage),
         (Flake8Bandit, "303") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousInsecureHashUsage),
