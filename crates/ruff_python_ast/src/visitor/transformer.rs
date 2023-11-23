@@ -762,7 +762,11 @@ pub fn walk_cmp_op<V: Transformer + ?Sized>(visitor: &V, cmp_op: &mut CmpOp) {}
 pub fn walk_alias<V: Transformer + ?Sized>(visitor: &V, alias: &mut Alias) {}
 
 #[allow(unused_variables)]
-pub fn walk_string_literal<V: Transformer + ?Sized>(visitor: &V, alias: &mut StringLiteral) {}
+pub fn walk_string_literal<V: Transformer + ?Sized>(
+    visitor: &V,
+    string_literal: &mut StringLiteral,
+) {
+}
 
 #[allow(unused_variables)]
-pub fn walk_bytes_literal<V: Transformer + ?Sized>(visitor: &V, alias: &mut BytesLiteral) {}
+pub fn walk_bytes_literal<V: Transformer + ?Sized>(visitor: &V, bytes_literal: &mut BytesLiteral) {}

@@ -776,7 +776,15 @@ pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, cmp_op: &'a CmpOp) 
 pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &V, alias: &'a Alias) {}
 
 #[allow(unused_variables)]
-pub fn walk_string_literal<'a, V: Visitor<'a> + ?Sized>(visitor: &V, alias: &'a StringLiteral) {}
+pub fn walk_string_literal<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &V,
+    string_literal: &'a StringLiteral,
+) {
+}
 
 #[allow(unused_variables)]
-pub fn walk_bytes_literal<'a, V: Visitor<'a> + ?Sized>(visitor: &V, alias: &'a BytesLiteral) {}
+pub fn walk_bytes_literal<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &V,
+    bytes_literal: &'a BytesLiteral,
+) {
+}
