@@ -743,30 +743,26 @@ pub fn walk_pattern_keyword<V: Transformer + ?Sized>(
     visitor.visit_pattern(&mut pattern_keyword.pattern);
 }
 
-#[allow(unused_variables)]
-pub fn walk_expr_context<V: Transformer + ?Sized>(visitor: &V, expr_context: &mut ExprContext) {}
+pub fn walk_expr_context<V: Transformer + ?Sized>(_visitor: &V, _expr_context: &mut ExprContext) {}
 
-#[allow(unused_variables)]
-pub fn walk_bool_op<V: Transformer + ?Sized>(visitor: &V, bool_op: &mut BoolOp) {}
+pub fn walk_bool_op<V: Transformer + ?Sized>(_visitor: &V, _bool_op: &mut BoolOp) {}
 
-#[allow(unused_variables)]
-pub fn walk_operator<V: Transformer + ?Sized>(visitor: &V, operator: &mut Operator) {}
+pub fn walk_operator<V: Transformer + ?Sized>(_visitor: &V, _operator: &mut Operator) {}
 
-#[allow(unused_variables)]
-pub fn walk_unary_op<V: Transformer + ?Sized>(visitor: &V, unary_op: &mut UnaryOp) {}
+pub fn walk_unary_op<V: Transformer + ?Sized>(_visitor: &V, _unary_op: &mut UnaryOp) {}
 
-#[allow(unused_variables)]
-pub fn walk_cmp_op<V: Transformer + ?Sized>(visitor: &V, cmp_op: &mut CmpOp) {}
+pub fn walk_cmp_op<V: Transformer + ?Sized>(_visitor: &V, _cmp_op: &mut CmpOp) {}
 
-#[allow(unused_variables)]
-pub fn walk_alias<V: Transformer + ?Sized>(visitor: &V, alias: &mut Alias) {}
+pub fn walk_alias<V: Transformer + ?Sized>(_visitor: &V, _alias: &mut Alias) {}
 
-#[allow(unused_variables)]
 pub fn walk_string_literal<V: Transformer + ?Sized>(
-    visitor: &V,
-    string_literal: &mut StringLiteral,
+    _visitor: &V,
+    _string_literal: &mut StringLiteral,
 ) {
 }
 
-#[allow(unused_variables)]
-pub fn walk_bytes_literal<V: Transformer + ?Sized>(visitor: &V, bytes_literal: &mut BytesLiteral) {}
+pub fn walk_bytes_literal<V: Transformer + ?Sized>(
+    _visitor: &V,
+    _bytes_literal: &mut BytesLiteral,
+) {
+}
