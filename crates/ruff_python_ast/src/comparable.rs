@@ -766,7 +766,7 @@ pub enum ComparableExpr<'a> {
     NumberLiteral(ExprNumberLiteral<'a>),
     BoolLiteral(ExprBoolLiteral<'a>),
     NoneLiteral,
-    EllispsisLiteral,
+    EllipsisLiteral,
     Attribute(ExprAttribute<'a>),
     Subscript(ExprSubscript<'a>),
     Starred(ExprStarred<'a>),
@@ -964,7 +964,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 Self::BoolLiteral(ExprBoolLiteral { value })
             }
             ast::Expr::NoneLiteral(_) => Self::NoneLiteral,
-            ast::Expr::EllipsisLiteral(_) => Self::EllispsisLiteral,
+            ast::Expr::EllipsisLiteral(_) => Self::EllipsisLiteral,
             ast::Expr::Attribute(ast::ExprAttribute {
                 value,
                 attr,
