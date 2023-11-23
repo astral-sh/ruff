@@ -60,7 +60,7 @@ pub(crate) fn repeated_keyword_argument(checker: &mut Checker, call: &ExprCall) 
             // Ex) `func(**{"a": 1, "a": 2})`
             for key in keys.iter().flatten() {
                 if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
-                    if !seen.insert(value) {
+                    if !seen.insert(value.as_str()) {
                         checker.diagnostics.push(Diagnostic::new(
                             RepeatedKeywordArgument {
                                 duplicate_keyword: value.to_string(),

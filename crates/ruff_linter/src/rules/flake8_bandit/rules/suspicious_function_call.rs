@@ -855,7 +855,7 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
                 // If the `url` argument is a string literal, allow `http` and `https` schemes.
                 if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
                     if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = &call.arguments.find_argument("url", 0) {
-                        let url = value.trim_start();
+                        let url = value.as_str().trim_start();
                         if url.starts_with("http://") || url.starts_with("https://") {
                             return None;
                         }
