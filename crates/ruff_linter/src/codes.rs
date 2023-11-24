@@ -635,7 +635,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "408") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousXmlMinidomImport),
         (Flake8Bandit, "409") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousXmlPulldomImport),
         (Flake8Bandit, "410") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousLxmlImport),
-        (Flake8Bandit, "411") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousXmlrpclibImport),
+        (Flake8Bandit, "411") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousXmlrpcImport),
         (Flake8Bandit, "412") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousHttpoxyImport),
         (Flake8Bandit, "413") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousPycryptoImport),
         (Flake8Bandit, "415") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousPyghmiImport),

@@ -557,8 +557,15 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::SuspiciousFtplibImport,
                 Rule::SuspiciousPickleImport,
                 Rule::SuspiciousSubprocessImport,
+                Rule::SuspiciousXmlEtreeImport,
+                Rule::SuspiciousXmlSaxImport,
+                Rule::SuspiciousXmlExpatImport,
+                Rule::SuspiciousXmlMinidomImport,
+                Rule::SuspiciousXmlPulldomImport,
                 Rule::SuspiciousLxmlImport,
-                Rule::SuspiciousXmlrpclibImport,
+                Rule::SuspiciousXmlrpcImport,
+                Rule::SuspiciousHttpoxyImport,
+                Rule::SuspiciousPycryptoImport,
                 Rule::SuspiciousPyghmiImport,
             ]) {
                 flake8_bandit::rules::suspicious_imports(checker, stmt);
@@ -767,8 +774,15 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::SuspiciousFtplibImport,
                 Rule::SuspiciousPickleImport,
                 Rule::SuspiciousSubprocessImport,
+                Rule::SuspiciousXmlEtreeImport,
+                Rule::SuspiciousXmlSaxImport,
+                Rule::SuspiciousXmlExpatImport,
+                Rule::SuspiciousXmlMinidomImport,
+                Rule::SuspiciousXmlPulldomImport,
                 Rule::SuspiciousLxmlImport,
-                Rule::SuspiciousXmlrpclibImport,
+                Rule::SuspiciousXmlrpcImport,
+                Rule::SuspiciousHttpoxyImport,
+                Rule::SuspiciousPycryptoImport,
                 Rule::SuspiciousPyghmiImport,
             ]) {
                 flake8_bandit::rules::suspicious_imports(checker, stmt);

@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S412.py:1:6: S412 `httpoxy` is a set of vulnerabilities that affect application code running inCGI, or CGI-like environments. The use of CGI for web applications should be avoided
+  |
+1 | from twisted.web.twcgi import CGIScript  # S412
+  |      ^^^^^^^^^^^^^^^^^ S412
+  |
+
+

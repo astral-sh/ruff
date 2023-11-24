@@ -112,9 +112,9 @@ impl Violation for SuspiciousLxmlImport {
 }
 
 #[violation]
-pub struct SuspiciousXmlrpclibImport;
+pub struct SuspiciousXmlrpcImport;
 
-impl Violation for SuspiciousXmlrpclibImport {
+impl Violation for SuspiciousXmlrpcImport {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("XMLRPC is particularly dangerous as it is also concerned with communicating data over a network")
@@ -153,7 +153,7 @@ impl Violation for SuspiciousPyghmiImport {
     }
 }
 
-/// S401, S402, S403, S404, S405, S406, S407, S408, S409, S410, S411, S412, S413
+/// S401, S402, S403, S404, S405, S406, S407, S408, S409, S410, S411, S412, S413, S415
 pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
     match stmt {
         Stmt::Import(ast::StmtImport { names, .. }) => {
@@ -179,6 +179,33 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                         DiagnosticKind::from(SuspiciousSubprocessImport),
                         name.range,
                     ),
+                    "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
+                        check_and_push_diagnostic(
+                            checker,
+                            DiagnosticKind::from(SuspiciousXmlEtreeImport),
+                            name.range,
+                        );
+                    }
+                    "xml.sax" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousXmlSaxImport),
+                        name.range,
+                    ),
+                    "xml.dom.expatbuilder" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousXmlExpatImport),
+                        name.range,
+                    ),
+                    "xml.dom.minidom" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousXmlMinidomImport),
+                        name.range,
+                    ),
+                    "xml.dom.pulldom" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousXmlPulldomImport),
+                        name.range,
+                    ),
                     "lxml" => check_and_push_diagnostic(
                         checker,
                         DiagnosticKind::from(SuspiciousLxmlImport),
@@ -186,9 +213,17 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                     ),
                     "xmlrpc" => check_and_push_diagnostic(
                         checker,
-                        DiagnosticKind::from(SuspiciousXmlrpclibImport),
+                        DiagnosticKind::from(SuspiciousXmlrpcImport),
                         name.range,
                     ),
+                    "Crypto.Cipher" | "Crypto.Hash" | "Crypto.IO" | "Crypto.Protocol"
+                    | "Crypto.PublicKey" | "Crypto.Random" | "Crypto.Signature" | "Crypto.Util" => {
+                        check_and_push_diagnostic(
+                            checker,
+                            DiagnosticKind::from(SuspiciousPycryptoImport),
+                            name.range,
+                        );
+                    }
                     "pyghmi" => check_and_push_diagnostic(
                         checker,
                         DiagnosticKind::from(SuspiciousPyghmiImport),
@@ -198,7 +233,7 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom { module, .. }) => {
+        Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
             let Some(identifier) = module else { return };
             match identifier.as_str() {
                 "telnetlib" => check_and_push_diagnostic(
@@ -221,6 +256,77 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                     DiagnosticKind::from(SuspiciousSubprocessImport),
                     identifier.range(),
                 ),
+                "xml.etree" => {
+                    for name in names {
+                        if &name.name == "cElementTree" || &name.name == "ElementTree" {
+                            check_and_push_diagnostic(
+                                checker,
+                                DiagnosticKind::from(SuspiciousXmlEtreeImport),
+                                identifier.range(),
+                            );
+                        }
+                    }
+                }
+                "xml.etree.cElementTree" | "xml.etree.ElementTree" => {
+                    check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousXmlEtreeImport),
+                        identifier.range(),
+                    );
+                }
+                "xml" => {
+                    for name in names {
+                        if &name.name == "sax" {
+                            check_and_push_diagnostic(
+                                checker,
+                                DiagnosticKind::from(SuspiciousXmlSaxImport),
+                                identifier.range(),
+                            );
+                        }
+                    }
+                }
+                "xml.sax" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousXmlSaxImport),
+                    identifier.range(),
+                ),
+                "xml.dom" => {
+                    for name in names {
+                        match name.name.as_str() {
+                            "expatbuilder" => check_and_push_diagnostic(
+                                checker,
+                                DiagnosticKind::from(SuspiciousXmlExpatImport),
+                                identifier.range(),
+                            ),
+                            "minidom" => check_and_push_diagnostic(
+                                checker,
+                                DiagnosticKind::from(SuspiciousXmlMinidomImport),
+                                identifier.range(),
+                            ),
+                            "pulldom" => check_and_push_diagnostic(
+                                checker,
+                                DiagnosticKind::from(SuspiciousXmlPulldomImport),
+                                identifier.range(),
+                            ),
+                            _ => (),
+                        }
+                    }
+                }
+                "xml.dom.expatbuilder" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousXmlExpatImport),
+                    identifier.range(),
+                ),
+                "xml.dom.minidom" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousXmlMinidomImport),
+                    identifier.range(),
+                ),
+                "xml.dom.pulldom" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousXmlPulldomImport),
+                    identifier.range(),
+                ),
                 "lxml" => check_and_push_diagnostic(
                     checker,
                     DiagnosticKind::from(SuspiciousLxmlImport),
@@ -228,9 +334,58 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 ),
                 "xmlrpc" => check_and_push_diagnostic(
                     checker,
-                    DiagnosticKind::from(SuspiciousXmlrpclibImport),
+                    DiagnosticKind::from(SuspiciousXmlrpcImport),
                     identifier.range(),
                 ),
+                "wsgiref.handlers" => {
+                    for name in names {
+                        if &name.name == "CGIHandler" {
+                            check_and_push_diagnostic(
+                                checker,
+                                DiagnosticKind::from(SuspiciousHttpoxyImport),
+                                identifier.range(),
+                            );
+                        }
+                    }
+                }
+                "twisted.web.twcgi" => {
+                    for name in names {
+                        if &name.name == "CGIScript" {
+                            check_and_push_diagnostic(
+                                checker,
+                                DiagnosticKind::from(SuspiciousHttpoxyImport),
+                                identifier.range(),
+                            );
+                        }
+                    }
+                }
+                "Crypto" => {
+                    for name in names {
+                        if &name.name == "Cipher"
+                            || &name.name == "Hash"
+                            || &name.name == "IO"
+                            || &name.name == "Protocol"
+                            || &name.name == "PublicKey"
+                            || &name.name == "Random"
+                            || &name.name == "Signature"
+                            || &name.name == "Util"
+                        {
+                            check_and_push_diagnostic(
+                                checker,
+                                DiagnosticKind::from(SuspiciousPycryptoImport),
+                                identifier.range(),
+                            );
+                        }
+                    }
+                }
+                "Crypto.Cipher" | "Crypto.Hash" | "Crypto.IO" | "Crypto.Protocol"
+                | "Crypto.PublicKey" | "Crypto.Random" | "Crypto.Signature" | "Crypto.Util" => {
+                    check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousPycryptoImport),
+                        identifier.range(),
+                    );
+                }
                 "pyghmi" => check_and_push_diagnostic(
                     checker,
                     DiagnosticKind::from(SuspiciousPyghmiImport),

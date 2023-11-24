@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S406.py:1:6: S406 `xml.sax` methods are vulnerable to XML attacks
+  |
+1 | from xml import sax  # S406
+  |      ^^^ S406
+2 | import xml.sax as xmls  # S406
+3 | import xml.sax  # S406
+  |
+
+S406.py:2:8: S406 `xml.sax` methods are vulnerable to XML attacks
+  |
+1 | from xml import sax  # S406
+2 | import xml.sax as xmls  # S406
+  |        ^^^^^^^^^^^^^^^ S406
+3 | import xml.sax  # S406
+  |
+
+S406.py:3:8: S406 `xml.sax` methods are vulnerable to XML attacks
+  |
+1 | from xml import sax  # S406
+2 | import xml.sax as xmls  # S406
+3 | import xml.sax  # S406
+  |        ^^^^^^^ S406
+  |
+
+
