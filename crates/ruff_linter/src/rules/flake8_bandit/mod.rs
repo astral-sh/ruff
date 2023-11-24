@@ -45,6 +45,7 @@ mod tests {
     #[test_case(Rule::SuspiciousEvalUsage, Path::new("S307.py"))]
     #[test_case(Rule::SuspiciousURLOpenUsage, Path::new("S310.py"))]
     #[test_case(Rule::SuspiciousTelnetUsage, Path::new("S312.py"))]
+    #[test_case(Rule::SuspiciousTelnetlibImport, Path::new("S401.py"))]
     #[test_case(Rule::TryExceptContinue, Path::new("S112.py"))]
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"))]
     #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"))]

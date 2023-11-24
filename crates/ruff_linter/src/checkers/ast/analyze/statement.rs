@@ -552,6 +552,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::DeprecatedMockImport) {
                 pyupgrade::rules::deprecated_mock_import(checker, stmt);
             }
+            if checker.enabled(Rule::SuspiciousTelnetlibImport) {
+                flake8_bandit::rules::suspicious_imports(checker, stmt)
+            }
 
             for alias in names {
                 if checker.enabled(Rule::NonAsciiImportName) {
@@ -750,6 +753,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if let Some(module) = module {
                     pyupgrade::rules::unnecessary_builtin_import(checker, stmt, module, names);
                 }
+            }
+            if checker.enabled(Rule::SuspiciousTelnetlibImport) {
+                flake8_bandit::rules::suspicious_imports(checker, stmt)
             }
             if checker.enabled(Rule::BannedApi) {
                 if let Some(module) =
