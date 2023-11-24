@@ -315,7 +315,6 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// Use instead:
 /// ```python
 /// def outer():
-///
 ///     def inner():
 ///         pass
 ///
@@ -535,8 +534,8 @@ pub(crate) fn blank_lines(
                 && !tracked_vars.follows_decorator
                 // The class's docstring can directly precede the first function.
                 && !tracked_vars.follows_docstring
-                // Do not trigger when the def/class follows an "indenting token" (if/while/etc...), unless that "indenting token" is a def.
-                && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level || tracked_vars.follows_def)
+                // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
+                && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
                 // Allow groups of one-liners.
                 && !(tracked_vars.follows_def
                      && line

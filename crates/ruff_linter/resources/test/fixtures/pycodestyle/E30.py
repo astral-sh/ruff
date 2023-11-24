@@ -349,6 +349,13 @@ except:
 # end
 
 
+# no error
+def f():
+    def f():
+        pass
+# end
+
+
 # E301
 class Class(object):
 
@@ -652,13 +659,6 @@ def foo():
 def foo():
     def bar(): pass
     def baz():
-        pass
-# end
-
-
-# E306
-def f():
-    def f():
         pass
 # end
 
