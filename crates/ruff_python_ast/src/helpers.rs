@@ -133,9 +133,11 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         return true;
     }
     match expr {
-        Expr::BoolOp(ast::ExprBoolOp { values, .. })
-        | Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
+        }
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            value.elements().any(|expr| any_over_expr(expr, func))
         }
         Expr::NamedExpr(ast::ExprNamedExpr {
             target,
@@ -1139,11 +1141,14 @@ impl Truthiness {
             }
             Expr::NoneLiteral(_) => Self::Falsey,
             Expr::EllipsisLiteral(_) => Self::Truthy,
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                if values.is_empty() {
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                if value.parts().all(|part| match part {
+                    ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
+                    ast::FStringPart::FString(f_string) => f_string.values.is_empty(),
+                }) {
                     Self::Falsey
-                } else if values.iter().any(|value| {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &value {
+                } else if value.elements().any(|expr| {
+                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &expr {
                         !value.is_empty()
                     } else {
                         false

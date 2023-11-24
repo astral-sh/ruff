@@ -111,7 +111,6 @@ impl<'a> TypingTarget<'a> {
             Expr::StringLiteral(ast::ExprStringLiteral {
                 value: string,
                 range,
-                ..
             }) => parse_type_annotation(string, *range, locator.contents())
                 .map_or(None, |(expr, _)| Some(TypingTarget::ForwardReference(expr))),
             _ => semantic.resolve_call_path(expr).map_or(

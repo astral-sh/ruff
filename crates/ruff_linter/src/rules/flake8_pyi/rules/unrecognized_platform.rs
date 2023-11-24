@@ -130,7 +130,7 @@ pub(crate) fn unrecognized_platform(checker: &mut Checker, test: &Expr) {
             if !matches!(value.as_str(), "linux" | "win32" | "cygwin" | "darwin") {
                 checker.diagnostics.push(Diagnostic::new(
                     UnrecognizedPlatformName {
-                        platform: value.clone(),
+                        platform: value.to_string(),
                     },
                     right.range(),
                 ));

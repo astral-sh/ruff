@@ -9,49 +9,81 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..16,
-                    values: [
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 2..15,
-                                value: Name(
-                                    ExprName {
-                                        range: 3..6,
-                                        id: "foo",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: Some(
-                                    FString(
-                                        ExprFString {
-                                            range: 7..14,
-                                            values: [
-                                                FormattedValue(
-                                                    ExprFormattedValue {
-                                                        range: 7..14,
-                                                        value: StringLiteral(
-                                                            ExprStringLiteral {
-                                                                range: 8..13,
-                                                                value: "",
-                                                                unicode: false,
-                                                                implicit_concatenated: true,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..16,
+                                    values: [
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 2..15,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 3..6,
+                                                        id: "foo",
+                                                        ctx: Load,
                                                     },
                                                 ),
-                                            ],
-                                            implicit_concatenated: false,
-                                        },
-                                    ),
-                                ),
-                            },
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: Some(
+                                                    FString(
+                                                        ExprFString {
+                                                            range: 7..14,
+                                                            value: FStringValue {
+                                                                inner: Single(
+                                                                    FString(
+                                                                        FString {
+                                                                            range: 7..14,
+                                                                            values: [
+                                                                                FormattedValue(
+                                                                                    ExprFormattedValue {
+                                                                                        range: 7..14,
+                                                                                        value: StringLiteral(
+                                                                                            ExprStringLiteral {
+                                                                                                range: 8..13,
+                                                                                                value: StringLiteralValue {
+                                                                                                    inner: Concatenated(
+                                                                                                        ConcatenatedStringLiteral {
+                                                                                                            strings: [
+                                                                                                                StringLiteral {
+                                                                                                                    range: 8..10,
+                                                                                                                    value: "",
+                                                                                                                    unicode: false,
+                                                                                                                },
+                                                                                                                StringLiteral {
+                                                                                                                    range: 11..13,
+                                                                                                                    value: "",
+                                                                                                                    unicode: false,
+                                                                                                                },
+                                                                                                            ],
+                                                                                                            value: "",
+                                                                                                        },
+                                                                                                    ),
+                                                                                                },
+                                                                                            },
+                                                                                        ),
+                                                                                        debug_text: None,
+                                                                                        conversion: None,
+                                                                                        format_spec: None,
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                        },
+                                                                    ),
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
                         ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

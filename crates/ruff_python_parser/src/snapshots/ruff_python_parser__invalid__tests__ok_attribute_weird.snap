@@ -14,9 +14,15 @@ Ok(
                             value: StringLiteral(
                                 ExprStringLiteral {
                                     range: 0..5,
-                                    value: "foo",
-                                    unicode: false,
-                                    implicit_concatenated: false,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 0..5,
+                                                value: "foo",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                             attr: Identifier {

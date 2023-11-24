@@ -988,15 +988,22 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 pylint::rules::await_outside_async(checker, expr);
             }
         }
-        Expr::FString(fstring @ ast::ExprFString { values, .. }) => {
+        Expr::FString(f_string_expr @ ast::ExprFString { value, .. }) => {
             if checker.enabled(Rule::FStringMissingPlaceholders) {
-                pyflakes::rules::f_string_missing_placeholders(fstring, checker);
+                pyflakes::rules::f_string_missing_placeholders(checker, f_string_expr);
+            }
+            if checker.enabled(Rule::ExplicitFStringTypeConversion) {
+                for f_string in value.f_strings() {
+                    ruff::rules::explicit_f_string_type_conversion(checker, f_string);
+                }
             }
             if checker.enabled(Rule::HardcodedSQLExpression) {
                 flake8_bandit::rules::hardcoded_sql_expression(checker, expr);
             }
-            if checker.enabled(Rule::ExplicitFStringTypeConversion) {
-                ruff::rules::explicit_f_string_type_conversion(checker, expr, values);
+            if checker.enabled(Rule::UnicodeKindPrefix) {
+                for string_literal in value.literals() {
+                    pyupgrade::rules::unicode_kind_prefix(checker, string_literal);
+                }
             }
         }
         Expr::BinOp(ast::ExprBinOp {
@@ -1277,6 +1284,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::HardcodedTempFile) {
                 flake8_bandit::rules::hardcoded_tmp_directory(checker, string);
+            }
+            if checker.enabled(Rule::UnicodeKindPrefix) {
+                for string_part in string.value.parts() {
+                    pyupgrade::rules::unicode_kind_prefix(checker, string_part);
+                }
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StringOrBytesTooLong) {

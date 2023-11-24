@@ -244,14 +244,10 @@ fn match_open_keywords(
 
 /// Match open mode to see if it is supported.
 fn match_open_mode(mode: &Expr) -> Option<ReadMode> {
-    let ast::ExprStringLiteral {
-        value,
-        implicit_concatenated: false,
-        ..
-    } = mode.as_string_literal_expr()?
-    else {
+    let ast::ExprStringLiteral { value, .. } = mode.as_string_literal_expr()?;
+    if value.is_implicit_concatenated() {
         return None;
-    };
+    }
     match value.as_str() {
         "r" => Some(ReadMode::Text),
         "rb" => Some(ReadMode::Bytes),

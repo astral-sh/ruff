@@ -7,9 +7,9 @@ use crate::lexer::{LexicalError, LexicalErrorType};
 use crate::token::{StringKind, Tok};
 
 pub(crate) enum StringType {
-    Str(ast::ExprStringLiteral),
-    Bytes(ast::ExprBytesLiteral),
-    FString(ast::ExprFString),
+    Str(ast::StringLiteral),
+    Bytes(ast::BytesLiteral),
+    FString(ast::FString),
 }
 
 impl Ranged for StringType {
@@ -22,11 +22,12 @@ impl Ranged for StringType {
     }
 }
 
-impl StringType {
-    fn is_unicode(&self) -> bool {
-        match self {
-            Self::Str(ast::ExprStringLiteral { unicode, .. }) => *unicode,
-            _ => false,
+impl From<StringType> for Expr {
+    fn from(string: StringType) -> Self {
+        match string {
+            StringType::Str(node) => Expr::from(node),
+            StringType::Bytes(node) => Expr::from(node),
+            StringType::FString(node) => Expr::from(node),
         }
     }
 }
@@ -35,14 +36,16 @@ struct StringParser<'a> {
     rest: &'a str,
     kind: StringKind,
     location: TextSize,
+    range: TextRange,
 }
 
 impl<'a> StringParser<'a> {
-    fn new(source: &'a str, kind: StringKind, start: TextSize) -> Self {
+    fn new(source: &'a str, kind: StringKind, start: TextSize, range: TextRange) -> Self {
         Self {
             rest: source,
             kind,
             location: start,
+            range,
         }
     }
 
@@ -57,11 +60,6 @@ impl<'a> StringParser<'a> {
     #[inline]
     fn get_pos(&self) -> TextSize {
         self.location
-    }
-
-    #[inline]
-    fn range(&self, start_location: TextSize) -> TextRange {
-        TextRange::new(start_location, self.location)
     }
 
     /// Returns the next byte in the string, if there is one.
@@ -208,7 +206,6 @@ impl<'a> StringParser<'a> {
 
     fn parse_fstring_middle(&mut self) -> Result<Expr, LexicalError> {
         let mut value = String::new();
-        let start_location = self.get_pos();
         while let Some(ch) = self.next_char() {
             match ch {
                 // We can encounter a `\` as the last character in a `FStringMiddle`
@@ -244,17 +241,15 @@ impl<'a> StringParser<'a> {
                 ch => value.push(ch),
             }
         }
-        Ok(Expr::from(ast::ExprStringLiteral {
+        Ok(Expr::from(ast::StringLiteral {
             value,
             unicode: false,
-            implicit_concatenated: false,
-            range: self.range(start_location),
+            range: self.range,
         }))
     }
 
     fn parse_bytes(&mut self) -> Result<StringType, LexicalError> {
         let mut content = String::new();
-        let start_location = self.get_pos();
         while let Some(ch) = self.next_char() {
             match ch {
                 '\\' if !self.kind.is_raw() => {
@@ -274,15 +269,13 @@ impl<'a> StringParser<'a> {
             }
         }
 
-        Ok(StringType::Bytes(ast::ExprBytesLiteral {
+        Ok(StringType::Bytes(ast::BytesLiteral {
             value: content.chars().map(|c| c as u8).collect::<Vec<u8>>(),
-            implicit_concatenated: false,
-            range: self.range(start_location),
+            range: self.range,
         }))
     }
 
     fn parse_string(&mut self) -> Result<StringType, LexicalError> {
-        let start_location = self.get_pos();
         let mut value = String::new();
 
         if self.kind.is_raw() {
@@ -301,11 +294,10 @@ impl<'a> StringParser<'a> {
                 self.parse_escaped_char(&mut value)?;
             }
         }
-        Ok(StringType::Str(ast::ExprStringLiteral {
+        Ok(StringType::Str(ast::StringLiteral {
             value,
             unicode: self.kind.is_unicode(),
-            implicit_concatenated: false,
-            range: self.range(start_location),
+            range: self.range,
         }))
     }
 
@@ -322,38 +314,37 @@ pub(crate) fn parse_string_literal(
     source: &str,
     kind: StringKind,
     triple_quoted: bool,
-    start_location: TextSize,
+    range: TextRange,
 ) -> Result<StringType, LexicalError> {
-    let start_location = start_location
+    let start_location = range.start()
         + kind.prefix_len()
         + if triple_quoted {
             TextSize::from(3)
         } else {
             TextSize::from(1)
         };
-    StringParser::new(source, kind, start_location).parse()
+    StringParser::new(source, kind, start_location, range).parse()
 }
 
 pub(crate) fn parse_fstring_middle(
     source: &str,
     is_raw: bool,
-    start_location: TextSize,
+    range: TextRange,
 ) -> Result<Expr, LexicalError> {
     let kind = if is_raw {
         StringKind::RawString
     } else {
         StringKind::String
     };
-    StringParser::new(source, kind, start_location).parse_fstring_middle()
+    StringParser::new(source, kind, range.start(), range).parse_fstring_middle()
 }
 
-/// Concatenate a list of string literals into a single string expression.
-pub(crate) fn concatenate_strings(
+pub(crate) fn concatenated_strings(
     strings: Vec<StringType>,
     range: TextRange,
 ) -> Result<Expr, LexicalError> {
     #[cfg(debug_assertions)]
-    debug_assert!(!strings.is_empty());
+    debug_assert!(strings.len() > 1);
 
     let mut has_fstring = false;
     let mut byte_literal_count = 0;
@@ -365,7 +356,6 @@ pub(crate) fn concatenate_strings(
         }
     }
     let has_bytes = byte_literal_count > 0;
-    let implicit_concatenated = strings.len() > 1;
 
     if has_bytes && byte_literal_count < strings.len() {
         return Err(LexicalError {
@@ -377,111 +367,44 @@ pub(crate) fn concatenate_strings(
     }
 
     if has_bytes {
-        let mut content: Vec<u8> = vec![];
+        let mut values = Vec::with_capacity(strings.len());
         for string in strings {
             match string {
-                StringType::Bytes(ast::ExprBytesLiteral { value, .. }) => content.extend(value),
+                StringType::Bytes(value) => values.push(value),
                 _ => unreachable!("Unexpected non-bytes literal."),
             }
         }
-        return Ok(ast::ExprBytesLiteral {
-            value: content,
-            implicit_concatenated,
+        return Ok(Expr::from(ast::ExprBytesLiteral {
+            value: ast::BytesLiteralValue::concatenated(values),
             range,
-        }
-        .into());
+        }));
     }
 
     if !has_fstring {
-        let mut content = String::new();
-        let is_unicode = strings.first().map_or(false, StringType::is_unicode);
+        let mut values = Vec::with_capacity(strings.len());
         for string in strings {
             match string {
-                StringType::Str(ast::ExprStringLiteral { value, .. }) => content.push_str(&value),
+                StringType::Str(value) => values.push(value),
                 _ => unreachable!("Unexpected non-string literal."),
             }
         }
-        return Ok(ast::ExprStringLiteral {
-            value: content,
-            unicode: is_unicode,
-            implicit_concatenated,
+        return Ok(Expr::from(ast::ExprStringLiteral {
+            value: ast::StringLiteralValue::concatenated(values),
             range,
-        }
-        .into());
+        }));
     }
 
-    // De-duplicate adjacent constants.
-    let mut deduped: Vec<Expr> = vec![];
-    let mut current = String::new();
-    let mut current_start = range.start();
-    let mut current_end = range.end();
-    let mut is_unicode = false;
-
-    let take_current = |current: &mut String, start, end, unicode| -> Expr {
-        Expr::StringLiteral(ast::ExprStringLiteral {
-            value: std::mem::take(current),
-            unicode,
-            implicit_concatenated,
-            range: TextRange::new(start, end),
-        })
-    };
-
+    let mut parts = Vec::with_capacity(strings.len());
     for string in strings {
-        let string_range = string.range();
         match string {
-            StringType::FString(ast::ExprFString { values, .. }) => {
-                for value in values {
-                    let value_range = value.range();
-                    match value {
-                        Expr::FormattedValue { .. } => {
-                            if !current.is_empty() {
-                                deduped.push(take_current(
-                                    &mut current,
-                                    current_start,
-                                    current_end,
-                                    is_unicode,
-                                ));
-                            }
-                            deduped.push(value);
-                            is_unicode = false;
-                        }
-                        Expr::StringLiteral(ast::ExprStringLiteral { value, unicode, .. }) => {
-                            if current.is_empty() {
-                                is_unicode |= unicode;
-                                current_start = value_range.start();
-                            }
-                            current_end = value_range.end();
-                            current.push_str(&value);
-                        }
-                        _ => {
-                            unreachable!("Expected `Expr::FormattedValue` or `Expr::StringLiteral`")
-                        }
-                    }
-                }
-            }
-            StringType::Str(ast::ExprStringLiteral { value, unicode, .. }) => {
-                if current.is_empty() {
-                    is_unicode |= unicode;
-                    current_start = string_range.start();
-                }
-                current_end = string_range.end();
-                current.push_str(&value);
-            }
+            StringType::FString(fstring) => parts.push(ast::FStringPart::FString(fstring)),
+            StringType::Str(string) => parts.push(ast::FStringPart::Literal(string)),
             StringType::Bytes(_) => unreachable!("Unexpected bytes literal."),
         }
     }
-    if !current.is_empty() {
-        deduped.push(take_current(
-            &mut current,
-            current_start,
-            current_end,
-            is_unicode,
-        ));
-    }
 
     Ok(ast::ExprFString {
-        values: deduped,
-        implicit_concatenated,
+        value: ast::FStringValue::concatenated(parts),
         range,
     }
     .into())

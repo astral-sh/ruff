@@ -15,9 +15,9 @@ fn to_formatted_value_expr(inner: &Expr) -> Expr {
 
 /// Convert a string to a constant string expression.
 pub(super) fn to_constant_string(s: &str) -> Expr {
-    let node = ast::ExprStringLiteral {
-        value: s.to_owned(),
-        ..ast::ExprStringLiteral::default()
+    let node = ast::StringLiteral {
+        value: s.to_string(),
+        ..ast::StringLiteral::default()
     };
     node.into()
 }

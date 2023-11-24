@@ -62,7 +62,7 @@ fn is_static_length(elts: &[Expr]) -> bool {
 fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
-        let node = ast::ExprStringLiteral {
+        let node = ast::StringLiteral {
             value: joinees
                 .iter()
                 .filter_map(|expr| {
@@ -73,9 +73,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
                     }
                 })
                 .join(joiner),
-            unicode: false,
-            implicit_concatenated: false,
-            range: TextRange::default(),
+            ..ast::StringLiteral::default()
         };
         return Some(node.into());
     }
@@ -95,9 +93,8 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
         fstring_elems.push(helpers::to_f_string_element(expr)?);
     }
 
-    let node = ast::ExprFString {
+    let node = ast::FString {
         values: fstring_elems,
-        implicit_concatenated: false,
         range: TextRange::default(),
     };
     Some(node.into())

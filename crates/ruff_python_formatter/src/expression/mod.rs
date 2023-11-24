@@ -804,18 +804,17 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
-            Expr::StringLiteral(ast::ExprStringLiteral {
-                implicit_concatenated: true,
-                ..
-            })
-            | Expr::BytesLiteral(ast::ExprBytesLiteral {
-                implicit_concatenated: true,
-                ..
-            })
-            | Expr::FString(ast::ExprFString {
-                implicit_concatenated: true,
-                ..
-            }) => {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                if value.is_implicit_concatenated() =>
+            {
+                self.update_max_precedence(OperatorPrecedence::String);
+            }
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
+                if value.is_implicit_concatenated() =>
+            {
+                self.update_max_precedence(OperatorPrecedence::String);
+            }
+            Expr::FString(ast::ExprFString { value, .. }) if value.is_implicit_concatenated() => {
                 self.update_max_precedence(OperatorPrecedence::String);
             }
 

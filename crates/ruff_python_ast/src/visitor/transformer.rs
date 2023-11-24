@@ -1,8 +1,8 @@
 use crate::{
-    self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
-    PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp,
-    WithItem,
+    self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
+    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, Keyword, MatchCase, Operator,
+    Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, StringLiteral,
+    TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for transforming ASTs. Visits all nodes in the AST recursively in evaluation-order.
@@ -84,6 +84,15 @@ pub trait Transformer {
     }
     fn visit_elif_else_clause(&self, elif_else_clause: &mut ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
+    }
+    fn visit_f_string(&self, f_string: &mut FString) {
+        walk_f_string(self, f_string);
+    }
+    fn visit_string_literal(&self, string_literal: &mut StringLiteral) {
+        walk_string_literal(self, string_literal);
+    }
+    fn visit_bytes_literal(&self, bytes_literal: &mut BytesLiteral) {
+        walk_bytes_literal(self, bytes_literal);
     }
 }
 
@@ -462,14 +471,29 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
                 visitor.visit_format_spec(expr);
             }
         }
-        Expr::FString(ast::ExprFString { values, .. }) => {
-            for expr in values {
-                visitor.visit_expr(expr);
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            for f_string_part in value.parts_mut() {
+                match f_string_part {
+                    ast::FStringPart::Literal(string_literal) => {
+                        visitor.visit_string_literal(string_literal);
+                    }
+                    ast::FStringPart::FString(f_string) => {
+                        visitor.visit_f_string(f_string);
+                    }
+                }
             }
         }
-        Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            for string_literal in value.parts_mut() {
+                visitor.visit_string_literal(string_literal);
+            }
+        }
+        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+            for bytes_literal in value.parts_mut() {
+                visitor.visit_bytes_literal(bytes_literal);
+            }
+        }
+        Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_) => {}
@@ -557,6 +581,12 @@ pub fn walk_except_handler<V: Transformer + ?Sized>(
             }
             visitor.visit_body(body);
         }
+    }
+}
+
+pub fn walk_f_string<V: Transformer + ?Sized>(visitor: &V, f_string: &mut FString) {
+    for expr in &mut f_string.values {
+        visitor.visit_expr(expr);
     }
 }
 
@@ -730,3 +760,13 @@ pub fn walk_cmp_op<V: Transformer + ?Sized>(visitor: &V, cmp_op: &mut CmpOp) {}
 
 #[allow(unused_variables)]
 pub fn walk_alias<V: Transformer + ?Sized>(visitor: &V, alias: &mut Alias) {}
+
+#[allow(unused_variables)]
+pub fn walk_string_literal<V: Transformer + ?Sized>(
+    visitor: &V,
+    string_literal: &mut StringLiteral,
+) {
+}
+
+#[allow(unused_variables)]
+pub fn walk_bytes_literal<V: Transformer + ?Sized>(visitor: &V, bytes_literal: &mut BytesLiteral) {}

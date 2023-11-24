@@ -51,20 +51,16 @@ impl Transformer for Normalizer {
         transformer::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&self, expr: &mut Expr) {
-        if let Expr::StringLiteral(string_literal) = expr {
-            // Normalize a string by (1) stripping any leading and trailing space from each
-            // line, and (2) removing any blank lines from the start and end of the string.
-            string_literal.value = string_literal
-                .value
-                .lines()
-                .map(str::trim)
-                .collect::<Vec<_>>()
-                .join("\n")
-                .trim()
-                .to_owned();
-        }
-
-        transformer::walk_expr(self, expr);
+    fn visit_string_literal(&self, string_literal: &mut ast::StringLiteral) {
+        // Normalize a string by (1) stripping any leading and trailing space from each
+        // line, and (2) removing any blank lines from the start and end of the string.
+        string_literal.value = string_literal
+            .value
+            .lines()
+            .map(str::trim)
+            .collect::<Vec<_>>()
+            .join("\n")
+            .trim()
+            .to_owned();
     }
 }

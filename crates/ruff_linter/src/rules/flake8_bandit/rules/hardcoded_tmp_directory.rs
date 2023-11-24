@@ -76,7 +76,7 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: &ast::ExprS
 
     checker.diagnostics.push(Diagnostic::new(
         HardcodedTempFile {
-            string: string.value.clone(),
+            string: string.value.to_string(),
         },
         string.range,
     ));

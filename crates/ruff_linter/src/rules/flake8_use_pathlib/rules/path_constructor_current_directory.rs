@@ -65,7 +65,7 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
         return;
     }
 
-    let [Expr::StringLiteral(ast::ExprStringLiteral { value, range, .. })] = args.as_slice() else {
+    let [Expr::StringLiteral(ast::ExprStringLiteral { value, range })] = args.as_slice() else {
         return;
     };
 

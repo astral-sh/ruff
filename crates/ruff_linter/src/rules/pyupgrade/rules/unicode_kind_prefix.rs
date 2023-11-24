@@ -1,10 +1,9 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-
-use ruff_python_parser::lexer::LexResult;
-use ruff_python_parser::{StringKind, Tok};
-
+use ruff_python_ast::StringLiteral;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for uses of the Unicode kind prefix (`u`) in strings.
@@ -40,19 +39,13 @@ impl AlwaysFixableViolation for UnicodeKindPrefix {
 }
 
 /// UP025
-pub(crate) fn unicode_kind_prefix(diagnostics: &mut Vec<Diagnostic>, tokens: &[LexResult]) {
-    for (token, range) in tokens.iter().flatten() {
-        if let Tok::String {
-            kind: StringKind::Unicode,
-            ..
-        } = token
-        {
-            let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, *range);
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
-                range.start(),
-                TextSize::from(1),
-            ))));
-            diagnostics.push(diagnostic);
-        }
+pub(crate) fn unicode_kind_prefix(checker: &mut Checker, string: &StringLiteral) {
+    if string.unicode {
+        let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, string.range);
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
+            string.start(),
+            TextSize::from(1),
+        ))));
+        checker.diagnostics.push(diagnostic);
     }
 }

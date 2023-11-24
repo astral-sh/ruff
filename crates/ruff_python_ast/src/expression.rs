@@ -361,3 +361,44 @@ impl Ranged for LiteralExpressionRef<'_> {
         }
     }
 }
+
+impl<'a> From<LiteralExpressionRef<'a>> for AnyNodeRef<'a> {
+    fn from(value: LiteralExpressionRef<'a>) -> Self {
+        match value {
+            LiteralExpressionRef::StringLiteral(expression) => {
+                AnyNodeRef::ExprStringLiteral(expression)
+            }
+            LiteralExpressionRef::BytesLiteral(expression) => {
+                AnyNodeRef::ExprBytesLiteral(expression)
+            }
+            LiteralExpressionRef::NumberLiteral(expression) => {
+                AnyNodeRef::ExprNumberLiteral(expression)
+            }
+            LiteralExpressionRef::BooleanLiteral(expression) => {
+                AnyNodeRef::ExprBooleanLiteral(expression)
+            }
+            LiteralExpressionRef::NoneLiteral(expression) => {
+                AnyNodeRef::ExprNoneLiteral(expression)
+            }
+            LiteralExpressionRef::EllipsisLiteral(expression) => {
+                AnyNodeRef::ExprEllipsisLiteral(expression)
+            }
+        }
+    }
+}
+
+impl LiteralExpressionRef<'_> {
+    /// Returns `true` if the literal is either a string or bytes literal that
+    /// is implicitly concatenated.
+    pub fn is_implicit_concatenated(&self) -> bool {
+        match self {
+            LiteralExpressionRef::StringLiteral(expression) => {
+                expression.value.is_implicit_concatenated()
+            }
+            LiteralExpressionRef::BytesLiteral(expression) => {
+                expression.value.is_implicit_concatenated()
+            }
+            _ => false,
+        }
+    }
+}
