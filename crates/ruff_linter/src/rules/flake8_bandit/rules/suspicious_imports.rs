@@ -3,11 +3,10 @@
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html>
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::codes::Rule::SuspiciousFTPLibUsage;
 use crate::registry::AsRule;
 
 // TODO: Docs
@@ -157,25 +156,100 @@ impl Violation for SuspiciousPyghmiImport {
 /// S401, S402, S403, S404, S405, S406, S407, S408, S409, S410, S411, S412, S413
 pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
     match stmt {
-        Stmt::Import(ast::StmtImport { names, ..}) => {
+        Stmt::Import(ast::StmtImport { names, .. }) => {
             for name in names {
                 match name.name.as_str() {
-                    "telnetlib" => {
-                        checker.diagnostics.push(Diagnostic::new(SuspiciousTelnetlibImport, name.range))
-                    },
+                    "telnetlib" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousTelnetlibImport),
+                        name.range,
+                    ),
+                    "ftplib" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousFtplibImport),
+                        name.range,
+                    ),
+                    "pickle" | "cPickle" | "dill" | "shelve" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousPickleImport),
+                        name.range,
+                    ),
+                    "subprocess" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousSubprocessImport),
+                        name.range,
+                    ),
+                    "lxml" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousLxmlImport),
+                        name.range,
+                    ),
+                    "xmlrpc" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousXmlrpclibImport),
+                        name.range,
+                    ),
+                    "pyghmi" => check_and_push_diagnostic(
+                        checker,
+                        DiagnosticKind::from(SuspiciousPyghmiImport),
+                        name.range,
+                    ),
                     _ => {}
                 }
             }
-        },
+        }
         Stmt::ImportFrom(ast::StmtImportFrom { module, .. }) => {
             let Some(identifier) = module else { return };
             match identifier.as_str() {
-                "telnetlib" => {
-                    checker.diagnostics.push(Diagnostic::new(SuspiciousTelnetlibImport, identifier.range()))
-                },
+                "telnetlib" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousTelnetlibImport),
+                    identifier.range(),
+                ),
+                "ftplib" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousFtplibImport),
+                    identifier.range(),
+                ),
+                "pickle" | "cPickle" | "dill" | "shelve" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousPickleImport),
+                    identifier.range(),
+                ),
+                "subprocess" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousSubprocessImport),
+                    identifier.range(),
+                ),
+                "lxml" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousLxmlImport),
+                    identifier.range(),
+                ),
+                "xmlrpc" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousXmlrpclibImport),
+                    identifier.range(),
+                ),
+                "pyghmi" => check_and_push_diagnostic(
+                    checker,
+                    DiagnosticKind::from(SuspiciousPyghmiImport),
+                    identifier.range(),
+                ),
                 _ => {}
             }
-        },
+        }
         _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),
     };
+}
+
+fn check_and_push_diagnostic(
+    checker: &mut Checker,
+    diagnostic_kind: DiagnosticKind,
+    range: TextRange,
+) {
+    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, range);
+    if checker.enabled(diagnostic.kind.rule()) {
+        checker.diagnostics.push(diagnostic);
+    }
 }

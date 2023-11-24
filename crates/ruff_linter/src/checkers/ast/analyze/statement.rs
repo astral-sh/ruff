@@ -552,8 +552,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::DeprecatedMockImport) {
                 pyupgrade::rules::deprecated_mock_import(checker, stmt);
             }
-            if checker.enabled(Rule::SuspiciousTelnetlibImport) {
-                flake8_bandit::rules::suspicious_imports(checker, stmt)
+            if checker.any_enabled(&[
+                Rule::SuspiciousTelnetlibImport,
+                Rule::SuspiciousFtplibImport,
+                Rule::SuspiciousPickleImport,
+                Rule::SuspiciousSubprocessImport,
+                Rule::SuspiciousLxmlImport,
+                Rule::SuspiciousXmlrpclibImport,
+                Rule::SuspiciousPyghmiImport,
+            ]) {
+                flake8_bandit::rules::suspicious_imports(checker, stmt);
             }
 
             for alias in names {
@@ -754,8 +762,16 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     pyupgrade::rules::unnecessary_builtin_import(checker, stmt, module, names);
                 }
             }
-            if checker.enabled(Rule::SuspiciousTelnetlibImport) {
-                flake8_bandit::rules::suspicious_imports(checker, stmt)
+            if checker.any_enabled(&[
+                Rule::SuspiciousTelnetlibImport,
+                Rule::SuspiciousFtplibImport,
+                Rule::SuspiciousPickleImport,
+                Rule::SuspiciousSubprocessImport,
+                Rule::SuspiciousLxmlImport,
+                Rule::SuspiciousXmlrpclibImport,
+                Rule::SuspiciousPyghmiImport,
+            ]) {
+                flake8_bandit::rules::suspicious_imports(checker, stmt);
             }
             if checker.enabled(Rule::BannedApi) {
                 if let Some(module) =
