@@ -550,7 +550,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
                 visitor.visit_expr(expr);
             }
         }
-        Expr::IpyEscapeCommand(_) => {}
+        Expr::IpyEscapeCommand(_) | Expr::Invalid(_) => {}
     }
 }
 
@@ -703,6 +703,7 @@ pub fn walk_pattern<V: Transformer + ?Sized>(visitor: &V, pattern: &mut Pattern)
                 visitor.visit_pattern(pattern);
             }
         }
+        Pattern::Invalid(_) => {}
     }
 }
 

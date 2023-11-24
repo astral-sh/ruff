@@ -73,6 +73,7 @@ pub(crate) fn assignment_target(target: &Expr) -> Result<(), LexicalError> {
         // parser prevents this from ever appearing as an assignment target
         // anyway. ---AG
         IpyEscapeCommand(ref e) => Err(err(e.range.start())),
+        Invalid(ref e) => Err(err(e.range.start())),
         // The only nested expressions allowed as an assignment target
         // are star exprs, lists and tuples.
         Starred(ref e) => assignment_target(&e.value),

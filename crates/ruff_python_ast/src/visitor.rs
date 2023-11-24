@@ -562,6 +562,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             }
         }
         Expr::IpyEscapeCommand(_) => {}
+        Expr::Invalid(_) => {}
     }
 }
 
@@ -717,6 +718,7 @@ pub fn walk_pattern<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, pattern: &'a P
                 visitor.visit_pattern(pattern);
             }
         }
+        Pattern::Invalid(_) => {}
     }
 }
 

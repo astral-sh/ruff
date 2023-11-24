@@ -257,7 +257,8 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
-        | Expr::IpyEscapeCommand(_) => false,
+        | Expr::IpyEscapeCommand(_)
+        | Expr::Invalid(_) => false,
     }
 }
 
@@ -276,7 +277,7 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
         Pattern::MatchValue(ast::PatternMatchValue { value, range: _ }) => {
             any_over_expr(value, func)
         }
-        Pattern::MatchSingleton(_) => false,
+        Pattern::MatchSingleton(_) | Pattern::Invalid(_) => false,
         Pattern::MatchSequence(ast::PatternMatchSequence { patterns, range: _ }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
@@ -1579,7 +1580,7 @@ mod tests {
     fn any_over_stmt_type_alias() {
         let seen = RefCell::new(Vec::new());
         let name = Expr::Name(ExprName {
-            id: "x".to_string(),
+            id: "x".into(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         });

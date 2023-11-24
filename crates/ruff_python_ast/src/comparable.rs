@@ -234,6 +234,7 @@ pub enum ComparablePattern<'a> {
     MatchStar(PatternMatchStar<'a>),
     MatchAs(PatternMatchAs<'a>),
     MatchOr(PatternMatchOr<'a>),
+    Invalid,
 }
 
 impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
@@ -286,6 +287,7 @@ impl<'a> From<&'a ast::Pattern> for ComparablePattern<'a> {
                     patterns: patterns.iter().map(Into::into).collect(),
                 })
             }
+            ast::Pattern::Invalid(_) => Self::Invalid,
         }
     }
 }
@@ -864,6 +866,7 @@ pub enum ComparableExpr<'a> {
     Tuple(ExprTuple<'a>),
     Slice(ExprSlice<'a>),
     IpyEscapeCommand(ExprIpyEscapeCommand<'a>),
+    Invalid,
 }
 
 impl<'a> From<&'a Box<ast::Expr>> for Box<ComparableExpr<'a>> {
@@ -1093,6 +1096,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 kind: *kind,
                 value: value.as_str(),
             }),
+            ast::Expr::Invalid(_) => Self::Invalid,
         }
     }
 }

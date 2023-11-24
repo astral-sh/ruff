@@ -304,6 +304,7 @@ where
             Expr::Tuple(expr) => expr.visit_preorder(visitor),
             Expr::Slice(expr) => expr.visit_preorder(visitor),
             Expr::IpyEscapeCommand(expr) => expr.visit_preorder(visitor),
+            Expr::Invalid(_) => {}
         }
     }
 
@@ -485,6 +486,7 @@ where
             Pattern::MatchStar(pattern) => pattern.visit_preorder(visitor),
             Pattern::MatchAs(pattern) => pattern.visit_preorder(visitor),
             Pattern::MatchOr(pattern) => pattern.visit_preorder(visitor),
+            Pattern::Invalid(_) => {}
         }
     }
     visitor.leave_node(node);

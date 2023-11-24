@@ -9,8 +9,6 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::slice::{Iter, IterMut};
 
-use itertools::Itertools;
-
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{int, LiteralExpressionRef};
@@ -625,6 +623,9 @@ pub enum Expr {
     // Jupyter notebook specific
     #[is(name = "ipy_escape_command_expr")]
     IpyEscapeCommand(ExprIpyEscapeCommand),
+
+    #[is(name = "invalid_expr")]
+    Invalid(ExprInvalid),
 }
 
 impl Expr {
@@ -655,6 +656,24 @@ impl Expr {
             Expr::EllipsisLiteral(expr) => Some(LiteralExpressionRef::EllipsisLiteral(expr)),
             _ => None,
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprInvalid {
+    pub value: String,
+    pub range: TextRange,
+}
+
+impl From<ExprInvalid> for Expr {
+    fn from(payload: ExprInvalid) -> Self {
+        Expr::Invalid(payload)
+    }
+}
+
+impl Ranged for ExprInvalid {
+    fn range(&self) -> TextRange {
+        self.range
     }
 }
 
@@ -2644,6 +2663,7 @@ pub enum Pattern {
     MatchStar(PatternMatchStar),
     MatchAs(PatternMatchAs),
     MatchOr(PatternMatchOr),
+    Invalid(PatternMatchInvalid),
 }
 
 /// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
@@ -2773,6 +2793,18 @@ pub struct PatternMatchOr {
 impl From<PatternMatchOr> for Pattern {
     fn from(payload: PatternMatchOr) -> Self {
         Pattern::MatchOr(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchInvalid {
+    pub value: String,
+    pub range: TextRange,
+}
+
+impl From<PatternMatchInvalid> for Pattern {
+    fn from(payload: PatternMatchInvalid) -> Self {
+        Pattern::Invalid(payload)
     }
 }
 
@@ -3226,6 +3258,13 @@ impl IpyEscapeKind {
     }
 }
 
+/// An `Identifier` with an empty `id` is invalid.
+///
+/// For example, in the following code `id` will be empty.
+/// ```python
+/// def 1():
+///     ...
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
     pub id: SmolStr,
@@ -3239,6 +3278,10 @@ impl Identifier {
             id: id.into(),
             range,
         }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !self.id.is_empty()
     }
 }
 
@@ -3674,6 +3717,7 @@ impl Ranged for crate::Expr {
             Self::Tuple(node) => node.range(),
             Self::Slice(node) => node.range(),
             Self::IpyEscapeCommand(node) => node.range(),
+            Self::Invalid(node) => node.range(),
         }
     }
 }
@@ -3759,6 +3803,11 @@ impl Ranged for crate::nodes::PatternMatchOr {
         self.range
     }
 }
+impl Ranged for crate::nodes::PatternMatchInvalid {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 impl Ranged for crate::Pattern {
     fn range(&self) -> TextRange {
         match self {
@@ -3770,6 +3819,7 @@ impl Ranged for crate::Pattern {
             Self::MatchStar(node) => node.range(),
             Self::MatchAs(node) => node.range(),
             Self::MatchOr(node) => node.range(),
+            Self::Invalid(node) => node.range(),
         }
     }
 }

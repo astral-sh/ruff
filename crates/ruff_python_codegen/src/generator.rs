@@ -729,6 +729,7 @@ impl<'a> Generator<'a> {
                     self.unparse_pattern(pattern);
                 }
             }
+            Pattern::Invalid(ast::PatternMatchInvalid { value, .. }) => self.p(value.as_str()),
         }
     }
 
@@ -1190,6 +1191,7 @@ impl<'a> Generator<'a> {
             Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { kind, value, .. }) => {
                 self.p(&format!("{kind}{value}"));
             }
+            Expr::Invalid(ast::ExprInvalid { value, .. }) => self.p(value.as_str()),
         }
     }
 
