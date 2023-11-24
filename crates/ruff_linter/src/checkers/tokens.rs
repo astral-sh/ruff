@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use ruff_notebook::CellOffsets;
+use ruff_python_ast::PySourceType;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 
@@ -25,7 +27,8 @@ pub(crate) fn check_tokens(
     locator: &Locator,
     indexer: &Indexer,
     settings: &LinterSettings,
-    is_stub: bool,
+    source_type: PySourceType,
+    cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -108,7 +111,14 @@ pub(crate) fn check_tokens(
         Rule::MultipleStatementsOnOneLineSemicolon,
         Rule::UselessSemicolon,
     ]) {
-        pycodestyle::rules::compound_statements(&mut diagnostics, tokens, locator, indexer);
+        pycodestyle::rules::compound_statements(
+            &mut diagnostics,
+            tokens,
+            locator,
+            indexer,
+            source_type,
+            cell_offsets,
+        );
     }
 
     if settings.rules.enabled(Rule::AvoidableEscapedQuote) && settings.flake8_quotes.avoid_escape {
@@ -152,7 +162,7 @@ pub(crate) fn check_tokens(
         pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator);
     }
 
-    if is_stub && settings.rules.enabled(Rule::TypeCommentInStub) {
+    if source_type.is_stub() && settings.rules.enabled(Rule::TypeCommentInStub) {
         flake8_pyi::rules::type_comment_in_stub(&mut diagnostics, locator, indexer);
     }
 
