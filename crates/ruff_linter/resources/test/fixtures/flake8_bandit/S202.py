@@ -27,6 +27,24 @@ def provided_members_archive_handler(filename):
     tar.close()
 
 
+def filter_data(filename):
+    tar = tarfile.open(filename)
+    tarfile.extractall(path=tempfile.mkdtemp(), filter="data")
+    tar.close()
+
+
+def filter_fully_trusted(filename):
+    tar = tarfile.open(filename)
+    tarfile.extractall(path=tempfile.mkdtemp(), filter="fully_trusted")
+    tar.close()
+
+
+def filter_tar(filename):
+    tar = tarfile.open(filename)
+    tarfile.extractall(path=tempfile.mkdtemp(), filter="tar")
+    tar.close()
+
+
 def members_filter(tarfile):
     result = []
     for member in tarfile.getmembers():

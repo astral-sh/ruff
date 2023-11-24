@@ -37,4 +37,13 @@ S202.py:26:5: S202 Uses of `tarfile.extractall()`
 27 |     tar.close()
    |
 
+S202.py:38:5: S202 Uses of `tarfile.extractall()`
+   |
+36 | def filter_fully_trusted(filename):
+37 |     tar = tarfile.open(filename)
+38 |     tarfile.extractall(path=tempfile.mkdtemp(), filter="fully_trusted")
+   |     ^^^^^^^^^^^^^^^^^^ S202
+39 |     tar.close()
+   |
+
 
