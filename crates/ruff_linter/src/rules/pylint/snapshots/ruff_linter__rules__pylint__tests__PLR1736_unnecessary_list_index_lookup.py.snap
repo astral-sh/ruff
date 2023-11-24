@@ -11,7 +11,7 @@ unnecessary_list_index_lookup.py:5:6: PLR1736 [*] Unnecessary list index lookup
   |
   = help: Remove unnecessary list index lookup
 
-ℹ Fix
+ℹ Safe fix
 2 2 | 
 3 3 | 
 4 4 | def fix_these():
@@ -31,7 +31,7 @@ unnecessary_list_index_lookup.py:6:6: PLR1736 [*] Unnecessary list index lookup
   |
   = help: Remove unnecessary list index lookup
 
-ℹ Fix
+ℹ Safe fix
 3 3 | 
 4 4 | def fix_these():
 5 5 |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
@@ -52,7 +52,7 @@ unnecessary_list_index_lookup.py:7:14: PLR1736 [*] Unnecessary list index lookup
   |
   = help: Remove unnecessary list index lookup
 
-ℹ Fix
+ℹ Safe fix
 4 4 | def fix_these():
 5 5 |     [letters[index] for index, letter in enumerate(letters)]  # PLR1736
 6 6 |     {letters[index] for index, letter in enumerate(letters)}  # PLR1736
@@ -72,7 +72,7 @@ unnecessary_list_index_lookup.py:10:15: PLR1736 [*] Unnecessary list index looku
    |
    = help: Remove unnecessary list index lookup
 
-ℹ Fix
+ℹ Safe fix
 7  7  |     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
 8  8  | 
 9  9  |     for index, letter in enumerate(letters):
@@ -92,7 +92,7 @@ unnecessary_list_index_lookup.py:11:16: PLR1736 [*] Unnecessary list index looku
    |
    = help: Remove unnecessary list index lookup
 
-ℹ Fix
+ℹ Safe fix
 8  8  | 
 9  9  |     for index, letter in enumerate(letters):
 10 10 |         print(letters[index])  # PLR1736
@@ -111,7 +111,7 @@ unnecessary_list_index_lookup.py:12:16: PLR1736 [*] Unnecessary list index looku
    |
    = help: Remove unnecessary list index lookup
 
-ℹ Fix
+ℹ Safe fix
 9  9  |     for index, letter in enumerate(letters):
 10 10 |         print(letters[index])  # PLR1736
 11 11 |         blah = letters[index]  # PLR1736
