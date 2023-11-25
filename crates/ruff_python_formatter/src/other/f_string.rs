@@ -6,7 +6,7 @@ use crate::prelude::*;
 pub struct FormatFString;
 
 impl FormatNodeRule<FString> for FormatFString {
-    fn fmt_fields(&self, item: &FString, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &FString, _f: &mut PyFormatter) -> FormatResult<()> {
         unreachable!("Handled inside of `FormatExprFString`");
     }
 }

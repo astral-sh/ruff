@@ -6,7 +6,7 @@ use crate::prelude::*;
 pub struct FormatBytesLiteral;
 
 impl FormatNodeRule<BytesLiteral> for FormatBytesLiteral {
-    fn fmt_fields(&self, item: &BytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, _item: &BytesLiteral, _f: &mut PyFormatter) -> FormatResult<()> {
         unreachable!("Handled inside of `FormatExprBytesLiteral`");
     }
 }
