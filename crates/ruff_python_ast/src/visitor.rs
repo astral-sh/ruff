@@ -757,34 +757,30 @@ pub fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
     visitor.visit_pattern(&pattern_keyword.pattern);
 }
 
-#[allow(unused_variables)]
-pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(visitor: &V, expr_context: &'a ExprContext) {}
-
-#[allow(unused_variables)]
-pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, bool_op: &'a BoolOp) {}
-
-#[allow(unused_variables)]
-pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &V, operator: &'a Operator) {}
-
-#[allow(unused_variables)]
-pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, unary_op: &'a UnaryOp) {}
-
-#[allow(unused_variables)]
-pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, cmp_op: &'a CmpOp) {}
-
-#[allow(unused_variables)]
-pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &V, alias: &'a Alias) {}
-
-#[allow(unused_variables)]
-pub fn walk_string_literal<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &V,
-    string_literal: &'a StringLiteral,
+pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
+    _visitor: &V,
+    _expr_context: &'a ExprContext,
 ) {
 }
 
-#[allow(unused_variables)]
+pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _bool_op: &'a BoolOp) {}
+
+pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _operator: &'a Operator) {}
+
+pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _unary_op: &'a UnaryOp) {}
+
+pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _cmp_op: &'a CmpOp) {}
+
+pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _alias: &'a Alias) {}
+
+pub fn walk_string_literal<'a, V: Visitor<'a> + ?Sized>(
+    _visitor: &V,
+    _string_literal: &'a StringLiteral,
+) {
+}
+
 pub fn walk_bytes_literal<'a, V: Visitor<'a> + ?Sized>(
-    visitor: &V,
-    bytes_literal: &'a BytesLiteral,
+    _visitor: &V,
+    _bytes_literal: &'a BytesLiteral,
 ) {
 }
