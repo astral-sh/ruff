@@ -108,7 +108,8 @@ pub fn check_path(
             locator,
             indexer,
             settings,
-            source_type.is_stub(),
+            source_type,
+            source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
         ));
     }
 
