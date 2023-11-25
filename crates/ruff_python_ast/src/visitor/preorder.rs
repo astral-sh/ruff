@@ -1,8 +1,8 @@
 use crate::{
     Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, FString, Keyword, MatchCase, Mod, Operator, Parameter,
-    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
-    StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
+    ExceptHandler, Expr, FString, FStringElement, FStringExpressionElement, Keyword, MatchCase,
+    Mod, Operator, Parameter, ParameterWithDefault, Parameters, Pattern, PatternArguments,
+    PatternKeyword, Singleton, Stmt, StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 use crate::{AnyNodeRef, AstNode};
 
@@ -72,11 +72,6 @@ pub trait PreorderVisitor<'a> {
     #[inline]
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
         walk_except_handler(self, except_handler);
-    }
-
-    #[inline]
-    fn visit_format_spec(&mut self, format_spec: &'a Expr) {
-        walk_format_spec(self, format_spec);
     }
 
     #[inline]
@@ -157,6 +152,11 @@ pub trait PreorderVisitor<'a> {
     #[inline]
     fn visit_f_string(&mut self, f_string: &'a FString) {
         walk_f_string(self, f_string);
+    }
+
+    #[inline]
+    fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
+        walk_f_string_element(self, f_string_element);
     }
 
     #[inline]
@@ -290,7 +290,6 @@ where
             Expr::YieldFrom(expr) => expr.visit_preorder(visitor),
             Expr::Compare(expr) => expr.visit_preorder(visitor),
             Expr::Call(expr) => expr.visit_preorder(visitor),
-            Expr::FormattedValue(expr) => expr.visit_preorder(visitor),
             Expr::FString(expr) => expr.visit_preorder(visitor),
             Expr::StringLiteral(expr) => expr.visit_preorder(visitor),
             Expr::BytesLiteral(expr) => expr.visit_preorder(visitor),
@@ -515,6 +514,27 @@ where
     let node = AnyNodeRef::from(pattern_keyword);
     if visitor.enter_node(node).is_traverse() {
         visitor.visit_pattern(&pattern_keyword.pattern);
+    }
+    visitor.leave_node(node);
+}
+
+pub fn walk_f_string_element<'a, V: PreorderVisitor<'a> + ?Sized>(
+    visitor: &mut V,
+    f_string_element: &'a FStringElement,
+) {
+    let node = AnyNodeRef::from(f_string_element);
+    if visitor.enter_node(node).is_traverse() {
+        if let FStringElement::Expression(FStringExpressionElement {
+            expression,
+            format_spec,
+            ..
+        }) = f_string_element
+        {
+            visitor.visit_expr(expression);
+            for spec_element in format_spec {
+                visitor.visit_f_string_element(spec_element);
+            }
+        }
     }
     visitor.leave_node(node);
 }
