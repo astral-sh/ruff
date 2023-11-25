@@ -185,13 +185,13 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Vec<Stmt>> {
                     return None;
                 }
                 let ast::ExprStringLiteral { value: field, .. } = field.as_string_literal_expr()?;
-                if !is_identifier(field) {
+                if !is_identifier(field.as_str()) {
                     return None;
                 }
-                if is_dunder(field) {
+                if is_dunder(field.as_str()) {
                     return None;
                 }
-                Some(create_field_assignment_stmt(field, annotation))
+                Some(create_field_assignment_stmt(field.as_str(), annotation))
             })
             .collect()
     }

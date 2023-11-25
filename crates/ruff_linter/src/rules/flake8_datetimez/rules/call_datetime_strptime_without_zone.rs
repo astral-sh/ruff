@@ -78,7 +78,7 @@ pub(crate) fn call_datetime_strptime_without_zone(checker: &mut Checker, call: &
     if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value: format, .. })) =
         call.arguments.args.get(1).as_ref()
     {
-        if format.contains("%z") {
+        if format.as_str().contains("%z") {
             return;
         }
     };

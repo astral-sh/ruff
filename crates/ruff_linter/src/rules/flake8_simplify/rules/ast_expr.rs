@@ -161,11 +161,11 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     }
 
-    if is_lowercase_allowed(env_var) {
+    if is_lowercase_allowed(env_var.as_str()) {
         return;
     }
 
-    let capital_env_var = env_var.to_ascii_uppercase();
+    let capital_env_var = env_var.as_str().to_ascii_uppercase();
     if capital_env_var == env_var.as_str() {
         return;
     }
@@ -201,11 +201,11 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    if is_lowercase_allowed(env_var) {
+    if is_lowercase_allowed(env_var.as_str()) {
         return;
     }
 
-    let capital_env_var = env_var.to_ascii_uppercase();
+    let capital_env_var = env_var.as_str().to_ascii_uppercase();
     if capital_env_var == env_var.as_str() {
         return;
     }

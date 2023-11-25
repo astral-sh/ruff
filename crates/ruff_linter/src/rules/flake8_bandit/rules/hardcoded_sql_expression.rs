@@ -93,7 +93,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
             let Some(string) = left.as_string_literal_expr() else {
                 return;
             };
-            string.value.escape_default().to_string()
+            string.value.as_str().escape_default().to_string()
         }
         Expr::Call(ast::ExprCall { func, .. }) => {
             let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() else {
@@ -106,7 +106,7 @@ pub(crate) fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
             let Some(string) = value.as_string_literal_expr() else {
                 return;
             };
-            string.value.escape_default().to_string()
+            string.value.as_str().escape_default().to_string()
         }
         // f"select * from table where val = {val}"
         Expr::FString(f_string) => concatenated_f_string(f_string, checker.locator()),

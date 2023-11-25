@@ -369,18 +369,24 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) =
-                        value.as_ref()
+                    if let Expr::StringLiteral(ast::ExprStringLiteral {
+                        value: string_value,
+                        ..
+                    }) = value.as_ref()
                     {
                         if attr == "join" {
                             // "...".join(...) call
                             if checker.enabled(Rule::StaticJoinToFString) {
-                                flynt::rules::static_join_to_fstring(checker, expr, string);
+                                flynt::rules::static_join_to_fstring(
+                                    checker,
+                                    expr,
+                                    string_value.as_str(),
+                                );
                             }
                         } else if attr == "format" {
                             // "...".format(...) call
                             let location = expr.range();
-                            match pyflakes::format::FormatSummary::try_from(string.as_ref()) {
+                            match pyflakes::format::FormatSummary::try_from(string_value.as_str()) {
                                 Err(e) => {
                                     if checker.enabled(Rule::StringDotFormatInvalidFormat) {
                                         checker.diagnostics.push(Diagnostic::new(
@@ -425,7 +431,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
 
                             if checker.enabled(Rule::BadStringFormatCharacter) {
                                 pylint::rules::bad_string_format_character::call(
-                                    checker, string, location,
+                                    checker,
+                                    string_value.as_str(),
+                                    location,
                                 );
                             }
                         }

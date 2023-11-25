@@ -1213,7 +1213,26 @@ impl StringLiteralValue {
         }
     }
 
+    /// Returns `true` if the string literal value is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Returns the total length of the string literal value, in bytes, not
+    /// [`char`]s or graphemes.
+    pub fn len(&self) -> usize {
+        self.parts().fold(0, |acc, part| acc + part.value.len())
+    }
+
+    /// Returns an iterator over the [`char`]s of each string literal part.
+    pub fn chars(&self) -> impl Iterator<Item = char> + '_ {
+        self.parts().flat_map(|part| part.value.chars())
+    }
+
     /// Returns the concatenated string value as a [`str`].
+    ///
+    /// Note that this will perform an allocation on the first invocation if the
+    /// string value is implicitly concatenated.
     pub fn as_str(&self) -> &str {
         match &self.inner {
             StringLiteralValueInner::Single(value) => value.as_str(),
@@ -1224,21 +1243,17 @@ impl StringLiteralValue {
 
 impl PartialEq<str> for StringLiteralValue {
     fn eq(&self, other: &str) -> bool {
-        self.as_str() == other
+        if self.len() != other.len() {
+            return false;
+        }
+        // The `zip` here is safe because we have checked the length of both parts.
+        self.chars().zip(other.chars()).all(|(c1, c2)| c1 == c2)
     }
 }
 
 impl PartialEq<String> for StringLiteralValue {
     fn eq(&self, other: &String) -> bool {
-        self.as_str() == other
-    }
-}
-
-impl Deref for StringLiteralValue {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
+        self == other.as_str()
     }
 }
 
