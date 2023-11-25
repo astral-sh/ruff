@@ -98,9 +98,13 @@ fn contains_message(expr: &Expr) -> bool {
                         }
                     }
                     ast::FStringPart::FString(f_string) => {
-                        for value in &f_string.values {
-                            if contains_message(value) {
-                                return true;
+                        for element in &f_string.elements {
+                            if let Some(ast::FStringLiteralElement { value, .. }) =
+                                element.as_literal()
+                            {
+                                if value.chars().any(char::is_whitespace) {
+                                    return true;
+                                }
                             }
                         }
                     }

@@ -4,6 +4,7 @@ use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 use ruff_diagnostics::Diagnostic;
 
 use ruff_python_ast::types::Node;
+use ruff_python_ast::AstNode;
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::ScopeKind;
 use ruff_text_size::Ranged;
@@ -1006,6 +1007,32 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_literal);
                 }
             }
+            for element in value.elements() {
+                if let ast::FStringElement::Literal(
+                    literal_element @ ast::FStringLiteralElement { value, range },
+                ) = element
+                {
+                    if checker.enabled(Rule::HardcodedBindAllInterfaces) {
+                        if let Some(diagnostic) =
+                            flake8_bandit::rules::hardcoded_bind_all_interfaces(value, *range)
+                        {
+                            checker.diagnostics.push(diagnostic);
+                        }
+                    }
+                    if checker.enabled(Rule::HardcodedTempFile) {
+                        flake8_bandit::rules::hardcoded_tmp_directory(checker, value, *range);
+                    }
+
+                    if checker.source_type.is_stub() {
+                        if checker.enabled(Rule::StringOrBytesTooLong) {
+                            flake8_pyi::rules::string_or_bytes_too_long(
+                                checker,
+                                literal_element.as_any_node_ref(),
+                            );
+                        }
+                    }
+                }
+            }
         }
         Expr::BinOp(ast::ExprBinOp {
             left,
@@ -1270,30 +1297,36 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }
-        Expr::BytesLiteral(_) => {
+        Expr::BytesLiteral(bytes_literal) => {
             if checker.source_type.is_stub() && checker.enabled(Rule::StringOrBytesTooLong) {
-                flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
+                flake8_pyi::rules::string_or_bytes_too_long(
+                    checker,
+                    bytes_literal.as_any_node_ref(),
+                );
             }
         }
-        Expr::StringLiteral(string) => {
+        Expr::StringLiteral(string_literal @ ast::ExprStringLiteral { value, range }) => {
             if checker.enabled(Rule::HardcodedBindAllInterfaces) {
                 if let Some(diagnostic) =
-                    flake8_bandit::rules::hardcoded_bind_all_interfaces(string)
+                    flake8_bandit::rules::hardcoded_bind_all_interfaces(value.to_str(), *range)
                 {
                     checker.diagnostics.push(diagnostic);
                 }
             }
             if checker.enabled(Rule::HardcodedTempFile) {
-                flake8_bandit::rules::hardcoded_tmp_directory(checker, string);
+                flake8_bandit::rules::hardcoded_tmp_directory(checker, value.to_str(), *range);
             }
             if checker.enabled(Rule::UnicodeKindPrefix) {
-                for string_part in string.value.parts() {
+                for string_part in value.parts() {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
                 }
             }
             if checker.source_type.is_stub() {
                 if checker.enabled(Rule::StringOrBytesTooLong) {
-                    flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
+                    flake8_pyi::rules::string_or_bytes_too_long(
+                        checker,
+                        string_literal.as_any_node_ref(),
+                    );
                 }
             }
         }

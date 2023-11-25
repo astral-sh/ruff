@@ -86,25 +86,17 @@ expression: parse_ast
                                                                     FString(
                                                                         FString {
                                                                             range: 62..81,
-                                                                            values: [
-                                                                                StringLiteral(
-                                                                                    ExprStringLiteral {
+                                                                            elements: [
+                                                                                Literal(
+                                                                                    FStringLiteralElement {
                                                                                         range: 64..71,
-                                                                                        value: StringLiteralValue {
-                                                                                            inner: Single(
-                                                                                                StringLiteral {
-                                                                                                    range: 64..71,
-                                                                                                    value: "caught ",
-                                                                                                    unicode: false,
-                                                                                                },
-                                                                                            ),
-                                                                                        },
+                                                                                        value: "caught ",
                                                                                     },
                                                                                 ),
-                                                                                FormattedValue(
-                                                                                    ExprFormattedValue {
+                                                                                Expression(
+                                                                                    FStringExpressionElement {
                                                                                         range: 71..80,
-                                                                                        value: Call(
+                                                                                        expression: Call(
                                                                                             ExprCall {
                                                                                                 range: 72..79,
                                                                                                 func: Name(
@@ -131,7 +123,7 @@ expression: parse_ast
                                                                                         ),
                                                                                         debug_text: None,
                                                                                         conversion: None,
-                                                                                        format_spec: None,
+                                                                                        format_spec: [],
                                                                                     },
                                                                                 ),
                                                                             ],
@@ -194,25 +186,17 @@ expression: parse_ast
                                                                     FString(
                                                                         FString {
                                                                             range: 114..133,
-                                                                            values: [
-                                                                                StringLiteral(
-                                                                                    ExprStringLiteral {
+                                                                            elements: [
+                                                                                Literal(
+                                                                                    FStringLiteralElement {
                                                                                         range: 116..123,
-                                                                                        value: StringLiteralValue {
-                                                                                            inner: Single(
-                                                                                                StringLiteral {
-                                                                                                    range: 116..123,
-                                                                                                    value: "caught ",
-                                                                                                    unicode: false,
-                                                                                                },
-                                                                                            ),
-                                                                                        },
+                                                                                        value: "caught ",
                                                                                     },
                                                                                 ),
-                                                                                FormattedValue(
-                                                                                    ExprFormattedValue {
+                                                                                Expression(
+                                                                                    FStringExpressionElement {
                                                                                         range: 123..132,
-                                                                                        value: Call(
+                                                                                        expression: Call(
                                                                                             ExprCall {
                                                                                                 range: 124..131,
                                                                                                 func: Name(
@@ -239,7 +223,7 @@ expression: parse_ast
                                                                                         ),
                                                                                         debug_text: None,
                                                                                         conversion: None,
-                                                                                        format_spec: None,
+                                                                                        format_spec: [],
                                                                                     },
                                                                                 ),
                                                                             ],

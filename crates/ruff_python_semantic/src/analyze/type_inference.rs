@@ -323,7 +323,6 @@ impl From<&Expr> for ResolvedPythonType {
             | Expr::YieldFrom(_)
             | Expr::Compare(_)
             | Expr::Call(_)
-            | Expr::FormattedValue(_)
             | Expr::Attribute(_)
             | Expr::Subscript(_)
             | Expr::Starred(_)

@@ -228,12 +228,6 @@ impl Visitor<'_> for RecordVisitor {
         self.exit_node();
     }
 
-    fn visit_format_spec(&mut self, format_spec: &Expr) {
-        self.enter_node(format_spec);
-        walk_expr(self, format_spec);
-        self.exit_node();
-    }
-
     fn visit_parameters(&mut self, parameters: &Parameters) {
         self.enter_node(parameters);
         walk_parameters(self, parameters);

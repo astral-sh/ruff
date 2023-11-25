@@ -1534,42 +1534,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprCall {
     }
 }
 
-impl FormatRule<ast::ExprFormattedValue, PyFormatContext<'_>>
-    for crate::expression::expr_formatted_value::FormatExprFormattedValue
-{
-    #[inline]
-    fn fmt(&self, node: &ast::ExprFormattedValue, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatNodeRule::<ast::ExprFormattedValue>::fmt(self, node, f)
-    }
-}
-impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::ExprFormattedValue {
-    type Format<'a> = FormatRefWithRule<
-        'a,
-        ast::ExprFormattedValue,
-        crate::expression::expr_formatted_value::FormatExprFormattedValue,
-        PyFormatContext<'ast>,
-    >;
-    fn format(&self) -> Self::Format<'_> {
-        FormatRefWithRule::new(
-            self,
-            crate::expression::expr_formatted_value::FormatExprFormattedValue::default(),
-        )
-    }
-}
-impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExprFormattedValue {
-    type Format = FormatOwnedWithRule<
-        ast::ExprFormattedValue,
-        crate::expression::expr_formatted_value::FormatExprFormattedValue,
-        PyFormatContext<'ast>,
-    >;
-    fn into_format(self) -> Self::Format {
-        FormatOwnedWithRule::new(
-            self,
-            crate::expression::expr_formatted_value::FormatExprFormattedValue::default(),
-        )
-    }
-}
-
 impl FormatRule<ast::ExprFString, PyFormatContext<'_>>
     for crate::expression::expr_f_string::FormatExprFString
 {
@@ -2144,6 +2108,78 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::ExceptHandlerExceptHandler
             self,
             crate::other::except_handler_except_handler::FormatExceptHandlerExceptHandler::default(
             ),
+        )
+    }
+}
+
+impl FormatRule<ast::FStringExpressionElement, PyFormatContext<'_>>
+    for crate::other::f_string_expression_element::FormatFStringExpressionElement
+{
+    #[inline]
+    fn fmt(&self, node: &ast::FStringExpressionElement, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::FStringExpressionElement>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::FStringExpressionElement {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::FStringExpressionElement,
+        crate::other::f_string_expression_element::FormatFStringExpressionElement,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::other::f_string_expression_element::FormatFStringExpressionElement::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FStringExpressionElement {
+    type Format = FormatOwnedWithRule<
+        ast::FStringExpressionElement,
+        crate::other::f_string_expression_element::FormatFStringExpressionElement,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::other::f_string_expression_element::FormatFStringExpressionElement::default(),
+        )
+    }
+}
+
+impl FormatRule<ast::FStringLiteralElement, PyFormatContext<'_>>
+    for crate::other::f_string_literal_element::FormatFStringLiteralElement
+{
+    #[inline]
+    fn fmt(&self, node: &ast::FStringLiteralElement, f: &mut PyFormatter) -> FormatResult<()> {
+        FormatNodeRule::<ast::FStringLiteralElement>::fmt(self, node, f)
+    }
+}
+impl<'ast> AsFormat<PyFormatContext<'ast>> for ast::FStringLiteralElement {
+    type Format<'a> = FormatRefWithRule<
+        'a,
+        ast::FStringLiteralElement,
+        crate::other::f_string_literal_element::FormatFStringLiteralElement,
+        PyFormatContext<'ast>,
+    >;
+    fn format(&self) -> Self::Format<'_> {
+        FormatRefWithRule::new(
+            self,
+            crate::other::f_string_literal_element::FormatFStringLiteralElement::default(),
+        )
+    }
+}
+impl<'ast> IntoFormat<PyFormatContext<'ast>> for ast::FStringLiteralElement {
+    type Format = FormatOwnedWithRule<
+        ast::FStringLiteralElement,
+        crate::other::f_string_literal_element::FormatFStringLiteralElement,
+        PyFormatContext<'ast>,
+    >;
+    fn into_format(self) -> Self::Format {
+        FormatOwnedWithRule::new(
+            self,
+            crate::other::f_string_literal_element::FormatFStringLiteralElement::default(),
         )
     }
 }

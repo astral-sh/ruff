@@ -14,25 +14,17 @@ expression: parse_ast
                             FString(
                                 FString {
                                     range: 0..22,
-                                    values: [
-                                        StringLiteral(
-                                            ExprStringLiteral {
+                                    elements: [
+                                        Literal(
+                                            FStringLiteralElement {
                                                 range: 2..5,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 2..5,
-                                                            value: "aaa",
-                                                            unicode: false,
-                                                        },
-                                                    ),
-                                                },
+                                                value: "aaa",
                                             },
                                         ),
-                                        FormattedValue(
-                                            ExprFormattedValue {
+                                        Expression(
+                                            FStringExpressionElement {
                                                 range: 5..10,
-                                                value: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 6..9,
                                                         id: "bbb",
@@ -41,27 +33,19 @@ expression: parse_ast
                                                 ),
                                                 debug_text: None,
                                                 conversion: None,
-                                                format_spec: None,
+                                                format_spec: [],
                                             },
                                         ),
-                                        StringLiteral(
-                                            ExprStringLiteral {
+                                        Literal(
+                                            FStringLiteralElement {
                                                 range: 10..13,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 10..13,
-                                                            value: "ccc",
-                                                            unicode: false,
-                                                        },
-                                                    ),
-                                                },
+                                                value: "ccc",
                                             },
                                         ),
-                                        FormattedValue(
-                                            ExprFormattedValue {
+                                        Expression(
+                                            FStringExpressionElement {
                                                 range: 13..18,
-                                                value: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 14..17,
                                                         id: "ddd",
@@ -70,21 +54,13 @@ expression: parse_ast
                                                 ),
                                                 debug_text: None,
                                                 conversion: None,
-                                                format_spec: None,
+                                                format_spec: [],
                                             },
                                         ),
-                                        StringLiteral(
-                                            ExprStringLiteral {
+                                        Literal(
+                                            FStringLiteralElement {
                                                 range: 18..21,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 18..21,
-                                                            value: "eee",
-                                                            unicode: false,
-                                                        },
-                                                    ),
-                                                },
+                                                value: "eee",
                                             },
                                         ),
                                     ],

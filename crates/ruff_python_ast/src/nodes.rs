@@ -590,8 +590,6 @@ pub enum Expr {
     Compare(ExprCompare),
     #[is(name = "call_expr")]
     Call(ExprCall),
-    #[is(name = "formatted_value_expr")]
-    FormattedValue(ExprFormattedValue),
     #[is(name = "f_string_expr")]
     FString(ExprFString),
     #[is(name = "string_literal_expr")]
@@ -921,18 +919,18 @@ impl From<ExprCall> for Expr {
 
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprFormattedValue {
+pub struct FStringExpressionElement {
     pub range: TextRange,
-    pub value: Box<Expr>,
+    pub expression: Box<Expr>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
-    pub format_spec: Option<Box<Expr>>,
+    pub format_spec: Vec<FStringElement>,
 }
 
-impl From<ExprFormattedValue> for Expr {
-    fn from(payload: ExprFormattedValue) -> Self {
-        Expr::FormattedValue(payload)
-    }
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringLiteralElement {
+    pub range: TextRange,
+    pub value: String,
 }
 
 /// Transforms a value prior to formatting it.
@@ -1064,7 +1062,7 @@ impl FStringValue {
         self.parts().filter_map(|part| part.as_f_string())
     }
 
-    /// Returns an iterator over all the f-string elements contained in this value.
+    /// Returns an iterator over all the [`FStringElement`] contained in this value.
     ///
     /// An f-string element is what makes up an [`FString`] i.e., it is either a
     /// string literal or an expression. In the following example,
@@ -1075,8 +1073,8 @@ impl FStringValue {
     ///
     /// The f-string elements returned would be string literal (`"bar "`),
     /// expression (`x`) and string literal (`"qux"`).
-    pub fn elements(&self) -> impl Iterator<Item = &Expr> {
-        self.f_strings().flat_map(|fstring| fstring.values.iter())
+    pub fn elements(&self) -> impl Iterator<Item = &FStringElement> {
+        self.f_strings().flat_map(|fstring| fstring.elements.iter())
     }
 }
 
@@ -1113,7 +1111,7 @@ impl Ranged for FStringPart {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
-    pub values: Vec<Expr>,
+    pub elements: Vec<FStringElement>,
 }
 
 impl Ranged for FString {
@@ -1130,6 +1128,12 @@ impl From<FString> for Expr {
         }
         .into()
     }
+}
+
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+pub enum FStringElement {
+    Literal(FStringLiteralElement),
+    Expression(FStringExpressionElement),
 }
 
 /// An AST node that represents either a single string literal or an implicitly
@@ -3483,11 +3487,6 @@ impl Ranged for crate::nodes::ExprCall {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprFormattedValue {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::nodes::ExprFString {
     fn range(&self) -> TextRange {
         self.range
@@ -3553,7 +3552,6 @@ impl Ranged for crate::Expr {
             Self::YieldFrom(node) => node.range(),
             Self::Compare(node) => node.range(),
             Self::Call(node) => node.range(),
-            Self::FormattedValue(node) => node.range(),
             Self::FString(node) => node.range(),
             Self::StringLiteral(node) => node.range(),
             Self::BytesLiteral(node) => node.range(),
@@ -3851,11 +3849,6 @@ impl From<ExprCall> for ParenthesizedExpr {
         Expr::Call(payload).into()
     }
 }
-impl From<ExprFormattedValue> for ParenthesizedExpr {
-    fn from(payload: ExprFormattedValue) -> Self {
-        Expr::FormattedValue(payload).into()
-    }
-}
 impl From<ExprFString> for ParenthesizedExpr {
     fn from(payload: ExprFString) -> Self {
         Expr::FString(payload).into()
@@ -3941,4 +3934,25 @@ mod size_assertions {
     assert_eq_size!(Expr, [u8; 80]);
     assert_eq_size!(Pattern, [u8; 96]);
     assert_eq_size!(Mod, [u8; 32]);
+}
+
+impl Ranged for crate::nodes::FStringExpressionElement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl Ranged for crate::nodes::FStringElement {
+    fn range(&self) -> TextRange {
+        match self {
+            FStringElement::Literal(node) => node.range(),
+            FStringElement::Expression(node) => node.range(),
+        }
+    }
+}
+
+impl Ranged for crate::nodes::FStringLiteralElement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
