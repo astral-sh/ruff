@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
-use crate::rules::{flake8_annotations, flake8_pyi, pydocstyle};
+use crate::rules::{flake8_annotations, flake8_pyi, pydocstyle, pylint};
 use crate::{docstrings, warn_user};
 
 /// Run lint rules over all [`Definition`] nodes in the [`SemanticModel`].
@@ -78,6 +78,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedPublicModule,
         Rule::UndocumentedPublicNestedClass,
         Rule::UndocumentedPublicPackage,
+        Rule::MissingReturnDoc,
     ]);
 
     if !enforce_annotations && !enforce_docstrings && !enforce_stubs && !enforce_stubs_and_runtime {
@@ -194,6 +195,9 @@ pub(crate) fn definitions(checker: &mut Checker) {
 
             if !pydocstyle::rules::not_empty(checker, &docstring) {
                 continue;
+            }
+            if checker.enabled(Rule::MissingReturnDoc) {
+                pylint::rules::missing_return_doc(checker, &docstring);
             }
             if checker.enabled(Rule::FitsOnOneLine) {
                 pydocstyle::rules::one_liner(checker, &docstring);
