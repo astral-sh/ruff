@@ -75,9 +75,9 @@ pub(crate) enum Distance {
 /// `foo` in `from foo import bar`).
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct ModuleKey<'a> {
-    distance: Distance,
-    force_to_top: Option<bool>,
+    force_to_top: bool,
     maybe_length: Option<usize>,
+    distance: Distance,
     maybe_lowercase_name: Option<NatOrdStr<'a>>,
     module_name: Option<NatOrdStr<'a>>,
     first_alias: Option<MemberKey<'a>>,
@@ -93,18 +93,20 @@ impl<'a> ModuleKey<'a> {
         settings: &Settings,
         straight_import: bool,
     ) -> Self {
+        let force_to_top = !name
+            .map(|name| settings.force_to_top.contains(name))
+            .unwrap_or_default(); // `false` < `true` so we get forced to top first
+
+        let maybe_length = (settings.length_sort
+            || (settings.length_sort_straight && straight_import))
+            .then_some(name.map(str::width).unwrap_or_default());
+
         let distance = match settings.relative_imports_order {
             RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level.unwrap_or_default()),
             RelativeImportsOrder::FurthestToClosest => {
                 Distance::Furthest(Reverse(level.unwrap_or_default()))
             }
         };
-
-        let force_to_top = name.map(|name| !settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
-
-        let maybe_length = (settings.length_sort
-            || (settings.length_sort_straight && straight_import))
-            .then_some(name.map(str::width).unwrap_or_default());
 
         let maybe_lowercase_name = name.and_then(|name| {
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
@@ -118,9 +120,9 @@ impl<'a> ModuleKey<'a> {
             first_alias.map(|(name, asname)| MemberKey::from_member(name, asname, settings));
 
         Self {
-            distance,
             force_to_top,
             maybe_length,
+            distance,
             maybe_lowercase_name,
             module_name,
             first_alias,
