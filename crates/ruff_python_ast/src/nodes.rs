@@ -917,6 +917,18 @@ impl From<ExprCall> for Expr {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringFormatSpec {
+    pub range: TextRange,
+    pub elements: Vec<FStringElement>,
+}
+
+impl Ranged for FStringFormatSpec {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
 pub struct FStringExpressionElement {
@@ -924,7 +936,7 @@ pub struct FStringExpressionElement {
     pub expression: Box<Expr>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
-    pub format_spec: Vec<FStringElement>,
+    pub format_spec: Option<Box<FStringFormatSpec>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

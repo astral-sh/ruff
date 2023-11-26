@@ -27,14 +27,19 @@ expression: parse_ast
                                                 ),
                                                 debug_text: None,
                                                 conversion: None,
-                                                format_spec: [
-                                                    Literal(
-                                                        FStringLiteralElement {
-                                                            range: 7..11,
-                                                            value: "spec",
-                                                        },
-                                                    ),
-                                                ],
+                                                format_spec: Some(
+                                                    FStringFormatSpec {
+                                                        range: 7..11,
+                                                        elements: [
+                                                            Literal(
+                                                                FStringLiteralElement {
+                                                                    range: 7..11,
+                                                                    value: "spec",
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
                                             },
                                         ),
                                     ],

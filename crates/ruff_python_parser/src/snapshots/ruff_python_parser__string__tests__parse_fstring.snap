@@ -27,7 +27,7 @@ expression: parse_ast
                                                 ),
                                                 debug_text: None,
                                                 conversion: None,
-                                                format_spec: [],
+                                                format_spec: None,
                                             },
                                         ),
                                         Expression(
@@ -42,7 +42,7 @@ expression: parse_ast
                                                 ),
                                                 debug_text: None,
                                                 conversion: None,
-                                                format_spec: [],
+                                                format_spec: None,
                                             },
                                         ),
                                         Literal(
