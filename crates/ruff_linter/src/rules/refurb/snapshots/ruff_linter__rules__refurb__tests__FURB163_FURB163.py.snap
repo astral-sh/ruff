@@ -1,0 +1,65 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB163.py:4:1: FURB163 [*] Replace with `math.log2(1)`
+  |
+3 | # Errors.
+4 | math.log(1, 2)
+  | ^^^^^^^^^^^^^^ FURB163
+5 | math.log(1, 10)
+6 | math.log(1, math.e)
+  |
+  = help: Use `math.log2(1)`
+
+ℹ Safe fix
+1 1 | import math
+2 2 | 
+3 3 | # Errors.
+4   |-math.log(1, 2)
+  4 |+math.log2(1)
+5 5 | math.log(1, 10)
+6 6 | math.log(1, math.e)
+7 7 | 
+
+FURB163.py:5:1: FURB163 [*] Replace with `math.log10(1)`
+  |
+3 | # Errors.
+4 | math.log(1, 2)
+5 | math.log(1, 10)
+  | ^^^^^^^^^^^^^^^ FURB163
+6 | math.log(1, math.e)
+  |
+  = help: Use `math.log10(1)`
+
+ℹ Safe fix
+2 2 | 
+3 3 | # Errors.
+4 4 | math.log(1, 2)
+5   |-math.log(1, 10)
+  5 |+math.log10(1)
+6 6 | math.log(1, math.e)
+7 7 | 
+8 8 | # Ok.
+
+FURB163.py:6:1: FURB163 [*] Replace with `math.log(1)`
+  |
+4 | math.log(1, 2)
+5 | math.log(1, 10)
+6 | math.log(1, math.e)
+  | ^^^^^^^^^^^^^^^^^^^ FURB163
+7 | 
+8 | # Ok.
+  |
+  = help: Use `math.log(1)`
+
+ℹ Safe fix
+3 3 | # Errors.
+4 4 | math.log(1, 2)
+5 5 | math.log(1, 10)
+6   |-math.log(1, math.e)
+  6 |+math.log(1)
+7 7 | 
+8 8 | # Ok.
+9 9 | math.log2(1)
+
+

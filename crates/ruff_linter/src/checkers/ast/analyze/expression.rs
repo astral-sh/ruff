@@ -928,6 +928,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::PrintEmptyString) {
                 refurb::rules::print_empty_string(checker, call);
             }
+            if checker.enabled(Rule::RedundantLogBase) {
+                refurb::rules::redundant_log_base(checker, call);
+            }
             if checker.enabled(Rule::QuadraticListSummation) {
                 ruff::rules::quadratic_list_summation(checker, call);
             }
