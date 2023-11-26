@@ -1144,6 +1144,7 @@ mod tests {
     #[test_case(Path::new("length_sort_straight_and_from_imports.py"))]
     #[test_case(Path::new("length_sort_non_ascii_members.py"))]
     #[test_case(Path::new("length_sort_non_ascii_modules.py"))]
+    #[test_case(Path::new("length_sort_with_relative_imports.py"))]
     fn length_sort(path: &Path) -> Result<()> {
         let snapshot = format!("length_sort__{}", path.to_string_lossy());
         let diagnostics = test_path(

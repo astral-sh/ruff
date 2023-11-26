@@ -93,19 +93,19 @@ impl<'a> ModuleKey<'a> {
         settings: &Settings,
         straight_import: bool,
     ) -> Self {
+        let level = level.unwrap_or_default();
+
         let force_to_top = !name
             .map(|name| settings.force_to_top.contains(name))
             .unwrap_or_default(); // `false` < `true` so we get forced to top first
 
         let maybe_length = (settings.length_sort
             || (settings.length_sort_straight && straight_import))
-            .then_some(name.map(str::width).unwrap_or_default());
+            .then_some(name.map(str::width).unwrap_or_default() + level as usize);
 
         let distance = match settings.relative_imports_order {
-            RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level.unwrap_or_default()),
-            RelativeImportsOrder::FurthestToClosest => {
-                Distance::Furthest(Reverse(level.unwrap_or_default()))
-            }
+            RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level),
+            RelativeImportsOrder::FurthestToClosest => Distance::Furthest(Reverse(level)),
         };
 
         let maybe_lowercase_name = name.and_then(|name| {
