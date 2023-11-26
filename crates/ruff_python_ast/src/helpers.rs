@@ -1482,7 +1482,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
 pub fn typing_optional(elt: Expr, binding: String) -> Expr {
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding,
+            id: binding.into(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })),
@@ -1513,7 +1513,7 @@ pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
 
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding,
+            id: binding.into(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })),
@@ -1579,7 +1579,7 @@ mod tests {
     fn any_over_stmt_type_alias() {
         let seen = RefCell::new(Vec::new());
         let name = Expr::Name(ExprName {
-            id: "x".to_string(),
+            id: "x".into(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         });

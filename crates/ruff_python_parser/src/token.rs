@@ -8,6 +8,7 @@ use crate::Mode;
 
 use ruff_python_ast::{Int, IpyEscapeKind};
 use ruff_text_size::TextSize;
+use smol_str::SmolStr;
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
@@ -16,7 +17,7 @@ pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
     Name {
         /// The name value.
-        name: String,
+        name: SmolStr,
     },
     /// Token value for an integer.
     Int {

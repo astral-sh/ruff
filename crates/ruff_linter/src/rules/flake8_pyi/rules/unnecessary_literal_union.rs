@@ -80,7 +80,7 @@ fn make_literal_expr(subscript: Option<Expr>, exprs: Vec<&Expr>) -> Expr {
         subscript.unwrap().clone()
     } else {
         Expr::Name(ast::ExprName {
-            id: "Literal".to_string(),
+            id: "Literal".into(),
             range: TextRange::default(),
             ctx: ast::ExprContext::Load,
         })

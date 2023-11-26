@@ -23,6 +23,7 @@ is-macro = { workspace = true }
 itertools = { workspace = true }
 lalrpop-util = { version = "0.20.0", default-features = false }
 memchr = { workspace = true }
+smol_str = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
 rustc-hash = { workspace = true }

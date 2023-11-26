@@ -202,9 +202,7 @@ fn soft_to_name(tok: &Tok) -> Tok {
         Tok::Type => "type",
         _ => unreachable!("other tokens never reach here"),
     };
-    Tok::Name {
-        name: name.to_owned(),
-    }
+    Tok::Name { name: name.into() }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

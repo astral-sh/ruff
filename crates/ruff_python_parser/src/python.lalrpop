@@ -3,6 +3,7 @@
 // See also: file:///usr/share/doc/python/html/reference/compound_stmts.html#function-definitions
 // See also: https://greentreesnakes.readthedocs.io/en/latest/nodes.html#keyword
 
+use smol_str::SmolStr;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -289,7 +290,7 @@ ImportAsAlias<I>: ast::Alias = {
 DottedName: ast::Identifier = {
     <location:@L> <n:name> <end_location:@R> => ast::Identifier::new(n, (location..end_location).into()),
     <location:@L> <n:name> <n2: ("." Identifier)+> <end_location:@R> => {
-        let mut r = n;
+        let mut r = n.to_string();
         for x in n2 {
             r.push('.');
             r.push_str(x.1.as_str());
@@ -2069,7 +2070,7 @@ extern {
             value: <String>,
             is_raw: <bool>
         },
-        name => token::Tok::Name { name: <String> },
+        name => token::Tok::Name { name: <SmolStr> },
         ipy_escape_command => token::Tok::IpyEscapeCommand {
             kind: <IpyEscapeKind>,
             value: <String>

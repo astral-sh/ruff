@@ -1,5 +1,6 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 031689e389556292d9dbd8a1b1ff8ca29bac76d83f1b345630481d620b89e1c2
+// sha3: d4ee7846b5dfacc84c7fcd86cd6afddd44e4ae968b0a0e48ae8970bb2a7b4d12
+use smol_str::SmolStr;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -24,6 +25,7 @@ extern crate alloc;
 #[allow(non_snake_case, non_camel_case_types, unused_mut, unused_variables, unused_imports, unused_parens, clippy::all)]
 mod __parse__Top {
 
+    use smol_str::SmolStr;
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
     use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
     use crate::{
@@ -53,7 +55,7 @@ mod __parse__Top {
         Variant3((String, bool)),
         Variant4(Int),
         Variant5((IpyEscapeKind, String)),
-        Variant6(String),
+        Variant6(SmolStr),
         Variant7((String, StringKind, bool)),
         Variant8(core::option::Option<token::Tok>),
         Variant9(Option<Box<ast::Parameter>>),
@@ -18526,7 +18528,7 @@ mod __parse__Top {
     fn __pop_Variant6<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, String, TextSize)
+    ) -> (TextSize, SmolStr, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant6(__v), __r)) => (__l, __v, __r),
@@ -33541,7 +33543,7 @@ fn __action69<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, n, _): (TextSize, String, TextSize),
+    (_, n, _): (TextSize, SmolStr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -33555,13 +33557,13 @@ fn __action70<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, n, _): (TextSize, String, TextSize),
+    (_, n, _): (TextSize, SmolStr, TextSize),
     (_, n2, _): (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
     {
-        let mut r = n;
+        let mut r = n.to_string();
         for x in n2 {
             r.push('.');
             r.push_str(x.1.as_str());
@@ -36514,7 +36516,7 @@ fn __action224<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, name_location, _): (TextSize, TextSize, TextSize),
-    (_, s, _): (TextSize, String, TextSize),
+    (_, s, _): (TextSize, SmolStr, TextSize),
 ) -> Result<(TextSize, ast::ConversionFlag),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
@@ -36899,7 +36901,7 @@ fn __action249<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, s, _): (TextSize, String, TextSize),
+    (_, s, _): (TextSize, SmolStr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -48027,7 +48029,7 @@ fn __action789<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, SmolStr, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -48055,7 +48057,7 @@ fn __action790<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, SmolStr, TextSize),
     __1: (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
@@ -48408,7 +48410,7 @@ fn __action801<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, String, TextSize),
+    __1: (TextSize, SmolStr, TextSize),
 ) -> Result<(TextSize, ast::ConversionFlag),__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
@@ -49209,7 +49211,7 @@ fn __action826<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, SmolStr, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> ast::Identifier
 {
@@ -64211,7 +64213,7 @@ fn __action1304<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, SmolStr, TextSize),
 ) -> ast::Identifier
 {
     let __start0 = __0.2;
@@ -64237,7 +64239,7 @@ fn __action1305<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, SmolStr, TextSize),
     __1: (TextSize, alloc::vec::Vec<(token::Tok, ast::Identifier)>, TextSize),
 ) -> ast::Identifier
 {
@@ -65035,7 +65037,7 @@ fn __action1333<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, String, TextSize),
+    __0: (TextSize, SmolStr, TextSize),
 ) -> ast::Identifier
 {
     let __start0 = __0.2;
