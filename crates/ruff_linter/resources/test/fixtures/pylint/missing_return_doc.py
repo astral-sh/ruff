@@ -1,4 +1,4 @@
-def sum_good(a: int, b: int) -> int:
+def return_good(a: int, b: int) -> int:
     """Returns sum of two integers.
     :param a: first integer
     :param b: second integer
@@ -6,7 +6,25 @@ def sum_good(a: int, b: int) -> int:
     """
     return a + b
 
-def sum_bad(a: int, b: int):  # [missing-return-doc]
+
+def no_return_good(a: int, b: int) -> None:
+    """Prints the sum of two integers.
+    :param a: first integer
+    :param b: second integer
+    """
+    print(a + b)
+
+
+def no_return_also_good(a: int, b: int) -> None:
+    """Prints the sum of two integers.
+    :param a: first integer
+    :param b: second integer
+    """
+    print(a + b)
+    return None
+
+
+def return_bad(a: int, b: int):  # [missing-return-doc]
     """Returns sum of two integers.
     :param a: first integer
     :param b: second integer
