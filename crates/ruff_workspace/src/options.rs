@@ -2062,6 +2062,9 @@ pub struct IsortOptions {
     pub sections: Option<FxHashMap<ImportSection, Vec<String>>>,
 
     /// Sort imports by their string length.
+    ///
+    /// The string length is computed using the [`unicode_width`](https://crates.io/crates/unicode-width) crate,
+    /// i.e. it is the displayed width of the string according to [Unicode Standard Annex #11 rules](http://www.unicode.org/reports/tr11/).
     #[option(
         default = r#"false"#,
         value_type = "bool",
@@ -2071,7 +2074,9 @@ pub struct IsortOptions {
     )]
     pub length_sort: Option<bool>,
 
-    /// Sort straight imports by their string length. Does not affect from imports.
+    /// Sort straight imports by their string length.
+    ///
+    /// Same as `length-sort` but does not affect from imports.
     #[option(
         default = r#"false"#,
         value_type = "bool",

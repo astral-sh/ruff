@@ -1478,14 +1478,14 @@
           }
         },
         "length-sort": {
-          "description": "Sort imports by their string length.",
+          "description": "Sort imports by their string length.\n\nThe string length is computed using the [`unicode_width`](https://crates.io/crates/unicode-width) crate, i.e. it is the displayed width of the string according to [Unicode Standard Annex #11 rules](http://www.unicode.org/reports/tr11/).",
           "type": [
             "boolean",
             "null"
           ]
         },
         "length-sort-straight": {
-          "description": "Sort straight imports by their string length. Does not affect from imports.",
+          "description": "Sort straight imports by their string length.\n\nSame as `length-sort` but does not affect from imports.",
           "type": [
             "boolean",
             "null"
