@@ -1,6 +1,9 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use itertools::Itertools;
+use smol_str::SmolStr;
 use std::cell::OnceCell;
+
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -1739,7 +1742,7 @@ impl From<ExprStarred> for Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprName {
     pub range: TextRange,
-    pub id: String,
+    pub id: SmolStr,
     pub ctx: ExprContext,
 }
 
@@ -3225,13 +3228,13 @@ impl IpyEscapeKind {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Identifier {
-    id: String,
-    range: TextRange,
+    pub id: SmolStr,
+    pub range: TextRange,
 }
 
 impl Identifier {
     #[inline]
-    pub fn new(id: impl Into<String>, range: TextRange) -> Self {
+    pub fn new(id: impl Into<SmolStr>, range: TextRange) -> Self {
         Self {
             id: id.into(),
             range,
@@ -3275,9 +3278,9 @@ impl AsRef<str> for Identifier {
     }
 }
 
-impl AsRef<String> for Identifier {
+impl AsRef<SmolStr> for Identifier {
     #[inline]
-    fn as_ref(&self) -> &String {
+    fn as_ref(&self) -> &SmolStr {
         &self.id
     }
 }
@@ -3291,6 +3294,13 @@ impl std::fmt::Display for Identifier {
 impl From<Identifier> for String {
     #[inline]
     fn from(identifier: Identifier) -> String {
+        identifier.id.to_string()
+    }
+}
+
+impl From<Identifier> for SmolStr {
+    #[inline]
+    fn from(identifier: Identifier) -> Self {
         identifier.id
     }
 }
@@ -3836,6 +3846,6 @@ mod size_assertions {
     assert_eq_size!(StmtClassDef, [u8; 104]);
     assert_eq_size!(StmtTry, [u8; 112]);
     assert_eq_size!(Expr, [u8; 80]);
-    assert_eq_size!(Pattern, [u8; 96]);
+    assert_eq_size!(Pattern, [u8; 88]);
     assert_eq_size!(Mod, [u8; 32]);
 }

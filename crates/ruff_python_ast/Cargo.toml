@@ -26,6 +26,7 @@ rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = "1.1.0"
+smol_str = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }
