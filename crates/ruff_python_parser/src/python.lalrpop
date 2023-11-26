@@ -1628,7 +1628,7 @@ FStringMiddlePattern: ast::FStringElement = {
 };
 
 FStringReplacementField: ast::FStringElement = {
-    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> =>? {
+    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpec?> "}" <end_location:@R> =>? {
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
             return Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
@@ -1664,12 +1664,8 @@ FStringReplacementField: ast::FStringElement = {
     }
 };
 
-FStringFormatSpecSuffix: (TextSize, Vec<ast::FStringElement>) = {
-    ":" <format_spec:FStringFormatSpec> => format_spec
-};
-
 FStringFormatSpec: (TextSize, Vec<ast::FStringElement>) = {
-    <location:@L> <elements:FStringMiddlePattern*> => (location, elements),
+    ":" <location:@L> <elements:FStringMiddlePattern*> => (location, elements)
 };
 
 FStringConversion: (TextSize, ast::ConversionFlag) = {
