@@ -7,7 +7,7 @@ fn to_formatted_value_expr(inner: &Expr) -> ast::FStringElement {
         expression: Box::new(inner.clone()),
         debug_text: None,
         conversion: ConversionFlag::None,
-        format_spec: vec![],
+        format_spec: None,
         range: TextRange::default(),
     })
 }

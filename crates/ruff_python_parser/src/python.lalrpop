@@ -1628,7 +1628,7 @@ FStringMiddlePattern: ast::FStringElement = {
 };
 
 FStringReplacementField: ast::FStringElement = {
-    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpec?> "}" <end_location:@R> =>? {
+    <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> =>? {
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
             return Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
@@ -1642,7 +1642,7 @@ FStringReplacementField: ast::FStringElement = {
             } else {
                 format_spec.as_ref().map_or_else(
                     || end_location - "}".text_len(),
-                    |(spec_start_location, _)| spec_start_location - ":".text_len(),
+                    |spec| spec.start() - ":".text_len(),
                 )
             };
             ast::DebugText {
@@ -1657,15 +1657,22 @@ FStringReplacementField: ast::FStringElement = {
                 conversion: conversion.map_or(ast::ConversionFlag::None, |(_, conversion_flag)| {
                     conversion_flag
                 }),
-                format_spec: format_spec.map_or_else(Vec::new, |(_, elements)| elements),
+                format_spec: format_spec.map(Box::new),
                 range: (location..end_location).into(),
             })
         )
     }
 };
 
-FStringFormatSpec: (TextSize, Vec<ast::FStringElement>) = {
-    ":" <location:@L> <elements:FStringMiddlePattern*> => (location, elements)
+FStringFormatSpecSuffix: ast::FStringFormatSpec = {
+    ":" <format_spec:FStringFormatSpec> => format_spec
+};
+
+FStringFormatSpec: ast::FStringFormatSpec = {
+    <location:@L> <elements:FStringMiddlePattern*> <end_location:@R> => ast::FStringFormatSpec {
+        elements,
+        range: (location..end_location).into(),
+    },
 };
 
 FStringConversion: (TextSize, ast::ConversionFlag) = {

@@ -32,14 +32,19 @@ expression: parse_ast
                                                     },
                                                 ),
                                                 conversion: None,
-                                                format_spec: [
-                                                    Literal(
-                                                        FStringLiteralElement {
-                                                            range: 9..12,
-                                                            value: ">10",
-                                                        },
-                                                    ),
-                                                ],
+                                                format_spec: Some(
+                                                    FStringFormatSpec {
+                                                        range: 9..12,
+                                                        elements: [
+                                                            Literal(
+                                                                FStringLiteralElement {
+                                                                    range: 9..12,
+                                                                    value: ">10",
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
+                                                ),
                                             },
                                         ),
                                     ],

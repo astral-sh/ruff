@@ -1305,7 +1305,7 @@ impl<'a> Generator<'a> {
         val: &Expr,
         debug_text: Option<&DebugText>,
         conversion: ConversionFlag,
-        spec: &[ast::FStringElement],
+        spec: Option<&ast::FStringFormatSpec>,
     ) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
@@ -1333,9 +1333,9 @@ impl<'a> Generator<'a> {
             self.p(&format!("{}", conversion as u8 as char));
         }
 
-        if !spec.is_empty() {
+        if let Some(spec) = spec {
             self.p(":");
-            self.unparse_f_string(spec, true);
+            self.unparse_f_string(&spec.elements, true);
         }
 
         self.p("}");
@@ -1356,7 +1356,7 @@ impl<'a> Generator<'a> {
                 expression,
                 debug_text.as_ref(),
                 *conversion,
-                format_spec,
+                format_spec.as_deref(),
             ),
         }
     }

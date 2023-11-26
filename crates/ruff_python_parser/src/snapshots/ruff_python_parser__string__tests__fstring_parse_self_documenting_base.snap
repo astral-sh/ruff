@@ -32,7 +32,7 @@ expression: parse_ast
                                                     },
                                                 ),
                                                 conversion: None,
-                                                format_spec: [],
+                                                format_spec: None,
                                             },
                                         ),
                                     ],
