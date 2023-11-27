@@ -20,13 +20,15 @@ use crate::rules::ruff::rules::helpers::{
 /// changed in one instance, as those changes will unexpectedly affect all
 /// other instances.
 ///
-/// When mutable value are intended, they should be annotated with
-/// `typing.ClassVar`.
+/// When mutable values are intended, they should be annotated with
+/// `typing.ClassVar`. When mutability is not required, values should be
+/// immutable types, like `tuple` or `frozenset`.
 ///
 /// ## Examples
 /// ```python
 /// class A:
 ///     mutable_default: list[int] = []
+///     immutable_default: list[int] = []
 /// ```
 ///
 /// Use instead:
@@ -36,6 +38,7 @@ use crate::rules::ruff::rules::helpers::{
 ///
 /// class A:
 ///     mutable_default: ClassVar[list[int]] = []
+///     immutable_default: tuple[int, ...] = ()
 /// ```
 #[violation]
 pub struct MutableClassDefault;
