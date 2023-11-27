@@ -15,24 +15,25 @@ use crate::importer::ImportRequest;
 /// redundant.
 ///
 /// Instead of passing 2 or 10 as the base, use `math.log2` or `math.log10`
-/// respectively. This is more readable, precise, and efficient.
+/// respectively, as these dedicated variants are typically more accurate
+/// than `math.log`.
 ///
 /// ## Example
 /// ```python
 /// import math
 ///
-/// math.log(2, 2)
-/// math.log(2, 10)
-/// math.log(2, math.e)
+/// math.log(4, math.e)
+/// math.log(4, 2)
+/// math.log(4, 10)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// import math
 ///
-/// math.log2(2)
-/// math.log10(2)
-/// math.log(2)
+/// math.log(4)
+/// math.log2(4)
+/// math.log10(4)
 /// ```
 ///
 /// ## References
@@ -52,18 +53,26 @@ impl Violation for RedundantLogBase {
     fn message(&self) -> String {
         let RedundantLogBase { base, arg } = self;
         let log_function = base.to_log_function();
-        format!("Replace with `math.{log_function}({arg})`")
+        format!("Prefer `math.{log_function}({arg})` over `math.log` with a redundant base")
     }
 
     fn fix_title(&self) -> Option<String> {
         let RedundantLogBase { base, arg } = self;
         let log_function = base.to_log_function();
-        Some(format!("Use `math.{log_function}({arg})`"))
+        Some(format!("Replace with `math.{log_function}({arg})`"))
     }
 }
 
 /// FURB163
 pub(crate) fn redundant_log_base(checker: &mut Checker, call: &ast::ExprCall) {
+    if !call.arguments.keywords.is_empty() {
+        return;
+    }
+
+    let [arg, base] = &call.arguments.args.as_slice() else {
+        return;
+    };
+
     if !checker
         .semantic()
         .resolve_call_path(&call.func)
@@ -72,48 +81,31 @@ pub(crate) fn redundant_log_base(checker: &mut Checker, call: &ast::ExprCall) {
     {
         return;
     }
-    match &call.arguments.args.as_slice() {
-        [arg, base] if is_number_literal(base, 2) => {
-            let mut diagnostic = Diagnostic::new(
-                RedundantLogBase {
-                    base: Base::Two,
-                    arg: checker.locator().slice(arg).into(),
-                },
-                call.range(),
-            );
-            diagnostic.try_set_fix(|| generate_fix(checker, call, Base::Two));
-            checker.diagnostics.push(diagnostic);
-        }
-        [arg, base] if is_number_literal(base, 10) => {
-            let mut diagnostic = Diagnostic::new(
-                RedundantLogBase {
-                    base: Base::Ten,
-                    arg: checker.locator().slice(arg).into(),
-                },
-                call.range(),
-            );
-            diagnostic.try_set_fix(|| generate_fix(checker, call, Base::Ten));
-            checker.diagnostics.push(diagnostic);
-        }
-        [arg, base]
-            if checker
-                .semantic()
-                .resolve_call_path(base)
-                .as_ref()
-                .is_some_and(|call_path| matches!(call_path.as_slice(), ["math", "e"])) =>
-        {
-            let mut diagnostic = Diagnostic::new(
-                RedundantLogBase {
-                    base: Base::E,
-                    arg: checker.locator().slice(arg).into(),
-                },
-                call.range(),
-            );
-            diagnostic.try_set_fix(|| generate_fix(checker, call, Base::E));
-            checker.diagnostics.push(diagnostic);
-        }
-        _ => {}
-    }
+
+    let base = if is_number_literal(base, 2) {
+        Base::Two
+    } else if is_number_literal(base, 10) {
+        Base::Ten
+    } else if checker
+        .semantic()
+        .resolve_call_path(base)
+        .as_ref()
+        .is_some_and(|call_path| matches!(call_path.as_slice(), ["math", "e"]))
+    {
+        Base::E
+    } else {
+        return;
+    };
+
+    let mut diagnostic = Diagnostic::new(
+        RedundantLogBase {
+            base,
+            arg: checker.locator().slice(arg).into(),
+        },
+        call.range(),
+    );
+    diagnostic.try_set_fix(|| generate_fix(checker, call, base));
+    checker.diagnostics.push(diagnostic);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
