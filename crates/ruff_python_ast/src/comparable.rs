@@ -520,7 +520,7 @@ pub struct FStringExpressionElement<'a> {
     expression: ComparableExpr<'a>,
     debug_text: Option<&'a ast::DebugText>,
     conversion: ast::ConversionFlag,
-    format_spec: Option<Vec<ComparableFStringElement<'a>>>,
+    format_spec: Option<ComparableExpr<'a>>,
 }
 
 impl<'a> From<&'a ast::FStringElement> for ComparableFStringElement<'a> {
@@ -534,10 +534,7 @@ impl<'a> From<&'a ast::FStringElement> for ComparableFStringElement<'a> {
                     expression: (&formatted_value.expression).into(),
                     debug_text: formatted_value.debug_text.as_ref(),
                     conversion: formatted_value.conversion,
-                    format_spec: formatted_value
-                        .format_spec
-                        .as_ref()
-                        .map(|spec| spec.elements.iter().map(Into::into).collect()),
+                    format_spec: formatted_value.format_spec.as_deref().map(Into::into),
                 })
             }
         }

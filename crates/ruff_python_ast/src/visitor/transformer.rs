@@ -743,9 +743,7 @@ pub fn walk_f_string_element<V: Transformer + ?Sized>(
     {
         visitor.visit_expr(expression);
         if let Some(format_spec) = format_spec {
-            for spec_element in &mut format_spec.elements {
-                visitor.visit_f_string_element(spec_element);
-            }
+            visitor.visit_expr(format_spec);
         }
     }
 }

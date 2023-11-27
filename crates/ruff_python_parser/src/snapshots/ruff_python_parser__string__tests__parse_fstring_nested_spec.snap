@@ -28,26 +28,37 @@ expression: parse_ast
                                                 debug_text: None,
                                                 conversion: None,
                                                 format_spec: Some(
-                                                    FStringFormatSpec {
-                                                        range: 7..13,
-                                                        elements: [
-                                                            Expression(
-                                                                FStringExpressionElement {
-                                                                    range: 7..13,
-                                                                    expression: Name(
-                                                                        ExprName {
-                                                                            range: 8..12,
-                                                                            id: "spec",
-                                                                            ctx: Load,
+                                                    FString(
+                                                        ExprFString {
+                                                            range: 7..13,
+                                                            value: FStringValue {
+                                                                inner: Single(
+                                                                    FString(
+                                                                        FString {
+                                                                            range: 7..13,
+                                                                            elements: [
+                                                                                Expression(
+                                                                                    FStringExpressionElement {
+                                                                                        range: 7..13,
+                                                                                        expression: Name(
+                                                                                            ExprName {
+                                                                                                range: 8..12,
+                                                                                                id: "spec",
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                        debug_text: None,
+                                                                                        conversion: None,
+                                                                                        format_spec: None,
+                                                                                    },
+                                                                                ),
+                                                                            ],
                                                                         },
                                                                     ),
-                                                                    debug_text: None,
-                                                                    conversion: None,
-                                                                    format_spec: None,
-                                                                },
-                                                            ),
-                                                        ],
-                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
                                                 ),
                                             },
                                         ),
