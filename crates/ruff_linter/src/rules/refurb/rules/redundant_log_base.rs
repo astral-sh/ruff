@@ -40,6 +40,7 @@ use crate::importer::ImportRequest;
 /// - [Python documentation: `math.log`](https://docs.python.org/3/library/math.html#math.log)
 /// - [Python documentation: `math.log2`](https://docs.python.org/3/library/math.html#math.log2)
 /// - [Python documentation: `math.log10`](https://docs.python.org/3/library/math.html#math.log10)
+/// - [Python documentation: `math.e`](https://docs.python.org/3/library/math.html#math.e)
 #[violation]
 pub struct RedundantLogBase {
     base: Base,
@@ -104,7 +105,7 @@ pub(crate) fn redundant_log_base(checker: &mut Checker, call: &ast::ExprCall) {
         },
         call.range(),
     );
-    diagnostic.try_set_fix(|| generate_fix(checker, call, base));
+    diagnostic.try_set_fix(|| generate_fix(checker, call, base, arg));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -134,13 +135,13 @@ fn is_number_literal(expr: &Expr, value: i8) -> bool {
     false
 }
 
-fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base) -> Result<Fix> {
+fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr) -> Result<Fix> {
     let (edit, binding) = checker.importer().get_or_import_symbol(
         &ImportRequest::import("math", base.to_log_function()),
         call.start(),
         checker.semantic(),
     )?;
-    let number = checker.locator().slice(&call.arguments.args[0]);
+    let number = checker.locator().slice(arg);
     Ok(Fix::safe_edits(
         Edit::range_replacement(format!("{binding}({number})"), call.range()),
         [edit],
