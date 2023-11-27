@@ -103,10 +103,12 @@ Going forward, the Ruff Formatter will support Black's preview style under Ruff'
 ## Configuration
 
 The Ruff Formatter exposes a small set of configuration options, some of which are also supported
-by Black (like line width), some of which are unique to Ruff (like quote and indentation style).
+by Black (like line width), some of which are unique to Ruff (like quote, indentation style and
+formatting code examples in docstrings).
 
-For example, to configure the formatter to use single quotes, a line width of 100, and
-tab indentation, add the following to your configuration file:
+For example, to configure the formatter to use single quotes, format code
+examples in docstrings, a line width of 100, and tab indentation, add the
+following to your configuration file:
 
 === "pyproject.toml"
 
@@ -117,6 +119,7 @@ tab indentation, add the following to your configuration file:
     [tool.ruff.format]
     quote-style = "single"
     indent-style = "tab"
+    docstring-code-format = true
     ```
 
 === "ruff.toml"
@@ -127,6 +130,7 @@ tab indentation, add the following to your configuration file:
     [format]
     quote-style = "single"
     indent-style = "tab"
+    docstring-code-format = true
     ```
 
 
@@ -136,6 +140,97 @@ configuring Ruff via `pyproject.toml`, see [_Configuring Ruff_](configuration.md
 Given the focus on Black compatibility (and unlike formatters like [YAPF](https://github.com/google/yapf)),
 Ruff does not currently expose any configuration options to modify core formatting behavior outside
 of these trivia-related settings.
+
+## Docstring formatting
+
+The Ruff formatter provides an opt-in feature for automatically formatting
+Python code examples in docstrings. The Ruff formatter currently recognizes
+code examples in the following formats:
+
+* The Python [doctest] format.
+* CommonMark [fenced code blocks] with the following info strings: `python`,
+`py`, `python3`, or `py3`. Fenced code blocks without an info string are
+assumed to be Python code examples and also formatted.
+* reStructuredText [literal blocks]. While literal blocks may contain things
+other than Python, this is meant to reflect a long-standing convention in the
+Python ecosystem where literal blocks often contain Python code.
+* reStructuredText [`code-block` and `sourcecode` directives]. As with
+Markdown, the language names recognized for Python are `python`, `py`,
+`python3`, or `py3`.
+
+If a code example is recognized and treated as Python, the Ruff formatter will
+automatically skip it if the code does not parse as valid Python or if the
+reformatted code would produce an invalid Python program.
+
+Users may also configure the line length limit used for reformatting Python
+code examples in docstrings. The default is a special value, `dynamic`, which
+instructs the formatter to respect the line length limit setting for the
+surrounding Python code. The `dynamic` setting ensures that even when code
+examples are found inside indented docstrings, the line length limit configured
+for the surrounding Python code will not be exceeded. Users may also configure
+a fixed line length limit for code examples in docstrings.
+
+For example, this configuration shows how to enable docstring code formatting
+with a fixed line length limit:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.format]
+    docstring-code-format = true
+    docstring-code-line-length = 20
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [format]
+    docstring-code-format = true
+    docstring-code-line-length = 20
+    ```
+
+With the above configuration, this code:
+
+```python
+def f(x):
+    '''
+    Something about `f`. And an example:
+
+    .. code-block:: python
+
+        foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+    '''
+    pass
+```
+
+... will be reformatted (assuming the rest of the options are set
+to their defaults) as:
+
+```python
+def f(x):
+    """
+    Something about `f`. And an example:
+
+    .. code-block:: python
+
+        (
+            foo,
+            bar,
+            quux,
+        ) = this_is_a_long_line(
+            lion,
+            hippo,
+            lemur,
+            bear,
+        )
+    """
+    pass
+```
+
+[doctest]: https://docs.python.org/3/library/doctest.html
+[fenced code blocks]: https://spec.commonmark.org/0.30/#fenced-code-blocks
+[literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
+[`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
 
 ## Format suppression
 

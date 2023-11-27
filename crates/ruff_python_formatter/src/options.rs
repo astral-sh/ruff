@@ -176,6 +176,12 @@ impl PyFormatOptions {
     }
 
     #[must_use]
+    pub fn with_docstring_code_line_width(mut self, line_width: DocstringCodeLineWidth) -> Self {
+        self.docstring_code_line_width = line_width;
+        self
+    }
+
+    #[must_use]
     pub fn with_preview(mut self, preview: PreviewMode) -> Self {
         self.preview = preview;
         self

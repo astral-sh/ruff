@@ -27,7 +27,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{warn_user_once, RuleSelector};
 use ruff_macros::{CombineOptions, OptionsMetadata};
-use ruff_python_formatter::QuoteStyle;
+use ruff_python_formatter::{DocstringCodeLineWidth, QuoteStyle};
 
 use crate::settings::LineEnding;
 
@@ -2948,6 +2948,156 @@ pub struct FormatOptions {
         "#
     )]
     pub line_ending: Option<LineEnding>,
+
+    /// Whether to format code snippets in docstrings.
+    ///
+    /// When this is enabled, Python code examples within docstrings are
+    /// automatically reformatted.
+    ///
+    /// For example, when this is enabled, the following code:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     """
+    ///     Something about `f`. And an example in doctest format:
+    ///
+    ///     >>> f(  x  )
+    ///
+    ///     Markdown is also supported:
+    ///
+    ///     ```py
+    ///     f(  x  )
+    ///     ```
+    ///
+    ///     As are reStructuredText literal blocks::
+    ///
+    ///         f(  x  )
+    ///
+    ///
+    ///     And reStructuredText code blocks:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         f(  x  )
+    ///     """
+    ///     pass
+    /// ```
+    ///
+    /// ... will be reformatted (assuming the rest of the options are set to
+    /// their defaults) as:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     """
+    ///     Something about `f`. And an example in doctest format:
+    ///
+    ///     >>> f(x)
+    ///
+    ///     Markdown is also supported:
+    ///
+    ///     ```py
+    ///     f(x)
+    ///     ```
+    ///
+    ///     As are reStructuredText literal blocks::
+    ///
+    ///         f(x)
+    ///
+    ///
+    ///     And reStructuredText code blocks:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         f(x)
+    ///     """
+    ///     pass
+    /// ```
+    ///
+    /// If a code snippt in a docstring contains invalid Python code or if the
+    /// formatter would otherwise write invalid Python code, then the code
+    /// example is ignored by the formatter and kept as-is.
+    ///
+    /// Currently, doctest, Markdown, reStructuredText literal blocks, and
+    /// reStructuredText code blocks are all supported and automatically
+    /// recognized. In the case of unlabeled fenced code blocks in Markdown and
+    /// reStructuredText literal blocks, the contents are assumed to be Python
+    /// and reformatted. As with any other format, if the contents aren't valid
+    /// Python, then the block is left untouched automatically.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Enable reformatting of code snippets in docstrings.
+            docstring-code-format = true
+        "#
+    )]
+    pub docstring_code_format: Option<bool>,
+
+    /// Set the line length used when formatting code snippets in docstrings.
+    ///
+    /// This only has an effect when the `docstring-code-format` setting is
+    /// enabled.
+    ///
+    /// The default value for this setting is `"dynamic"`, which has the effect
+    /// of ensuring that any reformatted code examples in docstrings adhere to
+    /// the global line length configuration that is used for the surrounding
+    /// Python code. The point of this setting is that it takes the indentation
+    /// of the docstring into account when reformatting code examples.
+    ///
+    /// Alternatively, this can be set to a fixed integer, which will result
+    /// in the same line length limit being applied to all reformatted code
+    /// examples in docstrings. When set to a fixed integer, the indent of the
+    /// docstring is not taken into account. That is, this may result in lines
+    /// in the reformatted code example that exceed the globally configured
+    /// line length limit.
+    ///
+    /// For example, when this is set to `20` and `docstring-code-format` is
+    /// enabled, then this code:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     '''
+    ///     Something about `f`. And an example:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+    ///     '''
+    ///     pass
+    /// ```
+    ///
+    /// ... will be reformatted (assuming the rest of the options are set
+    /// to their defaults) as:
+    ///
+    /// ```python
+    /// def f(x):
+    ///     """
+    ///     Something about `f`. And an example:
+    ///
+    ///     .. code-block:: python
+    ///
+    ///         (
+    ///             foo,
+    ///             bar,
+    ///             quux,
+    ///         ) = this_is_a_long_line(
+    ///             lion,
+    ///             hippo,
+    ///             lemur,
+    ///             bear,
+    ///         )
+    ///     """
+    ///     pass
+    /// ```
+    #[option(
+        default = r#""dynamic""#,
+        value_type = r#"int | "dynamic""#,
+        example = r#"
+            # Format all docstring code snippets with a line length of 60.
+            docstring-code-line-length = 60
+        "#
+    )]
+    pub docstring_code_line_length: Option<DocstringCodeLineWidth>,
 }
 
 #[cfg(test)]

@@ -5,7 +5,10 @@ use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFor
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
-use ruff_python_formatter::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
+use ruff_python_formatter::{
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
+    QuoteStyle,
+};
 use ruff_source_file::find_newline;
 use std::path::{Path, PathBuf};
 
@@ -124,6 +127,9 @@ pub struct FormatterSettings {
     pub magic_trailing_comma: MagicTrailingComma,
 
     pub line_ending: LineEnding,
+
+    pub docstring_code_format: DocstringCode,
+    pub docstring_code_line_width: DocstringCodeLineWidth,
 }
 
 impl FormatterSettings {
@@ -157,6 +163,8 @@ impl FormatterSettings {
             .with_preview(self.preview)
             .with_line_ending(line_ending)
             .with_line_width(self.line_width)
+            .with_docstring_code(self.docstring_code_format)
+            .with_docstring_code_line_width(self.docstring_code_line_width)
     }
 }
 
@@ -173,6 +181,8 @@ impl Default for FormatterSettings {
             indent_width: default_options.indent_width(),
             quote_style: default_options.quote_style(),
             magic_trailing_comma: default_options.magic_trailing_comma(),
+            docstring_code_format: default_options.docstring_code(),
+            docstring_code_line_width: default_options.docstring_code_line_width(),
         }
     }
 }
