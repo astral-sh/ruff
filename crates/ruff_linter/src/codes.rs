@@ -285,7 +285,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         #[allow(deprecated)]
         (Pylint, "W3201") => (RuleGroup::Nursery, rules::pylint::rules::BadDunderMethodName),
         (Pylint, "W3301") => (RuleGroup::Stable, rules::pylint::rules::NestedMinMax),
-        (Pylint, "W9011") => (RuleGroup::Stable, rules::pylint::rules::MissingReturnDoc),
+        (Pylint, "W9011") => (RuleGroup::Preview, rules::pylint::rules::MissingReturnDoc),
 
         // flake8-async
         (Flake8Async, "100") => (RuleGroup::Stable, rules::flake8_async::rules::BlockingHttpCallInAsyncFunction),
