@@ -2334,6 +2334,7 @@ dependencies = [
  "itertools 0.11.0",
  "memchr",
  "once_cell",
+ "regex",
  "ruff_cache",
  "ruff_formatter",
  "ruff_macros",

@@ -41,6 +41,7 @@ unicode-width = { workspace = true }
 ruff_formatter = { path = "../ruff_formatter" }
 
 insta = { workspace = true, features = ["glob"] }
+regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
