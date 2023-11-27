@@ -24,6 +24,14 @@ def no_return_also_good(a: int, b: int) -> None:
     return None
 
 
+def _private_good(a: int, b: int) -> None:
+    """Returns sum of two integers.
+    :param a: first integer
+    :param b: second integer
+    """
+    return a + b
+
+
 def return_bad(a: int, b: int):  # [missing-return-doc]
     """Returns sum of two integers.
     :param a: first integer

@@ -46,22 +46,24 @@ impl Violation for MissingReturnDoc {
 
 /// PLW9011
 pub(crate) fn missing_return_doc(checker: &mut Checker, docstring: &Docstring) {
-    let is_method_with_return = docstring
-        .definition
-        .as_function_def()
-        .map_or(false, |function| {
-            function
-                .body
-                .iter()
-                .filter_map(|statement| statement.as_return_stmt())
-                .any(|return_statement| {
-                    return_statement
-                        .value
-                        .as_deref()
-                        .is_some_and(|value| !value.is_none_literal_expr())
-                })
-        });
-    if is_method_with_return && !docstring.contents.contains(":return:") {
+    let is_public_method_with_return =
+        docstring
+            .definition
+            .as_function_def()
+            .map_or(false, |function| {
+                !function.name.starts_with('_')
+                    && function
+                        .body
+                        .iter()
+                        .filter_map(|statement| statement.as_return_stmt())
+                        .any(|return_statement| {
+                            return_statement
+                                .value
+                                .as_deref()
+                                .is_some_and(|value| !value.is_none_literal_expr())
+                        })
+            });
+    if is_public_method_with_return && !docstring.contents.contains(":return:") {
         checker
             .diagnostics
             .push(Diagnostic::new(MissingReturnDoc, docstring.range()));
