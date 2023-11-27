@@ -24,6 +24,36 @@ def no_return_also_good(a: int, b: int) -> None:
     return None
 
 
+def google_good(a: int, b: int):
+    """Returns sum of two integers.
+
+    Args:
+        a: first integer
+        b: second integer
+
+    Returns:
+        sum
+    """
+    return a + b
+
+
+def numpy_good(a: int, b: int):
+    """Returns sum of two integers.
+
+    Parameters
+    ----------
+    a:
+        first integer
+    b:
+        second integer
+
+    Returns
+    -------
+        sum
+    """
+    return a + b
+
+
 def _private_good(a: int, b: int) -> None:
     """Returns sum of two integers.
     :param a: first integer

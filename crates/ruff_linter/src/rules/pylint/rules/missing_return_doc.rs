@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::fmt::Debug;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -63,7 +64,14 @@ pub(crate) fn missing_return_doc(checker: &mut Checker, docstring: &Docstring) {
                                 .is_some_and(|value| !value.is_none_literal_expr())
                         })
             });
-    if is_public_method_with_return && !docstring.contents.contains(":return:") {
+    let rest_style = ":return:";
+    let numpy_style = r"Returns\n\s*-------\n";
+    let google_style = r"Returns:\n";
+    let has_return_documentation = [rest_style, numpy_style, google_style]
+        .map(|pattern| Regex::new(pattern).unwrap())
+        .iter()
+        .any(|return_regex| return_regex.is_match(docstring.contents));
+    if is_public_method_with_return && !has_return_documentation {
         checker
             .diagnostics
             .push(Diagnostic::new(MissingReturnDoc, docstring.range()));

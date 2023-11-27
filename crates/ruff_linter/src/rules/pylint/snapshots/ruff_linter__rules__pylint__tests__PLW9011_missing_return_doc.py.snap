@@ -1,16 +1,16 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-missing_return_doc.py:36:5: PLW9011 Docstring missing documentation on what is returned
+missing_return_doc.py:66:5: PLW9011 Docstring missing documentation on what is returned
    |
-35 |   def return_bad(a: int, b: int):  # [missing-return-doc]
-36 |       """Returns sum of two integers.
+65 |   def return_bad(a: int, b: int):  # [missing-return-doc]
+66 |       """Returns sum of two integers.
    |  _____^
-37 | |     :param a: first integer
-38 | |     :param b: second integer
-39 | |     """
+67 | |     :param a: first integer
+68 | |     :param b: second integer
+69 | |     """
    | |_______^ PLW9011
-40 |       return a + b
+70 |       return a + b
    |
 
 
