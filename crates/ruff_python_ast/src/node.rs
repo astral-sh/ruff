@@ -2668,7 +2668,9 @@ impl AstNode for ast::FStringExpressionElement {
         visitor.visit_expr(expression);
 
         if let Some(format_spec) = format_spec {
-            visitor.visit_expr(format_spec);
+            for spec_part in &format_spec.elements {
+                visitor.visit_f_string_element(spec_part);
+            }
         }
     }
 }

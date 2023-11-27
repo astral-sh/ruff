@@ -33,28 +33,17 @@ expression: parse_ast
                                                 ),
                                                 conversion: None,
                                                 format_spec: Some(
-                                                    FString(
-                                                        ExprFString {
-                                                            range: 9..12,
-                                                            value: FStringValue {
-                                                                inner: Single(
-                                                                    FString(
-                                                                        FString {
-                                                                            range: 9..12,
-                                                                            elements: [
-                                                                                Literal(
-                                                                                    FStringLiteralElement {
-                                                                                        range: 9..12,
-                                                                                        value: ">10",
-                                                                                    },
-                                                                                ),
-                                                                            ],
-                                                                        },
-                                                                    ),
-                                                                ),
-                                                            },
-                                                        },
-                                                    ),
+                                                    FStringFormatSpec {
+                                                        range: 9..12,
+                                                        elements: [
+                                                            Literal(
+                                                                FStringLiteralElement {
+                                                                    range: 9..12,
+                                                                    value: ">10",
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
                                                 ),
                                             },
                                         ),

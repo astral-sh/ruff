@@ -316,9 +316,11 @@ pub fn any_over_f_string_element(element: &FStringElement, func: &dyn Fn(&Expr) 
             ..
         }) => {
             any_over_expr(expression, func)
-                || format_spec
-                    .as_ref()
-                    .is_some_and(|spec| any_over_expr(spec, func))
+                || format_spec.as_ref().is_some_and(|spec| {
+                    spec.elements
+                        .iter()
+                        .any(|spec_element| any_over_f_string_element(spec_element, func))
+                })
         }
     }
 }

@@ -936,7 +936,7 @@ pub struct FStringExpressionElement {
     pub expression: Box<Expr>,
     pub debug_text: Option<DebugText>,
     pub conversion: ConversionFlag,
-    pub format_spec: Option<Box<Expr>>,
+    pub format_spec: Option<Box<FStringFormatSpec>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -757,7 +757,9 @@ pub fn walk_f_string_element<'a, V: Visitor<'a> + ?Sized>(
     {
         visitor.visit_expr(expression);
         if let Some(format_spec) = format_spec {
-            visitor.visit_expr(format_spec);
+            for spec_element in &format_spec.elements {
+                visitor.visit_f_string_element(spec_element);
+            }
         }
     }
 }
