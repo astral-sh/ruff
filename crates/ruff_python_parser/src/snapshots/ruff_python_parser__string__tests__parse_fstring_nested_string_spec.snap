@@ -28,44 +28,33 @@ expression: parse_ast
                                                 debug_text: None,
                                                 conversion: None,
                                                 format_spec: Some(
-                                                    FString(
-                                                        ExprFString {
-                                                            range: 7..11,
-                                                            value: FStringValue {
-                                                                inner: Single(
-                                                                    FString(
-                                                                        FString {
-                                                                            range: 7..11,
-                                                                            elements: [
-                                                                                Expression(
-                                                                                    FStringExpressionElement {
-                                                                                        range: 7..11,
-                                                                                        expression: StringLiteral(
-                                                                                            ExprStringLiteral {
-                                                                                                range: 8..10,
-                                                                                                value: StringLiteralValue {
-                                                                                                    inner: Single(
-                                                                                                        StringLiteral {
-                                                                                                            range: 8..10,
-                                                                                                            value: "",
-                                                                                                            unicode: false,
-                                                                                                        },
-                                                                                                    ),
-                                                                                                },
-                                                                                            },
-                                                                                        ),
-                                                                                        debug_text: None,
-                                                                                        conversion: None,
-                                                                                        format_spec: None,
+                                                    FStringFormatSpec {
+                                                        range: 7..11,
+                                                        elements: [
+                                                            Expression(
+                                                                FStringExpressionElement {
+                                                                    range: 7..11,
+                                                                    expression: StringLiteral(
+                                                                        ExprStringLiteral {
+                                                                            range: 8..10,
+                                                                            value: StringLiteralValue {
+                                                                                inner: Single(
+                                                                                    StringLiteral {
+                                                                                        range: 8..10,
+                                                                                        value: "",
+                                                                                        unicode: false,
                                                                                     },
                                                                                 ),
-                                                                            ],
+                                                                            },
                                                                         },
                                                                     ),
-                                                                ),
-                                                            },
-                                                        },
-                                                    ),
+                                                                    debug_text: None,
+                                                                    conversion: None,
+                                                                    format_spec: None,
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
                                                 ),
                                             },
                                         ),
