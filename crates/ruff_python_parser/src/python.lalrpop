@@ -1664,14 +1664,16 @@ FStringReplacementField: ast::FStringElement = {
     }
 };
 
-FStringFormatSpecSuffix: ast::FStringFormatSpec = {
+FStringFormatSpecSuffix: ast::Expr = {
     ":" <format_spec:FStringFormatSpec> => format_spec
 };
 
-FStringFormatSpec: ast::FStringFormatSpec = {
-    <location:@L> <elements:FStringMiddlePattern*> <end_location:@R> => ast::FStringFormatSpec {
-        elements,
-        range: (location..end_location).into(),
+FStringFormatSpec: ast::Expr = {
+    <location:@L> <elements:FStringMiddlePattern*> <end_location:@R> => {
+        ast::FString {
+            elements,
+            range: (location..end_location).into(),
+        }.into()
     },
 };
 

@@ -1305,7 +1305,7 @@ impl<'a> Generator<'a> {
         val: &Expr,
         debug_text: Option<&DebugText>,
         conversion: ConversionFlag,
-        spec: Option<&ast::FStringFormatSpec>,
+        spec: Option<&ast::Expr>,
     ) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
@@ -1335,7 +1335,7 @@ impl<'a> Generator<'a> {
 
         if let Some(spec) = spec {
             self.p(":");
-            self.unparse_f_string(&spec.elements, true);
+            self.unparse_f_string_value(&spec.as_f_string_expr().unwrap().value, true);
         }
 
         self.p("}");
