@@ -39,7 +39,7 @@ impl AlwaysFixableViolation for UnnecessaryListIndexLookup {
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary list index lookup")
+        format!("Use existing item variable instead")
     }
 }
 
