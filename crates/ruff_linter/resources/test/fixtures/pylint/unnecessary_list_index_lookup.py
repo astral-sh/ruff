@@ -16,7 +16,18 @@ def dont_fix_these():
     # once there is an assignment to the sequence[index], we stop emitting diagnostics
     for index, letter in enumerate(letters):
         letters[index] = "d"  # Ok
-        assert letters[index] == "d"  # Ok
+        letters[index] += "e"  # Ok
+        assert letters[index] == "de"  # Ok
+    
+    # once there is an assignment to the index, we stop emitting diagnostics
+    for index, letter in enumerate(letters):
+        index += 1  # Ok
+        print(letters[index])  # Ok
+    
+    # once there is an assignment to the sequence, we stop emitting diagnostics
+    for index, letter in enumerate(letters):
+        letters = ["d", "e", "f"]  # Ok
+        print(letters[index])  # Ok
 
 
 def value_intentionally_unused():
