@@ -20,18 +20,10 @@ pub(crate) struct BlankLinesTrackingVars {
     follows_decorator: bool,
     follows_def: bool,
     follows_docstring: bool,
-    is_in_class: bool,
-    /// The indent level where the class started.
-    class_indent_level: usize,
-    is_in_fn: bool,
-    /// The indent level where the function started.
-    fn_indent_level: usize,
+    fn_status: Status,
+    class_status: Status,
     /// First line that is not a comment.
     is_not_first_logical_line: bool,
-    /// This needs to be tracked between lines since the `is_in_class` and `is_in_fn` are set to
-    /// false when a comment is set dedented, but E305 should trigger on the next non-comment line.
-    follows_comment_after_fn: bool,
-    follows_comment_after_class: bool,
     /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
     /// to the second line instead of the first.
     last_non_comment_line_end: TextSize,
@@ -42,6 +34,16 @@ pub(crate) struct BlankLinesTrackingVars {
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
 /// Number of blank lines around methods and nested classes and functions.
 const BLANK_LINES_METHOD_LEVEL: u32 = 1;
+
+#[derive(Copy, Clone, Debug, Default)]
+enum Status {
+    /// Stores the indent level where the nesting started.
+    Inside(usize),
+    /// This is used to rectify a Inside switched to a Outside because of a dedented comment.
+    CommentAfter(usize),
+    #[default]
+    Outside,
+}
 
 /// ## What it does
 /// Checks for missing blank lines between methods of a class.
@@ -354,34 +356,42 @@ pub(crate) fn blank_lines(
 ) {
     let line_is_comment_only = line.is_comment_only();
 
-    if indent_level < tracked_vars.class_indent_level && tracked_vars.is_in_class {
-        tracked_vars.is_in_class = false;
-        if line_is_comment_only {
-            tracked_vars.follows_comment_after_class = true;
+    if let Status::Inside(nesting_indent) = tracked_vars.class_status {
+        if indent_level < nesting_indent {
+            if line_is_comment_only {
+                tracked_vars.class_status = Status::CommentAfter(nesting_indent);
+            } else {
+                tracked_vars.class_status = Status::Outside;
+            }
         }
     }
 
-    if indent_level < tracked_vars.fn_indent_level && tracked_vars.is_in_fn {
-        tracked_vars.is_in_fn = false;
-        if line_is_comment_only {
-            tracked_vars.follows_comment_after_fn = true;
+    if let Status::Inside(nesting_indent) = tracked_vars.fn_status {
+        if indent_level < nesting_indent {
+            if line_is_comment_only {
+                tracked_vars.fn_status = Status::CommentAfter(nesting_indent);
+            } else {
+                tracked_vars.fn_status = Status::Outside;
+            }
         }
     }
 
     // A comment can be de-indented while still being in a class/function, in that case
     // we need to revert the variables.
-    if tracked_vars.follows_comment_after_fn && !line_is_comment_only {
-        if indent_level == tracked_vars.fn_indent_level {
-            tracked_vars.is_in_fn = true;
+    if !line_is_comment_only {
+        if let Status::CommentAfter(indent) = tracked_vars.fn_status {
+            if indent_level >= indent {
+                tracked_vars.fn_status = Status::Inside(indent)
+            }
+            tracked_vars.fn_status = Status::Outside
         }
-        tracked_vars.follows_comment_after_fn = false;
-    }
 
-    if tracked_vars.follows_comment_after_class && !line_is_comment_only {
-        if indent_level == tracked_vars.class_indent_level {
-            tracked_vars.is_in_class = true;
+        if let Status::CommentAfter(indent) = tracked_vars.class_status {
+            if indent_level >= indent {
+                tracked_vars.class_status = Status::Inside(indent)
+            }
+            tracked_vars.class_status = Status::Outside
         }
-        tracked_vars.follows_comment_after_class = false;
     }
 
     for token in line.tokens() {
@@ -394,7 +404,7 @@ pub(crate) fn blank_lines(
             if line.line.preceding_blank_lines == 0
                 // Only applies to methods.
                 && token.kind() == TokenKind::Def
-                && tracked_vars.is_in_class
+                && matches!(tracked_vars.class_status, Status::Inside(_))
                 // The class/parent method's docstring can directly precede the def.
                 && !tracked_vars.follows_docstring
                 // Do not trigger when the def follows an if/while/etc...
@@ -505,8 +515,8 @@ pub(crate) fn blank_lines(
             }
 
             if line.line.preceding_blank_lines == 0
-                // Only apply to nested functions.
-                && tracked_vars.is_in_fn
+            // Only apply to nested functions.
+                && matches!(tracked_vars.fn_status, Status::Inside(_))
                 && is_top_level_token_or_decorator(token.kind)
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !tracked_vars.follows_decorator
@@ -539,10 +549,9 @@ pub(crate) fn blank_lines(
 
         match token.kind() {
             TokenKind::Class => {
-                if !tracked_vars.is_in_class {
-                    tracked_vars.class_indent_level = indent_level + indent_size;
+                if matches!(tracked_vars.class_status, Status::Outside) {
+                    tracked_vars.class_status = Status::Inside(indent_level + indent_size);
                 }
-                tracked_vars.is_in_class = true;
                 tracked_vars.follows_decorator = false;
                 tracked_vars.follows_def = false;
                 break;
@@ -553,10 +562,9 @@ pub(crate) fn blank_lines(
                 break;
             }
             TokenKind::Def | TokenKind::Async => {
-                if !tracked_vars.is_in_fn {
-                    tracked_vars.fn_indent_level = indent_level + indent_size;
+                if matches!(tracked_vars.fn_status, Status::Outside) {
+                    tracked_vars.fn_status = Status::Inside(indent_level + indent_size);
                 }
-                tracked_vars.is_in_fn = true;
                 tracked_vars.follows_def = true;
                 tracked_vars.follows_decorator = false;
                 break;
