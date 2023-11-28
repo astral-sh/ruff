@@ -65,10 +65,18 @@ impl<'a> From<String> for NatOrdStr<'a> {
     }
 }
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) enum Distance {
     Nearest(u32),
     Furthest(Reverse<u32>),
+}
+
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) enum ImportStyle {
+    // Ex) `import foo`
+    Straight,
+    // Ex) `from foo import bar`
+    From,
 }
 
 /// A comparable key to capture the desired sorting order for an imported module (e.g.,
@@ -90,8 +98,8 @@ impl<'a> ModuleKey<'a> {
         asname: Option<&'a str>,
         level: Option<u32>,
         first_alias: Option<(&'a str, Option<&'a str>)>,
+        style: ImportStyle,
         settings: &Settings,
-        straight_import: bool,
     ) -> Self {
         let level = level.unwrap_or_default();
 
@@ -100,7 +108,7 @@ impl<'a> ModuleKey<'a> {
             .unwrap_or_default(); // `false` < `true` so we get forced to top first
 
         let maybe_length = (settings.length_sort
-            || (settings.length_sort_straight && straight_import))
+            || (settings.length_sort_straight && style == ImportStyle::Straight))
             .then_some(name.map(str::width).unwrap_or_default() + level as usize);
 
         let distance = match settings.relative_imports_order {

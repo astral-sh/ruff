@@ -1478,14 +1478,14 @@
           }
         },
         "length-sort": {
-          "description": "Sort imports by their string length.\n\nThe string length is computed using the [`unicode_width`](https://crates.io/crates/unicode-width) crate, i.e. it is the displayed width of the string according to [Unicode Standard Annex #11 rules](http://www.unicode.org/reports/tr11/).",
+          "description": "Sort imports by their string length, such that shorter imports appear before longer imports. For example, by default, imports will be sorted alphabetically, as in: ```python import collections import os ```\n\nSetting `length-sort = true` will instead sort such that shorter imports appear before longer imports, as in: ```python import os import collections ```",
           "type": [
             "boolean",
             "null"
           ]
         },
         "length-sort-straight": {
-          "description": "Sort straight imports by their string length.\n\nSame as `length-sort` but does not affect from imports.",
+          "description": "Sort straight imports by their string length. Similar to `length-sort`, but applies only to straight imports and doesn't affect `from` imports.",
           "type": [
             "boolean",
             "null"

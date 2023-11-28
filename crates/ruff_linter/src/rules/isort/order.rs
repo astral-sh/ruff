@@ -1,3 +1,4 @@
+use crate::rules::isort::sorting::ImportStyle;
 use itertools::Itertools;
 
 use super::settings::Settings;
@@ -61,22 +62,29 @@ pub(crate) fn order_imports<'a>(
                     alias.asname,
                     None,
                     None,
+                    ImportStyle::Straight,
                     settings,
-                    true,
                 ),
                 ImportFrom((import_from, _, _, aliases)) => ModuleKey::from_module(
                     import_from.module,
                     None,
                     import_from.level,
                     aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
                     settings,
-                    false,
                 ),
             })
             .collect()
     } else {
         let ordered_straight_imports = straight_imports.sorted_by_cached_key(|(alias, _)| {
-            ModuleKey::from_module(Some(alias.name), alias.asname, None, None, settings, true)
+            ModuleKey::from_module(
+                Some(alias.name),
+                alias.asname,
+                None,
+                None,
+                ImportStyle::Straight,
+                settings,
+            )
         });
         let ordered_from_imports =
             from_imports.sorted_by_cached_key(|(import_from, _, _, aliases)| {
@@ -85,8 +93,8 @@ pub(crate) fn order_imports<'a>(
                     None,
                     import_from.level,
                     aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
                     settings,
-                    false,
                 )
             });
         if settings.from_first {
