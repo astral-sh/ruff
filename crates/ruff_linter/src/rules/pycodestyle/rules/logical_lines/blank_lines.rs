@@ -38,15 +38,10 @@ pub(crate) struct BlankLinesTrackingVars {
     previous_unindented_token: Option<TokenKind>,
 }
 
-/// Number of blank lines between various code parts.
-struct BlankLinesConfig;
-
-impl BlankLinesConfig {
-    /// Number of blank lines around top level classes and functions.
-    const TOP_LEVEL: u32 = 2;
-    /// Number of blank lines around methods and nested classes and functions.
-    const METHOD: u32 = 1;
-}
+/// Number of blank lines around top level classes and functions.
+const BLANK_LINES_TOP_LEVEL: u32 = 2;
+/// Number of blank lines around methods and nested classes and functions.
+const BLANK_LINES_METHOD_LEVEL: u32 = 1;
 
 /// ## What it does
 /// Checks for missing blank lines between methods of a class.
@@ -87,7 +82,7 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
         let BlankLineBetweenMethods(nb_blank_lines) = self;
         format!(
             "Expected {:?} blank line, found {nb_blank_lines}",
-            BlankLinesConfig::METHOD
+            BLANK_LINES_METHOD_LEVEL
         )
     }
 
@@ -134,7 +129,7 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
         let BlankLinesTopLevel(nb_blank_lines) = self;
         format!(
             "Expected {:?} blank lines, found {nb_blank_lines}",
-            BlankLinesConfig::TOP_LEVEL
+            BLANK_LINES_TOP_LEVEL
         )
     }
 
@@ -420,7 +415,7 @@ pub(crate) fn blank_lines(
                 context.push_diagnostic(diagnostic);
             }
 
-            if line.line.preceding_blank_lines < BlankLinesConfig::TOP_LEVEL
+            if line.line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !tracked_vars.follows_decorator
                 // Allow groups of one-liners.
@@ -441,26 +436,28 @@ pub(crate) fn blank_lines(
                     token.range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    stylist.line_ending().as_str().to_string().repeat(
-                        (BlankLinesConfig::TOP_LEVEL - line.line.preceding_blank_lines) as usize,
-                    ),
+                    stylist
+                        .line_ending()
+                        .as_str()
+                        .to_string()
+                        .repeat((BLANK_LINES_TOP_LEVEL - line.line.preceding_blank_lines) as usize),
                     locator.line_start(tracked_vars.last_non_comment_line_end),
                 )));
 
                 context.push_diagnostic(diagnostic);
             }
 
-            if line.line.blank_lines > BlankLinesConfig::TOP_LEVEL
-                || (indent_level > 0 && line.line.blank_lines > BlankLinesConfig::METHOD)
+            if line.line.blank_lines > BLANK_LINES_TOP_LEVEL
+                || (indent_level > 0 && line.line.blank_lines > BLANK_LINES_METHOD_LEVEL)
             {
                 // E303
                 let mut diagnostic =
                     Diagnostic::new(TooManyBlankLines(line.line.blank_lines), token.range);
 
                 let chars_to_remove = if indent_level > 0 {
-                    line.line.preceding_blank_characters - BlankLinesConfig::METHOD
+                    line.line.preceding_blank_characters - BLANK_LINES_METHOD_LEVEL
                 } else {
-                    line.line.preceding_blank_characters - BlankLinesConfig::TOP_LEVEL
+                    line.line.preceding_blank_characters - BLANK_LINES_TOP_LEVEL
                 };
                 let end = locator.line_start(token.range.start());
                 let start = end - TextSize::new(chars_to_remove);
@@ -483,7 +480,7 @@ pub(crate) fn blank_lines(
                 context.push_diagnostic(diagnostic);
             }
 
-            if line.line.preceding_blank_lines < BlankLinesConfig::TOP_LEVEL
+            if line.line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
                 && is_top_level_token(tracked_vars.previous_unindented_token)
                 && indent_level == 0
                 && !line_is_comment_only
@@ -500,7 +497,7 @@ pub(crate) fn blank_lines(
                         .line_ending()
                         .as_str()
                         .to_string()
-                        .repeat((BlankLinesConfig::TOP_LEVEL - line.line.blank_lines) as usize),
+                        .repeat((BLANK_LINES_TOP_LEVEL - line.line.blank_lines) as usize),
                     locator.line_start(token.range.start()),
                 )));
 
