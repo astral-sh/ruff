@@ -399,7 +399,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                 _ => {
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
-                        location: expr.range().start(),
+                        location: expr.start(),
                     });
                 }
             }
@@ -1642,12 +1642,12 @@ FStringReplacementField: ast::Expr = {
             } else {
                 format_spec.as_ref().map_or_else(
                     || end_location - "}".text_len(),
-                    |spec| spec.range().start() - ":".text_len(),
+                    |spec| spec.start() - ":".text_len(),
                 )
             };
             ast::DebugText {
-                leading: source_code[TextRange::new(start_offset, value.range().start())].to_string(),
-                trailing: source_code[TextRange::new(value.range().end(), end_offset)].to_string(),
+                leading: source_code[TextRange::new(start_offset, value.start())].to_string(),
+                trailing: source_code[TextRange::new(value.end(), end_offset)].to_string(),
             }
         });
         Ok(

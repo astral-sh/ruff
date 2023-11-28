@@ -42,8 +42,24 @@ def func(x: int):
     return {"foo": 1}
 
 
-def func():
+def func(x: int):
     if not x:
         return 1
     else:
         return True
+
+
+def func(x: int):
+    if not x:
+        return 1
+    else:
+        return None
+
+
+def func(x: int):
+    if not x:
+        return 1
+    elif x > 5:
+        return "str"
+    else:
+        return None

@@ -725,39 +725,55 @@ pub(crate) fn definition(
     ) {
         if is_method && visibility::is_classmethod(decorator_list, checker.semantic()) {
             if checker.enabled(Rule::MissingReturnTypeClassMethod) {
-                let return_type = auto_return_type(function, checker.settings.target_version)
-                    .map(|return_type| checker.generator().expr(&return_type));
+                let return_type = auto_return_type(function)
+                    .and_then(|return_type| {
+                        return_type.into_expression(
+                            checker.importer(),
+                            function.parameters.start(),
+                            checker.semantic(),
+                            checker.settings.target_version,
+                        )
+                    })
+                    .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits));
                 let mut diagnostic = Diagnostic::new(
                     MissingReturnTypeClassMethod {
                         name: name.to_string(),
-                        annotation: return_type.clone(),
+                        annotation: return_type.clone().map(|(return_type, ..)| return_type),
                     },
                     function.identifier(),
                 );
-                if let Some(return_type) = return_type {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        format!(" -> {return_type}"),
-                        function.parameters.range().end(),
-                    )));
+                if let Some((return_type, edits)) = return_type {
+                    diagnostic.set_fix(Fix::unsafe_edits(
+                        Edit::insertion(format!(" -> {return_type}"), function.parameters.end()),
+                        edits,
+                    ));
                 }
                 diagnostics.push(diagnostic);
             }
         } else if is_method && visibility::is_staticmethod(decorator_list, checker.semantic()) {
             if checker.enabled(Rule::MissingReturnTypeStaticMethod) {
-                let return_type = auto_return_type(function, checker.settings.target_version)
-                    .map(|return_type| checker.generator().expr(&return_type));
+                let return_type = auto_return_type(function)
+                    .and_then(|return_type| {
+                        return_type.into_expression(
+                            checker.importer(),
+                            function.parameters.start(),
+                            checker.semantic(),
+                            checker.settings.target_version,
+                        )
+                    })
+                    .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits));
                 let mut diagnostic = Diagnostic::new(
                     MissingReturnTypeStaticMethod {
                         name: name.to_string(),
-                        annotation: return_type.clone(),
+                        annotation: return_type.clone().map(|(return_type, ..)| return_type),
                     },
                     function.identifier(),
                 );
-                if let Some(return_type) = return_type {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                        format!(" -> {return_type}"),
-                        function.parameters.range().end(),
-                    )));
+                if let Some((return_type, edits)) = return_type {
+                    diagnostic.set_fix(Fix::unsafe_edits(
+                        Edit::insertion(format!(" -> {return_type}"), function.parameters.end()),
+                        edits,
+                    ));
                 }
                 diagnostics.push(diagnostic);
             }
@@ -775,7 +791,7 @@ pub(crate) fn definition(
                     );
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                         " -> None".to_string(),
-                        function.parameters.range().end(),
+                        function.parameters.end(),
                     )));
                     diagnostics.push(diagnostic);
                 }
@@ -793,7 +809,7 @@ pub(crate) fn definition(
                 if let Some(return_type) = return_type {
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                         format!(" -> {return_type}"),
-                        function.parameters.range().end(),
+                        function.parameters.end(),
                     )));
                 }
                 diagnostics.push(diagnostic);
@@ -802,42 +818,70 @@ pub(crate) fn definition(
             match visibility {
                 visibility::Visibility::Public => {
                     if checker.enabled(Rule::MissingReturnTypeUndocumentedPublicFunction) {
-                        let return_type =
-                            auto_return_type(function, checker.settings.target_version)
-                                .map(|return_type| checker.generator().expr(&return_type));
+                        let return_type = auto_return_type(function)
+                            .and_then(|return_type| {
+                                return_type.into_expression(
+                                    checker.importer(),
+                                    function.parameters.start(),
+                                    checker.semantic(),
+                                    checker.settings.target_version,
+                                )
+                            })
+                            .map(|(return_type, edits)| {
+                                (checker.generator().expr(&return_type), edits)
+                            });
                         let mut diagnostic = Diagnostic::new(
                             MissingReturnTypeUndocumentedPublicFunction {
                                 name: name.to_string(),
-                                annotation: return_type.clone(),
+                                annotation: return_type
+                                    .clone()
+                                    .map(|(return_type, ..)| return_type),
                             },
                             function.identifier(),
                         );
-                        if let Some(return_type) = return_type {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                                format!(" -> {return_type}"),
-                                function.parameters.range().end(),
-                            )));
+                        if let Some((return_type, edits)) = return_type {
+                            diagnostic.set_fix(Fix::unsafe_edits(
+                                Edit::insertion(
+                                    format!(" -> {return_type}"),
+                                    function.parameters.end(),
+                                ),
+                                edits,
+                            ));
                         }
                         diagnostics.push(diagnostic);
                     }
                 }
                 visibility::Visibility::Private => {
                     if checker.enabled(Rule::MissingReturnTypePrivateFunction) {
-                        let return_type =
-                            auto_return_type(function, checker.settings.target_version)
-                                .map(|return_type| checker.generator().expr(&return_type));
+                        let return_type = auto_return_type(function)
+                            .and_then(|return_type| {
+                                return_type.into_expression(
+                                    checker.importer(),
+                                    function.parameters.start(),
+                                    checker.semantic(),
+                                    checker.settings.target_version,
+                                )
+                            })
+                            .map(|(return_type, edits)| {
+                                (checker.generator().expr(&return_type), edits)
+                            });
                         let mut diagnostic = Diagnostic::new(
                             MissingReturnTypePrivateFunction {
                                 name: name.to_string(),
-                                annotation: return_type.clone(),
+                                annotation: return_type
+                                    .clone()
+                                    .map(|(return_type, ..)| return_type),
                             },
                             function.identifier(),
                         );
-                        if let Some(return_type) = return_type {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
-                                format!(" -> {return_type}"),
-                                function.parameters.range().end(),
-                            )));
+                        if let Some((return_type, edits)) = return_type {
+                            diagnostic.set_fix(Fix::unsafe_edits(
+                                Edit::insertion(
+                                    format!(" -> {return_type}"),
+                                    function.parameters.end(),
+                                ),
+                                edits,
+                            ));
                         }
                         diagnostics.push(diagnostic);
                     }

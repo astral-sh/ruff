@@ -96,17 +96,22 @@ auto_return_type.py:27:5: ANN201 [*] Missing return type annotation for public f
    |     ^^^^ ANN201
 28 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
    |
-   = help: Add return type annotation: `str | float`
+   = help: Add return type annotation: `Union[str | float]`
 
 ℹ Unsafe fix
-24 24 |         return
-25 25 | 
-26 26 | 
+   1  |+from typing import Union
+1  2  | def func():
+2  3  |     return 1
+3  4  | 
+--------------------------------------------------------------------------------
+24 25 |         return
+25 26 | 
+26 27 | 
 27    |-def func(x: int):
-   27 |+def func(x: int) -> str | float:
-28 28 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
-29 29 | 
-30 30 | 
+   28 |+def func(x: int) -> Union[str | float]:
+28 29 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
+29 30 | 
+30 31 | 
 
 auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -114,17 +119,22 @@ auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public f
    |     ^^^^ ANN201
 32 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
    |
-   = help: Add return type annotation: `str | float`
+   = help: Add return type annotation: `Union[str | float]`
 
 ℹ Unsafe fix
-28 28 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
-29 29 | 
-30 30 | 
+   1  |+from typing import Union
+1  2  | def func():
+2  3  |     return 1
+3  4  | 
+--------------------------------------------------------------------------------
+28 29 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
+29 30 | 
+30 31 | 
 31    |-def func(x: int):
-   31 |+def func(x: int) -> str | float:
-32 32 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
-33 33 | 
-34 34 | 
+   32 |+def func(x: int) -> Union[str | float]:
+32 33 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
+33 34 | 
+34 35 | 
 
 auto_return_type.py:35:5: ANN201 Missing return type annotation for public function `func`
    |
@@ -169,17 +179,22 @@ auto_return_type.py:52:5: ANN201 [*] Missing return type annotation for public f
 53 |     if not x:
 54 |         return 1
    |
-   = help: Add return type annotation: `int | None`
+   = help: Add return type annotation: `Optional[int]`
 
 ℹ Unsafe fix
-49 49 |         return True
-50 50 | 
-51 51 | 
+   1  |+from typing import Optional
+1  2  | def func():
+2  3  |     return 1
+3  4  | 
+--------------------------------------------------------------------------------
+49 50 |         return True
+50 51 | 
+51 52 | 
 52    |-def func(x: int):
-   52 |+def func(x: int) -> int | None:
-53 53 |     if not x:
-54 54 |         return 1
-55 55 |     else:
+   53 |+def func(x: int) -> Optional[int]:
+53 54 |     if not x:
+54 55 |         return 1
+55 56 |     else:
 
 auto_return_type.py:59:5: ANN201 [*] Missing return type annotation for public function `func`
    |
@@ -188,16 +203,21 @@ auto_return_type.py:59:5: ANN201 [*] Missing return type annotation for public f
 60 |     if not x:
 61 |         return 1
    |
-   = help: Add return type annotation: `str | int | None`
+   = help: Add return type annotation: `Union[str | int | None]`
 
 ℹ Unsafe fix
-56 56 |         return None
-57 57 | 
-58 58 | 
+   1  |+from typing import Union
+1  2  | def func():
+2  3  |     return 1
+3  4  | 
+--------------------------------------------------------------------------------
+56 57 |         return None
+57 58 | 
+58 59 | 
 59    |-def func(x: int):
-   59 |+def func(x: int) -> str | int | None:
-60 60 |     if not x:
-61 61 |         return 1
-62 62 |     elif x > 5:
+   60 |+def func(x: int) -> Union[str | int | None]:
+60 61 |     if not x:
+61 62 |         return 1
+62 63 |     elif x > 5:
 
 

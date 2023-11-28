@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: e78a653b50980f07fcb78bfa43c9f023870e26514f59acdec0bec5bf84c2a133
+// sha3: e999c9c9ca8fe5a29655244aa995b8cf4e639f0bda95099d8f2a395bc06b6408
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -33700,7 +33700,7 @@ fn __action76<
                 _ => {
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
-                        location: expr.range().start(),
+                        location: expr.start(),
                     });
                 }
             }
@@ -36420,12 +36420,12 @@ fn __action221<
             } else {
                 format_spec.as_ref().map_or_else(
                     || end_location - "}".text_len(),
-                    |spec| spec.range().start() - ":".text_len(),
+                    |spec| spec.start() - ":".text_len(),
                 )
             };
             ast::DebugText {
-                leading: source_code[TextRange::new(start_offset, value.range().start())].to_string(),
-                trailing: source_code[TextRange::new(value.range().end(), end_offset)].to_string(),
+                leading: source_code[TextRange::new(start_offset, value.start())].to_string(),
+                trailing: source_code[TextRange::new(value.end(), end_offset)].to_string(),
             }
         });
         Ok(
