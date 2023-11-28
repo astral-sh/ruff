@@ -175,10 +175,7 @@ impl Cell {
 }
 
 /// Cell offsets are used to keep track of the start and end offsets of each
-/// cell in the concatenated source code.
-///
-/// These offsets are in sorted order and is enforced by the [`CellOffsets::push`]
-/// method.
+/// cell in the concatenated source code. These offsets are in sorted order.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CellOffsets(Vec<TextSize>);
 
@@ -195,9 +192,10 @@ impl CellOffsets {
     /// Panics if the offset is less than the last offset pushed.
     pub(crate) fn push(&mut self, offset: TextSize) {
         if let Some(last_offset) = self.0.last() {
-            if *last_offset > offset {
-                panic!("Offsets must be pushed in sorted order");
-            }
+            assert!(
+                *last_offset <= offset,
+                "Offsets must be pushed in sorted order"
+            );
         }
         self.0.push(offset);
     }
