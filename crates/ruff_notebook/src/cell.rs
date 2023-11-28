@@ -176,6 +176,9 @@ impl Cell {
 
 /// Cell offsets are used to keep track of the start and end offsets of each
 /// cell in the concatenated source code.
+///
+/// These offsets are in sorted order and is enforced by the [`CellOffsets::push`]
+/// method.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CellOffsets(Vec<TextSize>);
 
@@ -186,7 +189,16 @@ impl CellOffsets {
     }
 
     /// Push a new offset to the end of the [`CellOffsets`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the offset is less than the last offset pushed.
     pub(crate) fn push(&mut self, offset: TextSize) {
+        if let Some(last_offset) = self.0.last() {
+            if *last_offset > offset {
+                panic!("Offsets must be pushed in sorted order");
+            }
+        }
         self.0.push(offset);
     }
 
@@ -199,6 +211,22 @@ impl CellOffsets {
                 None
             }
         })
+    }
+
+    /// Returns `true` if the given range contains a cell boundary.
+    pub fn has_cell_boundary(&self, range: TextRange) -> bool {
+        self.binary_search_by(|offset| {
+            if range.start() <= *offset {
+                if range.end() < *offset {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            } else {
+                std::cmp::Ordering::Less
+            }
+        })
+        .is_ok()
     }
 }
 
