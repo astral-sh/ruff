@@ -215,15 +215,15 @@ fn enumerate_items(
     };
 
     // Check that the function is the `enumerate` builtin.
-    let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
+    let Some(call_path) = checker.semantic().resolve_call_path(func.as_ref()) else {
         return None;
     };
-    if id != "enumerate" {
-        return None;
-    };
-    if !checker.semantic().is_builtin("enumerate") {
-        return None;
-    };
+
+    match call_path.as_slice() {
+        ["", "enumerate"] => (),
+        ["builtins", "enumerate"] => (),
+        _ => return None,
+    }
 
     let Expr::Tuple(ast::ExprTuple { elts, .. }) = tuple_expr else {
         return None;

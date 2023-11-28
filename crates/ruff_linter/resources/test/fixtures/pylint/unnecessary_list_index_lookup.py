@@ -1,3 +1,5 @@
+import builtins
+
 letters = ["a", "b", "c"]
 
 
@@ -7,6 +9,11 @@ def fix_these():
     {letter: letters[index] for index, letter in enumerate(letters)}  # PLR1736
 
     for index, letter in enumerate(letters):
+        print(letters[index])  # PLR1736
+        blah = letters[index]  # PLR1736
+        assert letters[index]  == "d"  # PLR1736
+    
+    for index, letter in builtins.enumerate(letters):
         print(letters[index])  # PLR1736
         blah = letters[index]  # PLR1736
         assert letters[index]  == "d"  # PLR1736
