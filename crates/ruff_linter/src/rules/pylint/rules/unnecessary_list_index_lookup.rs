@@ -9,7 +9,7 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of enumeration and accessing the value by index lookup.
+/// Checks for access of a list item at the current index when using enumeration.
 ///
 /// ## Why is this bad?
 /// It is more succinct to use the variable for the value at the current index which is already in scope from the iterator. 
