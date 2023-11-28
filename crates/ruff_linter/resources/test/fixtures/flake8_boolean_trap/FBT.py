@@ -106,3 +106,11 @@ def func(x: bool | str):
 
 def func(x: int | str):
     pass
+
+
+from typing import override
+
+
+@override
+def func(x: bool):
+    pass
