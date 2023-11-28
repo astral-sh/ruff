@@ -130,6 +130,26 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
                     check_target_for_assignment(target, self.sequence_name, self.index_name);
                 self.visit_expr(value);
             }
+            Stmt::Delete(ast::StmtDelete { targets, .. }) => {
+                self.modified = targets.iter().any(|target| match target {
+                    Expr::Name(ast::ExprName { id, .. }) => {
+                        id == self.sequence_name || id == self.index_name
+                    }
+                    Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+                        if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
+                            if id == self.sequence_name {
+                                if let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() {
+                                    if id == self.index_name {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                        false
+                    }
+                    _ => false,
+                });
+            }
             _ => visitor::walk_stmt(self, stmt),
         }
     }

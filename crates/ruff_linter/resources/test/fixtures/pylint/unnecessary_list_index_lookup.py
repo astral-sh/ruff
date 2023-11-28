@@ -36,6 +36,17 @@ def dont_fix_these():
         letters = ["d", "e", "f"]  # Ok
         print(letters[index])  # Ok
 
+    # once there is an deletion from or of the sequence or index, we stop emitting diagnostics
+    for index, letter in enumerate(letters):
+        del letters[index]  # Ok
+        print(letters[index])  # Ok
+    for index, letter in enumerate(letters):
+        del letters  # Ok
+        print(letters[index])  # Ok
+    for index, letter in enumerate(letters):
+        del index  # Ok
+        print(letters[index])  # Ok
+
 
 def value_intentionally_unused():
     [letters[index] for index, _ in enumerate(letters)]  # PLR1736
