@@ -35,7 +35,7 @@ pub struct UnnecessaryListIndexLookup;
 impl AlwaysFixableViolation for UnnecessaryListIndexLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary list index lookup")
+        format!("Unnecessary lookup of list item by index")
     }
 
     fn fix_title(&self) -> String {
