@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 /// Checks for uses of enumeration and accessing the value by index lookup.
 ///
 /// ## Why is this bad?
-/// The value is already accessible by the 2nd variable from the enumeration.
+/// It is more succinct to use the variable for the value at the current index which is already in scope from the iterator. 
 ///
 /// ## Example
 /// ```python
