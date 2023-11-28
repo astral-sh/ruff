@@ -123,5 +123,43 @@ auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public f
 31    |-def func(x: int):
    31 |+def func(x: int) -> str | float:
 32 32 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
+33 33 | 
+34 34 | 
+
+auto_return_type.py:35:5: ANN201 Missing return type annotation for public function `func`
+   |
+35 | def func(x: int):
+   |     ^^^^ ANN201
+36 |     if not x:
+37 |         return None
+   |
+   = help: Add return type annotation
+
+auto_return_type.py:41:5: ANN201 Missing return type annotation for public function `func`
+   |
+41 | def func(x: int):
+   |     ^^^^ ANN201
+42 |     return {"foo": 1}
+   |
+   = help: Add return type annotation
+
+auto_return_type.py:45:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+45 | def func():
+   |     ^^^^ ANN201
+46 |     if not x:
+47 |         return 1
+   |
+   = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+42 42 |     return {"foo": 1}
+43 43 | 
+44 44 | 
+45    |-def func():
+   45 |+def func() -> int:
+46 46 |     if not x:
+47 47 |         return 1
+48 48 |     else:
 
 

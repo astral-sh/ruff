@@ -74,8 +74,8 @@ pub(crate) fn auto_return_type(
             let names = python_types
                 .iter()
                 .sorted_unstable()
-                .filter_map(|python_type| type_expr(*python_type))
-                .collect::<Vec<_>>();
+                .map(|python_type| type_expr(*python_type))
+                .collect::<Option<Vec<_>>>()?;
 
             // Wrap in a bitwise union (e.g., `int | float`).
             Some(pep_604_union(&names))
