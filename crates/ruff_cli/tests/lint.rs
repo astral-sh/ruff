@@ -396,3 +396,43 @@ if __name__ == "__main__":
     "###);
     Ok(())
 }
+
+/// Regression test for https://github.com/astral-sh/ruff/issues/8858
+#[test]
+fn parent_configuration_override() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let root_ruff = tempdir.path().join("ruff.toml");
+    fs::write(
+        &root_ruff,
+        r#"
+[lint]
+select = ["ALL"]
+"#,
+    )?;
+
+    let sub_dir = tempdir.path().join("subdirectory");
+    fs::create_dir(&sub_dir)?;
+
+    let subdirectory_ruff = sub_dir.join("ruff.toml");
+    fs::write(
+        &subdirectory_ruff,
+        r#"
+[lint]
+ignore = ["D203", "D212"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(sub_dir)
+        .arg("check")
+        .args(STDIN_BASE_OPTIONS)
+        , @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    warning: No Python files found under the given path(s)
+    "###);
+    Ok(())
+}
