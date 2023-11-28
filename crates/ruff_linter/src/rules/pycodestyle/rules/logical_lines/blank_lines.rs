@@ -18,9 +18,7 @@ use super::LogicalLine;
 #[derive(Debug, Default)]
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct BlankLinesTrackingVars {
-    follows_decorator: bool,
-    follows_def: bool,
-    follows_docstring: bool,
+    follows: Follows,
     fn_status: Status,
     class_status: Status,
     /// First line that is not a comment.
@@ -36,6 +34,14 @@ const BLANK_LINES_TOP_LEVEL: u32 = 2;
 /// Number of blank lines around methods and nested classes and functions.
 const BLANK_LINES_METHOD_LEVEL: u32 = 1;
 
+#[derive(Copy, Clone, Debug, Default)]
+enum Follows {
+    #[default]
+    Other,
+    Decorator,
+    Def,
+    Docstring,
+}
 #[derive(Copy, Clone, Debug, Default)]
 enum Status {
     /// Stores the indent level where the nesting started.
@@ -386,13 +392,12 @@ pub(crate) fn blank_lines(
             tracked_vars.class_status = Status::Outside;
         }
     }
-    let first_token = match line
+    let Some(first_token) = line
         .tokens()
         .iter()
         .find(|token| !matches!(token.kind, TokenKind::Indent | TokenKind::Dedent))
-    {
-        Some(token) => token,
-        None => return,
+    else {
+        return;
     };
 
     // Don't expect blank lines before the first non comment line.
@@ -402,11 +407,11 @@ pub(crate) fn blank_lines(
             && first_token.kind() == TokenKind::Def
                 && matches!(tracked_vars.class_status, Status::Inside(_))
                 // The class/parent method's docstring can directly precede the def.
-                && !tracked_vars.follows_docstring
+                && !matches!(tracked_vars.follows, Follows::Docstring)
                 // Do not trigger when the def follows an if/while/etc...
                 && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !tracked_vars.follows_decorator
+                && !matches!(tracked_vars.follows, Follows::Decorator)
         {
             // E301
             let mut diagnostic = Diagnostic::new(
@@ -423,9 +428,9 @@ pub(crate) fn blank_lines(
 
         if line.line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !tracked_vars.follows_decorator
+                && !matches!(tracked_vars.follows, Follows::Decorator)
                 // Allow groups of one-liners.
-                && !(tracked_vars.follows_def
+                && !(matches!(tracked_vars.follows, Follows::Def)
                     && line
                     .tokens_trimmed()
                     .last()
@@ -472,7 +477,8 @@ pub(crate) fn blank_lines(
             context.push_diagnostic(diagnostic);
         }
 
-        if tracked_vars.follows_decorator && line.line.preceding_blank_lines > 0 {
+        if matches!(tracked_vars.follows, Follows::Decorator) && line.line.preceding_blank_lines > 0
+        {
             // E304
             let mut diagnostic = Diagnostic::new(BlankLineAfterDecorator, first_token.range);
 
@@ -513,15 +519,15 @@ pub(crate) fn blank_lines(
         if line.line.preceding_blank_lines == 0
             // Only apply to nested functions.
                 && matches!(tracked_vars.fn_status, Status::Inside(_))
-            && is_top_level_token_or_decorator(first_token.kind)
+                && is_top_level_token_or_decorator(first_token.kind)
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
-                && !tracked_vars.follows_decorator
+                && !matches!(tracked_vars.follows, Follows::Decorator)
                 // The class's docstring can directly precede the first function.
-                && !tracked_vars.follows_docstring
+                && !matches!(tracked_vars.follows, Follows::Docstring)
                 // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
                 && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= indent_level)
                 // Allow groups of one-liners.
-                && !(tracked_vars.follows_def
+                && !(matches!(tracked_vars.follows, Follows::Def)
                      && line
                      .tokens_trimmed()
                      .last()
@@ -548,24 +554,20 @@ pub(crate) fn blank_lines(
             if matches!(tracked_vars.class_status, Status::Outside) {
                 tracked_vars.class_status = Status::Inside(indent_level + indent_size);
             }
-            tracked_vars.follows_decorator = false;
-            tracked_vars.follows_def = false;
+            tracked_vars.follows = Follows::Other;
         }
         TokenKind::At => {
-            tracked_vars.follows_decorator = true;
-            tracked_vars.follows_def = false;
+            tracked_vars.follows = Follows::Decorator;
         }
         TokenKind::Def | TokenKind::Async => {
             if matches!(tracked_vars.fn_status, Status::Outside) {
                 tracked_vars.fn_status = Status::Inside(indent_level + indent_size);
             }
-            tracked_vars.follows_def = true;
-            tracked_vars.follows_decorator = false;
+            tracked_vars.follows = Follows::Def;
         }
         TokenKind::Comment => {}
         _ => {
-            tracked_vars.follows_decorator = false;
-            tracked_vars.follows_def = false;
+            tracked_vars.follows = Follows::Other;
         }
     }
 
@@ -574,7 +576,9 @@ pub(crate) fn blank_lines(
             tracked_vars.is_not_first_logical_line = true;
         }
 
-        tracked_vars.follows_docstring = is_docstring(line);
+        if is_docstring(line) {
+            tracked_vars.follows = Follows::Docstring;
+        }
 
         tracked_vars.last_non_comment_line_end = line
             .tokens()
