@@ -637,11 +637,11 @@ enum CodeExampleAddAction<'src> {
         ///
         /// This is guaranteed to be non-empty.
         code: Vec<CodeExampleLine<'src>>,
-        /// When set, the line is considered not part of any code example
-        /// and should be formatted as if the `Ignore` action were returned.
+        /// When set, the line is considered not part of any code example and
+        /// should be formatted as if the [`Print`] action were returned.
         /// Otherwise, if there is no line, then either one does not exist
         /// or it is part of another code example and should be treated as a
-        /// `Kept` action.
+        /// [`Kept`] action.
         original: Option<DocstringLine<'src>>,
     },
 }
