@@ -1,0 +1,68 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/reason.py
+---
+## Input
+```python
+# fmt: off
+x =    1  
+# fmt: on
+
+# fmt: off reason
+x =    1  
+# fmt: on
+
+# fmt: off reason
+x =    1  
+# fmt: on
+
+# fmt: off
+x =    1  
+# fmt: on reason
+
+# fmt: off reason
+x =    1  
+# fmt: on reason
+
+# fmt: off - reason
+x =    1  
+# fmt: on
+
+# fmt: off
+x =    1  
+# fmt: on - reason
+```
+
+## Output
+```python
+# fmt: off
+x =    1  
+# fmt: on
+
+# fmt: off reason
+x =    1  
+# fmt: on
+
+# fmt: off reason
+x =    1  
+# fmt: on
+
+# fmt: off
+x =    1  
+# fmt: on reason
+
+# fmt: off reason
+x =    1  
+# fmt: on reason
+
+# fmt: off - reason
+x =    1  
+# fmt: on
+
+# fmt: off
+x =    1  
+# fmt: on - reason
+```
+
+
+

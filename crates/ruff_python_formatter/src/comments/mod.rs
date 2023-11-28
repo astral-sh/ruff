@@ -178,7 +178,14 @@ impl SourceComment {
                 "off" => Some(SuppressionKind::Off),
                 "on" => Some(SuppressionKind::On),
                 "skip" => Some(SuppressionKind::Skip),
-                _ => None,
+
+                // Allow additional context separated by whitespace
+                command => match command.split_whitespace().next() {
+                    Some("off") => Some(SuppressionKind::Off),
+                    Some("on") => Some(SuppressionKind::On),
+                    Some("skip") => Some(SuppressionKind::Skip),
+                    _ => None,
+                },
             }
         } else if let Some(command) = trimmed.strip_prefix("yapf:") {
             match command.trim_whitespace_start() {
