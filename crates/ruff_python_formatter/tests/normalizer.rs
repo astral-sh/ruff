@@ -63,12 +63,14 @@ impl Transformer for Normalizer {
         static STRIP_CODE_SNIPPETS: Lazy<Regex> = Lazy::new(|| {
             Regex::new(
                 r#"(?mx)
-                    # strip doctest PS1 prompt lines
-                    ^\s*>>>\s.*(\n|$)
-                    |
-                    # strip doctest PS2 prompt lines
-                    # Also handles the case of an empty ... line.
-                    ^\s*\.\.\.((\n|$)|\s.*(\n|$))
+                    (
+                        # strip doctest PS1 prompt lines
+                        ^\s*>>>\s.*(\n|$)
+                        |
+                        # strip doctest PS2 prompt lines
+                        # Also handles the case of an empty ... line.
+                        ^\s*\.\.\.((\n|$)|\s.*(\n|$))
+                    )+
                 "#,
             )
             .unwrap()
@@ -78,7 +80,10 @@ impl Transformer for Normalizer {
         // snippet, since code snippets may be completely reformatted if
         // they are Python code.
         string_literal.value = STRIP_CODE_SNIPPETS
-            .replace_all(&string_literal.value, "")
+            .replace_all(
+                &string_literal.value,
+                "<CODE-SNIPPET: Removed by normalizer>\n",
+            )
             .into_owned();
         // Normalize a string by (2) stripping any leading and trailing space from each
         // line, and (3) removing any blank lines from the start and end of the string.

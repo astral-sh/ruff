@@ -457,6 +457,10 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
 #[derive(Clone, Debug)]
 struct DocstringLine<'src> {
     /// The actual text of the line, not including the line terminator.
+    ///
+    /// In practice, this line is borrowed when it corresponds to an original
+    /// unformatted line in a docstring, and owned when it corresponds to a
+    /// reformatted line (e.g., from a code snippet) in a docstring.
     line: Cow<'src, str>,
     /// The offset into the source document which this line corresponds to.
     offset: TextSize,
@@ -561,8 +565,10 @@ enum CodeExampleKind {
     /// found as part of the Python standard library:
     /// https://docs.python.org/3/library/doctest.html.
     ///
-    /// (You'll likely need to read the regex matching used internally by the
+    /// (You'll likely need to read the [regex matching] used internally by the
     /// doctest module to determine more precisely how it works.)
+    ///
+    /// [regex matching]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L611-L622
     Doctest(CodeExampleDoctest),
 }
 
@@ -631,11 +637,11 @@ enum CodeExampleAddAction<'src> {
         ///
         /// This is guaranteed to be non-empty.
         code: Vec<CodeExampleLine<'src>>,
-        /// When set, the line is considered not part of any code example
-        /// and should be formatted as if the `Ignore` action were returned.
+        /// When set, the line is considered not part of any code example and
+        /// should be formatted as if the [`Print`] action were returned.
         /// Otherwise, if there is no line, then either one does not exist
         /// or it is part of another code example and should be treated as a
-        /// `Kept` action.
+        /// [`Kept`] action.
         original: Option<DocstringLine<'src>>,
     },
 }
