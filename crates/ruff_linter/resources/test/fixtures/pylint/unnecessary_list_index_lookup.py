@@ -49,9 +49,9 @@ def dont_fix_these():
 
 
 def value_intentionally_unused():
-    [letters[index] for index, _ in enumerate(letters)]  # PLR1736
-    {letters[index] for index, _ in enumerate(letters)}  # PLR1736
-    {index: letters[index] for index, _ in enumerate(letters)}  # PLR1736
+    [letters[index] for index, _ in enumerate(letters)]  # Ok
+    {letters[index] for index, _ in enumerate(letters)}  # Ok
+    {index: letters[index] for index, _ in enumerate(letters)}  # Ok
 
     for index, _ in enumerate(letters):
         print(letters[index])  # Ok
