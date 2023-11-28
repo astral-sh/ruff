@@ -457,6 +457,10 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
 #[derive(Clone, Debug)]
 struct DocstringLine<'src> {
     /// The actual text of the line, not including the line terminator.
+    ///
+    /// In practice, this line is borrowed when it corresponds to an original
+    /// unformatted line in a docstring, and owned when it corresponds to a
+    /// reformatted line (e.g., from a code snippet) in a docstring.
     line: Cow<'src, str>,
     /// The offset into the source document which this line corresponds to.
     offset: TextSize,
