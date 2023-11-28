@@ -39,10 +39,13 @@ class Repository(NamedTuple):
     repo: str
     ref: str | None
     select: str = ""
+    extend_select: str = ""
     ignore: str = ""
     exclude: str = ""
     # Generating fixes is slow and verbose
     show_fixes: bool = False
+    # Only check Jupyter Notebooks
+    only_ipynb: bool = False
 
     @asynccontextmanager
     async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
@@ -109,6 +112,10 @@ class Repository(NamedTuple):
         return git_sha_stdout.decode().strip()
 
 
+# Rules to check for Jupyter Notebooks. These are the rules that are updated with
+# additional logic for Jupyter Notebooks.
+JUPYTER_NOTEBOOK_SELECT = "A,E703,F704,B015,B018,D100"
+
 # Repositories to check
 # We check most repositories with the default ruleset instead of all rules to avoid
 # noisy reports when new rules are added; see https://github.com/astral-sh/ruff/pull/3590
@@ -154,6 +161,21 @@ REPOSITORIES: list[Repository] = [
     Repository("tiangolo", "fastapi", "master"),
     Repository("yandex", "ch-backup", "main"),
     Repository("zulip", "zulip", "main", select="ALL"),
+    # Jupyter Notebooks
+    Repository(
+        "huggingface",
+        "notebooks",
+        "main",
+        select=JUPYTER_NOTEBOOK_SELECT,
+        only_ipynb=True,
+    ),
+    Repository(
+        "openai",
+        "openai-cookbook",
+        "main",
+        select=JUPYTER_NOTEBOOK_SELECT,
+        only_ipynb=True,
+    ),
 ]
 
 SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.*potentially fixable with.*)$")
@@ -172,6 +194,7 @@ async def check(
     ignore: str = "",
     exclude: str = "",
     show_fixes: bool = False,
+    only_ipynb: bool = False,
 ) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
     logger.debug(f"Checking {name} with {ruff}")
@@ -184,12 +207,13 @@ async def check(
         ruff_args.extend(["--exclude", exclude])
     if show_fixes:
         ruff_args.extend(["--show-fixes", "--ecosystem-ci"])
+    files = "**/*.ipynb" if only_ipynb else "."
 
     start = time.time()
     proc = await create_subprocess_exec(
         ruff.absolute(),
         *ruff_args,
-        ".",
+        files,
         stdout=PIPE,
         stderr=PIPE,
         cwd=path,
@@ -263,6 +287,7 @@ async def compare(
                             ignore=repo.ignore,
                             exclude=repo.exclude,
                             show_fixes=repo.show_fixes,
+                            only_ipynb=repo.only_ipynb,
                         ),
                     )
                     check2 = tg.create_task(
@@ -274,6 +299,7 @@ async def compare(
                             ignore=repo.ignore,
                             exclude=repo.exclude,
                             show_fixes=repo.show_fixes,
+                            only_ipynb=repo.only_ipynb,
                         ),
                     )
             except ExceptionGroup as e:
