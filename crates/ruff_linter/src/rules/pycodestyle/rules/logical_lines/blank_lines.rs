@@ -314,14 +314,12 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
 }
 
 /// Returns `true` if line is a docstring only line.
-fn is_docstring(line: Option<&LogicalLine>) -> bool {
-    line.is_some_and(|line| {
-        !line.tokens_trimmed().is_empty()
-            && line
-                .tokens_trimmed()
-                .iter()
-                .all(|token| matches!(token.kind(), TokenKind::String))
-    })
+fn is_docstring(line: &LogicalLine) -> bool {
+    !line.tokens_trimmed().is_empty()
+        && line
+            .tokens_trimmed()
+            .iter()
+            .all(|token| matches!(token.kind(), TokenKind::String))
 }
 
 /// Returns `true` if the token is Async, Class or Def
@@ -576,7 +574,7 @@ pub(crate) fn blank_lines(
             tracked_vars.is_not_first_logical_line = true;
         }
 
-        tracked_vars.follows_docstring = is_docstring(Some(line));
+        tracked_vars.follows_docstring = is_docstring(line);
 
         tracked_vars.last_non_comment_line_end = line
             .tokens()
