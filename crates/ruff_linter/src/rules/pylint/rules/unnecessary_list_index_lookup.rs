@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 /// Checks for access of a list item at the current index when using enumeration.
 ///
 /// ## Why is this bad?
-/// It is more succinct to use the variable for the value at the current index which is already in scope from the iterator. 
+/// It is more succinct to use the variable for the value at the current index which is already in scope from the iterator.
 ///
 /// ## Example
 /// ```python
@@ -47,7 +47,7 @@ struct SubscriptVisitor<'a> {
     sequence_name: &'a str,
     index_name: &'a str,
     diagnostic_ranges: Vec<TextRange>,
-    is_subcript_modified: bool,
+    modified: bool,
 }
 
 impl<'a> SubscriptVisitor<'a> {
@@ -56,14 +56,15 @@ impl<'a> SubscriptVisitor<'a> {
             sequence_name,
             index_name,
             diagnostic_ranges: Vec::new(),
-            is_subcript_modified: false,
+            modified: false,
         }
     }
 }
 
 fn check_target_for_assignment(expr: &Expr, sequence_name: &str, index_name: &str) -> bool {
-    // if we see the sequence subscript being modified, we'll stop emitting diagnostics
+    // if we see the sequence, a subscript, or the index being modified, we'll stop emitting diagnostics
     match expr {
+        Expr::Name(ast::ExprName { id, .. }) => id == sequence_name || id == index_name,
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
                 if id == sequence_name {
@@ -82,7 +83,7 @@ fn check_target_for_assignment(expr: &Expr, sequence_name: &str, index_name: &st
 
 impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
     fn visit_expr(&mut self, expr: &Expr) {
-        if self.is_subcript_modified {
+        if self.modified {
             return;
         }
         match expr {
@@ -107,25 +108,25 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
     }
 
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if self.is_subcript_modified {
+        if self.modified {
             return;
         }
         match stmt {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                self.is_subcript_modified = targets.iter().any(|target| {
+                self.modified = targets.iter().any(|target| {
                     check_target_for_assignment(target, self.sequence_name, self.index_name)
                 });
                 self.visit_expr(value);
             }
             Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
                 if let Some(value) = value {
-                    self.is_subcript_modified =
+                    self.modified =
                         check_target_for_assignment(target, self.sequence_name, self.index_name);
                     self.visit_expr(value);
                 }
             }
             Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                self.is_subcript_modified =
+                self.modified =
                     check_target_for_assignment(target, self.sequence_name, self.index_name);
                 self.visit_expr(value);
             }
