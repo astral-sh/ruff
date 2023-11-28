@@ -330,7 +330,7 @@ fn is_docstring(line: &LogicalLine) -> bool {
 
 /// Returns `true` if the token is Async, Class or Def
 fn is_top_level_token(token: Option<TokenKind>) -> bool {
-    token.is_some_and(|token| matches!(token, TokenKind::Class | TokenKind::Def | TokenKind::Async))
+    matches!(token, Some(TokenKind::Class | TokenKind::Def | TokenKind::Async))
 }
 
 /// Returns `true` if the token is At, Async, Class or Def
