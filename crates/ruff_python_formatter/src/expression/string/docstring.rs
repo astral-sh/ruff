@@ -565,8 +565,10 @@ enum CodeExampleKind {
     /// found as part of the Python standard library:
     /// https://docs.python.org/3/library/doctest.html.
     ///
-    /// (You'll likely need to read the regex matching used internally by the
+    /// (You'll likely need to read the [regex matching] used internally by the
     /// doctest module to determine more precisely how it works.)
+    ///
+    /// [regex matching]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L611-L622
     Doctest(CodeExampleDoctest),
 }
 
