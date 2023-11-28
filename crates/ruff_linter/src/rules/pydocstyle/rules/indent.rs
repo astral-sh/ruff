@@ -172,7 +172,7 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
     let mut has_seen_tab = docstring.indentation.contains('\t');
     let mut is_over_indented = true;
     let mut over_indented_lines = vec![];
-    let mut over_indented_offset = TextSize::from(u32::MAX);
+    let mut over_indented_offset = usize::MAX;
 
     for i in 0..lines.len() {
         // First lines and continuations doesn't need any indentation.
@@ -220,9 +220,9 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
             if line_indent.len() > docstring.indentation.len() {
                 over_indented_lines.push(line);
 
-                // Track the _smallest_ offset we see
+                // Track the _smallest_ offset we see, in terms of characters.
                 over_indented_offset = std::cmp::min(
-                    line_indent.text_len() - docstring.indentation.text_len(),
+                    line_indent.chars().count() - docstring.indentation.chars().count(),
                     over_indented_offset,
                 );
             } else {
@@ -247,15 +247,23 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let indent = clean_space(docstring.indentation);
 
                 // We report over-indentation on every line. This isn't great, but
-                // enables fix.
+                // enables the fix capability.
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(line.start()));
                 let edit = if indent.is_empty() {
-                    Edit::range_deletion(TextRange::at(line.start(), line_indent.text_len()))
+                    Edit::deletion(line.start(), line_indent.text_len())
                 } else {
+                    // Convert the character count to an offset within the source.
+                    let offset = checker
+                        .locator()
+                        .after(line.start() + indent.text_len())
+                        .chars()
+                        .take(over_indented_offset)
+                        .map(TextLen::text_len)
+                        .sum::<TextSize>();
                     Edit::range_replacement(
                         indent.clone(),
-                        TextRange::at(line.start(), indent.text_len() + over_indented_offset),
+                        TextRange::at(line.start(), indent.text_len() + offset),
                     )
                 };
                 diagnostic.set_fix(Fix::safe_edit(edit));

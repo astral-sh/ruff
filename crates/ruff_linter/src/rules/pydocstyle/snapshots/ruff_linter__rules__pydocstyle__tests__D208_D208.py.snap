@@ -1,0 +1,57 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D208.py:3:1: D208 [*] Docstring is over-indented
+  |
+1 | class Platform:
+2 |     """ Remove sampler
+3 |             Args:
+  |  D208
+4 |             Returns:
+5 |             """
+  |
+  = help: Remove over-indentation
+
+ℹ Safe fix
+1 1 | class Platform:
+2 2 |     """ Remove sampler
+3   |-            Args:
+  3 |+    Args:
+4 4 |             Returns:
+5 5 |             """
+
+D208.py:4:1: D208 [*] Docstring is over-indented
+  |
+2 |     """ Remove sampler
+3 |             Args:
+4 |             Returns:
+  |  D208
+5 |             """
+  |
+  = help: Remove over-indentation
+
+ℹ Safe fix
+1 1 | class Platform:
+2 2 |     """ Remove sampler
+3 3 |             Args:
+4   |-            Returns:
+  4 |+    Returns:
+5 5 |             """
+
+D208.py:5:1: D208 [*] Docstring is over-indented
+  |
+3 |             Args:
+4 |             Returns:
+5 |             """
+  |  D208
+  |
+  = help: Remove over-indentation
+
+ℹ Safe fix
+2 2 |     """ Remove sampler
+3 3 |             Args:
+4 4 |             Returns:
+5   |-            """
+  5 |+    """
+
+
