@@ -14,7 +14,7 @@ use crate::checkers::logical_lines::LogicalLinesContext;
 use super::LogicalLine;
 
 /// Contains variables used for the linting of blank lines.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[allow(clippy::struct_excessive_bools)]
 pub(crate) struct BlankLinesTrackingVars {
     follows_decorator: bool,
@@ -27,7 +27,7 @@ pub(crate) struct BlankLinesTrackingVars {
     /// The indent level where the function started.
     fn_indent_level: usize,
     /// First line that is not a comment.
-    is_first_logical_line: bool,
+    is_not_first_logical_line: bool,
     /// This needs to be tracked between lines since the `is_in_class` and `is_in_fn` are set to
     /// false when a comment is set dedented, but E305 should trigger on the next non-comment line.
     follows_comment_after_fn: bool,
@@ -36,25 +36,6 @@ pub(crate) struct BlankLinesTrackingVars {
     /// to the second line instead of the first.
     last_non_comment_line_end: TextSize,
     previous_unindented_token: Option<TokenKind>,
-}
-
-impl Default for BlankLinesTrackingVars {
-    fn default() -> BlankLinesTrackingVars {
-        BlankLinesTrackingVars {
-            follows_decorator: false,
-            follows_def: false,
-            follows_docstring: false,
-            is_in_class: false,
-            class_indent_level: 0,
-            is_in_fn: false,
-            fn_indent_level: 0,
-            is_first_logical_line: true,
-            follows_comment_after_fn: false,
-            follows_comment_after_class: false,
-            last_non_comment_line_end: TextSize::new(0),
-            previous_unindented_token: None,
-        }
-    }
 }
 
 /// Number of blank lines between various code parts.
@@ -414,7 +395,7 @@ pub(crate) fn blank_lines(
         }
 
         // Don't expect blank lines before the first non comment line.
-        if !tracked_vars.is_first_logical_line {
+        if tracked_vars.is_not_first_logical_line {
             if line.line.preceding_blank_lines == 0
                 // Only applies to methods.
                 && token.kind() == TokenKind::Def
@@ -595,8 +576,8 @@ pub(crate) fn blank_lines(
     }
 
     if !line_is_comment_only {
-        if tracked_vars.is_first_logical_line {
-            tracked_vars.is_first_logical_line = false;
+        if !tracked_vars.is_not_first_logical_line {
+            tracked_vars.is_not_first_logical_line = true;
         }
 
         tracked_vars.follows_docstring = is_docstring(Some(line));
