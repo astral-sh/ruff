@@ -1105,9 +1105,8 @@ impl OperatorIndex {
     fn new(index: usize) -> Self {
         assert_eq!(index % 2, 1, "Operator indices must be odd positions");
 
-        // SAFETY A value with a module 0 is guaranteed to never equal 0
-        #[allow(unsafe_code)]
-        Self(unsafe { NonZeroUsize::new_unchecked(index) })
+        // OK because a value with a modulo 1 is guaranteed to never equal 0
+        Self(NonZeroUsize::new(index).expect("valid index"))
     }
 
     const fn value(self) -> usize {

@@ -120,10 +120,8 @@ impl<'a> StringParser<'a> {
             len += 1;
         }
 
-        // SAFETY: radix_bytes is always going to be in the ASCII range.
-        #[allow(unsafe_code)]
-        let radix_str = unsafe { std::str::from_utf8_unchecked(&radix_bytes[..len]) };
-
+        // OK because radix_bytes is always going to be in the ASCII range.
+        let radix_str = std::str::from_utf8(&radix_bytes[..len]).expect("ASCII bytes");
         let value = u32::from_str_radix(radix_str, 8).unwrap();
         char::from_u32(value).unwrap()
     }
