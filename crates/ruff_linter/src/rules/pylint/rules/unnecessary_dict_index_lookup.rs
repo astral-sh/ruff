@@ -10,10 +10,10 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of `dict.items()` and accessing the value by index lookup.
+/// Checks for access of a dict value at the current index when iterating through the dict items.
 ///
 /// ## Why is this bad?
-/// The value is already accessible by the 2nd variable from `dict.items()`.
+/// It is more succinct to use the variable for the value at the current index which is already in scope from the iterator.
 ///
 /// ## Example
 /// ```python
@@ -36,11 +36,11 @@ pub struct UnnecessaryDictIndexLookup;
 impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary dict index lookup")
+        format!("Unnecessary lookup of dict item by index")
     }
 
     fn fix_title(&self) -> String {
-        format!("Remove unnecessary dict index lookup")
+        format!("Use existing item variable instead")
     }
 }
 
