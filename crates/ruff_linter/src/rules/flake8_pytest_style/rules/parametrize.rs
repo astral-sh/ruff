@@ -550,7 +550,7 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                     element.range(),
                 );
                 if let Some(prev) = prev {
-                    let values_end = values.range().end() - TextSize::new(1);
+                    let values_end = values.end() - TextSize::new(1);
                     let previous_end =
                         trailing_comma(prev, checker.locator().contents()).unwrap_or(values_end);
                     let element_end =

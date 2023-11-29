@@ -1293,6 +1293,50 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
     }
 }
 
+pub fn typing_optional(elt: Expr, binding: String) -> Expr {
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(elt),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
+}
+
+pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
+    fn tuple(elts: &[Expr]) -> Expr {
+        match elts {
+            [] => Expr::Tuple(ast::ExprTuple {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            }),
+            [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
+            [elt] => elt.clone(),
+            [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(tuple(rest)),
+                op: Operator::BitOr,
+                right: Box::new(elt.clone()),
+                range: TextRange::default(),
+            }),
+        }
+    }
+
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(tuple(elts)),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
