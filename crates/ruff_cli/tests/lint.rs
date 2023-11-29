@@ -397,13 +397,13 @@ if __name__ == "__main__":
     Ok(())
 }
 
-/// Regression test for https://github.com/astral-sh/ruff/issues/8858
+/// Regression test for [#8858](https://github.com/astral-sh/ruff/issues/8858)
 #[test]
 fn parent_configuration_override() -> Result<()> {
     let tempdir = TempDir::new()?;
     let root_ruff = tempdir.path().join("ruff.toml");
     fs::write(
-        &root_ruff,
+        root_ruff,
         r#"
 [lint]
 select = ["ALL"]
@@ -415,7 +415,7 @@ select = ["ALL"]
 
     let subdirectory_ruff = sub_dir.join("ruff.toml");
     fs::write(
-        &subdirectory_ruff,
+        subdirectory_ruff,
         r#"
 [lint]
 ignore = ["D203", "D212"]
