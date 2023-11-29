@@ -276,6 +276,12 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         match self.code_example.add(line) {
             CodeExampleAddAction::Print { original } => self.print_one(&original)?,
             CodeExampleAddAction::Kept => {}
+            CodeExampleAddAction::Reset { code, original } => {
+                for codeline in code {
+                    self.print_one(&codeline.original)?;
+                }
+                self.print_one(&original)?;
+            }
             CodeExampleAddAction::Format {
                 kind,
                 code,
@@ -658,6 +664,19 @@ enum CodeExampleAddAction<'src> {
         /// or it is part of another code example and should be treated as a
         /// [`Kept`] action.
         original: Option<DocstringLine<'src>>,
+    },
+    /// This occurs when adding a line to an existing code example
+    /// results in that code example becoming invalid. In this case,
+    /// we don't want to treat it as a code example, but instead write
+    /// back the lines to the docstring unchanged.
+    #[allow(dead_code)] // FIXME: remove when reStructuredText support is added
+    Reset {
+        /// The lines of code that we collected but should be printed back to
+        /// the docstring as-is and not formatted.
+        code: Vec<CodeExampleLine<'src>>,
+        /// The line that was added and triggered this reset to occur. It
+        /// should be written back to the docstring as-is after the code lines.
+        original: DocstringLine<'src>,
     },
 }
 
