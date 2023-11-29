@@ -54,22 +54,22 @@ pub(crate) fn import_private_name(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom { names, module, .. }) => {
-            for alias in names {
-                if alias.name.as_str().starts_with('_') {
-                    checker.diagnostics.push(Diagnostic::new(
-                        ImportPrivateName {
-                            symbol_type: SymbolType::Object,
-                        },
-                        alias.name.range(),
-                    ));
-                }
-            }
-
+        Stmt::ImportFrom(ast::StmtImportFrom {
+            names,
+            module,
+            level,
+            ..
+        }) => {
             if let Some(identifier) = module {
                 if identifier == "__future__" {
                     return;
                 }
+
+                if level.is_some_and(|level| level > 0) {
+                    // allow relative private imports, common in libs
+                    return;
+                }
+
                 if identifier.starts_with('_') {
                     checker.diagnostics.push(Diagnostic::new(
                         ImportPrivateName {
@@ -83,6 +83,17 @@ pub(crate) fn import_private_name(checker: &mut Checker, stmt: &Stmt) {
                             symbol_type: SymbolType::FromModule,
                         },
                         identifier.range(),
+                    ));
+                }
+            }
+
+            for alias in names {
+                if alias.name.as_str().starts_with('_') {
+                    checker.diagnostics.push(Diagnostic::new(
+                        ImportPrivateName {
+                            symbol_type: SymbolType::Object,
+                        },
+                        alias.name.range(),
                     ));
                 }
             }
