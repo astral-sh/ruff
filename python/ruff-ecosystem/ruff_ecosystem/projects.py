@@ -104,7 +104,7 @@ class FormatOptions(CommandOptions):
         return args
 
     def to_black_args(self) -> list[str]:
-        args = []
+        args: list[str] = []
         if self.exclude:
             args.extend(["--exclude", self.exclude])
         if self.preview:
