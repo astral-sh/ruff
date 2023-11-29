@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ruff_python_trivia::PythonWhitespace;
 use {
     ruff_formatter::{write, Printed},
     ruff_source_file::Locator,
@@ -99,7 +100,7 @@ pub(super) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let docstring = &normalized.text;
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline
-    if docstring.contains("\\\n") {
+    if contains_unescaped_newline(docstring) {
         return normalized.fmt(f);
     }
 
@@ -198,6 +199,20 @@ pub(super) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     }
 
     write!(f, [source_position(normalized.end()), normalized.quotes])
+}
+
+fn contains_unescaped_newline(haystack: &str) -> bool {
+    let mut rest = haystack;
+
+    while let Some(index) = memchr::memchr(b'\\', rest.as_bytes()) {
+        rest = &rest[index + 1..].trim_whitespace_start();
+
+        if rest.starts_with('\n') {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// An abstraction for printing each line of a docstring.

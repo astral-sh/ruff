@@ -1,0 +1,93 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/fmtpass_imports.py
+---
+## Input
+
+```python
+# Regression test for https://github.com/psf/black/issues/3438
+
+import ast
+import collections  # fmt: skip
+import dataclasses
+# fmt: off
+import os
+# fmt: on
+import pathlib
+
+import re  # fmt: skip
+import secrets
+
+# fmt: off
+import sys
+# fmt: on
+
+import tempfile
+import zoneinfo
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -3,6 +3,7 @@
+ import ast
+ import collections  # fmt: skip
+ import dataclasses
++
+ # fmt: off
+ import os
+ # fmt: on
+```
+
+## Ruff Output
+
+```python
+# Regression test for https://github.com/psf/black/issues/3438
+
+import ast
+import collections  # fmt: skip
+import dataclasses
+
+# fmt: off
+import os
+# fmt: on
+import pathlib
+
+import re  # fmt: skip
+import secrets
+
+# fmt: off
+import sys
+# fmt: on
+
+import tempfile
+import zoneinfo
+```
+
+## Black Output
+
+```python
+# Regression test for https://github.com/psf/black/issues/3438
+
+import ast
+import collections  # fmt: skip
+import dataclasses
+# fmt: off
+import os
+# fmt: on
+import pathlib
+
+import re  # fmt: skip
+import secrets
+
+# fmt: off
+import sys
+# fmt: on
+
+import tempfile
+import zoneinfo
+```
+
+

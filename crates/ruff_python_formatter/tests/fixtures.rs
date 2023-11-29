@@ -20,9 +20,10 @@ fn black_compatibility() {
 
         let options_path = input_path.with_extension("options.json");
 
-        let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(options_path) {
+        let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
-            serde_json::from_reader(reader).expect("Options to be a valid Json file")
+            serde_json::from_reader(reader)
+                .unwrap_or_else(|_| panic!("Option file {options_path:?} to be a valid Json file"))
         } else {
             PyFormatOptions::from_extension(input_path)
         };
@@ -34,7 +35,11 @@ fn black_compatibility() {
             )
         });
 
-        let expected_path = input_path.with_extension("py.expect");
+        let extension = input_path
+            .extension()
+            .expect("Test file to have py or pyi extension")
+            .to_string_lossy();
+        let expected_path = input_path.with_extension(format!("{extension}.expect"));
         let expected_output = fs::read_to_string(&expected_path)
             .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
@@ -106,7 +111,11 @@ fn black_compatibility() {
         }
     };
 
-    insta::glob!("../resources", "test/fixtures/black/**/*.py", test_file);
+    insta::glob!(
+        "../resources",
+        "test/fixtures/black/**/*.{py,pyi}",
+        test_file
+    );
 }
 
 #[test]

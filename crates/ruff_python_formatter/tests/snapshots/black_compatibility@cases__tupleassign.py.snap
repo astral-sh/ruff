@@ -1,0 +1,67 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/tupleassign.py
+---
+## Input
+
+```python
+# This is a standalone comment.
+sdfjklsdfsjldkflkjsf, sdfjsdfjlksdljkfsdlkf, sdfsdjfklsdfjlksdljkf, sdsfsdfjskdflsfsdf = 1, 2, 3
+
+# This is as well.
+this_will_be_wrapped_in_parens, = struct.unpack(b"12345678901234567890")
+
+(a,) = call()
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -4,7 +4,7 @@
+     sdfjsdfjlksdljkfsdlkf,
+     sdfsdjfklsdfjlksdljkf,
+     sdsfsdfjskdflsfsdf,
+-) = (1, 2, 3)
++) = 1, 2, 3
+ 
+ # This is as well.
+ (this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
+```
+
+## Ruff Output
+
+```python
+# This is a standalone comment.
+(
+    sdfjklsdfsjldkflkjsf,
+    sdfjsdfjlksdljkfsdlkf,
+    sdfsdjfklsdfjlksdljkf,
+    sdsfsdfjskdflsfsdf,
+) = 1, 2, 3
+
+# This is as well.
+(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
+
+(a,) = call()
+```
+
+## Black Output
+
+```python
+# This is a standalone comment.
+(
+    sdfjklsdfsjldkflkjsf,
+    sdfjsdfjlksdljkfsdlkf,
+    sdfsdjfklsdfjlksdljkf,
+    sdsfsdfjskdflsfsdf,
+) = (1, 2, 3)
+
+# This is as well.
+(this_will_be_wrapped_in_parens,) = struct.unpack(b"12345678901234567890")
+
+(a,) = call()
+```
+
+
