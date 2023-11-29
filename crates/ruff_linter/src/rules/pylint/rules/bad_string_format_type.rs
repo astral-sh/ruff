@@ -201,7 +201,7 @@ fn is_valid_dict(
             value: mapping_key, ..
         }) = key
         {
-            let Some(format) = formats_hash.get(mapping_key.as_str()) else {
+            let Some(format) = formats_hash.get(mapping_key.to_str()) else {
                 return true;
             };
             if !equivalent(format, value) {

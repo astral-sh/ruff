@@ -380,13 +380,13 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                                 flynt::rules::static_join_to_fstring(
                                     checker,
                                     expr,
-                                    string_value.as_str(),
+                                    string_value.to_str(),
                                 );
                             }
                         } else if attr == "format" {
                             // "...".format(...) call
                             let location = expr.range();
-                            match pyflakes::format::FormatSummary::try_from(string_value.as_str()) {
+                            match pyflakes::format::FormatSummary::try_from(string_value.to_str()) {
                                 Err(e) => {
                                     if checker.enabled(Rule::StringDotFormatInvalidFormat) {
                                         checker.diagnostics.push(Diagnostic::new(
@@ -432,7 +432,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                             if checker.enabled(Rule::BadStringFormatCharacter) {
                                 pylint::rules::bad_string_format_character::call(
                                     checker,
-                                    string_value.as_str(),
+                                    string_value.to_str(),
                                     location,
                                 );
                             }
@@ -1045,7 +1045,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     Rule::PercentFormatUnsupportedFormatCharacter,
                 ]) {
                     let location = expr.range();
-                    match pyflakes::cformat::CFormatSummary::try_from(value.as_str()) {
+                    match pyflakes::cformat::CFormatSummary::try_from(value.to_str()) {
                         Err(CFormatError {
                             typ: CFormatErrorType::UnsupportedFormatChar(c),
                             ..

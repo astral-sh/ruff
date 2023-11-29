@@ -1233,10 +1233,10 @@ impl StringLiteralValue {
     ///
     /// Note that this will perform an allocation on the first invocation if the
     /// string value is implicitly concatenated.
-    pub fn as_str(&self) -> &str {
+    pub fn to_str(&self) -> &str {
         match &self.inner {
             StringLiteralValueInner::Single(value) => value.as_str(),
-            StringLiteralValueInner::Concatenated(value) => value.as_str(),
+            StringLiteralValueInner::Concatenated(value) => value.to_str(),
         }
     }
 }
@@ -1259,7 +1259,7 @@ impl PartialEq<String> for StringLiteralValue {
 
 impl fmt::Display for StringLiteralValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
+        f.write_str(self.to_str())
     }
 }
 
@@ -1331,7 +1331,7 @@ struct ConcatenatedStringLiteral {
 
 impl ConcatenatedStringLiteral {
     /// Extracts a string slice containing the entire concatenated string.
-    fn as_str(&self) -> &str {
+    fn to_str(&self) -> &str {
         self.value
             .get_or_init(|| self.strings.iter().map(StringLiteral::as_str).collect())
     }
@@ -1354,7 +1354,7 @@ impl Debug for ConcatenatedStringLiteral {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ConcatenatedStringLiteral")
             .field("strings", &self.strings)
-            .field("value", &self.as_str())
+            .field("value", &self.to_str())
             .finish()
     }
 }

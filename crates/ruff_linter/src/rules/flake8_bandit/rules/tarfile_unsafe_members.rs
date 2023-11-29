@@ -60,7 +60,7 @@ pub(crate) fn tarfile_unsafe_members(checker: &mut Checker, call: &ast::ExprCall
         .arguments
         .find_keyword("filter")
         .and_then(|keyword| keyword.value.as_string_literal_expr())
-        .is_some_and(|value| matches!(value.value.as_str(), "data" | "tar"))
+        .is_some_and(|value| matches!(value.value.to_str(), "data" | "tar"))
     {
         return;
     }

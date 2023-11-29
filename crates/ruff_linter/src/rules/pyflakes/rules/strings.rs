@@ -583,10 +583,10 @@ pub(crate) fn percent_format_extra_named_arguments(
         .enumerate()
         .filter_map(|(index, key)| match key {
             Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
-                if summary.keywords.contains(value.as_str()) {
+                if summary.keywords.contains(value.to_str()) {
                     None
                 } else {
-                    Some((index, value.as_str()))
+                    Some((index, value.to_str()))
                 }
             }
             _ => None,
@@ -641,7 +641,7 @@ pub(crate) fn percent_format_missing_arguments(
     for key in keys.iter().flatten() {
         match key {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                keywords.insert(value.as_str());
+                keywords.insert(value.to_str());
             }
             _ => {
                 return; // Dynamic keys present

@@ -69,10 +69,10 @@ pub(crate) fn getattr_with_constant(
     let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg else {
         return;
     };
-    if !is_identifier(value.as_str()) {
+    if !is_identifier(value.to_str()) {
         return;
     }
-    if is_mangled_private(value.as_str()) {
+    if is_mangled_private(value.to_str()) {
         return;
     }
     if !checker.semantic().is_builtin("getattr") {

@@ -1356,7 +1356,7 @@ impl<'a> Generator<'a> {
     fn unparse_f_string_elem(&mut self, expr: &Expr, is_spec: bool) {
         match expr {
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                self.unparse_f_string_literal(value.as_str());
+                self.unparse_f_string_literal(value.to_str());
             }
             Expr::FString(ast::ExprFString { value, .. }) => {
                 self.unparse_f_string_value(value, is_spec);

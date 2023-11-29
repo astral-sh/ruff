@@ -248,7 +248,7 @@ fn match_open_mode(mode: &Expr) -> Option<ReadMode> {
     if value.is_implicit_concatenated() {
         return None;
     }
-    match value.as_str() {
+    match value.to_str() {
         "r" => Some(ReadMode::Text),
         "rb" => Some(ReadMode::Bytes),
         _ => None,
