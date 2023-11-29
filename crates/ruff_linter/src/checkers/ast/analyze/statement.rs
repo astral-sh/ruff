@@ -536,6 +536,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::ImportOutsideTopLevel) {
                 pylint::rules::import_outside_top_level(checker, stmt);
             }
+            if checker.enabled(Rule::ImportPrivateName) {
+                pylint::rules::import_private_name(checker, stmt);
+            }
             if checker.enabled(Rule::GlobalStatement) {
                 for name in names {
                     if let Some(asname) = name.asname.as_ref() {
@@ -714,6 +717,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::ImportOutsideTopLevel) {
                 pylint::rules::import_outside_top_level(checker, stmt);
+            }
+            if checker.enabled(Rule::ImportPrivateName) {
+                pylint::rules::import_private_name(checker, stmt);
             }
             if checker.enabled(Rule::GlobalStatement) {
                 for name in names {

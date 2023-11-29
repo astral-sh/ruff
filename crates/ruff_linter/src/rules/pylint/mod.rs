@@ -62,6 +62,7 @@ mod tests {
         Path::new("global_variable_not_assigned.py")
     )]
     #[test_case(Rule::ImportOutsideTopLevel, Path::new("import_outside_top_level.py"))]
+    #[test_case(Rule::ImportPrivateName, Path::new("import_private_name.py"))]
     #[test_case(Rule::ImportSelf, Path::new("import_self/module.py"))]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"))]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"))]
