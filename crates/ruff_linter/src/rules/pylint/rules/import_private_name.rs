@@ -67,6 +67,9 @@ pub(crate) fn import_private_name(checker: &mut Checker, stmt: &Stmt) {
             }
 
             if let Some(identifier) = module {
+                if identifier == "__future__" {
+                    return;
+                }
                 if identifier.starts_with('_') {
                     checker.diagnostics.push(Diagnostic::new(
                         ImportPrivateName {

@@ -1,0 +1,126 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 172
+---
+import_private_name.py:3:8: PLC2701 Imported private module
+  |
+1 | from __future__ import annotations  # Ok
+2 | 
+3 | import _private  # PLC2701
+  |        ^^^^^^^^ PLC2701
+4 | import _private as _p  # PLC2701
+5 | from _private import _private  # PLC2701
+  |
+
+import_private_name.py:4:8: PLC2701 Imported private module
+  |
+3 | import _private  # PLC2701
+4 | import _private as _p  # PLC2701
+  |        ^^^^^^^^ PLC2701
+5 | from _private import _private  # PLC2701
+6 | from lib import _private  # PLC2701
+  |
+
+import_private_name.py:5:6: PLC2701 Imported private module
+  |
+3 | import _private  # PLC2701
+4 | import _private as _p  # PLC2701
+5 | from _private import _private  # PLC2701
+  |      ^^^^^^^^ PLC2701
+6 | from lib import _private  # PLC2701
+7 | from lib import _private as _p  # PLC2701
+  |
+
+import_private_name.py:5:22: PLC2701 Imported private object
+  |
+3 | import _private  # PLC2701
+4 | import _private as _p  # PLC2701
+5 | from _private import _private  # PLC2701
+  |                      ^^^^^^^^ PLC2701
+6 | from lib import _private  # PLC2701
+7 | from lib import _private as _p  # PLC2701
+  |
+
+import_private_name.py:6:17: PLC2701 Imported private object
+  |
+4 | import _private as _p  # PLC2701
+5 | from _private import _private  # PLC2701
+6 | from lib import _private  # PLC2701
+  |                 ^^^^^^^^ PLC2701
+7 | from lib import _private as _p  # PLC2701
+8 | from lib._private import _private  # PLC2701
+  |
+
+import_private_name.py:7:17: PLC2701 Imported private object
+  |
+5 | from _private import _private  # PLC2701
+6 | from lib import _private  # PLC2701
+7 | from lib import _private as _p  # PLC2701
+  |                 ^^^^^^^^ PLC2701
+8 | from lib._private import _private  # PLC2701
+9 | from lib._private import _private as _p  # PLC2701
+  |
+
+import_private_name.py:8:6: PLC2701 Imported from private module
+   |
+ 6 | from lib import _private  # PLC2701
+ 7 | from lib import _private as _p  # PLC2701
+ 8 | from lib._private import _private  # PLC2701
+   |      ^^^^^^^^^^^^ PLC2701
+ 9 | from lib._private import _private as _p  # PLC2701
+10 | from lib._private import _private, _private as _p  # PLC2701
+   |
+
+import_private_name.py:8:26: PLC2701 Imported private object
+   |
+ 6 | from lib import _private  # PLC2701
+ 7 | from lib import _private as _p  # PLC2701
+ 8 | from lib._private import _private  # PLC2701
+   |                          ^^^^^^^^ PLC2701
+ 9 | from lib._private import _private as _p  # PLC2701
+10 | from lib._private import _private, _private as _p  # PLC2701
+   |
+
+import_private_name.py:9:6: PLC2701 Imported from private module
+   |
+ 7 | from lib import _private as _p  # PLC2701
+ 8 | from lib._private import _private  # PLC2701
+ 9 | from lib._private import _private as _p  # PLC2701
+   |      ^^^^^^^^^^^^ PLC2701
+10 | from lib._private import _private, _private as _p  # PLC2701
+   |
+
+import_private_name.py:9:26: PLC2701 Imported private object
+   |
+ 7 | from lib import _private as _p  # PLC2701
+ 8 | from lib._private import _private  # PLC2701
+ 9 | from lib._private import _private as _p  # PLC2701
+   |                          ^^^^^^^^ PLC2701
+10 | from lib._private import _private, _private as _p  # PLC2701
+   |
+
+import_private_name.py:10:6: PLC2701 Imported from private module
+   |
+ 8 | from lib._private import _private  # PLC2701
+ 9 | from lib._private import _private as _p  # PLC2701
+10 | from lib._private import _private, _private as _p  # PLC2701
+   |      ^^^^^^^^^^^^ PLC2701
+   |
+
+import_private_name.py:10:26: PLC2701 Imported private object
+   |
+ 8 | from lib._private import _private  # PLC2701
+ 9 | from lib._private import _private as _p  # PLC2701
+10 | from lib._private import _private, _private as _p  # PLC2701
+   |                          ^^^^^^^^ PLC2701
+   |
+
+import_private_name.py:10:36: PLC2701 Imported private object
+   |
+ 8 | from lib._private import _private  # PLC2701
+ 9 | from lib._private import _private as _p  # PLC2701
+10 | from lib._private import _private, _private as _p  # PLC2701
+   |                                    ^^^^^^^^ PLC2701
+   |
+
+
