@@ -208,6 +208,9 @@ pub enum Linter {
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
+    /// [Array-agnosticism](https://data-apis.org/array-api/latest/)
+    #[prefix = "XP"]
+    XP,
 }
 
 pub trait RuleNamespace: Sized {

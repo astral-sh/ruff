@@ -967,6 +967,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "007") => (RuleGroup::Preview, rules::flake8_logging::rules::ExceptionWithoutExcInfo),
         (Flake8Logging, "009") => (RuleGroup::Preview, rules::flake8_logging::rules::UndocumentedWarn),
 
+        // array-agnosticism (xp)
+        (XP, "001") => (RuleGroup::Preview, rules::xp::rules::NotArrayAgnosticNumPy),
+
         _ => return None,
     })
 }

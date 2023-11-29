@@ -17,6 +17,7 @@ use crate::rules::{
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
     flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_use_pathlib, flynt, numpy,
     pandas_vet, pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff,
+    xp,
 };
 use crate::settings::types::PythonVersion;
 
@@ -163,6 +164,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                     if checker.enabled(Rule::CollectionsNamedTuple) {
                         flake8_pyi::rules::collections_named_tuple(checker, expr);
+                    }
+                    if checker.enabled(Rule::NotArrayAgnosticNumPy) {
+                        xp::rules::not_array_agnostic_numpy(checker, expr);
                     }
 
                     // Ex) List[...]
@@ -337,6 +341,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UndocumentedWarn) {
                 flake8_logging::rules::undocumented_warn(checker, expr);
+            }
+            if checker.enabled(Rule::NotArrayAgnosticNumPy) {
+                xp::rules::not_array_agnostic_numpy(checker, expr);
             }
             pandas_vet::rules::attr(checker, attribute);
         }
