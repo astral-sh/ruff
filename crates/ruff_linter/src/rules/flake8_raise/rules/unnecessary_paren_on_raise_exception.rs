@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::BindingKind;
@@ -103,17 +103,23 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
             .next()
             .is_some_and(char::is_alphanumeric)
         {
-            diagnostic.set_fix(if exception_type.is_some() {
-                Fix::safe_edit(Edit::range_replacement(" ".to_string(), arguments.range()))
-            } else {
-                Fix::unsafe_edit(Edit::range_replacement(" ".to_string(), arguments.range()))
-            });
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(" ".to_string(), arguments.range()),
+                if exception_type.is_some() {
+                    Applicability::Safe
+                } else {
+                    Applicability::Unsafe
+                },
+            ));
         } else {
-            diagnostic.set_fix(if exception_type.is_some() {
-                Fix::safe_edit(Edit::range_deletion(arguments.range()))
-            } else {
-                Fix::unsafe_edit(Edit::range_deletion(arguments.range()))
-            });
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_deletion(arguments.range()),
+                if exception_type.is_some() {
+                    Applicability::Safe
+                } else {
+                    Applicability::Unsafe
+                },
+            ));
         }
 
         checker.diagnostics.push(diagnostic);

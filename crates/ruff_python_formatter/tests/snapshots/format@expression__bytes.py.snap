@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/bytes.py
 ---
 ## Input
-```py
+```python
 b"' test"
 b'" test'
 
@@ -133,11 +133,13 @@ indent-style            = space
 line-width              = 88
 indent-width            = 4
 quote-style             = Double
+line-ending             = LineFeed
 magic-trailing-comma    = Respect
+docstring-code          = Disabled
 preview                 = Disabled
 ```
 
-```py
+```python
 b"' test"
 b'" test'
 
@@ -282,11 +284,13 @@ indent-style            = space
 line-width              = 88
 indent-width            = 4
 quote-style             = Single
+line-ending             = LineFeed
 magic-trailing-comma    = Respect
+docstring-code          = Disabled
 preview                 = Disabled
 ```
 
-```py
+```python
 b"' test"
 b'" test'
 

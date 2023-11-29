@@ -27,7 +27,7 @@ For **Conda** users, Ruff is also available as [`ruff`](https://anaconda.org/con
 conda install -c conda-forge ruff
 ```
 
-For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/community/x86_64/ruff/)
+For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/extra/x86_64/ruff/)
 on the official repositories:
 
 ```shell
@@ -39,6 +39,14 @@ on the testing repositories:
 
 ```shell
 apk add ruff
+```
+
+On **Docker**, it is published as `ghcr.io/astral-sh/ruff`, tagged for each release and `latest` for
+the latest release.
+
+```shell
+docker run -v .:/io --rm ghcr.io/astral-sh/ruff check .
+docker run -v .:/io --rm ghcr.io/astral-sh/ruff:0.1.3 check .
 ```
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/ruff-python-linter.svg?exclude_unsupported=1)](https://repology.org/project/ruff-python-linter/versions)

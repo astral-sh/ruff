@@ -3,6 +3,7 @@
 use std::{borrow::Cow, cmp::Ordering, cmp::Reverse};
 
 use natord;
+use unicode_width::UnicodeWidthStr;
 
 use ruff_python_stdlib::str;
 
@@ -64,22 +65,31 @@ impl<'a> From<String> for NatOrdStr<'a> {
     }
 }
 
-#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) enum Distance {
     Nearest(u32),
     Furthest(Reverse<u32>),
+}
+
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) enum ImportStyle {
+    // Ex) `import foo`
+    Straight,
+    // Ex) `from foo import bar`
+    From,
 }
 
 /// A comparable key to capture the desired sorting order for an imported module (e.g.,
 /// `foo` in `from foo import bar`).
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct ModuleKey<'a> {
+    force_to_top: bool,
+    maybe_length: Option<usize>,
     distance: Distance,
-    force_to_top: Option<bool>,
     maybe_lowercase_name: Option<NatOrdStr<'a>>,
     module_name: Option<NatOrdStr<'a>>,
-    asname: Option<NatOrdStr<'a>>,
     first_alias: Option<MemberKey<'a>>,
+    asname: Option<NatOrdStr<'a>>,
 }
 
 impl<'a> ModuleKey<'a> {
@@ -88,30 +98,43 @@ impl<'a> ModuleKey<'a> {
         asname: Option<&'a str>,
         level: Option<u32>,
         first_alias: Option<(&'a str, Option<&'a str>)>,
+        style: ImportStyle,
         settings: &Settings,
     ) -> Self {
+        let level = level.unwrap_or_default();
+
+        let force_to_top = !name
+            .map(|name| settings.force_to_top.contains(name))
+            .unwrap_or_default(); // `false` < `true` so we get forced to top first
+
+        let maybe_length = (settings.length_sort
+            || (settings.length_sort_straight && style == ImportStyle::Straight))
+            .then_some(name.map(str::width).unwrap_or_default() + level as usize);
+
         let distance = match settings.relative_imports_order {
-            RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level.unwrap_or_default()),
-            RelativeImportsOrder::FurthestToClosest => {
-                Distance::Furthest(Reverse(level.unwrap_or_default()))
-            }
+            RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level),
+            RelativeImportsOrder::FurthestToClosest => Distance::Furthest(Reverse(level)),
         };
-        let force_to_top = name.map(|name| !settings.force_to_top.contains(name)); // `false` < `true` so we get forced to top first
+
         let maybe_lowercase_name = name.and_then(|name| {
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
         });
+
         let module_name = name.map(NatOrdStr::from);
+
         let asname = asname.map(NatOrdStr::from);
+
         let first_alias =
             first_alias.map(|(name, asname)| MemberKey::from_member(name, asname, settings));
 
         Self {
-            distance,
             force_to_top,
+            maybe_length,
+            distance,
             maybe_lowercase_name,
             module_name,
-            asname,
             first_alias,
+            asname,
         }
     }
 }
@@ -122,6 +145,7 @@ impl<'a> ModuleKey<'a> {
 pub(crate) struct MemberKey<'a> {
     not_star_import: bool,
     member_type: Option<MemberType>,
+    maybe_length: Option<usize>,
     maybe_lowercase_name: Option<NatOrdStr<'a>>,
     module_name: NatOrdStr<'a>,
     asname: Option<NatOrdStr<'a>>,
@@ -133,6 +157,7 @@ impl<'a> MemberKey<'a> {
         let member_type = settings
             .order_by_type
             .then_some(member_type(name, settings));
+        let maybe_length = settings.length_sort.then_some(name.width());
         let maybe_lowercase_name =
             (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
         let module_name = NatOrdStr::from(name);
@@ -141,6 +166,7 @@ impl<'a> MemberKey<'a> {
         Self {
             not_star_import,
             member_type,
+            maybe_length,
             maybe_lowercase_name,
             module_name,
             asname,

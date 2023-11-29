@@ -27,6 +27,11 @@ use crate::checkers::ast::Checker;
 /// raise AssertionError
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as changing an `assert` to a
+/// `raise` will change the behavior of your program when running in
+/// optimized mode (`python -O`).
+///
 /// ## References
 /// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[violation]

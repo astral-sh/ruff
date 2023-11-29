@@ -7,7 +7,7 @@ use std::error::Error;
 
 use anyhow::Result;
 use libcst_native::{ImportAlias, Name, NameOrAttribute};
-use ruff_python_ast::{self as ast, PySourceType, Stmt, Suite};
+use ruff_python_ast::{self as ast, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use ruff_diagnostics::Edit;
@@ -26,7 +26,7 @@ mod insertion;
 
 pub(crate) struct Importer<'a> {
     /// The Python AST to which we are adding imports.
-    python_ast: &'a Suite,
+    python_ast: &'a [Stmt],
     /// The [`Locator`] for the Python AST.
     locator: &'a Locator<'a>,
     /// The [`Stylist`] for the Python AST.
@@ -39,7 +39,7 @@ pub(crate) struct Importer<'a> {
 
 impl<'a> Importer<'a> {
     pub(crate) fn new(
-        python_ast: &'a Suite,
+        python_ast: &'a [Stmt],
         locator: &'a Locator<'a>,
         stylist: &'a Stylist<'a>,
     ) -> Self {
@@ -132,11 +132,7 @@ impl<'a> Importer<'a> {
         )?;
 
         // Import the `TYPE_CHECKING` symbol from the typing module.
-        let (type_checking_edit, type_checking) = self.get_or_import_symbol(
-            &ImportRequest::import_from("typing", "TYPE_CHECKING"),
-            at,
-            semantic,
-        )?;
+        let (type_checking_edit, type_checking) = self.get_or_import_type_checking(at, semantic)?;
 
         // Add the import to a `TYPE_CHECKING` block.
         let add_import_edit = if let Some(block) = self.preceding_type_checking_block(at) {
@@ -159,6 +155,30 @@ impl<'a> Importer<'a> {
             type_checking_edit,
             add_import_edit,
         })
+    }
+
+    /// Generate an [`Edit`] to reference `typing.TYPE_CHECKING`. Returns the [`Edit`] necessary to
+    /// make the symbol available in the current scope along with the bound name of the symbol.
+    fn get_or_import_type_checking(
+        &self,
+        at: TextSize,
+        semantic: &SemanticModel,
+    ) -> Result<(Edit, String), ResolutionError> {
+        for module in semantic.typing_modules() {
+            if let Some((edit, name)) = self.get_symbol(
+                &ImportRequest::import_from(module, "TYPE_CHECKING"),
+                at,
+                semantic,
+            )? {
+                return Ok((edit, name));
+            }
+        }
+
+        self.import_symbol(
+            &ImportRequest::import_from("typing", "TYPE_CHECKING"),
+            at,
+            semantic,
+        )
     }
 
     /// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make
@@ -209,7 +229,7 @@ impl<'a> Importer<'a> {
         // We also add a no-op edit to force conflicts with any other fixes that might try to
         // remove the import. Consider:
         //
-        // ```py
+        // ```python
         // import sys
         //
         // quit()

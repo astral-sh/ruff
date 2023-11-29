@@ -1,5 +1,5 @@
 use crate::comments::Comments;
-use crate::PyFormatOptions;
+use crate::{PyFormatOptions, QuoteStyle};
 use ruff_formatter::{Buffer, FormatContext, GroupId, SourceCode};
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
@@ -11,6 +11,15 @@ pub struct PyFormatContext<'a> {
     contents: &'a str,
     comments: Comments<'a>,
     node_level: NodeLevel,
+    /// Set to a non-None value when the formatter is running on a code
+    /// snippet within a docstring. The value should be the quote style of the
+    /// docstring containing the code snippet.
+    ///
+    /// Various parts of the formatter may inspect this state to change how it
+    /// works. For example, multi-line strings will always be written with a
+    /// quote style that is inverted from the one here in order to ensure that
+    /// the formatted Python code will be valid.
+    docstring: Option<QuoteStyle>,
 }
 
 impl<'a> PyFormatContext<'a> {
@@ -19,7 +28,8 @@ impl<'a> PyFormatContext<'a> {
             options,
             contents,
             comments,
-            node_level: NodeLevel::TopLevel,
+            node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
+            docstring: None,
         }
     }
 
@@ -42,6 +52,27 @@ impl<'a> PyFormatContext<'a> {
 
     pub(crate) fn comments(&self) -> &Comments<'a> {
         &self.comments
+    }
+
+    /// Returns a non-None value only if the formatter is running on a code
+    /// snippet within a docstring.
+    ///
+    /// The quote style returned corresponds to the quoting used for the
+    /// docstring containing the code snippet currently being formatted.
+    pub(crate) fn docstring(&self) -> Option<QuoteStyle> {
+        self.docstring
+    }
+
+    /// Return a new context suitable for formatting code snippets within a
+    /// docstring.
+    ///
+    /// The quote style given should correspond to the style of quoting used
+    /// for the docstring containing the code snippets.
+    pub(crate) fn in_docstring(self, style: QuoteStyle) -> PyFormatContext<'a> {
+        PyFormatContext {
+            docstring: Some(style),
+            ..self
+        }
     }
 }
 
@@ -68,12 +99,21 @@ impl Debug for PyFormatContext<'_> {
     }
 }
 
-/// What's the enclosing level of the outer node.
+/// The position of a top-level statement in the module.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+pub(crate) enum TopLevelStatementPosition {
+    /// This is the last top-level statement in the module.
+    Last,
+    /// Any other top-level statement.
+    #[default]
+    Other,
+}
+
+/// What's the enclosing level of the outer node.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum NodeLevel {
     /// Formatting statements on the module level.
-    #[default]
-    TopLevel,
+    TopLevel(TopLevelStatementPosition),
 
     /// Formatting the body statements of a [compound statement](https://docs.python.org/3/reference/compound_stmts.html#compound-statements)
     /// (`if`, `while`, `match`, etc.).
@@ -86,6 +126,12 @@ pub(crate) enum NodeLevel {
     ParenthesizedExpression,
 }
 
+impl Default for NodeLevel {
+    fn default() -> Self {
+        Self::TopLevel(TopLevelStatementPosition::Other)
+    }
+}
+
 impl NodeLevel {
     /// Returns `true` if the expression is in a parenthesized context.
     pub(crate) const fn is_parenthesized(self) -> bool {
@@ -93,6 +139,11 @@ impl NodeLevel {
             self,
             NodeLevel::Expression(Some(_)) | NodeLevel::ParenthesizedExpression
         )
+    }
+
+    /// Returns `true` if this is the last top-level statement in the module.
+    pub(crate) const fn is_last_top_level_statement(self) -> bool {
+        matches!(self, NodeLevel::TopLevel(TopLevelStatementPosition::Last))
     }
 }
 

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/await.py
 ---
 ## Input
-```py
+```python
 # Regression test for: https://github.com/astral-sh/ruff/issues/7420
 result = await self.request(
     f"/applications/{int(application_id)}/guilds/{int(scope)}/commands/{int(command_id)}/permissions"
@@ -54,10 +54,19 @@ await (
     # comment
     [foo]
 )
+
+# https://github.com/astral-sh/ruff/issues/8644
+test_data = await (
+    Stream.from_async(async_data)
+    .flat_map_async()
+    .map()
+    .filter_async(is_valid_data)
+    .to_list()
+)
 ```
 
 ## Output
-```py
+```python
 # Regression test for: https://github.com/astral-sh/ruff/issues/7420
 result = await self.request(
     f"/applications/{int(application_id)}/guilds/{int(scope)}/commands/{int(command_id)}/permissions"
@@ -121,6 +130,15 @@ await (  # comment
 await (
     # comment
     [foo]
+)
+
+# https://github.com/astral-sh/ruff/issues/8644
+test_data = await (
+    Stream.from_async(async_data)
+    .flat_map_async()
+    .map()
+    .filter_async(is_valid_data)
+    .to_list()
 )
 ```
 

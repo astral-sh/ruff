@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::comments::{
     leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
 };
-use crate::context::{NodeLevel, WithNodeLevel};
+use crate::context::{NodeLevel, TopLevelStatementPosition, WithNodeLevel};
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
 use crate::statement::stmt_expr::FormatStmtExpr;
@@ -49,8 +49,19 @@ impl Default for FormatSuite {
 
 impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
     fn fmt(&self, statements: &Suite, f: &mut PyFormatter) -> FormatResult<()> {
+        let mut iter = statements.iter();
+        let Some(first) = iter.next() else {
+            return Ok(());
+        };
+
         let node_level = match self.kind {
-            SuiteKind::TopLevel => NodeLevel::TopLevel,
+            SuiteKind::TopLevel => NodeLevel::TopLevel(
+                iter.clone()
+                    .next()
+                    .map_or(TopLevelStatementPosition::Last, |_| {
+                        TopLevelStatementPosition::Other
+                    }),
+            ),
             SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
                 NodeLevel::CompoundStatement
             }
@@ -61,11 +72,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let source_type = f.options().source_type();
 
         let f = &mut WithNodeLevel::new(node_level, f);
-
-        let mut iter = statements.iter();
-        let Some(first) = iter.next() else {
-            return Ok(());
-        };
 
         // Format the first statement in the body, which often has special formatting rules.
         let first = match self.kind {
@@ -165,6 +171,11 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let mut preceding_comments = comments.leading_dangling_trailing(preceding);
 
         while let Some(following) = iter.next() {
+            if self.kind == SuiteKind::TopLevel && iter.clone().next().is_none() {
+                f.context_mut()
+                    .set_node_level(NodeLevel::TopLevel(TopLevelStatementPosition::Last));
+            }
+
             let following_comments = comments.leading_dangling_trailing(following);
 
             let needs_empty_lines = if is_class_or_function_definition(following) {
@@ -351,7 +362,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     .map_or(preceding.end(), |comment| comment.slice().end());
 
                 match node_level {
-                    NodeLevel::TopLevel => match lines_after(end, source) {
+                    NodeLevel::TopLevel(_) => match lines_after(end, source) {
                         0 | 1 => hard_line_break().fmt(f)?,
                         2 => empty_line().fmt(f)?,
                         _ => match source_type {
@@ -558,10 +569,14 @@ impl<'a> DocstringStmt<'a> {
         };
 
         match value.as_ref() {
-            Expr::StringLiteral(value) if !value.implicit_concatenated => Some(DocstringStmt {
-                docstring: stmt,
-                suite_kind,
-            }),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                if !value.is_implicit_concatenated() =>
+            {
+                Some(DocstringStmt {
+                    docstring: stmt,
+                    suite_kind,
+                })
+            }
             _ => None,
         }
     }
@@ -674,7 +689,7 @@ mod tests {
     use crate::PyFormatOptions;
 
     fn format_suite(level: SuiteKind) -> String {
-        let source = r#"
+        let source = r"
 a = 10
 
 
@@ -693,7 +708,7 @@ def func():
     pass
 def trailing_func():
     pass
-"#;
+";
 
         let statements = parse_suite(source, "test.py").unwrap();
 
@@ -719,7 +734,7 @@ def trailing_func():
 
         assert_eq!(
             formatted,
-            r#"a = 10
+            r"a = 10
 
 
 three_leading_newlines = 80
@@ -744,7 +759,7 @@ def func():
 
 def trailing_func():
     pass
-"#
+"
         );
     }
 
@@ -754,7 +769,7 @@ def trailing_func():
 
         assert_eq!(
             formatted,
-            r#"a = 10
+            r"a = 10
 
 three_leading_newlines = 80
 
@@ -773,7 +788,7 @@ def func():
 
 def trailing_func():
     pass
-"#
+"
         );
     }
 }

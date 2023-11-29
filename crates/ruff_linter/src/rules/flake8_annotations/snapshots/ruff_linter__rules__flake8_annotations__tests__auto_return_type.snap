@@ -1,0 +1,165 @@
+---
+source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+---
+auto_return_type.py:1:5: ANN201 [*] Missing return type annotation for public function `func`
+  |
+1 | def func():
+  |     ^^^^ ANN201
+2 |     return 1
+  |
+  = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+1   |-def func():
+  1 |+def func() -> int:
+2 2 |     return 1
+3 3 | 
+4 4 | 
+
+auto_return_type.py:5:5: ANN201 [*] Missing return type annotation for public function `func`
+  |
+5 | def func():
+  |     ^^^^ ANN201
+6 |     return 1.5
+  |
+  = help: Add return type annotation: `float`
+
+ℹ Unsafe fix
+2 2 |     return 1
+3 3 | 
+4 4 | 
+5   |-def func():
+  5 |+def func() -> float:
+6 6 |     return 1.5
+7 7 | 
+8 8 | 
+
+auto_return_type.py:9:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+ 9 | def func(x: int):
+   |     ^^^^ ANN201
+10 |     if x > 0:
+11 |         return 1
+   |
+   = help: Add return type annotation: `float`
+
+ℹ Unsafe fix
+6  6  |     return 1.5
+7  7  | 
+8  8  | 
+9     |-def func(x: int):
+   9  |+def func(x: int) -> float:
+10 10 |     if x > 0:
+11 11 |         return 1
+12 12 |     else:
+
+auto_return_type.py:16:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+16 | def func():
+   |     ^^^^ ANN201
+17 |     return True
+   |
+   = help: Add return type annotation: `bool`
+
+ℹ Unsafe fix
+13 13 |         return 1.5
+14 14 | 
+15 15 | 
+16    |-def func():
+   16 |+def func() -> bool:
+17 17 |     return True
+18 18 | 
+19 19 | 
+
+auto_return_type.py:20:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+20 | def func(x: int):
+   |     ^^^^ ANN201
+21 |     if x > 0:
+22 |         return None
+   |
+   = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+17 17 |     return True
+18 18 | 
+19 19 | 
+20    |-def func(x: int):
+   20 |+def func(x: int) -> None:
+21 21 |     if x > 0:
+22 22 |         return None
+23 23 |     else:
+
+auto_return_type.py:27:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+27 | def func(x: int):
+   |     ^^^^ ANN201
+28 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
+   |
+   = help: Add return type annotation: `str | float`
+
+ℹ Unsafe fix
+24 24 |         return
+25 25 | 
+26 26 | 
+27    |-def func(x: int):
+   27 |+def func(x: int) -> str | float:
+28 28 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
+29 29 | 
+30 30 | 
+
+auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+31 | def func(x: int):
+   |     ^^^^ ANN201
+32 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
+   |
+   = help: Add return type annotation: `str | float`
+
+ℹ Unsafe fix
+28 28 |     return 1 or 2.5 if x > 0 else 1.5 or "str"
+29 29 | 
+30 30 | 
+31    |-def func(x: int):
+   31 |+def func(x: int) -> str | float:
+32 32 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
+33 33 | 
+34 34 | 
+
+auto_return_type.py:35:5: ANN201 Missing return type annotation for public function `func`
+   |
+35 | def func(x: int):
+   |     ^^^^ ANN201
+36 |     if not x:
+37 |         return None
+   |
+   = help: Add return type annotation
+
+auto_return_type.py:41:5: ANN201 Missing return type annotation for public function `func`
+   |
+41 | def func(x: int):
+   |     ^^^^ ANN201
+42 |     return {"foo": 1}
+   |
+   = help: Add return type annotation
+
+auto_return_type.py:45:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+45 | def func():
+   |     ^^^^ ANN201
+46 |     if not x:
+47 |         return 1
+   |
+   = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+42 42 |     return {"foo": 1}
+43 43 | 
+44 44 | 
+45    |-def func():
+   45 |+def func() -> int:
+46 46 |     if not x:
+47 47 |         return 1
+48 48 |     else:
+
+

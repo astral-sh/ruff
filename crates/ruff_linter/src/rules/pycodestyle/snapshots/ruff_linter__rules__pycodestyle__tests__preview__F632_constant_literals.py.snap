@@ -1,0 +1,481 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
+  |
+2 | # Errors
+3 | ###
+4 | if "abc" is "def":  # F632 (fix)
+  |    ^^^^^^^^^^^^^^ F632
+5 |     pass
+6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
+  |
+  = help: Replace `is` with `==`
+
+ℹ Safe fix
+1 1 | ###
+2 2 | # Errors
+3 3 | ###
+4   |-if "abc" is "def":  # F632 (fix)
+  4 |+if "abc" == "def":  # F632 (fix)
+5 5 |     pass
+6 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
+7 7 |     pass
+
+constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
+  |
+4 | if "abc" is "def":  # F632 (fix)
+5 |     pass
+6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
+  |    ^^^^^^^^^^^^^ F632
+7 |     pass
+8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
+  |
+  = help: Replace `is` with `==`
+
+ℹ Safe fix
+3 3 | ###
+4 4 | if "abc" is "def":  # F632 (fix)
+5 5 |     pass
+6   |-if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
+  6 |+if "abc" == None:  # F632 (fix, but leaves behind unfixable E711)
+7 7 |     pass
+8 8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
+9 9 |     pass
+
+constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
+   |
+ 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
+ 7 |     pass
+ 8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
+   |    ^^^^^^^^^^^^^ F632
+ 9 |     pass
+10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+5 5 |     pass
+6 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
+7 7 |     pass
+8   |-if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
+  8 |+if None == "abc":  # F632 (fix, but leaves behind unfixable E711)
+9 9 |     pass
+10 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
+11 11 |     pass
+
+constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
+   |
+ 8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
+ 9 |     pass
+10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
+   |    ^^^^^^^^^^^^^^ F632
+11 |     pass
+12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+7  7  |     pass
+8  8  | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
+9  9  |     pass
+10    |-if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
+   10 |+if "abc" == False:  # F632 (fix, but leaves behind unfixable E712)
+11 11 |     pass
+12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
+13 13 |     pass
+
+constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
+   |
+10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
+11 |     pass
+12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
+   |    ^^^^^^^^^^^^^^ F632
+13 |     pass
+14 | if False == None:  # E711, E712 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+9  9  |     pass
+10 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
+11 11 |     pass
+12    |-if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
+   12 |+if False == "abc":  # F632 (fix, but leaves behind unfixable E712)
+13 13 |     pass
+14 14 | if False == None:  # E711, E712 (fix)
+15 15 |     pass
+
+constant_literals.py:20:4: F632 [*] Use `==` to compare constant literals
+   |
+19 | named_var = []
+20 | if [] is []:  # F632 (fix)
+   |    ^^^^^^^^ F632
+21 |     pass
+22 | if named_var is []:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+17 17 |     pass
+18 18 | 
+19 19 | named_var = []
+20    |-if [] is []:  # F632 (fix)
+   20 |+if [] == []:  # F632 (fix)
+21 21 |     pass
+22 22 | if named_var is []:  # F632 (fix)
+23 23 |     pass
+
+constant_literals.py:22:4: F632 [*] Use `==` to compare constant literals
+   |
+20 | if [] is []:  # F632 (fix)
+21 |     pass
+22 | if named_var is []:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^ F632
+23 |     pass
+24 | if [] is named_var:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+19 19 | named_var = []
+20 20 | if [] is []:  # F632 (fix)
+21 21 |     pass
+22    |-if named_var is []:  # F632 (fix)
+   22 |+if named_var == []:  # F632 (fix)
+23 23 |     pass
+24 24 | if [] is named_var:  # F632 (fix)
+25 25 |     pass
+
+constant_literals.py:24:4: F632 [*] Use `==` to compare constant literals
+   |
+22 | if named_var is []:  # F632 (fix)
+23 |     pass
+24 | if [] is named_var:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^ F632
+25 |     pass
+26 | if named_var is [1]:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+21 21 |     pass
+22 22 | if named_var is []:  # F632 (fix)
+23 23 |     pass
+24    |-if [] is named_var:  # F632 (fix)
+   24 |+if [] == named_var:  # F632 (fix)
+25 25 |     pass
+26 26 | if named_var is [1]:  # F632 (fix)
+27 27 |     pass
+
+constant_literals.py:26:4: F632 [*] Use `==` to compare constant literals
+   |
+24 | if [] is named_var:  # F632 (fix)
+25 |     pass
+26 | if named_var is [1]:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^ F632
+27 |     pass
+28 | if [1] is named_var:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+23 23 |     pass
+24 24 | if [] is named_var:  # F632 (fix)
+25 25 |     pass
+26    |-if named_var is [1]:  # F632 (fix)
+   26 |+if named_var == [1]:  # F632 (fix)
+27 27 |     pass
+28 28 | if [1] is named_var:  # F632 (fix)
+29 29 |     pass
+
+constant_literals.py:28:4: F632 [*] Use `==` to compare constant literals
+   |
+26 | if named_var is [1]:  # F632 (fix)
+27 |     pass
+28 | if [1] is named_var:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^ F632
+29 |     pass
+30 | if named_var is [i for i in [1]]:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+25 25 |     pass
+26 26 | if named_var is [1]:  # F632 (fix)
+27 27 |     pass
+28    |-if [1] is named_var:  # F632 (fix)
+   28 |+if [1] == named_var:  # F632 (fix)
+29 29 |     pass
+30 30 | if named_var is [i for i in [1]]:  # F632 (fix)
+31 31 |     pass
+
+constant_literals.py:30:4: F632 [*] Use `==` to compare constant literals
+   |
+28 | if [1] is named_var:  # F632 (fix)
+29 |     pass
+30 | if named_var is [i for i in [1]]:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F632
+31 |     pass
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+27 27 |     pass
+28 28 | if [1] is named_var:  # F632 (fix)
+29 29 |     pass
+30    |-if named_var is [i for i in [1]]:  # F632 (fix)
+   30 |+if named_var == [i for i in [1]]:  # F632 (fix)
+31 31 |     pass
+32 32 | 
+33 33 | named_var = {}
+
+constant_literals.py:34:4: F632 [*] Use `==` to compare constant literals
+   |
+33 | named_var = {}
+34 | if {} is {}:  # F632 (fix)
+   |    ^^^^^^^^ F632
+35 |     pass
+36 | if named_var is {}:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+31 31 |     pass
+32 32 | 
+33 33 | named_var = {}
+34    |-if {} is {}:  # F632 (fix)
+   34 |+if {} == {}:  # F632 (fix)
+35 35 |     pass
+36 36 | if named_var is {}:  # F632 (fix)
+37 37 |     pass
+
+constant_literals.py:36:4: F632 [*] Use `==` to compare constant literals
+   |
+34 | if {} is {}:  # F632 (fix)
+35 |     pass
+36 | if named_var is {}:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^ F632
+37 |     pass
+38 | if {} is named_var:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+33 33 | named_var = {}
+34 34 | if {} is {}:  # F632 (fix)
+35 35 |     pass
+36    |-if named_var is {}:  # F632 (fix)
+   36 |+if named_var == {}:  # F632 (fix)
+37 37 |     pass
+38 38 | if {} is named_var:  # F632 (fix)
+39 39 |     pass
+
+constant_literals.py:38:4: F632 [*] Use `==` to compare constant literals
+   |
+36 | if named_var is {}:  # F632 (fix)
+37 |     pass
+38 | if {} is named_var:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^ F632
+39 |     pass
+40 | if named_var is {1}:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+35 35 |     pass
+36 36 | if named_var is {}:  # F632 (fix)
+37 37 |     pass
+38    |-if {} is named_var:  # F632 (fix)
+   38 |+if {} == named_var:  # F632 (fix)
+39 39 |     pass
+40 40 | if named_var is {1}:  # F632 (fix)
+41 41 |     pass
+
+constant_literals.py:40:4: F632 [*] Use `==` to compare constant literals
+   |
+38 | if {} is named_var:  # F632 (fix)
+39 |     pass
+40 | if named_var is {1}:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^ F632
+41 |     pass
+42 | if {1} is named_var:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+37 37 |     pass
+38 38 | if {} is named_var:  # F632 (fix)
+39 39 |     pass
+40    |-if named_var is {1}:  # F632 (fix)
+   40 |+if named_var == {1}:  # F632 (fix)
+41 41 |     pass
+42 42 | if {1} is named_var:  # F632 (fix)
+43 43 |     pass
+
+constant_literals.py:42:4: F632 [*] Use `==` to compare constant literals
+   |
+40 | if named_var is {1}:  # F632 (fix)
+41 |     pass
+42 | if {1} is named_var:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^ F632
+43 |     pass
+44 | if named_var is {i for i in [1]}:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+39 39 |     pass
+40 40 | if named_var is {1}:  # F632 (fix)
+41 41 |     pass
+42    |-if {1} is named_var:  # F632 (fix)
+   42 |+if {1} == named_var:  # F632 (fix)
+43 43 |     pass
+44 44 | if named_var is {i for i in [1]}:  # F632 (fix)
+45 45 |     pass
+
+constant_literals.py:44:4: F632 [*] Use `==` to compare constant literals
+   |
+42 | if {1} is named_var:  # F632 (fix)
+43 |     pass
+44 | if named_var is {i for i in [1]}:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F632
+45 |     pass
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+41 41 |     pass
+42 42 | if {1} is named_var:  # F632 (fix)
+43 43 |     pass
+44    |-if named_var is {i for i in [1]}:  # F632 (fix)
+   44 |+if named_var == {i for i in [1]}:  # F632 (fix)
+45 45 |     pass
+46 46 | 
+47 47 | named_var = {1: 1}
+
+constant_literals.py:48:4: F632 [*] Use `==` to compare constant literals
+   |
+47 | named_var = {1: 1}
+48 | if {1: 1} is {1: 1}:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^ F632
+49 |     pass
+50 | if named_var is {1: 1}:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+45 45 |     pass
+46 46 | 
+47 47 | named_var = {1: 1}
+48    |-if {1: 1} is {1: 1}:  # F632 (fix)
+   48 |+if {1: 1} == {1: 1}:  # F632 (fix)
+49 49 |     pass
+50 50 | if named_var is {1: 1}:  # F632 (fix)
+51 51 |     pass
+
+constant_literals.py:50:4: F632 [*] Use `==` to compare constant literals
+   |
+48 | if {1: 1} is {1: 1}:  # F632 (fix)
+49 |     pass
+50 | if named_var is {1: 1}:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^^^^ F632
+51 |     pass
+52 | if {1: 1} is named_var:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+47 47 | named_var = {1: 1}
+48 48 | if {1: 1} is {1: 1}:  # F632 (fix)
+49 49 |     pass
+50    |-if named_var is {1: 1}:  # F632 (fix)
+   50 |+if named_var == {1: 1}:  # F632 (fix)
+51 51 |     pass
+52 52 | if {1: 1} is named_var:  # F632 (fix)
+53 53 |     pass
+
+constant_literals.py:52:4: F632 [*] Use `==` to compare constant literals
+   |
+50 | if named_var is {1: 1}:  # F632 (fix)
+51 |     pass
+52 | if {1: 1} is named_var:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^^^^ F632
+53 |     pass
+54 | if named_var is {1: 1}:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+49 49 |     pass
+50 50 | if named_var is {1: 1}:  # F632 (fix)
+51 51 |     pass
+52    |-if {1: 1} is named_var:  # F632 (fix)
+   52 |+if {1: 1} == named_var:  # F632 (fix)
+53 53 |     pass
+54 54 | if named_var is {1: 1}:  # F632 (fix)
+55 55 |     pass
+
+constant_literals.py:54:4: F632 [*] Use `==` to compare constant literals
+   |
+52 | if {1: 1} is named_var:  # F632 (fix)
+53 |     pass
+54 | if named_var is {1: 1}:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^^^^ F632
+55 |     pass
+56 | if {1: 1} is named_var:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+51 51 |     pass
+52 52 | if {1: 1} is named_var:  # F632 (fix)
+53 53 |     pass
+54    |-if named_var is {1: 1}:  # F632 (fix)
+   54 |+if named_var == {1: 1}:  # F632 (fix)
+55 55 |     pass
+56 56 | if {1: 1} is named_var:  # F632 (fix)
+57 57 |     pass
+
+constant_literals.py:56:4: F632 [*] Use `==` to compare constant literals
+   |
+54 | if named_var is {1: 1}:  # F632 (fix)
+55 |     pass
+56 | if {1: 1} is named_var:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^^^^ F632
+57 |     pass
+58 | if named_var is {i: 1 for i in [1]}:  # F632 (fix)
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+53 53 |     pass
+54 54 | if named_var is {1: 1}:  # F632 (fix)
+55 55 |     pass
+56    |-if {1: 1} is named_var:  # F632 (fix)
+   56 |+if {1: 1} == named_var:  # F632 (fix)
+57 57 |     pass
+58 58 | if named_var is {i: 1 for i in [1]}:  # F632 (fix)
+59 59 |     pass
+
+constant_literals.py:58:4: F632 [*] Use `==` to compare constant literals
+   |
+56 | if {1: 1} is named_var:  # F632 (fix)
+57 |     pass
+58 | if named_var is {i: 1 for i in [1]}:  # F632 (fix)
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F632
+59 |     pass
+   |
+   = help: Replace `is` with `==`
+
+ℹ Safe fix
+55 55 |     pass
+56 56 | if {1: 1} is named_var:  # F632 (fix)
+57 57 |     pass
+58    |-if named_var is {i: 1 for i in [1]}:  # F632 (fix)
+   58 |+if named_var == {i: 1 for i in [1]}:  # F632 (fix)
+59 59 |     pass
+60 60 | 
+61 61 | ###
+
+

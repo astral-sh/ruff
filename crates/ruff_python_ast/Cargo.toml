@@ -33,3 +33,6 @@ ruff_python_parser = { path = "../ruff_python_parser" }
 
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]
+
+[lints]
+workspace = true

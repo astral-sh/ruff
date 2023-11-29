@@ -1344,6 +1344,8 @@ pub enum LexicalErrorType {
     LineContinuationError,
     /// An unexpected end of file was encountered.
     Eof,
+    /// Occurs when a syntactically invalid assignment was encountered.
+    AssignmentError,
     /// An unexpected error occurred.
     OtherError(String),
 }
@@ -1389,6 +1391,7 @@ impl std::fmt::Display for LexicalErrorType {
                 write!(f, "unexpected character after line continuation character")
             }
             LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
+            LexicalErrorType::AssignmentError => write!(f, "invalid assignment target"),
             LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
         }
     }
@@ -1970,9 +1973,9 @@ def f(arg=%timeit a = b):
     #[test]
     fn tet_too_low_dedent() {
         let tokens: Vec<_> = lex(
-            r#"if True:
+            "if True:
     pass
-  pass"#,
+  pass",
             Mode::Module,
         )
         .collect();
@@ -2157,6 +2160,14 @@ f"{(lambda x:{x})}"
         assert_debug_snapshot!(lex_source(source));
     }
 
+    #[test]
+    fn test_match_softkeyword_in_notebook() {
+        let source = r"match foo:
+    case bar:
+        pass";
+        assert_debug_snapshot!(lex_jupyter_source(source));
+    }
+
     fn lex_fstring_error(source: &str) -> FStringErrorType {
         match lex(source, Mode::Module).find_map(std::result::Result::err) {
             Some(err) => match err.error {
@@ -2195,10 +2206,10 @@ f"{(lambda x:{x})}"
         assert_eq!(lex_fstring_error(r#"f"""{""""#), UnclosedLbrace);
 
         assert_eq!(lex_fstring_error(r#"f""#), UnterminatedString);
-        assert_eq!(lex_fstring_error(r#"f'"#), UnterminatedString);
+        assert_eq!(lex_fstring_error(r"f'"), UnterminatedString);
 
         assert_eq!(lex_fstring_error(r#"f""""#), UnterminatedTripleQuotedString);
-        assert_eq!(lex_fstring_error(r#"f'''"#), UnterminatedTripleQuotedString);
+        assert_eq!(lex_fstring_error(r"f'''"), UnterminatedTripleQuotedString);
         assert_eq!(
             lex_fstring_error(r#"f"""""#),
             UnterminatedTripleQuotedString

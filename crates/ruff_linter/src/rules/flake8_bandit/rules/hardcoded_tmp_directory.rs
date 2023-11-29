@@ -57,7 +57,7 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: &ast::ExprS
         .flake8_bandit
         .hardcoded_tmp_directory
         .iter()
-        .any(|prefix| string.value.starts_with(prefix))
+        .any(|prefix| string.value.as_str().starts_with(prefix))
     {
         return;
     }
@@ -76,7 +76,7 @@ pub(crate) fn hardcoded_tmp_directory(checker: &mut Checker, string: &ast::ExprS
 
     checker.diagnostics.push(Diagnostic::new(
         HardcodedTempFile {
-            string: string.value.clone(),
+            string: string.value.to_string(),
         },
         string.range,
     ));

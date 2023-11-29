@@ -356,6 +356,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
             }
+            if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
+                flake8_trio::rules::async_function_with_timeout(checker, function_def);
+            }
             #[cfg(feature = "unreachable-code")]
             if checker.enabled(Rule::UnreachableCode) {
                 checker
@@ -1206,7 +1209,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_trio::rules::timeout_without_await(checker, with_stmt, items);
             }
         }
-        Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+        Stmt::While(while_stmt @ ast::StmtWhile { body, orelse, .. }) => {
             if checker.enabled(Rule::FunctionUsesLoopVariable) {
                 flake8_bugbear::rules::function_uses_loop_variable(checker, &Node::Stmt(stmt));
             }
@@ -1215,6 +1218,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::TryExceptInLoop) {
                 perflint::rules::try_except_in_loop(checker, body);
+            }
+            if checker.enabled(Rule::TrioUnneededSleep) {
+                flake8_trio::rules::unneeded_sleep(checker, while_stmt);
             }
         }
         Stmt::For(
@@ -1263,7 +1269,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 perflint::rules::manual_dict_comprehension(checker, target, body);
             }
             if checker.enabled(Rule::UnnecessaryListCast) {
-                perflint::rules::unnecessary_list_cast(checker, iter);
+                perflint::rules::unnecessary_list_cast(checker, iter, body);
             }
             if !is_async {
                 if checker.enabled(Rule::ReimplementedBuiltin) {
@@ -1349,7 +1355,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
-            checker.enabled(Rule::NonAsciiName);
             if checker.enabled(Rule::LambdaAssignment) {
                 if let [target] = &targets[..] {
                     pycodestyle::rules::lambda_assignment(checker, target, value, None, stmt);
@@ -1401,9 +1406,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.settings.rules.enabled(Rule::SelfAssigningVariable) {
-                if let [target] = targets.as_slice() {
-                    pylint::rules::self_assigning_variable(checker, target, value);
-                }
+                pylint::rules::self_assignment(checker, assign);
             }
             if checker.settings.rules.enabled(Rule::TypeParamNameMismatch) {
                 pylint::rules::type_param_name_mismatch(checker, value, targets);
@@ -1473,9 +1476,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                     );
                 }
-                if checker.enabled(Rule::SelfAssigningVariable) {
-                    pylint::rules::self_assigning_variable(checker, target, value);
-                }
+            }
+            if checker.enabled(Rule::SelfAssigningVariable) {
+                pylint::rules::self_annotated_assignment(checker, assign_stmt);
             }
             if checker.enabled(Rule::UnintentionalTypeAnnotation) {
                 flake8_bugbear::rules::unintentional_type_annotation(

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/optional_parentheses_comments.py
 ---
 ## Input
-```py
+```python
 comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
 
 # 88 characters unparenthesized
@@ -213,7 +213,7 @@ def test6():
 ```
 
 ## Output
-```py
+```python
 comment_string = "Long lines with inline comments should have their comments appended to the reformatted string's enclosing right parentheses."  # This comment gets thrown to the top.
 
 # 88 characters unparenthesized

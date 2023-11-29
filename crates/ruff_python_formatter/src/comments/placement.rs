@@ -283,13 +283,13 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
         AnyNodeRef::ExprStringLiteral(_) => {
-            if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
+            if let Some(AnyNodeRef::FString(fstring)) = comment.enclosing_parent() {
                 CommentPlacement::dangling(fstring, comment)
             } else {
                 CommentPlacement::Default(comment)
             }
         }
-        AnyNodeRef::ExprFString(fstring) => CommentPlacement::dangling(fstring, comment),
+        AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
@@ -2281,10 +2281,10 @@ mod tests {
 
         assert_eq!(
             max_empty_lines(
-                r#"# This multiline comments section
+                r"# This multiline comments section
 # should be split from the statement
 # above by two lines.
-"#
+"
             ),
             0
         );

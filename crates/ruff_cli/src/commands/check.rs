@@ -30,6 +30,7 @@ use crate::diagnostics::Diagnostics;
 use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check(
     files: &[PathBuf],
     pyproject_config: &PyprojectConfig,
@@ -184,6 +185,7 @@ pub(crate) fn check(
 
 /// Wraps [`lint_path`](crate::diagnostics::lint_path) in a [`catch_unwind`](std::panic::catch_unwind) and emits
 /// a diagnostic if the linting the file panics.
+#[allow(clippy::too_many_arguments)]
 fn lint_path(
     path: &Path,
     package: Option<&Path>,
@@ -200,12 +202,12 @@ fn lint_path(
     match result {
         Ok(inner) => inner,
         Err(error) => {
-            let message = r#"This indicates a bug in Ruff. If you could open an issue at:
+            let message = r"This indicates a bug in Ruff. If you could open an issue at:
 
     https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
 ...with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
-"#;
+";
 
             error!(
                 "{}{}{} {message}\n{error}",

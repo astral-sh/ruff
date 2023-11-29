@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/docstring.py
 ---
 ## Input
-```py
+```python
 def single_line_backslashes1():
   """ content\     """
   return
@@ -165,11 +165,13 @@ indent-style            = space
 line-width              = 88
 indent-width            = 4
 quote-style             = Double
+line-ending             = LineFeed
 magic-trailing-comma    = Respect
+docstring-code          = Disabled
 preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
     """content\ """
     return
@@ -331,11 +333,13 @@ indent-style            = space
 line-width              = 88
 indent-width            = 2
 quote-style             = Double
+line-ending             = LineFeed
 magic-trailing-comma    = Respect
+docstring-code          = Disabled
 preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
   """content\ """
   return
@@ -497,11 +501,13 @@ indent-style            = tab
 line-width              = 88
 indent-width            = 8
 quote-style             = Double
+line-ending             = LineFeed
 magic-trailing-comma    = Respect
+docstring-code          = Disabled
 preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
 	"""content\ """
 	return
@@ -663,11 +669,13 @@ indent-style            = tab
 line-width              = 88
 indent-width            = 4
 quote-style             = Double
+line-ending             = LineFeed
 magic-trailing-comma    = Respect
+docstring-code          = Disabled
 preview                 = Disabled
 ```
 
-```py
+```python
 def single_line_backslashes1():
 	"""content\ """
 	return

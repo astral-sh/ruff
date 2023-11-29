@@ -61,12 +61,20 @@ impl AlwaysFixableViolation for TimeoutErrorAlias {
 fn is_alias(expr: &Expr, semantic: &SemanticModel, target_version: PythonVersion) -> bool {
     semantic.resolve_call_path(expr).is_some_and(|call_path| {
         if target_version >= PythonVersion::Py311 {
-            matches!(call_path.as_slice(), [""] | ["asyncio", "TimeoutError"])
-        } else {
             matches!(
                 call_path.as_slice(),
-                [""] | ["asyncio", "TimeoutError"] | ["socket", "timeout"]
+                ["socket", "timeout"] | ["asyncio", "TimeoutError"]
             )
+        } else {
+            // N.B. This lint is only invoked for Python 3.10+. We assume
+            // as much here since otherwise socket.timeout would be an unsafe
+            // fix in Python <3.10. We add an assert to make this assumption
+            // explicit.
+            assert!(
+                target_version >= PythonVersion::Py310,
+                "lint should only be used for Python 3.10+",
+            );
+            matches!(call_path.as_slice(), ["socket", "timeout"])
         }
     })
 }

@@ -1,5 +1,127 @@
 # Changelog
 
+## 0.1.6
+
+### Preview features
+
+- \[`flake8-boolean-trap`\] Extend `boolean-type-hint-positional-argument` (`FBT001`) to include booleans in unions ([#7501](https://github.com/astral-sh/ruff/pull/7501))
+- \[`flake8-pie`\] Extend `reimplemented-list-builtin` (`PIE807`) to `dict` reimplementations ([#8608](https://github.com/astral-sh/ruff/pull/8608))
+- \[`flake8-pie`\] Extend `unnecessary-pass` (`PIE790`) to include ellipses (`...`) ([#8641](https://github.com/astral-sh/ruff/pull/8641))
+- \[`flake8-pie`\] Implement fix for `unnecessary-spread` (`PIE800`) ([#8668](https://github.com/astral-sh/ruff/pull/8668))
+- \[`flake8-quotes`\] Implement `unnecessary-escaped-quote` (`Q004`) ([#8630](https://github.com/astral-sh/ruff/pull/8630))
+- \[`pycodestyle`\] Implement fix for `multiple-spaces-after-keyword` (`E271`) and `multiple-spaces-before-keyword` (`E272`) ([#8622](https://github.com/astral-sh/ruff/pull/8622))
+- \[`pycodestyle`\] Implement fix for `multiple-spaces-after-operator` (`E222`) and `multiple-spaces-before-operator` (`E221`) ([#8623](https://github.com/astral-sh/ruff/pull/8623))
+- \[`pyflakes`\] Extend `is-literal` (`F632`) to include comparisons against mutable initializers ([#8607](https://github.com/astral-sh/ruff/pull/8607))
+- \[`pylint`\] Implement `redefined-argument-from-local` (`PLR1704`) ([#8159](https://github.com/astral-sh/ruff/pull/8159))
+- \[`pylint`\] Implement fix for `unnecessary-lambda` (`PLW0108`) ([#8621](https://github.com/astral-sh/ruff/pull/8621))
+- \[`refurb`\] Implement `if-expr-min-max` (`FURB136`) ([#8664](https://github.com/astral-sh/ruff/pull/8664))
+- \[`refurb`\] Implement `math-constant` (`FURB152`) ([#8727](https://github.com/astral-sh/ruff/pull/8727))
+
+### Rule changes
+
+- \[`flake8-annotations`\] Add autotyping-like return type inference for annotation rules ([#8643](https://github.com/astral-sh/ruff/pull/8643))
+- \[`flake8-future-annotations`\] Implement fix for `future-required-type-annotation` (`FA102`) ([#8711](https://github.com/astral-sh/ruff/pull/8711))
+- \[`flake8-implicit-namespace-package`\] Avoid missing namespace violations in scripts with shebangs ([#8710](https://github.com/astral-sh/ruff/pull/8710))
+- \[`pydocstyle`\] Update `over-indentation` (`D208`) to preserve indentation offsets when fixing overindented lines ([#8699](https://github.com/astral-sh/ruff/pull/8699))
+- \[`pyupgrade`\] Refine `timeout-error-alias` (`UP041`) to remove false positives ([#8587](https://github.com/astral-sh/ruff/pull/8587))
+
+### Formatter
+
+- Fix instability in `await` formatting with fluent style ([#8676](https://github.com/astral-sh/ruff/pull/8676))
+- Compare formatted and unformatted ASTs during formatter tests ([#8624](https://github.com/astral-sh/ruff/pull/8624))
+- Preserve trailing semicolon for Notebooks ([#8590](https://github.com/astral-sh/ruff/pull/8590))
+
+### CLI
+
+- Improve debug printing for resolving origin of config settings ([#8729](https://github.com/astral-sh/ruff/pull/8729))
+- Write unchanged, excluded files to stdout when read via stdin ([#8596](https://github.com/astral-sh/ruff/pull/8596))
+
+### Configuration
+
+- \[`isort`\] Support disabling sections with `no-sections = true` ([#8657](https://github.com/astral-sh/ruff/pull/8657))
+- \[`pep8-naming`\] Support local and dynamic class- and static-method decorators ([#8592](https://github.com/astral-sh/ruff/pull/8592))
+- \[`pydocstyle`\] Allow overriding pydocstyle convention rules ([#8586](https://github.com/astral-sh/ruff/pull/8586))
+
+### Bug fixes
+
+- Avoid syntax error via importing `trio.lowlevel` ([#8730](https://github.com/astral-sh/ruff/pull/8730))
+- Omit unrolled augmented assignments in `PIE794` ([#8634](https://github.com/astral-sh/ruff/pull/8634))
+- Slice source code instead of generating it for `EM` fixes ([#7746](https://github.com/astral-sh/ruff/pull/7746))
+- Allow whitespace around colon in slices for `whitespace-before-punctuation` (`E203`) ([#8654](https://github.com/astral-sh/ruff/pull/8654))
+- Use function range for `no-self-use` ([#8637](https://github.com/astral-sh/ruff/pull/8637))
+- F-strings doesn't contain bytes literal for `PLW0129` ([#8675](https://github.com/astral-sh/ruff/pull/8675))
+- Improve detection of `TYPE_CHECKING` blocks imported from `typing_extensions` or `_typeshed` ([#8429](https://github.com/astral-sh/ruff/pull/8429))
+- Treat display as a builtin in IPython ([#8707](https://github.com/astral-sh/ruff/pull/8707))
+- Avoid `FURB113` autofix if comments are present ([#8494](https://github.com/astral-sh/ruff/pull/8494))
+- Consider the new f-string tokens for `flake8-commas` ([#8582](https://github.com/astral-sh/ruff/pull/8582))
+- Remove erroneous bad-dunder-name reference ([#8742](https://github.com/astral-sh/ruff/pull/8742))
+- Avoid recommending Self usages in metaclasses ([#8639](https://github.com/astral-sh/ruff/pull/8639))
+- Detect runtime-evaluated base classes defined in the current file ([#8572](https://github.com/astral-sh/ruff/pull/8572))
+- Avoid inserting trailing commas within f-strings ([#8574](https://github.com/astral-sh/ruff/pull/8574))
+- Remove incorrect deprecation label for stdout and stderr ([#8743](https://github.com/astral-sh/ruff/pull/8743))
+- Fix unnecessary parentheses in UP007 fix ([#8610](https://github.com/astral-sh/ruff/pull/8610))
+- Remove repeated and erroneous scoped settings headers in docs ([#8670](https://github.com/astral-sh/ruff/pull/8670))
+- Trim trailing empty strings when converting to f-strings ([#8712](https://github.com/astral-sh/ruff/pull/8712))
+- Fix ordering for `force-sort-within-sections` ([#8665](https://github.com/astral-sh/ruff/pull/8665))
+- Run unicode prefix rule over tokens ([#8709](https://github.com/astral-sh/ruff/pull/8709))
+- Update UP032 to unescape curly braces in literal parts of converted strings ([#8697](https://github.com/astral-sh/ruff/pull/8697))
+- List all ipython builtins ([#8719](https://github.com/astral-sh/ruff/pull/8719))
+
+### Documentation
+
+- Document conventions in the FAQ ([#8638](https://github.com/astral-sh/ruff/pull/8638))
+- Redirect from rule codes to rule pages in docs ([#8636](https://github.com/astral-sh/ruff/pull/8636))
+- Fix permalink to convention setting ([#8575](https://github.com/astral-sh/ruff/pull/8575))
+
+## 0.1.5
+
+### Preview features
+
+- \[`flake8-bandit`\] Implement `mako-templates` (`S702`) ([#8533](https://github.com/astral-sh/ruff/pull/8533))
+- \[`flake8-trio`\] Implement `TRIO105` ([#8490](https://github.com/astral-sh/ruff/pull/8490))
+- \[`flake8-trio`\] Implement `TRIO109` ([#8534](https://github.com/astral-sh/ruff/pull/8534))
+- \[`flake8-trio`\] Implement `TRIO110` ([#8537](https://github.com/astral-sh/ruff/pull/8537))
+- \[`flake8-trio`\] Implement `TRIO115` ([#8486](https://github.com/astral-sh/ruff/pull/8486))
+- \[`refurb`\] Implement `type-none-comparison` (`FURB169`) ([#8487](https://github.com/astral-sh/ruff/pull/8487))
+- Flag all comparisons against builtin types in `E721` ([#8491](https://github.com/astral-sh/ruff/pull/8491))
+- Make `SIM118` fix as safe when the expression is a known dictionary  ([#8525](https://github.com/astral-sh/ruff/pull/8525))
+
+### Formatter
+
+- Fix multiline lambda expression statement formatting ([#8466](https://github.com/astral-sh/ruff/pull/8466))
+
+### CLI
+
+- Add hidden `--extension` to override inference of source type from file extension ([#8373](https://github.com/astral-sh/ruff/pull/8373))
+
+### Configuration
+
+- Account for selector specificity when merging `extend_unsafe_fixes` and `override extend_safe_fixes` ([#8444](https://github.com/astral-sh/ruff/pull/8444))
+- Add support for disabling cache with `RUFF_NO_CACHE` environment variable ([#8538](https://github.com/astral-sh/ruff/pull/8538))
+
+### Bug fixes
+
+- \[`E721`\] Flag comparisons to `memoryview` ([#8485](https://github.com/astral-sh/ruff/pull/8485))
+- Allow collapsed-ellipsis bodies in other statements ([#8499](https://github.com/astral-sh/ruff/pull/8499))
+- Avoid `D301` autofix for `u` prefixed strings ([#8495](https://github.com/astral-sh/ruff/pull/8495))
+- Only flag `flake8-trio` rules when `trio` import is present ([#8550](https://github.com/astral-sh/ruff/pull/8550))
+- Reject more syntactically invalid Python programs ([#8524](https://github.com/astral-sh/ruff/pull/8524))
+- Avoid raising `TRIO115` violations for `trio.sleep(...)` calls with non-number values ([#8532](https://github.com/astral-sh/ruff/pull/8532))
+- Fix `F841` false negative on assignment to multiple variables ([#8489](https://github.com/astral-sh/ruff/pull/8489))
+
+### Documentation
+
+- Fix link to isort `known-first-party` ([#8562](https://github.com/astral-sh/ruff/pull/8562))
+- Add notes on fix safety to a few rules ([#8500](https://github.com/astral-sh/ruff/pull/8500))
+- Add missing toml config tabs ([#8512](https://github.com/astral-sh/ruff/pull/8512))
+- Add instructions for configuration of Emacs ([#8488](https://github.com/astral-sh/ruff/pull/8488))
+- Improve detail link contrast in dark mode ([#8548](https://github.com/astral-sh/ruff/pull/8548))
+- Fix typo in example ([#8506](https://github.com/astral-sh/ruff/pull/8506))
+- Added tabs for configuration files in the documentation ([#8480](https://github.com/astral-sh/ruff/pull/8480))
+- Recommend `project.requires-python` over `target-version` ([#8513](https://github.com/astral-sh/ruff/pull/8513))
+- Add singleton escape hatch to `B008` documentation ([#8501](https://github.com/astral-sh/ruff/pull/8501))
+- Fix tab configuration docs ([#8502](https://github.com/astral-sh/ruff/pull/8502))
+
 ## 0.1.4
 
 ### Preview features

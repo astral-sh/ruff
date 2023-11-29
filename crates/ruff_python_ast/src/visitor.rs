@@ -1,12 +1,13 @@
 //! AST visitor trait and walk functions.
 
 pub mod preorder;
+pub mod transformer;
 
 use crate::{
-    self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
-    PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp,
-    WithItem,
+    self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
+    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringPart, Keyword, MatchCase,
+    Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
+    StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for AST visitors. Visits all nodes in the AST recursively in evaluation-order.
@@ -14,8 +15,10 @@ use crate::{
 /// Prefer [`crate::statement_visitor::StatementVisitor`] for visitors that only need to visit
 /// statements.
 ///
-/// Use the [`PreorderVisitor`](self::preorder::PreorderVisitor) if you want to visit the nodes
+/// Use the [`PreorderVisitor`](preorder::PreorderVisitor) if you want to visit the nodes
 /// in pre-order rather than evaluation order.
+///
+/// Use the [`Transformer`](transformer::Transformer) if you want to modify the nodes.
 pub trait Visitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         walk_stmt(self, stmt);
@@ -94,6 +97,15 @@ pub trait Visitor<'a> {
     }
     fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
+    }
+    fn visit_f_string(&mut self, f_string: &'a FString) {
+        walk_f_string(self, f_string);
+    }
+    fn visit_string_literal(&mut self, string_literal: &'a StringLiteral) {
+        walk_string_literal(self, string_literal);
+    }
+    fn visit_bytes_literal(&mut self, bytes_literal: &'a BytesLiteral) {
+        walk_bytes_literal(self, bytes_literal);
     }
 }
 
@@ -472,14 +484,27 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
                 visitor.visit_format_spec(expr);
             }
         }
-        Expr::FString(ast::ExprFString { values, .. }) => {
-            for expr in values {
-                visitor.visit_expr(expr);
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            for part in value.parts() {
+                match part {
+                    FStringPart::Literal(string_literal) => {
+                        visitor.visit_string_literal(string_literal);
+                    }
+                    FStringPart::FString(f_string) => visitor.visit_f_string(f_string),
+                }
             }
         }
-        Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            for string_literal in value.parts() {
+                visitor.visit_string_literal(string_literal);
+            }
+        }
+        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+            for bytes_literal in value.parts() {
+                visitor.visit_bytes_literal(bytes_literal);
+            }
+        }
+        Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_) => {}
@@ -570,6 +595,12 @@ pub fn walk_except_handler<'a, V: Visitor<'a> + ?Sized>(
             }
             visitor.visit_body(body);
         }
+    }
+}
+
+pub fn walk_f_string<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, f_string: &'a FString) {
+    for expr in &f_string.values {
+        visitor.visit_expr(expr);
     }
 }
 
@@ -726,20 +757,30 @@ pub fn walk_pattern_keyword<'a, V: Visitor<'a> + ?Sized>(
     visitor.visit_pattern(&pattern_keyword.pattern);
 }
 
-#[allow(unused_variables)]
-pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(visitor: &V, expr_context: &'a ExprContext) {}
+pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
+    _visitor: &V,
+    _expr_context: &'a ExprContext,
+) {
+}
 
-#[allow(unused_variables)]
-pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, bool_op: &'a BoolOp) {}
+pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _bool_op: &'a BoolOp) {}
 
-#[allow(unused_variables)]
-pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &V, operator: &'a Operator) {}
+pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _operator: &'a Operator) {}
 
-#[allow(unused_variables)]
-pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, unary_op: &'a UnaryOp) {}
+pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _unary_op: &'a UnaryOp) {}
 
-#[allow(unused_variables)]
-pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &V, cmp_op: &'a CmpOp) {}
+pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _cmp_op: &'a CmpOp) {}
 
-#[allow(unused_variables)]
-pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &V, alias: &'a Alias) {}
+pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(_visitor: &V, _alias: &'a Alias) {}
+
+pub fn walk_string_literal<'a, V: Visitor<'a> + ?Sized>(
+    _visitor: &V,
+    _string_literal: &'a StringLiteral,
+) {
+}
+
+pub fn walk_bytes_literal<'a, V: Visitor<'a> + ?Sized>(
+    _visitor: &V,
+    _bytes_literal: &'a BytesLiteral,
+) {
+}

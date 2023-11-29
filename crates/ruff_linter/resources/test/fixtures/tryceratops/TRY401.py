@@ -126,3 +126,25 @@ def main_function():
     except Exception as ex:
         exception(f"Found an error: {er}")
         exception(f"Found an error: {ex.field}")
+
+
+def nested():
+    try:
+        process()
+        handle()
+    except Exception as ex:
+        try:
+            finish()
+        except Exception as ex:
+            logger.exception(f"Found an error: {ex}")  # TRY401
+
+
+def nested():
+    try:
+        process()
+        handle()
+    except Exception as ex:
+        try:
+            finish()
+        except Exception:
+            logger.exception(f"Found an error: {ex}")  # TRY401

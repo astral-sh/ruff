@@ -97,6 +97,19 @@ mod tests {
     }
 
     #[test]
+    fn async_timeout_error_alias_not_applied_py310() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP041.py"),
+            &settings::LinterSettings {
+                target_version: PythonVersion::Py310,
+                ..settings::LinterSettings::for_rule(Rule::TimeoutErrorAlias)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn non_pep695_type_alias_not_applied_py311() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pyupgrade/UP040.py"),

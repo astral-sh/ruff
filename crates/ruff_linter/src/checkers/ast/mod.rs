@@ -37,6 +37,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
+use ruff_notebook::CellOffsets;
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{
     collect_import_from_member, extract_handled_exceptions, to_module_path,
@@ -54,7 +55,7 @@ use ruff_python_semantic::{
     ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, Snapshot,
     StarImport, SubmoduleImport,
 };
-use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
 use ruff_source_file::Locator;
 
 use crate::checkers::ast::deferred::Deferred;
@@ -78,6 +79,8 @@ pub(crate) struct Checker<'a> {
     module_path: Option<&'a [String]>,
     /// The [`PySourceType`] of the current file.
     pub(crate) source_type: PySourceType,
+    /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
+    cell_offsets: Option<&'a CellOffsets>,
     /// The [`flags::Noqa`] for the current analysis (i.e., whether to respect suppression
     /// comments).
     noqa: flags::Noqa,
@@ -120,6 +123,7 @@ impl<'a> Checker<'a> {
         indexer: &'a Indexer,
         importer: Importer<'a>,
         source_type: PySourceType,
+        cell_offsets: Option<&'a CellOffsets>,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -137,6 +141,7 @@ impl<'a> Checker<'a> {
             deferred: Deferred::default(),
             diagnostics: Vec::default(),
             flake8_bugbear_seen: Vec::default(),
+            cell_offsets,
         }
     }
 }
@@ -223,6 +228,11 @@ impl<'a> Checker<'a> {
     /// The [`Path`] to the package containing the current file.
     pub(crate) const fn package(&self) -> Option<&'a Path> {
         self.package
+    }
+
+    /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
+    pub(crate) const fn cell_offsets(&self) -> Option<&'a CellOffsets> {
+        self.cell_offsets
     }
 
     /// Returns whether the given rule should be checked.
@@ -789,7 +799,7 @@ where
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.deferred.string_type_definitions.push((
                     expr.range(),
-                    value,
+                    value.as_str(),
                     self.semantic.snapshot(),
                 ));
             } else {
@@ -1014,33 +1024,54 @@ where
                         if let Some(arg) = args.next() {
                             self.visit_non_type_definition(arg);
                         }
+
                         for arg in args {
-                            if let Expr::List(ast::ExprList { elts, .. })
-                            | Expr::Tuple(ast::ExprTuple { elts, .. }) = arg
-                            {
-                                for elt in elts {
-                                    match elt {
-                                        Expr::List(ast::ExprList { elts, .. })
-                                        | Expr::Tuple(ast::ExprTuple { elts, .. })
-                                            if elts.len() == 2 =>
-                                        {
-                                            self.visit_non_type_definition(&elts[0]);
-                                            self.visit_type_definition(&elts[1]);
-                                        }
-                                        _ => {
-                                            self.visit_non_type_definition(elt);
+                            match arg {
+                                // Ex) NamedTuple("a", [("a", int)])
+                                Expr::List(ast::ExprList { elts, .. })
+                                | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                                    for elt in elts {
+                                        match elt {
+                                            Expr::List(ast::ExprList { elts, .. })
+                                            | Expr::Tuple(ast::ExprTuple { elts, .. })
+                                                if elts.len() == 2 =>
+                                            {
+                                                self.visit_non_type_definition(&elts[0]);
+                                                self.visit_type_definition(&elts[1]);
+                                            }
+                                            _ => {
+                                                self.visit_non_type_definition(elt);
+                                            }
                                         }
                                     }
                                 }
-                            } else {
-                                self.visit_non_type_definition(arg);
+                                _ => self.visit_non_type_definition(arg),
                             }
                         }
 
-                        // Ex) NamedTuple("a", a=int)
                         for keyword in keywords {
-                            let Keyword { value, .. } = keyword;
-                            self.visit_type_definition(value);
+                            let Keyword { arg, value, .. } = keyword;
+                            match (arg.as_ref(), value) {
+                                // Ex) NamedTuple("a", **{"a": int})
+                                (None, Expr::Dict(ast::ExprDict { keys, values, .. })) => {
+                                    for (key, value) in keys.iter().zip(values) {
+                                        if let Some(key) = key.as_ref() {
+                                            self.visit_non_type_definition(key);
+                                            self.visit_type_definition(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
+                                }
+                                // Ex) NamedTuple("a", **obj)
+                                (None, _) => {
+                                    self.visit_non_type_definition(value);
+                                }
+                                // Ex) NamedTuple("a", a=int)
+                                _ => {
+                                    self.visit_type_definition(value);
+                                }
+                            }
                         }
                     }
                     Some(typing::Callable::TypedDict) => {
@@ -1188,7 +1219,7 @@ where
                 {
                     self.deferred.string_type_definitions.push((
                         expr.range(),
-                        value,
+                        value.as_str(),
                         self.semantic.snapshot(),
                     ));
                 }
@@ -1272,9 +1303,9 @@ where
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
         match format_spec {
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                for value in values {
-                    self.visit_expr(value);
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                for expr in value.elements() {
+                    self.visit_expr(expr);
                 }
             }
             _ => unreachable!("Unexpected expression for format_spec"),
@@ -1415,7 +1446,7 @@ impl<'a> Checker<'a> {
         // subsequent nodes are evaluated in the inner scope.
         //
         // For example, given:
-        // ```py
+        // ```python
         // class A:
         //     T = range(10)
         //
@@ -1423,7 +1454,7 @@ impl<'a> Checker<'a> {
         // ```
         //
         // Conceptually, this is compiled as:
-        // ```py
+        // ```python
         // class A:
         //     T = range(10)
         //
@@ -1592,9 +1623,16 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        for builtin in BUILTINS
+        for builtin in PYTHON_BUILTINS
             .iter()
             .chain(MAGIC_GLOBALS.iter())
+            .chain(
+                self.source_type
+                    .is_ipynb()
+                    .then_some(IPYTHON_BUILTINS)
+                    .into_iter()
+                    .flatten(),
+            )
             .copied()
             .chain(self.settings.builtins.iter().map(String::as_str))
         {
@@ -1615,38 +1653,28 @@ impl<'a> Checker<'a> {
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
         let parent = self.semantic.current_statement();
 
+        let mut flags = BindingFlags::empty();
+        if helpers::is_unpacking_assignment(parent, expr) {
+            flags.insert(BindingFlags::UNPACKED_ASSIGNMENT);
+        }
+
         // Match the left-hand side of an annotated assignment, like `x` in `x: int`.
         if matches!(
             parent,
             Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
         ) && !self.semantic.in_annotation()
         {
-            self.add_binding(
-                id,
-                expr.range(),
-                BindingKind::Annotation,
-                BindingFlags::empty(),
-            );
+            self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
             return;
         }
 
         if parent.is_for_stmt() {
-            self.add_binding(
-                id,
-                expr.range(),
-                BindingKind::LoopVar,
-                BindingFlags::empty(),
-            );
+            self.add_binding(id, expr.range(), BindingKind::LoopVar, flags);
             return;
         }
 
-        if helpers::is_unpacking_assignment(parent, expr) {
-            self.add_binding(
-                id,
-                expr.range(),
-                BindingKind::UnpackedAssignment,
-                BindingFlags::empty(),
-            );
+        if parent.is_with_stmt() {
+            self.add_binding(id, expr.range(), BindingKind::WithItemVar, flags);
             return;
         }
 
@@ -1681,7 +1709,6 @@ impl<'a> Checker<'a> {
             let (all_names, all_flags) =
                 extract_all_names(parent, |name| self.semantic.is_builtin(name));
 
-            let mut flags = BindingFlags::empty();
             if all_flags.intersects(DunderAllFlags::INVALID_OBJECT) {
                 flags |= BindingFlags::INVALID_ALL_OBJECT;
             }
@@ -1705,21 +1732,11 @@ impl<'a> Checker<'a> {
             .current_expressions()
             .any(Expr::is_named_expr_expr)
         {
-            self.add_binding(
-                id,
-                expr.range(),
-                BindingKind::NamedExprAssignment,
-                BindingFlags::empty(),
-            );
+            self.add_binding(id, expr.range(), BindingKind::NamedExprAssignment, flags);
             return;
         }
 
-        self.add_binding(
-            id,
-            expr.range(),
-            BindingKind::Assignment,
-            BindingFlags::empty(),
-        );
+        self.add_binding(id, expr.range(), BindingKind::Assignment, flags);
     }
 
     fn handle_node_delete(&mut self, expr: &'a Expr) {
@@ -1935,6 +1952,7 @@ pub(crate) fn check_ast(
     path: &Path,
     package: Option<&Path>,
     source_type: PySourceType,
+    cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {
     let module_path = package.and_then(|package| to_module_path(package, path));
     let module = Module {
@@ -1963,6 +1981,7 @@ pub(crate) fn check_ast(
         indexer,
         Importer::new(python_ast, locator, stylist),
         source_type,
+        cell_offsets,
     );
     checker.bind_builtins();
 

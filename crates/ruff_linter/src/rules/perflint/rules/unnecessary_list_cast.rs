@@ -49,7 +49,7 @@ impl AlwaysFixableViolation for UnnecessaryListCast {
 }
 
 /// PERF101
-pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
+pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[Stmt]) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments:
@@ -98,6 +98,18 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
             range: iterable_range,
             ..
         }) => {
+            // If the variable is being appended to, don't suggest removing the cast:
+            //
+            // ```python
+            // items = ["foo", "bar"]
+            // for item in list(items):
+            //    items.append("baz")
+            // ```
+            //
+            // Here, removing the `list()` cast would change the behavior of the code.
+            if body.iter().any(|stmt| match_append(stmt, id)) {
+                return;
+            }
             let scope = checker.semantic().current_scope();
             if let Some(binding_id) = scope.get(id) {
                 let binding = checker.semantic().binding(binding_id);
@@ -126,6 +138,28 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr) {
         }
         _ => {}
     }
+}
+
+/// Check if a statement is an `append` call to a given identifier.
+///
+/// For example, `foo.append(bar)` would return `true` if `id` is `foo`.
+fn match_append(stmt: &Stmt, id: &str) -> bool {
+    let Some(ast::StmtExpr { value, .. }) = stmt.as_expr_stmt() else {
+        return false;
+    };
+    let Some(ast::ExprCall { func, .. }) = value.as_call_expr() else {
+        return false;
+    };
+    let Some(ast::ExprAttribute { value, attr, .. }) = func.as_attribute_expr() else {
+        return false;
+    };
+    if attr != "append" {
+        return false;
+    }
+    let Some(ast::ExprName { id: target_id, .. }) = value.as_name_expr() else {
+        return false;
+    };
+    target_id == id
 }
 
 /// Generate a [`Fix`] to remove a `list` cast from an expression.

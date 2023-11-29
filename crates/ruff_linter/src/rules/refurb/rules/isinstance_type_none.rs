@@ -2,11 +2,11 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::{self as ast, Expr, Operator};
 
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_codegen::Generator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::rules::refurb::helpers::generate_none_identity_comparison;
 
 /// ## What it does
 /// Checks for uses of `isinstance` that check if an object is of type `None`.
@@ -69,7 +69,8 @@ pub(crate) fn isinstance_type_none(checker: &mut Checker, call: &ast::ExprCall) 
             return;
         };
         let mut diagnostic = Diagnostic::new(IsinstanceTypeNone, call.range());
-        let replacement = generate_replacement(object_name, checker.generator());
+        let replacement =
+            generate_none_identity_comparison(object_name, false, checker.generator());
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             pad(replacement, call.range(), checker.locator()),
             call.range(),
@@ -116,22 +117,4 @@ fn is_none(expr: &Expr) -> bool {
         }
     }
     inner(expr, false)
-}
-
-/// Format a code snippet comparing `name` to `None` (e.g., `name is None`).
-fn generate_replacement(name: &str, generator: Generator) -> String {
-    // Construct `name`.
-    let var = ast::ExprName {
-        id: name.to_string(),
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-    };
-    // Construct `name is None`.
-    let compare = ast::ExprCompare {
-        left: Box::new(var.into()),
-        ops: vec![ast::CmpOp::Is],
-        comparators: vec![ast::Expr::NoneLiteral(ast::ExprNoneLiteral::default())],
-        range: TextRange::default(),
-    };
-    generator.expr(&compare.into())
 }

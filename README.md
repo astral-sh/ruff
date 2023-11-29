@@ -54,7 +54,7 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Pandas](https://github.com/pandas-dev/pandas)
 - [SciPy](https://github.com/scipy/scipy)
 
-...and many more.
+...and [many more](#whos-using-ruff).
 
 Ruff is backed by [Astral](https://astral.sh). Read the [launch post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff),
 or the original [project announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
@@ -150,11 +150,12 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.4
+  rev: v0.1.6
   hooks:
-    # Run the Ruff linter.
+    # Run the linter.
     - id: ruff
-    # Run the Ruff formatter.
+      args: [ --fix ]
+    # Run the formatter.
     - id: ruff-format
 ```
 
@@ -376,8 +377,8 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Anthropic ([Python SDK](https://github.com/anthropics/anthropic-sdk-python))
 - [Apache Airflow](https://github.com/apache/airflow)
 - AstraZeneca ([Magnus](https://github.com/AstraZeneca/magnus-core))
-- Benchling ([Refac](https://github.com/benchling/refac))
 - [Babel](https://github.com/python-babel/babel)
+- Benchling ([Refac](https://github.com/benchling/refac))
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
 - [DVC](https://github.com/iterative/dvc)
@@ -388,15 +389,16 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Gradio](https://github.com/gradio-app/gradio)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
 - [HTTPX](https://github.com/encode/httpx)
+- [Hatch](https://github.com/pypa/hatch)
+- [Home Assistant](https://github.com/home-assistant/core)
 - Hugging Face ([Transformers](https://github.com/huggingface/transformers),
     [Datasets](https://github.com/huggingface/datasets),
     [Diffusers](https://github.com/huggingface/diffusers))
-- [Hatch](https://github.com/pypa/hatch)
-- [Home Assistant](https://github.com/home-assistant/core)
 - ING Bank ([popmon](https://github.com/ing-bank/popmon), [probatus](https://github.com/ing-bank/probatus))
 - [Ibis](https://github.com/ibis-project/ibis)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
 - [LangChain](https://github.com/hwchase17/langchain)
+- [Litestar](https://litestar.dev/)
 - [LlamaIndex](https://github.com/jerryjliu/llama_index)
 - Matrix ([Synapse](https://github.com/matrix-org/synapse))
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
@@ -415,24 +417,27 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PDM](https://github.com/pdm-project/pdm)
 - [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
 - [Pandas](https://github.com/pandas-dev/pandas)
+- [Pillow](https://github.com/python-pillow/Pillow)
 - [Poetry](https://github.com/python-poetry/poetry)
 - [Polars](https://github.com/pola-rs/polars)
 - [PostHog](https://github.com/PostHog/posthog)
 - Prefect ([Python SDK](https://github.com/PrefectHQ/prefect), [Marvin](https://github.com/PrefectHQ/marvin))
 - [PyInstaller](https://github.com/pyinstaller/pyinstaller)
+- [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing)
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
 - [Reflex](https://github.com/reflex-dev/reflex)
+- [River](https://github.com/online-ml/river)
 - [Rippling](https://rippling.com)
 - [Robyn](https://github.com/sansyrox/robyn)
-- Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
-- Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
 - [Saleor](https://github.com/saleor/saleor)
+- Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
 - [SciPy](https://github.com/scipy/scipy)
+- Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
-- [Litestar](https://litestar.dev/)
+- [Starlette](https://github.com/encode/starlette)
 - [The Algorithms](https://github.com/TheAlgorithms/Python)
 - [Vega-Altair](https://github.com/altair-viz/altair)
 - WordPress ([Openverse](https://github.com/WordPress/openverse))

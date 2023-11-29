@@ -1,9 +1,10 @@
-use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{Applicability, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
+use ruff_python_semantic::analyze::typing;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -27,8 +28,19 @@ use crate::checkers::ast::Checker;
 /// key in foo
 /// ```
 ///
+/// ## Fix safety
+/// Given `key in obj.keys()`, `obj` _could_ be a dictionary, or it could be
+/// another type that defines a `.keys()` method. In the latter case, removing
+/// the `.keys()` attribute could lead to a runtime error.
+///
+/// As such, this rule's fixes are marked as unsafe. In [preview], though,
+/// fixes are marked as safe when Ruff can determine that `obj` is a
+/// dictionary.
+///
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct InDictKeys {
     operator: String,
@@ -113,6 +125,28 @@ fn key_in_dict(
         .skip_trivia()
         .find(|token| token.kind == SimpleTokenKind::Dot)
     {
+        // The fix is only safe if we know the expression is a dictionary, since other types
+        // can define a `.keys()` method.
+        let applicability = if checker.settings.preview.is_enabled() {
+            let is_dict = value.as_name_expr().is_some_and(|name| {
+                let Some(binding) = checker
+                    .semantic()
+                    .only_binding(name)
+                    .map(|id| checker.semantic().binding(id))
+                else {
+                    return false;
+                };
+                typing::is_dict(binding, checker.semantic())
+            });
+            if is_dict {
+                Applicability::Safe
+            } else {
+                Applicability::Unsafe
+            }
+        } else {
+            Applicability::Unsafe
+        };
+
         // If the `.keys()` is followed by (e.g.) a keyword, we need to insert a space,
         // since we're removing parentheses, which could lead to invalid syntax, as in:
         // ```python
@@ -126,12 +160,15 @@ fn key_in_dict(
             .next()
             .is_some_and(|char| char.is_ascii_alphabetic())
         {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                " ".to_string(),
-                range,
-            )));
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(" ".to_string(), range),
+                applicability,
+            ));
         } else {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(range)));
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_deletion(range),
+                applicability,
+            ));
         }
     }
     checker.diagnostics.push(diagnostic);

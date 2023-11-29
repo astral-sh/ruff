@@ -74,7 +74,11 @@ pub(crate) fn builtin_attribute_shadowing(
     name: &str,
     range: TextRange,
 ) {
-    if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
+    if shadows_builtin(
+        name,
+        &checker.settings.flake8_builtins.builtins_ignorelist,
+        checker.source_type,
+    ) {
         // Ignore shadowing within `TypedDict` definitions, since these are only accessible through
         // subscripting and not through attribute access.
         if class_def
@@ -102,7 +106,11 @@ pub(crate) fn builtin_method_shadowing(
     decorator_list: &[Decorator],
     range: TextRange,
 ) {
-    if shadows_builtin(name, &checker.settings.flake8_builtins.builtins_ignorelist) {
+    if shadows_builtin(
+        name,
+        &checker.settings.flake8_builtins.builtins_ignorelist,
+        checker.source_type,
+    ) {
         // Ignore some standard-library methods. Ideally, we'd ignore all overridden methods, since
         // those should be flagged on the superclass, but that's more difficult.
         if is_standard_library_override(name, class_def, checker.semantic()) {

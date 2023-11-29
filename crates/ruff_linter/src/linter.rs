@@ -8,7 +8,8 @@ use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Applicability, Diagnostic};
+use ruff_diagnostics::Diagnostic;
+use ruff_notebook::Notebook;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
@@ -107,7 +108,8 @@ pub fn check_path(
             locator,
             indexer,
             settings,
-            source_type.is_stub(),
+            source_type,
+            source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
         ));
     }
 
@@ -117,7 +119,7 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
-        diagnostics.extend(check_file_path(path, package, settings));
+        diagnostics.extend(check_file_path(path, package, locator, indexer, settings));
     }
 
     // Run the logical line-based rules.
@@ -149,6 +151,7 @@ pub fn check_path(
             source_type.is_ipynb(),
         ) {
             Ok(python_ast) => {
+                let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
                 if use_ast {
                     diagnostics.extend(check_ast(
                         &python_ast,
@@ -161,6 +164,7 @@ pub fn check_path(
                         path,
                         package,
                         source_type,
+                        cell_offsets,
                     ));
                 }
                 if use_imports {
@@ -173,8 +177,8 @@ pub fn check_path(
                         stylist,
                         path,
                         package,
-                        source_kind,
                         source_type,
+                        cell_offsets,
                     );
                     imports = module_imports;
                     diagnostics.extend(import_diagnostics);
@@ -268,24 +272,13 @@ pub fn check_path(
     }
 
     // Update fix applicability to account for overrides
-    if !settings.extend_safe_fixes.is_empty() || !settings.extend_unsafe_fixes.is_empty() {
+    if !settings.fix_safety.is_empty() {
         for diagnostic in &mut diagnostics {
             if let Some(fix) = diagnostic.fix.take() {
-                // Enforce demotions over promotions so if someone puts a rule in both we are conservative
-                if fix.applicability().is_safe()
-                    && settings
-                        .extend_unsafe_fixes
-                        .contains(diagnostic.kind.rule())
-                {
-                    diagnostic.set_fix(fix.with_applicability(Applicability::Unsafe));
-                } else if fix.applicability().is_unsafe()
-                    && settings.extend_safe_fixes.contains(diagnostic.kind.rule())
-                {
-                    diagnostic.set_fix(fix.with_applicability(Applicability::Safe));
-                } else {
-                    // Retain the existing fix (will be dropped from `.take()` otherwise)
-                    diagnostic.set_fix(fix);
-                }
+                let fixed_applicability = settings
+                    .fix_safety
+                    .resolve_applicability(diagnostic.kind.rule(), fix.applicability());
+                diagnostic.set_fix(fix.with_applicability(fixed_applicability));
             }
         }
     }
@@ -650,7 +643,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::source_kind::SourceKind;
-    use crate::test::{test_contents, test_notebook_path, TestedNotebook};
+    use crate::test::{assert_notebook_path, test_contents, TestedNotebook};
     use crate::{assert_messages, settings};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
@@ -666,7 +659,7 @@ mod tests {
             messages,
             source_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             &actual,
             expected,
             &settings::LinterSettings::for_rule(Rule::UnsortedImports),
@@ -683,7 +676,7 @@ mod tests {
             messages,
             source_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             &actual,
             expected,
             &settings::LinterSettings::for_rule(Rule::UnusedImport),
@@ -700,7 +693,7 @@ mod tests {
             messages,
             source_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             &actual,
             expected,
             &settings::LinterSettings::for_rule(Rule::UnusedVariable),
@@ -717,7 +710,7 @@ mod tests {
         let TestedNotebook {
             linted_notebook: fixed_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             actual_path,
             &expected_path,
             &settings::LinterSettings::for_rule(Rule::UnusedImport),

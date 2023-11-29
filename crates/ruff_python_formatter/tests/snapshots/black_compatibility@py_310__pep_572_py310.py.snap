@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/py_310/pe
 ---
 ## Input
 
-```py
+```python
 # Unparenthesized walruses are now allowed in indices since Python 3.10.
 x[a:=0]
 x[a:=0, b:=1]
@@ -42,7 +42,7 @@ f(x, (a := b + c for c in range(10)), y=z, **q)
 
 ## Ruff Output
 
-```py
+```python
 # Unparenthesized walruses are now allowed in indices since Python 3.10.
 x[a := 0]
 x[a := 0, b := 1]
@@ -62,7 +62,7 @@ f(x, (a := b + c for c in range(10)), y=z, **q)
 
 ## Black Output
 
-```py
+```python
 # Unparenthesized walruses are now allowed in indices since Python 3.10.
 x[a:=0]
 x[a:=0, b:=1]

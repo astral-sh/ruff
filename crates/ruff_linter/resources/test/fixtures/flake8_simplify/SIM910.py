@@ -25,3 +25,11 @@ a = {}.get(key, None)
 
 # SIM910
 ({}).get(key, None)
+
+# SIM910
+ages = {"Tom": 23, "Maria": 23, "Dog": 11}
+age = ages.get("Cat", None)
+
+# OK
+ages = ["Tom", "Maria", "Dog"]
+age = ages.get("Cat", None)

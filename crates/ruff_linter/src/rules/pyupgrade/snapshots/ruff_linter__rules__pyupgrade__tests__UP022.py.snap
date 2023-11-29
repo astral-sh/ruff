@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-UP022.py:4:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:4:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   |
 2 | import subprocess
 3 | 
@@ -12,7 +12,7 @@ UP022.py:4:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, 
   |
   = help: Replace with `capture_output` keyword argument
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | from subprocess import run
 2 2 | import subprocess
 3 3 | 
@@ -22,7 +22,7 @@ UP022.py:4:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, 
 6 6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 7 7 | 
 
-UP022.py:6:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:6:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
   |
 4 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 5 | 
@@ -33,7 +33,7 @@ UP022.py:6:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, 
   |
   = help: Replace with `capture_output` keyword argument
 
-ℹ Suggested fix
+ℹ Unsafe fix
 3 3 | 
 4 4 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 5 5 | 
@@ -43,7 +43,7 @@ UP022.py:6:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, 
 8 8 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
 9 9 | 
 
-UP022.py:8:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:8:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
  6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
  7 | 
@@ -54,7 +54,7 @@ UP022.py:8:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, 
    |
    = help: Replace with `capture_output` keyword argument
 
-ℹ Suggested fix
+ℹ Unsafe fix
 5 5 | 
 6 6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 7 7 | 
@@ -64,7 +64,7 @@ UP022.py:8:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, 
 10 10 | output = subprocess.run(
 11 11 |     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
 
-UP022.py:10:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:10:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
  8 |   output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
  9 |   
@@ -78,7 +78,7 @@ UP022.py:10:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
    |
    = help: Replace with `capture_output` keyword argument
 
-ℹ Suggested fix
+ℹ Unsafe fix
 8  8  | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
 9  9  | 
 10 10 | output = subprocess.run(
@@ -88,7 +88,7 @@ UP022.py:10:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
 13 13 | 
 14 14 | output = subprocess.run(
 
-UP022.py:14:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:14:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 12 |   )
 13 |   
@@ -102,7 +102,7 @@ UP022.py:14:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
    |
    = help: Replace with `capture_output` keyword argument
 
-ℹ Suggested fix
+ℹ Unsafe fix
 12 12 | )
 13 13 | 
 14 14 | output = subprocess.run(
@@ -112,7 +112,7 @@ UP022.py:14:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
 17 17 | 
 18 18 | output = subprocess.run(
 
-UP022.py:18:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:18:10: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 16 |   )
 17 |   
@@ -132,7 +132,7 @@ UP022.py:18:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
    |
    = help: Replace with `capture_output` keyword argument
 
-ℹ Suggested fix
+ℹ Unsafe fix
 17 17 | 
 18 18 | output = subprocess.run(
 19 19 |     ["foo"],
@@ -144,7 +144,7 @@ UP022.py:18:10: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
 24 23 |     encoding="utf-8",
 25 24 |     close_fds=True,
 
-UP022.py:29:14: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:29:14: UP022 [*] Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 28 |   if output:
 29 |       output = subprocess.run(
@@ -162,7 +162,7 @@ UP022.py:29:14: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
    |
    = help: Replace with `capture_output` keyword argument
 
-ℹ Suggested fix
+ℹ Unsafe fix
 28 28 | if output:
 29 29 |     output = subprocess.run(
 30 30 |         ["foo"],
@@ -174,7 +174,7 @@ UP022.py:29:14: UP022 [*] Sending `stdout` and `stderr` to `PIPE` is deprecated,
 35 34 |         encoding="utf-8",
 36 35 |     )
 
-UP022.py:38:10: UP022 Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:38:10: UP022 Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 36 |       )
 37 |   
@@ -188,7 +188,7 @@ UP022.py:38:10: UP022 Sending `stdout` and `stderr` to `PIPE` is deprecated, use
    |
    = help: Replace with `capture_output` keyword argument
 
-UP022.py:42:10: UP022 Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:42:10: UP022 Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 40 |   )
 41 |   
@@ -202,7 +202,7 @@ UP022.py:42:10: UP022 Sending `stdout` and `stderr` to `PIPE` is deprecated, use
    |
    = help: Replace with `capture_output` keyword argument
 
-UP022.py:46:10: UP022 Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`
+UP022.py:46:10: UP022 Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`
    |
 44 |   )
 45 |   

@@ -19,6 +19,10 @@ and instead exit with a non-zero status code upon detecting any unformatted file
 
 For the full list of supported options, run `ruff format --help`.
 
+!!! note
+    As of Ruff v0.1.7 the `ruff format` command uses the current working directory (`.`) as the default path to format.
+    See [the file discovery documentation](configuration.md#python-file-discovery) for details.
+
 ## Philosophy
 
 The initial goal of the Ruff formatter is _not_ to innovate on code style, but rather, to innovate
@@ -99,16 +103,29 @@ The Ruff Formatter exposes a small set of configuration options, some of which a
 by Black (like line width), some of which are unique to Ruff (like quote and indentation style).
 
 For example, to configure the formatter to use single quotes, a line width of 100, and
-tab indentation, add the following to your `pyproject.toml`:
+tab indentation, add the following to your configuration file:
 
-```toml
-[tool.ruff]
-line-length = 100
+=== "pyproject.toml"
 
-[tool.ruff.format]
-quote-style = "single"
-indent-style = "tab"
-```
+    ```toml
+    [tool.ruff]
+    line-length = 100
+
+    [tool.ruff.format]
+    quote-style = "single"
+    indent-style = "tab"
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    line-length = 100
+
+    [format]
+    quote-style = "single"
+    indent-style = "tab"
+    ```
+
 
 For the full list of supported settings, see [_Settings_](settings.md#format). For more on
 configuring Ruff via `pyproject.toml`, see [_Configuring Ruff_](configuration.md).

@@ -9,8 +9,16 @@ expression: "parse_suite(r#\"f\"\"\"#, \"<test>\").unwrap()"
             value: FString(
                 ExprFString {
                     range: 0..3,
-                    values: [],
-                    implicit_concatenated: false,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..3,
+                                    values: [],
+                                },
+                            ),
+                        ),
+                    },
                 },
             ),
         },

@@ -28,6 +28,7 @@ mod tests {
     #[test_case(Rule::HardcodedTempFile, Path::new("S108.py"))]
     #[test_case(Rule::HashlibInsecureHashFunction, Path::new("S324.py"))]
     #[test_case(Rule::Jinja2AutoescapeFalse, Path::new("S701.py"))]
+    #[test_case(Rule::MakoTemplates, Path::new("S702.py"))]
     #[test_case(Rule::LoggingConfigInsecureListen, Path::new("S612.py"))]
     #[test_case(Rule::ParamikoCall, Path::new("S601.py"))]
     #[test_case(Rule::RequestWithNoCertValidation, Path::new("S501.py"))]
@@ -49,6 +50,8 @@ mod tests {
     #[test_case(Rule::UnixCommandWildcardInjection, Path::new("S609.py"))]
     #[test_case(Rule::UnsafeYAMLLoad, Path::new("S506.py"))]
     #[test_case(Rule::WeakCryptographicKey, Path::new("S505.py"))]
+    #[test_case(Rule::DjangoRawSql, Path::new("S611.py"))]
+    #[test_case(Rule::TarfileUnsafeMembers, Path::new("S202.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -50,11 +50,10 @@ jobs:
               - "!.devcontainer/**"
               - "!.assets/**"
               - "!playground/**"
-              - "!python/**"
               - "!mkdocs.*.yml"
 
             formatter:
-              - "**/*"
+                            - "**/*"
               - "!**/*.md"
               - "!docs/**"
               - "!.devcontainer/**"
@@ -70,7 +69,6 @@ jobs:
               - "!.devcontainer/**"
               - "!.assets/**"
               - "!playground/**"
-              - "!python/**"
               - "!mkdocs.*.yml"
 
   cargo-fmt:
@@ -209,7 +207,11 @@ jobs:
       - cargo-test-linux
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-    if: github.event_name == 'pull_request'
+    # Ecosystem check needs linter and/or formatter changes.
+    if: github.event_name == 'pull_request' && ${{
+      needs.determine_changes.outputs.linter == 'true' ||
+      needs.determine_changes.outputs.formatter == 'true'
+      }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
@@ -415,7 +417,7 @@ jobs:
         run: mkdocs build --strict -f mkdocs.insiders.yml
       - name: "Build docs"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
-        run: mkdocs build --strict -f mkdocs.generated.yml
+        run: mkdocs build --strict -f mkdocs.public.yml
 
   check-formatter-instability-and-black-similarity:
     name: "formatter instabilities and black similarity"

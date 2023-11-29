@@ -252,7 +252,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
         return None;
     }
 
-    let node = Expr::StringLiteral(ast::ExprStringLiteral {
+    let node = Expr::from(ast::StringLiteral {
         value: elts.iter().fold(String::new(), |mut acc, elt| {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
                 if !acc.is_empty() {
@@ -262,9 +262,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
             }
             acc
         }),
-        unicode: false,
-        implicit_concatenated: false,
-        range: TextRange::default(),
+        ..ast::StringLiteral::default()
     });
     Some(generator.expr(&node))
 }
@@ -302,8 +300,8 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match expr {
-        Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) => {
-            let names = split_names(string);
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            let names = split_names(value.as_str());
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
@@ -324,9 +322,9 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: names
                                 .iter()
                                 .map(|name| {
-                                    Expr::StringLiteral(ast::ExprStringLiteral {
+                                    Expr::from(ast::StringLiteral {
                                         value: (*name).to_string(),
-                                        ..ast::ExprStringLiteral::default()
+                                        ..ast::StringLiteral::default()
                                     })
                                 })
                                 .collect(),
@@ -357,9 +355,9 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: names
                                 .iter()
                                 .map(|name| {
-                                    Expr::StringLiteral(ast::ExprStringLiteral {
+                                    Expr::from(ast::StringLiteral {
                                         value: (*name).to_string(),
-                                        ..ast::ExprStringLiteral::default()
+                                        ..ast::StringLiteral::default()
                                     })
                                 })
                                 .collect(),
@@ -477,12 +475,11 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         .flake8_pytest_style
         .parametrize_values_row_type;
 
-    let is_multi_named =
-        if let Expr::StringLiteral(ast::ExprStringLiteral { value: string, .. }) = &names {
-            split_names(string).len() > 1
-        } else {
-            true
-        };
+    let is_multi_named = if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &names {
+        split_names(value.as_str()).len() > 1
+    } else {
+        true
+    };
 
     match values {
         Expr::List(ast::ExprList { elts, .. }) => {

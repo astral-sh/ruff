@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-```py
+```python
 importA;() << 0 ** 101234234242352525425252352352525234890264906820496920680926538059059209922523523525 #
 
 assert sort_by_dependency(
@@ -66,7 +66,7 @@ assert (
 
 ## Ruff Output
 
-```py
+```python
 importA
 (
     ()
@@ -129,7 +129,7 @@ assert a_function(
 
 ## Black Output
 
-```py
+```python
 importA
 (
     ()

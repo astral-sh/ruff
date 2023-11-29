@@ -124,8 +124,8 @@ fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
         ResolvedPythonType::Atom(atom) => {
             // Special case where `%c` allows single character strings to be formatted
             if format.format_char == 'c' {
-                if let Expr::StringLiteral(string) = value {
-                    let mut chars = string.chars();
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = value {
+                    let mut chars = value.chars();
                     if chars.next().is_some() && chars.next().is_none() {
                         return true;
                     }

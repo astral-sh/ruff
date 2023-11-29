@@ -9,43 +9,51 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..11,
-                    values: [
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 2..10,
-                                value: Compare(
-                                    ExprCompare {
-                                        range: 3..9,
-                                        left: NumberLiteral(
-                                            ExprNumberLiteral {
-                                                range: 3..4,
-                                                value: Int(
-                                                    1,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..11,
+                                    values: [
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 2..10,
+                                                value: Compare(
+                                                    ExprCompare {
+                                                        range: 3..9,
+                                                        left: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 3..4,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                        ops: [
+                                                            NotEq,
+                                                        ],
+                                                        comparators: [
+                                                            NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    range: 8..9,
+                                                                    value: Int(
+                                                                        2,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
                                                 ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
                                             },
                                         ),
-                                        ops: [
-                                            NotEq,
-                                        ],
-                                        comparators: [
-                                            NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 8..9,
-                                                    value: Int(
-                                                        2,
-                                                    ),
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                                    ],
+                                },
+                            ),
                         ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },
