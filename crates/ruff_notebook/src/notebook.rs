@@ -426,6 +426,7 @@ mod tests {
     #[test_case(Path::new("code_and_magic.json"), true; "code_and_magic")]
     #[test_case(Path::new("only_code.json"), true; "only_code")]
     #[test_case(Path::new("cell_magic.json"), false; "cell_magic")]
+    #[test_case(Path::new("valid_cell_magic.json"), true; "valid_cell_magic")]
     #[test_case(Path::new("automagic.json"), false; "automagic")]
     #[test_case(Path::new("automagics.json"), false; "automagics")]
     #[test_case(Path::new("automagic_before_code.json"), false; "automagic_before_code")]
