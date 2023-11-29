@@ -205,19 +205,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 ExprContext::Store => {
                     if checker.enabled(Rule::NonLowercaseVariableInFunction) {
                         if checker.semantic.current_scope().kind.is_function() {
-                            // Ignore globals.
-                            if !checker
-                                .semantic
-                                .current_scope()
-                                .get(id)
-                                .is_some_and(|binding_id| {
-                                    checker.semantic.binding(binding_id).is_global()
-                                })
-                            {
-                                pep8_naming::rules::non_lowercase_variable_in_function(
-                                    checker, expr, id,
-                                );
-                            }
+                            pep8_naming::rules::non_lowercase_variable_in_function(
+                                checker, expr, id,
+                            );
                         }
                     }
                     if checker.enabled(Rule::MixedCaseVariableInClassScope) {
