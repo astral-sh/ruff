@@ -69,7 +69,7 @@ pub(crate) fn path_constructor_current_directory(checker: &mut Checker, expr: &E
         return;
     };
 
-    if matches!(value.as_str(), "" | ".") {
+    if matches!(value.to_str(), "" | ".") {
         let mut diagnostic = Diagnostic::new(PathConstructorCurrentDirectory, *range);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(*range)));
         checker.diagnostics.push(diagnostic);

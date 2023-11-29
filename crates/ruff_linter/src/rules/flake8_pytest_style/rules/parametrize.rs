@@ -258,7 +258,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
                 if !acc.is_empty() {
                     acc.push(',');
                 }
-                acc.push_str(value.as_str());
+                acc.push_str(value.to_str());
             }
             acc
         }),
@@ -301,7 +301,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
 
     match expr {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-            let names = split_names(value.as_str());
+            let names = split_names(value.to_str());
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
@@ -476,7 +476,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         .parametrize_values_row_type;
 
     let is_multi_named = if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &names {
-        split_names(value.as_str()).len() > 1
+        split_names(value.to_str()).len() > 1
     } else {
         true
     };

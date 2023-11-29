@@ -228,14 +228,14 @@ fn clean_params_dictionary(right: &Expr, locator: &Locator, stylist: &Stylist) -
                     }) = key
                     {
                         // If the dictionary key is not a valid variable name, abort.
-                        if !is_identifier(key_string.as_str()) {
+                        if !is_identifier(key_string.to_str()) {
                             return None;
                         }
                         // If there are multiple entries of the same key, abort.
-                        if seen.contains(&key_string.as_str()) {
+                        if seen.contains(&key_string.to_str()) {
                             return None;
                         }
-                        seen.push(key_string.as_str());
+                        seen.push(key_string.to_str());
                         if is_multi_line {
                             if indent.is_none() {
                                 indent = indentation(locator, key);
