@@ -60,13 +60,13 @@ pub(crate) fn import_private_name(checker: &mut Checker, stmt: &Stmt) {
             level,
             ..
         }) => {
+            if level.is_some_and(|level| level > 0) {
+                // allow relative private imports, common in libs
+                return;
+            }
+
             if let Some(identifier) = module {
                 if identifier == "__future__" {
-                    return;
-                }
-
-                if level.is_some_and(|level| level > 0) {
-                    // allow relative private imports, common in libs
                     return;
                 }
 

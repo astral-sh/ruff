@@ -1,5 +1,6 @@
 from __future__ import annotations  # Ok
 
+from .. import __version__  # Ok
 from .internal import _private  # Ok
 
 import _private  # PLC2701
