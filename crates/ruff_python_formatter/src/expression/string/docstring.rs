@@ -247,7 +247,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             let line = InputDocstringLine {
                 line,
                 offset: self.offset,
-                is_last: lines.peek().is_none(),
+                next: lines.peek().copied(),
             };
             // We know that the normalized string has \n line endings.
             self.offset += line.line.text_len() + "\n".text_len();
@@ -399,6 +399,10 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// routine is silent about it. So from the user's perspective, this will
     /// fail silently. Ideally, this would at least emit a warning message,
     /// but at time of writing, it wasn't clear to me how to best do that.
+    ///
+    /// # Panics
+    ///
+    /// This panics when the given slice is empty.
     fn format(
         &mut self,
         code: &[CodeExampleLine<'src>],
@@ -414,7 +418,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             .last()
             .expect("code blob must be non-empty")
             .original
-            .is_last;
+            .is_last();
         let codeblob = code
             .iter()
             .map(|line| line.code)
@@ -487,9 +491,11 @@ struct InputDocstringLine<'src> {
     line: &'src str,
     /// The offset into the source document which this line corresponds to.
     offset: TextSize,
-    /// Whether this is the last line in a docstring or not. "Last" lines have
-    /// some special treatment when printing.
-    is_last: bool,
+    /// For any input line that isn't the last line, this contains a reference
+    /// to the line immediately following this one.
+    ///
+    /// This is `None` if and only if this is the last line in the docstring.
+    next: Option<&'src str>,
 }
 
 impl<'src> InputDocstringLine<'src> {
@@ -498,8 +504,13 @@ impl<'src> InputDocstringLine<'src> {
         OutputDocstringLine {
             line: Cow::Borrowed(self.line),
             offset: self.offset,
-            is_last: self.is_last,
+            is_last: self.is_last(),
         }
+    }
+
+    /// Whether this is the last line in the docstring or not.
+    fn is_last(&self) -> bool {
+        self.next.is_none()
     }
 }
 
