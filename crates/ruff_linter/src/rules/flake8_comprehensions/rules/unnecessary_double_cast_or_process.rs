@@ -43,6 +43,10 @@ use crate::rules::flake8_comprehensions::fixes;
 /// - Instead of `sorted(tuple(iterable))`, use `sorted(iterable)`.
 /// - Instead of `sorted(sorted(iterable))`, use `sorted(iterable)`.
 /// - Instead of `sorted(reversed(iterable))`, use `sorted(iterable)`.
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryDoubleCastOrProcess {
     inner: String,

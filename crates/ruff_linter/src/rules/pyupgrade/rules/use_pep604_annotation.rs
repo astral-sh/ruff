@@ -36,6 +36,11 @@ use crate::fix::edits::pad;
 /// foo: int | str = 1
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may lead to runtime errors when
+/// alongside libraries that rely on runtime type annotations, like Pydantic,
+/// on Python versions prior to Python 3.10.
+///
 /// ## Options
 /// - `target-version`
 /// - `pyupgrade.keep-runtime-typing`
