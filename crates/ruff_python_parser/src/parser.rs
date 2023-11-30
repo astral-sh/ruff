@@ -822,6 +822,10 @@ type X \
     [T] = T
 type X[T] \
     = T
+
+# simple statements
+type X = int; type X = str; type X = type
+class X: type X = int
 "#;
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
