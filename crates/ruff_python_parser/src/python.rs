@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: e999c9c9ca8fe5a29655244aa995b8cf4e639f0bda95099d8f2a395bc06b6408
+// sha3: c7c0b9368fa05f7d2fc1d06a665ff4232555f276a1d9569afdbc86d0905b3a2a
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -35374,7 +35374,7 @@ fn __action159<
         // ```
         // In this case, the `(` and `)` are part of the `with` statement.
         // The same applies to `yield` and `yield from`.
-        let item = if matches!(item.context_expr, ast::Expr::NamedExpr(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
+        let item = if item.optional_vars.is_none() && matches!(item.context_expr, ast::Expr::NamedExpr(_) | ast::Expr::Yield(_) | ast::Expr::YieldFrom(_)) {
             ast::WithItem {
                 range: item.range().add_start(TextSize::new(1)).sub_end(TextSize::new(1)),
                 context_expr: item.context_expr,
