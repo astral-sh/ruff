@@ -158,6 +158,8 @@ mod tests {
         Rule::UnnecessaryListIndexLookup,
         Path::new("unnecessary_list_index_lookup.py")
     )]
+    #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

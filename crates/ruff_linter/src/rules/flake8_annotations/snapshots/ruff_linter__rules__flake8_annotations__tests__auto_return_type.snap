@@ -123,5 +123,81 @@ auto_return_type.py:31:5: ANN201 [*] Missing return type annotation for public f
 31    |-def func(x: int):
    31 |+def func(x: int) -> str | float:
 32 32 |     return 1 + 2.5 if x > 0 else 1.5 or "str"
+33 33 | 
+34 34 | 
+
+auto_return_type.py:35:5: ANN201 Missing return type annotation for public function `func`
+   |
+35 | def func(x: int):
+   |     ^^^^ ANN201
+36 |     if not x:
+37 |         return None
+   |
+   = help: Add return type annotation
+
+auto_return_type.py:41:5: ANN201 Missing return type annotation for public function `func`
+   |
+41 | def func(x: int):
+   |     ^^^^ ANN201
+42 |     return {"foo": 1}
+   |
+   = help: Add return type annotation
+
+auto_return_type.py:45:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+45 | def func(x: int):
+   |     ^^^^ ANN201
+46 |     if not x:
+47 |         return 1
+   |
+   = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+42 42 |     return {"foo": 1}
+43 43 | 
+44 44 | 
+45    |-def func(x: int):
+   45 |+def func(x: int) -> int:
+46 46 |     if not x:
+47 47 |         return 1
+48 48 |     else:
+
+auto_return_type.py:52:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+52 | def func(x: int):
+   |     ^^^^ ANN201
+53 |     if not x:
+54 |         return 1
+   |
+   = help: Add return type annotation: `int | None`
+
+ℹ Unsafe fix
+49 49 |         return True
+50 50 | 
+51 51 | 
+52    |-def func(x: int):
+   52 |+def func(x: int) -> int | None:
+53 53 |     if not x:
+54 54 |         return 1
+55 55 |     else:
+
+auto_return_type.py:59:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+59 | def func(x: int):
+   |     ^^^^ ANN201
+60 |     if not x:
+61 |         return 1
+   |
+   = help: Add return type annotation: `str | int | None`
+
+ℹ Unsafe fix
+56 56 |         return None
+57 57 | 
+58 58 | 
+59    |-def func(x: int):
+   59 |+def func(x: int) -> str | int | None:
+60 60 |     if not x:
+61 61 |         return 1
+62 62 |     elif x > 5:
 
 

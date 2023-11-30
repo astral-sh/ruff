@@ -1,5 +1,6 @@
-use crate::{lexer::LexResult, token::Tok, Mode};
 use itertools::{Itertools, MultiPeek};
+
+use crate::{lexer::LexResult, token::Tok, Mode};
 
 /// An [`Iterator`] that transforms a token stream to accommodate soft keywords (namely, `match`
 /// `case`, and `type`).
@@ -21,7 +22,7 @@ where
     I: Iterator<Item = LexResult>,
 {
     underlying: MultiPeek<I>,
-    start_of_line: bool,
+    position: Position,
 }
 
 impl<I> SoftKeywordTransformer<I>
@@ -31,7 +32,11 @@ where
     pub fn new(lexer: I, mode: Mode) -> Self {
         Self {
             underlying: lexer.multipeek(), // spell-checker:ignore multipeek
-            start_of_line: matches!(mode, Mode::Module),
+            position: if mode == Mode::Expression {
+                Position::Other
+            } else {
+                Position::Statement
+            },
         }
     }
 }
@@ -49,7 +54,6 @@ where
             // If the token is a soft keyword e.g. `type`, `match`, or `case`, check if it's
             // used as an identifier. We assume every soft keyword use is an identifier unless
             // a heuristic is met.
-
             match tok {
                 // For `match` and `case`, all of the following conditions must be met:
                 // 1. The token is at the start of a logical line.
@@ -57,9 +61,9 @@ where
                 //    inside a parenthesized expression, list, or dictionary).
                 // 3. The top-level colon is not the immediate sibling of a `match` or `case` token.
                 //    (This is to avoid treating `match` or `case` as identifiers when annotated with
-                //    type hints.)   type hints.)
+                //    type hints.)
                 Tok::Match | Tok::Case => {
-                    if self.start_of_line {
+                    if matches!(self.position, Position::Statement) {
                         let mut nesting = 0;
                         let mut first = true;
                         let mut seen_colon = false;
@@ -93,7 +97,10 @@ where
                 // 2. The type token is immediately followed by a name token.
                 // 3. The name token is eventually followed by an equality token.
                 Tok::Type => {
-                    if self.start_of_line {
+                    if matches!(
+                        self.position,
+                        Position::Statement | Position::SimpleStatement
+                    ) {
                         let mut is_type_alias = false;
                         if let Some(Ok((tok, _))) = self.underlying.peek() {
                             if matches!(
@@ -132,18 +139,56 @@ where
             }
         }
 
-        self.start_of_line = next.as_ref().is_some_and(|lex_result| {
-            lex_result.as_ref().is_ok_and(|(tok, _)| {
-                if matches!(tok, Tok::NonLogicalNewline | Tok::Comment { .. }) {
-                    return self.start_of_line;
+        // Update the position, to track whether we're at the start of a logical line.
+        if let Some(lex_result) = next.as_ref() {
+            if let Ok((tok, _)) = lex_result.as_ref() {
+                match tok {
+                    Tok::NonLogicalNewline | Tok::Comment { .. } => {
+                        // Nothing to do.
+                    }
+                    Tok::StartModule | Tok::Newline | Tok::Indent | Tok::Dedent => {
+                        self.position = Position::Statement;
+                    }
+                    // If we see a semicolon, assume we're at the start of a simple statement, as in:
+                    // ```python
+                    // type X = int; type Y = float
+                    // ```
+                    Tok::Semi => {
+                        self.position = Position::SimpleStatement;
+                    }
+                    // If we see a colon, and we're not in a nested context, assume we're at the
+                    // start of a simple statement, as in:
+                    // ```python
+                    // class Class: type X = int
+                    // ```
+                    Tok::Colon if self.position == Position::Other => {
+                        self.position = Position::SimpleStatement;
+                    }
+                    Tok::Lpar | Tok::Lsqb | Tok::Lbrace => {
+                        self.position = if let Position::Nested(depth) = self.position {
+                            Position::Nested(depth.saturating_add(1))
+                        } else {
+                            Position::Nested(1)
+                        };
+                    }
+                    Tok::Rpar | Tok::Rsqb | Tok::Rbrace => {
+                        self.position = if let Position::Nested(depth) = self.position {
+                            let depth = depth.saturating_sub(1);
+                            if depth > 0 {
+                                Position::Nested(depth)
+                            } else {
+                                Position::Other
+                            }
+                        } else {
+                            Position::Other
+                        };
+                    }
+                    _ => {
+                        self.position = Position::Other;
+                    }
                 }
-
-                matches!(
-                    tok,
-                    Tok::StartModule | Tok::Newline | Tok::Indent | Tok::Dedent
-                )
-            })
-        });
+            }
+        }
 
         next
     }
@@ -160,4 +205,20 @@ fn soft_to_name(tok: &Tok) -> Tok {
     Tok::Name {
         name: name.to_owned(),
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Position {
+    /// The lexer is at the start of a logical line, i.e., the start of a simple or compound statement.
+    Statement,
+    /// The lexer is at the start of a simple statement, e.g., a statement following a semicolon
+    /// or colon, as in:
+    /// ```python
+    /// class Class: type X = int
+    /// ```
+    SimpleStatement,
+    /// The lexer is within brackets, with the given bracket nesting depth.
+    Nested(u32),
+    /// The lexer is some other location.
+    Other,
 }

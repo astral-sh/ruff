@@ -1477,6 +1477,20 @@
             "type": "string"
           }
         },
+        "length-sort": {
+          "description": "Sort imports by their string length, such that shorter imports appear before longer imports. For example, by default, imports will be sorted alphabetically, as in: ```python import collections import os ```\n\nSetting `length-sort = true` will instead sort such that shorter imports appear before longer imports, as in: ```python import os import collections ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "length-sort-straight": {
+          "description": "Sort straight imports by their string length. Similar to `length-sort`, but applies only to straight imports and doesn't affect `from` imports.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "lines-after-imports": {
           "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
           "type": [
@@ -2849,6 +2863,7 @@
         "FURB15",
         "FURB152",
         "FURB16",
+        "FURB163",
         "FURB168",
         "FURB169",
         "FURB17",
@@ -3087,6 +3102,8 @@
         "PLR0133",
         "PLR02",
         "PLR020",
+        "PLR0202",
+        "PLR0203",
         "PLR0206",
         "PLR04",
         "PLR040",

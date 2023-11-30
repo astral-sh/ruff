@@ -107,6 +107,8 @@ pub(crate) struct Checker<'a> {
     pub(crate) diagnostics: Vec<Diagnostic>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
     pub(crate) flake8_bugbear_seen: Vec<TextRange>,
+    /// The end offset of the last visited statement.
+    last_stmt_end: TextSize,
 }
 
 impl<'a> Checker<'a> {
@@ -142,6 +144,7 @@ impl<'a> Checker<'a> {
             diagnostics: Vec::default(),
             flake8_bugbear_seen: Vec::default(),
             cell_offsets,
+            last_stmt_end: TextSize::default(),
         }
     }
 }
@@ -267,6 +270,18 @@ where
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
+
+        // For Jupyter Notebooks, we'll reset the `IMPORT_BOUNDARY` flag when
+        // we encounter a cell boundary.
+        if self.source_type.is_ipynb()
+            && self.semantic.at_top_level()
+            && self.semantic.seen_import_boundary()
+            && self.cell_offsets.is_some_and(|cell_offsets| {
+                cell_offsets.has_cell_boundary(TextRange::new(self.last_stmt_end, stmt.start()))
+            })
+        {
+            self.semantic.flags -= SemanticModelFlags::IMPORT_BOUNDARY;
+        }
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
@@ -779,6 +794,7 @@ where
 
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
+        self.last_stmt_end = stmt.end();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -799,7 +815,7 @@ where
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.deferred.string_type_definitions.push((
                     expr.range(),
-                    value,
+                    value.to_str(),
                     self.semantic.snapshot(),
                 ));
             } else {
@@ -1219,7 +1235,7 @@ where
                 {
                     self.deferred.string_type_definitions.push((
                         expr.range(),
-                        value,
+                        value.to_str(),
                         self.semantic.snapshot(),
                     ));
                 }
@@ -1303,9 +1319,9 @@ where
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
         match format_spec {
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                for value in values {
-                    self.visit_expr(value);
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                for expr in value.elements() {
+                    self.visit_expr(expr);
                 }
             }
             _ => unreachable!("Unexpected expression for format_spec"),

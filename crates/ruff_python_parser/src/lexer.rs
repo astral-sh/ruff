@@ -2160,6 +2160,14 @@ f"{(lambda x:{x})}"
         assert_debug_snapshot!(lex_source(source));
     }
 
+    #[test]
+    fn test_match_softkeyword_in_notebook() {
+        let source = r"match foo:
+    case bar:
+        pass";
+        assert_debug_snapshot!(lex_jupyter_source(source));
+    }
+
     fn lex_fstring_error(source: &str) -> FStringErrorType {
         match lex(source, Mode::Module).find_map(std::result::Result::err) {
             Some(err) => match err.error {

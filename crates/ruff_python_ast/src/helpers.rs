@@ -133,9 +133,11 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         return true;
     }
     match expr {
-        Expr::BoolOp(ast::ExprBoolOp { values, .. })
-        | Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
+        }
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            value.elements().any(|expr| any_over_expr(expr, func))
         }
         Expr::NamedExpr(ast::ExprNamedExpr {
             target,
@@ -1139,11 +1141,14 @@ impl Truthiness {
             }
             Expr::NoneLiteral(_) => Self::Falsey,
             Expr::EllipsisLiteral(_) => Self::Truthy,
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                if values.is_empty() {
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                if value.parts().all(|part| match part {
+                    ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
+                    ast::FStringPart::FString(f_string) => f_string.values.is_empty(),
+                }) {
                     Self::Falsey
-                } else if values.iter().any(|value| {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &value {
+                } else if value.elements().any(|expr| {
+                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &expr {
                         !value.is_empty()
                     } else {
                         false
@@ -1286,6 +1291,50 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             range: TextRange::default(),
         }),
     }
+}
+
+pub fn typing_optional(elt: Expr, binding: String) -> Expr {
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(elt),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
+}
+
+pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
+    fn tuple(elts: &[Expr]) -> Expr {
+        match elts {
+            [] => Expr::Tuple(ast::ExprTuple {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            }),
+            [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
+            [elt] => elt.clone(),
+            [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(tuple(rest)),
+                op: Operator::BitOr,
+                right: Box::new(elt.clone()),
+                range: TextRange::default(),
+            }),
+        }
+    }
+
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(tuple(elts)),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
 }
 
 #[cfg(test)]

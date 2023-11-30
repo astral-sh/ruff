@@ -1,0 +1,81 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_context_managers_autodetect_39.py
+---
+## Input
+
+```python
+# This file uses parenthesized context managers introduced in Python 3.9.
+
+
+with \
+     make_context_manager1() as cm1, \
+     make_context_manager2() as cm2, \
+     make_context_manager3() as cm3, \
+     make_context_manager4() as cm4 \
+:
+    pass
+
+
+with (
+     new_new_new1() as cm1,
+     new_new_new2()
+):
+    pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,12 +1,7 @@
+ # This file uses parenthesized context managers introduced in Python 3.9.
+ 
+ 
+-with (
+-    make_context_manager1() as cm1,
+-    make_context_manager2() as cm2,
+-    make_context_manager3() as cm3,
+-    make_context_manager4() as cm4,
+-):
++with make_context_manager1() as cm1, make_context_manager2() as cm2, make_context_manager3() as cm3, make_context_manager4() as cm4:
+     pass
+ 
+ 
+```
+
+## Ruff Output
+
+```python
+# This file uses parenthesized context managers introduced in Python 3.9.
+
+
+with make_context_manager1() as cm1, make_context_manager2() as cm2, make_context_manager3() as cm3, make_context_manager4() as cm4:
+    pass
+
+
+with new_new_new1() as cm1, new_new_new2():
+    pass
+```
+
+## Black Output
+
+```python
+# This file uses parenthesized context managers introduced in Python 3.9.
+
+
+with (
+    make_context_manager1() as cm1,
+    make_context_manager2() as cm2,
+    make_context_manager3() as cm3,
+    make_context_manager4() as cm4,
+):
+    pass
+
+
+with new_new_new1() as cm1, new_new_new2():
+    pass
+```
+
+

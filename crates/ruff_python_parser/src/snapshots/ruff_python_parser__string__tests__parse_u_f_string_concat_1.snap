@@ -9,17 +9,40 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..18,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 2..17,
-                                value: "Hello world",
-                                unicode: true,
-                                implicit_concatenated: true,
-                            },
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..9,
+                                        value: "Hello ",
+                                        unicode: true,
+                                    },
+                                ),
+                                FString(
+                                    FString {
+                                        range: 10..18,
+                                        values: [
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 12..17,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 12..17,
+                                                                value: "world",
+                                                                unicode: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ],
                         ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },

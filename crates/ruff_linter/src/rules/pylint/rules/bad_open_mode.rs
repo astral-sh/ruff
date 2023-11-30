@@ -154,7 +154,7 @@ impl TryFrom<char> for OpenMode {
 }
 
 /// Returns `true` if the open mode is valid.
-fn is_valid_mode(mode: &str) -> bool {
+fn is_valid_mode(mode: &ast::StringLiteralValue) -> bool {
     // Flag duplicates and invalid characters.
     let mut flags = OpenMode::empty();
     for char in mode.chars() {

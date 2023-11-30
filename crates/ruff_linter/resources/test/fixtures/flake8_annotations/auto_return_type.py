@@ -30,3 +30,36 @@ def func(x: int):
 
 def func(x: int):
     return 1 + 2.5 if x > 0 else 1.5 or "str"
+
+
+def func(x: int):
+    if not x:
+        return None
+    return {"foo": 1}
+
+
+def func(x: int):
+    return {"foo": 1}
+
+
+def func(x: int):
+    if not x:
+        return 1
+    else:
+        return True
+
+
+def func(x: int):
+    if not x:
+        return 1
+    else:
+        return None
+
+
+def func(x: int):
+    if not x:
+        return 1
+    elif x > 5:
+        return "str"
+    else:
+        return None

@@ -569,10 +569,14 @@ impl<'a> DocstringStmt<'a> {
         };
 
         match value.as_ref() {
-            Expr::StringLiteral(value) if !value.implicit_concatenated => Some(DocstringStmt {
-                docstring: stmt,
-                suite_kind,
-            }),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                if !value.is_implicit_concatenated() =>
+            {
+                Some(DocstringStmt {
+                    docstring: stmt,
+                    suite_kind,
+                })
+            }
             _ => None,
         }
     }

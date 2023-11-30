@@ -10,9 +10,15 @@ Dict(
                 StringLiteral(
                     ExprStringLiteral {
                         range: 1..4,
-                        value: "a",
-                        unicode: false,
-                        implicit_concatenated: false,
+                        value: StringLiteralValue {
+                            inner: Single(
+                                StringLiteral {
+                                    range: 1..4,
+                                    value: "a",
+                                    unicode: false,
+                                },
+                            ),
+                        },
                     },
                 ),
             ),
@@ -21,9 +27,15 @@ Dict(
                 StringLiteral(
                     ExprStringLiteral {
                         range: 16..19,
-                        value: "d",
-                        unicode: false,
-                        implicit_concatenated: false,
+                        value: StringLiteralValue {
+                            inner: Single(
+                                StringLiteral {
+                                    range: 16..19,
+                                    value: "d",
+                                    unicode: false,
+                                },
+                            ),
+                        },
                     },
                 ),
             ),
@@ -32,9 +44,15 @@ Dict(
             StringLiteral(
                 ExprStringLiteral {
                     range: 6..9,
-                    value: "b",
-                    unicode: false,
-                    implicit_concatenated: false,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 6..9,
+                                value: "b",
+                                unicode: false,
+                            },
+                        ),
+                    },
                 },
             ),
             Name(
@@ -47,9 +65,15 @@ Dict(
             StringLiteral(
                 ExprStringLiteral {
                     range: 21..24,
-                    value: "e",
-                    unicode: false,
-                    implicit_concatenated: false,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 21..24,
+                                value: "e",
+                                unicode: false,
+                            },
+                        ),
+                    },
                 },
             ),
         ],
