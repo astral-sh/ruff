@@ -66,13 +66,15 @@ fn check_target_for_assignment(expr: &Expr, sequence_name: &str, index_name: &st
     match expr {
         Expr::Name(ast::ExprName { id, .. }) => id == sequence_name || id == index_name,
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                if id == sequence_name {
-                    if let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() {
-                        if id == index_name {
-                            return true;
-                        }
-                    }
+            let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+                return false;
+            };
+            if id == sequence_name {
+                let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
+                    return false;
+                };
+                if id == index_name {
+                    return true;
                 }
             }
             false
@@ -93,13 +95,15 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
                 range,
                 ..
             }) => {
-                if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                    if id == self.sequence_name {
-                        if let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() {
-                            if id == self.index_name {
-                                self.diagnostic_ranges.push(*range);
-                            }
-                        }
+                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+                    return;
+                };
+                if id == self.sequence_name {
+                    let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
+                        return;
+                    };
+                    if id == self.index_name {
+                        self.diagnostic_ranges.push(*range);
                     }
                 }
             }
@@ -136,13 +140,15 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
                         id == self.sequence_name || id == self.index_name
                     }
                     Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                        if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                            if id == self.sequence_name {
-                                if let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() {
-                                    if id == self.index_name {
-                                        return true;
-                                    }
-                                }
+                        let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+                            return false;
+                        };
+                        if id == self.sequence_name {
+                            let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
+                                return false;
+                            };
+                            if id == self.index_name {
+                                return true;
                             }
                         }
                         false
@@ -198,23 +204,25 @@ pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker,
             elt, generators, ..
         }) => {
             for comp in generators {
-                if let Some((sequence, index_name, value_name)) =
+                let Some((sequence, index_name, value_name)) =
                     enumerate_items(checker, &comp.iter, &comp.target)
-                {
-                    let mut visitor = SubscriptVisitor::new(&sequence, &index_name);
+                else {
+                    return;
+                };
 
-                    visitor.visit_expr(elt.as_ref());
+                let mut visitor = SubscriptVisitor::new(&sequence, &index_name);
 
-                    for range in visitor.diagnostic_ranges {
-                        let mut diagnostic = Diagnostic::new(UnnecessaryListIndexLookup, range);
+                visitor.visit_expr(elt.as_ref());
 
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            value_name.clone(),
-                            range,
-                        )));
+                for range in visitor.diagnostic_ranges {
+                    let mut diagnostic = Diagnostic::new(UnnecessaryListIndexLookup, range);
 
-                        checker.diagnostics.push(diagnostic);
-                    }
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        value_name.clone(),
+                        range,
+                    )));
+
+                    checker.diagnostics.push(diagnostic);
                 }
             }
         }
@@ -227,12 +235,9 @@ fn enumerate_items(
     call_expr: &Expr,
     tuple_expr: &Expr,
 ) -> Option<(String, String, String)> {
-    let Expr::Call(ast::ExprCall {
+    let ast::ExprCall {
         func, arguments, ..
-    }) = call_expr
-    else {
-        return None;
-    };
+    } = call_expr.as_call_expr()?;
 
     // Check that the function is the `enumerate` builtin.
     let Some(call_path) = checker.semantic().resolve_call_path(func.as_ref()) else {
