@@ -46,6 +46,10 @@ impl fmt::Display for DictKind {
 /// {}
 /// {"a": 1}
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryLiteralWithinDictCall {
     kind: DictKind,
