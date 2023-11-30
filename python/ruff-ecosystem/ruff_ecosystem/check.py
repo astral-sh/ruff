@@ -63,7 +63,7 @@ def markdown_check_result(result: Result) -> str:
         project_rule_changes[project] = changes = RuleChanges.from_diff(diff)
         all_rule_changes.update(changes)
 
-    lines = []
+    lines: list[str] = []
     total_removed = all_rule_changes.total_removed_violations()
     total_added = all_rule_changes.total_added_violations()
     total_added_fixes = all_rule_changes.total_added_fixes()
