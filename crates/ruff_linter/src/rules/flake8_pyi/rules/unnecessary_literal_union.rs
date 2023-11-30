@@ -102,7 +102,8 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
     let mut literal_exprs = Vec::new();
     let mut other_exprs = Vec::new();
 
-    // for the sake of consistency and correctness, we'll use the first Literal subscript attribute
+    // for the sake of consistency and correctness, we'll use the first `Literal` subscript attribute
+    // to construct the fix
     let mut literal_subscript = None;
     let mut total_literals = 0;
 
