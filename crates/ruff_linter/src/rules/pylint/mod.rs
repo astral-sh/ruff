@@ -154,6 +154,10 @@ mod tests {
         Rule::RepeatedKeywordArgument,
         Path::new("repeated_keyword_argument.py")
     )]
+    #[test_case(
+        Rule::UnnecessaryListIndexLookup,
+        Path::new("unnecessary_list_index_lookup.py")
+    )]
     #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
