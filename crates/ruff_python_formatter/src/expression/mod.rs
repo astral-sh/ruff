@@ -952,7 +952,7 @@ impl OwnParentheses {
 /// Differs from [`has_own_parentheses`] in that it returns [`OwnParentheses::NonEmpty`] for
 /// parenthesized expressions, like `(1)` or `([1])`, regardless of whether those expression have
 /// their _own_ parentheses.
-fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<OwnParentheses> {
+pub(crate) fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<OwnParentheses> {
     let own_parentheses = has_own_parentheses(expr, context);
 
     // If the node has its own non-empty parentheses, we don't need to check for surrounding

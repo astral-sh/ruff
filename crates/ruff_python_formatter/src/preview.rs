@@ -17,3 +17,10 @@ pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`prefer_splitting_right_hand_side_of_assignments`](https://github.com/astral-sh/ruff/issues/6975) preview style is enabled.
+pub(crate) const fn is_prefer_splitting_right_hand_side_of_assignments_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}

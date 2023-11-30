@@ -67,4 +67,24 @@ class DefaultRunner:
 ```
 
 
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -7,9 +7,9 @@
+     Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb()
+ )
+ 
+-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: (
+-    Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+-) = Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb()
++bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = (
++    Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb()
++)
+ 
+ JSONSerializable: TypeAlias = (
+     "str | int | float | bool | None | list | tuple | JSONMapping"
+```
+
+
 
