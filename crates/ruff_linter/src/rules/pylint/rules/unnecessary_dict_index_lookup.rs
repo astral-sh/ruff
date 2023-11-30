@@ -1,4 +1,4 @@
-use ast::{Arguments, Stmt};
+use ast::Stmt;
 use ruff_python_ast::{self as ast, Expr, StmtFor};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
@@ -66,13 +66,15 @@ fn check_target_for_assignment(expr: &Expr, dict_name: &str, index_name: &str) -
     // if we see the sequence subscript being modified, we'll stop emitting diagnostics
     match expr {
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-            if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                if id == dict_name {
-                    if let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() {
-                        if id == index_name {
-                            return true;
-                        }
-                    }
+            let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+                return false;
+            };
+            if id == dict_name {
+                let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
+                    return false;
+                };
+                if id == index_name {
+                    return true;
                 }
             }
             false
@@ -93,13 +95,15 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
                 range,
                 ..
             }) => {
-                if let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() {
-                    if id == self.dict_name {
-                        if let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() {
-                            if id == self.index_name {
-                                self.diagnostic_ranges.push(*range);
-                            }
-                        }
+                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+                    return;
+                };
+                if id == self.dict_name {
+                    let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
+                        return;
+                    };
+                    if id == self.index_name {
+                        self.diagnostic_ranges.push(*range);
                     }
                 }
             }
@@ -207,15 +211,11 @@ pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker,
 }
 
 fn dict_items(call_expr: &Expr, tuple_expr: &Expr) -> Option<(String, String, String)> {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { args, .. },
-        ..
-    }) = call_expr
-    else {
-        return None;
-    };
-    if !args.is_empty() {
+    let ast::ExprCall {
+        func, arguments, ..
+    } = call_expr.as_call_expr()?;
+
+    if !arguments.is_empty() {
         return None;
     }
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
