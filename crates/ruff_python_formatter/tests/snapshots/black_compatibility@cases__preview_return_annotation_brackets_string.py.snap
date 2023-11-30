@@ -19,7 +19,7 @@ def frobnicate(a) -> "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisI
 ```diff
 --- Black
 +++ Ruff
-@@ -1,13 +1,12 @@
+@@ -1,7 +1,6 @@
  # Long string example
  def frobnicate() -> (
 -    "ThisIsTrulyUnreasonablyExtremelyLongClassName |"
@@ -28,13 +28,6 @@ def frobnicate(a) -> "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisI
  ):
      pass
  
- 
- # splitting the string breaks if there's any parameters
- def frobnicate(
--    a,
-+    a
- ) -> "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisIsTrulyUnreasonablyExtremelyLongClassName]":
-     pass
 ```
 
 ## Ruff Output
@@ -49,7 +42,7 @@ def frobnicate() -> (
 
 # splitting the string breaks if there's any parameters
 def frobnicate(
-    a
+    a,
 ) -> "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisIsTrulyUnreasonablyExtremelyLongClassName]":
     pass
 ```

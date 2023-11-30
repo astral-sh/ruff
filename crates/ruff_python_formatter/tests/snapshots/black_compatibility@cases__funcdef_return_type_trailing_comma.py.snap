@@ -179,13 +179,7 @@ def SimplePyFn(
      p,
      q,
  ]:
-@@ -63,16 +67,18 @@
- # long function definition, return type is longer
- # this should maybe split on rhs?
- def aaaaaaaaaaaaaaaaa(
--    bbbbbbbbbbbbbbbbbb,
-+    bbbbbbbbbbbbbbbbbb
- ) -> list[Ccccccccccccccccccccccccccccccccccccccccccccccccccc, Dddddd]: ...
+@@ -68,11 +72,13 @@
  
  
  # long return type, no param list
@@ -204,25 +198,19 @@ def SimplePyFn(
  
  
  # long function name, no param list, no return value
-@@ -93,12 +99,16 @@
+@@ -93,7 +99,11 @@
  
  
  # unskippable type hint (??)
 -def foo(a) -> list[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]:  # type: ignore
 +def foo(
-+    a
++    a,
 +) -> list[
 +    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 +]:  # type: ignore
      pass
  
  
- def foo(
--    a,
-+    a
- ) -> list[
-     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
- ]:  # abpedeifnore
 @@ -112,7 +122,13 @@
  
  
@@ -333,7 +321,7 @@ def aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
 # long function definition, return type is longer
 # this should maybe split on rhs?
 def aaaaaaaaaaaaaaaaa(
-    bbbbbbbbbbbbbbbbbb
+    bbbbbbbbbbbbbbbbbb,
 ) -> list[Ccccccccccccccccccccccccccccccccccccccccccccccccccc, Dddddd]: ...
 
 
@@ -366,7 +354,7 @@ def thiiiiiiiiiiiiiiiiiis_iiiiiiiiiiiiiiiiiiiiiiiiiiiiiis_veeeeeeeeeeeeeeeeeeeee
 
 # unskippable type hint (??)
 def foo(
-    a
+    a,
 ) -> list[
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ]:  # type: ignore
@@ -374,7 +362,7 @@ def foo(
 
 
 def foo(
-    a
+    a,
 ) -> list[
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 ]:  # abpedeifnore

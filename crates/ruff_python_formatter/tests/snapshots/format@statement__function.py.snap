@@ -928,7 +928,7 @@ def f(  # first
 
 
 def f(  # first
-    a
+    a,
 ):  # second
     ...
 
