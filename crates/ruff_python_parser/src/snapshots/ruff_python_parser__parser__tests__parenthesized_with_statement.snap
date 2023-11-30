@@ -347,7 +347,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             is_async: false,
             items: [
                 WithItem {
-                    range: 184..195,
+                    range: 183..196,
                     context_expr: NamedExpr(
                         ExprNamedExpr {
                             range: 184..190,
