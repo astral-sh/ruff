@@ -88,7 +88,7 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             ", encoding=\"locale\"".to_string(),
             call.range().end() - TextSize::from(1),
-        )))
+        )));
     } else {
         let import_edit = checker.importer().add_import(
             &AnyImport::Import(Import::module("locale")),
