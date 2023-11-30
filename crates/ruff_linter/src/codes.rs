@@ -245,6 +245,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E2515") => (RuleGroup::Stable, rules::pylint::rules::InvalidCharacterZeroWidthSpace),
         (Pylint, "R0124") => (RuleGroup::Stable, rules::pylint::rules::ComparisonWithItself),
         (Pylint, "R0133") => (RuleGroup::Stable, rules::pylint::rules::ComparisonOfConstant),
+        (Pylint, "R0202") => (RuleGroup::Preview, rules::pylint::rules::NoClassmethodDecorator),
+        (Pylint, "R0203") => (RuleGroup::Preview, rules::pylint::rules::NoStaticmethodDecorator),
         (Pylint, "R0206") => (RuleGroup::Stable, rules::pylint::rules::PropertyWithParameters),
         (Pylint, "R0402") => (RuleGroup::Stable, rules::pylint::rules::ManualFromImport),
         (Pylint, "R0911") => (RuleGroup::Stable, rules::pylint::rules::TooManyReturnStatements),
