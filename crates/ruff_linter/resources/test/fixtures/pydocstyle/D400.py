@@ -91,3 +91,12 @@ def f(rounds: list[int], number: int) -> bool:
         bool: was the round played?
     """
     return number in rounds
+
+
+def f():
+    """
+    My example
+    ==========
+
+    My example explanation
+    """
