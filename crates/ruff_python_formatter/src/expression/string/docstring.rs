@@ -302,13 +302,15 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
 
                 self.already_normalized = false;
                 match kind {
-                    CodeExampleKind::Doctest(CodeExampleDoctest { indent }) => {
+                    CodeExampleKind::Doctest(CodeExampleDoctest { ps1_indent }) => {
                         let mut lines = formatted_lines.into_iter();
                         if let Some(first) = lines.next() {
-                            self.print_one(&first.map(|line| std::format!("{indent}>>> {line}")))?;
+                            self.print_one(
+                                &first.map(|line| std::format!("{ps1_indent}>>> {line}")),
+                            )?;
                             for docline in lines {
                                 self.print_one(
-                                    &docline.map(|line| std::format!("{indent}... {line}")),
+                                    &docline.map(|line| std::format!("{ps1_indent}... {line}")),
                                 )?;
                             }
                         }
@@ -536,9 +538,8 @@ impl<'src> CodeExample<'src> {
                 Some(original) => CodeExampleAddAction::Print { original },
             },
             Some(CodeExampleKind::Doctest(doctest)) => {
-                if let Some(code) = doctest_find_ps2_prompt(&doctest.indent, &original.line) {
-                    let code = code.to_string();
-                    self.lines.push(CodeExampleLine { original, code });
+                if let Some(code) = doctest.find_code_line(original.clone()) {
+                    self.lines.push(code);
                     // Stay with the doctest kind while we accumulate all
                     // PS2 prompts.
                     self.kind = Some(CodeExampleKind::Doctest(doctest));
@@ -566,11 +567,9 @@ impl<'src> CodeExample<'src> {
     /// collected and looks for the beginning of another code example.
     fn add_start(&mut self, original: DocstringLine<'src>) -> Option<DocstringLine<'src>> {
         assert_eq!(None, self.kind, "expected no existing code example");
-        if let Some((indent, code)) = doctest_find_ps1_prompt(&original.line) {
-            let indent = indent.to_string();
-            let code = code.to_string();
-            self.lines.push(CodeExampleLine { original, code });
-            self.kind = Some(CodeExampleKind::Doctest(CodeExampleDoctest { indent }));
+        if let Some((doctest, code)) = CodeExampleDoctest::new(original.clone()) {
+            self.lines.push(code);
+            self.kind = Some(CodeExampleKind::Doctest(doctest));
             return None;
         }
         Some(original)
@@ -600,7 +599,66 @@ struct CodeExampleDoctest {
     ///
     /// More precisely, this corresponds to the whitespace observed before
     /// the starting `>>> ` (the "PS1 prompt").
-    indent: String,
+    ps1_indent: String,
+}
+
+impl CodeExampleDoctest {
+    /// Looks for a valid doctest PS1 prompt in the line given.
+    ///
+    /// If one was found, then state for a new doctest code example is
+    /// returned, along with the code example line.
+    fn new<'src>(
+        original: DocstringLine<'src>,
+    ) -> Option<(CodeExampleDoctest, CodeExampleLine<'src>)> {
+        let trim_start = original.line.trim_start();
+        // Prompts must be followed by an ASCII space character[1].
+        //
+        // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
+        let code = trim_start.strip_prefix(">>> ")?.to_string();
+        let indent_len = original
+            .line
+            .len()
+            .checked_sub(trim_start.len())
+            .expect("suffix is <= original");
+        let ps1_indent = original.line[..indent_len].to_string();
+        let doctest = CodeExampleDoctest { ps1_indent };
+        let line = CodeExampleLine { original, code };
+        Some((doctest, line))
+    }
+
+    /// Looks for a valid doctest PS2 prompt in the line given.
+    ///
+    /// If one is found, then the code portion of the line following the PS2 prompt
+    /// is returned.
+    ///
+    /// Callers must provide a string containing the original indentation of the
+    /// PS1 prompt that started the doctest containing the potential PS2 prompt
+    /// in the line given. If the line contains a PS2 prompt, its indentation must
+    /// match the indentation used for the corresponding PS1 prompt (otherwise
+    /// `None` will be returned).
+    fn find_code_line<'src>(&self, original: DocstringLine<'src>) -> Option<CodeExampleLine<'src>> {
+        let (ps2_indent, ps2_after) = original.line.split_once("...")?;
+        // PS2 prompts must have the same indentation as their
+        // corresponding PS1 prompt.[1] While the 'doctest' Python
+        // module will error in this case, we just treat this line as a
+        // non-doctest line.
+        //
+        // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L733
+        if self.ps1_indent != ps2_indent {
+            return None;
+        }
+        // PS2 prompts must be followed by an ASCII space character unless
+        // it's an otherwise empty line[1].
+        //
+        // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
+        let code = match ps2_after.strip_prefix(' ') {
+            None if ps2_after.is_empty() => "",
+            None => return None,
+            Some(code) => code,
+        };
+        let code = code.to_string();
+        Some(CodeExampleLine { original, code })
+    }
 }
 
 /// A single line in a code example found in a docstring.
@@ -678,56 +736,6 @@ enum CodeExampleAddAction<'src> {
         /// should be written back to the docstring as-is after the code lines.
         original: DocstringLine<'src>,
     },
-}
-
-/// Looks for a valid doctest PS1 prompt in the line given.
-///
-/// If one was found, then the indentation prior to the prompt is returned
-/// along with the code portion of the line.
-fn doctest_find_ps1_prompt(line: &str) -> Option<(&str, &str)> {
-    let trim_start = line.trim_start();
-    // Prompts must be followed by an ASCII space character[1].
-    //
-    // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
-    let code = trim_start.strip_prefix(">>> ")?;
-    let indent_len = line
-        .len()
-        .checked_sub(trim_start.len())
-        .expect("suffix is <= original");
-    let indent = &line[..indent_len];
-    Some((indent, code))
-}
-
-/// Looks for a valid doctest PS2 prompt in the line given.
-///
-/// If one is found, then the code portion of the line following the PS2 prompt
-/// is returned.
-///
-/// Callers must provide a string containing the original indentation of the
-/// PS1 prompt that started the doctest containing the potential PS2 prompt
-/// in the line given. If the line contains a PS2 prompt, its indentation must
-/// match the indentation used for the corresponding PS1 prompt (otherwise
-/// `None` will be returned).
-fn doctest_find_ps2_prompt<'src>(ps1_indent: &str, line: &'src str) -> Option<&'src str> {
-    let (ps2_indent, ps2_after) = line.split_once("...")?;
-    // PS2 prompts must have the same indentation as their
-    // corresponding PS1 prompt.[1] While the 'doctest' Python
-    // module will error in this case, we just treat this line as a
-    // non-doctest line.
-    //
-    // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L733
-    if ps1_indent != ps2_indent {
-        return None;
-    }
-    // PS2 prompts must be followed by an ASCII space character unless
-    // it's an otherwise empty line[1].
-    //
-    // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
-    match ps2_after.strip_prefix(' ') {
-        None if ps2_after.is_empty() => Some(""),
-        None => None,
-        Some(code) => Some(code),
-    }
 }
 
 /// Formats the given source code using the given options.
