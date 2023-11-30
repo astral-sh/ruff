@@ -1,10 +1,12 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::call_path::{format_call_path, CallPath};
-use ruff_text_size::Ranged;
+use ruff_python_ast::imports::{AnyImport, Import};
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for uses of `open` and related calls without an explicit `encoding`
@@ -35,7 +37,7 @@ pub struct UnspecifiedEncoding {
     mode: Mode,
 }
 
-impl Violation for UnspecifiedEncoding {
+impl AlwaysFixableViolation for UnspecifiedEncoding {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnspecifiedEncoding {
@@ -51,6 +53,10 @@ impl Violation for UnspecifiedEncoding {
                 format!("`{function_name}` without explicit `encoding` argument")
             }
         }
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Add explicit `encoding` argument")
     }
 }
 
@@ -70,13 +76,32 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
         return;
     };
 
-    checker.diagnostics.push(Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         UnspecifiedEncoding {
             function_name,
             mode,
         },
         call.func.range(),
-    ));
+    );
+
+    if checker.settings.target_version >= PythonVersion::Py310 {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
+            ", encoding=\"locale\"".to_string(),
+            call.range().end() - TextSize::from(1),
+        )))
+    } else {
+        let import_edit = checker.importer().add_import(
+            &AnyImport::Import(Import::module("locale")),
+            TextSize::default(),
+        );
+        let call_edit = Edit::insertion(
+            ", encoding=locale.getpreferredencoding(False)".to_string(),
+            call.range().end() - TextSize::from(1),
+        );
+        diagnostic.set_fix(Fix::unsafe_edits(import_edit, [call_edit]));
+    }
+
+    checker.diagnostics.push(diagnostic);
 }
 
 /// Returns `true` if the given expression is a string literal containing a `b` character.

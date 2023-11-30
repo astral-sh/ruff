@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-unspecified_encoding.py:8:1: PLW1514 `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:8:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
  7 | # Errors.
  8 | open("test.txt")
@@ -9,8 +9,19 @@ unspecified_encoding.py:8:1: PLW1514 `open` in text mode without explicit `encod
  9 | io.TextIOWrapper(io.FileIO("test.txt"))
 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
    |
+   = help: Add explicit `encoding` argument
 
-unspecified_encoding.py:9:1: PLW1514 `io.TextIOWrapper` without explicit `encoding` argument
+ℹ Unsafe fix
+5 5 | import codecs
+6 6 | 
+7 7 | # Errors.
+8   |-open("test.txt")
+  8 |+open("test.txt", encoding="locale")
+9 9 | io.TextIOWrapper(io.FileIO("test.txt"))
+10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+11 11 | tempfile.NamedTemporaryFile("w")
+
+unspecified_encoding.py:9:1: PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
    |
  7 | # Errors.
  8 | open("test.txt")
@@ -19,8 +30,19 @@ unspecified_encoding.py:9:1: PLW1514 `io.TextIOWrapper` without explicit `encodi
 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
 11 | tempfile.NamedTemporaryFile("w")
    |
+   = help: Add explicit `encoding` argument
 
-unspecified_encoding.py:10:1: PLW1514 `io.TextIOWrapper` without explicit `encoding` argument
+ℹ Unsafe fix
+6  6  | 
+7  7  | # Errors.
+8  8  | open("test.txt")
+9     |-io.TextIOWrapper(io.FileIO("test.txt"))
+   9  |+io.TextIOWrapper(io.FileIO("test.txt"), encoding="locale")
+10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+11 11 | tempfile.NamedTemporaryFile("w")
+12 12 | tempfile.TemporaryFile("w")
+
+unspecified_encoding.py:10:1: PLW1514 [*] `io.TextIOWrapper` without explicit `encoding` argument
    |
  8 | open("test.txt")
  9 | io.TextIOWrapper(io.FileIO("test.txt"))
@@ -29,8 +51,19 @@ unspecified_encoding.py:10:1: PLW1514 `io.TextIOWrapper` without explicit `encod
 11 | tempfile.NamedTemporaryFile("w")
 12 | tempfile.TemporaryFile("w")
    |
+   = help: Add explicit `encoding` argument
 
-unspecified_encoding.py:11:1: PLW1514 `tempfile.NamedTemporaryFile` in text mode without explicit `encoding` argument
+ℹ Unsafe fix
+7  7  | # Errors.
+8  8  | open("test.txt")
+9  9  | io.TextIOWrapper(io.FileIO("test.txt"))
+10    |-hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+   10 |+hugo.TextIOWrapper(hugo.FileIO("test.txt"), encoding="locale")
+11 11 | tempfile.NamedTemporaryFile("w")
+12 12 | tempfile.TemporaryFile("w")
+13 13 | codecs.open("test.txt")
+
+unspecified_encoding.py:11:1: PLW1514 [*] `tempfile.NamedTemporaryFile` in text mode without explicit `encoding` argument
    |
  9 | io.TextIOWrapper(io.FileIO("test.txt"))
 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
@@ -39,8 +72,19 @@ unspecified_encoding.py:11:1: PLW1514 `tempfile.NamedTemporaryFile` in text mode
 12 | tempfile.TemporaryFile("w")
 13 | codecs.open("test.txt")
    |
+   = help: Add explicit `encoding` argument
 
-unspecified_encoding.py:12:1: PLW1514 `tempfile.TemporaryFile` in text mode without explicit `encoding` argument
+ℹ Unsafe fix
+8  8  | open("test.txt")
+9  9  | io.TextIOWrapper(io.FileIO("test.txt"))
+10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+11    |-tempfile.NamedTemporaryFile("w")
+   11 |+tempfile.NamedTemporaryFile("w", encoding="locale")
+12 12 | tempfile.TemporaryFile("w")
+13 13 | codecs.open("test.txt")
+14 14 | tempfile.SpooledTemporaryFile(0, "w")
+
+unspecified_encoding.py:12:1: PLW1514 [*] `tempfile.TemporaryFile` in text mode without explicit `encoding` argument
    |
 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
 11 | tempfile.NamedTemporaryFile("w")
@@ -49,8 +93,19 @@ unspecified_encoding.py:12:1: PLW1514 `tempfile.TemporaryFile` in text mode with
 13 | codecs.open("test.txt")
 14 | tempfile.SpooledTemporaryFile(0, "w")
    |
+   = help: Add explicit `encoding` argument
 
-unspecified_encoding.py:13:1: PLW1514 `codecs.open` in text mode without explicit `encoding` argument
+ℹ Unsafe fix
+9  9  | io.TextIOWrapper(io.FileIO("test.txt"))
+10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+11 11 | tempfile.NamedTemporaryFile("w")
+12    |-tempfile.TemporaryFile("w")
+   12 |+tempfile.TemporaryFile("w", encoding="locale")
+13 13 | codecs.open("test.txt")
+14 14 | tempfile.SpooledTemporaryFile(0, "w")
+15 15 | 
+
+unspecified_encoding.py:13:1: PLW1514 [*] `codecs.open` in text mode without explicit `encoding` argument
    |
 11 | tempfile.NamedTemporaryFile("w")
 12 | tempfile.TemporaryFile("w")
@@ -58,8 +113,19 @@ unspecified_encoding.py:13:1: PLW1514 `codecs.open` in text mode without explici
    | ^^^^^^^^^^^ PLW1514
 14 | tempfile.SpooledTemporaryFile(0, "w")
    |
+   = help: Add explicit `encoding` argument
 
-unspecified_encoding.py:14:1: PLW1514 `tempfile.SpooledTemporaryFile` in text mode without explicit `encoding` argument
+ℹ Unsafe fix
+10 10 | hugo.TextIOWrapper(hugo.FileIO("test.txt"))
+11 11 | tempfile.NamedTemporaryFile("w")
+12 12 | tempfile.TemporaryFile("w")
+13    |-codecs.open("test.txt")
+   13 |+codecs.open("test.txt", encoding="locale")
+14 14 | tempfile.SpooledTemporaryFile(0, "w")
+15 15 | 
+16 16 | # Non-errors.
+
+unspecified_encoding.py:14:1: PLW1514 [*] `tempfile.SpooledTemporaryFile` in text mode without explicit `encoding` argument
    |
 12 | tempfile.TemporaryFile("w")
 13 | codecs.open("test.txt")
@@ -68,5 +134,16 @@ unspecified_encoding.py:14:1: PLW1514 `tempfile.SpooledTemporaryFile` in text mo
 15 | 
 16 | # Non-errors.
    |
+   = help: Add explicit `encoding` argument
+
+ℹ Unsafe fix
+11 11 | tempfile.NamedTemporaryFile("w")
+12 12 | tempfile.TemporaryFile("w")
+13 13 | codecs.open("test.txt")
+14    |-tempfile.SpooledTemporaryFile(0, "w")
+   14 |+tempfile.SpooledTemporaryFile(0, "w", encoding="locale")
+15 15 | 
+16 16 | # Non-errors.
+17 17 | open("test.txt", encoding="utf-8")
 
 
