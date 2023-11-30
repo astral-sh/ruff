@@ -32,7 +32,7 @@ where
     pub fn new(lexer: I, mode: Mode) -> Self {
         Self {
             underlying: lexer.multipeek(), // spell-checker:ignore multipeek
-            position: if matches!(mode, Mode::Expression) {
+            position: if mode == Mode::Expression {
                 Position::Other
             } else {
                 Position::Statement
@@ -54,7 +54,6 @@ where
             // If the token is a soft keyword e.g. `type`, `match`, or `case`, check if it's
             // used as an identifier. We assume every soft keyword use is an identifier unless
             // a heuristic is met.
-
             match tok {
                 // For `match` and `case`, all of the following conditions must be met:
                 // 1. The token is at the start of a logical line.
@@ -62,7 +61,7 @@ where
                 //    inside a parenthesized expression, list, or dictionary).
                 // 3. The top-level colon is not the immediate sibling of a `match` or `case` token.
                 //    (This is to avoid treating `match` or `case` as identifiers when annotated with
-                //    type hints.)   type hints.)
+                //    type hints.)
                 Tok::Match | Tok::Case => {
                     if matches!(self.position, Position::Statement) {
                         let mut nesting = 0;
@@ -162,7 +161,7 @@ where
                     // ```python
                     // class Class: type X = int
                     // ```
-                    Tok::Colon if matches!(self.position, Position::Other) => {
+                    Tok::Colon if self.position == Position::Other => {
                         self.position = Position::SimpleStatement;
                     }
                     Tok::Lpar | Tok::Lsqb | Tok::Lbrace => {

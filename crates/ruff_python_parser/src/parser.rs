@@ -863,8 +863,15 @@ type (
 type = 1
 type = x = 1
 x = type = 1
+lambda x: type
 ";
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+    }
+
+    #[test]
+    fn test_invalid_type() {
+        assert!(parse_suite("a: type X = int", "<test>").is_err());
+        assert!(parse_suite("lambda: type X = int", "<test>").is_err());
     }
 
     #[test]
