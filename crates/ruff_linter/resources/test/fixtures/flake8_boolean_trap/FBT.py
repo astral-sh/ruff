@@ -91,3 +91,26 @@ class Registry:
 
     def foo(self) -> None:
         object.__setattr__(self, "flag", True)
+
+
+from typing import Optional, Union
+
+
+def func(x: Union[list, Optional[int | str | float | bool]]):
+    pass
+
+
+def func(x: bool | str):
+    pass
+
+
+def func(x: int | str):
+    pass
+
+
+from typing import override
+
+
+@override
+def func(x: bool):
+    pass

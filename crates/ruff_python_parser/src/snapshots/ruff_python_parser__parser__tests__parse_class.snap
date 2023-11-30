@@ -116,9 +116,15 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         StringLiteral(
                                             ExprStringLiteral {
                                                 range: 80..89,
-                                                value: "default",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 80..89,
+                                                            value: "default",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     ),

@@ -11,9 +11,15 @@ Call(
                 value: StringLiteral(
                     ExprStringLiteral {
                         range: 0..3,
-                        value: " ",
-                        unicode: false,
-                        implicit_concatenated: false,
+                        value: StringLiteralValue {
+                            inner: Single(
+                                StringLiteral {
+                                    range: 0..3,
+                                    value: " ",
+                                    unicode: false,
+                                },
+                            ),
+                        },
                     },
                 ),
                 attr: Identifier {
@@ -66,9 +72,15 @@ Call(
                                                             left: StringLiteral(
                                                                 ExprStringLiteral {
                                                                     range: 43..53,
-                                                                    value: "LIMIT %d",
-                                                                    unicode: false,
-                                                                    implicit_concatenated: false,
+                                                                    value: StringLiteralValue {
+                                                                        inner: Single(
+                                                                            StringLiteral {
+                                                                                range: 43..53,
+                                                                                value: "LIMIT %d",
+                                                                                unicode: false,
+                                                                            },
+                                                                        ),
+                                                                    },
                                                                 },
                                                             ),
                                                             op: Mod,
@@ -104,9 +116,15 @@ Call(
                                                             left: StringLiteral(
                                                                 ExprStringLiteral {
                                                                     range: 91..102,
-                                                                    value: "OFFSET %d",
-                                                                    unicode: false,
-                                                                    implicit_concatenated: false,
+                                                                    value: StringLiteralValue {
+                                                                        inner: Single(
+                                                                            StringLiteral {
+                                                                                range: 91..102,
+                                                                                value: "OFFSET %d",
+                                                                                unicode: false,
+                                                                            },
+                                                                        ),
+                                                                    },
                                                                 },
                                                             ),
                                                             op: Mod,

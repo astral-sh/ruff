@@ -56,6 +56,10 @@ pub struct Settings {
     pub lines_between_types: usize,
     pub forced_separate: Vec<String>,
     pub section_order: Vec<ImportSection>,
+    pub no_sections: bool,
+    pub from_first: bool,
+    pub length_sort: bool,
+    pub length_sort_straight: bool,
 }
 
 impl Default for Settings {
@@ -82,6 +86,10 @@ impl Default for Settings {
             lines_between_types: 0,
             forced_separate: Vec::new(),
             section_order: ImportType::iter().map(ImportSection::Known).collect(),
+            no_sections: false,
+            from_first: false,
+            length_sort: false,
+            length_sort_straight: false,
         }
     }
 }

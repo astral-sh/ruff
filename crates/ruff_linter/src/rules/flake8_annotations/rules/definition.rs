@@ -1,8 +1,8 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault, Stmt};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::analyze::visibility;
@@ -12,6 +12,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
+use crate::rules::flake8_annotations::helpers::auto_return_type;
 use crate::rules::ruff::typing::type_hint_resolves_to_any;
 
 /// ## What it does
@@ -41,7 +42,7 @@ pub struct MissingTypeFunctionArgument {
 impl Violation for MissingTypeFunctionArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeFunctionArgument { name } = self;
+        let Self { name } = self;
         format!("Missing type annotation for function argument `{name}`")
     }
 }
@@ -73,7 +74,7 @@ pub struct MissingTypeArgs {
 impl Violation for MissingTypeArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeArgs { name } = self;
+        let Self { name } = self;
         format!("Missing type annotation for `*{name}`")
     }
 }
@@ -105,7 +106,7 @@ pub struct MissingTypeKwargs {
 impl Violation for MissingTypeKwargs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeKwargs { name } = self;
+        let Self { name } = self;
         format!("Missing type annotation for `**{name}`")
     }
 }
@@ -142,7 +143,7 @@ pub struct MissingTypeSelf {
 impl Violation for MissingTypeSelf {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeSelf { name } = self;
+        let Self { name } = self;
         format!("Missing type annotation for `{name}` in method")
     }
 }
@@ -181,7 +182,7 @@ pub struct MissingTypeCls {
 impl Violation for MissingTypeCls {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingTypeCls { name } = self;
+        let Self { name } = self;
         format!("Missing type annotation for `{name}` in classmethod")
     }
 }
@@ -208,13 +209,25 @@ impl Violation for MissingTypeCls {
 #[violation]
 pub struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
+    annotation: Option<String>,
 }
 
 impl Violation for MissingReturnTypeUndocumentedPublicFunction {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypeUndocumentedPublicFunction { name } = self;
+        let Self { name, .. } = self;
         format!("Missing return type annotation for public function `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { annotation, .. } = self;
+        if let Some(annotation) = annotation {
+            Some(format!("Add return type annotation: `{annotation}`"))
+        } else {
+            Some(format!("Add return type annotation"))
+        }
     }
 }
 
@@ -240,13 +253,25 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 #[violation]
 pub struct MissingReturnTypePrivateFunction {
     name: String,
+    annotation: Option<String>,
 }
 
 impl Violation for MissingReturnTypePrivateFunction {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypePrivateFunction { name } = self;
+        let Self { name, .. } = self;
         format!("Missing return type annotation for private function `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { annotation, .. } = self;
+        if let Some(annotation) = annotation {
+            Some(format!("Add return type annotation: `{annotation}`"))
+        } else {
+            Some(format!("Add return type annotation"))
+        }
     }
 }
 
@@ -285,17 +310,25 @@ impl Violation for MissingReturnTypePrivateFunction {
 #[violation]
 pub struct MissingReturnTypeSpecialMethod {
     name: String,
+    annotation: Option<String>,
 }
 
-impl AlwaysFixableViolation for MissingReturnTypeSpecialMethod {
+impl Violation for MissingReturnTypeSpecialMethod {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypeSpecialMethod { name } = self;
+        let Self { name, .. } = self;
         format!("Missing return type annotation for special method `{name}`")
     }
 
-    fn fix_title(&self) -> String {
-        "Add `None` return type".to_string()
+    fn fix_title(&self) -> Option<String> {
+        let Self { annotation, .. } = self;
+        if let Some(annotation) = annotation {
+            Some(format!("Add return type annotation: `{annotation}`"))
+        } else {
+            Some(format!("Add return type annotation"))
+        }
     }
 }
 
@@ -325,13 +358,25 @@ impl AlwaysFixableViolation for MissingReturnTypeSpecialMethod {
 #[violation]
 pub struct MissingReturnTypeStaticMethod {
     name: String,
+    annotation: Option<String>,
 }
 
 impl Violation for MissingReturnTypeStaticMethod {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypeStaticMethod { name } = self;
+        let Self { name, .. } = self;
         format!("Missing return type annotation for staticmethod `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { annotation, .. } = self;
+        if let Some(annotation) = annotation {
+            Some(format!("Add return type annotation: `{annotation}`"))
+        } else {
+            Some(format!("Add return type annotation"))
+        }
     }
 }
 
@@ -361,13 +406,25 @@ impl Violation for MissingReturnTypeStaticMethod {
 #[violation]
 pub struct MissingReturnTypeClassMethod {
     name: String,
+    annotation: Option<String>,
 }
 
 impl Violation for MissingReturnTypeClassMethod {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypeClassMethod { name } = self;
+        let Self { name, .. } = self;
         format!("Missing return type annotation for classmethod `{name}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { annotation, .. } = self;
+        if let Some(annotation) = annotation {
+            Some(format!("Add return type annotation: `{annotation}`"))
+        } else {
+            Some(format!("Add return type annotation"))
+        }
     }
 }
 
@@ -421,7 +478,7 @@ pub struct AnyType {
 impl Violation for AnyType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AnyType { name } = self;
+        let Self { name } = self;
         format!("Dynamically typed expressions (typing.Any) are disallowed in `{name}`")
     }
 }
@@ -448,15 +505,10 @@ fn check_dynamically_typed<F>(
 ) where
     F: FnOnce() -> String,
 {
-    if let Expr::StringLiteral(ast::ExprStringLiteral {
-        range,
-        value: string,
-        ..
-    }) = annotation
-    {
+    if let Expr::StringLiteral(ast::ExprStringLiteral { range, value }) = annotation {
         // Quoted annotations
         if let Ok((parsed_annotation, _)) =
-            parse_type_annotation(string, *range, checker.locator().contents())
+            parse_type_annotation(value.to_str(), *range, checker.locator().contents())
         {
             if type_hint_resolves_to_any(
                 &parsed_annotation,
@@ -673,21 +725,57 @@ pub(crate) fn definition(
     ) {
         if is_method && visibility::is_classmethod(decorator_list, checker.semantic()) {
             if checker.enabled(Rule::MissingReturnTypeClassMethod) {
-                diagnostics.push(Diagnostic::new(
+                let return_type = auto_return_type(function)
+                    .and_then(|return_type| {
+                        return_type.into_expression(
+                            checker.importer(),
+                            function.parameters.start(),
+                            checker.semantic(),
+                            checker.settings.target_version,
+                        )
+                    })
+                    .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits));
+                let mut diagnostic = Diagnostic::new(
                     MissingReturnTypeClassMethod {
                         name: name.to_string(),
+                        annotation: return_type.clone().map(|(return_type, ..)| return_type),
                     },
                     function.identifier(),
-                ));
+                );
+                if let Some((return_type, edits)) = return_type {
+                    diagnostic.set_fix(Fix::unsafe_edits(
+                        Edit::insertion(format!(" -> {return_type}"), function.parameters.end()),
+                        edits,
+                    ));
+                }
+                diagnostics.push(diagnostic);
             }
         } else if is_method && visibility::is_staticmethod(decorator_list, checker.semantic()) {
             if checker.enabled(Rule::MissingReturnTypeStaticMethod) {
-                diagnostics.push(Diagnostic::new(
+                let return_type = auto_return_type(function)
+                    .and_then(|return_type| {
+                        return_type.into_expression(
+                            checker.importer(),
+                            function.parameters.start(),
+                            checker.semantic(),
+                            checker.settings.target_version,
+                        )
+                    })
+                    .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits));
+                let mut diagnostic = Diagnostic::new(
                     MissingReturnTypeStaticMethod {
                         name: name.to_string(),
+                        annotation: return_type.clone().map(|(return_type, ..)| return_type),
                     },
                     function.identifier(),
-                ));
+                );
+                if let Some((return_type, edits)) = return_type {
+                    diagnostic.set_fix(Fix::unsafe_edits(
+                        Edit::insertion(format!(" -> {return_type}"), function.parameters.end()),
+                        edits,
+                    ));
+                }
+                diagnostics.push(diagnostic);
             }
         } else if is_method && visibility::is_init(name) {
             // Allow omission of return annotation in `__init__` functions, as long as at
@@ -697,28 +785,31 @@ pub(crate) fn definition(
                     let mut diagnostic = Diagnostic::new(
                         MissingReturnTypeSpecialMethod {
                             name: name.to_string(),
+                            annotation: Some("None".to_string()),
                         },
                         function.identifier(),
                     );
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                         " -> None".to_string(),
-                        function.parameters.range().end(),
+                        function.parameters.end(),
                     )));
                     diagnostics.push(diagnostic);
                 }
             }
         } else if is_method && visibility::is_magic(name) {
             if checker.enabled(Rule::MissingReturnTypeSpecialMethod) {
+                let return_type = simple_magic_return_type(name);
                 let mut diagnostic = Diagnostic::new(
                     MissingReturnTypeSpecialMethod {
                         name: name.to_string(),
+                        annotation: return_type.map(ToString::to_string),
                     },
                     function.identifier(),
                 );
-                if let Some(return_type) = simple_magic_return_type(name) {
+                if let Some(return_type) = return_type {
                     diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
                         format!(" -> {return_type}"),
-                        function.parameters.range().end(),
+                        function.parameters.end(),
                     )));
                 }
                 diagnostics.push(diagnostic);
@@ -727,22 +818,72 @@ pub(crate) fn definition(
             match visibility {
                 visibility::Visibility::Public => {
                     if checker.enabled(Rule::MissingReturnTypeUndocumentedPublicFunction) {
-                        diagnostics.push(Diagnostic::new(
+                        let return_type = auto_return_type(function)
+                            .and_then(|return_type| {
+                                return_type.into_expression(
+                                    checker.importer(),
+                                    function.parameters.start(),
+                                    checker.semantic(),
+                                    checker.settings.target_version,
+                                )
+                            })
+                            .map(|(return_type, edits)| {
+                                (checker.generator().expr(&return_type), edits)
+                            });
+                        let mut diagnostic = Diagnostic::new(
                             MissingReturnTypeUndocumentedPublicFunction {
                                 name: name.to_string(),
+                                annotation: return_type
+                                    .clone()
+                                    .map(|(return_type, ..)| return_type),
                             },
                             function.identifier(),
-                        ));
+                        );
+                        if let Some((return_type, edits)) = return_type {
+                            diagnostic.set_fix(Fix::unsafe_edits(
+                                Edit::insertion(
+                                    format!(" -> {return_type}"),
+                                    function.parameters.end(),
+                                ),
+                                edits,
+                            ));
+                        }
+                        diagnostics.push(diagnostic);
                     }
                 }
                 visibility::Visibility::Private => {
                     if checker.enabled(Rule::MissingReturnTypePrivateFunction) {
-                        diagnostics.push(Diagnostic::new(
+                        let return_type = auto_return_type(function)
+                            .and_then(|return_type| {
+                                return_type.into_expression(
+                                    checker.importer(),
+                                    function.parameters.start(),
+                                    checker.semantic(),
+                                    checker.settings.target_version,
+                                )
+                            })
+                            .map(|(return_type, edits)| {
+                                (checker.generator().expr(&return_type), edits)
+                            });
+                        let mut diagnostic = Diagnostic::new(
                             MissingReturnTypePrivateFunction {
                                 name: name.to_string(),
+                                annotation: return_type
+                                    .clone()
+                                    .map(|(return_type, ..)| return_type),
                             },
                             function.identifier(),
-                        ));
+                        );
+                        if let Some((return_type, edits)) = return_type {
+                            diagnostic.set_fix(Fix::unsafe_edits(
+                                Edit::insertion(
+                                    format!(" -> {return_type}"),
+                                    function.parameters.end(),
+                                ),
+                                edits,
+                            ));
+                        }
+                        diagnostics.push(diagnostic);
                     }
                 }
             }

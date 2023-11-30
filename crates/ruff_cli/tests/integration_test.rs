@@ -5,7 +5,6 @@ use std::fs;
 use std::fs::Permissions;
 #[cfg(unix)]
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-#[cfg(unix)]
 use std::path::Path;
 use std::process::Command;
 use std::str;
@@ -26,12 +25,84 @@ use ruff_cli::args::Args;
 use ruff_cli::run;
 
 const BIN_NAME: &str = "ruff";
-const STDIN_BASE_OPTIONS: &[&str] = &["--isolated", "--no-cache", "-", "--output-format", "text"];
+
+fn ruff_cmd() -> Command {
+    Command::new(get_cargo_bin(BIN_NAME))
+}
+
+/// Builder for `ruff check` commands.
+#[derive(Debug)]
+struct RuffCheck<'a> {
+    output_format: &'a str,
+    config: Option<&'a Path>,
+    filename: Option<&'a str>,
+    args: Vec<&'a str>,
+}
+
+impl<'a> Default for RuffCheck<'a> {
+    fn default() -> RuffCheck<'a> {
+        RuffCheck {
+            output_format: "text",
+            config: None,
+            filename: None,
+            args: vec![],
+        }
+    }
+}
+
+impl<'a> RuffCheck<'a> {
+    /// Set the `--config` option.
+    #[must_use]
+    fn config(mut self, config: &'a Path) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    /// Set the `--output-format` option.
+    #[must_use]
+    fn output_format(mut self, format: &'a str) -> Self {
+        self.output_format = format;
+        self
+    }
+
+    /// Set the input file to pass to `ruff check`.
+    #[must_use]
+    fn filename(mut self, filename: &'a str) -> Self {
+        self.filename = Some(filename);
+        self
+    }
+
+    /// Set the list of positional arguments.
+    #[must_use]
+    fn args(mut self, args: impl IntoIterator<Item = &'a str>) -> Self {
+        self.args = args.into_iter().collect();
+        self
+    }
+
+    /// Generate a [`Command`] for the `ruff check` command.
+    fn build(self) -> Command {
+        let mut cmd = ruff_cmd();
+        cmd.args(["--output-format", self.output_format, "--no-cache"]);
+        if let Some(path) = self.config {
+            cmd.arg("--config");
+            cmd.arg(path);
+        } else {
+            cmd.arg("--isolated");
+        }
+        if let Some(filename) = self.filename {
+            cmd.arg(filename);
+        } else {
+            cmd.arg("-");
+        }
+        cmd.args(self.args);
+        cmd
+    }
+}
 
 #[test]
 fn stdin_success() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    let mut cmd = RuffCheck::default().args([]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin(""), @r###"
     success: true
     exit_code: 0
@@ -43,8 +114,8 @@ fn stdin_success() {
 
 #[test]
 fn stdin_error() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    let mut cmd = RuffCheck::default().args([]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: false
     exit_code: 1
@@ -59,9 +130,10 @@ fn stdin_error() {
 
 #[test]
 fn stdin_filename() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    let mut cmd = RuffCheck::default()
         .args(["--stdin-filename", "F401.py"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: false
     exit_code: 1
@@ -74,12 +146,65 @@ fn stdin_filename() {
     "###);
 }
 
+#[test]
+fn check_default_files() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(
+        tempdir.path().join("foo.py"),
+        r#"
+import foo   # unused import
+"#,
+    )?;
+    fs::write(
+        tempdir.path().join("bar.py"),
+        r#"
+import bar   # unused import
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["check", "--isolated", "--no-cache", "--select", "F401"]).current_dir(tempdir.path()), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    bar.py:2:8: F401 [*] `bar` imported but unused
+    foo.py:2:8: F401 [*] `foo` imported but unused
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn check_warn_stdin_filename_with_files() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "F401.py"])
+        .filename("foo.py")
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("import os\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    warning: Ignoring file foo.py in favor of standard input.
+    "###);
+}
+
 /// Raise `TCH` errors in `.py` files ...
 #[test]
 fn stdin_source_type_py() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+    let mut cmd = RuffCheck::default()
         .args(["--stdin-filename", "TCH.py"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: false
     exit_code: 1
@@ -95,10 +220,10 @@ fn stdin_source_type_py() {
 /// ... but not in `.pyi` files.
 #[test]
 fn stdin_source_type_pyi() {
-    let args = ["--stdin-filename", "TCH.pyi", "--select", "TCH"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "TCH.pyi", "--select", "TCH"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: true
     exit_code: 0
@@ -111,35 +236,26 @@ fn stdin_source_type_pyi() {
 #[cfg(unix)]
 #[test]
 fn stdin_json() {
-    let args = [
-        "-",
-        "--isolated",
-        "--no-cache",
-        "--output-format",
-        "json",
-        "--stdin-filename",
-        "F401.py",
-    ];
-
     let directory = path_dedot::CWD.to_str().unwrap();
     let binding = Path::new(directory).join("F401.py");
     let file_path = binding.display();
 
+    let mut cmd = RuffCheck::default()
+        .output_format("json")
+        .args(["--stdin-filename", "F401.py"])
+        .build();
+
     insta::with_settings!({filters => vec![
         (file_path.to_string().as_str(), "/path/to/F401.py"),
     ]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(args)
-            .pass_stdin("import os\n"));
+        assert_cmd_snapshot!(cmd.pass_stdin("import os\n"));
     });
 }
 
 #[test]
 fn stdin_fix_py() {
-    let args = ["--fix"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--fix"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import os\nimport sys\n\nprint(sys.version)\n"), @r###"
     success: true
     exit_code: 0
@@ -155,10 +271,10 @@ fn stdin_fix_py() {
 
 #[test]
 fn stdin_fix_jupyter() {
-    let args = ["--fix", "--stdin-filename", "Jupyter.ipynb"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--fix", "--stdin-filename", "Jupyter.ipynb"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin(r#"{
  "cells": [
   {
@@ -320,12 +436,13 @@ fn stdin_fix_jupyter() {
     Found 2 errors (2 fixed, 0 remaining).
     "###);
 }
+
 #[test]
 fn stdin_override_parser_ipynb() {
-    let args = ["--extension", "py:ipynb", "--stdin-filename", "Jupyter.py"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--extension", "py:ipynb", "--stdin-filename", "Jupyter.py"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin(r#"{
  "cells": [
   {
@@ -419,9 +536,15 @@ fn stdin_override_parser_ipynb() {
 
 #[test]
 fn stdin_override_parser_py() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(["--extension", "ipynb:python", "--stdin-filename", "F401.ipynb"])
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--extension",
+            "ipynb:python",
+            "--stdin-filename",
+            "F401.ipynb",
+        ])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import os\n"), @r###"
     success: false
     exit_code: 1
@@ -436,10 +559,8 @@ fn stdin_override_parser_py() {
 
 #[test]
 fn stdin_fix_when_not_fixable_should_still_print_contents() {
-    let args = ["--fix"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--fix"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"), @r###"
     success: false
     exit_code: 1
@@ -457,10 +578,8 @@ fn stdin_fix_when_not_fixable_should_still_print_contents() {
 
 #[test]
 fn stdin_fix_when_no_issues_should_still_print_contents() {
-    let args = ["--fix"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--fix"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import sys\n\nprint(sys.version)\n"), @r###"
     success: true
     exit_code: 0
@@ -475,9 +594,8 @@ fn stdin_fix_when_no_issues_should_still_print_contents() {
 
 #[test]
 fn stdin_format_jupyter() {
-    let args = ["format", "--stdin-filename", "Jupyter.ipynb", "--isolated"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(args)
+    assert_cmd_snapshot!(ruff_cmd()
+        .args(["format", "--stdin-filename", "Jupyter.ipynb", "--isolated"])
         .pass_stdin(r#"{
  "cells": [
   {
@@ -603,10 +721,8 @@ fn stdin_format_jupyter() {
 
 #[test]
 fn show_source() {
-    let args = ["--show-source"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--show-source"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @r###"
     success: false
     exit_code: 1
@@ -625,11 +741,11 @@ fn show_source() {
 
 #[test]
 fn explain_status_codes_f401() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME)).args(["--explain", "F401"]));
+    assert_cmd_snapshot!(ruff_cmd().args(["--explain", "F401"]));
 }
 #[test]
 fn explain_status_codes_ruf404() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME)).args(["--explain", "RUF404"]), @r###"
+    assert_cmd_snapshot!(ruff_cmd().args(["--explain", "RUF404"]), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -643,10 +759,10 @@ fn explain_status_codes_ruf404() {
 
 #[test]
 fn show_statistics() {
-    let args = ["--select", "F401", "--statistics"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F401", "--statistics"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("import sys\nimport os\n\nprint(os.getuid())\n"), @r###"
     success: false
     exit_code: 1
@@ -660,10 +776,8 @@ fn show_statistics() {
 #[test]
 fn nursery_prefix() {
     // `--select E` should detect E741, but not E225, which is in the nursery.
-    let args = ["--select", "E"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--select", "E"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -678,10 +792,8 @@ fn nursery_prefix() {
 #[test]
 fn nursery_all() {
     // `--select ALL` should detect E741, but not E225, which is in the nursery.
-    let args = ["--select", "ALL"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--select", "ALL"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -699,10 +811,8 @@ fn nursery_all() {
 #[test]
 fn nursery_direct() {
     // `--select E225` should detect E225.
-    let args = ["--select", "E225"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--select", "E225"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -718,10 +828,8 @@ fn nursery_direct() {
 #[test]
 fn nursery_group_selector() {
     // Only nursery rules should be detected e.g. E225 and a warning should be displayed
-    let args = ["--select", "NURSERY"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--select", "NURSERY"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -738,10 +846,10 @@ fn nursery_group_selector() {
 #[test]
 fn nursery_group_selector_preview_enabled() {
     // Only nursery rules should be detected e.g. E225 and a warning should be displayed
-    let args = ["--select", "NURSERY", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "NURSERY", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -759,10 +867,10 @@ fn nursery_group_selector_preview_enabled() {
 #[test]
 fn preview_enabled_prefix() {
     // E741 and E225 (preview) should both be detected
-    let args = ["--select", "E", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "E", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -778,10 +886,10 @@ fn preview_enabled_prefix() {
 
 #[test]
 fn preview_enabled_all() {
-    let args = ["--select", "ALL", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "ALL", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -802,10 +910,10 @@ fn preview_enabled_all() {
 #[test]
 fn preview_enabled_direct() {
     // E225 should be detected without warning
-    let args = ["--select", "E225", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "E225", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -821,10 +929,8 @@ fn preview_enabled_direct() {
 #[test]
 fn preview_disabled_direct() {
     // FURB145 is preview not nursery so selecting should be empty
-    let args = ["--select", "FURB145"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--select", "FURB145"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("a = l[:]\n"), @r###"
     success: true
     exit_code: 0
@@ -838,10 +944,8 @@ fn preview_disabled_direct() {
 #[test]
 fn preview_disabled_prefix_empty() {
     // Warns that the selection is empty since all of the CPY rules are in preview
-    let args = ["--select", "CPY"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--select", "CPY"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: true
     exit_code: 0
@@ -855,10 +959,8 @@ fn preview_disabled_prefix_empty() {
 #[test]
 fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
-    let args = ["--ignore", "CPY"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--ignore", "CPY"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -873,10 +975,8 @@ fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
 #[test]
 fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
     // Does not warn that the selection is empty since the user is not trying to enable the rule
-    let args = ["--fixable", "CPY"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default().args(["--fixable", "CPY"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 1
@@ -891,10 +991,10 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
 #[test]
 fn preview_group_selector() {
     // `--select PREVIEW` should error (selector was removed)
-    let args = ["--select", "PREVIEW", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "PREVIEW", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 2
@@ -910,10 +1010,10 @@ fn preview_group_selector() {
 #[test]
 fn preview_enabled_group_ignore() {
     // `--select E --ignore PREVIEW` should detect E741 and E225, which is in preview but "E" is more specific.
-    let args = ["--select", "E", "--ignore", "PREVIEW", "--preview"];
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
-        .args(args)
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "E", "--ignore", "PREVIEW", "--preview"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("I=42\n"), @r###"
     success: false
     exit_code: 2
@@ -965,9 +1065,11 @@ fn unreadable_dir() -> Result<()> {
     // We (currently?) have to use a subcommand to check exit status (currently wrong) and logging
     // output
     // TODO(konstin): This should be a failure, but we currently can't track that
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["--no-cache", "--isolated"])
-        .arg(&unreadable_dir), @r###"
+    let mut cmd = RuffCheck::default()
+        .filename(unreadable_dir.to_str().unwrap())
+        .args([])
+        .build();
+    assert_cmd_snapshot!(cmd, @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -998,18 +1100,12 @@ fn check_input_from_argfile() -> Result<()> {
     )?;
 
     // Generate the args with the argfile notation
-    let args = vec![
-        "check".to_string(),
-        "--no-cache".to_string(),
-        "--isolated".to_string(),
-        format!("@{}", &input_file_path.display()),
-    ];
-
+    let argfile = format!("@{}", &input_file_path.display());
+    let mut cmd = RuffCheck::default().filename(argfile.as_ref()).build();
     insta::with_settings!({filters => vec![
         (file_a_path.display().to_string().as_str(), "/path/to/a.py"),
     ]}, {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-            .args(args)
+        assert_cmd_snapshot!(cmd
             .pass_stdin(""), @r###"
         success: false
         exit_code: 1
@@ -1027,15 +1123,10 @@ fn check_input_from_argfile() -> Result<()> {
 
 #[test]
 fn check_hints_hidden_unsafe_fixes() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args([
-            "-",
-            "--output-format=text",
-            "--isolated",
-            "--select",
-            "F601,UP034",
-            "--no-cache",
-        ])
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
     success: false
@@ -1052,8 +1143,8 @@ fn check_hints_hidden_unsafe_fixes() {
 
 #[test]
 fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["-", "--output-format", "text", "--no-cache", "--isolated", "--select", "F601"])
+    let mut cmd = RuffCheck::default().args(["--select", "F601"]).build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
         @r###"
     success: false
@@ -1069,16 +1160,10 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
 
 #[test]
 fn check_shows_unsafe_fixes_with_opt_in() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args([
-            "-",
-            "--output-format=text",
-            "--isolated",
-            "--select",
-            "F601,UP034",
-            "--no-cache",
-            "--unsafe-fixes",
-        ])
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
     success: false
@@ -1095,20 +1180,12 @@ fn check_shows_unsafe_fixes_with_opt_in() {
 
 #[test]
 fn fix_applies_safe_fixes_by_default() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "-",
-                "--output-format",
-                "text",
-                "--isolated",
-                "--no-cache",
-                "--select",
-                "F601,UP034",
-                "--fix",
-            ])
-            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
-            @r###"
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--fix"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1124,21 +1201,12 @@ fn fix_applies_safe_fixes_by_default() {
 
 #[test]
 fn fix_applies_unsafe_fixes_with_opt_in() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "-",
-                "--output-format",
-                "text",
-                "--isolated",
-                "--no-cache",
-                "--select",
-                "F601,UP034",
-                "--fix",
-                "--unsafe-fixes",
-            ])
-            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
-            @r###"
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--fix", "--unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1152,20 +1220,12 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
 
 #[test]
 fn fix_does_not_apply_display_only_fixes() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "-",
-                "--output-format",
-                "text",
-                "--isolated",
-                "--no-cache",
-                "--select",
-                "B006",
-                "--fix",
-            ])
-            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
-            @r###"
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "B006", "--fix"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1178,21 +1238,12 @@ fn fix_does_not_apply_display_only_fixes() {
 
 #[test]
 fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "-",
-                "--output-format",
-                "text",
-                "--isolated",
-                "--no-cache",
-                "--select",
-                "B006",
-                "--fix",
-                "--unsafe-fixes",
-            ])
-            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
-            @r###"
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "B006", "--fix", "--unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1205,20 +1256,12 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
 
 #[test]
 fn fix_only_unsafe_fixes_available() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "-",
-                "--output-format",
-                "text",
-                "--isolated",
-                "--no-cache",
-                "--select",
-                "F601",
-                "--fix",
-            ])
-            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
-            @r###"
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601", "--fix"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1234,20 +1277,12 @@ fn fix_only_unsafe_fixes_available() {
 
 #[test]
 fn fix_only_flag_applies_safe_fixes_by_default() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "-",
-                "--output-format",
-                "text",
-                "--isolated",
-                "--no-cache",
-                "--select",
-                "F601,UP034",
-                "--fix-only",
-            ])
-            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
-            @r###"
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--fix-only"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1261,21 +1296,12 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
 
 #[test]
 fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "-",
-                "--output-format",
-                "text",
-                "--isolated",
-                "--no-cache",
-                "--select",
-                "F601,UP034",
-                "--fix-only",
-                "--unsafe-fixes",
-            ])
-            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
-            @r###"
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--fix-only", "--unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1289,18 +1315,10 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
 
 #[test]
 fn diff_shows_safe_fixes_by_default() {
-    assert_cmd_snapshot!(
-    Command::new(get_cargo_bin(BIN_NAME))
-        .args([
-            "-",
-            "--output-format",
-            "text",
-            "--isolated",
-            "--no-cache",
-            "--select",
-            "F601,UP034",
-            "--diff",
-        ])
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--diff"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
     success: false
@@ -1320,21 +1338,12 @@ fn diff_shows_safe_fixes_by_default() {
 
 #[test]
 fn diff_shows_unsafe_fixes_with_opt_in() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "-",
-                "--output-format",
-                "text",
-                "--isolated",
-                "--no-cache",
-                "--select",
-                "F601,UP034",
-                "--diff",
-                "--unsafe-fixes",
-            ])
-            .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
-            @r###"
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--diff", "--unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1353,21 +1362,12 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
 
 #[test]
 fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args([
-                "-",
-                "--output-format",
-                "text",
-                "--isolated",
-                "--no-cache",
-                "--select",
-                "B006",
-                "--diff",
-                "--unsafe-fixes",
-            ])
-            .pass_stdin("def add_to_list(item, some_list=[]): ..."),
-            @r###"
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "B006", "--diff", "--unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("def add_to_list(item, some_list=[]): ..."),
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1378,18 +1378,10 @@ fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
 
 #[test]
 fn diff_only_unsafe_fixes_available() {
-    assert_cmd_snapshot!(
-    Command::new(get_cargo_bin(BIN_NAME))
-        .args([
-            "-",
-            "--output-format",
-            "text",
-            "--isolated",
-            "--no-cache",
-            "--select",
-            "F601",
-            "--diff",
-        ])
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601", "--diff"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
         @r###"
     success: true
@@ -1414,17 +1406,11 @@ extend-unsafe-fixes = ["UP034"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--config"])
-        .arg(&ruff_toml)
-        .arg("-")
-        .args([
-            "--output-format",
-            "text",
-            "--no-cache",
-            "--select",
-            "F601,UP034",
-        ])
+    let mut cmd = RuffCheck::default()
+        .config(&ruff_toml)
+        .args(["--select", "F601,UP034"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
             @r###"
     success: false
@@ -1453,17 +1439,11 @@ extend-safe-fixes = ["F601"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--config"])
-        .arg(&ruff_toml)
-        .arg("-")
-        .args([
-            "--output-format",
-            "text",
-            "--no-cache",
-            "--select",
-            "F601,UP034",
-        ])
+    let mut cmd = RuffCheck::default()
+        .config(&ruff_toml)
+        .args(["--select", "F601,UP034"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
             @r###"
     success: false
@@ -1494,17 +1474,11 @@ extend-safe-fixes = ["UP034"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--config"])
-        .arg(&ruff_toml)
-        .arg("-")
-        .args([
-            "--output-format",
-            "text",
-            "--no-cache",
-            "--select",
-            "F601,UP034",
-        ])
+    let mut cmd = RuffCheck::default()
+        .config(&ruff_toml)
+        .args(["--select", "F601,UP034"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
             @r###"
     success: false
@@ -1536,17 +1510,11 @@ extend-safe-fixes = ["UP03"]
 "#,
     )?;
 
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--config"])
-        .arg(&ruff_toml)
-        .arg("-")
-        .args([
-            "--output-format",
-            "text",
-            "--no-cache",
-            "--select",
-            "F601,UP018,UP034,UP038",
-        ])
+    let mut cmd = RuffCheck::default()
+        .config(&ruff_toml)
+        .args(["--select", "F601,UP018,UP034,UP038"])
+        .build();
+    assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\nprint(str('foo'))\nisinstance(x, (int, str))\n"),
             @r###"
     success: false
@@ -1591,12 +1559,12 @@ def log(x, base) -> float:
 "#;
 
     // If we only select the prefix, then everything passes
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "-", "--config"])
-        .arg(&ruff_toml)
-        .args(["--output-format", "text", "--no-cache", "--select", "D41"])
-        .pass_stdin(stdin),
-        @r###"
+    let mut cmd = RuffCheck::default()
+        .config(&ruff_toml)
+        .args(["--select", "D41"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(stdin), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1606,12 +1574,12 @@ def log(x, base) -> float:
     );
 
     // But if we select the exact code, we get an error
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "-", "--config"])
-        .arg(&ruff_toml)
-        .args(["--output-format", "text", "--no-cache", "--select", "D417"])
-        .pass_stdin(stdin),
-        @r###"
+    let mut cmd = RuffCheck::default()
+        .config(&ruff_toml)
+        .args(["--select", "D417"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin(stdin), @r###"
     success: false
     exit_code: 1
     ----- stdout -----

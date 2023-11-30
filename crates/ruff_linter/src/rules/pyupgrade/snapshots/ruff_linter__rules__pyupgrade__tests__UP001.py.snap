@@ -7,7 +7,7 @@ UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
 2 |     __metaclass__ = type
   |     ^^^^^^^^^^^^^^^^^^^^ UP001
   |
-  = help: Remove `metaclass = type`
+  = help: Remove `__metaclass__ = type`
 
 ℹ Safe fix
 1 1 | class A:
@@ -25,7 +25,7 @@ UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
 7 | 
 8 |     def __init__(self) -> None:
   |
-  = help: Remove `metaclass = type`
+  = help: Remove `__metaclass__ = type`
 
 ℹ Safe fix
 3 3 | 

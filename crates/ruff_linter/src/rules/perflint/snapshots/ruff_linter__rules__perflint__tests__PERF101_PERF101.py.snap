@@ -180,4 +180,25 @@ PERF101.py:34:10: PERF101 [*] Do not cast an iterable to `list` before iterating
 38 36 | 
 39 37 | for i in list(foo_dict):  # Ok
 
+PERF101.py:57:10: PERF101 [*] Do not cast an iterable to `list` before iterating over it
+   |
+55 |     foo_list.append(i + 1)
+56 | 
+57 | for i in list(foo_list):  # PERF101
+   |          ^^^^^^^^^^^^^^ PERF101
+58 |     # Make sure we match the correct list
+59 |     other_list.append(i + 1)
+   |
+   = help: Remove `list()` cast
+
+ℹ Safe fix
+54 54 | for i in list(foo_list):  # Ok
+55 55 |     foo_list.append(i + 1)
+56 56 | 
+57    |-for i in list(foo_list):  # PERF101
+   57 |+for i in foo_list:  # PERF101
+58 58 |     # Make sure we match the correct list
+59 59 |     other_list.append(i + 1)
+60 60 | 
+
 

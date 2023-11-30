@@ -44,6 +44,53 @@ if condition:
 }
 
 #[test]
+fn default_files() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(
+        tempdir.path().join("foo.py"),
+        r#"
+foo =     "needs formatting"
+"#,
+    )?;
+    fs::write(
+        tempdir.path().join("bar.py"),
+        r#"
+bar =     "needs formatting"
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--no-cache", "--check"]).current_dir(tempdir.path()), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: bar.py
+    Would reformat: foo.py
+    2 files would be reformatted
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+#[test]
+fn format_warn_stdin_filename_with_files() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--isolated", "--stdin-filename", "foo.py"])
+        .arg("foo.py")
+        .pass_stdin("foo =     1"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    foo = 1
+
+    ----- stderr -----
+    warning: Ignoring file foo.py in favor of standard input.
+    "###);
+}
+
+#[test]
 fn format_options() -> Result<()> {
     let tempdir = TempDir::new()?;
     let ruff_toml = tempdir.path().join("ruff.toml");
@@ -395,9 +442,9 @@ fn deprecated_options() -> Result<()> {
     let ruff_toml = tempdir.path().join("ruff.toml");
     fs::write(
         &ruff_toml,
-        r#"
+        r"
 tab-size = 2
-"#,
+",
     )?;
 
     insta::with_settings!({filters => vec![
@@ -407,10 +454,10 @@ tab-size = 2
             .args(["format", "--config"])
             .arg(&ruff_toml)
             .arg("-")
-            .pass_stdin(r#"
+            .pass_stdin(r"
 if True:
     pass
-    "#), @r###"
+    "), @r###"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -443,9 +490,9 @@ format = "json"
             .args(["check", "--select", "F401", "--no-cache", "--config"])
             .arg(&ruff_toml)
             .arg("-")
-            .pass_stdin(r#"
+            .pass_stdin(r"
     import os
-    "#), @r###"
+    "), @r###"
         success: false
         exit_code: 2
         ----- stdout -----

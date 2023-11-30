@@ -40,6 +40,11 @@ use crate::rules::flake8_comprehensions::fixes;
 /// any(x.id for x in bar)
 /// all(x.id for x in bar)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the comprehension. In most cases, though, comments will be
+/// preserved.
 #[violation]
 pub struct UnnecessaryComprehensionAnyAll;
 

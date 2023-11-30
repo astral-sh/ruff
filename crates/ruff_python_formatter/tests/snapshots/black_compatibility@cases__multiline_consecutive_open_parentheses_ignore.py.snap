@@ -1,0 +1,91 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/multiline_consecutive_open_parentheses_ignore.py
+---
+## Input
+
+```python
+# This is a regression test. Issue #3737
+
+a = (  # type: ignore
+    int(  # type: ignore
+        int(  # type: ignore
+            int(  # type: ignore
+                6
+            )
+        )
+    )
+)
+
+b = (
+    int(
+        6
+    )
+)
+
+print(   "111") # type: ignore
+print(   "111"                         ) # type: ignore
+print(   "111"       ) # type: ignore
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -3,7 +3,9 @@
+ a = (  # type: ignore
+     int(  # type: ignore
+         int(  # type: ignore
+-            int(6)  # type: ignore
++            int(  # type: ignore
++                6
++            )
+         )
+     )
+ )
+```
+
+## Ruff Output
+
+```python
+# This is a regression test. Issue #3737
+
+a = (  # type: ignore
+    int(  # type: ignore
+        int(  # type: ignore
+            int(  # type: ignore
+                6
+            )
+        )
+    )
+)
+
+b = int(6)
+
+print("111")  # type: ignore
+print("111")  # type: ignore
+print("111")  # type: ignore
+```
+
+## Black Output
+
+```python
+# This is a regression test. Issue #3737
+
+a = (  # type: ignore
+    int(  # type: ignore
+        int(  # type: ignore
+            int(6)  # type: ignore
+        )
+    )
+)
+
+b = int(6)
+
+print("111")  # type: ignore
+print("111")  # type: ignore
+print("111")  # type: ignore
+```
+
+

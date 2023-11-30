@@ -9,41 +9,63 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..13,
-                    values: [
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 2..12,
-                                value: Name(
-                                    ExprName {
-                                        range: 3..6,
-                                        id: "foo",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: Some(
-                                    FString(
-                                        ExprFString {
-                                            range: 7..11,
-                                            values: [
-                                                StringLiteral(
-                                                    ExprStringLiteral {
-                                                        range: 7..11,
-                                                        value: "spec",
-                                                        unicode: false,
-                                                        implicit_concatenated: false,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..13,
+                                    values: [
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 2..12,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 3..6,
+                                                        id: "foo",
+                                                        ctx: Load,
                                                     },
                                                 ),
-                                            ],
-                                            implicit_concatenated: false,
-                                        },
-                                    ),
-                                ),
-                            },
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: Some(
+                                                    FString(
+                                                        ExprFString {
+                                                            range: 7..11,
+                                                            value: FStringValue {
+                                                                inner: Single(
+                                                                    FString(
+                                                                        FString {
+                                                                            range: 7..11,
+                                                                            values: [
+                                                                                StringLiteral(
+                                                                                    ExprStringLiteral {
+                                                                                        range: 7..11,
+                                                                                        value: StringLiteralValue {
+                                                                                            inner: Single(
+                                                                                                StringLiteral {
+                                                                                                    range: 7..11,
+                                                                                                    value: "spec",
+                                                                                                    unicode: false,
+                                                                                                },
+                                                                                            ),
+                                                                                        },
+                                                                                    },
+                                                                                ),
+                                                                            ],
+                                                                        },
+                                                                    ),
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
                         ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

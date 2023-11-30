@@ -34,7 +34,7 @@ use crate::args::{CliOverrides, FormatArguments};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
 use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
-use crate::ExitStatus;
+use crate::{resolve_default_files, ExitStatus};
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
 pub(crate) enum FormatMode {
@@ -60,7 +60,7 @@ impl FormatMode {
 
 /// Format a set of files, and return the exit status.
 pub(crate) fn format(
-    cli: &FormatArguments,
+    cli: FormatArguments,
     overrides: &CliOverrides,
     log_level: LogLevel,
 ) -> Result<ExitStatus> {
@@ -70,8 +70,9 @@ pub(crate) fn format(
         overrides,
         cli.stdin_filename.as_deref(),
     )?;
-    let mode = FormatMode::from_cli(cli);
-    let (paths, resolver) = python_files_in_path(&cli.files, &pyproject_config, overrides)?;
+    let mode = FormatMode::from_cli(&cli);
+    let files = resolve_default_files(cli.files, false);
+    let (paths, resolver) = python_files_in_path(&files, &pyproject_config, overrides)?;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -660,12 +661,12 @@ impl Display for FormatCommandError {
                 }
             }
             Self::Panic(path, err) => {
-                let message = r#"This indicates a bug in Ruff. If you could open an issue at:
+                let message = r"This indicates a bug in Ruff. If you could open an issue at:
 
     https://github.com/astral-sh/ruff/issues/new?title=%5BFormatter%20panic%5D
 
 ...with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
-"#;
+";
                 if let Some(path) = path {
                     write!(
                         f,

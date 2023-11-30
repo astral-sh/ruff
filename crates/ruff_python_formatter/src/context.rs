@@ -1,5 +1,5 @@
 use crate::comments::Comments;
-use crate::PyFormatOptions;
+use crate::{PyFormatOptions, QuoteStyle};
 use ruff_formatter::{Buffer, FormatContext, GroupId, SourceCode};
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
@@ -11,6 +11,15 @@ pub struct PyFormatContext<'a> {
     contents: &'a str,
     comments: Comments<'a>,
     node_level: NodeLevel,
+    /// Set to a non-None value when the formatter is running on a code
+    /// snippet within a docstring. The value should be the quote style of the
+    /// docstring containing the code snippet.
+    ///
+    /// Various parts of the formatter may inspect this state to change how it
+    /// works. For example, multi-line strings will always be written with a
+    /// quote style that is inverted from the one here in order to ensure that
+    /// the formatted Python code will be valid.
+    docstring: Option<QuoteStyle>,
 }
 
 impl<'a> PyFormatContext<'a> {
@@ -20,6 +29,7 @@ impl<'a> PyFormatContext<'a> {
             contents,
             comments,
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
+            docstring: None,
         }
     }
 
@@ -42,6 +52,27 @@ impl<'a> PyFormatContext<'a> {
 
     pub(crate) fn comments(&self) -> &Comments<'a> {
         &self.comments
+    }
+
+    /// Returns a non-None value only if the formatter is running on a code
+    /// snippet within a docstring.
+    ///
+    /// The quote style returned corresponds to the quoting used for the
+    /// docstring containing the code snippet currently being formatted.
+    pub(crate) fn docstring(&self) -> Option<QuoteStyle> {
+        self.docstring
+    }
+
+    /// Return a new context suitable for formatting code snippets within a
+    /// docstring.
+    ///
+    /// The quote style given should correspond to the style of quoting used
+    /// for the docstring containing the code snippets.
+    pub(crate) fn in_docstring(self, style: QuoteStyle) -> PyFormatContext<'a> {
+        PyFormatContext {
+            docstring: Some(style),
+            ..self
+        }
     }
 }
 

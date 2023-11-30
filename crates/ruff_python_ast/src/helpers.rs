@@ -1,20 +1,21 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
 use smallvec::SmallVec;
 
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::call_path::CallPath;
 use crate::parenthesize::parenthesized_range;
-use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use crate::statement_visitor::StatementVisitor;
 use crate::visitor::Visitor;
-use crate::AnyNodeRef;
 use crate::{
-    self as ast, Arguments, CmpOp, ExceptHandler, Expr, MatchCase, Pattern, Stmt, TypeParam,
+    self as ast, Arguments, CmpOp, ExceptHandler, Expr, MatchCase, Operator, Pattern, Stmt,
+    TypeParam,
 };
+use crate::{AnyNodeRef, ExprContext};
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
 pub const fn is_compound_statement(stmt: &Stmt) -> bool {
@@ -132,9 +133,11 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         return true;
     }
     match expr {
-        Expr::BoolOp(ast::ExprBoolOp { values, .. })
-        | Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
+        }
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            value.elements().any(|expr| any_over_expr(expr, func))
         }
         Expr::NamedExpr(ast::ExprNamedExpr {
             target,
@@ -882,9 +885,10 @@ pub fn resolve_imported_module_path<'a>(
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<&'a ast::StmtReturn>,
+    pub is_generator: bool,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for ReturnStatementVisitor<'a>
+impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
 where
     'b: 'a,
 {
@@ -894,7 +898,15 @@ where
                 // Don't recurse.
             }
             Stmt::Return(stmt) => self.returns.push(stmt),
-            _ => walk_stmt(self, stmt),
+            _ => crate::visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'b Expr) {
+        if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
+            self.is_generator = true;
+        } else {
+            crate::visitor::walk_expr(self, expr);
         }
     }
 }
@@ -925,7 +937,7 @@ where
                 elif_else_clauses,
                 ..
             }) => {
-                walk_body(self, body);
+                crate::statement_visitor::walk_body(self, body);
                 for clause in elif_else_clauses {
                     self.visit_elif_else_clause(clause);
                 }
@@ -933,11 +945,11 @@ where
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::With(ast::StmtWith { body, .. })
             | Stmt::For(ast::StmtFor { body, .. }) => {
-                walk_body(self, body);
+                crate::statement_visitor::walk_body(self, body);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
-                    walk_body(self, &case.body);
+                    crate::statement_visitor::walk_body(self, &case.body);
                 }
             }
             _ => {}
@@ -1129,11 +1141,14 @@ impl Truthiness {
             }
             Expr::NoneLiteral(_) => Self::Falsey,
             Expr::EllipsisLiteral(_) => Self::Truthy,
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                if values.is_empty() {
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                if value.parts().all(|part| match part {
+                    ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
+                    ast::FStringPart::FString(f_string) => f_string.values.is_empty(),
+                }) {
                     Self::Falsey
-                } else if values.iter().any(|value| {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &value {
+                } else if value.elements().any(|expr| {
+                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &expr {
                         !value.is_empty()
                     } else {
                         false
@@ -1246,6 +1261,80 @@ pub fn generate_comparison(
     }
 
     contents
+}
+
+/// Format the expression as a PEP 604-style optional.
+pub fn pep_604_optional(expr: &Expr) -> Expr {
+    ast::ExprBinOp {
+        left: Box::new(expr.clone()),
+        op: Operator::BitOr,
+        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
+        range: TextRange::default(),
+    }
+    .into()
+}
+
+/// Format the expressions as a PEP 604-style union.
+pub fn pep_604_union(elts: &[Expr]) -> Expr {
+    match elts {
+        [] => Expr::Tuple(ast::ExprTuple {
+            elts: vec![],
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
+        }),
+        [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
+        [elt] => elt.clone(),
+        [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+            left: Box::new(pep_604_union(rest)),
+            op: Operator::BitOr,
+            right: Box::new(pep_604_union(&[elt.clone()])),
+            range: TextRange::default(),
+        }),
+    }
+}
+
+pub fn typing_optional(elt: Expr, binding: String) -> Expr {
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(elt),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
+}
+
+pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
+    fn tuple(elts: &[Expr]) -> Expr {
+        match elts {
+            [] => Expr::Tuple(ast::ExprTuple {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            }),
+            [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
+            [elt] => elt.clone(),
+            [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(tuple(rest)),
+                op: Operator::BitOr,
+                right: Box::new(elt.clone()),
+                range: TextRange::default(),
+            }),
+        }
+    }
+
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(tuple(elts)),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
 }
 
 #[cfg(test)]

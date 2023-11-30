@@ -228,6 +228,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "E0604") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllObject),
         (Pylint, "E0605") => (RuleGroup::Stable, rules::pylint::rules::InvalidAllFormat),
         (Pylint, "E0704") => (RuleGroup::Preview, rules::pylint::rules::MisplacedBareRaise),
+        (Pylint, "E1132") => (RuleGroup::Preview, rules::pylint::rules::RepeatedKeywordArgument),
         (Pylint, "E1142") => (RuleGroup::Stable, rules::pylint::rules::AwaitOutsideAsync),
         (Pylint, "E1205") => (RuleGroup::Stable, rules::pylint::rules::LoggingTooManyArgs),
         (Pylint, "E1206") => (RuleGroup::Stable, rules::pylint::rules::LoggingTooFewArgs),
@@ -404,6 +405,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Quotes, "001") => (RuleGroup::Stable, rules::flake8_quotes::rules::BadQuotesMultilineString),
         (Flake8Quotes, "002") => (RuleGroup::Stable, rules::flake8_quotes::rules::BadQuotesDocstring),
         (Flake8Quotes, "003") => (RuleGroup::Stable, rules::flake8_quotes::rules::AvoidableEscapedQuote),
+        (Flake8Quotes, "004") => (RuleGroup::Preview, rules::flake8_quotes::rules::UnnecessaryEscapedQuote),
 
         // flake8-annotations
         (Flake8Annotations, "001") => (RuleGroup::Stable, rules::flake8_annotations::rules::MissingTypeFunctionArgument),
@@ -594,6 +596,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "112") => (RuleGroup::Stable, rules::flake8_bandit::rules::TryExceptContinue),
         (Flake8Bandit, "113") => (RuleGroup::Stable, rules::flake8_bandit::rules::RequestWithoutTimeout),
         (Flake8Bandit, "201") => (RuleGroup::Preview, rules::flake8_bandit::rules::FlaskDebugTrue),
+        (Flake8Bandit, "202") => (RuleGroup::Preview, rules::flake8_bandit::rules::TarfileUnsafeMembers),
         (Flake8Bandit, "301") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousPickleUsage),
         (Flake8Bandit, "302") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousMarshalUsage),
         (Flake8Bandit, "303") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousInsecureHashUsage),
@@ -631,6 +634,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "607") => (RuleGroup::Stable, rules::flake8_bandit::rules::StartProcessWithPartialPath),
         (Flake8Bandit, "608") => (RuleGroup::Stable, rules::flake8_bandit::rules::HardcodedSQLExpression),
         (Flake8Bandit, "609") => (RuleGroup::Stable, rules::flake8_bandit::rules::UnixCommandWildcardInjection),
+        (Flake8Bandit, "611") => (RuleGroup::Preview, rules::flake8_bandit::rules::DjangoRawSql),
         (Flake8Bandit, "612") => (RuleGroup::Stable, rules::flake8_bandit::rules::LoggingConfigInsecureListen),
         (Flake8Bandit, "701") => (RuleGroup::Stable, rules::flake8_bandit::rules::Jinja2AutoescapeFalse),
         (Flake8Bandit, "702") => (RuleGroup::Preview, rules::flake8_bandit::rules::MakoTemplates),
@@ -769,12 +773,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8PytestStyle, "027") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestUnittestRaisesAssertion),
 
         // flake8-pie
-        (Flake8Pie, "790") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryPass),
+        (Flake8Pie, "790") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryPlaceholder),
         (Flake8Pie, "794") => (RuleGroup::Stable, rules::flake8_pie::rules::DuplicateClassFieldDefinition),
         (Flake8Pie, "796") => (RuleGroup::Stable, rules::flake8_pie::rules::NonUniqueEnums),
         (Flake8Pie, "800") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessarySpread),
         (Flake8Pie, "804") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryDictKwargs),
-        (Flake8Pie, "807") => (RuleGroup::Stable, rules::flake8_pie::rules::ReimplementedListBuiltin),
+        (Flake8Pie, "807") => (RuleGroup::Stable, rules::flake8_pie::rules::ReimplementedContainerBuiltin),
         (Flake8Pie, "808") => (RuleGroup::Stable, rules::flake8_pie::rules::UnnecessaryRangeStart),
         (Flake8Pie, "810") => (RuleGroup::Stable, rules::flake8_pie::rules::MultipleStartsEndsWith),
 
@@ -947,9 +951,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "131") => (RuleGroup::Nursery, rules::refurb::rules::DeleteFullSlice),
         #[allow(deprecated)]
         (Refurb, "132") => (RuleGroup::Nursery, rules::refurb::rules::CheckAndRemoveFromSet),
+        (Refurb, "136") => (RuleGroup::Preview, rules::refurb::rules::IfExprMinMax),
         (Refurb, "140") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedStarmap),
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
         (Refurb, "148") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryEnumerate),
+        (Refurb, "152") => (RuleGroup::Preview, rules::refurb::rules::MathConstant),
+        (Refurb, "163") => (RuleGroup::Preview, rules::refurb::rules::RedundantLogBase),
         (Refurb, "168") => (RuleGroup::Preview, rules::refurb::rules::IsinstanceTypeNone),
         (Refurb, "169") => (RuleGroup::Preview, rules::refurb::rules::TypeNoneComparison),
         (Refurb, "171") => (RuleGroup::Preview, rules::refurb::rules::SingleItemMembershipTest),

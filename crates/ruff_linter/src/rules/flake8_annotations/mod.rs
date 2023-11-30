@@ -11,6 +11,7 @@ mod tests {
 
     use crate::assert_messages;
     use crate::registry::Rule;
+    use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
     use crate::test::test_path;
 
@@ -97,6 +98,43 @@ mod tests {
                     mypy_init_return: true,
                     ..Default::default()
                 },
+                ..LinterSettings::for_rules(vec![
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn auto_return_type() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_annotations/auto_return_type.py"),
+            &LinterSettings {
+                ..LinterSettings::for_rules(vec![
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn auto_return_type_py38() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_annotations/auto_return_type.py"),
+            &LinterSettings {
+                target_version: PythonVersion::Py38,
                 ..LinterSettings::for_rules(vec![
                     Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,

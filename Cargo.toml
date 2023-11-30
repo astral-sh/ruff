@@ -19,7 +19,7 @@ clap = { version = "4.4.7", features = ["derive"] }
 colored = { version = "2.0.0" }
 filetime = { version = "0.2.20" }
 glob = { version = "0.3.1" }
-globset = { version = "0.4.10" }
+globset = { version = "0.4.14" }
 ignore = { version = "0.4.20" }
 insta = { version = "1.34.0", feature = ["filters", "glob"] }
 is-macro = { version = "0.3.0" }
@@ -29,7 +29,7 @@ log = { version = "0.4.17" }
 memchr = { version = "2.6.4" }
 once_cell = { version = "1.17.1" }
 path-absolutize = { version = "3.1.1" }
-proc-macro2 = { version = "1.0.69" }
+proc-macro2 = { version = "1.0.70" }
 quote = { version = "1.0.23" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "1.1.0" }
@@ -38,7 +38,7 @@ serde = { version = "1.0.190", features = ["derive"] }
 serde_json = { version = "1.0.108" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.3.0", features = ["inline"] }
-smallvec = { version = "1.11.1" }
+smallvec = { version = "1.11.2" }
 static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
 strum_macros = { version = "0.25.3" }
@@ -48,12 +48,44 @@ thiserror = { version = "1.0.50" }
 toml = { version = "0.7.8" }
 tracing = { version = "0.1.40" }
 tracing-indicatif = { version = "0.3.4" }
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 unicode-ident = { version = "1.0.12" }
 unicode_names2 = { version = "1.2.0" }
 unicode-width = { version = "0.1.11" }
-uuid = { version = "1.5.0", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
+uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 wsl = { version = "0.1.0" }
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -2 }
+# Allowed pedantic lints
+char_lit_as_u8 = "allow"
+collapsible_else_if = "allow"
+collapsible_if = "allow"
+implicit_hasher = "allow"
+match_same_arms = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+similar_names = "allow"
+too_many_lines = "allow"
+# To allow `#[allow(clippy::all)]` in `crates/ruff_python_parser/src/python.rs`.
+needless_raw_string_hashes = "allow"
+# Disallowed restriction lints
+print_stdout = "warn"
+print_stderr = "warn"
+dbg_macro = "warn"
+empty_drop = "warn"
+empty_structs_with_brackets = "warn"
+exit = "warn"
+get_unwrap = "warn"
+rc_buffer = "warn"
+rc_mutex = "warn"
+rest_pat_in_fully_bound_structs = "warn"
 
 [profile.release]
 lto = "fat"

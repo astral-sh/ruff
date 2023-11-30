@@ -1,11 +1,13 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, ExprContext, Operator};
+use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::Pep604Operator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Check for type annotations that can be rewritten based on [PEP 604] syntax.
@@ -34,6 +36,11 @@ use crate::fix::edits::pad;
 /// ```python
 /// foo: int | str = 1
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may lead to runtime errors when
+/// alongside libraries that rely on runtime type annotations, like Pydantic,
+/// on Python versions prior to Python 3.10.
 ///
 /// ## Options
 /// - `target-version`
@@ -69,6 +76,16 @@ pub(crate) fn use_pep604_annotation(
         && !checker.semantic().in_complex_string_type_definition()
         && is_allowed_value(slice);
 
+    let applicability = if checker.settings.preview.is_enabled() {
+        if checker.settings.target_version >= PythonVersion::Py310 {
+            Applicability::Safe
+        } else {
+            Applicability::Unsafe
+        }
+    } else {
+        Applicability::Unsafe
+    };
+
     match operator {
         Pep604Operator::Optional => {
             let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
@@ -78,14 +95,17 @@ pub(crate) fn use_pep604_annotation(
                         // Invalid type annotation.
                     }
                     _ => {
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            pad(
-                                checker.generator().expr(&optional(slice)),
+                        diagnostic.set_fix(Fix::applicable_edit(
+                            Edit::range_replacement(
+                                pad(
+                                    checker.generator().expr(&pep_604_optional(slice)),
+                                    expr.range(),
+                                    checker.locator(),
+                                ),
                                 expr.range(),
-                                checker.locator(),
                             ),
-                            expr.range(),
-                        )));
+                            applicability,
+                        ));
                     }
                 }
             }
@@ -99,60 +119,36 @@ pub(crate) fn use_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            pad(
-                                checker.generator().expr(&union(elts)),
+                        diagnostic.set_fix(Fix::applicable_edit(
+                            Edit::range_replacement(
+                                pad(
+                                    checker.generator().expr(&pep_604_union(elts)),
+                                    expr.range(),
+                                    checker.locator(),
+                                ),
                                 expr.range(),
-                                checker.locator(),
                             ),
-                            expr.range(),
-                        )));
+                            applicability,
+                        ));
                     }
                     _ => {
                         // Single argument.
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            pad(
-                                checker.locator().slice(slice).to_string(),
+                        diagnostic.set_fix(Fix::applicable_edit(
+                            Edit::range_replacement(
+                                pad(
+                                    checker.locator().slice(slice).to_string(),
+                                    expr.range(),
+                                    checker.locator(),
+                                ),
                                 expr.range(),
-                                checker.locator(),
                             ),
-                            expr.range(),
-                        )));
+                            applicability,
+                        ));
                     }
                 }
             }
             checker.diagnostics.push(diagnostic);
         }
-    }
-}
-
-/// Format the expression as a PEP 604-style optional.
-fn optional(expr: &Expr) -> Expr {
-    ast::ExprBinOp {
-        left: Box::new(expr.clone()),
-        op: Operator::BitOr,
-        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
-        range: TextRange::default(),
-    }
-    .into()
-}
-
-/// Format the expressions as a PEP 604-style union.
-fn union(elts: &[Expr]) -> Expr {
-    match elts {
-        [] => Expr::Tuple(ast::ExprTuple {
-            elts: vec![],
-            ctx: ExprContext::Load,
-            range: TextRange::default(),
-        }),
-        [Expr::Tuple(ast::ExprTuple { elts, .. })] => union(elts),
-        [elt] => elt.clone(),
-        [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(union(rest)),
-            op: Operator::BitOr,
-            right: Box::new(union(&[elt.clone()])),
-            range: TextRange::default(),
-        }),
     }
 }
 

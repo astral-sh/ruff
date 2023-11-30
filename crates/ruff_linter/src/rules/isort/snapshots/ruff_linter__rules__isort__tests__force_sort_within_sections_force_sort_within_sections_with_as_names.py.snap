@@ -1,0 +1,25 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+force_sort_within_sections_with_as_names.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / import encodings
+2 | | from datetime import timezone as tz
+3 | | from datetime import timedelta
+4 | | import datetime as dt
+5 | | import datetime
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+  1 |+import datetime
+  2 |+import datetime as dt
+  3 |+from datetime import timedelta
+  4 |+from datetime import timezone as tz
+1 5 | import encodings
+2   |-from datetime import timezone as tz
+3   |-from datetime import timedelta
+4   |-import datetime as dt
+5   |-import datetime
+
+

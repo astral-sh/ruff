@@ -24,13 +24,13 @@ use crate::settings::types::IdentifierPattern;
 ///
 /// ## Example
 /// ```python
-/// def MY_FUNCTION():
+/// def my_function(A, myArg):
 ///     pass
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def my_function():
+/// def my_function(a, my_arg):
 ///     pass
 /// ```
 ///

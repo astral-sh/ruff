@@ -29,3 +29,6 @@ insta = { workspace = true }
 [features]
 serde = ["dep:serde", "ruff_text_size/serde"]
 schemars = ["dep:schemars", "ruff_text_size/schemars"]
+
+[lints]
+workspace = true
