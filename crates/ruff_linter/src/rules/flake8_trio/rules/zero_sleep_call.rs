@@ -18,6 +18,7 @@ use crate::importer::ImportRequest;
 /// ```python
 /// import trio
 ///
+///
 /// async def func():
 ///     await trio.sleep(0)
 /// ```
@@ -25,6 +26,7 @@ use crate::importer::ImportRequest;
 /// Use instead:
 /// ```python
 /// import trio
+///
 ///
 /// async def func():
 ///     await trio.lowlevel.checkpoint()
