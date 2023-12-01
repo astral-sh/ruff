@@ -152,6 +152,7 @@ unspecified_encoding.py:46:1: PLW1514 [*] `open` in text mode without explicit `
 45 | 
 46 | open("test.txt",)
    | ^^^^ PLW1514
+47 | open()
    |
    = help: Add explicit `encoding` argument
 
@@ -161,5 +162,21 @@ unspecified_encoding.py:46:1: PLW1514 [*] `open` in text mode without explicit `
 45 45 | 
 46    |-open("test.txt",)
    46 |+open("test.txt",encoding="locale")
+47 47 | open()
+
+unspecified_encoding.py:47:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+   |
+46 | open("test.txt",)
+47 | open()
+   | ^^^^ PLW1514
+   |
+   = help: Add explicit `encoding` argument
+
+ℹ Unsafe fix
+44 44 | tempfile.SpooledTemporaryFile(0, )
+45 45 | 
+46 46 | open("test.txt",)
+47    |-open()
+   47 |+open(encoding="locale")
 
 

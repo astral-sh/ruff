@@ -44,3 +44,4 @@ tempfile.SpooledTemporaryFile(0, "wb")
 tempfile.SpooledTemporaryFile(0, )
 
 open("test.txt",)
+open()
