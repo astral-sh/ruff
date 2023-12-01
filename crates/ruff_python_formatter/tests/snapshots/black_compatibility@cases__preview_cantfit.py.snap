@@ -51,29 +51,23 @@ del concatenated_strings, string_variable_name, normal_function_name, normal_nam
 ```diff
 --- Black
 +++ Ruff
-@@ -1,18 +1,12 @@
- # long variable name
--this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
--    0
--)
--this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
--    1  # with a comment
--)
-+this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = 0
-+this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = 1  # with a comment
- this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = [
-     1,
-     2,
-     3,
- ]
--this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
--    function()
--)
-+this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = function()
- this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = function(
-     arg1, arg2, arg3
+@@ -13,11 +13,11 @@
+ this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
+     function()
  )
-@@ -35,10 +29,8 @@
+-this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = function(
+-    arg1, arg2, arg3
++this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
++    function(arg1, arg2, arg3)
+ )
+-this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = function(
+-    [1, 2, 3], arg1, [1, 2, 3], arg2, [1, 2, 3], arg3
++this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
++    function([1, 2, 3], arg1, [1, 2, 3], arg2, [1, 2, 3], arg3)
+ )
+ # long function name
+ normal_name = (
+@@ -35,10 +35,8 @@
  )
  # long arguments
  normal_name = normal_function_name(
@@ -92,19 +86,25 @@ del concatenated_strings, string_variable_name, normal_function_name, normal_nam
 
 ```python
 # long variable name
-this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = 0
-this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = 1  # with a comment
+this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
+    0
+)
+this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
+    1  # with a comment
+)
 this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = [
     1,
     2,
     3,
 ]
-this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = function()
-this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = function(
-    arg1, arg2, arg3
+this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
+    function()
 )
-this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = function(
-    [1, 2, 3], arg1, [1, 2, 3], arg2, [1, 2, 3], arg3
+this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
+    function(arg1, arg2, arg3)
+)
+this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use_one_like_it = (
+    function([1, 2, 3], arg1, [1, 2, 3], arg2, [1, 2, 3], arg3)
 )
 # long function name
 normal_name = (

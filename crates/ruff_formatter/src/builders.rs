@@ -1451,11 +1451,12 @@ impl<Context> std::fmt::Debug for Group<'_, Context> {
     }
 }
 
-/// Content that may get parenthesized if it exceeds the configured line width but only if the parenthesized
-/// layout doesn't exceed the line width too, in which case it falls back to the flat layout.
+/// Content that may get parenthesized if it exceeds the configured line width but only if the parenthesized content
+/// doesn't exceed the line width too, in which case it falls back to the flat layout.
 ///
-/// This IR is identical to the following [`best_fitting`] layout but is implemented as custom IR for
-/// best performance.
+/// This IR is almost identical to the following [`best_fitting`] layout but is implemented as custom IR for
+/// best performance. It differs in that the open parentheses is ignored when testing if the content fits because
+/// the goal is to only parenthesize the content if parenthesizing makes the content fit.
 ///
 /// ```rust
 /// # use ruff_formatter::prelude::*;

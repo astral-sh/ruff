@@ -290,7 +290,9 @@ def f(*args, **kwargs):
     pass
 
 
-this_is_a_very_long_argument_asökdhflakjslaslhfdlaffahflahsöfdhasägporejfäalkdsjäfalisjäfdlkasjd = 1
+this_is_a_very_long_argument_asökdhflakjslaslhfdlaffahflahsöfdhasägporejfäalkdsjäfalisjäfdlkasjd = (
+    1
+)
 session = MagicMock()
 models = MagicMock()
 

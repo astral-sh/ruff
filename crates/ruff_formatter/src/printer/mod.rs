@@ -203,7 +203,9 @@ impl<'a> Printer<'a> {
                         args.with_measure_mode(MeasureMode::AllLines),
                     );
 
-                    queue.extend_back(&[OPEN_PAREN, INDENT, HARD_LINE_BREAK]);
+                    // Don't measure the opening parentheses. Only concerned whether parenthesizing
+                    // makes the content fit.
+                    queue.extend_back(&[INDENT, HARD_LINE_BREAK]);
                     let fits_expanded = self.fits(queue, stack)?;
                     queue.pop_slice();
                     stack.pop(TagKind::BestFitParenthesize)?;
@@ -1299,10 +1301,11 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                     self.state.line_width = 0;
                     self.state.pending_indent = unindented.indention();
 
-                    return Ok(self.fits_text(Text::Token(")"), unindented));
+                    // Don't measure the `)` similar to the open parentheses but increment the line width and indent level.
+                    self.fits_text(Text::Token(")"), unindented);
+                } else {
+                    self.stack.pop(TagKind::BestFitParenthesize)?;
                 }
-
-                self.stack.pop(TagKind::BestFitParenthesize)?;
             }
 
             FormatElement::Tag(StartConditionalGroup(group)) => {
