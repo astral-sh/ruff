@@ -344,3 +344,487 @@ def doctest_invalid_skipped_with_triple_double_in_single_quote_string():
     >>> x        =      '\"\"\"'
     """
     pass
+
+
+###############################################################################
+# reStructuredText CODE EXAMPLES
+#
+# This section shows examples of docstrings that contain code snippets in
+# reStructuredText formatted code blocks.
+#
+# See: https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#literal-blocks
+# See: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+# See: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
+# See: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#toc-entry-30
+# See: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#toc-entry-38
+###############################################################################
+
+
+def rst_literal_simple():
+    """
+    Do cool stuff::
+
+        cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+def rst_literal_simple_continued():
+    """
+    Do cool stuff::
+
+        def cool_stuff( x ):
+            print( f"hi {x}" );
+
+    Done.
+    """
+    pass
+
+
+# Tests that we can end the literal block on the second
+# to last line of the docstring.
+def rst_literal_second_to_last():
+    """
+    Do cool stuff::
+
+        cool_stuff( 1 )
+    """
+    pass
+
+
+# Tests that we can end the literal block on the actual
+# last line of the docstring.
+def rst_literal_actually_last():
+    """
+    Do cool stuff::
+
+        cool_stuff( 1 )"""
+    pass
+
+
+def rst_literal_with_blank_lines():
+    """
+    Do cool stuff::
+
+        def cool_stuff( x ):
+            print( f"hi {x}" );
+
+        def other_stuff( y ):
+            print(    y     )
+
+    Done.
+    """
+    pass
+
+
+# Extra blanks should be preserved.
+def rst_literal_extra_blanks():
+    """
+    Do cool stuff::
+
+
+
+        cool_stuff( 1 )
+
+
+
+    Done.
+    """
+    pass
+
+
+# If a literal block is never properly ended (via a non-empty unindented line),
+# then the end of the block should be the last non-empty line. And subsequent
+# empty lines should be preserved as-is.
+def rst_literal_extra_blanks_at_end():
+    """
+    Do cool stuff::
+
+
+        cool_stuff( 1 )
+
+
+
+    """
+    pass
+
+
+# A literal block can contain many empty lines and it should not end the block
+# if it continues.
+def rst_literal_extra_blanks_in_snippet():
+    """
+    Do cool stuff::
+
+        cool_stuff( 1 )
+
+
+        cool_stuff( 2 )
+
+    Done.
+    """
+    pass
+
+
+# This tests that a unindented line appearing after an indented line (but where
+# the indent is still beyond the minimum) gets formatted properly.
+def rst_literal_subsequent_line_not_indented():
+    """
+    Do cool stuff::
+
+     if True:
+        cool_stuff( '''
+     hiya''' )
+
+    Done.
+    """
+    pass
+
+
+# This checks that if the first line in a code snippet has been indented with
+# tabs, then so long as its "indentation length" is considered bigger than the
+# line with `::`, it is reformatted as code.
+#
+# (If your tabwidth is set to 4, then it looks like the code snippet
+# isn't indented at all, which is perhaps counter-intuitive. Indeed, reST
+# itself also seems to recognize this as a code block, although it appears
+# under-specified.)
+def rst_literal_first_line_indent_uses_tabs_4spaces():
+    """
+    Do cool stuff::
+
+	cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+# Like the test above, but with multiple lines.
+def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
+    """
+    Do cool stuff::
+
+	cool_stuff( 1 )
+	cool_stuff( 2 )
+
+    Done.
+    """
+    pass
+
+
+# Another test with tabs, except in this case, if your tabwidth is less than
+# 8, than the code snippet actually looks like its indent is *less* than the
+# opening line with a `::`. One might presume this means that the code snippet
+# is not treated as a literal block and thus not reformatted, but since we
+# assume all tabs have tabwidth=8 when computing indentation length, the code
+# snippet is actually seen as being more indented than the opening `::` line.
+# As with the above example, reST seems to behave the same way here.
+def rst_literal_first_line_indent_uses_tabs_8spaces():
+        """
+        Do cool stuff::
+
+	 cool_stuff( 1 )
+
+        Done.
+        """
+        pass
+
+
+# Like the test above, but with multiple lines.
+def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
+        """
+        Do cool stuff::
+
+	 cool_stuff( 1 )
+	 cool_stuff( 2 )
+
+        Done.
+        """
+        pass
+
+
+# Tests that if two lines in a literal block are indented to the same level
+# but by different means (tabs versus spaces), then we correctly recognize the
+# block and format it.
+def rst_literal_first_line_tab_second_line_spaces():
+    """
+    Do cool stuff::
+
+	cool_stuff( 1 )
+        cool_stuff( 2 )
+
+    Done.
+    """
+    pass
+
+
+# Tests that when two lines in a code snippet have weird and inconsistent
+# indentation, the code still gets formatted so long as the indent is greater
+# than the indent of the `::` line.
+#
+# In this case, the minimum indent is 5 spaces (from the second line) where as
+# the first line has an indent of 8 spaces via a tab (by assuming tabwidth=8).
+# The minimum indent is stripped from each code line. Since tabs aren't
+# divisible, the entire tab is stripped, which means the first and second lines
+# wind up with the same level of indentation.
+#
+# An alternative behavior here would be that the tab is replaced with 3 spaces
+# instead of being stripped entirely. The code snippet itself would then have
+# inconsistent indentation to the point of being invalid Python, and thus code
+# formatting would be skipped.
+#
+# I decided on the former behavior because it seems a bit easier to implement,
+# but we might want to switch to the alternative if cases like this show up in
+# the real world. ---AG
+def rst_literal_odd_indentation():
+    """
+    Do cool stuff::
+
+	cool_stuff( 1 )
+     cool_stuff( 2 )
+
+    Done.
+    """
+    pass
+
+
+# Tests that having a line with a lone `::` works as an introduction of a
+# literal block.
+def rst_literal_lone_colon():
+    """
+    Do cool stuff.
+
+    ::
+
+        cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+def rst_directive_simple():
+    """
+    .. code-block:: python
+
+        cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+def rst_directive_case_insensitive():
+    """
+    .. cOdE-bLoCk:: python
+
+        cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+def rst_directive_sourcecode():
+    """
+    .. sourcecode:: python
+
+        cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+def rst_directive_options():
+    """
+    .. code-block:: python
+        :linenos:
+        :emphasize-lines: 2,3
+        :name: blah blah
+
+        cool_stuff( 1 )
+        cool_stuff( 2 )
+        cool_stuff( 3 )
+        cool_stuff( 4 )
+
+    Done.
+    """
+    pass
+
+
+# In this case, since `pycon` isn't recognized as a Python code snippet, the
+# docstring reformatter ignores it. But it then picks up the doctest and
+# reformats it.
+def rst_directive_doctest():
+    """
+    .. code-block:: pycon
+
+        >>> cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+# This checks that if the first non-empty line after the start of a literal
+# block is not indented more than the line containing the `::`, then it is not
+# treated as a code snippet.
+def rst_literal_skipped_first_line_not_indented():
+    """
+    Do cool stuff::
+
+    cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+# Like the test above, but inserts an indented line after the un-indented one.
+# This should not cause the literal block to be resumed.
+def rst_literal_skipped_first_line_not_indented_then_indented():
+    """
+    Do cool stuff::
+
+    cool_stuff( 1 )
+      cool_stuff( 2 )
+
+    Done.
+    """
+    pass
+
+
+# This also checks that a code snippet is not reformatted when the indentation
+# of the first line is not more than the line with `::`, but this uses tabs to
+# make it a little more confounding. It relies on the fact that indentation
+# length is computed by assuming a tabwidth equal to 8. reST also rejects this
+# and doesn't treat it as a literal block.
+def rst_literal_skipped_first_line_not_indented_tab():
+        """
+        Do cool stuff::
+
+	cool_stuff( 1 )
+
+        Done.
+        """
+        pass
+
+
+# Like the previous test, but adds a second line.
+def rst_literal_skipped_first_line_not_indented_tab_multiple():
+        """
+        Do cool stuff::
+
+	cool_stuff( 1 )
+	cool_stuff( 2 )
+
+        Done.
+        """
+        pass
+
+
+# Tests that a code block with a second line that is not properly indented gets
+# skipped. A valid code block needs to have an empty line separating these.
+#
+# One trick here is that we need to make sure the Python code in the snippet is
+# valid, otherwise it would be skipped because of invalid Python.
+def rst_literal_skipped_subsequent_line_not_indented():
+    """
+    Do cool stuff::
+
+     if True:
+        cool_stuff( '''
+    hiya''' )
+
+    Done.
+    """
+    pass
+
+
+# In this test, we write what looks like a code-block, but it should be treated
+# as invalid due to the missing `language` argument.
+#
+# It does still look like it could be a literal block according to the literal
+# rules, but we currently consider the `.. ` prefix to indicate that it is not
+# a literal block.
+def rst_literal_skipped_not_directive():
+    """
+    .. code-block::
+
+        cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+# In this test, we start a line with `.. `, which makes it look like it might
+# be a directive. But instead continue it as if it was just some periods from
+# the previous line, and then try to end it by starting a literal block.
+#
+# But because of the `.. ` in the beginning, we wind up not treating this as a
+# code snippet. The reST render I was using to test things does actually treat
+# this as a code block, so we may be out of conformance here.
+def rst_literal_skipped_possible_false_negative():
+    """
+    This is a test.
+    .. This is a test::
+
+        cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+# This tests that a doctest inside of a reST literal block doesn't get
+# reformatted. It's plausible this isn't the right behavior, but it also seems
+# like it might be the right behavior since it is a literal block. (The doctest
+# makes the Python code invalid.)
+def rst_literal_skipped_doctest():
+    """
+    Do cool stuff::
+
+        >>> cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+def rst_directive_skipped_not_indented():
+    """
+    .. code-block:: python
+
+    cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+def rst_directive_skipped_wrong_language():
+    """
+    .. code-block:: rust
+
+        cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+# This gets skipped for the same reason that the doctest in a literal block
+# gets skipped.
+def rst_directive_skipped_doctest():
+    """
+    .. code-block:: python
+
+        >>> cool_stuff( 1 )
+
+    Done.
+    """
+    pass
