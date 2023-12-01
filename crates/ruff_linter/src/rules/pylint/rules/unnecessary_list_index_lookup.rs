@@ -266,7 +266,7 @@ fn enumerate_items(
         return None;
     };
 
-    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit
+    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit.
     if index_name == "_" || value_name == "_" {
         return None;
     }

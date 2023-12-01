@@ -53,19 +53,19 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &St
         return;
     };
 
-    let mut visitor = SubscriptVisitor::new(dict_name, index_name);
+    let ranges = {
+        let mut visitor = SubscriptVisitor::new(dict_name, index_name);
+        visitor.visit_body(&stmt_for.body);
+        visitor.visit_body(&stmt_for.orelse);
+        visitor.diagnostic_ranges
+    };
 
-    visitor.visit_body(&stmt_for.body);
-    visitor.visit_body(&stmt_for.orelse);
-
-    for range in visitor.diagnostic_ranges {
+    for range in ranges {
         let mut diagnostic = Diagnostic::new(UnnecessaryDictIndexLookup, range);
-
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             value_name.to_string(),
             range,
         )));
-
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -95,21 +95,21 @@ pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker,
             continue;
         };
 
-        let mut visitor = SubscriptVisitor::new(dict_name, index_name);
+        let ranges = {
+            let mut visitor = SubscriptVisitor::new(dict_name, index_name);
+            visitor.visit_expr(elt.as_ref());
+            for expr in &comp.ifs {
+                visitor.visit_expr(expr);
+            }
+            visitor.diagnostic_ranges
+        };
 
-        visitor.visit_expr(elt.as_ref());
-        for expr in &comp.ifs {
-            visitor.visit_expr(expr);
-        }
-
-        for range in visitor.diagnostic_ranges {
+        for range in ranges {
             let mut diagnostic = Diagnostic::new(UnnecessaryDictIndexLookup, range);
-
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 value_name.to_string(),
                 range,
             )));
-
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -144,7 +144,7 @@ fn dict_items<'a>(
         return None;
     };
 
-    // Grab the variable names
+    // Grab the variable names.
     let Expr::Name(ast::ExprName { id: index_name, .. }) = index else {
         return None;
     };
@@ -153,7 +153,7 @@ fn dict_items<'a>(
         return None;
     };
 
-    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit
+    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit.
     if index_name == "_" || value_name == "_" {
         return None;
     }
