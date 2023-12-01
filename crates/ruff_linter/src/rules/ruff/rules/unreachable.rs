@@ -2,8 +2,8 @@ use std::{fmt, iter, usize};
 
 use log::error;
 use ruff_python_ast::{
-    Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs, Stmt, StmtFor,
-    StmtMatch, StmtReturn, StmtTry, StmtWhile, StmtWith,
+    Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs, PatternMatchOr, Stmt,
+    StmtFor, StmtMatch, StmtReturn, StmtTry, StmtWhile, StmtWith,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -416,13 +416,6 @@ fn match_case<'stmt>(
         }
         last_statement_index
     };
-    // TODO: handle named arguments, e.g.
-    // ```python
-    // match $subject:
-    //   case $binding:
-    //     print($binding)
-    // ```
-    // These should also return `NextBlock::Always`.
     let next = if is_wildcard(case) {
         // Wildcard case is always taken.
         NextBlock::Always(next_block_index)
@@ -436,10 +429,25 @@ fn match_case<'stmt>(
     BasicBlock { stmts, next }
 }
 
-/// Returns true if `pattern` is a wildcard (`_`) pattern.
+/// Returns true if the [`MatchCase`] is a wildcard pattern.
 fn is_wildcard(pattern: &MatchCase) -> bool {
-    pattern.guard.is_none()
-        && matches!(&pattern.pattern, Pattern::MatchAs(PatternMatchAs { pattern, name, .. }) if pattern.is_none() && name.is_none())
+    /// Returns true if the [`Pattern`] is a wildcard pattern.
+    fn is_wildcard_pattern(pattern: &Pattern) -> bool {
+        match pattern {
+            Pattern::MatchValue(_)
+            | Pattern::MatchSingleton(_)
+            | Pattern::MatchSequence(_)
+            | Pattern::MatchMapping(_)
+            | Pattern::MatchClass(_)
+            | Pattern::MatchStar(_) => false,
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => pattern.is_none(),
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().all(is_wildcard_pattern)
+            }
+        }
+    }
+
+    pattern.guard.is_none() && is_wildcard_pattern(&pattern.pattern)
 }
 
 #[derive(Debug, Default)]
