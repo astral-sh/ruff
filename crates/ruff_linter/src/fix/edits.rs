@@ -1,10 +1,11 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
 use anyhow::{Context, Result};
+use itertools::{Either, Itertools};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
+use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::{
@@ -135,6 +136,69 @@ pub(crate) fn remove_argument<T: Ranged>(
             Parentheses::Remove => Edit::range_deletion(arguments.range()),
             Parentheses::Preserve => Edit::range_replacement("()".to_string(), arguments.range()),
         })
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum ArgumentType {
+    Keyword,
+}
+
+/// Generic function to add arguments or keyword arguments to function
+/// calls and class definitions. (For classes `args` should be considered
+/// `bases`)
+pub(crate) fn add_argument(
+    argument: &str,
+    arguments: &Arguments,
+    arg_type: ArgumentType,
+    source: &str,
+) -> Result<Edit> {
+    // Partition into arguments before and after the argument to remove.
+    let (positional, keyword): (Vec<_>, Vec<_>) =
+        arguments
+            .arguments_source_order()
+            .partition_map(|arg| match arg {
+                ArgOrKeyword::Arg(_) => Either::Left(arg),
+                ArgOrKeyword::Keyword(_) => Either::Right(arg),
+            });
+
+    if positional.is_empty() && keyword.is_empty() {
+        // Case 1: no arguments. Add argument to call without comma
+        // TODO: Check no parentheses case
+        Ok(Edit::insertion(
+            argument.to_string(),
+            arguments.start() + TextSize::from(1),
+        ))
+    } else {
+        match arg_type {
+            ArgumentType::Keyword => {
+                // Case 3: Keyword arg passed. Can be added at the end of call
+                // Look ahead back from last argument for a trailing comma
+                let Some(last_arg) = arguments.args.last() else {
+                    panic!("No last argument found")
+                };
+                let mut tokenizer = SimpleTokenizer::starts_at(last_arg.range().end(), source);
+
+                // Find the next non-whitespace token.
+                let next = tokenizer
+                    .find(|token| {
+                        token.kind != SimpleTokenKind::Whitespace
+                            && token.kind != SimpleTokenKind::Newline
+                    })
+                    .context("Unable to find next token")?;
+
+                match next.kind {
+                    SimpleTokenKind::Comma => Ok(Edit::insertion(
+                        argument.to_string(),
+                        arguments.end() - TextSize::from(1),
+                    )),
+                    _ => Ok(Edit::insertion(
+                        format!(", {argument}"),
+                        arguments.end() - TextSize::from(1),
+                    )),
+                }
+            }
+        }
     }
 }
 

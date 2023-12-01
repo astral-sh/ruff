@@ -42,3 +42,5 @@ tempfile.SpooledTemporaryFile(0, "w", encoding="utf-8")
 tempfile.SpooledTemporaryFile(0, "w", -1, "utf-8")
 tempfile.SpooledTemporaryFile(0, "wb")
 tempfile.SpooledTemporaryFile(0, )
+
+open("test.txt",)

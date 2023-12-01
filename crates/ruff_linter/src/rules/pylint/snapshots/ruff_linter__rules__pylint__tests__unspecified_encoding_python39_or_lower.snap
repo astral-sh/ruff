@@ -181,4 +181,25 @@ unspecified_encoding.py:14:1: PLW1514 [*] `tempfile.SpooledTemporaryFile` in tex
 16 17 | # Non-errors.
 17 18 | open("test.txt", encoding="utf-8")
 
+unspecified_encoding.py:46:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+   |
+44 | tempfile.SpooledTemporaryFile(0, )
+45 | 
+46 | open("test.txt",)
+   | ^^^^ PLW1514
+   |
+   = help: Add explicit `encoding` argument
+
+ℹ Unsafe fix
+   1  |+import locale
+1  2  | import io
+2  3  | import sys
+3  4  | import tempfile
+--------------------------------------------------------------------------------
+43 44 | tempfile.SpooledTemporaryFile(0, "wb")
+44 45 | tempfile.SpooledTemporaryFile(0, )
+45 46 | 
+46    |-open("test.txt",)
+   47 |+open("test.txt",encoding=locale.getpreferredencoding(False))
+
 
