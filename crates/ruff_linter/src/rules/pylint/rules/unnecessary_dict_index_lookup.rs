@@ -10,12 +10,12 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for index-based dict accesses during iterations through
-/// the `dict.items()`.
+/// Checks for key-based dict accesses during `.items()` iterations.
 ///
 /// ## Why is this bad?
-/// It is more succinct to use the variable for the value at the current
-/// index which is already in scope from the iterator.
+/// When iterating over a dict via `.items()`, the current value is already
+/// available alongside its key. Using the key to look up the value is
+/// unnecessary.
 ///
 /// ## Example
 /// ```python
@@ -38,7 +38,7 @@ pub struct UnnecessaryDictIndexLookup;
 impl AlwaysFixableViolation for UnnecessaryDictIndexLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary lookup of dict item by index")
+        format!("Unnecessary lookup of dictionary value by key")
     }
 
     fn fix_title(&self) -> String {
@@ -153,7 +153,8 @@ fn dict_items<'a>(
         return None;
     };
 
-    // If either of the variable names are intentionally ignored by naming them `_`, then don't emit.
+    // If either of the variable names are intentionally ignored by naming them `_`, then don't
+    // emit.
     if index_name == "_" || value_name == "_" {
         return None;
     }
@@ -181,24 +182,22 @@ impl<'a> SubscriptVisitor<'a> {
 }
 
 impl SubscriptVisitor<'_> {
-    fn check_target(&self, expr: &Expr) -> bool {
-        match expr {
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
-                    return false;
-                };
-                if id == self.dict_name {
-                    let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
-                        return false;
-                    };
-                    if id == self.index_name {
-                        return true;
-                    }
-                }
-                false
+    fn is_assignment(&self, expr: &Expr) -> bool {
+        let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
+            return false;
+        };
+        let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+            return false;
+        };
+        if id == self.dict_name {
+            let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
+                return false;
+            };
+            if id == self.index_name {
+                return true;
             }
-            _ => false,
         }
+        false
     }
 }
 
@@ -209,17 +208,17 @@ impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
         }
         match stmt {
             Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                self.modified = targets.iter().any(|target| self.check_target(target));
+                self.modified = targets.iter().any(|target| self.is_assignment(target));
                 self.visit_expr(value);
             }
             Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
                 if let Some(value) = value {
-                    self.modified = self.check_target(target);
+                    self.modified = self.is_assignment(target);
                     self.visit_expr(value);
                 }
             }
             Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                self.modified = self.check_target(target);
+                self.modified = self.is_assignment(target);
                 self.visit_expr(value);
             }
             _ => visitor::walk_stmt(self, stmt),

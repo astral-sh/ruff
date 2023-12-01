@@ -1,7 +1,7 @@
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
-use ruff_python_ast::{self as ast};
-use ruff_python_semantic::{Binding, BindingId, BindingKind, ScopeKind, SemanticModel};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::{Binding, BindingId, BindingKind, SemanticModel};
 use rustc_hash::FxHashSet;
 
 pub(crate) fn is_valid_runtime_import(binding: &Binding, semantic: &SemanticModel) -> bool {
@@ -18,25 +18,26 @@ pub(crate) fn is_valid_runtime_import(binding: &Binding, semantic: &SemanticMode
     }
 }
 
-pub(crate) fn runtime_evaluated(
+pub(crate) fn runtime_evaluated_class(
+    class_def: &ast::StmtClassDef,
     base_classes: &[String],
     decorators: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    if !base_classes.is_empty() {
-        if runtime_evaluated_base_class(base_classes, semantic) {
-            return true;
-        }
+    if runtime_evaluated_base_class(class_def, base_classes, semantic) {
+        return true;
     }
-    if !decorators.is_empty() {
-        if runtime_evaluated_decorators(decorators, semantic) {
-            return true;
-        }
+    if runtime_evaluated_decorators(class_def, decorators, semantic) {
+        return true;
     }
     false
 }
 
-fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticModel) -> bool {
+fn runtime_evaluated_base_class(
+    class_def: &ast::StmtClassDef,
+    base_classes: &[String],
+    semantic: &SemanticModel,
+) -> bool {
     fn inner(
         class_def: &ast::StmtClassDef,
         base_classes: &[String],
@@ -78,19 +79,21 @@ fn runtime_evaluated_base_class(base_classes: &[String], semantic: &SemanticMode
         })
     }
 
-    semantic
-        .current_scope()
-        .kind
-        .as_class()
-        .is_some_and(|class_def| {
-            inner(class_def, base_classes, semantic, &mut FxHashSet::default())
-        })
+    if base_classes.is_empty() {
+        return false;
+    }
+
+    inner(class_def, base_classes, semantic, &mut FxHashSet::default())
 }
 
-fn runtime_evaluated_decorators(decorators: &[String], semantic: &SemanticModel) -> bool {
-    let ScopeKind::Class(class_def) = &semantic.current_scope().kind else {
+fn runtime_evaluated_decorators(
+    class_def: &ast::StmtClassDef,
+    decorators: &[String],
+    semantic: &SemanticModel,
+) -> bool {
+    if decorators.is_empty() {
         return false;
-    };
+    }
 
     class_def.decorator_list.iter().any(|decorator| {
         semantic
@@ -100,5 +103,74 @@ fn runtime_evaluated_decorators(decorators: &[String], semantic: &SemanticModel)
                     .iter()
                     .any(|base_class| from_qualified_name(base_class) == call_path)
             })
+    })
+}
+
+/// Returns `true` if a function is registered as a `singledispatch` interface.
+///
+/// For example, `fun` below is a `singledispatch` interface:
+/// ```python
+/// from functools import singledispatch
+///
+/// @singledispatch
+/// def fun(arg, verbose=False):
+///     ...
+/// ```
+pub(crate) fn is_singledispatch_interface(
+    function_def: &ast::StmtFunctionDef,
+    semantic: &SemanticModel,
+) -> bool {
+    function_def.decorator_list.iter().any(|decorator| {
+        semantic
+            .resolve_call_path(&decorator.expression)
+            .is_some_and(|call_path| {
+                matches!(call_path.as_slice(), ["functools", "singledispatch"])
+            })
+    })
+}
+
+/// Returns `true` if a function is registered as a `singledispatch` implementation.
+///
+/// For example, `_` below is a `singledispatch` implementation:
+/// For example:
+/// ```python
+/// from functools import singledispatch
+///
+/// @singledispatch
+/// def fun(arg, verbose=False):
+///     ...
+///
+/// @fun.register
+/// def _(arg: int, verbose=False):
+///     ...
+/// ```
+pub(crate) fn is_singledispatch_implementation(
+    function_def: &ast::StmtFunctionDef,
+    semantic: &SemanticModel,
+) -> bool {
+    function_def.decorator_list.iter().any(|decorator| {
+        let Expr::Attribute(attribute) = &decorator.expression else {
+            return false;
+        };
+
+        if attribute.attr.as_str() != "register" {
+            return false;
+        };
+
+        let Some(id) = semantic.lookup_attribute(attribute.value.as_ref()) else {
+            return false;
+        };
+
+        let binding = semantic.binding(id);
+        let Some(function_def) = binding
+            .kind
+            .as_function_definition()
+            .map(|id| &semantic.scopes[*id])
+            .and_then(|scope| scope.kind.as_function())
+        else {
+            return false;
+        };
+
+        is_singledispatch_interface(function_def, semantic)
     })
 }

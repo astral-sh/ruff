@@ -492,6 +492,13 @@ where
                 // are enabled.
                 let runtime_annotation = !self.semantic.future_annotations();
 
+                // The first parameter may be a single dispatch.
+                let mut singledispatch =
+                    flake8_type_checking::helpers::is_singledispatch_implementation(
+                        function_def,
+                        self.semantic(),
+                    );
+
                 self.semantic.push_scope(ScopeKind::Type);
 
                 if let Some(type_params) = type_params {
@@ -505,7 +512,7 @@ where
                     .chain(&parameters.kwonlyargs)
                 {
                     if let Some(expr) = &parameter_with_default.parameter.annotation {
-                        if runtime_annotation {
+                        if runtime_annotation || singledispatch {
                             self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
@@ -514,6 +521,7 @@ where
                     if let Some(expr) = &parameter_with_default.default {
                         self.visit_expr(expr);
                     }
+                    singledispatch = false;
                 }
                 if let Some(arg) = &parameters.vararg {
                     if let Some(expr) = &arg.annotation {
@@ -670,23 +678,24 @@ where
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 let runtime_annotation = if self.semantic.future_annotations() {
-                    if self.semantic.current_scope().kind.is_class() {
-                        let baseclasses = &self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_base_classes;
-                        let decorators = &self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_decorators;
-                        flake8_type_checking::helpers::runtime_evaluated(
-                            baseclasses,
-                            decorators,
-                            &self.semantic,
-                        )
-                    } else {
-                        false
-                    }
+                    self.semantic
+                        .current_scope()
+                        .kind
+                        .as_class()
+                        .is_some_and(|class_def| {
+                            flake8_type_checking::helpers::runtime_evaluated_class(
+                                class_def,
+                                &self
+                                    .settings
+                                    .flake8_type_checking
+                                    .runtime_evaluated_base_classes,
+                                &self
+                                    .settings
+                                    .flake8_type_checking
+                                    .runtime_evaluated_decorators,
+                                &self.semantic,
+                            )
+                        })
                 } else {
                     matches!(
                         self.semantic.current_scope().kind,

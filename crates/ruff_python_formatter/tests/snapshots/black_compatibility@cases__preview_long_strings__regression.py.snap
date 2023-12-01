@@ -573,7 +573,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 ```diff
 --- Black
 +++ Ruff
-@@ -25,41 +25,42 @@
+@@ -25,20 +25,17 @@
      "Jaguar",
  )
  
@@ -599,27 +599,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
          )
  
  
- class A:
-     def foo():
--        XXXXXXXXXXXX.append((
--            "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
--                xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
--            ),
--            my_var,
--            my_other_var,
--        ))
-+        XXXXXXXXXXXX.append(
-+            (
-+                "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
-+                    xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
-+                ),
-+                my_var,
-+                my_other_var,
-+            )
-+        )
- 
- 
- class A:
+@@ -57,9 +54,11 @@
      class B:
          def foo():
              bar(
@@ -634,7 +614,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
                  ),
                  varX,
                  varY,
-@@ -70,9 +71,10 @@
+@@ -70,9 +69,10 @@
  def foo(xxxx):
      for xxx_xxxx, _xxx_xxx, _xxx_xxxxx, xxx_xxxx in xxxx:
          for xxx in xxx_xxxx:
@@ -648,7 +628,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
              )
  
  
-@@ -80,10 +82,11 @@
+@@ -80,10 +80,11 @@
      def disappearing_comment():
          return (
              (  # xx -x xxxxxxx xx xxx xxxxxxx.
@@ -662,7 +642,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
                          "--xxxxxxx --xxxxxx=x --xxxxxx-xxxxx=xxxxxx"
                          " --xxxxxx-xxxx=xxxxxxxxxxx.xxx"
                      )
-@@ -113,18 +116,25 @@
+@@ -113,18 +114,25 @@
  
  
  func_call_where_string_arg_has_method_call_and_bad_parens(
@@ -694,7 +674,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  
-@@ -132,52 +142,60 @@
+@@ -132,52 +140,60 @@
      def append(self):
          if True:
              xxxx.xxxxxxx.xxxxx(
@@ -788,7 +768,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  }
  
  
-@@ -185,10 +203,10 @@
+@@ -185,10 +201,10 @@
      def foo(self):
          if True:
              xxxxx_xxxxxxxxxxxx(
@@ -803,7 +783,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
              )
  
  
-@@ -232,39 +250,24 @@
+@@ -232,39 +248,24 @@
  
  some_dictionary = {
      "xxxxx006": [
@@ -852,7 +832,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  some_commented_string = (  # This comment stays at the top.
      "This string is long but not so long that it needs hahahah toooooo be so greatttt"
-@@ -279,36 +282,25 @@
+@@ -279,38 +280,27 @@
  )
  
  lpar_and_rpar_have_comments = func_call(  # LPAR Comment
@@ -892,12 +872,14 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -    f" certainly, absolutely {does}."
 +    f"We have to remember to escape {braces}." " Like {these}." f" But not {this}."
  )
--
+ 
 -fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
  
- 
+-
  class A:
-@@ -364,10 +356,7 @@
+     class B:
+         def foo():
+@@ -364,10 +354,7 @@
          def foo():
              if not hasattr(module, name):
                  raise ValueError(
@@ -909,7 +891,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
                      % (name, module_name, get_docs_version())
                  )
  
-@@ -382,35 +371,33 @@
+@@ -382,23 +369,19 @@
  
  class Step(StepBase):
      def who(self):
@@ -931,29 +913,16 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
          )
  
  
--xxxxxxx_xxxxxx_xxxxxxx = xxx([
--    xxxxxxxxxxxx(
--        xxxxxx_xxxxxxx=(
+ xxxxxxx_xxxxxx_xxxxxxx = xxx([
+     xxxxxxxxxxxx(
+         xxxxxx_xxxxxxx=(
 -            '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx ='
 -            ' "xxxxxxxxxxxx")) && '
--            # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
--            "(x.bbbbbbbbbbbb.xxx != "
--            '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
-+xxxxxxx_xxxxxx_xxxxxxx = xxx(
-+    [
-+        xxxxxxxxxxxx(
-+            xxxxxx_xxxxxxx=(
-+                '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx = "xxxxxxxxxxxx")) && '
-+                # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
-+                "(x.bbbbbbbbbbbb.xxx != "
-+                '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
-+            )
-         )
--    )
--])
-+    ]
-+)
- 
++            '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx = "xxxxxxxxxxxx")) && '
+             # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
+             "(x.bbbbbbbbbbbb.xxx != "
+             '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
+@@ -409,8 +392,8 @@
  if __name__ == "__main__":
      for i in range(4, 8):
          cmd = (
@@ -964,7 +933,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
          )
  
  
-@@ -432,14 +419,12 @@
+@@ -432,14 +415,12 @@
          assert xxxxxxx_xxxx in [
              x.xxxxx.xxxxxx.xxxxx.xxxxxx,
              x.xxxxx.xxxxxx.xxxxx.xxxx,
@@ -983,7 +952,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  RE_ONE_BACKSLASH = {
      "asdf_hjkl_jkl": re.compile(
-@@ -449,8 +434,7 @@
+@@ -449,8 +430,7 @@
  
  RE_TWO_BACKSLASHES = {
      "asdf_hjkl_jkl": re.compile(
@@ -993,7 +962,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      ),
  }
  
-@@ -462,13 +446,9 @@
+@@ -462,13 +442,9 @@
  
  # We do NOT split on f-string expressions.
  print(
@@ -1009,7 +978,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  # The parens should NOT be removed in this case.
  (
-@@ -478,8 +458,8 @@
+@@ -478,8 +454,8 @@
  
  # The parens should NOT be removed in this case.
  (
@@ -1020,7 +989,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # The parens should NOT be removed in this case.
-@@ -518,88 +498,78 @@
+@@ -518,88 +494,78 @@
      f"<<{author.display_name}>>\n"
  )
  
@@ -1144,7 +1113,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
      "6. Click on Create Credential at the top."
      '7. At the top click the link for "API key".'
      "8. No application restrictions are needed. Click Create at the bottom."
-@@ -613,55 +583,40 @@
+@@ -613,55 +579,40 @@
      f"<<{author.display_name}>>\n"
  )
  
@@ -1217,7 +1186,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  )
  
  # Regression test for https://github.com/psf/black/issues/3455.
-@@ -672,9 +627,11 @@
+@@ -672,9 +623,11 @@
  }
  
  # Regression test for https://github.com/psf/black/issues/3506.
@@ -1281,15 +1250,13 @@ class A:
 
 class A:
     def foo():
-        XXXXXXXXXXXX.append(
-            (
-                "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
-                    xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
-                ),
-                my_var,
-                my_other_var,
-            )
-        )
+        XXXXXXXXXXXX.append((
+            "xxx_xxxxxxxxxx(xxxxx={}, xxxx={}, xxxxx, xxxx_xxxx_xxxxxxxxxx={})".format(
+                xxxxx, xxxx, xxxx_xxxx_xxxxxxxxxx
+            ),
+            my_var,
+            my_other_var,
+        ))
 
 
 class A:
@@ -1620,18 +1587,16 @@ class Step(StepBase):
         )
 
 
-xxxxxxx_xxxxxx_xxxxxxx = xxx(
-    [
-        xxxxxxxxxxxx(
-            xxxxxx_xxxxxxx=(
-                '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx = "xxxxxxxxxxxx")) && '
-                # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
-                "(x.bbbbbbbbbbbb.xxx != "
-                '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
-            )
+xxxxxxx_xxxxxx_xxxxxxx = xxx([
+    xxxxxxxxxxxx(
+        xxxxxx_xxxxxxx=(
+            '((x.aaaaaaaaa = "xxxxxx.xxxxxxxxxxxxxxxxxxxxx") || (x.xxxxxxxxx = "xxxxxxxxxxxx")) && '
+            # xxxxx xxxxxxxxxxxx xxxx xxx (xxxxxxxxxxxxxxxx) xx x xxxxxxxxx xx xxxxxx.
+            "(x.bbbbbbbbbbbb.xxx != "
+            '"xxx:xxx:xxx::cccccccccccc:xxxxxxx-xxxx/xxxxxxxxxxx/xxxxxxxxxxxxxxxxx") && '
         )
-    ]
-)
+    )
+])
 
 if __name__ == "__main__":
     for i in range(4, 8):

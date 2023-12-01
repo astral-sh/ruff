@@ -111,7 +111,7 @@ def foo(a,b) -> tuple[int, int, int,]:
  # Don't lose the comments
 -def double(a: int) -> int:  # Hello
 +def double(
-+    a: int
++    a: int,
 +) -> (  # Hello
 +    int
 +):
@@ -120,7 +120,7 @@ def foo(a,b) -> tuple[int, int, int,]:
  
 -def double(a: int) -> int:  # Hello
 +def double(
-+    a: int
++    a: int,
 +) -> (
 +    int  # Hello
 +):
@@ -168,7 +168,7 @@ def double(a: int) -> int:
 
 # Don't lose the comments
 def double(
-    a: int
+    a: int,
 ) -> (  # Hello
     int
 ):
@@ -176,7 +176,7 @@ def double(
 
 
 def double(
-    a: int
+    a: int,
 ) -> (
     int  # Hello
 ):
