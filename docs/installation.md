@@ -20,17 +20,18 @@ on Homebrew:
 brew install ruff
 ```
 
-For **pkgx** users, Ruff is also available as [`ruff`](https://pkgx.dev/pkgs/github.com/charliermarsh/ruff/)
-
-```shell
-pkgx install ruff # or run directly using pkgx ruff
-```
-
 For **Conda** users, Ruff is also available as [`ruff`](https://anaconda.org/conda-forge/ruff) on
 `conda-forge`:
 
 ```shell
 conda install -c conda-forge ruff
+```
+
+For **pkgx** users, Ruff is also available as [`ruff`](https://pkgx.dev/pkgs/github.com/charliermarsh/ruff/)
+on the `pkgx` registry:
+
+```shell
+pkgx install ruff
 ```
 
 For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/extra/x86_64/ruff/)
