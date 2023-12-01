@@ -45,3 +45,19 @@ tempfile.SpooledTemporaryFile(0, )
 
 open("test.txt",)
 open()
+open(
+    "test.txt",  # comment
+)
+open(
+    "test.txt",
+    # comment
+)
+open(("test.txt"),)
+open()
+open(
+    ("test.txt"),  # comment
+)
+open(
+    ("test.txt"),
+    # comment
+)

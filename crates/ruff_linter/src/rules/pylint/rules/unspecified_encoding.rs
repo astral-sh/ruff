@@ -1,14 +1,15 @@
 use anyhow::Result;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::call_path::{format_call_path, CallPath};
-use ruff_python_ast::imports::{AnyImport, Import};
-use ruff_text_size::{Ranged, TextSize};
+use ruff_python_ast::Expr;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
-use crate::fix::edits::ArgumentType::Keyword;
+use crate::importer::ImportRequest;
 use crate::settings::types::PythonVersion;
 
 /// ## What it does
@@ -20,7 +21,9 @@ use crate::settings::types::PythonVersion;
 /// non-portable code, with differing behavior across platforms.
 ///
 /// Instead, consider using the `encoding` parameter to enforce a specific
-/// encoding.
+/// encoding. [PEP 597] recommends using `locale.getpreferredencoding(False)`
+/// as the default encoding on versions earlier than Python 3.10, and
+/// `encoding="locale"` on Python 3.10 and later.
 ///
 /// ## Example
 /// ```python
@@ -34,6 +37,8 @@ use crate::settings::types::PythonVersion;
 ///
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
+///
+/// [PEP 597]: https://peps.python.org/pep-0597/
 #[violation]
 pub struct UnspecifiedEncoding {
     function_name: String,
@@ -88,40 +93,52 @@ pub(crate) fn unspecified_encoding(checker: &mut Checker, call: &ast::ExprCall) 
     );
 
     if checker.settings.target_version >= PythonVersion::Py310 {
-        diagnostic.try_set_fix(|| {
-            add_argument(
-                "encoding=\"locale\"",
-                &call.arguments,
-                Keyword,
-                checker.locator().contents(),
-            )
-            .map(Fix::unsafe_edit)
-        });
+        diagnostic.set_fix(generate_keyword_fix(checker, call));
     } else {
-        diagnostic.try_set_fix(|| generate_fix(checker, call));
+        diagnostic.try_set_fix(|| generate_import_fix(checker, call));
     }
 
     checker.diagnostics.push(diagnostic);
 }
 
-/// Generate a [`Edit`] for Python39 and older.
-fn generate_fix(checker: &Checker, call: &ast::ExprCall) -> Result<Fix> {
-    Ok(Fix::unsafe_edits(
-        checker.importer().add_import(
-            &AnyImport::Import(Import::module("locale")),
-            TextSize::default(),
+/// Generate an [`Edit`] for Python 3.10 and later.
+fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
+    Fix::unsafe_edit(add_argument(
+        &format!(
+            "encoding={}",
+            checker
+                .generator()
+                .expr(&Expr::StringLiteral(ast::ExprStringLiteral {
+                    value: ast::StringLiteralValue::single(ast::StringLiteral {
+                        value: "locale".to_string(),
+                        unicode: false,
+                        range: TextRange::default(),
+                    }),
+                    range: TextRange::default(),
+                }))
         ),
-        [add_argument(
-            "encoding=locale.getpreferredencoding(False)",
-            &call.arguments,
-            Keyword,
-            checker.locator().contents(),
-        )?],
+        &call.arguments,
+        checker.locator().contents(),
     ))
 }
 
+/// Generate an [`Edit`] for Python 3.9 and earlier.
+fn generate_import_fix(checker: &Checker, call: &ast::ExprCall) -> Result<Fix> {
+    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+        &ImportRequest::import("locale", "getpreferredencoding"),
+        call.start(),
+        checker.semantic(),
+    )?;
+    let argument_edit = add_argument(
+        &format!("encoding={binding}(False)"),
+        &call.arguments,
+        checker.locator().contents(),
+    );
+    Ok(Fix::unsafe_edits(import_edit, [argument_edit]))
+}
+
 /// Returns `true` if the given expression is a string literal containing a `b` character.
-fn is_binary_mode(expr: &ast::Expr) -> Option<bool> {
+fn is_binary_mode(expr: &Expr) -> Option<bool> {
     Some(
         expr.as_string_literal_expr()?
             .value
@@ -133,12 +150,7 @@ fn is_binary_mode(expr: &ast::Expr) -> Option<bool> {
 /// Returns `true` if the given call lacks an explicit `encoding`.
 fn is_violation(call: &ast::ExprCall, call_path: &CallPath) -> bool {
     // If we have something like `*args`, which might contain the encoding argument, abort.
-    if call
-        .arguments
-        .args
-        .iter()
-        .any(ruff_python_ast::Expr::is_starred_expr)
-    {
+    if call.arguments.args.iter().any(Expr::is_starred_expr) {
         return false;
     }
     // If we have something like `**kwargs`, which might contain the encoding argument, abort.
