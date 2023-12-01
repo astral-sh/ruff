@@ -103,7 +103,7 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
         )?;
         let reference_edit =
             Edit::range_replacement(format!("{binding}.checkpoint"), call.func.range());
-        let arg_edit = Edit::range_deletion(call.arguments.range);
+        let arg_edit = Edit::range_deletion(arg.range());
         Ok(Fix::safe_edits(import_edit, [reference_edit, arg_edit]))
     });
     checker.diagnostics.push(diagnostic);
