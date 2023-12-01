@@ -102,10 +102,7 @@ impl std::fmt::Display for ModuleMember {
 /// a variant exists.
 pub fn to_pep585_generic(expr: &Expr, semantic: &SemanticModel) -> Option<ModuleMember> {
     semantic.resolve_call_path(expr).and_then(|call_path| {
-        let [module, member] = call_path.as_slice() else {
-            return None;
-        };
-        as_pep_585_generic(module, member).map(|(module, member)| {
+        as_pep_585_generic(call_path.as_slice()).map(|(module, member)| {
             if module.is_empty() {
                 ModuleMember::BuiltIn(member)
             } else {
