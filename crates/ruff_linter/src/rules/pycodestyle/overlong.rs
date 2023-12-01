@@ -53,16 +53,24 @@ impl Overlong {
         };
 
         let mut chunks = line.split_whitespace();
-        let (Some(_), Some(second_chunk)) = (chunks.next(), chunks.next()) else {
-            // Single word / no printable chars - no way to make the line shorter.
-            return None;
-        };
+        if let (Some(_), Some(second_chunk)) = (chunks.next(), chunks.next()) {
+            // Do not enforce the line length for lines that end with a URL, as long as the URL
+            // begins before the limit.
+            let last_chunk = chunks.last().unwrap_or(second_chunk);
+            if last_chunk.contains("://") {
+                if width.get() - last_chunk.width() <= limit.value() as usize {
+                    return None;
+                }
+            }
+        } else {
+            // This is a single word. If's a URL, ignore it.
+            if line.contains("://") {
+                return None;
+            }
 
-        // Do not enforce the line length for lines that end with a URL, as long as the URL
-        // begins before the limit.
-        let last_chunk = chunks.last().unwrap_or(second_chunk);
-        if last_chunk.contains("://") {
-            if width.get() - last_chunk.width() <= limit.value() as usize {
+            // This is a single word. If there are no split points, ignore it.
+            indexer.comment_ranges()
+            if !line.contains(['(', '[', ')', ']', '{', '}', ';']) {
                 return None;
             }
         }
