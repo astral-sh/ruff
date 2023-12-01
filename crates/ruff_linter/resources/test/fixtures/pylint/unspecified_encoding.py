@@ -53,11 +53,19 @@ open(
     # comment
 )
 open(("test.txt"),)
-open()
 open(
     ("test.txt"),  # comment
 )
 open(
     ("test.txt"),
+    # comment
+)
+
+open((("test.txt")),)
+open(
+    (("test.txt")),  # comment
+)
+open(
+    (("test.txt")),
     # comment
 )

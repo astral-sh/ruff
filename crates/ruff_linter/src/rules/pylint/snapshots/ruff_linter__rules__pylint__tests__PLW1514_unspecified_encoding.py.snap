@@ -235,8 +235,8 @@ unspecified_encoding.py:55:1: PLW1514 [*] `open` in text mode without explicit `
 54 | )
 55 | open(("test.txt"),)
    | ^^^^ PLW1514
-56 | open()
-57 | open(
+56 | open(
+57 |     ("test.txt"),  # comment
    |
    = help: Add explicit `encoding` argument
 
@@ -246,70 +246,111 @@ unspecified_encoding.py:55:1: PLW1514 [*] `open` in text mode without explicit `
 54 54 | )
 55    |-open(("test.txt"),)
    55 |+open(("test.txt"), encoding="locale",)
-56 56 | open()
-57 57 | open(
-58 58 |     ("test.txt"),  # comment
+56 56 | open(
+57 57 |     ("test.txt"),  # comment
+58 58 | )
 
 unspecified_encoding.py:56:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
 54 | )
 55 | open(("test.txt"),)
-56 | open()
+56 | open(
    | ^^^^ PLW1514
-57 | open(
-58 |     ("test.txt"),  # comment
+57 |     ("test.txt"),  # comment
+58 | )
    |
    = help: Add explicit `encoding` argument
 
 ℹ Unsafe fix
-53 53 |     # comment
 54 54 | )
 55 55 | open(("test.txt"),)
-56    |-open()
-   56 |+open(encoding="locale")
-57 57 | open(
-58 58 |     ("test.txt"),  # comment
-59 59 | )
+56 56 | open(
+57    |-    ("test.txt"),  # comment
+   57 |+    ("test.txt"), encoding="locale",  # comment
+58 58 | )
+59 59 | open(
+60 60 |     ("test.txt"),
 
-unspecified_encoding.py:57:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:59:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
-55 | open(("test.txt"),)
-56 | open()
-57 | open(
+57 |     ("test.txt"),  # comment
+58 | )
+59 | open(
    | ^^^^ PLW1514
-58 |     ("test.txt"),  # comment
-59 | )
+60 |     ("test.txt"),
+61 |     # comment
    |
    = help: Add explicit `encoding` argument
 
 ℹ Unsafe fix
-55 55 | open(("test.txt"),)
-56 56 | open()
-57 57 | open(
-58    |-    ("test.txt"),  # comment
-   58 |+    ("test.txt"), encoding="locale",  # comment
-59 59 | )
-60 60 | open(
-61 61 |     ("test.txt"),
+57 57 |     ("test.txt"),  # comment
+58 58 | )
+59 59 | open(
+60    |-    ("test.txt"),
+   60 |+    ("test.txt"), encoding="locale",
+61 61 |     # comment
+62 62 | )
+63 63 | 
 
-unspecified_encoding.py:60:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+unspecified_encoding.py:64:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
    |
-58 |     ("test.txt"),  # comment
-59 | )
-60 | open(
+62 | )
+63 | 
+64 | open((("test.txt")),)
    | ^^^^ PLW1514
-61 |     ("test.txt"),
-62 |     # comment
+65 | open(
+66 |     (("test.txt")),  # comment
    |
    = help: Add explicit `encoding` argument
 
 ℹ Unsafe fix
-58 58 |     ("test.txt"),  # comment
-59 59 | )
-60 60 | open(
-61    |-    ("test.txt"),
-   61 |+    ("test.txt"), encoding="locale",
-62 62 |     # comment
-63 63 | )
+61 61 |     # comment
+62 62 | )
+63 63 | 
+64    |-open((("test.txt")),)
+   64 |+open((("test.txt")), encoding="locale",)
+65 65 | open(
+66 66 |     (("test.txt")),  # comment
+67 67 | )
+
+unspecified_encoding.py:65:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+   |
+64 | open((("test.txt")),)
+65 | open(
+   | ^^^^ PLW1514
+66 |     (("test.txt")),  # comment
+67 | )
+   |
+   = help: Add explicit `encoding` argument
+
+ℹ Unsafe fix
+63 63 | 
+64 64 | open((("test.txt")),)
+65 65 | open(
+66    |-    (("test.txt")),  # comment
+   66 |+    (("test.txt")), encoding="locale",  # comment
+67 67 | )
+68 68 | open(
+69 69 |     (("test.txt")),
+
+unspecified_encoding.py:68:1: PLW1514 [*] `open` in text mode without explicit `encoding` argument
+   |
+66 |     (("test.txt")),  # comment
+67 | )
+68 | open(
+   | ^^^^ PLW1514
+69 |     (("test.txt")),
+70 |     # comment
+   |
+   = help: Add explicit `encoding` argument
+
+ℹ Unsafe fix
+66 66 |     (("test.txt")),  # comment
+67 67 | )
+68 68 | open(
+69    |-    (("test.txt")),
+   69 |+    (("test.txt")), encoding="locale",
+70 70 |     # comment
+71 71 | )
 
 

@@ -1,16 +1,16 @@
 //! Interface for generating fix edits from higher-level actions (e.g., "remove an argument").
 
-use std::ops::Sub;
-
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
+use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::{
-    has_leading_content, is_python_whitespace, PythonWhitespace, SimpleTokenKind, SimpleTokenizer,
+    has_leading_content, is_python_whitespace, CommentRanges, PythonWhitespace, SimpleTokenKind,
+    SimpleTokenizer,
 };
 use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -141,26 +141,25 @@ pub(crate) fn remove_argument<T: Ranged>(
 }
 
 /// Generic function to add arguments or keyword arguments to function calls.
-pub(crate) fn add_argument(argument: &str, arguments: &Arguments, source: &str) -> Edit {
+pub(crate) fn add_argument(
+    argument: &str,
+    arguments: &Arguments,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> Edit {
     if let Some(last) = arguments.arguments_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
-        let tokenizer = SimpleTokenizer::new(
+        let last = parenthesized_range(
+            match last {
+                ArgOrKeyword::Arg(arg) => arg.into(),
+                ArgOrKeyword::Keyword(keyword) => (&keyword.value).into(),
+            },
+            arguments.into(),
+            comment_ranges,
             source,
-            TextRange::new(last.end(), arguments.end().sub(TextSize::from(1))),
-        );
-
-        // Skip any parentheses.
-        if let Some(token) = tokenizer
-            .skip_while(|token| token.kind.is_trivia())
-            .next()
-            .filter(|token| token.kind == SimpleTokenKind::RParen)
-        {
-            // Ex) Insert after `func(x=(1))`.
-            Edit::insertion(format!(", {argument}"), token.end())
-        } else {
-            // Ex) Insert after `func(x=1)`.
-            Edit::insertion(format!(", {argument}"), last.end())
-        }
+        )
+        .unwrap_or(last.range());
+        Edit::insertion(format!(", {argument}"), last.end())
     } else {
         // Case 2: no arguments. Add argument, without any trailing comma.
         Edit::insertion(argument.to_string(), arguments.start() + TextSize::from(1))
