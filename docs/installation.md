@@ -20,6 +20,12 @@ on Homebrew:
 brew install ruff
 ```
 
+For **pkgx** users, Ruff is also available as [`ruff`](https://pkgx.dev/pkgs/github.com/charliermarsh/ruff/)
+
+```shell
+pkgx ruff
+```
+
 For **Conda** users, Ruff is also available as [`ruff`](https://anaconda.org/conda-forge/ruff) on
 `conda-forge`:
 
