@@ -9,7 +9,7 @@ unnecessary_dict_index_lookup.py:4:6: PLR1733 [*] Unnecessary lookup of dict ite
 5 |     {FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
 6 |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
   |
-  = help: Use existing item variable instead
+  = help: Use existing variable
 
 ℹ Safe fix
 1 1 | FRUITS = {"apple": 1, "orange": 10, "berry": 22}
@@ -29,7 +29,7 @@ unnecessary_dict_index_lookup.py:5:6: PLR1733 [*] Unnecessary lookup of dict ite
   |      ^^^^^^^^^^^^^^^^^^ PLR1733
 6 |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
   |
-  = help: Use existing item variable instead
+  = help: Use existing variable
 
 ℹ Safe fix
 2 2 | 
@@ -50,7 +50,7 @@ unnecessary_dict_index_lookup.py:6:18: PLR1733 [*] Unnecessary lookup of dict it
 7 | 
 8 |     for fruit_name, fruit_count in FRUITS.items():
   |
-  = help: Use existing item variable instead
+  = help: Use existing variable
 
 ℹ Safe fix
 3 3 | def fix_these():
@@ -70,7 +70,7 @@ unnecessary_dict_index_lookup.py:9:15: PLR1733 [*] Unnecessary lookup of dict it
 10 |         blah = FRUITS[fruit_name]  # PLR1733
 11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
    |
-   = help: Use existing item variable instead
+   = help: Use existing variable
 
 ℹ Safe fix
 6  6  |     {fruit_name: FRUITS[fruit_name] for fruit_name, fruit_count in FRUITS.items()}  # PLR1733
@@ -90,7 +90,7 @@ unnecessary_dict_index_lookup.py:10:16: PLR1733 [*] Unnecessary lookup of dict i
    |                ^^^^^^^^^^^^^^^^^^ PLR1733
 11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
    |
-   = help: Use existing item variable instead
+   = help: Use existing variable
 
 ℹ Safe fix
 7  7  | 
@@ -109,7 +109,7 @@ unnecessary_dict_index_lookup.py:11:16: PLR1733 [*] Unnecessary lookup of dict i
 11 |         assert FRUITS[fruit_name] == "pear"  # PLR1733
    |                ^^^^^^^^^^^^^^^^^^ PLR1733
    |
-   = help: Use existing item variable instead
+   = help: Use existing variable
 
 ℹ Safe fix
 8  8  |     for fruit_name, fruit_count in FRUITS.items():
