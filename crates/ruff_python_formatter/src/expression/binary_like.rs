@@ -3,7 +3,7 @@ use std::ops::{Deref, Index};
 
 use smallvec::SmallVec;
 
-use ruff_formatter::write;
+use ruff_formatter::{write, FormatContext};
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, UnaryOp,
 };
@@ -13,10 +13,10 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
 use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_soft_line_break,
-    in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized,
-    write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
-    Parentheses,
+    in_parentheses_only_group, in_parentheses_only_if_group_breaks,
+    in_parentheses_only_soft_line_break, in_parentheses_only_soft_line_break_or_space,
+    is_expression_parenthesized, write_in_parentheses_only_group_end_tag,
+    write_in_parentheses_only_group_start_tag, Parentheses,
 };
 use crate::expression::string::{AnyString, FormatString, StringLayout};
 use crate::expression::OperatorPrecedence;
@@ -718,7 +718,11 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                     )
                 {
                     hard_line_break().fmt(f)?;
-                } else if !is_pow {
+                } else if is_pow {
+                    if f.context().options().preview().is_enabled() {
+                        in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
+                    }
+                } else {
                     space().fmt(f)?;
                 }
 
