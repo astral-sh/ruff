@@ -248,7 +248,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::property_with_parameters(checker, stmt, decorator_list, parameters);
             }
             if checker.enabled(Rule::TooManyArguments) {
-                pylint::rules::too_many_arguments(checker, parameters, stmt);
+                pylint::rules::too_many_arguments(checker, function_def);
             }
             if checker.enabled(Rule::TooManyReturnStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_return_statements(
