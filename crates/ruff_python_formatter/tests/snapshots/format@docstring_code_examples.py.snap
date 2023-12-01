@@ -2583,7 +2583,7 @@ def doctest_simple_continued():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(f"hi {x}")
+	...         print(f"hi {x}")
 	hi 2
 	"""
 	pass
@@ -2620,7 +2620,7 @@ def doctest_last_line_continued():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(f"hi {x}")
+	...         print(f"hi {x}")
 	"""
 	pass
 
@@ -2653,9 +2653,9 @@ def doctest_blank_continued():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(x)
+	...         print(x)
 	...
-	... 	print(x)
+	...         print(x)
 	"""
 	pass
 
@@ -2668,8 +2668,8 @@ def doctest_blank_end():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(x)
-	... 	print(x)
+	...         print(x)
+	...         print(x)
 	"""
 	pass
 
@@ -2681,8 +2681,8 @@ def doctest_blank_end_then_some_text():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(x)
-	... 	print(x)
+	...         print(x)
+	...         print(x)
 
 	And say something else.
 	"""
@@ -2754,11 +2754,11 @@ def doctest_nested_doctest_not_formatted():
 	Do cool stuff.
 
 	>>> def nested(x):
-	... 	"""
-	... 	Do nested cool stuff.
-	... 	>>> func_call( 5 )
-	... 	"""
-	... 	pass
+	...         """
+	...         Do nested cool stuff.
+	...         >>> func_call( 5 )
+	...         """
+	...         pass
 	'''
 	pass
 
@@ -2799,7 +2799,7 @@ def doctest_long_lines():
 
 	But this one is long enough to get wrapped.
 	>>> foo, bar, quux = this_is_a_long_line(
-	... 	lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
+	...         lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
 	... )
 	"""
 	# This demostrates a normal line that will get wrapped but won't
@@ -2855,7 +2855,7 @@ def doctest_skipped_partial_inconsistent_indent():
 	Do cool stuff.
 
 	 >>> def cool_stuff(x):
-	 ... 	print(x)
+	 ...         print(x)
 	...     print( f"hi {x}" );
 	hi 2
 	"""
@@ -2948,7 +2948,7 @@ def doctest_simple_continued():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(f"hi {x}")
+	...     print(f"hi {x}")
 	hi 2
 	"""
 	pass
@@ -2985,7 +2985,7 @@ def doctest_last_line_continued():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(f"hi {x}")
+	...     print(f"hi {x}")
 	"""
 	pass
 
@@ -3018,9 +3018,9 @@ def doctest_blank_continued():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(x)
+	...     print(x)
 	...
-	... 	print(x)
+	...     print(x)
 	"""
 	pass
 
@@ -3033,8 +3033,8 @@ def doctest_blank_end():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(x)
-	... 	print(x)
+	...     print(x)
+	...     print(x)
 	"""
 	pass
 
@@ -3046,8 +3046,8 @@ def doctest_blank_end_then_some_text():
 	Do cool stuff.
 
 	>>> def cool_stuff(x):
-	... 	print(x)
-	... 	print(x)
+	...     print(x)
+	...     print(x)
 
 	And say something else.
 	"""
@@ -3119,11 +3119,11 @@ def doctest_nested_doctest_not_formatted():
 	Do cool stuff.
 
 	>>> def nested(x):
-	... 	"""
-	... 	Do nested cool stuff.
-	... 	>>> func_call( 5 )
-	... 	"""
-	... 	pass
+	...     """
+	...     Do nested cool stuff.
+	...     >>> func_call( 5 )
+	...     """
+	...     pass
 	'''
 	pass
 
@@ -3164,7 +3164,7 @@ def doctest_long_lines():
 
 	But this one is long enough to get wrapped.
 	>>> foo, bar, quux = this_is_a_long_line(
-	... 	lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
+	...     lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
 	... )
 	"""
 	# This demostrates a normal line that will get wrapped but won't
@@ -3220,7 +3220,7 @@ def doctest_skipped_partial_inconsistent_indent():
 	Do cool stuff.
 
 	 >>> def cool_stuff(x):
-	 ... 	print(x)
+	 ...     print(x)
 	...     print( f"hi {x}" );
 	hi 2
 	"""

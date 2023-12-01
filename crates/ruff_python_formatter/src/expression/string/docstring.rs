@@ -6,7 +6,7 @@ use std::{borrow::Cow, collections::VecDeque};
 
 use ruff_python_trivia::PythonWhitespace;
 use {
-    ruff_formatter::{write, Printed},
+    ruff_formatter::{write, IndentStyle, Printed},
     ruff_source_file::Locator,
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
@@ -429,7 +429,23 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             .map(|line| line.code)
             .collect::<Vec<&str>>()
             .join("\n");
-        let printed = match docstring_format_source(self.f.options(), self.quote_style, &codeblob) {
+        let options = self
+            .f
+            .options()
+            .clone()
+            // It's perhaps a little odd to be hard-coding the indent
+            // style here, but I believe it is necessary as a result
+            // of the whitespace normalization otherwise done in
+            // docstrings. Namely, tabs are rewritten with ASCII
+            // spaces. If code examples in docstrings are formatted
+            // with tabs and those tabs end up getting rewritten, this
+            // winds up screwing with the indentation in ways that
+            // results in formatting no longer being idempotent. Since
+            // tabs will get erased anyway, we just clobber them here
+            // instead of later, and as a result, get more consistent
+            // results.
+            .with_indent_style(IndentStyle::Space);
+        let printed = match docstring_format_source(options, self.quote_style, &codeblob) {
             Ok(printed) => printed,
             Err(FormatModuleError::FormatError(err)) => return Err(err),
             Err(
@@ -837,7 +853,7 @@ enum CodeExampleAddAction<'src> {
 /// explicitly sets the context to indicate that formatting is taking place
 /// inside of a docstring.
 fn docstring_format_source(
-    options: &crate::PyFormatOptions,
+    options: crate::PyFormatOptions,
     docstring_quote_style: QuoteStyle,
     source: &str,
 ) -> Result<Printed, FormatModuleError> {
@@ -851,7 +867,7 @@ fn docstring_format_source(
     let comments = crate::Comments::from_ast(&module, source_code, &comment_ranges);
     let locator = Locator::new(source);
 
-    let ctx = PyFormatContext::new(options.clone(), locator.contents(), comments)
+    let ctx = PyFormatContext::new(options, locator.contents(), comments)
         .in_docstring(docstring_quote_style);
     let formatted = crate::format!(ctx, [module.format()])?;
     formatted
