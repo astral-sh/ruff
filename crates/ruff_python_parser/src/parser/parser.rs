@@ -12,16 +12,13 @@
 //! [Abstract Syntax Tree]: https://en.wikipedia.org/wiki/Abstract_syntax_tree
 //! [`Mode`]: crate::mode
 
-use std::{fmt, iter};
-
 use itertools::Itertools;
-pub(super) use lalrpop_util::ParseError as LalrpopError;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::lexer::{lex, lex_starts_at, Spanned};
+use crate::lexer::{lex, lex_starts_at, LexicalError, Spanned};
+use crate::ParseError;
 use crate::{
-    lexer::{self, LexResult, LexicalError, LexicalErrorType},
-    python,
+    lexer::{self, LexResult},
     token::Tok,
     Mode,
 };
@@ -33,6 +30,8 @@ use ruff_python_ast::{
     ExprStarred, ExprStringLiteral, ExprSubscript, ExprTuple, ExprUnaryOp, ExprYield,
     ExprYieldFrom, Mod, ModModule, Suite,
 };
+
+use super::Parser;
 
 /// Parse a full Python program usually consisting of multiple lines.
 ///
@@ -243,14 +242,14 @@ pub fn parse_ok_tokens(
 ) -> Result<Mod, ParseError> {
     let lxr = lxr
         .into_iter()
-        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-    let marker_token = (Tok::start_marker(mode), TextRange::default());
-    let lexer = iter::once(marker_token)
-        .chain(lxr)
-        .map(|(t, range)| (range.start(), t, range.end()));
-    python::TopParser::new()
-        .parse(source, mode, lexer)
-        .map_err(|e| parse_error_from_lalrpop(e, source_path))
+        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline))
+        .map(Ok::<(Tok, TextRange), LexicalError>);
+    let parsed_file = Parser::new(source, source_path, mode, lxr).parse();
+    if parsed_file.parse_errors.is_empty() {
+        Ok(parsed_file.ast)
+    } else {
+        Err(parsed_file.parse_errors.into_iter().next().unwrap())
+    }
 }
 
 fn parse_filtered_tokens(
@@ -259,168 +258,11 @@ fn parse_filtered_tokens(
     mode: Mode,
     source_path: &str,
 ) -> Result<Mod, ParseError> {
-    let marker_token = (Tok::start_marker(mode), TextRange::default());
-    let lexer = iter::once(Ok(marker_token)).chain(lxr);
-    python::TopParser::new()
-        .parse(
-            source,
-            mode,
-            lexer.map_ok(|(t, range)| (range.start(), t, range.end())),
-        )
-        .map_err(|e| parse_error_from_lalrpop(e, source_path))
-}
-
-/// Represents represent errors that occur during parsing and are
-/// returned by the `parse_*` functions.
-
-#[derive(Debug, PartialEq)]
-pub struct ParseError {
-    pub error: ParseErrorType,
-    pub offset: TextSize,
-    pub source_path: String,
-}
-
-impl std::ops::Deref for ParseError {
-    type Target = ParseErrorType;
-
-    fn deref(&self) -> &Self::Target {
-        &self.error
-    }
-}
-
-impl std::error::Error for ParseError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&self.error)
-    }
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "{} at byte offset {}",
-            &self.error,
-            u32::from(self.offset)
-        )
-    }
-}
-
-impl ParseError {
-    pub fn error(self) -> ParseErrorType {
-        self.error
-    }
-}
-
-/// Represents the different types of errors that can occur during parsing.
-#[derive(Debug, PartialEq)]
-pub enum ParseErrorType {
-    /// Parser encountered an unexpected end of input
-    Eof,
-    /// Parser encountered an extra token
-    ExtraToken(Tok),
-    /// Parser encountered an invalid token
-    InvalidToken,
-    /// Parser encountered an unexpected token
-    UnrecognizedToken(Tok, Option<String>),
-    // Maps to `User` type from `lalrpop-util`
-    /// Parser encountered an error during lexing.
-    Lexical(LexicalErrorType),
-}
-
-impl std::error::Error for ParseErrorType {}
-
-// Convert `lalrpop_util::ParseError` to our internal type
-fn parse_error_from_lalrpop(
-    err: LalrpopError<TextSize, Tok, LexicalError>,
-    source_path: &str,
-) -> ParseError {
-    let source_path = source_path.to_owned();
-
-    match err {
-        // TODO: Are there cases where this isn't an EOF?
-        LalrpopError::InvalidToken { location } => ParseError {
-            error: ParseErrorType::Eof,
-            offset: location,
-            source_path,
-        },
-        LalrpopError::ExtraToken { token } => ParseError {
-            error: ParseErrorType::ExtraToken(token.1),
-            offset: token.0,
-            source_path,
-        },
-        LalrpopError::User { error } => ParseError {
-            error: ParseErrorType::Lexical(error.error),
-            offset: error.location,
-            source_path,
-        },
-        LalrpopError::UnrecognizedToken { token, expected } => {
-            // Hacky, but it's how CPython does it. See PyParser_AddToken,
-            // in particular "Only one possible expected token" comment.
-            let expected = (expected.len() == 1).then(|| expected[0].clone());
-            ParseError {
-                error: ParseErrorType::UnrecognizedToken(token.1, expected),
-                offset: token.0,
-                source_path,
-            }
-        }
-        LalrpopError::UnrecognizedEof { location, expected } => {
-            // This could be an initial indentation error that we should ignore
-            let indent_error = expected == ["Indent"];
-            if indent_error {
-                ParseError {
-                    error: ParseErrorType::Lexical(LexicalErrorType::IndentationError),
-                    offset: location,
-                    source_path,
-                }
-            } else {
-                ParseError {
-                    error: ParseErrorType::Eof,
-                    offset: location,
-                    source_path,
-                }
-            }
-        }
-    }
-}
-
-impl std::fmt::Display for ParseErrorType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            ParseErrorType::Eof => write!(f, "Got unexpected EOF"),
-            ParseErrorType::ExtraToken(ref tok) => write!(f, "Got extraneous token: {tok:?}"),
-            ParseErrorType::InvalidToken => write!(f, "Got invalid token"),
-            ParseErrorType::UnrecognizedToken(ref tok, ref expected) => {
-                if *tok == Tok::Indent {
-                    write!(f, "unexpected indent")
-                } else if expected.as_deref() == Some("Indent") {
-                    write!(f, "expected an indented block")
-                } else {
-                    write!(f, "invalid syntax. Got unexpected token {tok}")
-                }
-            }
-            ParseErrorType::Lexical(ref error) => write!(f, "{error}"),
-        }
-    }
-}
-
-impl ParseErrorType {
-    /// Returns true if the error is an indentation error.
-    pub fn is_indentation_error(&self) -> bool {
-        match self {
-            ParseErrorType::Lexical(LexicalErrorType::IndentationError) => true,
-            ParseErrorType::UnrecognizedToken(token, expected) => {
-                *token == Tok::Indent || expected.clone() == Some("Indent".to_owned())
-            }
-            _ => false,
-        }
-    }
-
-    /// Returns true if the error is a tab error.
-    pub fn is_tab_error(&self) -> bool {
-        matches!(
-            self,
-            ParseErrorType::Lexical(LexicalErrorType::TabError | LexicalErrorType::TabsAfterSpaces)
-        )
+    let parsed_file = Parser::new(source, source_path, mode, lxr.into_iter()).parse();
+    if parsed_file.parse_errors.is_empty() {
+        Ok(parsed_file.ast)
+    } else {
+        Err(parsed_file.parse_errors.into_iter().next().unwrap())
     }
 }
 
@@ -903,7 +745,6 @@ with ((yield from a)): pass
         for source in [
             "with 0,: pass",
             "with 0 as x,: pass",
-            "with 0 as *x: pass",
             "with *a: pass",
             "with *a as x: pass",
             "with (*a): pass",
@@ -1509,7 +1350,7 @@ a = 1
         let parse_err = parse_tokens(lxr, source, Mode::Module, "<test>").unwrap_err();
         assert_eq!(
             parse_err.to_string(),
-            "IPython escape commands are only allowed in `Mode::Ipython` at byte offset 6"
+            "IPython escape commands are only allowed in `Mode::Ipython` at byte range 6..20"
                 .to_string()
         );
     }

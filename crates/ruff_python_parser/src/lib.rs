@@ -111,7 +111,7 @@
 
 pub use parser::{
     parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
-    parse_starts_at, parse_suite, parse_tokens, ParseError, ParseErrorType,
+    parse_starts_at, parse_suite, parse_tokens, ParsedFile,
 };
 use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -123,13 +123,17 @@ use crate::lexer::LexResult;
 mod function;
 // Skip flattening lexer to distinguish from full ruff_python_parser
 mod context;
+mod error;
+mod helpers;
 mod invalid;
 pub mod lexer;
 mod parser;
 mod soft_keywords;
 mod string;
 mod token;
+mod token_set;
 pub mod typing;
+pub use error::{ParseError, ParseErrorType};
 
 /// Collect tokens up to and including the first error.
 pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
@@ -340,31 +344,6 @@ impl std::fmt::Display for ModeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, r#"mode must be "exec", "eval", "ipython", or "single""#)
     }
-}
-
-#[rustfmt::skip]
-#[allow(unreachable_pub)]
-#[allow(clippy::type_complexity)]
-#[allow(clippy::extra_unused_lifetimes)]
-#[allow(clippy::needless_lifetimes)]
-#[allow(clippy::unused_self)]
-#[allow(clippy::cast_sign_loss)]
-#[allow(clippy::default_trait_access)]
-#[allow(clippy::let_unit_value)]
-#[allow(clippy::just_underscores_and_digits)]
-#[allow(clippy::no_effect_underscore_binding)]
-#[allow(clippy::trivially_copy_pass_by_ref)]
-#[allow(clippy::option_option)]
-#[allow(clippy::unnecessary_wraps)]
-#[allow(clippy::uninlined_format_args)]
-#[allow(clippy::cloned_instead_of_copied)]
-mod python {
-
-    #[cfg(feature = "lalrpop")]
-    include!(concat!(env!("OUT_DIR"), "/src/python.rs"));
-
-    #[cfg(not(feature = "lalrpop"))]
-    include!("python.rs");
 }
 
 #[cfg(test)]

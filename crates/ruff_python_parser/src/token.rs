@@ -4,10 +4,10 @@
 //! loosely based on the token definitions found in the [CPython source].
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
-use crate::Mode;
 
-use ruff_python_ast::{Int, IpyEscapeKind};
+use ruff_python_ast::{BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use ruff_text_size::TextSize;
+use smol_str::SmolStr;
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
@@ -16,7 +16,7 @@ pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
     Name {
         /// The name value.
-        name: String,
+        name: SmolStr,
     },
     /// Token value for an integer.
     Int {
@@ -218,18 +218,7 @@ pub enum Tok {
     With,
     Yield,
 
-    // RustPython specific.
-    StartModule,
-    StartExpression,
-}
-
-impl Tok {
-    pub fn start_marker(mode: Mode) -> Self {
-        match mode {
-            Mode::Module | Mode::Ipython => Tok::StartModule,
-            Mode::Expression => Tok::StartExpression,
-        }
-    }
+    Invalid,
 }
 
 impl fmt::Display for Tok {
@@ -257,8 +246,6 @@ impl fmt::Display for Tok {
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
             Indent => f.write_str("Indent"),
             Dedent => f.write_str("Dedent"),
-            StartModule => f.write_str("StartProgram"),
-            StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
             Question => f.write_str("'?'"),
             Exclamation => f.write_str("'!'"),
@@ -348,6 +335,7 @@ impl fmt::Display for Tok {
             With => f.write_str("'with'"),
             Yield => f.write_str("'yield'"),
             ColonEqual => f.write_str("':='"),
+            Invalid => f.write_str("Invalid"),
         }
     }
 }
@@ -624,10 +612,7 @@ pub enum TokenKind {
     With,
     Yield,
 
-    // RustPython specific.
-    StartModule,
-    StartInteractive,
-    StartExpression,
+    Invalid,
 }
 
 impl TokenKind {
@@ -795,6 +780,27 @@ impl TokenKind {
         matches!(self, TokenKind::Match | TokenKind::Case)
     }
 
+    #[inline]
+    pub const fn is_compare_operator(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::Not
+                | TokenKind::In
+                | TokenKind::Is
+                | TokenKind::EqEqual
+                | TokenKind::NotEqual
+                | TokenKind::Less
+                | TokenKind::LessEqual
+                | TokenKind::Greater
+                | TokenKind::GreaterEqual
+        )
+    }
+
+    #[inline]
+    pub const fn is_bool_operator(&self) -> bool {
+        matches!(self, TokenKind::And | TokenKind::Or)
+    }
+
     pub const fn from_token(token: &Tok) -> Self {
         match token {
             Tok::Name { .. } => TokenKind::Name,
@@ -899,8 +905,7 @@ impl TokenKind {
             Tok::Type => TokenKind::Type,
             Tok::With => TokenKind::With,
             Tok::Yield => TokenKind::Yield,
-            Tok::StartModule => TokenKind::StartModule,
-            Tok::StartExpression => TokenKind::StartExpression,
+            Tok::Invalid => TokenKind::Invalid,
         }
     }
 }
@@ -908,5 +913,60 @@ impl TokenKind {
 impl From<&Tok> for TokenKind {
     fn from(value: &Tok) -> Self {
         Self::from_token(value)
+    }
+}
+
+impl From<Tok> for TokenKind {
+    fn from(value: Tok) -> Self {
+        Self::from_token(&value)
+    }
+}
+
+impl TryFrom<TokenKind> for Operator {
+    type Error = ();
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TokenKind::At | TokenKind::AtEqual => Operator::MatMult,
+            TokenKind::Plus | TokenKind::PlusEqual => Operator::Add,
+            TokenKind::Star | TokenKind::StarEqual => Operator::Mult,
+            TokenKind::Vbar | TokenKind::VbarEqual => Operator::BitOr,
+            TokenKind::Minus | TokenKind::MinusEqual => Operator::Sub,
+            TokenKind::Slash | TokenKind::SlashEqual => Operator::Div,
+            TokenKind::Amper | TokenKind::AmperEqual => Operator::BitAnd,
+            TokenKind::Percent | TokenKind::PercentEqual => Operator::Mod,
+            TokenKind::DoubleStar | TokenKind::DoubleStarEqual => Operator::Pow,
+            TokenKind::LeftShift | TokenKind::LeftShiftEqual => Operator::LShift,
+            TokenKind::CircumFlex | TokenKind::CircumflexEqual => Operator::BitXor,
+            TokenKind::RightShift | TokenKind::RightShiftEqual => Operator::RShift,
+            TokenKind::DoubleSlash | TokenKind::DoubleSlashEqual => Operator::FloorDiv,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl TryFrom<TokenKind> for BoolOp {
+    type Error = ();
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
+        Ok(match value {
+            TokenKind::And => BoolOp::And,
+            TokenKind::Or => BoolOp::Or,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl TryFrom<Tok> for UnaryOp {
+    type Error = ();
+
+    fn try_from(value: Tok) -> Result<Self, Self::Error> {
+        Ok(match value {
+            Tok::Plus => UnaryOp::UAdd,
+            Tok::Minus => UnaryOp::USub,
+            Tok::Tilde => UnaryOp::Invert,
+            Tok::Not => UnaryOp::Not,
+            _ => return Err(()),
+        })
     }
 }

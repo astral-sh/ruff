@@ -5,8 +5,8 @@ expression: tokens
 Err(
     LexicalError {
         error: OtherError(
-            "Invalid Token",
+            "Invalid decimal integer literal",
         ),
-        location: 0,
+        location: 0..3,
     },
 )

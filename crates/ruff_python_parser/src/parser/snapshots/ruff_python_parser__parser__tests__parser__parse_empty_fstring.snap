@@ -1,0 +1,74 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: "parse(r#\"\nf\"\"\nF\"\"\nf''\nf\"\"\"\"\"\"\nf''''''\n\"#)"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..29,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 1..4,
+                        value: FString(
+                            ExprFString {
+                                range: 1..4,
+                                values: [],
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 5..8,
+                        value: FString(
+                            ExprFString {
+                                range: 5..8,
+                                values: [],
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 9..12,
+                        value: FString(
+                            ExprFString {
+                                range: 9..12,
+                                values: [],
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 13..20,
+                        value: FString(
+                            ExprFString {
+                                range: 13..20,
+                                values: [],
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 21..28,
+                        value: FString(
+                            ExprFString {
+                                range: 21..28,
+                                values: [],
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

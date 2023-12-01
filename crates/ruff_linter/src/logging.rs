@@ -166,7 +166,9 @@ impl Display for DisplayParseError<'_> {
             colon = ":".cyan(),
         )?;
 
-        let source_location = self.source_code.source_location(self.error.offset);
+        let source_location = self
+            .source_code
+            .source_location(self.error.location.start());
 
         // If we're working on a Jupyter notebook, translate the positions
         // with respect to the cell and row in the cell. This is the same
@@ -213,27 +215,7 @@ impl<'a> DisplayParseErrorType<'a> {
 
 impl Display for DisplayParseErrorType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.0 {
-            ParseErrorType::Eof => write!(f, "Expected token but reached end of file."),
-            ParseErrorType::ExtraToken(ref tok) => write!(
-                f,
-                "Got extraneous token: {tok}",
-                tok = TruncateAtNewline(&tok)
-            ),
-            ParseErrorType::InvalidToken => write!(f, "Got invalid token"),
-            ParseErrorType::UnrecognizedToken(ref tok, ref expected) => {
-                if let Some(expected) = expected.as_ref() {
-                    write!(
-                        f,
-                        "Expected '{expected}', but got {tok}",
-                        tok = TruncateAtNewline(&tok)
-                    )
-                } else {
-                    write!(f, "Unexpected token {tok}", tok = TruncateAtNewline(&tok))
-                }
-            }
-            ParseErrorType::Lexical(ref error) => write!(f, "{error}"),
-        }
+        write!(f, "{}", TruncateAtNewline(&self.0))
     }
 }
 

@@ -1,0 +1,159 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: "parse(r#\"\n'Hello World'\n\"😎\"\n'Foo' 'Bar'\n(\n    'A'\n    'B'\n    'C'\n)\n'''Olá, Mundo!'''\n\"\"\"ABCDE\"\"\"\n(\n    '''aB'''\n    '''cD'''\n)\nb'hello world'\nb'bytes' b'concatenated'\n\"#)"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..163,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 1..14,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 1..14,
+                                value: "Hello World",
+                                unicode: false,
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 15..21,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 15..21,
+                                value: "😎",
+                                unicode: false,
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 22..33,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 22..33,
+                                value: "FooBar",
+                                unicode: false,
+                                implicit_concatenated: true,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 34..61,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 40..59,
+                                value: "ABC",
+                                unicode: false,
+                                implicit_concatenated: true,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 62..80,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 62..80,
+                                value: "Olá, Mundo!",
+                                unicode: false,
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 81..92,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 81..92,
+                                value: "ABCDE",
+                                unicode: false,
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 93..122,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 99..120,
+                                value: "aBcD",
+                                unicode: false,
+                                implicit_concatenated: true,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 123..137,
+                        value: BytesLiteral(
+                            ExprBytesLiteral {
+                                range: 123..137,
+                                value: [
+                                    104,
+                                    101,
+                                    108,
+                                    108,
+                                    111,
+                                    32,
+                                    119,
+                                    111,
+                                    114,
+                                    108,
+                                    100,
+                                ],
+                                implicit_concatenated: false,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 138..162,
+                        value: BytesLiteral(
+                            ExprBytesLiteral {
+                                range: 138..162,
+                                value: [
+                                    98,
+                                    121,
+                                    116,
+                                    101,
+                                    115,
+                                    99,
+                                    111,
+                                    110,
+                                    99,
+                                    97,
+                                    116,
+                                    101,
+                                    110,
+                                    97,
+                                    116,
+                                    101,
+                                    100,
+                                ],
+                                implicit_concatenated: true,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}
