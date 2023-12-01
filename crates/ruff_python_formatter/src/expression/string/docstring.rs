@@ -1,4 +1,8 @@
-use std::borrow::Cow;
+// This gives tons of false positives in this file because of
+// "reStructuredText."
+#![allow(clippy::doc_markdown)]
+
+use std::{borrow::Cow, collections::VecDeque};
 
 use ruff_python_trivia::PythonWhitespace;
 use {
@@ -182,6 +186,7 @@ pub(super) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
 
     DocstringLinePrinter {
         f,
+        action_queue: VecDeque::new(),
         offset,
         stripped_indentation_length,
         already_normalized,
@@ -218,6 +223,17 @@ fn contains_unescaped_newline(haystack: &str) -> bool {
 /// An abstraction for printing each line of a docstring.
 struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     f: &'fmt mut PyFormatter<'ast, 'buf>,
+    /// A queue of actions to perform.
+    ///
+    /// Whenever we process a line, it is possible for it to generate multiple
+    /// actions to take. The most basic, and most common case, is for the line
+    /// to just simply be printed as-is. But in some cases, a line is part of
+    /// a code example that we'd like to reformat. In those cases, the actions
+    /// can be more complicated.
+    ///
+    /// Actions are pushed on to the end of the queue and popped from the
+    /// beginning.
+    action_queue: VecDeque<CodeExampleAddAction<'src>>,
     /// The source offset of the beginning of the line that is currently being
     /// printed.
     offset: TextSize,
@@ -253,7 +269,8 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             self.offset += line.line.text_len() + "\n".text_len();
             self.add_one(line)?;
         }
-        Ok(())
+        self.code_example.finish(&mut self.action_queue);
+        self.run_action_queue()
     }
 
     /// Adds the given line to this printer.
@@ -273,34 +290,40 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         {
             return self.print_one(&line.as_output());
         }
-        match self.code_example.add(line) {
-            CodeExampleAddAction::Print { original } => self.print_one(&original.as_output())?,
-            CodeExampleAddAction::Kept => {}
-            CodeExampleAddAction::Reset { code, original } => {
-                for codeline in code {
-                    self.print_one(&codeline.original.as_output())?;
+        self.code_example.add(line, &mut self.action_queue);
+        self.run_action_queue()
+    }
+
+    /// Process any actions in this printer's queue until the queue is empty.
+    fn run_action_queue(&mut self) -> FormatResult<()> {
+        while let Some(action) = self.action_queue.pop_front() {
+            match action {
+                CodeExampleAddAction::Print { original } => {
+                    self.print_one(&original.as_output())?;
                 }
-                self.print_one(&original.as_output())?;
-            }
-            CodeExampleAddAction::Format { mut kind, original } => {
-                let Some(formatted_lines) = self.format(kind.code())? else {
-                    // If formatting failed in a way that should not be
-                    // allowed, we back out what we're doing and print the
-                    // original lines we found as-is as if we did nothing.
-                    for codeline in kind.code() {
+                CodeExampleAddAction::Kept => {}
+                CodeExampleAddAction::Reset { code } => {
+                    for codeline in code {
                         self.print_one(&codeline.original.as_output())?;
                     }
-                    if let Some(original) = original {
-                        self.print_one(&original.as_output())?;
-                    }
-                    return Ok(());
-                };
+                }
+                CodeExampleAddAction::Format { mut kind } => {
+                    let Some(formatted_lines) = self.format(kind.code())? else {
+                        // Since we've failed to emit these lines, we need to
+                        // put them back in the queue but have them jump to the
+                        // front of the queue to get processed before any other
+                        // action.
+                        self.action_queue.push_front(CodeExampleAddAction::Reset {
+                            code: kind.into_code(),
+                        });
+                        continue;
+                    };
 
-                self.already_normalized = false;
-                match kind {
-                    CodeExampleKind::Doctest(CodeExampleDoctest { ps1_indent, .. }) => {
-                        let mut lines = formatted_lines.into_iter();
-                        if let Some(first) = lines.next() {
+                    self.already_normalized = false;
+                    match kind {
+                        CodeExampleKind::Doctest(CodeExampleDoctest { ps1_indent, .. }) => {
+                            let mut lines = formatted_lines.into_iter();
+                            let Some(first) = lines.next() else { continue };
                             self.print_one(
                                 &first.map(|line| std::format!("{ps1_indent}>>> {line}")),
                             )?;
@@ -311,9 +334,6 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                             }
                         }
                     }
-                }
-                if let Some(original) = original {
-                    self.print_one(&original.as_output())?;
                 }
             }
         }
@@ -568,38 +588,44 @@ impl<'src> CodeExample<'src> {
     /// Attempt to add an original line from a docstring to this code example.
     ///
     /// Based on the line and the internal state of whether a code example is
-    /// currently being collected or not, this will return an "action" for
-    /// the caller to perform. The typical case is a "print" action, which
-    /// instructs the caller to just print the line as though it were not part
-    /// of a code snippet.
-    fn add(&mut self, original: InputDocstringLine<'src>) -> CodeExampleAddAction<'src> {
+    /// currently being collected or not, this will push an "action" to the
+    /// given queue for the caller to perform. The typical case is a "print"
+    /// action, which instructs the caller to just print the line as though it
+    /// were not part of a code snippet.
+    fn add(
+        &mut self,
+        original: InputDocstringLine<'src>,
+        queue: &mut VecDeque<CodeExampleAddAction<'src>>,
+    ) {
         match self.kind.take() {
             // There's no existing code example being built, so we look for
             // the start of one or otherwise tell the caller we couldn't find
             // anything.
-            None => match self.add_start(original) {
-                None => CodeExampleAddAction::Kept,
-                Some(original) => CodeExampleAddAction::Print { original },
-            },
-            Some(CodeExampleKind::Doctest(mut doctest)) => {
-                if doctest.add_code_line(original) {
-                    // Stay with the doctest kind while we accumulate all
-                    // PS2 prompts.
-                    self.kind = Some(CodeExampleKind::Doctest(doctest));
-                    return CodeExampleAddAction::Kept;
-                }
-                let original = self.add_start(original);
-                CodeExampleAddAction::Format {
-                    kind: CodeExampleKind::Doctest(doctest),
-                    original,
-                }
+            None => {
+                self.add_start(original, queue);
+            }
+            Some(CodeExampleKind::Doctest(doctest)) => {
+                let Some(doctest) = doctest.add_code_line(original, queue) else {
+                    self.add_start(original, queue);
+                    return;
+                };
+                self.kind = Some(CodeExampleKind::Doctest(doctest));
             }
         }
     }
 
+    /// Finish the code example by generating any final actions if applicable.
+    ///
+    /// This typically adds an action when the end of a code example coincides
+    /// with the end of the docstring.
+    fn finish(&mut self, queue: &mut VecDeque<CodeExampleAddAction<'src>>) {
+        let Some(kind) = self.kind.take() else { return };
+        queue.push_back(CodeExampleAddAction::Format { kind });
+    }
+
     /// Looks for the start of a code example. If one was found, then the given
     /// line is kept and added as part of the code example. Otherwise, the line
-    /// is returned unchanged and no code example was found.
+    /// is pushed onto the queue unchanged to be printed as-is.
     ///
     /// # Panics
     ///
@@ -609,13 +635,15 @@ impl<'src> CodeExample<'src> {
     fn add_start(
         &mut self,
         original: InputDocstringLine<'src>,
-    ) -> Option<InputDocstringLine<'src>> {
+        queue: &mut VecDeque<CodeExampleAddAction<'src>>,
+    ) {
         assert!(self.kind.is_none(), "expected no existing code example");
         if let Some(doctest) = CodeExampleDoctest::new(original) {
             self.kind = Some(CodeExampleKind::Doctest(doctest));
-            return None;
+            queue.push_back(CodeExampleAddAction::Kept);
+        } else {
+            queue.push_back(CodeExampleAddAction::Print { original });
         }
-        Some(original)
     }
 }
 
@@ -643,6 +671,18 @@ impl<'src> CodeExampleKind<'src> {
     fn code(&mut self) -> &[CodeExampleLine<'src>] {
         match *self {
             CodeExampleKind::Doctest(ref doctest) => &doctest.lines,
+        }
+    }
+
+    /// Consume this code example and return only the lines that have been
+    /// accrued so far.
+    ///
+    /// This is useful when the code example being collected has been
+    /// determined to be invalid, and one wants to "give up" and print the
+    /// original lines through unchanged without attempting formatting.
+    fn into_code(self) -> Vec<CodeExampleLine<'src>> {
+        match self {
+            CodeExampleKind::Doctest(doctest) => doctest.lines,
         }
     }
 }
@@ -681,19 +721,24 @@ impl<'src> CodeExampleDoctest<'src> {
         Some(doctest)
     }
 
-    /// Looks for a valid doctest PS2 prompt in the line given.
+    /// Looks for a valid doctest PS2 prompt in the line given. If one is
+    /// found, it is added to this code example and ownership of the example is
+    /// returned to the caller. In this case, callers should continue trying to
+    /// add PS2 prompt lines.
     ///
-    /// If one is found, then the code portion of the line following the PS2 prompt
-    /// is returned.
+    /// But if one isn't found, then the given line is not part of the code
+    /// example and ownership of this example is not returned.
     ///
-    /// Callers must provide a string containing the original indentation of the
-    /// PS1 prompt that started the doctest containing the potential PS2 prompt
-    /// in the line given. If the line contains a PS2 prompt, its indentation must
-    /// match the indentation used for the corresponding PS1 prompt (otherwise
-    /// `None` will be returned).
-    fn add_code_line(&mut self, original: InputDocstringLine<'src>) -> bool {
+    /// In either case, relevant actions will be added to the given queue to
+    /// process.
+    fn add_code_line(
+        mut self,
+        original: InputDocstringLine<'src>,
+        queue: &mut VecDeque<CodeExampleAddAction<'src>>,
+    ) -> Option<CodeExampleDoctest<'src>> {
         let Some((ps2_indent, ps2_after)) = original.line.split_once("...") else {
-            return false;
+            queue.push_back(self.into_format_action());
+            return None;
         };
         // PS2 prompts must have the same indentation as their
         // corresponding PS1 prompt.[1] While the 'doctest' Python
@@ -702,7 +747,8 @@ impl<'src> CodeExampleDoctest<'src> {
         //
         // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L733
         if self.ps1_indent != ps2_indent {
-            return false;
+            queue.push_back(self.into_format_action());
+            return None;
         }
         // PS2 prompts must be followed by an ASCII space character unless
         // it's an otherwise empty line[1].
@@ -710,11 +756,22 @@ impl<'src> CodeExampleDoctest<'src> {
         // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
         let code = match ps2_after.strip_prefix(' ') {
             None if ps2_after.is_empty() => "",
-            None => return false,
+            None => {
+                queue.push_back(self.into_format_action());
+                return None;
+            }
             Some(code) => code,
         };
         self.lines.push(CodeExampleLine { original, code });
-        true
+        queue.push_back(CodeExampleAddAction::Kept);
+        Some(self)
+    }
+
+    /// Consume this doctest and turn it into a formatting action.
+    fn into_format_action(self) -> CodeExampleAddAction<'src> {
+        CodeExampleAddAction::Format {
+            kind: CodeExampleKind::Doctest(self),
+        }
     }
 }
 
@@ -763,20 +820,12 @@ enum CodeExampleAddAction<'src> {
     Kept,
     /// The line added indicated that the code example is finished and should
     /// be formatted and printed. The line added is not treated as part of
-    /// the code example. If the line added indicated the start of another
-    /// code example, then is won't be returned to the caller here. Otherwise,
-    /// callers should pass it through to the formatter as-is.
+    /// the code example.
     Format {
         /// The kind of code example that was found.
         ///
         /// This is guaranteed to have a non-empty code snippet.
         kind: CodeExampleKind<'src>,
-        /// When set, the line is considered not part of any code example and
-        /// should be formatted as if the [`Print`] action were returned.
-        /// Otherwise, if there is no line, then either one does not exist
-        /// or it is part of another code example and should be treated as a
-        /// [`Kept`] action.
-        original: Option<InputDocstringLine<'src>>,
     },
     /// This occurs when adding a line to an existing code example
     /// results in that code example becoming invalid. In this case,
@@ -787,9 +836,6 @@ enum CodeExampleAddAction<'src> {
         /// The lines of code that we collected but should be printed back to
         /// the docstring as-is and not formatted.
         code: Vec<CodeExampleLine<'src>>,
-        /// The line that was added and triggered this reset to occur. It
-        /// should be written back to the docstring as-is after the code lines.
-        original: InputDocstringLine<'src>,
     },
 }
 

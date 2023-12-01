@@ -67,6 +67,27 @@ def doctest_last_line_continued():
     pass
 
 
+# Test that a doctest on the real last line of a docstring reformats
+# correctly.
+def doctest_really_last_line():
+    """
+    Do cool stuff.
+
+    >>> cool_stuff( x )"""
+    pass
+
+
+# Test that a continued doctest on the real last line of a docstring reformats
+# correctly.
+def doctest_really_last_line_continued():
+    """
+    Do cool stuff.
+
+    >>> cool_stuff( x )
+    ... more( y )"""
+    pass
+
+
 # Test that a doctest is correctly identified and formatted with a blank
 # continuation line.
 def doctest_blank_continued():
