@@ -415,26 +415,15 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// routine is silent about it. So from the user's perspective, this will
     /// fail silently. Ideally, this would at least emit a warning message,
     /// but at time of writing, it wasn't clear to me how to best do that.
-    ///
-    /// # Panics
-    ///
-    /// This panics when the given slice is empty.
     fn format(
         &mut self,
         code: &[CodeExampleLine<'_>],
     ) -> FormatResult<Option<Vec<OutputDocstringLine<'static>>>> {
         use ruff_python_parser::AsMode;
 
-        let offset = code
-            .get(0)
-            .expect("code blob must be non-empty")
-            .original
-            .offset;
-        let last_line_is_last = code
-            .last()
-            .expect("code blob must be non-empty")
-            .original
-            .is_last();
+        let (Some(unformatted_first), Some(unformatted_last)) = (code.first(), code.last()) else {
+            return Ok(None);
+        };
         let codeblob = code
             .iter()
             .map(|line| line.code)
@@ -481,12 +470,12 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             .lines()
             .map(|line| OutputDocstringLine {
                 line: Cow::Owned(line.to_string()),
-                offset,
+                offset: unformatted_first.original.offset,
                 is_last: false,
             })
             .collect::<Vec<_>>();
-        if let Some(last) = lines.last_mut() {
-            last.is_last = last_line_is_last;
+        if let Some(reformatted_last) = lines.last_mut() {
+            reformatted_last.is_last = unformatted_last.original.is_last();
         }
         Ok(Some(lines))
     }
@@ -823,8 +812,6 @@ enum CodeExampleAddAction<'src> {
     /// the code example.
     Format {
         /// The kind of code example that was found.
-        ///
-        /// This is guaranteed to have a non-empty code snippet.
         kind: CodeExampleKind<'src>,
     },
     /// This occurs when adding a line to an existing code example
