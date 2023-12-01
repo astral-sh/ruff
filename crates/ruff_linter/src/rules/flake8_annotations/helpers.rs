@@ -1,10 +1,9 @@
 use itertools::Itertools;
-use ruff_diagnostics::Edit;
 use rustc_hash::FxHashSet;
 
-use crate::importer::{ImportRequest, Importer};
+use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
-    pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
+    implicit_return, pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
 };
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
@@ -13,6 +12,7 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::importer::{ImportRequest, Importer};
 use crate::settings::types::PythonVersion;
 
 /// Return the name of the function, if it's overloaded.
@@ -48,14 +48,19 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
     let returns = {
         let mut visitor = ReturnStatementVisitor::default();
         visitor.visit_body(&function.body);
+
+        // Ignore generators.
         if visitor.is_generator {
             return None;
         }
+
         visitor.returns
     };
 
     // Determine the return type of the first `return` statement.
-    let (return_statement, returns) = returns.split_first()?;
+    let Some((return_statement, returns)) = returns.split_first() else {
+        return Some(AutoPythonType::Atom(PythonType::None));
+    };
     let mut return_type = return_statement.value.as_deref().map_or(
         ResolvedPythonType::Atom(PythonType::None),
         ResolvedPythonType::from,
@@ -67,6 +72,16 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
             ResolvedPythonType::Atom(PythonType::None),
             ResolvedPythonType::from,
         ));
+    }
+
+    // If the function has an implicit return, union with `None`, as in:
+    // ```python
+    // def func(x: int):
+    //     if x > 0:
+    //         return 1
+    // ```
+    if implicit_return(function) {
+        return_type = return_type.union(ResolvedPythonType::Atom(PythonType::None));
     }
 
     match return_type {
