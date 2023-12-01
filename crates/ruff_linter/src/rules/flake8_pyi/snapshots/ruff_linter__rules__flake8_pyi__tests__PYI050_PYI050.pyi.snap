@@ -28,6 +28,42 @@ PYI050.pyi:11:47: PYI050 Prefer `typing.Never` over `NoReturn` for argument anno
 11 | def foo_no_return_pos_only(arg: int, /, arg2: NoReturn): ...  # Error: PYI050
    |                                               ^^^^^^^^ PYI050
 12 | def foo_never(arg: Never): ...
+13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
+   |
+
+PYI050.pyi:13:21: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+   |
+11 | def foo_no_return_pos_only(arg: int, /, arg2: NoReturn): ...  # Error: PYI050
+12 | def foo_never(arg: Never): ...
+13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
+   |                     ^^^^^^^^ PYI050
+14 | def foo_kwargs(**kwargs: NoReturn): ...  # Error: PYI050
+15 | def foo_args_kwargs(*args: NoReturn, **kwargs: NoReturn): ...  # Error: PYI050
+   |
+
+PYI050.pyi:14:26: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+   |
+12 | def foo_never(arg: Never): ...
+13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
+14 | def foo_kwargs(**kwargs: NoReturn): ...  # Error: PYI050
+   |                          ^^^^^^^^ PYI050
+15 | def foo_args_kwargs(*args: NoReturn, **kwargs: NoReturn): ...  # Error: PYI050
+   |
+
+PYI050.pyi:15:28: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+   |
+13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
+14 | def foo_kwargs(**kwargs: NoReturn): ...  # Error: PYI050
+15 | def foo_args_kwargs(*args: NoReturn, **kwargs: NoReturn): ...  # Error: PYI050
+   |                            ^^^^^^^^ PYI050
+   |
+
+PYI050.pyi:15:48: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+   |
+13 | def foo_args(*args: NoReturn): ...  # Error: PYI050
+14 | def foo_kwargs(**kwargs: NoReturn): ...  # Error: PYI050
+15 | def foo_args_kwargs(*args: NoReturn, **kwargs: NoReturn): ...  # Error: PYI050
+   |                                                ^^^^^^^^ PYI050
    |
 
 

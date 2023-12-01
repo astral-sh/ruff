@@ -10,3 +10,6 @@ def foo_no_return_typing_extensions(
 def foo_no_return_kwarg(arg: int, *, arg2: NoReturn): ...  # Error: PYI050
 def foo_no_return_pos_only(arg: int, /, arg2: NoReturn): ...  # Error: PYI050
 def foo_never(arg: Never): ...
+def foo_args(*args: NoReturn): ...  # Error: PYI050
+def foo_kwargs(**kwargs: NoReturn): ...  # Error: PYI050
+def foo_args_kwargs(*args: NoReturn, **kwargs: NoReturn): ...  # Error: PYI050
