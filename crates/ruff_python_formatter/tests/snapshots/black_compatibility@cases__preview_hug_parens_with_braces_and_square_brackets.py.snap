@@ -197,94 +197,7 @@ for foo in ["a", "b"]:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,43 +1,55 @@
- def foo_brackets(request):
--    return JsonResponse({
--        "var_1": foo,
--        "var_2": bar,
--    })
-+    return JsonResponse(
-+        {
-+            "var_1": foo,
-+            "var_2": bar,
-+        }
-+    )
- 
- 
- def foo_square_brackets(request):
--    return JsonResponse([
--        "var_1",
--        "var_2",
--    ])
-+    return JsonResponse(
-+        [
-+            "var_1",
-+            "var_2",
-+        ]
-+    )
- 
- 
--func({
--    "a": 37,
--    "b": 42,
--    "c": 927,
--    "aaaaaaaaaaaaaaaaaaaaaaaaa": 11111111111111111111111111111111111111111,
--})
-+func(
-+    {
-+        "a": 37,
-+        "b": 42,
-+        "c": 927,
-+        "aaaaaaaaaaaaaaaaaaaaaaaaa": 11111111111111111111111111111111111111111,
-+    }
-+)
- 
--func([
--    "random_string_number_one",
--    "random_string_number_two",
--    "random_string_number_three",
--    "random_string_number_four",
--])
-+func(
-+    [
-+        "random_string_number_one",
-+        "random_string_number_two",
-+        "random_string_number_three",
-+        "random_string_number_four",
-+    ]
-+)
- 
--func({
--    # expand me
--    "a": 37,
--    "b": 42,
--    "c": 927,
--})
-+func(
-+    {
-+        # expand me
-+        "a": 37,
-+        "b": 42,
-+        "c": 927,
-+    }
-+)
- 
--func([
--    "a",
--    "b",
--    "c",
--])
-+func(
-+    [
-+        "a",
-+        "b",
-+        "c",
-+    ]
-+)
- 
- func(
-     [
-@@ -47,17 +59,21 @@
+@@ -47,17 +47,21 @@
      ],
  )
  
@@ -316,67 +229,9 @@ for foo in ["a", "b"]:
  
  func(
      # preserve me
-@@ -68,38 +84,48 @@
-     ]
- )
- 
--func([  # preserve me but hug brackets
--    "c",
--    "d",
--    "e",
--])
-+func(
-+    [  # preserve me but hug brackets
-+        "c",
-+        "d",
-+        "e",
-+    ]
-+)
- 
--func([
--    # preserve me but hug brackets
--    "c",
--    "d",
--    "e",
--])
-+func(
-+    [
-+        # preserve me but hug brackets
-+        "c",
-+        "d",
-+        "e",
-+    ]
-+)
- 
--func([
--    "c",
--    # preserve me but hug brackets
--    "d",
--    "e",
--])
-+func(
-+    [
-+        "c",
-+        # preserve me but hug brackets
-+        "d",
-+        "e",
-+    ]
-+)
- 
--func([
--    "c",
--    "d",
--    "e",
--    # preserve me but hug brackets
--])
-+func(
-+    [
-+        "c",
-+        "d",
-+        "e",
-+        # preserve me but hug brackets
-+    ]
-+)
+@@ -95,11 +99,13 @@
+     # preserve me but hug brackets
+ ])
  
 -func([
 -    "c",
@@ -393,33 +248,24 @@ for foo in ["a", "b"]:
  
  func(
      [
-@@ -114,50 +140,68 @@
- func(
-     [x for x in "long line long line long line long line long line long line long line"]
+@@ -111,10 +117,10 @@
  )
--func([
--    x
--    for x in [
-+func(
-+    [
-         x
--        for x in "long line long line long line long line long line long line long line"
-+        for x in [
-+            x
-+            for x in "long line long line long line long line long line long line long line"
-+        ]
-     ]
--])
-+)
  
- func({"short line"})
--func({
--    "long line",
--    "long long line",
--    "long long long line",
--    "long long long long line",
--    "long long long long long line",
--})
+ func([x for x in "short line"])
+-func(
+-    [x for x in "long line long line long line long line long line long line long line"]
+-)
+ func([
++    x for x in "long line long line long line long line long line long line long line"
++])
++func([
+     x
+     for x in [
+         x
+@@ -130,13 +136,15 @@
+     "long long long long line",
+     "long long long long long line",
+ })
 -func({{
 -    "long line",
 -    "long long line",
@@ -427,20 +273,22 @@ for foo in ["a", "b"]:
 -    "long long long long line",
 -    "long long long long long line",
 -}})
--func((
--    "long line",
--    "long long line",
--    "long long long line",
--    "long long long long line",
--    "long long long long long line",
--))
--func(((
--    "long line",
--    "long long line",
--    "long long long line",
--    "long long long long line",
--    "long long long long long line",
--)))
++func({
++    {
++        "long line",
++        "long long line",
++        "long long long line",
++        "long long long long line",
++        "long long long long long line",
++    }
++})
+ func((
+     "long line",
+     "long long line",
+@@ -151,30 +159,62 @@
+     "long long long long line",
+     "long long long long long line",
+ )))
 -func([[
 -    "long line",
 -    "long long line",
@@ -448,61 +296,81 @@ for foo in ["a", "b"]:
 -    "long long long long line",
 -    "long long long long long line",
 -]])
-+func(
-+    {
-+        "long line",
-+        "long long line",
-+        "long long long line",
-+        "long long long long line",
-+        "long long long long long line",
-+    }
-+)
-+func(
-+    {
-+        {
-+            "long line",
-+            "long long line",
-+            "long long long line",
-+            "long long long long line",
-+            "long long long long long line",
-+        }
-+    }
-+)
-+func(
-+    (
-+        "long line",
-+        "long long line",
-+        "long long long line",
-+        "long long long long line",
-+        "long long long long long line",
-+    )
-+)
-+func(
-+    (
-+        (
-+            "long line",
-+            "long long line",
-+            "long long long line",
-+            "long long long long line",
-+            "long long long long long line",
-+        )
-+    )
-+)
-+func(
++func([
 +    [
-+        [
-+            "long line",
-+            "long long line",
-+            "long long long line",
-+            "long long long long line",
-+            "long long long long long line",
-+        ]
++        "long line",
++        "long long line",
++        "long long long line",
++        "long long long long line",
++        "long long long long long line",
 +    ]
-+)
++])
  
  # Do not hug if the argument fits on a single line.
- func(
-@@ -194,18 +238,24 @@
+-func(
+-    {"fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit line"}
+-)
+-func(
+-    ("fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit line")
+-)
+-func(
+-    ["fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit line"]
+-)
+-func(
+-    **{"fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit---"}
+-)
+-func(
+-    *("fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit----")
+-)
++func({
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++})
++func((
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++))
++func([
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++])
++func(**{
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit---",
++})
++func(*(
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit line",
++    "fit----",
++))
+ array = [
+     {"fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit line"}
+ ]
+@@ -194,18 +234,24 @@
  )
  
  nested_mapping = {
@@ -538,148 +406,64 @@ for foo in ["a", "b"]:
  explicit_exploding = [
      [
          [
-@@ -214,30 +264,42 @@
-         ],
-     ],
- ]
--single_item_do_not_explode = Context({
--    "version": get_docs_version(),
--})
-+single_item_do_not_explode = Context(
-+    {
-+        "version": get_docs_version(),
-+    }
-+)
- 
--foo(*[
--    "long long long long long line",
--    "long long long long long line",
--    "long long long long long line",
--])
-+foo(
-+    *[
-+        "long long long long long line",
-+        "long long long long long line",
-+        "long long long long long line",
-+    ]
-+)
- 
--foo(*[
--    str(i) for i in range(100000000000000000000000000000000000000000000000000000000000)
--])
-+foo(
-+    *[
-+        str(i)
-+        for i in range(100000000000000000000000000000000000000000000000000000000000)
-+    ]
-+)
- 
--foo(**{
--    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 1,
--    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 2,
--    "ccccccccccccccccccccccccccccccccc": 3,
--    **other,
--})
-+foo(
-+    **{
-+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 1,
-+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 2,
-+        "ccccccccccccccccccccccccccccccccc": 3,
-+        **other,
-+    }
-+)
- 
--foo(**{
--    x: y for x, y in enumerate(["long long long long line", "long long long long line"])
--})
-+foo(
-+    **{
-+        x: y
-+        for x, y in enumerate(["long long long long line", "long long long long line"])
-+    }
-+)
+@@ -240,9 +286,9 @@
+ })
  
  # Edge case when deciding whether to hug the brackets without inner content.
- very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName(
-@@ -245,11 +307,13 @@
- )
+-very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName(
+-    [[]]
+-)
++very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName([
++    []
++])
  
  for foo in ["a", "b"]:
--    output.extend([
--        individual
--        for
--        # Foobar
--        container in xs_by_y[foo]
--        # Foobar
--        for individual in container["nested"]
--    ])
-+    output.extend(
-+        [
-+            individual
-+            for
-+            # Foobar
-+            container in xs_by_y[foo]
-+            # Foobar
-+            for individual in container["nested"]
-+        ]
-+    )
+     output.extend([
 ```
 
 ## Ruff Output
 
 ```python
 def foo_brackets(request):
-    return JsonResponse(
-        {
-            "var_1": foo,
-            "var_2": bar,
-        }
-    )
+    return JsonResponse({
+        "var_1": foo,
+        "var_2": bar,
+    })
 
 
 def foo_square_brackets(request):
-    return JsonResponse(
-        [
-            "var_1",
-            "var_2",
-        ]
-    )
+    return JsonResponse([
+        "var_1",
+        "var_2",
+    ])
 
 
-func(
-    {
-        "a": 37,
-        "b": 42,
-        "c": 927,
-        "aaaaaaaaaaaaaaaaaaaaaaaaa": 11111111111111111111111111111111111111111,
-    }
-)
+func({
+    "a": 37,
+    "b": 42,
+    "c": 927,
+    "aaaaaaaaaaaaaaaaaaaaaaaaa": 11111111111111111111111111111111111111111,
+})
 
-func(
-    [
-        "random_string_number_one",
-        "random_string_number_two",
-        "random_string_number_three",
-        "random_string_number_four",
-    ]
-)
+func([
+    "random_string_number_one",
+    "random_string_number_two",
+    "random_string_number_three",
+    "random_string_number_four",
+])
 
-func(
-    {
-        # expand me
-        "a": 37,
-        "b": 42,
-        "c": 927,
-    }
-)
+func({
+    # expand me
+    "a": 37,
+    "b": 42,
+    "c": 927,
+})
 
-func(
-    [
-        "a",
-        "b",
-        "c",
-    ]
-)
+func([
+    "a",
+    "b",
+    "c",
+])
 
 func(
     [
@@ -714,40 +498,32 @@ func(
     ]
 )
 
-func(
-    [  # preserve me but hug brackets
-        "c",
-        "d",
-        "e",
-    ]
-)
+func([  # preserve me but hug brackets
+    "c",
+    "d",
+    "e",
+])
 
-func(
-    [
-        # preserve me but hug brackets
-        "c",
-        "d",
-        "e",
-    ]
-)
+func([
+    # preserve me but hug brackets
+    "c",
+    "d",
+    "e",
+])
 
-func(
-    [
-        "c",
-        # preserve me but hug brackets
-        "d",
-        "e",
-    ]
-)
+func([
+    "c",
+    # preserve me but hug brackets
+    "d",
+    "e",
+])
 
-func(
-    [
-        "c",
-        "d",
-        "e",
-        # preserve me but hug brackets
-    ]
-)
+func([
+    "c",
+    "d",
+    "e",
+    # preserve me but hug brackets
+])
 
 func(
     [
@@ -767,21 +543,26 @@ func(
 )
 
 func([x for x in "short line"])
-func(
-    [x for x in "long line long line long line long line long line long line long line"]
-)
-func(
-    [
+func([
+    x for x in "long line long line long line long line long line long line long line"
+])
+func([
+    x
+    for x in [
         x
-        for x in [
-            x
-            for x in "long line long line long line long line long line long line long line"
-        ]
+        for x in "long line long line long line long line long line long line long line"
     ]
-)
+])
 
 func({"short line"})
-func(
+func({
+    "long line",
+    "long long line",
+    "long long long line",
+    "long long long long line",
+    "long long long long long line",
+})
+func({
     {
         "long line",
         "long long line",
@@ -789,66 +570,77 @@ func(
         "long long long long line",
         "long long long long long line",
     }
-)
-func(
-    {
-        {
-            "long line",
-            "long long line",
-            "long long long line",
-            "long long long long line",
-            "long long long long long line",
-        }
-    }
-)
-func(
-    (
-        "long line",
-        "long long line",
-        "long long long line",
-        "long long long long line",
-        "long long long long long line",
-    )
-)
-func(
-    (
-        (
-            "long line",
-            "long long line",
-            "long long long line",
-            "long long long long line",
-            "long long long long long line",
-        )
-    )
-)
-func(
+})
+func((
+    "long line",
+    "long long line",
+    "long long long line",
+    "long long long long line",
+    "long long long long long line",
+))
+func(((
+    "long line",
+    "long long line",
+    "long long long line",
+    "long long long long line",
+    "long long long long long line",
+)))
+func([
     [
-        [
-            "long line",
-            "long long line",
-            "long long long line",
-            "long long long long line",
-            "long long long long long line",
-        ]
+        "long line",
+        "long long line",
+        "long long long line",
+        "long long long long line",
+        "long long long long long line",
     ]
-)
+])
 
 # Do not hug if the argument fits on a single line.
-func(
-    {"fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit line"}
-)
-func(
-    ("fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit line")
-)
-func(
-    ["fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit line"]
-)
-func(
-    **{"fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit---"}
-)
-func(
-    *("fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit----")
-)
+func({
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+})
+func((
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+))
+func([
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+])
+func(**{
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit---",
+})
+func(*(
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit line",
+    "fit----",
+))
 array = [
     {"fit line", "fit line", "fit line", "fit line", "fit line", "fit line", "fit line"}
 ]
@@ -894,59 +686,45 @@ explicit_exploding = [
         ],
     ],
 ]
-single_item_do_not_explode = Context(
-    {
-        "version": get_docs_version(),
-    }
-)
+single_item_do_not_explode = Context({
+    "version": get_docs_version(),
+})
 
-foo(
-    *[
-        "long long long long long line",
-        "long long long long long line",
-        "long long long long long line",
-    ]
-)
+foo(*[
+    "long long long long long line",
+    "long long long long long line",
+    "long long long long long line",
+])
 
-foo(
-    *[
-        str(i)
-        for i in range(100000000000000000000000000000000000000000000000000000000000)
-    ]
-)
+foo(*[
+    str(i) for i in range(100000000000000000000000000000000000000000000000000000000000)
+])
 
-foo(
-    **{
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 1,
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 2,
-        "ccccccccccccccccccccccccccccccccc": 3,
-        **other,
-    }
-)
+foo(**{
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 1,
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 2,
+    "ccccccccccccccccccccccccccccccccc": 3,
+    **other,
+})
 
-foo(
-    **{
-        x: y
-        for x, y in enumerate(["long long long long line", "long long long long line"])
-    }
-)
+foo(**{
+    x: y for x, y in enumerate(["long long long long line", "long long long long line"])
+})
 
 # Edge case when deciding whether to hug the brackets without inner content.
-very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName(
-    [[]]
-)
+very_very_very_long_variable = very_very_very_long_module.VeryVeryVeryVeryLongClassName([
+    []
+])
 
 for foo in ["a", "b"]:
-    output.extend(
-        [
-            individual
-            for
-            # Foobar
-            container in xs_by_y[foo]
-            # Foobar
-            for individual in container["nested"]
-        ]
-    )
+    output.extend([
+        individual
+        for
+        # Foobar
+        container in xs_by_y[foo]
+        # Foobar
+        for individual in container["nested"]
+    ])
 ```
 
 ## Black Output
