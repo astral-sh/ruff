@@ -1,3 +1,12 @@
+###############################################################################
+# DOCTEST CODE EXAMPLES
+#
+# This section shows examples of docstrings that contain code snippets in
+# Python's "doctest" format.
+#
+# See: https://docs.python.org/3/library/doctest.html
+###############################################################################
+
 # The simplest doctest to ensure basic formatting works.
 def doctest_simple():
     """

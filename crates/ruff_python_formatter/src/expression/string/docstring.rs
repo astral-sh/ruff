@@ -244,10 +244,10 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         mut lines: std::iter::Peekable<std::str::Lines<'src>>,
     ) -> FormatResult<()> {
         while let Some(line) = lines.next() {
-            let line = DocstringLine {
-                line: Cow::Borrowed(line),
+            let line = InputDocstringLine {
+                line,
                 offset: self.offset,
-                is_last: lines.peek().is_none(),
+                next: lines.peek().copied(),
             };
             // We know that the normalized string has \n line endings.
             self.offset += line.line.text_len() + "\n".text_len();
@@ -262,7 +262,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// immediately to the underlying buffer. If the line starts or is part
     /// of an existing code snippet, then the lines will get buffered until
     /// the code snippet is complete.
-    fn add_one(&mut self, line: DocstringLine<'src>) -> FormatResult<()> {
+    fn add_one(&mut self, line: InputDocstringLine<'src>) -> FormatResult<()> {
         // Just pass through the line as-is without looking for a code snippet
         // when docstring code formatting is disabled. And also when we are
         // formatting a code snippet so as to avoid arbitrarily nested code
@@ -271,45 +271,49 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         // not clear that it's worth the effort to support.
         if !self.f.options().docstring_code().is_enabled() || self.f.context().docstring().is_some()
         {
-            return self.print_one(&line);
+            return self.print_one(&line.as_output());
         }
         match self.code_example.add(line) {
-            CodeExampleAddAction::Print { original } => self.print_one(&original)?,
+            CodeExampleAddAction::Print { original } => self.print_one(&original.as_output())?,
             CodeExampleAddAction::Kept => {}
-            CodeExampleAddAction::Format {
-                kind,
-                code,
-                original,
-            } => {
-                let Some(formatted_lines) = self.format(&code)? else {
+            CodeExampleAddAction::Reset { code, original } => {
+                for codeline in code {
+                    self.print_one(&codeline.original.as_output())?;
+                }
+                self.print_one(&original.as_output())?;
+            }
+            CodeExampleAddAction::Format { mut kind, original } => {
+                let Some(formatted_lines) = self.format(kind.code())? else {
                     // If formatting failed in a way that should not be
                     // allowed, we back out what we're doing and print the
                     // original lines we found as-is as if we did nothing.
-                    for codeline in code {
-                        self.print_one(&codeline.original)?;
+                    for codeline in kind.code() {
+                        self.print_one(&codeline.original.as_output())?;
                     }
                     if let Some(original) = original {
-                        self.print_one(&original)?;
+                        self.print_one(&original.as_output())?;
                     }
                     return Ok(());
                 };
 
                 self.already_normalized = false;
                 match kind {
-                    CodeExampleKind::Doctest(CodeExampleDoctest { indent }) => {
+                    CodeExampleKind::Doctest(CodeExampleDoctest { ps1_indent, .. }) => {
                         let mut lines = formatted_lines.into_iter();
                         if let Some(first) = lines.next() {
-                            self.print_one(&first.map(|line| std::format!("{indent}>>> {line}")))?;
+                            self.print_one(
+                                &first.map(|line| std::format!("{ps1_indent}>>> {line}")),
+                            )?;
                             for docline in lines {
                                 self.print_one(
-                                    &docline.map(|line| std::format!("{indent}... {line}")),
+                                    &docline.map(|line| std::format!("{ps1_indent}... {line}")),
                                 )?;
                             }
                         }
                     }
                 }
                 if let Some(original) = original {
-                    self.print_one(&original)?;
+                    self.print_one(&original.as_output())?;
                 }
             }
         }
@@ -321,7 +325,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// This mostly just handles indentation and ensuring line breaks are
     /// inserted as appropriate before passing it on to the formatter to
     /// print to the buffer.
-    fn print_one(&mut self, line: &DocstringLine<'_>) -> FormatResult<()> {
+    fn print_one(&mut self, line: &OutputDocstringLine<'_>) -> FormatResult<()> {
         let trim_end = line.line.trim_end();
         if trim_end.is_empty() {
             return if line.is_last {
@@ -391,10 +395,14 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// routine is silent about it. So from the user's perspective, this will
     /// fail silently. Ideally, this would at least emit a warning message,
     /// but at time of writing, it wasn't clear to me how to best do that.
+    ///
+    /// # Panics
+    ///
+    /// This panics when the given slice is empty.
     fn format(
         &mut self,
-        code: &[CodeExampleLine<'src>],
-    ) -> FormatResult<Option<Vec<DocstringLine<'static>>>> {
+        code: &[CodeExampleLine<'_>],
+    ) -> FormatResult<Option<Vec<OutputDocstringLine<'static>>>> {
         use ruff_python_parser::AsMode;
 
         let offset = code
@@ -406,10 +414,10 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             .last()
             .expect("code blob must be non-empty")
             .original
-            .is_last;
+            .is_last();
         let codeblob = code
             .iter()
-            .map(|line| &*line.code)
+            .map(|line| line.code)
             .collect::<Vec<&str>>()
             .join("\n");
         let printed = match docstring_format_source(self.f.options(), self.quote_style, &codeblob) {
@@ -451,8 +459,8 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         let mut lines = printed
             .as_code()
             .lines()
-            .map(|line| DocstringLine {
-                line: Cow::Owned(line.into()),
+            .map(|line| OutputDocstringLine {
+                line: Cow::Owned(line.to_string()),
                 offset,
                 is_last: false,
             })
@@ -466,29 +474,72 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
 
 /// Represents a single line in a docstring.
 ///
-/// This type is used to both represent the original lines in a docstring
-/// (the line will be borrowed) and also the newly formatted lines from code
-/// snippets (the line will be owned).
-#[derive(Clone, Debug)]
-struct DocstringLine<'src> {
+/// This type is only used to represent the original lines in a docstring.
+/// Specifically, the line contained in this type has no changes from the input
+/// source.
+#[derive(Clone, Copy, Debug)]
+struct InputDocstringLine<'src> {
     /// The actual text of the line, not including the line terminator.
     ///
     /// In practice, this line is borrowed when it corresponds to an original
     /// unformatted line in a docstring, and owned when it corresponds to a
     /// reformatted line (e.g., from a code snippet) in a docstring.
-    line: Cow<'src, str>,
+    line: &'src str,
     /// The offset into the source document which this line corresponds to.
     offset: TextSize,
-    /// Whether this is the last line in a docstring or not. "Last" lines have
-    /// some special treatment when printing.
+    /// For any input line that isn't the last line, this contains a reference
+    /// to the line immediately following this one.
+    ///
+    /// This is `None` if and only if this is the last line in the docstring.
+    next: Option<&'src str>,
+}
+
+impl<'src> InputDocstringLine<'src> {
+    /// Borrow this input docstring line as an output docstring line.
+    fn as_output(&self) -> OutputDocstringLine<'src> {
+        OutputDocstringLine {
+            line: Cow::Borrowed(self.line),
+            offset: self.offset,
+            is_last: self.is_last(),
+        }
+    }
+
+    /// Whether this is the last line in the docstring or not.
+    fn is_last(&self) -> bool {
+        self.next.is_none()
+    }
+}
+
+/// Represents a single reformatted code line in a docstring.
+///
+/// An input source line may be cheaply converted to an output source line.
+/// This is the common case: an input source line is printed pretty much as it
+/// is, with perhaps some whitespace normalization applied. The less common
+/// case is that the output docstring line owns its `line` because it was
+/// produced by reformatting a code snippet.
+#[derive(Clone, Debug)]
+struct OutputDocstringLine<'src> {
+    /// The output line.
+    ///
+    /// This is an owned variant in precisely the cases where it corresponds to
+    /// a line from a reformatted code snippet. In other cases, it is borrowed
+    /// from the input docstring line as-is.
+    line: Cow<'src, str>,
+    /// The offset into the source document which this line corresponds to.
+    /// Currently, this is an estimate.
+    offset: TextSize,
+    /// Whether this is the last line in a docstring or not. This is determined
+    /// by whether the last line in the code snippet was also the last line in
+    /// the docstring. If it was, then it follows that the last line in the
+    /// reformatted code snippet is also the last line in the docstring.
     is_last: bool,
 }
 
-impl<'src> DocstringLine<'src> {
-    /// Return this line, but with the given function applied to the text of
-    /// the line.
-    fn map(self, mut map: impl FnMut(&str) -> String) -> DocstringLine<'static> {
-        DocstringLine {
+impl<'src> OutputDocstringLine<'src> {
+    /// Return this reformatted line, but with the given function applied to
+    /// the text of the line.
+    fn map(self, mut map: impl FnMut(&str) -> String) -> OutputDocstringLine<'static> {
+        OutputDocstringLine {
             line: Cow::Owned(map(&self.line)),
             ..self
         }
@@ -507,9 +558,10 @@ impl<'src> DocstringLine<'src> {
 struct CodeExample<'src> {
     /// The kind of code example being collected, or `None` if no code example
     /// has been observed.
-    kind: Option<CodeExampleKind>,
-    /// The lines that have been seen so far that make up the code example.
-    lines: Vec<CodeExampleLine<'src>>,
+    ///
+    /// The kind is split out into a separate type so that we can pass it
+    /// around and have a guarantee that a code example actually exists.
+    kind: Option<CodeExampleKind<'src>>,
 }
 
 impl<'src> CodeExample<'src> {
@@ -520,7 +572,7 @@ impl<'src> CodeExample<'src> {
     /// the caller to perform. The typical case is a "print" action, which
     /// instructs the caller to just print the line as though it were not part
     /// of a code snippet.
-    fn add(&mut self, original: DocstringLine<'src>) -> CodeExampleAddAction<'src> {
+    fn add(&mut self, original: InputDocstringLine<'src>) -> CodeExampleAddAction<'src> {
         match self.kind.take() {
             // There's no existing code example being built, so we look for
             // the start of one or otherwise tell the caller we couldn't find
@@ -529,19 +581,15 @@ impl<'src> CodeExample<'src> {
                 None => CodeExampleAddAction::Kept,
                 Some(original) => CodeExampleAddAction::Print { original },
             },
-            Some(CodeExampleKind::Doctest(doctest)) => {
-                if let Some(code) = doctest_find_ps2_prompt(&doctest.indent, &original.line) {
-                    let code = code.to_string();
-                    self.lines.push(CodeExampleLine { original, code });
+            Some(CodeExampleKind::Doctest(mut doctest)) => {
+                if doctest.add_code_line(original) {
                     // Stay with the doctest kind while we accumulate all
                     // PS2 prompts.
                     self.kind = Some(CodeExampleKind::Doctest(doctest));
                     return CodeExampleAddAction::Kept;
                 }
-                let code = std::mem::take(&mut self.lines);
                 let original = self.add_start(original);
                 CodeExampleAddAction::Format {
-                    code,
                     kind: CodeExampleKind::Doctest(doctest),
                     original,
                 }
@@ -558,13 +606,13 @@ impl<'src> CodeExample<'src> {
     /// This panics when the existing code-example is any non-None value. That
     /// is, this routine assumes that there is no ongoing code example being
     /// collected and looks for the beginning of another code example.
-    fn add_start(&mut self, original: DocstringLine<'src>) -> Option<DocstringLine<'src>> {
-        assert_eq!(None, self.kind, "expected no existing code example");
-        if let Some((indent, code)) = doctest_find_ps1_prompt(&original.line) {
-            let indent = indent.to_string();
-            let code = code.to_string();
-            self.lines.push(CodeExampleLine { original, code });
-            self.kind = Some(CodeExampleKind::Doctest(CodeExampleDoctest { indent }));
+    fn add_start(
+        &mut self,
+        original: InputDocstringLine<'src>,
+    ) -> Option<InputDocstringLine<'src>> {
+        assert!(self.kind.is_none(), "expected no existing code example");
+        if let Some(doctest) = CodeExampleDoctest::new(original) {
+            self.kind = Some(CodeExampleKind::Doctest(doctest));
             return None;
         }
         Some(original)
@@ -572,8 +620,8 @@ impl<'src> CodeExample<'src> {
 }
 
 /// The kind of code example observed in a docstring.
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum CodeExampleKind {
+#[derive(Debug)]
+enum CodeExampleKind<'src> {
     /// Code found in Python "doctests."
     ///
     /// Documentation describing doctests and how they're recognized can be
@@ -584,17 +632,90 @@ enum CodeExampleKind {
     /// doctest module to determine more precisely how it works.)
     ///
     /// [regex matching]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L611-L622
-    Doctest(CodeExampleDoctest),
+    Doctest(CodeExampleDoctest<'src>),
+}
+
+impl<'src> CodeExampleKind<'src> {
+    /// Return the lines of code collected so far for this example.
+    ///
+    /// This is borrowed mutably because it may need to mutate the code lines
+    /// based on the state accrued so far.
+    fn code(&mut self) -> &[CodeExampleLine<'src>] {
+        match *self {
+            CodeExampleKind::Doctest(ref doctest) => &doctest.lines,
+        }
+    }
 }
 
 /// State corresponding to a single doctest code example found in a docstring.
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct CodeExampleDoctest {
+#[derive(Debug)]
+struct CodeExampleDoctest<'src> {
+    /// The lines that have been seen so far that make up the doctest.
+    lines: Vec<CodeExampleLine<'src>>,
     /// The indent observed in the first doctest line.
     ///
     /// More precisely, this corresponds to the whitespace observed before
     /// the starting `>>> ` (the "PS1 prompt").
-    indent: String,
+    ps1_indent: &'src str,
+}
+
+impl<'src> CodeExampleDoctest<'src> {
+    /// Looks for a valid doctest PS1 prompt in the line given.
+    ///
+    /// If one was found, then state for a new doctest code example is
+    /// returned, along with the code example line.
+    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleDoctest<'src>> {
+        let trim_start = original.line.trim_start();
+        // Prompts must be followed by an ASCII space character[1].
+        //
+        // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
+        let code = trim_start.strip_prefix(">>> ")?;
+        let indent_len = original
+            .line
+            .len()
+            .checked_sub(trim_start.len())
+            .expect("suffix is <= original");
+        let lines = vec![CodeExampleLine { original, code }];
+        let ps1_indent = &original.line[..indent_len];
+        let doctest = CodeExampleDoctest { lines, ps1_indent };
+        Some(doctest)
+    }
+
+    /// Looks for a valid doctest PS2 prompt in the line given.
+    ///
+    /// If one is found, then the code portion of the line following the PS2 prompt
+    /// is returned.
+    ///
+    /// Callers must provide a string containing the original indentation of the
+    /// PS1 prompt that started the doctest containing the potential PS2 prompt
+    /// in the line given. If the line contains a PS2 prompt, its indentation must
+    /// match the indentation used for the corresponding PS1 prompt (otherwise
+    /// `None` will be returned).
+    fn add_code_line(&mut self, original: InputDocstringLine<'src>) -> bool {
+        let Some((ps2_indent, ps2_after)) = original.line.split_once("...") else {
+            return false;
+        };
+        // PS2 prompts must have the same indentation as their
+        // corresponding PS1 prompt.[1] While the 'doctest' Python
+        // module will error in this case, we just treat this line as a
+        // non-doctest line.
+        //
+        // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L733
+        if self.ps1_indent != ps2_indent {
+            return false;
+        }
+        // PS2 prompts must be followed by an ASCII space character unless
+        // it's an otherwise empty line[1].
+        //
+        // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
+        let code = match ps2_after.strip_prefix(' ') {
+            None if ps2_after.is_empty() => "",
+            None => return false,
+            Some(code) => code,
+        };
+        self.lines.push(CodeExampleLine { original, code });
+        true
+    }
 }
 
 /// A single line in a code example found in a docstring.
@@ -615,9 +736,9 @@ struct CodeExampleLine<'src> {
     /// The normalized (but original) line from the doc string. This might, for
     /// example, contain a `>>> ` or `... ` prefix if this code example is a
     /// doctest.
-    original: DocstringLine<'src>,
+    original: InputDocstringLine<'src>,
     /// The code extracted from the line.
-    code: String,
+    code: &'src str,
 }
 
 /// An action that a caller should perform after attempting to add a line from
@@ -633,7 +754,7 @@ enum CodeExampleAddAction<'src> {
     ///
     /// This is the common case. That is, most lines in most docstrings are not
     /// part of a code example.
-    Print { original: DocstringLine<'src> },
+    Print { original: InputDocstringLine<'src> },
     /// The line added was kept by `CodeExample` as part of a new or existing
     /// code example.
     ///
@@ -647,68 +768,29 @@ enum CodeExampleAddAction<'src> {
     /// callers should pass it through to the formatter as-is.
     Format {
         /// The kind of code example that was found.
-        kind: CodeExampleKind,
-        /// The Python code that should be formatted, indented and printed.
         ///
-        /// This is guaranteed to be non-empty.
-        code: Vec<CodeExampleLine<'src>>,
+        /// This is guaranteed to have a non-empty code snippet.
+        kind: CodeExampleKind<'src>,
         /// When set, the line is considered not part of any code example and
         /// should be formatted as if the [`Print`] action were returned.
         /// Otherwise, if there is no line, then either one does not exist
         /// or it is part of another code example and should be treated as a
         /// [`Kept`] action.
-        original: Option<DocstringLine<'src>>,
+        original: Option<InputDocstringLine<'src>>,
     },
-}
-
-/// Looks for a valid doctest PS1 prompt in the line given.
-///
-/// If one was found, then the indentation prior to the prompt is returned
-/// along with the code portion of the line.
-fn doctest_find_ps1_prompt(line: &str) -> Option<(&str, &str)> {
-    let trim_start = line.trim_start();
-    // Prompts must be followed by an ASCII space character[1].
-    //
-    // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
-    let code = trim_start.strip_prefix(">>> ")?;
-    let indent_len = line
-        .len()
-        .checked_sub(trim_start.len())
-        .expect("suffix is <= original");
-    let indent = &line[..indent_len];
-    Some((indent, code))
-}
-
-/// Looks for a valid doctest PS2 prompt in the line given.
-///
-/// If one is found, then the code portion of the line following the PS2 prompt
-/// is returned.
-///
-/// Callers must provide a string containing the original indentation of the
-/// PS1 prompt that started the doctest containing the potential PS2 prompt
-/// in the line given. If the line contains a PS2 prompt, its indentation must
-/// match the indentation used for the corresponding PS1 prompt (otherwise
-/// `None` will be returned).
-fn doctest_find_ps2_prompt<'src>(ps1_indent: &str, line: &'src str) -> Option<&'src str> {
-    let (ps2_indent, ps2_after) = line.split_once("...")?;
-    // PS2 prompts must have the same indentation as their
-    // corresponding PS1 prompt.[1] While the 'doctest' Python
-    // module will error in this case, we just treat this line as a
-    // non-doctest line.
-    //
-    // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L733
-    if ps1_indent != ps2_indent {
-        return None;
-    }
-    // PS2 prompts must be followed by an ASCII space character unless
-    // it's an otherwise empty line[1].
-    //
-    // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
-    match ps2_after.strip_prefix(' ') {
-        None if ps2_after.is_empty() => Some(""),
-        None => None,
-        Some(code) => Some(code),
-    }
+    /// This occurs when adding a line to an existing code example
+    /// results in that code example becoming invalid. In this case,
+    /// we don't want to treat it as a code example, but instead write
+    /// back the lines to the docstring unchanged.
+    #[allow(dead_code)] // FIXME: remove when reStructuredText support is added
+    Reset {
+        /// The lines of code that we collected but should be printed back to
+        /// the docstring as-is and not formatted.
+        code: Vec<CodeExampleLine<'src>>,
+        /// The line that was added and triggered this reset to occur. It
+        /// should be written back to the docstring as-is after the code lines.
+        original: InputDocstringLine<'src>,
+    },
 }
 
 /// Formats the given source code using the given options.
