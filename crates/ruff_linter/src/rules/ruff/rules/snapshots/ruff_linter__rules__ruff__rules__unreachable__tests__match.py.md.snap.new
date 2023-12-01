@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/rules/unreachable.rs
+assertion_line: 1112
 description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
 ---
 ## Function 0
@@ -780,7 +781,7 @@ def func(point):
     match point:
         case (0, 0):
             print("Origin")
-        case foo:
+        case _:
             raise ValueError("oops")
 ```
 
@@ -794,13 +795,13 @@ flowchart TD
   block2["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
-        case foo:
+        case _:
             raise ValueError(#quot;oops#quot;)\n"]
   block3["print(#quot;Origin#quot;)\n"]
   block4["match point:
         case (0, 0):
             print(#quot;Origin#quot;)
-        case foo:
+        case _:
             raise ValueError(#quot;oops#quot;)\n"]
 
   start --> block4
