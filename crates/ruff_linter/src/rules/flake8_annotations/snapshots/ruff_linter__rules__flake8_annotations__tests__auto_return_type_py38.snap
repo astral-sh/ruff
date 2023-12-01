@@ -220,4 +220,266 @@ auto_return_type.py:59:5: ANN201 [*] Missing return type annotation for public f
 61 62 |         return 1
 62 63 |     elif x > 5:
 
+auto_return_type.py:68:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+68 | def func(x: int):
+   |     ^^^^ ANN201
+69 |     if x:
+70 |         return 1
+   |
+   = help: Add return type annotation: `Optional[int]`
+
+ℹ Unsafe fix
+   1  |+from typing import Optional
+1  2  | def func():
+2  3  |     return 1
+3  4  | 
+--------------------------------------------------------------------------------
+65 66 |         return None
+66 67 | 
+67 68 | 
+68    |-def func(x: int):
+   69 |+def func(x: int) -> Optional[int]:
+69 70 |     if x:
+70 71 |         return 1
+71 72 | 
+
+auto_return_type.py:73:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+73 | def func():
+   |     ^^^^ ANN201
+74 |     x = 1
+   |
+   = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+70 70 |         return 1
+71 71 | 
+72 72 | 
+73    |-def func():
+   73 |+def func() -> None:
+74 74 |     x = 1
+75 75 | 
+76 76 | 
+
+auto_return_type.py:77:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+77 | def func(x: int):
+   |     ^^^^ ANN201
+78 |     if x > 0:
+79 |         return 1
+   |
+   = help: Add return type annotation: `Optional[int]`
+
+ℹ Unsafe fix
+   1  |+from typing import Optional
+1  2  | def func():
+2  3  |     return 1
+3  4  | 
+--------------------------------------------------------------------------------
+74 75 |     x = 1
+75 76 | 
+76 77 | 
+77    |-def func(x: int):
+   78 |+def func(x: int) -> Optional[int]:
+78 79 |     if x > 0:
+79 80 |         return 1
+80 81 | 
+
+auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+82 | def func(x: int):
+   |     ^^^^ ANN201
+83 |     match x:
+84 |         case [1, 2, 3]:
+   |
+   = help: Add return type annotation: `Union[str | int]`
+
+ℹ Unsafe fix
+   1  |+from typing import Union
+1  2  | def func():
+2  3  |     return 1
+3  4  | 
+--------------------------------------------------------------------------------
+79 80 |         return 1
+80 81 | 
+81 82 | 
+82    |-def func(x: int):
+   83 |+def func(x: int) -> Union[str | int]:
+83 84 |     match x:
+84 85 |         case [1, 2, 3]:
+85 86 |             return 1
+
+auto_return_type.py:90:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+90 | def func(x: int):
+   |     ^^^^ ANN201
+91 |     for i in range(5):
+92 |         if i > 0:
+   |
+   = help: Add return type annotation: `Optional[int]`
+
+ℹ Unsafe fix
+   1  |+from typing import Optional
+1  2  | def func():
+2  3  |     return 1
+3  4  | 
+--------------------------------------------------------------------------------
+87 88 |             return "foo"
+88 89 | 
+89 90 | 
+90    |-def func(x: int):
+   91 |+def func(x: int) -> Optional[int]:
+91 92 |     for i in range(5):
+92 93 |         if i > 0:
+93 94 |             return 1
+
+auto_return_type.py:96:5: ANN201 [*] Missing return type annotation for public function `func`
+   |
+96 | def func(x: int):
+   |     ^^^^ ANN201
+97 |     for i in range(5):
+98 |         if i > 0:
+   |
+   = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+93 93 |             return 1
+94 94 | 
+95 95 | 
+96    |-def func(x: int):
+   96 |+def func(x: int) -> int:
+97 97 |     for i in range(5):
+98 98 |         if i > 0:
+99 99 |             return 1
+
+auto_return_type.py:104:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+104 | def func(x: int):
+    |     ^^^^ ANN201
+105 |     for i in range(5):
+106 |         if i > 0:
+    |
+    = help: Add return type annotation: `Optional[int]`
+
+ℹ Unsafe fix
+    1   |+from typing import Optional
+1   2   | def func():
+2   3   |     return 1
+3   4   | 
+--------------------------------------------------------------------------------
+101 102 |         return 4
+102 103 | 
+103 104 | 
+104     |-def func(x: int):
+    105 |+def func(x: int) -> Optional[int]:
+105 106 |     for i in range(5):
+106 107 |         if i > 0:
+107 108 |             break
+
+auto_return_type.py:112:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+112 | def func(x: int):
+    |     ^^^^ ANN201
+113 |     try:
+114 |         pass
+    |
+    = help: Add return type annotation: `Optional[int]`
+
+ℹ Unsafe fix
+    1   |+from typing import Optional
+1   2   | def func():
+2   3   |     return 1
+3   4   | 
+--------------------------------------------------------------------------------
+109 110 |         return 4
+110 111 | 
+111 112 | 
+112     |-def func(x: int):
+    113 |+def func(x: int) -> Optional[int]:
+113 114 |     try:
+114 115 |         pass
+115 116 |     except:
+
+auto_return_type.py:119:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+119 | def func(x: int):
+    |     ^^^^ ANN201
+120 |     try:
+121 |         pass
+    |
+    = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+116 116 |         return 1
+117 117 | 
+118 118 | 
+119     |-def func(x: int):
+    119 |+def func(x: int) -> int:
+120 120 |     try:
+121 121 |         pass
+122 122 |     except:
+
+auto_return_type.py:128:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+128 | def func(x: int):
+    |     ^^^^ ANN201
+129 |     try:
+130 |         pass
+    |
+    = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+125 125 |         return 2
+126 126 | 
+127 127 | 
+128     |-def func(x: int):
+    128 |+def func(x: int) -> int:
+129 129 |     try:
+130 130 |         pass
+131 131 |     except:
+
+auto_return_type.py:137:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+137 | def func(x: int):
+    |     ^^^^ ANN201
+138 |     try:
+139 |         return 1
+    |
+    = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+134 134 |         return 2
+135 135 | 
+136 136 | 
+137     |-def func(x: int):
+    137 |+def func(x: int) -> int:
+138 138 |     try:
+139 139 |         return 1
+140 140 |     except:
+
+auto_return_type.py:146:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+146 | def func(x: int):
+    |     ^^^^ ANN201
+147 |     while x > 0:
+148 |         break
+    |
+    = help: Add return type annotation: `Optional[int]`
+
+ℹ Unsafe fix
+    1   |+from typing import Optional
+1   2   | def func():
+2   3   |     return 1
+3   4   | 
+--------------------------------------------------------------------------------
+143 144 |         pass
+144 145 | 
+145 146 | 
+146     |-def func(x: int):
+    147 |+def func(x: int) -> Optional[int]:
+147 148 |     while x > 0:
+148 149 |         break
+149 150 |         return 1
+
 
