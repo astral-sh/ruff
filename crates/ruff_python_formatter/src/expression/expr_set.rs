@@ -1,11 +1,10 @@
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{ExprSet, Ranged};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::ExprSet;
+use ruff_text_size::Ranged;
 
-use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
-};
+use crate::comments::SourceComment;
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
 #[derive(Default)]
 pub struct FormatExprSet;
@@ -23,12 +22,18 @@ impl FormatNodeRule<ExprSet> for FormatExprSet {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
-        parenthesized_with_dangling_comments("{", dangling, &joined, "}").fmt(f)
+        parenthesized("{", &joined, "}")
+            .with_dangling_comments(dangling)
+            .fmt(f)
     }
 
-    fn fmt_dangling_comments(&self, _node: &ExprSet, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`
         Ok(())
     }

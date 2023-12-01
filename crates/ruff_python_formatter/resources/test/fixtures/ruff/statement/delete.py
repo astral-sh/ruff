@@ -73,3 +73,7 @@ del (
 
 del (  # dangling end of line comment
 )
+
+del (  # dangling end of line comment
+    # dangling own line comment
+)  # trailing statement comment

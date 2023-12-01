@@ -1,0 +1,25 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        FStringStart,
+        0..2,
+    ),
+    (
+        FStringMiddle {
+            value: "\\0",
+            is_raw: false,
+        },
+        2..4,
+    ),
+    (
+        FStringEnd,
+        4..5,
+    ),
+    (
+        Newline,
+        5..5,
+    ),
+]

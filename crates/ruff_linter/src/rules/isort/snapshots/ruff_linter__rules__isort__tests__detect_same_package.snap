@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+bar.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / import os
+2 | | import pandas
+3 | | import foo.baz
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+1 1 | import os
+  2 |+
+2 3 | import pandas
+  4 |+
+3 5 | import foo.baz
+
+

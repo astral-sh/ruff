@@ -1,0 +1,128 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B009_B010.py:50:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+49 | # Invalid usage
+50 | setattr(foo, "bar", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+51 | setattr(foo, "_123abc", None)
+52 | setattr(foo, "__123abc__", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Safe fix
+47 47 |     pass
+48 48 | 
+49 49 | # Invalid usage
+50    |-setattr(foo, "bar", None)
+   50 |+foo.bar = None
+51 51 | setattr(foo, "_123abc", None)
+52 52 | setattr(foo, "__123abc__", None)
+53 53 | setattr(foo, "abc123", None)
+
+B009_B010.py:51:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+49 | # Invalid usage
+50 | setattr(foo, "bar", None)
+51 | setattr(foo, "_123abc", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+52 | setattr(foo, "__123abc__", None)
+53 | setattr(foo, "abc123", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Safe fix
+48 48 | 
+49 49 | # Invalid usage
+50 50 | setattr(foo, "bar", None)
+51    |-setattr(foo, "_123abc", None)
+   51 |+foo._123abc = None
+52 52 | setattr(foo, "__123abc__", None)
+53 53 | setattr(foo, "abc123", None)
+54 54 | setattr(foo, r"abc123", None)
+
+B009_B010.py:52:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+50 | setattr(foo, "bar", None)
+51 | setattr(foo, "_123abc", None)
+52 | setattr(foo, "__123abc__", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+53 | setattr(foo, "abc123", None)
+54 | setattr(foo, r"abc123", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Safe fix
+49 49 | # Invalid usage
+50 50 | setattr(foo, "bar", None)
+51 51 | setattr(foo, "_123abc", None)
+52    |-setattr(foo, "__123abc__", None)
+   52 |+foo.__123abc__ = None
+53 53 | setattr(foo, "abc123", None)
+54 54 | setattr(foo, r"abc123", None)
+55 55 | setattr(foo.bar, r"baz", None)
+
+B009_B010.py:53:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+51 | setattr(foo, "_123abc", None)
+52 | setattr(foo, "__123abc__", None)
+53 | setattr(foo, "abc123", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+54 | setattr(foo, r"abc123", None)
+55 | setattr(foo.bar, r"baz", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Safe fix
+50 50 | setattr(foo, "bar", None)
+51 51 | setattr(foo, "_123abc", None)
+52 52 | setattr(foo, "__123abc__", None)
+53    |-setattr(foo, "abc123", None)
+   53 |+foo.abc123 = None
+54 54 | setattr(foo, r"abc123", None)
+55 55 | setattr(foo.bar, r"baz", None)
+56 56 | 
+
+B009_B010.py:54:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+52 | setattr(foo, "__123abc__", None)
+53 | setattr(foo, "abc123", None)
+54 | setattr(foo, r"abc123", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+55 | setattr(foo.bar, r"baz", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Safe fix
+51 51 | setattr(foo, "_123abc", None)
+52 52 | setattr(foo, "__123abc__", None)
+53 53 | setattr(foo, "abc123", None)
+54    |-setattr(foo, r"abc123", None)
+   54 |+foo.abc123 = None
+55 55 | setattr(foo.bar, r"baz", None)
+56 56 | 
+57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
+
+B009_B010.py:55:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+53 | setattr(foo, "abc123", None)
+54 | setattr(foo, r"abc123", None)
+55 | setattr(foo.bar, r"baz", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+56 | 
+57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Safe fix
+52 52 | setattr(foo, "__123abc__", None)
+53 53 | setattr(foo, "abc123", None)
+54 54 | setattr(foo, r"abc123", None)
+55    |-setattr(foo.bar, r"baz", None)
+   55 |+foo.bar.baz = None
+56 56 | 
+57 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
+58 58 | assert getattr(func, '_rpc')is True
+
+

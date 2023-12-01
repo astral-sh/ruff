@@ -1,0 +1,51 @@
+---
+source: crates/ruff_linter/src/rules/flake8_quotes/mod.rs
+---
+docstring_singles_module_multiline.py:4:1: Q001 [*] Single quote multiline found but double quotes preferred
+  |
+2 |   Double quotes multiline module docstring
+3 |   '''
+4 | / '''
+5 | | this is not a docstring
+6 | | '''
+  | |___^ Q001
+7 |   def foo():
+8 |       pass
+  |
+  = help: Replace single multiline quotes with double quotes
+
+ℹ Safe fix
+1 1 | '''
+2 2 | Double quotes multiline module docstring
+3 3 | '''
+4   |-'''
+  4 |+"""
+5 5 | this is not a docstring
+6   |-'''
+  6 |+"""
+7 7 | def foo():
+8 8 |     pass
+9 9 | '''
+
+docstring_singles_module_multiline.py:9:1: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+ 7 |   def foo():
+ 8 |       pass
+ 9 | / '''
+10 | | this is not a docstring
+11 | | '''
+   | |___^ Q001
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Safe fix
+6  6  | '''
+7  7  | def foo():
+8  8  |     pass
+9     |-'''
+   9  |+"""
+10 10 | this is not a docstring
+11    |-'''
+   11 |+"""
+
+

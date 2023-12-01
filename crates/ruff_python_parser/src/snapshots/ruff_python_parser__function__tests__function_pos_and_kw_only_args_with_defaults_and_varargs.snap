@@ -7,6 +7,7 @@ Ok(
         FunctionDef(
             StmtFunctionDef {
                 range: 0..42,
+                is_async: false,
                 decorator_list: [],
                 name: Identifier {
                     id: "f",
@@ -88,13 +89,12 @@ Ok(
                                 annotation: None,
                             },
                             default: Some(
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 27..29,
                                         value: Int(
                                             20,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ),
@@ -110,13 +110,12 @@ Ok(
                                 annotation: None,
                             },
                             default: Some(
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 33..35,
                                         value: Int(
                                             30,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             ),

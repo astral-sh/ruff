@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+length_sort_non_ascii_modules.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / import loooooooooooooong
+2 | | import mediuuuuuum
+3 | | import short
+4 | | import σηορτ
+5 | | import shoort
+6 | | import mediuuuuum
+7 | | import λοοοοοοοοοοοοοονγ
+8 | | import μεδιυυυυυμ
+9 | | import looooooooooooooong
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+1   |-import loooooooooooooong
+2   |-import mediuuuuuum
+3 1 | import short
+4 2 | import σηορτ
+5 3 | import shoort
+6 4 | import mediuuuuum
+  5 |+import μεδιυυυυυμ
+  6 |+import mediuuuuuum
+  7 |+import loooooooooooooong
+7 8 | import λοοοοοοοοοοοοοονγ
+8   |-import μεδιυυυυυμ
+9 9 | import looooooooooooooong
+
+

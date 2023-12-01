@@ -1,0 +1,74 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
+    |
+286 | @expect('D210: No whitespaces allowed surrounding docstring text')
+287 | def endswith():
+288 |     """Whitespace at the end. """
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
+    |
+    = help: Trim surrounding whitespace
+
+ℹ Safe fix
+285 285 | 
+286 286 | @expect('D210: No whitespaces allowed surrounding docstring text')
+287 287 | def endswith():
+288     |-    """Whitespace at the end. """
+    288 |+    """Whitespace at the end."""
+289 289 | 
+290 290 | 
+291 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
+
+D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
+    |
+291 | @expect('D210: No whitespaces allowed surrounding docstring text')
+292 | def around():
+293 |     """ Whitespace at everywhere. """
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
+    |
+    = help: Trim surrounding whitespace
+
+ℹ Safe fix
+290 290 | 
+291 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
+292 292 | def around():
+293     |-    """ Whitespace at everywhere. """
+    293 |+    """Whitespace at everywhere."""
+294 294 | 
+295 295 | 
+296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
+
+D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
+    |
+297 |   @expect('D213: Multi-line docstring summary should start at the second line')
+298 |   def multiline():
+299 |       """ Whitespace at the beginning.
+    |  _____^
+300 | | 
+301 | |     This is the end.
+302 | |     """
+    | |_______^ D210
+    |
+    = help: Trim surrounding whitespace
+
+ℹ Safe fix
+296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
+297 297 | @expect('D213: Multi-line docstring summary should start at the second line')
+298 298 | def multiline():
+299     |-    """ Whitespace at the beginning.
+    299 |+    """Whitespace at the beginning.
+300 300 | 
+301 301 |     This is the end.
+302 302 |     """
+
+D.py:581:5: D210 No whitespaces allowed surrounding docstring text
+    |
+579 |         "or exclamation point (not '\"')")
+580 | def endswith_quote():
+581 |     """Whitespace at the end, but also a quote" """
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
+    |
+    = help: Trim surrounding whitespace
+
+

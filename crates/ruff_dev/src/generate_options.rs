@@ -1,75 +1,224 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
 //!
-//! Used for <https://beta.ruff.rs/docs/settings/>.
-use itertools::Itertools;
+//! Used for <https://docs.astral.sh/ruff/settings/>.
+use std::fmt::Write;
 
-use ruff::settings::options::Options;
-use ruff::settings::options_base::{OptionEntry, OptionField};
+use ruff_python_trivia::textwrap;
+use ruff_workspace::options::Options;
+use ruff_workspace::options_base::{OptionField, OptionSet, OptionsMetadata, Visit};
 
-fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
-    // if there's a group name, we need to add it to the anchor
-    if let Some(group_name) = group_name {
+pub(crate) fn generate() -> String {
+    let mut output = String::new();
+    generate_set(&mut output, &Set::Toplevel(Options::metadata()));
+
+    output
+}
+
+fn generate_set(output: &mut String, set: &Set) {
+    if set.level() < 2 {
+        writeln!(output, "### {title}\n", title = set.title()).unwrap();
+    } else {
+        writeln!(output, "#### {title}\n", title = set.title()).unwrap();
+    }
+
+    if let Some(documentation) = set.metadata().documentation() {
+        output.push_str(documentation);
+        output.push('\n');
+        output.push('\n');
+    }
+
+    let mut visitor = CollectOptionsVisitor::default();
+    set.metadata().record(&mut visitor);
+
+    let (mut fields, mut sets) = (visitor.fields, visitor.groups);
+
+    fields.sort_unstable_by(|(name, _), (name2, _)| name.cmp(name2));
+    sets.sort_unstable_by(|(name, _), (name2, _)| name.cmp(name2));
+
+    // Generate the fields.
+    for (name, field) in &fields {
+        emit_field(output, name, field, set);
+        output.push_str("---\n\n");
+    }
+
+    // Generate all the sub-sets.
+    for (set_name, sub_set) in &sets {
+        generate_set(output, &Set::Named(set_name, *sub_set, set.level() + 1));
+    }
+}
+
+enum Set<'a> {
+    Toplevel(OptionSet),
+    Named(&'a str, OptionSet, u32),
+}
+
+impl<'a> Set<'a> {
+    fn name(&self) -> Option<&'a str> {
+        match self {
+            Set::Toplevel(_) => None,
+            Set::Named(name, _, _) => Some(name),
+        }
+    }
+
+    fn title(&self) -> &'a str {
+        match self {
+            Set::Toplevel(_) => "Top-level",
+            Set::Named(name, _, _) => name,
+        }
+    }
+
+    fn metadata(&self) -> &OptionSet {
+        match self {
+            Set::Toplevel(set) => set,
+            Set::Named(_, set, _) => set,
+        }
+    }
+
+    fn level(&self) -> u32 {
+        match self {
+            Set::Toplevel(_) => 0,
+            Set::Named(_, _, level) => *level,
+        }
+    }
+}
+
+fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: &Set) {
+    let header_level = if parent_set.level() < 2 {
+        "####"
+    } else {
+        "#####"
+    };
+
+    // if there's a set name, we need to add it to the anchor
+    if let Some(set_name) = parent_set.name() {
         // the anchor used to just be the name, but now it's the group name
         // for backwards compatibility, we need to keep the old anchor
         output.push_str(&format!("<span id=\"{name}\"></span>\n"));
 
         output.push_str(&format!(
-            "#### [`{name}`](#{group_name}-{name}) {{: #{group_name}-{name} }}\n"
+            "{header_level} [`{name}`](#{set_name}-{name}) {{: #{set_name}-{name} }}\n"
         ));
     } else {
-        output.push_str(&format!("#### [`{name}`](#{name})\n"));
+        output.push_str(&format!("{header_level} [`{name}`](#{name})\n"));
     }
     output.push('\n');
+
+    if let Some(deprecated) = &field.deprecated {
+        output.push_str("!!! warning \"Deprecated\"\n");
+        output.push_str("    This option has been deprecated");
+
+        if let Some(since) = deprecated.since {
+            write!(output, " in {since}").unwrap();
+        }
+
+        output.push('.');
+
+        if let Some(message) = deprecated.message {
+            writeln!(output, " {message}").unwrap();
+        }
+
+        output.push('\n');
+    }
+
     output.push_str(field.doc);
     output.push_str("\n\n");
     output.push_str(&format!("**Default value**: `{}`\n", field.default));
     output.push('\n');
     output.push_str(&format!("**Type**: `{}`\n", field.value_type));
     output.push('\n');
-    output.push_str(&format!(
-        "**Example usage**:\n\n```toml\n[tool.ruff{}]\n{}\n```\n",
-        if group_name.is_some() {
-            format!(".{}", group_name.unwrap())
-        } else {
-            String::new()
-        },
-        field.example
+    output.push_str("**Example usage**:\n\n");
+    output.push_str(&format_tab(
+        "pyproject.toml",
+        &format_header(field.scope, parent_set, ConfigurationFile::PyprojectToml),
+        field.example,
+    ));
+    output.push_str(&format_tab(
+        "ruff.toml",
+        &format_header(field.scope, parent_set, ConfigurationFile::RuffToml),
+        field.example,
     ));
     output.push('\n');
 }
 
-pub(crate) fn generate() -> String {
-    let mut output: String = "### Top-level\n\n".into();
+fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
+    format!(
+        "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
+        tab_name,
+        header,
+        textwrap::indent(content, "    ")
+    )
+}
 
-    let sorted_options: Vec<_> = Options::metadata()
-        .into_iter()
-        .sorted_by_key(|(name, _)| *name)
-        .collect();
-
-    // Generate all the top-level fields.
-    for (name, entry) in &sorted_options {
-        let OptionEntry::Field(field) = entry else {
-            continue;
-        };
-        emit_field(&mut output, name, field, None);
-        output.push_str("---\n\n");
-    }
-
-    // Generate all the sub-groups.
-    for (group_name, entry) in &sorted_options {
-        let OptionEntry::Group(fields) = entry else {
-            continue;
-        };
-        output.push_str(&format!("### {group_name}\n"));
-        output.push('\n');
-        for (name, entry) in fields.iter().sorted_by_key(|(name, _)| name) {
-            let OptionEntry::Field(field) = entry else {
-                continue;
+/// Format the TOML header for the example usage for a given option.
+///
+/// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
+fn format_header(
+    scope: Option<&str>,
+    parent_set: &Set,
+    configuration: ConfigurationFile,
+) -> String {
+    match configuration {
+        ConfigurationFile::PyprojectToml => {
+            let mut header = if let Some(set_name) = parent_set.name() {
+                if set_name == "format" {
+                    String::from("tool.ruff.format")
+                } else {
+                    format!("tool.ruff.lint.{set_name}")
+                }
+            } else {
+                "tool.ruff".to_string()
             };
-            emit_field(&mut output, name, field, Some(group_name));
-            output.push_str("---\n\n");
+            if let Some(scope) = scope {
+                if !header.is_empty() {
+                    header.push('.');
+                }
+                header.push_str(scope);
+            }
+            format!("[{header}]")
+        }
+        ConfigurationFile::RuffToml => {
+            let mut header = if let Some(set_name) = parent_set.name() {
+                if set_name == "format" {
+                    String::from("format")
+                } else {
+                    format!("lint.{set_name}")
+                }
+            } else {
+                String::new()
+            };
+            if let Some(scope) = scope {
+                if !header.is_empty() {
+                    header.push('.');
+                }
+                header.push_str(scope);
+            }
+            if header.is_empty() {
+                String::new()
+            } else {
+                format!("[{header}]")
+            }
         }
     }
+}
 
-    output
+#[derive(Debug, Copy, Clone)]
+enum ConfigurationFile {
+    PyprojectToml,
+    RuffToml,
+}
+
+#[derive(Default)]
+struct CollectOptionsVisitor {
+    groups: Vec<(String, OptionSet)>,
+    fields: Vec<(String, OptionField)>,
+}
+
+impl Visit for CollectOptionsVisitor {
+    fn record_set(&mut self, name: &str, group: OptionSet) {
+        self.groups.push((name.to_owned(), group));
+    }
+
+    fn record_field(&mut self, name: &str, field: OptionField) {
+        self.fields.push((name.to_owned(), field));
+    }
 }

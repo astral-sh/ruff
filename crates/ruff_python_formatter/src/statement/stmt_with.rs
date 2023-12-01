@@ -1,129 +1,164 @@
-use ruff_python_ast::{Ranged, StmtAsyncWith, StmtWith, Suite, WithItem};
-use ruff_text_size::TextRange;
-
 use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AstNode;
+use ruff_python_ast::StmtWith;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange};
 
-use crate::comments::trailing_comments;
+use crate::builders::parenthesize_if_expands;
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{
-    in_parentheses_only_soft_line_break_or_space, optional_parentheses,
+    in_parentheses_only_soft_line_break_or_space, optional_parentheses, parenthesized,
 };
+use crate::other::commas;
 use crate::prelude::*;
-use crate::FormatNodeRule;
+use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
+use crate::PyFormatOptions;
 
-pub(super) enum AnyStatementWith<'a> {
-    With(&'a StmtWith),
-    AsyncWith(&'a StmtAsyncWith),
-}
+#[derive(Default)]
+pub struct FormatStmtWith;
 
-impl<'a> AnyStatementWith<'a> {
-    const fn is_async(&self) -> bool {
-        matches!(self, AnyStatementWith::AsyncWith(_))
-    }
-
-    fn items(&self) -> &[WithItem] {
-        match self {
-            AnyStatementWith::With(with) => with.items.as_slice(),
-            AnyStatementWith::AsyncWith(with) => with.items.as_slice(),
-        }
-    }
-
-    fn body(&self) -> &Suite {
-        match self {
-            AnyStatementWith::With(with) => &with.body,
-            AnyStatementWith::AsyncWith(with) => &with.body,
-        }
-    }
-}
-
-impl Ranged for AnyStatementWith<'_> {
-    fn range(&self) -> TextRange {
-        match self {
-            AnyStatementWith::With(with) => with.range(),
-            AnyStatementWith::AsyncWith(with) => with.range(),
-        }
-    }
-}
-
-impl<'a> From<&'a StmtWith> for AnyStatementWith<'a> {
-    fn from(value: &'a StmtWith) -> Self {
-        AnyStatementWith::With(value)
-    }
-}
-
-impl<'a> From<&'a StmtAsyncWith> for AnyStatementWith<'a> {
-    fn from(value: &'a StmtAsyncWith) -> Self {
-        AnyStatementWith::AsyncWith(value)
-    }
-}
-
-impl<'a> From<&AnyStatementWith<'a>> for AnyNodeRef<'a> {
-    fn from(value: &AnyStatementWith<'a>) -> Self {
-        match value {
-            AnyStatementWith::With(with) => AnyNodeRef::StmtWith(with),
-            AnyStatementWith::AsyncWith(with) => AnyNodeRef::StmtAsyncWith(with),
-        }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for AnyStatementWith<'_> {
-    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+impl FormatNodeRule<StmtWith> for FormatStmtWith {
+    fn fmt_fields(&self, item: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
+        // The `with` statement can have one dangling comment on the open parenthesis, like:
+        // ```python
+        // with (  # comment
+        //     CtxManager() as example
+        // ):
+        //     ...
+        // ```
+        //
+        // Any other dangling comments are trailing comments on the colon, like:
+        // ```python
+        // with CtxManager() as example:  # comment
+        //     ...
+        // ```
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(self);
+        let dangling_comments = comments.dangling(item.as_any_node_ref());
+        let partition_point = dangling_comments.partition_point(|comment| {
+            item.items
+                .first()
+                .is_some_and(|with_item| with_item.start() > comment.start())
+        });
+        let (parenthesized_comments, colon_comments) = dangling_comments.split_at(partition_point);
 
         write!(
             f,
             [
-                self.is_async()
-                    .then_some(format_args![text("async"), space()]),
-                text("with"),
-                space()
-            ]
-        )?;
+                clause_header(
+                    ClauseHeader::With(item),
+                    colon_comments,
+                    &format_with(|f| {
+                        write!(
+                            f,
+                            [
+                                item.is_async
+                                    .then_some(format_args![token("async"), space()]),
+                                token("with"),
+                                space()
+                            ]
+                        )?;
 
-        if are_with_items_parenthesized(self, f.context())? {
-            optional_parentheses(&format_with(|f| {
-                let mut joiner = f.join_comma_separated(self.body().first().unwrap().start());
+                        if !parenthesized_comments.is_empty() {
+                            let joined = format_with(|f: &mut PyFormatter| {
+                                f.join_comma_separated(item.body.first().unwrap().start())
+                                    .nodes(&item.items)
+                                    .finish()
+                            });
 
-                for item in self.items() {
-                    joiner.entry_with_line_separator(
-                        item,
-                        &item.format(),
-                        in_parentheses_only_soft_line_break_or_space(),
-                    );
-                }
-                joiner.finish()
-            }))
-            .fmt(f)?;
-        } else {
-            f.join_with(format_args![text(","), space()])
-                .entries(self.items().iter().formatted())
-                .finish()?;
-        }
+                            parenthesized("(", &joined, ")")
+                                .with_dangling_comments(parenthesized_comments)
+                                .fmt(f)?;
+                        } else if should_parenthesize(item, f.options(), f.context())? {
+                            parenthesize_if_expands(&format_with(|f| {
+                                let mut joiner =
+                                    f.join_comma_separated(item.body.first().unwrap().start());
 
-        write!(
-            f,
-            [
-                text(":"),
-                trailing_comments(dangling_comments),
-                block_indent(&self.body().format())
+                                for item in &item.items {
+                                    joiner.entry_with_line_separator(
+                                        item,
+                                        &item.format(),
+                                        in_parentheses_only_soft_line_break_or_space(),
+                                    );
+                                }
+                                joiner.finish()
+                            }))
+                            .fmt(f)?;
+                        } else if let [item] = item.items.as_slice() {
+                            // This is similar to `maybe_parenthesize_expression`, but we're not
+                            // dealing with an expression here, it's a `WithItem`.
+                            if comments.has_leading(item) || comments.has_trailing(item) {
+                                optional_parentheses(&item.format()).fmt(f)?;
+                            } else {
+                                item.format().fmt(f)?;
+                            }
+                        } else {
+                            f.join_with(format_args![token(","), space()])
+                                .entries(item.items.iter().formatted())
+                                .finish()?;
+                        }
+
+                        Ok(())
+                    })
+                ),
+                clause_body(&item.body, colon_comments)
             ]
         )
     }
+
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Handled in `fmt_fields`
+        Ok(())
+    }
 }
 
-fn are_with_items_parenthesized(
-    with: &AnyStatementWith,
+/// Returns `true` if the `with` items should be parenthesized, if at least one item expands.
+///
+/// Black parenthesizes `with` items if there's more than one item and they're already
+/// parenthesized, _or_ there's a single item with a trailing comma.
+fn should_parenthesize(
+    with: &StmtWith,
+    options: &PyFormatOptions,
     context: &PyFormatContext,
 ) -> FormatResult<bool> {
-    let first_with_item = with
-        .items()
-        .first()
-        .ok_or(FormatError::syntax_error("Expected at least one with item"))?;
-    let before_first_with_item = TextRange::new(with.start(), first_with_item.start());
+    if has_magic_trailing_comma(with, options, context) {
+        return Ok(true);
+    }
 
-    let mut tokenizer = SimpleTokenizer::new(context.source(), before_first_with_item)
+    if are_with_items_parenthesized(with, context)? {
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
+fn has_magic_trailing_comma(
+    with: &StmtWith,
+    options: &PyFormatOptions,
+    context: &PyFormatContext,
+) -> bool {
+    let Some(last_item) = with.items.last() else {
+        return false;
+    };
+
+    commas::has_magic_trailing_comma(
+        TextRange::new(last_item.end(), with.end()),
+        options,
+        context,
+    )
+}
+
+fn are_with_items_parenthesized(with: &StmtWith, context: &PyFormatContext) -> FormatResult<bool> {
+    let [first_item, _, ..] = with.items.as_slice() else {
+        return Ok(false);
+    };
+
+    let before_first_item = TextRange::new(with.start(), first_item.start());
+
+    let mut tokenizer = SimpleTokenizer::new(context.source(), before_first_item)
         .skip_trivia()
         .skip_while(|t| t.kind() == SimpleTokenKind::Async);
 
@@ -143,19 +178,5 @@ fn are_with_items_parenthesized(
             Ok(true)
         }
         None => Ok(false),
-    }
-}
-
-#[derive(Default)]
-pub struct FormatStmtWith;
-
-impl FormatNodeRule<StmtWith> for FormatStmtWith {
-    fn fmt_fields(&self, item: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
-        AnyStatementWith::from(item).fmt(f)
-    }
-
-    fn fmt_dangling_comments(&self, _node: &StmtWith, _f: &mut PyFormatter) -> FormatResult<()> {
-        // Handled in `fmt_fields`
-        Ok(())
     }
 }

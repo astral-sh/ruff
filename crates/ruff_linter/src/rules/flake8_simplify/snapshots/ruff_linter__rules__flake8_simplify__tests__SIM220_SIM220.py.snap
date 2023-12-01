@@ -1,0 +1,59 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM220.py:1:4: SIM220 [*] Use `False` instead of `a and not a`
+  |
+1 | if a and not a:
+  |    ^^^^^^^^^^^ SIM220
+2 |     pass
+  |
+  = help: Replace with `False`
+
+ℹ Unsafe fix
+1   |-if a and not a:
+  1 |+if False:
+2 2 |     pass
+3 3 | 
+4 4 | if (a and not a) and b:
+
+SIM220.py:4:5: SIM220 [*] Use `False` instead of `a and not a`
+  |
+2 |     pass
+3 | 
+4 | if (a and not a) and b:
+  |     ^^^^^^^^^^^ SIM220
+5 |     pass
+  |
+  = help: Replace with `False`
+
+ℹ Unsafe fix
+1 1 | if a and not a:
+2 2 |     pass
+3 3 | 
+4   |-if (a and not a) and b:
+  4 |+if (False) and b:
+5 5 |     pass
+6 6 | 
+7 7 | if (a and not a) or b:
+
+SIM220.py:7:5: SIM220 [*] Use `False` instead of `a and not a`
+  |
+5 |     pass
+6 | 
+7 | if (a and not a) or b:
+  |     ^^^^^^^^^^^ SIM220
+8 |     pass
+  |
+  = help: Replace with `False`
+
+ℹ Unsafe fix
+4 4 | if (a and not a) and b:
+5 5 |     pass
+6 6 | 
+7   |-if (a and not a) or b:
+  7 |+if (False) or b:
+8 8 |     pass
+9 9 | 
+10 10 | if a:
+
+

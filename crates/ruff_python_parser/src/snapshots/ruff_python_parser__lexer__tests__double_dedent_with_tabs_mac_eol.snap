@@ -1,0 +1,88 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: double_dedent_with_tabs_eol(MAC_EOL)
+---
+[
+    (
+        Def,
+        0..3,
+    ),
+    (
+        Name {
+            name: "foo",
+        },
+        4..7,
+    ),
+    (
+        Lpar,
+        7..8,
+    ),
+    (
+        Rpar,
+        8..9,
+    ),
+    (
+        Colon,
+        9..10,
+    ),
+    (
+        Newline,
+        10..11,
+    ),
+    (
+        Indent,
+        11..12,
+    ),
+    (
+        If,
+        12..14,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        15..16,
+    ),
+    (
+        Colon,
+        16..17,
+    ),
+    (
+        Newline,
+        17..18,
+    ),
+    (
+        NonLogicalNewline,
+        18..19,
+    ),
+    (
+        Indent,
+        19..22,
+    ),
+    (
+        Return,
+        22..28,
+    ),
+    (
+        Int {
+            value: 99,
+        },
+        29..31,
+    ),
+    (
+        Newline,
+        31..32,
+    ),
+    (
+        NonLogicalNewline,
+        32..33,
+    ),
+    (
+        Dedent,
+        33..33,
+    ),
+    (
+        Dedent,
+        33..33,
+    ),
+]

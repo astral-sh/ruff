@@ -1,0 +1,58 @@
+---
+source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+---
+N815.py:3:5: N815 Variable `stillBad` in class scope should not be mixedCase
+  |
+1 | class C:
+2 |     badAllowed = 0
+3 |     stillBad = 0
+  |     ^^^^^^^^ N815
+4 | 
+5 |     _badAllowed = 0
+  |
+
+N815.py:6:5: N815 Variable `_stillBad` in class scope should not be mixedCase
+  |
+5 |     _badAllowed = 0
+6 |     _stillBad = 0
+  |     ^^^^^^^^^ N815
+7 | 
+8 |     bad_Allowed = 0
+  |
+
+N815.py:9:5: N815 Variable `still_Bad` in class scope should not be mixedCase
+   |
+ 8 |     bad_Allowed = 0
+ 9 |     still_Bad = 0
+   |     ^^^^^^^^^ N815
+10 | 
+11 | class D(TypedDict):
+   |
+
+N815.py:13:5: N815 Variable `stillBad` in class scope should not be mixedCase
+   |
+11 | class D(TypedDict):
+12 |     badAllowed: bool
+13 |     stillBad: bool
+   |     ^^^^^^^^ N815
+14 | 
+15 |     _badAllowed: list
+   |
+
+N815.py:16:5: N815 Variable `_stillBad` in class scope should not be mixedCase
+   |
+15 |     _badAllowed: list
+16 |     _stillBad: list
+   |     ^^^^^^^^^ N815
+17 | 
+18 |     bad_Allowed: set
+   |
+
+N815.py:19:5: N815 Variable `still_Bad` in class scope should not be mixedCase
+   |
+18 |     bad_Allowed: set
+19 |     still_Bad: set
+   |     ^^^^^^^^^ N815
+   |
+
+

@@ -1,0 +1,12 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: tokens
+---
+Err(
+    LexicalError {
+        error: OtherError(
+            "Invalid Token",
+        ),
+        location: 0,
+    },
+)

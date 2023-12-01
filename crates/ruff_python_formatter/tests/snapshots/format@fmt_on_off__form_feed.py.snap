@@ -1,0 +1,29 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/form_feed.py
+---
+## Input
+```python
+# fmt: off
+# DB layer  (form feed at the start of the next line)
+
+# fmt: on
+
+def test():
+    pass
+```
+
+## Output
+```python
+# fmt: off
+# DB layer  (form feed at the start of the next line)
+
+# fmt: on
+
+
+def test():
+    pass
+```
+
+
+

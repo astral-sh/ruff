@@ -1,0 +1,40 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/docstrings.py
+---
+## Input
+```python
+def test():
+        # leading comment
+    """ This docstring does not
+        get formatted
+    """ # fmt: skip
+        # trailing comment
+
+def test():
+    # leading comment
+    """   This docstring gets formatted
+    """ # trailing comment
+
+    and_this +  gets + formatted + too
+```
+
+## Output
+```python
+def test():
+    # leading comment
+    """ This docstring does not
+        get formatted
+    """  # fmt: skip
+    # trailing comment
+
+
+def test():
+    # leading comment
+    """This docstring gets formatted"""  # trailing comment
+
+    and_this + gets + formatted + too
+```
+
+
+

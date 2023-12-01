@@ -1,0 +1,17 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: ipython_escape_command_line_continuation_with_eol_and_eof(MAC_EOL)
+---
+[
+    (
+        IpyEscapeCommand {
+            value: "matplotlib ",
+            kind: Magic,
+        },
+        0..14,
+    ),
+    (
+        Newline,
+        14..14,
+    ),
+]

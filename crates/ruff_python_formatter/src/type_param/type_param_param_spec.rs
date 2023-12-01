@@ -1,7 +1,7 @@
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::text;
-use ruff_formatter::{write, Buffer, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::TypeParamParamSpec;
+
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatTypeParamParamSpec;
@@ -9,6 +9,6 @@ pub struct FormatTypeParamParamSpec;
 impl FormatNodeRule<TypeParamParamSpec> for FormatTypeParamParamSpec {
     fn fmt_fields(&self, item: &TypeParamParamSpec, f: &mut PyFormatter) -> FormatResult<()> {
         let TypeParamParamSpec { range: _, name } = item;
-        write!(f, [text("**"), name.format()])
+        write!(f, [token("**"), name.format()])
     }
 }

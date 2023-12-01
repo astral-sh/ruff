@@ -4,22 +4,22 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: ExprName,
-        range: 1..2,
-        source: `a`,
+        kind: ExprBinOp,
+        range: 30..57,
+        source: `10 + # More comments⏎`,
     }: {
-        "leading": [],
-        "dangling": [],
-        "trailing": [
+        "leading": [
             SourceComment {
                 text: "# Trailing comment",
                 position: EndOfLine,
                 formatted: false,
             },
         ],
+        "dangling": [],
+        "trailing": [],
     },
     Node {
-        kind: ExprConstant,
+        kind: ExprNumberLiteral,
         range: 30..32,
         source: `10`,
     }: {

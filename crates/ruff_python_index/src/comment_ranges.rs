@@ -1,70 +1,10 @@
-use itertools::Itertools;
-use std::fmt::{Debug, Formatter};
-use std::ops::Deref;
+use std::fmt::Debug;
 
-use ruff_python_parser::Tok;
+use ruff_python_ast::PySourceType;
+use ruff_python_parser::lexer::{lex, LexicalError};
+use ruff_python_parser::{AsMode, Tok};
+use ruff_python_trivia::CommentRanges;
 use ruff_text_size::TextRange;
-
-/// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges are overlapping.
-#[derive(Clone)]
-pub struct CommentRanges {
-    raw: Vec<TextRange>,
-}
-
-impl CommentRanges {
-    /// Returns `true` if the given range includes a comment.
-    pub fn intersects(&self, target: TextRange) -> bool {
-        self.raw
-            .binary_search_by(|range| {
-                if target.contains_range(*range) {
-                    std::cmp::Ordering::Equal
-                } else if range.end() < target.start() {
-                    std::cmp::Ordering::Less
-                } else {
-                    std::cmp::Ordering::Greater
-                }
-            })
-            .is_ok()
-    }
-
-    /// Returns the comments who are within the range
-    pub fn comments_in_range(&self, range: TextRange) -> &[TextRange] {
-        let start = self
-            .raw
-            .partition_point(|comment| comment.start() < range.start());
-        // We expect there are few comments, so switching to find should be faster
-        match self.raw[start..]
-            .iter()
-            .find_position(|comment| comment.end() > range.end())
-        {
-            Some((in_range, _element)) => &self.raw[start..start + in_range],
-            None => &self.raw[start..],
-        }
-    }
-}
-
-impl Deref for CommentRanges {
-    type Target = [TextRange];
-
-    fn deref(&self) -> &Self::Target {
-        self.raw.as_slice()
-    }
-}
-
-impl Debug for CommentRanges {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("CommentRanges").field(&self.raw).finish()
-    }
-}
-
-impl<'a> IntoIterator for &'a CommentRanges {
-    type IntoIter = std::slice::Iter<'a, TextRange>;
-    type Item = &'a TextRange;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.raw.iter()
-    }
-}
 
 #[derive(Debug, Clone, Default)]
 pub struct CommentRangesBuilder {
@@ -79,6 +19,25 @@ impl CommentRangesBuilder {
     }
 
     pub fn finish(self) -> CommentRanges {
-        CommentRanges { raw: self.ranges }
+        CommentRanges::new(self.ranges)
     }
+}
+
+/// Helper method to lex and extract comment ranges
+pub fn tokens_and_ranges(
+    source: &str,
+    source_type: PySourceType,
+) -> Result<(Vec<(Tok, TextRange)>, CommentRanges), LexicalError> {
+    let mut tokens = Vec::new();
+    let mut comment_ranges = CommentRangesBuilder::default();
+
+    for result in lex(source, source_type.as_mode()) {
+        let (token, range) = result?;
+
+        comment_ranges.visit_token(&token, range);
+        tokens.push((token, range));
+    }
+
+    let comment_ranges = comment_ranges.finish();
+    Ok((tokens, comment_ranges))
 }

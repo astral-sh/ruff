@@ -1,0 +1,231 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF102.py:5:21: PERF102 [*] When using only the values of a dict use the `values()` method
+  |
+4 | def f():
+5 |     for _, value in some_dict.items():  # PERF102
+  |                     ^^^^^^^^^^^^^^^ PERF102
+6 |         print(value)
+  |
+  = help: Replace `.items()` with `.values()`
+
+ℹ Unsafe fix
+2 2 | 
+3 3 | 
+4 4 | def f():
+5   |-    for _, value in some_dict.items():  # PERF102
+  5 |+    for value in some_dict.values():  # PERF102
+6 6 |         print(value)
+7 7 | 
+8 8 | 
+
+PERF102.py:10:19: PERF102 [*] When using only the keys of a dict use the `keys()` method
+   |
+ 9 | def f():
+10 |     for key, _ in some_dict.items():  # PERF102
+   |                   ^^^^^^^^^^^^^^^ PERF102
+11 |         print(key)
+   |
+   = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+7  7  | 
+8  8  | 
+9  9  | def f():
+10    |-    for key, _ in some_dict.items():  # PERF102
+   10 |+    for key in some_dict.keys():  # PERF102
+11 11 |         print(key)
+12 12 | 
+13 13 | 
+
+PERF102.py:15:30: PERF102 [*] When using only the keys of a dict use the `keys()` method
+   |
+14 | def f():
+15 |     for weird_arg_name, _ in some_dict.items():  # PERF102
+   |                              ^^^^^^^^^^^^^^^ PERF102
+16 |         print(weird_arg_name)
+   |
+   = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+12 12 | 
+13 13 | 
+14 14 | def f():
+15    |-    for weird_arg_name, _ in some_dict.items():  # PERF102
+   15 |+    for weird_arg_name in some_dict.keys():  # PERF102
+16 16 |         print(weird_arg_name)
+17 17 | 
+18 18 | 
+
+PERF102.py:20:25: PERF102 [*] When using only the keys of a dict use the `keys()` method
+   |
+19 | def f():
+20 |     for name, (_, _) in some_dict.items():  # PERF102
+   |                         ^^^^^^^^^^^^^^^ PERF102
+21 |         print(name)
+   |
+   = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+17 17 | 
+18 18 | 
+19 19 | def f():
+20    |-    for name, (_, _) in some_dict.items():  # PERF102
+   20 |+    for name in some_dict.keys():  # PERF102
+21 21 |         print(name)
+22 22 | 
+23 23 | 
+
+PERF102.py:30:30: PERF102 [*] When using only the keys of a dict use the `keys()` method
+   |
+29 | def f():
+30 |     for (key1, _), (_, _) in some_dict.items():  # PERF102
+   |                              ^^^^^^^^^^^^^^^ PERF102
+31 |         print(key1)
+   |
+   = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+27 27 | 
+28 28 | 
+29 29 | def f():
+30    |-    for (key1, _), (_, _) in some_dict.items():  # PERF102
+   30 |+    for (key1, _) in some_dict.keys():  # PERF102
+31 31 |         print(key1)
+32 32 | 
+33 33 | 
+
+PERF102.py:35:36: PERF102 [*] When using only the values of a dict use the `values()` method
+   |
+34 | def f():
+35 |     for (_, (_, _)), (value, _) in some_dict.items():  # PERF102
+   |                                    ^^^^^^^^^^^^^^^ PERF102
+36 |         print(value)
+   |
+   = help: Replace `.items()` with `.values()`
+
+ℹ Unsafe fix
+32 32 | 
+33 33 | 
+34 34 | def f():
+35    |-    for (_, (_, _)), (value, _) in some_dict.items():  # PERF102
+   35 |+    for (value, _) in some_dict.values():  # PERF102
+36 36 |         print(value)
+37 37 | 
+38 38 | 
+
+PERF102.py:50:32: PERF102 [*] When using only the keys of a dict use the `keys()` method
+   |
+49 | def f():
+50 |     for ((_, key2), (_, _)) in some_dict.items():  # PERF102
+   |                                ^^^^^^^^^^^^^^^ PERF102
+51 |         print(key2)
+   |
+   = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+47 47 | 
+48 48 | 
+49 49 | def f():
+50    |-    for ((_, key2), (_, _)) in some_dict.items():  # PERF102
+   50 |+    for (_, key2) in some_dict.keys():  # PERF102
+51 51 |         print(key2)
+52 52 | 
+53 53 | 
+
+PERF102.py:85:25: PERF102 [*] When using only the keys of a dict use the `keys()` method
+   |
+84 | def f():
+85 |     for name, (_, _) in (some_function()).items():  # PERF102
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^ PERF102
+86 |         print(name)
+   |
+   = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+82 82 | 
+83 83 | 
+84 84 | def f():
+85    |-    for name, (_, _) in (some_function()).items():  # PERF102
+   85 |+    for name in (some_function()).keys():  # PERF102
+86 86 |         print(name)
+87 87 | 
+88 88 | 
+
+PERF102.py:90:25: PERF102 [*] When using only the keys of a dict use the `keys()` method
+   |
+89 | def f():
+90 |     for name, (_, _) in (some_function().some_attribute).items():  # PERF102
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PERF102
+91 |         print(name)
+   |
+   = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+87 87 | 
+88 88 | 
+89 89 | def f():
+90    |-    for name, (_, _) in (some_function().some_attribute).items():  # PERF102
+   90 |+    for name in (some_function().some_attribute).keys():  # PERF102
+91 91 |         print(name)
+92 92 | 
+93 93 | 
+
+PERF102.py:95:31: PERF102 [*] When using only the keys of a dict use the `keys()` method
+   |
+94 | def f():
+95 |     for name, unused_value in some_dict.items():  # PERF102
+   |                               ^^^^^^^^^^^^^^^ PERF102
+96 |         print(name)
+   |
+   = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+92 92 | 
+93 93 | 
+94 94 | def f():
+95    |-    for name, unused_value in some_dict.items():  # PERF102
+   95 |+    for name in some_dict.keys():  # PERF102
+96 96 |         print(name)
+97 97 | 
+98 98 | 
+
+PERF102.py:100:31: PERF102 [*] When using only the values of a dict use the `values()` method
+    |
+ 99 | def f():
+100 |     for unused_name, value in some_dict.items():  # PERF102
+    |                               ^^^^^^^^^^^^^^^ PERF102
+101 |         print(value)
+    |
+    = help: Replace `.items()` with `.values()`
+
+ℹ Unsafe fix
+97  97  | 
+98  98  | 
+99  99  | def f():
+100     |-    for unused_name, value in some_dict.items():  # PERF102
+    100 |+    for value in some_dict.values():  # PERF102
+101 101 |         print(value)
+102 102 | 
+103 103 | 
+
+PERF102.py:106:16: PERF102 [*] When using only the keys of a dict use the `keys()` method
+    |
+104 | # Regression test for: https://github.com/astral-sh/ruff/issues/7097
+105 | def _create_context(name_to_value):
+106 |     for(B,D)in A.items():
+    |                ^^^^^^^ PERF102
+107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
+    |
+    = help: Replace `.items()` with `.keys()`
+
+ℹ Unsafe fix
+103 103 | 
+104 104 | # Regression test for: https://github.com/astral-sh/ruff/issues/7097
+105 105 | def _create_context(name_to_value):
+106     |-    for(B,D)in A.items():
+    106 |+    for B in A.keys():
+107 107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
+
+

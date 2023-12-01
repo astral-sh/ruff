@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E22.py:48:5: E224 [*] Tab after operator
+   |
+47 | #: E224
+48 | a +=    1
+   |     ^^^^ E224
+49 | b += 1000
+50 | #:
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+45 45 | 
+46 46 | 
+47 47 | #: E224
+48    |-a +=	1
+   48 |+a += 1
+49 49 | b += 1000
+50 50 | #:
+51 51 | 
+
+

@@ -11,25 +11,29 @@ expression: parse_ast
                     range: 7..18,
                     keys: [
                         Some(
-                            Constant(
-                                ExprConstant {
+                            StringLiteral(
+                                ExprStringLiteral {
                                     range: 8..14,
-                                    value: Str(
-                                        "test",
-                                    ),
-                                    kind: None,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 8..14,
+                                                value: "test",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                         ),
                     ],
                     values: [
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 16..17,
                                 value: Int(
                                     1,
                                 ),
-                                kind: None,
                             },
                         ),
                     ],
@@ -96,25 +100,35 @@ expression: parse_ast
                     range: 80..97,
                     keys: [
                         Some(
-                            Constant(
-                                ExprConstant {
+                            StringLiteral(
+                                ExprStringLiteral {
                                     range: 81..88,
-                                    value: Str(
-                                        "label",
-                                    ),
-                                    kind: None,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 81..88,
+                                                value: "label",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                         ),
                     ],
                     values: [
-                        Constant(
-                            ExprConstant {
+                        StringLiteral(
+                            ExprStringLiteral {
                                 range: 90..96,
-                                value: Str(
-                                    "test",
-                                ),
-                                kind: None,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 90..96,
+                                            value: "test",
+                                            unicode: false,
+                                        },
+                                    ),
+                                },
                             },
                         ),
                     ],
@@ -127,13 +141,18 @@ expression: parse_ast
                         PatternMatchMapping {
                             range: 108..155,
                             keys: [
-                                Constant(
-                                    ExprConstant {
+                                StringLiteral(
+                                    ExprStringLiteral {
                                         range: 118..125,
-                                        value: Str(
-                                            "label",
-                                        ),
-                                        kind: None,
+                                        value: StringLiteralValue {
+                                            inner: Single(
+                                                StringLiteral {
+                                                    range: 118..125,
+                                                    value: "label",
+                                                    unicode: false,
+                                                },
+                                            ),
+                                        },
                                     },
                                 ),
                             ],
@@ -156,9 +175,11 @@ expression: parse_ast
                                                                         ctx: Load,
                                                                     },
                                                                 ),
-                                                                patterns: [],
-                                                                kwd_attrs: [],
-                                                                kwd_patterns: [],
+                                                                arguments: PatternArguments {
+                                                                    range: 130..132,
+                                                                    patterns: [],
+                                                                    keywords: [],
+                                                                },
                                                             },
                                                         ),
                                                         MatchSingleton(
@@ -240,13 +261,12 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 197..198,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 197..198,
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -254,13 +274,12 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 200..201,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 200..201,
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -282,13 +301,12 @@ expression: parse_ast
                                         },
                                     ),
                                 ],
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 217..218,
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -318,13 +336,12 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 238..239,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 238..239,
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -332,13 +349,12 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 241..242,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 241..242,
                                                 value: Int(
                                                     1,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -360,13 +376,12 @@ expression: parse_ast
                                         },
                                     ),
                                 ],
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 258..259,
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -396,13 +411,12 @@ expression: parse_ast
                                 MatchValue(
                                     PatternMatchValue {
                                         range: 279..280,
-                                        value: Constant(
-                                            ExprConstant {
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 279..280,
                                                 value: Int(
                                                     0,
                                                 ),
-                                                kind: None,
                                             },
                                         ),
                                     },
@@ -424,15 +438,163 @@ expression: parse_ast
                                         },
                                     ),
                                 ],
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 296..297,
                                         value: Int(
                                             0,
                                         ),
-                                        kind: None,
                                     },
                                 ),
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 298..332,
+            subject: Tuple(
+                ExprTuple {
+                    range: 304..306,
+                    elts: [
+                        Name(
+                            ExprName {
+                                range: 304..305,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 312..332,
+                    pattern: MatchAs(
+                        PatternMatchAs {
+                            range: 317..318,
+                            pattern: None,
+                            name: Some(
+                                Identifier {
+                                    id: "z",
+                                    range: 317..318,
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 328..332,
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 333..369,
+            subject: Tuple(
+                ExprTuple {
+                    range: 339..343,
+                    elts: [
+                        Name(
+                            ExprName {
+                                range: 339..340,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 342..343,
+                                id: "y",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 349..369,
+                    pattern: MatchAs(
+                        PatternMatchAs {
+                            range: 354..355,
+                            pattern: None,
+                            name: Some(
+                                Identifier {
+                                    id: "z",
+                                    range: 354..355,
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 365..369,
+                            },
+                        ),
+                    ],
+                },
+            ],
+        },
+    ),
+    Match(
+        StmtMatch {
+            range: 370..407,
+            subject: Tuple(
+                ExprTuple {
+                    range: 376..381,
+                    elts: [
+                        Name(
+                            ExprName {
+                                range: 376..377,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 379..380,
+                                id: "y",
+                                ctx: Load,
+                            },
+                        ),
+                    ],
+                    ctx: Load,
+                },
+            ),
+            cases: [
+                MatchCase {
+                    range: 387..407,
+                    pattern: MatchAs(
+                        PatternMatchAs {
+                            range: 392..393,
+                            pattern: None,
+                            name: Some(
+                                Identifier {
+                                    id: "z",
+                                    range: 392..393,
+                                },
+                            ),
+                        },
+                    ),
+                    guard: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 403..407,
                             },
                         ),
                     ],

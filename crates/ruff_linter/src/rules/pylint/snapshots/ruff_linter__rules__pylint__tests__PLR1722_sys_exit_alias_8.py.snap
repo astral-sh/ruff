@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+sys_exit_alias_8.py:5:5: PLR1722 [*] Use `sys.exit()` instead of `exit`
+  |
+4 | def main():
+5 |     exit(0)
+  |     ^^^^ PLR1722
+  |
+  = help: Replace `exit` with `sys.exit()`
+
+ℹ Unsafe fix
+1   |-from sys import argv
+  1 |+from sys import argv, exit
+2 2 | 
+3 3 | 
+4 4 | def main():
+
+

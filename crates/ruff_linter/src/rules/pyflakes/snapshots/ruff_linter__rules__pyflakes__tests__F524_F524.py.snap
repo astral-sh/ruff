@@ -1,0 +1,68 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F524.py:1:1: F524 `.format` call is missing argument(s) for placeholder(s): 1
+  |
+1 | "{} {}".format(1)  # F524
+  | ^^^^^^^^^^^^^^^^^ F524
+2 | "{2}".format()  # F524
+3 | "{bar}".format()  # F524
+  |
+
+F524.py:2:1: F524 `.format` call is missing argument(s) for placeholder(s): 2
+  |
+1 | "{} {}".format(1)  # F524
+2 | "{2}".format()  # F524
+  | ^^^^^^^^^^^^^^ F524
+3 | "{bar}".format()  # F524
+4 | "{0} {bar}".format(1)  # F524
+  |
+
+F524.py:3:1: F524 `.format` call is missing argument(s) for placeholder(s): bar
+  |
+1 | "{} {}".format(1)  # F524
+2 | "{2}".format()  # F524
+3 | "{bar}".format()  # F524
+  | ^^^^^^^^^^^^^^^^ F524
+4 | "{0} {bar}".format(1)  # F524
+5 | "{0} {bar}".format()  # F524
+  |
+
+F524.py:4:1: F524 `.format` call is missing argument(s) for placeholder(s): bar
+  |
+2 | "{2}".format()  # F524
+3 | "{bar}".format()  # F524
+4 | "{0} {bar}".format(1)  # F524
+  | ^^^^^^^^^^^^^^^^^^^^^ F524
+5 | "{0} {bar}".format()  # F524
+6 | "{bar} {0}".format()  # F524
+  |
+
+F524.py:5:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, bar
+  |
+3 | "{bar}".format()  # F524
+4 | "{0} {bar}".format(1)  # F524
+5 | "{0} {bar}".format()  # F524
+  | ^^^^^^^^^^^^^^^^^^^^ F524
+6 | "{bar} {0}".format()  # F524
+7 | "{1} {8}".format(0, 1)
+  |
+
+F524.py:6:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, bar
+  |
+4 | "{0} {bar}".format(1)  # F524
+5 | "{0} {bar}".format()  # F524
+6 | "{bar} {0}".format()  # F524
+  | ^^^^^^^^^^^^^^^^^^^^ F524
+7 | "{1} {8}".format(0, 1)
+  |
+
+F524.py:7:1: F524 `.format` call is missing argument(s) for placeholder(s): 8
+  |
+5 | "{0} {bar}".format()  # F524
+6 | "{bar} {0}".format()  # F524
+7 | "{1} {8}".format(0, 1)
+  | ^^^^^^^^^^^^^^^^^^^^^^ F524
+  |
+
+

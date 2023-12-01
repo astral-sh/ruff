@@ -4,6 +4,7 @@ import {
   FormatterIRIcon,
   StructureIcon,
   TokensIcon,
+  CommentsIcon,
 } from "./Icons";
 import { SecondaryTool } from "./SecondaryPanel";
 
@@ -19,7 +20,7 @@ export default function SecondarySideBar({
   return (
     <SideBar position="right">
       <SideBarEntry
-        title="Format (alpha)"
+        title="Format (beta)"
         position={"right"}
         selected={selected === SecondaryTool.Format}
         onClick={() => onSelected(SecondaryTool.Format)}
@@ -52,6 +53,15 @@ export default function SecondarySideBar({
         onClick={() => onSelected(SecondaryTool.FIR)}
       >
         <FormatterIRIcon />
+      </SideBarEntry>
+
+      <SideBarEntry
+        title="Formatter comments"
+        position={"right"}
+        selected={selected === SecondaryTool.Comments}
+        onClick={() => onSelected(SecondaryTool.Comments)}
+      >
+        <CommentsIcon />
       </SideBarEntry>
     </SideBar>
   );

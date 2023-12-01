@@ -1,0 +1,134 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_no_blank_line_before_docstring.py
+---
+## Input
+
+```python
+def line_before_docstring():
+
+    """Please move me up"""
+
+
+class LineBeforeDocstring:
+
+    """Please move me up"""
+
+
+class EvenIfThereIsAMethodAfter:
+
+    """I'm the docstring"""
+    def method(self):
+        pass
+
+
+class TwoLinesBeforeDocstring:
+
+
+    """I want to be treated the same as if I were closer"""
+
+
+class MultilineDocstringsAsWell:
+
+    """I'm so far
+
+    and on so many lines...
+    """
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -3,10 +3,12 @@
+ 
+ 
+ class LineBeforeDocstring:
++
+     """Please move me up"""
+ 
+ 
+ class EvenIfThereIsAMethodAfter:
++
+     """I'm the docstring"""
+ 
+     def method(self):
+@@ -14,10 +16,12 @@
+ 
+ 
+ class TwoLinesBeforeDocstring:
++
+     """I want to be treated the same as if I were closer"""
+ 
+ 
+ class MultilineDocstringsAsWell:
++
+     """I'm so far
+ 
+     and on so many lines...
+```
+
+## Ruff Output
+
+```python
+def line_before_docstring():
+    """Please move me up"""
+
+
+class LineBeforeDocstring:
+
+    """Please move me up"""
+
+
+class EvenIfThereIsAMethodAfter:
+
+    """I'm the docstring"""
+
+    def method(self):
+        pass
+
+
+class TwoLinesBeforeDocstring:
+
+    """I want to be treated the same as if I were closer"""
+
+
+class MultilineDocstringsAsWell:
+
+    """I'm so far
+
+    and on so many lines...
+    """
+```
+
+## Black Output
+
+```python
+def line_before_docstring():
+    """Please move me up"""
+
+
+class LineBeforeDocstring:
+    """Please move me up"""
+
+
+class EvenIfThereIsAMethodAfter:
+    """I'm the docstring"""
+
+    def method(self):
+        pass
+
+
+class TwoLinesBeforeDocstring:
+    """I want to be treated the same as if I were closer"""
+
+
+class MultilineDocstringsAsWell:
+    """I'm so far
+
+    and on so many lines...
+    """
+```
+
+

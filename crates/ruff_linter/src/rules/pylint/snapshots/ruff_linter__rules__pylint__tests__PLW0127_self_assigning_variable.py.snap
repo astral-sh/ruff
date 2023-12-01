@@ -1,0 +1,411 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+self_assigning_variable.py:6:1: PLW0127 Self-assignment of variable `foo`
+  |
+5 | # Errors.
+6 | foo = foo
+  | ^^^ PLW0127
+7 | bar = bar
+8 | foo, bar = foo, bar
+  |
+
+self_assigning_variable.py:7:1: PLW0127 Self-assignment of variable `bar`
+  |
+5 | # Errors.
+6 | foo = foo
+7 | bar = bar
+  | ^^^ PLW0127
+8 | foo, bar = foo, bar
+9 | bar, foo = bar, foo
+  |
+
+self_assigning_variable.py:8:1: PLW0127 Self-assignment of variable `foo`
+   |
+ 6 | foo = foo
+ 7 | bar = bar
+ 8 | foo, bar = foo, bar
+   | ^^^ PLW0127
+ 9 | bar, foo = bar, foo
+10 | (foo, bar) = (foo, bar)
+   |
+
+self_assigning_variable.py:8:6: PLW0127 Self-assignment of variable `bar`
+   |
+ 6 | foo = foo
+ 7 | bar = bar
+ 8 | foo, bar = foo, bar
+   |      ^^^ PLW0127
+ 9 | bar, foo = bar, foo
+10 | (foo, bar) = (foo, bar)
+   |
+
+self_assigning_variable.py:9:1: PLW0127 Self-assignment of variable `bar`
+   |
+ 7 | bar = bar
+ 8 | foo, bar = foo, bar
+ 9 | bar, foo = bar, foo
+   | ^^^ PLW0127
+10 | (foo, bar) = (foo, bar)
+11 | (bar, foo) = (bar, foo)
+   |
+
+self_assigning_variable.py:9:6: PLW0127 Self-assignment of variable `foo`
+   |
+ 7 | bar = bar
+ 8 | foo, bar = foo, bar
+ 9 | bar, foo = bar, foo
+   |      ^^^ PLW0127
+10 | (foo, bar) = (foo, bar)
+11 | (bar, foo) = (bar, foo)
+   |
+
+self_assigning_variable.py:10:2: PLW0127 Self-assignment of variable `foo`
+   |
+ 8 | foo, bar = foo, bar
+ 9 | bar, foo = bar, foo
+10 | (foo, bar) = (foo, bar)
+   |  ^^^ PLW0127
+11 | (bar, foo) = (bar, foo)
+12 | foo, (bar, baz) = foo, (bar, baz)
+   |
+
+self_assigning_variable.py:10:7: PLW0127 Self-assignment of variable `bar`
+   |
+ 8 | foo, bar = foo, bar
+ 9 | bar, foo = bar, foo
+10 | (foo, bar) = (foo, bar)
+   |       ^^^ PLW0127
+11 | (bar, foo) = (bar, foo)
+12 | foo, (bar, baz) = foo, (bar, baz)
+   |
+
+self_assigning_variable.py:11:2: PLW0127 Self-assignment of variable `bar`
+   |
+ 9 | bar, foo = bar, foo
+10 | (foo, bar) = (foo, bar)
+11 | (bar, foo) = (bar, foo)
+   |  ^^^ PLW0127
+12 | foo, (bar, baz) = foo, (bar, baz)
+13 | bar, (foo, baz) = bar, (foo, baz)
+   |
+
+self_assigning_variable.py:11:7: PLW0127 Self-assignment of variable `foo`
+   |
+ 9 | bar, foo = bar, foo
+10 | (foo, bar) = (foo, bar)
+11 | (bar, foo) = (bar, foo)
+   |       ^^^ PLW0127
+12 | foo, (bar, baz) = foo, (bar, baz)
+13 | bar, (foo, baz) = bar, (foo, baz)
+   |
+
+self_assigning_variable.py:12:1: PLW0127 Self-assignment of variable `foo`
+   |
+10 | (foo, bar) = (foo, bar)
+11 | (bar, foo) = (bar, foo)
+12 | foo, (bar, baz) = foo, (bar, baz)
+   | ^^^ PLW0127
+13 | bar, (foo, baz) = bar, (foo, baz)
+14 | (foo, bar), baz = (foo, bar), baz
+   |
+
+self_assigning_variable.py:12:7: PLW0127 Self-assignment of variable `bar`
+   |
+10 | (foo, bar) = (foo, bar)
+11 | (bar, foo) = (bar, foo)
+12 | foo, (bar, baz) = foo, (bar, baz)
+   |       ^^^ PLW0127
+13 | bar, (foo, baz) = bar, (foo, baz)
+14 | (foo, bar), baz = (foo, bar), baz
+   |
+
+self_assigning_variable.py:12:12: PLW0127 Self-assignment of variable `baz`
+   |
+10 | (foo, bar) = (foo, bar)
+11 | (bar, foo) = (bar, foo)
+12 | foo, (bar, baz) = foo, (bar, baz)
+   |            ^^^ PLW0127
+13 | bar, (foo, baz) = bar, (foo, baz)
+14 | (foo, bar), baz = (foo, bar), baz
+   |
+
+self_assigning_variable.py:13:1: PLW0127 Self-assignment of variable `bar`
+   |
+11 | (bar, foo) = (bar, foo)
+12 | foo, (bar, baz) = foo, (bar, baz)
+13 | bar, (foo, baz) = bar, (foo, baz)
+   | ^^^ PLW0127
+14 | (foo, bar), baz = (foo, bar), baz
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+   |
+
+self_assigning_variable.py:13:7: PLW0127 Self-assignment of variable `foo`
+   |
+11 | (bar, foo) = (bar, foo)
+12 | foo, (bar, baz) = foo, (bar, baz)
+13 | bar, (foo, baz) = bar, (foo, baz)
+   |       ^^^ PLW0127
+14 | (foo, bar), baz = (foo, bar), baz
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+   |
+
+self_assigning_variable.py:13:12: PLW0127 Self-assignment of variable `baz`
+   |
+11 | (bar, foo) = (bar, foo)
+12 | foo, (bar, baz) = foo, (bar, baz)
+13 | bar, (foo, baz) = bar, (foo, baz)
+   |            ^^^ PLW0127
+14 | (foo, bar), baz = (foo, bar), baz
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+   |
+
+self_assigning_variable.py:14:2: PLW0127 Self-assignment of variable `foo`
+   |
+12 | foo, (bar, baz) = foo, (bar, baz)
+13 | bar, (foo, baz) = bar, (foo, baz)
+14 | (foo, bar), baz = (foo, bar), baz
+   |  ^^^ PLW0127
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+16 | foo, bar = foo, 1
+   |
+
+self_assigning_variable.py:14:7: PLW0127 Self-assignment of variable `bar`
+   |
+12 | foo, (bar, baz) = foo, (bar, baz)
+13 | bar, (foo, baz) = bar, (foo, baz)
+14 | (foo, bar), baz = (foo, bar), baz
+   |       ^^^ PLW0127
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+16 | foo, bar = foo, 1
+   |
+
+self_assigning_variable.py:14:13: PLW0127 Self-assignment of variable `baz`
+   |
+12 | foo, (bar, baz) = foo, (bar, baz)
+13 | bar, (foo, baz) = bar, (foo, baz)
+14 | (foo, bar), baz = (foo, bar), baz
+   |             ^^^ PLW0127
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+16 | foo, bar = foo, 1
+   |
+
+self_assigning_variable.py:15:2: PLW0127 Self-assignment of variable `foo`
+   |
+13 | bar, (foo, baz) = bar, (foo, baz)
+14 | (foo, bar), baz = (foo, bar), baz
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+   |  ^^^ PLW0127
+16 | foo, bar = foo, 1
+17 | bar, foo = bar, 1
+   |
+
+self_assigning_variable.py:15:8: PLW0127 Self-assignment of variable `bar`
+   |
+13 | bar, (foo, baz) = bar, (foo, baz)
+14 | (foo, bar), baz = (foo, bar), baz
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+   |        ^^^ PLW0127
+16 | foo, bar = foo, 1
+17 | bar, foo = bar, 1
+   |
+
+self_assigning_variable.py:15:13: PLW0127 Self-assignment of variable `baz`
+   |
+13 | bar, (foo, baz) = bar, (foo, baz)
+14 | (foo, bar), baz = (foo, bar), baz
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+   |             ^^^ PLW0127
+16 | foo, bar = foo, 1
+17 | bar, foo = bar, 1
+   |
+
+self_assigning_variable.py:16:1: PLW0127 Self-assignment of variable `foo`
+   |
+14 | (foo, bar), baz = (foo, bar), baz
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+16 | foo, bar = foo, 1
+   | ^^^ PLW0127
+17 | bar, foo = bar, 1
+18 | (foo, bar) = (foo, 1)
+   |
+
+self_assigning_variable.py:17:1: PLW0127 Self-assignment of variable `bar`
+   |
+15 | (foo, (bar, baz)) = (foo, (bar, baz))
+16 | foo, bar = foo, 1
+17 | bar, foo = bar, 1
+   | ^^^ PLW0127
+18 | (foo, bar) = (foo, 1)
+19 | (bar, foo) = (bar, 1)
+   |
+
+self_assigning_variable.py:18:2: PLW0127 Self-assignment of variable `foo`
+   |
+16 | foo, bar = foo, 1
+17 | bar, foo = bar, 1
+18 | (foo, bar) = (foo, 1)
+   |  ^^^ PLW0127
+19 | (bar, foo) = (bar, 1)
+20 | foo, (bar, baz) = foo, (bar, 1)
+   |
+
+self_assigning_variable.py:19:2: PLW0127 Self-assignment of variable `bar`
+   |
+17 | bar, foo = bar, 1
+18 | (foo, bar) = (foo, 1)
+19 | (bar, foo) = (bar, 1)
+   |  ^^^ PLW0127
+20 | foo, (bar, baz) = foo, (bar, 1)
+21 | bar, (foo, baz) = bar, (foo, 1)
+   |
+
+self_assigning_variable.py:20:1: PLW0127 Self-assignment of variable `foo`
+   |
+18 | (foo, bar) = (foo, 1)
+19 | (bar, foo) = (bar, 1)
+20 | foo, (bar, baz) = foo, (bar, 1)
+   | ^^^ PLW0127
+21 | bar, (foo, baz) = bar, (foo, 1)
+22 | (foo, bar), baz = (foo, bar), 1
+   |
+
+self_assigning_variable.py:20:7: PLW0127 Self-assignment of variable `bar`
+   |
+18 | (foo, bar) = (foo, 1)
+19 | (bar, foo) = (bar, 1)
+20 | foo, (bar, baz) = foo, (bar, 1)
+   |       ^^^ PLW0127
+21 | bar, (foo, baz) = bar, (foo, 1)
+22 | (foo, bar), baz = (foo, bar), 1
+   |
+
+self_assigning_variable.py:21:1: PLW0127 Self-assignment of variable `bar`
+   |
+19 | (bar, foo) = (bar, 1)
+20 | foo, (bar, baz) = foo, (bar, 1)
+21 | bar, (foo, baz) = bar, (foo, 1)
+   | ^^^ PLW0127
+22 | (foo, bar), baz = (foo, bar), 1
+23 | (foo, (bar, baz)) = (foo, (bar, 1))
+   |
+
+self_assigning_variable.py:21:7: PLW0127 Self-assignment of variable `foo`
+   |
+19 | (bar, foo) = (bar, 1)
+20 | foo, (bar, baz) = foo, (bar, 1)
+21 | bar, (foo, baz) = bar, (foo, 1)
+   |       ^^^ PLW0127
+22 | (foo, bar), baz = (foo, bar), 1
+23 | (foo, (bar, baz)) = (foo, (bar, 1))
+   |
+
+self_assigning_variable.py:22:2: PLW0127 Self-assignment of variable `foo`
+   |
+20 | foo, (bar, baz) = foo, (bar, 1)
+21 | bar, (foo, baz) = bar, (foo, 1)
+22 | (foo, bar), baz = (foo, bar), 1
+   |  ^^^ PLW0127
+23 | (foo, (bar, baz)) = (foo, (bar, 1))
+24 | foo: int = foo
+   |
+
+self_assigning_variable.py:22:7: PLW0127 Self-assignment of variable `bar`
+   |
+20 | foo, (bar, baz) = foo, (bar, 1)
+21 | bar, (foo, baz) = bar, (foo, 1)
+22 | (foo, bar), baz = (foo, bar), 1
+   |       ^^^ PLW0127
+23 | (foo, (bar, baz)) = (foo, (bar, 1))
+24 | foo: int = foo
+   |
+
+self_assigning_variable.py:23:2: PLW0127 Self-assignment of variable `foo`
+   |
+21 | bar, (foo, baz) = bar, (foo, 1)
+22 | (foo, bar), baz = (foo, bar), 1
+23 | (foo, (bar, baz)) = (foo, (bar, 1))
+   |  ^^^ PLW0127
+24 | foo: int = foo
+25 | bar: int = bar
+   |
+
+self_assigning_variable.py:23:8: PLW0127 Self-assignment of variable `bar`
+   |
+21 | bar, (foo, baz) = bar, (foo, 1)
+22 | (foo, bar), baz = (foo, bar), 1
+23 | (foo, (bar, baz)) = (foo, (bar, 1))
+   |        ^^^ PLW0127
+24 | foo: int = foo
+25 | bar: int = bar
+   |
+
+self_assigning_variable.py:24:1: PLW0127 Self-assignment of variable `foo`
+   |
+22 | (foo, bar), baz = (foo, bar), 1
+23 | (foo, (bar, baz)) = (foo, (bar, 1))
+24 | foo: int = foo
+   | ^^^ PLW0127
+25 | bar: int = bar
+26 | foo = foo = bar
+   |
+
+self_assigning_variable.py:25:1: PLW0127 Self-assignment of variable `bar`
+   |
+23 | (foo, (bar, baz)) = (foo, (bar, 1))
+24 | foo: int = foo
+25 | bar: int = bar
+   | ^^^ PLW0127
+26 | foo = foo = bar
+27 | (foo, bar) = (foo, bar) = baz
+   |
+
+self_assigning_variable.py:26:1: PLW0127 Self-assignment of variable `foo`
+   |
+24 | foo: int = foo
+25 | bar: int = bar
+26 | foo = foo = bar
+   | ^^^ PLW0127
+27 | (foo, bar) = (foo, bar) = baz
+28 | (foo, bar) = baz = (foo, bar) = 1
+   |
+
+self_assigning_variable.py:27:2: PLW0127 Self-assignment of variable `foo`
+   |
+25 | bar: int = bar
+26 | foo = foo = bar
+27 | (foo, bar) = (foo, bar) = baz
+   |  ^^^ PLW0127
+28 | (foo, bar) = baz = (foo, bar) = 1
+   |
+
+self_assigning_variable.py:27:7: PLW0127 Self-assignment of variable `bar`
+   |
+25 | bar: int = bar
+26 | foo = foo = bar
+27 | (foo, bar) = (foo, bar) = baz
+   |       ^^^ PLW0127
+28 | (foo, bar) = baz = (foo, bar) = 1
+   |
+
+self_assigning_variable.py:28:2: PLW0127 Self-assignment of variable `foo`
+   |
+26 | foo = foo = bar
+27 | (foo, bar) = (foo, bar) = baz
+28 | (foo, bar) = baz = (foo, bar) = 1
+   |  ^^^ PLW0127
+29 | 
+30 | # Non-errors.
+   |
+
+self_assigning_variable.py:28:7: PLW0127 Self-assignment of variable `bar`
+   |
+26 | foo = foo = bar
+27 | (foo, bar) = (foo, bar) = baz
+28 | (foo, bar) = baz = (foo, bar) = 1
+   |       ^^^ PLW0127
+29 | 
+30 | # Non-errors.
+   |
+
+

@@ -1,0 +1,163 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        FStringStart,
+        0..2,
+    ),
+    (
+        FStringMiddle {
+            value: "foo ",
+            is_raw: false,
+        },
+        2..6,
+    ),
+    (
+        Lbrace,
+        6..7,
+    ),
+    (
+        FStringStart,
+        7..9,
+    ),
+    (
+        FStringMiddle {
+            value: "bar ",
+            is_raw: false,
+        },
+        9..13,
+    ),
+    (
+        Lbrace,
+        13..14,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        14..15,
+    ),
+    (
+        Plus,
+        16..17,
+    ),
+    (
+        FStringStart,
+        18..20,
+    ),
+    (
+        Lbrace,
+        20..21,
+    ),
+    (
+        Name {
+            name: "wow",
+        },
+        21..24,
+    ),
+    (
+        Rbrace,
+        24..25,
+    ),
+    (
+        FStringEnd,
+        25..26,
+    ),
+    (
+        Rbrace,
+        26..27,
+    ),
+    (
+        FStringEnd,
+        27..28,
+    ),
+    (
+        Rbrace,
+        28..29,
+    ),
+    (
+        FStringMiddle {
+            value: " baz",
+            is_raw: false,
+        },
+        29..33,
+    ),
+    (
+        FStringEnd,
+        33..34,
+    ),
+    (
+        FStringStart,
+        35..37,
+    ),
+    (
+        FStringMiddle {
+            value: "foo ",
+            is_raw: false,
+        },
+        37..41,
+    ),
+    (
+        Lbrace,
+        41..42,
+    ),
+    (
+        FStringStart,
+        42..44,
+    ),
+    (
+        FStringMiddle {
+            value: "bar",
+            is_raw: false,
+        },
+        44..47,
+    ),
+    (
+        FStringEnd,
+        47..48,
+    ),
+    (
+        Rbrace,
+        48..49,
+    ),
+    (
+        FStringMiddle {
+            value: " some ",
+            is_raw: false,
+        },
+        49..55,
+    ),
+    (
+        Lbrace,
+        55..56,
+    ),
+    (
+        FStringStart,
+        56..58,
+    ),
+    (
+        FStringMiddle {
+            value: "another",
+            is_raw: false,
+        },
+        58..65,
+    ),
+    (
+        FStringEnd,
+        65..66,
+    ),
+    (
+        Rbrace,
+        66..67,
+    ),
+    (
+        FStringEnd,
+        67..68,
+    ),
+    (
+        Newline,
+        68..68,
+    ),
+]

@@ -18,7 +18,7 @@ use itertools::Itertools;
 pub(super) use lalrpop_util::ParseError as LalrpopError;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::lexer::{lex, lex_starts_at};
+use crate::lexer::{lex, lex_starts_at, Spanned};
 use crate::{
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
     python,
@@ -50,7 +50,7 @@ use ruff_python_ast::{Mod, ModModule, Suite};
 /// ```
 pub fn parse_program(source: &str, source_path: &str) -> Result<ModModule, ParseError> {
     let lexer = lex(source, Mode::Module);
-    match parse_tokens(lexer, Mode::Module, source_path)? {
+    match parse_tokens(lexer, source, Mode::Module, source_path)? {
         Mod::Module(m) => Ok(m),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
@@ -78,7 +78,7 @@ pub fn parse_suite(source: &str, source_path: &str) -> Result<Suite, ParseError>
 /// ```
 pub fn parse_expression(source: &str, source_path: &str) -> Result<ast::Expr, ParseError> {
     let lexer = lex(source, Mode::Expression);
-    match parse_tokens(lexer, Mode::Expression, source_path)? {
+    match parse_tokens(lexer, source, Mode::Expression, source_path)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
     }
@@ -107,7 +107,7 @@ pub fn parse_expression_starts_at(
     offset: TextSize,
 ) -> Result<ast::Expr, ParseError> {
     let lexer = lex_starts_at(source, Mode::Module, offset);
-    match parse_tokens(lexer, Mode::Expression, source_path)? {
+    match parse_tokens(lexer, source, Mode::Expression, source_path)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
     }
@@ -117,7 +117,7 @@ pub fn parse_expression_starts_at(
 ///
 /// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
 /// it can be used to parse a single expression, a full Python program, an interactive expression
-/// or a Python program containing Jupyter magics.
+/// or a Python program containing IPython escape commands.
 ///
 /// # Example
 ///
@@ -146,7 +146,7 @@ pub fn parse_expression_starts_at(
 /// assert!(program.is_ok());
 /// ```
 ///
-/// Additionally, we can parse a Python program containing Jupyter magics:
+/// Additionally, we can parse a Python program containing IPython escapes:
 ///
 /// ```
 /// use ruff_python_parser::{Mode, parse};
@@ -156,10 +156,10 @@ pub fn parse_expression_starts_at(
 /// ?str.replace
 /// !ls
 /// "#;
-/// let program = parse(source, Mode::Jupyter, "<embedded>");
+/// let program = parse(source, Mode::Ipython, "<embedded>");
 /// assert!(program.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
+pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<Mod, ParseError> {
     parse_starts_at(source, mode, source_path, TextSize::default())
 }
 
@@ -191,9 +191,9 @@ pub fn parse_starts_at(
     mode: Mode,
     source_path: &str,
     offset: TextSize,
-) -> Result<ast::Mod, ParseError> {
+) -> Result<Mod, ParseError> {
     let lxr = lexer::lex_starts_at(source, mode, offset);
-    parse_tokens(lxr, mode, source_path)
+    parse_tokens(lxr, source, mode, source_path)
 }
 
 /// Parse an iterator of [`LexResult`]s using the specified [`Mode`].
@@ -208,36 +208,58 @@ pub fn parse_starts_at(
 /// ```
 /// use ruff_python_parser::{lexer::lex, Mode, parse_tokens};
 ///
-/// let expr = parse_tokens(lex("1 + 2", Mode::Expression), Mode::Expression, "<embedded>");
+/// let source = "1 + 2";
+/// let expr = parse_tokens(lex(source, Mode::Expression), source, Mode::Expression, "<embedded>");
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_tokens(
     lxr: impl IntoIterator<Item = LexResult>,
+    source: &str,
     mode: Mode,
     source_path: &str,
-) -> Result<ast::Mod, ParseError> {
+) -> Result<Mod, ParseError> {
     let lxr = lxr.into_iter();
 
     parse_filtered_tokens(
         lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline)),
+        source,
         mode,
         source_path,
     )
 }
 
-fn parse_filtered_tokens(
-    lxr: impl IntoIterator<Item = LexResult>,
+/// Parse tokens into an AST like [`parse_tokens`], but we already know all tokens are valid.
+pub fn parse_ok_tokens(
+    lxr: impl IntoIterator<Item = Spanned>,
+    source: &str,
     mode: Mode,
     source_path: &str,
-) -> Result<ast::Mod, ParseError> {
+) -> Result<Mod, ParseError> {
+    let lxr = lxr
+        .into_iter()
+        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
+    let marker_token = (Tok::start_marker(mode), TextRange::default());
+    let lexer = iter::once(marker_token)
+        .chain(lxr)
+        .map(|(t, range)| (range.start(), t, range.end()));
+    python::TopParser::new()
+        .parse(source, mode, lexer)
+        .map_err(|e| parse_error_from_lalrpop(e, source_path))
+}
+
+fn parse_filtered_tokens(
+    lxr: impl IntoIterator<Item = LexResult>,
+    source: &str,
+    mode: Mode,
+    source_path: &str,
+) -> Result<Mod, ParseError> {
     let marker_token = (Tok::start_marker(mode), TextRange::default());
     let lexer = iter::once(Ok(marker_token)).chain(lxr);
     python::TopParser::new()
         .parse(
+            source,
             mode,
-            lexer
-                .into_iter()
-                .map_ok(|(t, range)| (range.start(), t, range.end())),
+            lexer.map_ok(|(t, range)| (range.start(), t, range.end())),
         )
         .map_err(|e| parse_error_from_lalrpop(e, source_path))
 }
@@ -604,6 +626,13 @@ def func[T, U: str, *Ts, **P]():
     }
 
     #[test]
+    fn test_named_expression() {
+        let source = "(x := ( y * z ))";
+        let parse_ast = parse_expression(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
     fn test_with_statement() {
         let source = "\
 with 0: pass
@@ -632,6 +661,30 @@ with (0 as a): pass
 with (0 as a,): pass
 with (0 as a, 1 as b): pass
 with (0 as a, 1 as b,): pass
+";
+        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+    }
+
+    #[test]
+    fn test_parenthesized_with_statement() {
+        let source = "\
+with ((a), (b)): pass
+with ((a), (b), c as d, (e)): pass
+with (a, b): pass
+with (a, b) as c: pass
+with ((a, b) as c): pass
+with (a as b): pass
+with (a): pass
+with (a := 0): pass
+with (a := 0) as x: pass
+with ((a)): pass
+with ((a := 0)): pass
+with (a as b, (a := 0)): pass
+with (a, (a := 0)): pass
+with (yield): pass
+with (yield from a): pass
+with ((yield)): pass
+with ((yield from a)): pass
 ";
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
@@ -688,12 +741,12 @@ array[3:5, *indexes_to_select]
     #[test]
     fn test_try() {
         let parse_ast = parse_suite(
-            r#"try:
+            r"try:
     raise ValueError(1)
 except TypeError as e:
     print(f'caught {type(e)}')
 except OSError as e:
-    print(f'caught {type(e)}')"#,
+    print(f'caught {type(e)}')",
             "<test>",
         )
         .unwrap();
@@ -769,13 +822,17 @@ type X \
     [T] = T
 type X[T] \
     = T
+
+# simple statements
+type X = int; type X = str; type X = type
+class X: type X = int
 "#;
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
     fn test_type_as_identifier() {
-        let source = r#"\
+        let source = r"\
 type *a + b, c   # ((type * a) + b), c
 type *(a + b), c   # (type * (a + b)), c
 type (*a + b, c)   # type ((*(a + b)), c)
@@ -806,13 +863,20 @@ type (
 type = 1
 type = x = 1
 x = type = 1
-"#;
+lambda x: type
+";
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
+    fn test_invalid_type() {
+        assert!(parse_suite("a: type X = int", "<test>").is_err());
+        assert!(parse_suite("lambda: type X = int", "<test>").is_err());
+    }
+
+    #[test]
     fn numeric_literals() {
-        let source = r#"x = 123456789
+        let source = r"x = 123456789
 x = 123456
 x = .1
 x = 1.
@@ -830,14 +894,14 @@ x = 0O777
 x = 0.000000006
 x = 10000
 x = 133333
-"#;
+";
 
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
     fn numeric_literals_attribute_access() {
-        let source = r#"x = .1.is_integer()
+        let source = r"x = .1.is_integer()
 x = 1. .imag
 x = 1E+1.imag
 x = 1E-1.real
@@ -857,13 +921,13 @@ if 10 .real:
 
 y = 100[no]
 y = 100(no)
-"#;
+";
         assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
     #[test]
     fn test_match_as_identifier() {
-        let source = r#"\
+        let source = r"\
 match *a + b, c   # ((match * a) + b), c
 match *(a + b), c   # (match * (a + b)), c
 match (*a + b, c)   # match ((*(a + b)), c)
@@ -885,7 +949,7 @@ match match:
         pass
 match = lambda query: query == event
 print(match(12))
-"#;
+";
         insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
     }
 
@@ -1083,6 +1147,15 @@ match x:
 match x:
     case (0,):
         y = 0
+match x,:
+    case z:
+        pass
+match x, y:
+    case z:
+        pass
+match x, y,:
+    case z:
+        pass
 "#,
             "<test>",
         )
@@ -1091,11 +1164,29 @@ match x:
     }
 
     #[test]
+    fn test_match_pattern_fstring_literal() {
+        // F-string literal is not allowed in match pattern.
+        let parse_error = parse_suite(
+            r#"
+match x:
+    case f"{y}":
+        pass
+"#,
+            "<test>",
+        )
+        .err();
+        assert!(
+            parse_error.is_some(),
+            "expected parse error when f-string literal is used in match pattern"
+        );
+    }
+
+    #[test]
     fn test_variadic_generics() {
         let parse_ast = parse_suite(
-            r#"
+            r"
 def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
-"#,
+",
             "<test>",
         )
         .unwrap();
@@ -1105,7 +1196,7 @@ def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
     #[test]
     fn decorator_ranges() {
         let parse_ast = parse_suite(
-            r#"
+            r"
 @my_decorator
 def test():
     pass
@@ -1113,7 +1204,7 @@ def test():
 @class_decorator
 class Abcd:
     pass
-"#
+"
             .trim(),
             "<test>",
         )
@@ -1122,9 +1213,9 @@ class Abcd:
     }
 
     #[test]
-    fn test_jupyter_magic() {
+    fn test_ipython_escape_commands() {
         let parse_ast = parse(
-            r#"
+            r"
 # Normal Python code
 (
     a
@@ -1169,7 +1260,7 @@ def foo():
 ;foo 1 2
 ,foo 1 2
 
-# Indented magic
+# Indented escape commands
 for a in range(5):
     !ls
 
@@ -1180,9 +1271,18 @@ foo = %foo \
 
 % foo
 foo = %foo  # comment
-"#
+
+# Help end line magics
+foo?
+foo.bar??
+foo.bar.baz?
+foo[0]??
+foo[0][1]?
+foo.bar[0].baz[1]??
+foo.bar[0].baz[2].egg??
+"
             .trim(),
-            Mode::Jupyter,
+            Mode::Ipython,
             "<test>",
         )
         .unwrap();
@@ -1190,17 +1290,79 @@ foo = %foo  # comment
     }
 
     #[test]
-    fn test_jupyter_magic_parse_error() {
-        let source = r#"
+    fn test_ipython_escape_command_parse_error() {
+        let source = r"
 a = 1
 %timeit a == 1
-    "#
+    "
         .trim();
-        let lxr = lexer::lex_starts_at(source, Mode::Jupyter, TextSize::default());
-        let parse_err = parse_tokens(lxr, Mode::Module, "<test>").unwrap_err();
+        let lxr = lexer::lex_starts_at(source, Mode::Ipython, TextSize::default());
+        let parse_err = parse_tokens(lxr, source, Mode::Module, "<test>").unwrap_err();
         assert_eq!(
             parse_err.to_string(),
-            "line magics are only allowed in Jupyter mode at byte offset 6".to_string()
+            "IPython escape commands are only allowed in `Mode::Ipython` at byte offset 6"
+                .to_string()
         );
+    }
+
+    #[test]
+    fn test_fstrings() {
+        let parse_ast = parse_suite(
+            r#"
+f"{" f"}"
+f"{foo!s}"
+f"{3,}"
+f"{3!=4:}"
+f'{3:{"}"}>10}'
+f'{3:{"{"}>10}'
+f"{  foo =  }"
+f"{  foo =  :.3f  }"
+f"{  foo =  !s  }"
+f"{  1, 2  =  }"
+f'{f"{3.1415=:.1f}":*^20}'
+
+{"foo " f"bar {x + y} " "baz": 10}
+match foo:
+    case "one":
+        pass
+    case "implicitly " "concatenated":
+        pass
+
+f"\{foo}\{bar:\}"
+f"\\{{foo\\}}"
+f"""{
+    foo:x
+        y
+        z
+}"""
+"#
+            .trim(),
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_fstrings_with_unicode() {
+        let parse_ast = parse_suite(
+            r#"
+u"foo" f"{bar}" "baz" " some"
+"foo" f"{bar}" u"baz" " some"
+"foo" f"{bar}" "baz" u" some"
+u"foo" f"bar {baz} really" u"bar" "no"
+"#
+            .trim(),
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_unicode_aliases() {
+        // https://github.com/RustPython/RustPython/issues/4566
+        let parse_ast = parse_suite(r#"x = "\N{BACKSPACE}another cool trick""#, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
     }
 }

@@ -38,6 +38,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 FunctionDef(
                     StmtFunctionDef {
                         range: 18..44,
+                        is_async: false,
                         decorator_list: [],
                         name: Identifier {
                             id: "__init__",
@@ -78,6 +79,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 FunctionDef(
                     StmtFunctionDef {
                         range: 46..98,
+                        is_async: false,
                         decorator_list: [],
                         name: Identifier {
                             id: "method_with_default",
@@ -111,13 +113,18 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                         annotation: None,
                                     },
                                     default: Some(
-                                        Constant(
-                                            ExprConstant {
+                                        StringLiteral(
+                                            ExprStringLiteral {
                                                 range: 80..89,
-                                                value: Str(
-                                                    "default",
-                                                ),
-                                                kind: None,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 80..89,
+                                                            value: "default",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     ),

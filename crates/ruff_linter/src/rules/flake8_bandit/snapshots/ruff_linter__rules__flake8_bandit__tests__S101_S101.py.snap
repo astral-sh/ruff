@@ -1,0 +1,27 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S101.py:1:1: S101 Use of `assert` detected
+  |
+1 | assert True  # S101
+  | ^^^^^^ S101
+  |
+
+S101.py:6:5: S101 Use of `assert` detected
+  |
+4 | def fn():
+5 |     x = 1
+6 |     assert x == 1  # S101
+  |     ^^^^^^ S101
+7 |     assert x == 2  # S101
+  |
+
+S101.py:7:5: S101 Use of `assert` detected
+  |
+5 |     x = 1
+6 |     assert x == 1  # S101
+7 |     assert x == 2  # S101
+  |     ^^^^^^ S101
+  |
+
+

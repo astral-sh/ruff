@@ -1,0 +1,105 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_jupyter_source(source)
+---
+[
+    (
+        IpyEscapeCommand {
+            value: "",
+            kind: Magic,
+        },
+        0..1,
+    ),
+    (
+        Newline,
+        1..2,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "",
+            kind: Magic2,
+        },
+        2..4,
+    ),
+    (
+        Newline,
+        4..5,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "",
+            kind: Shell,
+        },
+        5..6,
+    ),
+    (
+        Newline,
+        6..7,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "",
+            kind: ShCap,
+        },
+        7..9,
+    ),
+    (
+        Newline,
+        9..10,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "",
+            kind: Help,
+        },
+        10..11,
+    ),
+    (
+        Newline,
+        11..12,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "",
+            kind: Help2,
+        },
+        12..14,
+    ),
+    (
+        Newline,
+        14..15,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "",
+            kind: Paren,
+        },
+        15..16,
+    ),
+    (
+        Newline,
+        16..17,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "",
+            kind: Quote,
+        },
+        17..18,
+    ),
+    (
+        Newline,
+        18..19,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "",
+            kind: Quote2,
+        },
+        19..20,
+    ),
+    (
+        Newline,
+        20..20,
+    ),
+]

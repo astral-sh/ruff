@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+---
+N814.py:1:8: N814 Camelcase `Camel` imported as constant `CAMEL`
+  |
+1 | import mod.Camel as CAMEL
+  |        ^^^^^^^^^^^^^^^^^^ N814
+2 | from mod import CamelCase as CAMELCASE
+3 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
+  |
+
+N814.py:2:17: N814 Camelcase `CamelCase` imported as constant `CAMELCASE`
+  |
+1 | import mod.Camel as CAMEL
+2 | from mod import CamelCase as CAMELCASE
+  |                 ^^^^^^^^^^^^^^^^^^^^^^ N814
+3 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
+  |
+
+N814.py:3:17: N814 Camelcase `AnotherCamelCase` imported as constant `ANOTHER_CAMELCASE`
+  |
+1 | import mod.Camel as CAMEL
+2 | from mod import CamelCase as CAMELCASE
+3 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N814
+  |
+
+

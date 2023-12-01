@@ -6,15 +6,18 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..20,
-            value: Constant(
-                ExprConstant {
+            value: StringLiteral(
+                ExprStringLiteral {
                     range: 0..20,
-                    value: Str(
-                        "Hello, world!",
-                    ),
-                    kind: Some(
-                        "u",
-                    ),
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 0..20,
+                                value: "Hello, world!",
+                                unicode: true,
+                            },
+                        ),
+                    },
                 },
             ),
         },

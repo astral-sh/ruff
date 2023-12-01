@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F842.py:2:5: F842 Local variable `name` is annotated but never used
+  |
+1 | def f():
+2 |     name: str
+  |     ^^^^ F842
+3 |     age: int
+  |
+
+F842.py:3:5: F842 Local variable `age` is annotated but never used
+  |
+1 | def f():
+2 |     name: str
+3 |     age: int
+  |     ^^^ F842
+  |
+
+

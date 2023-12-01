@@ -1,0 +1,102 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:181:5: D204 [*] 1 blank line required after class docstring
+    |
+179 | class TrailingSpace:
+180 | 
+181 |     """TrailingSpace."""
+    |     ^^^^^^^^^^^^^^^^^^^^ D204
+182 |     pass
+    |
+    = help: Insert 1 blank line after class docstring
+
+ℹ Safe fix
+179 179 | class TrailingSpace:
+180 180 | 
+181 181 |     """TrailingSpace."""
+    182 |+
+182 183 |     pass
+183 184 | 
+184 185 | 
+
+D.py:192:5: D204 [*] 1 blank line required after class docstring
+    |
+191 | class LeadingAndTrailingSpaceMissing:
+192 |     """Leading and trailing space missing."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D204
+193 |     pass
+    |
+    = help: Insert 1 blank line after class docstring
+
+ℹ Safe fix
+190 190 | 
+191 191 | class LeadingAndTrailingSpaceMissing:
+192 192 |     """Leading and trailing space missing."""
+    193 |+
+193 194 |     pass
+194 195 | 
+195 196 | 
+
+D.py:649:5: D204 [*] 1 blank line required after class docstring
+    |
+648 | class StatementOnSameLineAsDocstring:
+649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D204
+650 |     def sort_services(self):
+651 |         pass
+    |
+    = help: Insert 1 blank line after class docstring
+
+ℹ Safe fix
+646 646 |     "
+647 647 | 
+648 648 | class StatementOnSameLineAsDocstring:
+649     |-    "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
+    649 |+    "After this docstring there's another statement on the same line separated by a semicolon."
+    650 |+
+    651 |+    priorities=1
+650 652 |     def sort_services(self):
+651 653 |         pass
+652 654 | 
+
+D.py:654:5: D204 [*] 1 blank line required after class docstring
+    |
+653 | class StatementOnSameLineAsDocstring:
+654 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D204
+    |
+    = help: Insert 1 blank line after class docstring
+
+ℹ Safe fix
+651 651 |         pass
+652 652 | 
+653 653 | class StatementOnSameLineAsDocstring:
+654     |-    "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
+    654 |+    "After this docstring there's another statement on the same line separated by a semicolon."
+    655 |+
+    656 |+    priorities=1
+655 657 | 
+656 658 | 
+657 659 | class CommentAfterDocstring:
+
+D.py:658:5: D204 [*] 1 blank line required after class docstring
+    |
+657 | class CommentAfterDocstring:
+658 |     "After this docstring there's a comment."  # priorities=1
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D204
+659 |     def sort_services(self):
+660 |         pass
+    |
+    = help: Insert 1 blank line after class docstring
+
+ℹ Safe fix
+656 656 | 
+657 657 | class CommentAfterDocstring:
+658 658 |     "After this docstring there's a comment."  # priorities=1
+    659 |+
+659 660 |     def sort_services(self):
+660 661 |         pass
+661 662 | 
+
+

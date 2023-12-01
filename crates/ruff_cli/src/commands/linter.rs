@@ -7,7 +7,7 @@ use itertools::Itertools;
 use serde::Serialize;
 use strum::IntoEnumIterator;
 
-use ruff::registry::{Linter, RuleNamespace};
+use ruff_linter::registry::{Linter, RuleNamespace};
 
 use crate::args::HelpFormat;
 

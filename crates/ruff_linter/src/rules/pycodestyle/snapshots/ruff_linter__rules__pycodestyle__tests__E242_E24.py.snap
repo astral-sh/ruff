@@ -1,0 +1,25 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E24.py:6:8: E242 [*] Tab after comma
+  |
+4 | b = (1, 20)
+5 | #: E242
+6 | a = (1, 2)  # tab before 2
+  |        ^ E242
+7 | #: Okay
+8 | b = (1, 20)  # space before 20
+  |
+  = help: Replace with single space
+
+ℹ Safe fix
+3 3 | #: Okay
+4 4 | b = (1, 20)
+5 5 | #: E242
+6   |-a = (1,	2)  # tab before 2
+  6 |+a = (1, 2)  # tab before 2
+7 7 | #: Okay
+8 8 | b = (1, 20)  # space before 20
+9 9 | #: E241 E241 E241
+
+

@@ -1,0 +1,18 @@
+[
+  {
+    "indent_style": "space",
+    "indent_width": 4
+  },
+  {
+    "indent_style": "space",
+    "indent_width": 2
+  },
+  {
+    "indent_style": "tab",
+    "indent_width": 8
+  },
+  {
+    "indent_style": "tab",
+    "indent_width": 4
+  }
+]

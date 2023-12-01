@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+__init__.py:1:1: D104 Missing docstring in public package
+ |
+ |
+
+

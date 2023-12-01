@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+order_by_type_with_custom_classes.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / from sklearn.svm import func, SVC, CONST, Klass
+2 | | from subprocess import N_CLASS, PIPE, Popen, STDOUT
+3 | | from module import CLASS, Class, CONSTANT, function, BASIC, Apple
+4 | | from torch.nn import SELU, AClass, A_CONSTANT
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+1   |-from sklearn.svm import func, SVC, CONST, Klass
+2   |-from subprocess import N_CLASS, PIPE, Popen, STDOUT
+3   |-from module import CLASS, Class, CONSTANT, function, BASIC, Apple
+4   |-from torch.nn import SELU, AClass, A_CONSTANT
+  1 |+from subprocess import N_CLASS, PIPE, STDOUT, Popen
+  2 |+
+  3 |+from module import BASIC, CLASS, CONSTANT, Apple, Class, function
+  4 |+from sklearn.svm import CONST, SVC, Klass, func
+  5 |+from torch.nn import A_CONSTANT, SELU, AClass
+
+

@@ -1,0 +1,50 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:281:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
+    |
+279 |   @expect('D213: Multi-line docstring summary should start at the second line')
+280 |   def asdfljdf24():
+281 |       """Summary.
+    |  _____^
+282 | | 
+283 | |     Description."""
+    | |___________________^ D209
+    |
+    = help: Move closing quotes to new line
+
+ℹ Safe fix
+280 280 | def asdfljdf24():
+281 281 |     """Summary.
+282 282 | 
+283     |-    Description."""
+    283 |+    Description.
+    284 |+    """
+284 285 | 
+285 286 | 
+286 287 | @expect('D210: No whitespaces allowed surrounding docstring text')
+
+D.py:588:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
+    |
+586 |   @expect('D213: Multi-line docstring summary should start at the second line')
+587 |   def asdfljdjgf24():
+588 |       """Summary.
+    |  _____^
+589 | | 
+590 | |     Description.  """
+    | |_____________________^ D209
+    |
+    = help: Move closing quotes to new line
+
+ℹ Safe fix
+587 587 | def asdfljdjgf24():
+588 588 |     """Summary.
+589 589 | 
+590     |-    Description.  """
+    590 |+    Description.
+    591 |+    """
+591 592 | 
+592 593 | 
+593 594 | @expect('D200: One-line docstring should fit on one line with quotes '
+
+

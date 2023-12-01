@@ -1,0 +1,187 @@
+---
+source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
+---
+A001.py:1:16: A001 Variable `sum` is shadowing a Python builtin
+  |
+1 | import some as sum
+  |                ^^^ A001
+2 | from some import other as int
+3 | from directory import new as dir
+  |
+
+A001.py:2:27: A001 Variable `int` is shadowing a Python builtin
+  |
+1 | import some as sum
+2 | from some import other as int
+  |                           ^^^ A001
+3 | from directory import new as dir
+  |
+
+A001.py:3:30: A001 Variable `dir` is shadowing a Python builtin
+  |
+1 | import some as sum
+2 | from some import other as int
+3 | from directory import new as dir
+  |                              ^^^ A001
+4 | 
+5 | print = 1
+  |
+
+A001.py:5:1: A001 Variable `print` is shadowing a Python builtin
+  |
+3 | from directory import new as dir
+4 | 
+5 | print = 1
+  | ^^^^^ A001
+6 | copyright: 'annotation' = 2
+7 | (complex := 3)
+  |
+
+A001.py:6:1: A001 Variable `copyright` is shadowing a Python builtin
+  |
+5 | print = 1
+6 | copyright: 'annotation' = 2
+  | ^^^^^^^^^ A001
+7 | (complex := 3)
+8 | float = object = 4
+  |
+
+A001.py:7:2: A001 Variable `complex` is shadowing a Python builtin
+  |
+5 | print = 1
+6 | copyright: 'annotation' = 2
+7 | (complex := 3)
+  |  ^^^^^^^ A001
+8 | float = object = 4
+9 | min, max = 5, 6
+  |
+
+A001.py:8:1: A001 Variable `float` is shadowing a Python builtin
+  |
+6 | copyright: 'annotation' = 2
+7 | (complex := 3)
+8 | float = object = 4
+  | ^^^^^ A001
+9 | min, max = 5, 6
+  |
+
+A001.py:8:9: A001 Variable `object` is shadowing a Python builtin
+  |
+6 | copyright: 'annotation' = 2
+7 | (complex := 3)
+8 | float = object = 4
+  |         ^^^^^^ A001
+9 | min, max = 5, 6
+  |
+
+A001.py:9:1: A001 Variable `min` is shadowing a Python builtin
+   |
+ 7 | (complex := 3)
+ 8 | float = object = 4
+ 9 | min, max = 5, 6
+   | ^^^ A001
+10 | 
+11 | id = 4
+   |
+
+A001.py:9:6: A001 Variable `max` is shadowing a Python builtin
+   |
+ 7 | (complex := 3)
+ 8 | float = object = 4
+ 9 | min, max = 5, 6
+   |      ^^^ A001
+10 | 
+11 | id = 4
+   |
+
+A001.py:11:1: A001 Variable `id` is shadowing a Python builtin
+   |
+ 9 | min, max = 5, 6
+10 | 
+11 | id = 4
+   | ^^ A001
+12 | 
+13 | def bytes():
+   |
+
+A001.py:13:5: A001 Variable `bytes` is shadowing a Python builtin
+   |
+11 | id = 4
+12 | 
+13 | def bytes():
+   |     ^^^^^ A001
+14 |     pass
+   |
+
+A001.py:16:7: A001 Variable `slice` is shadowing a Python builtin
+   |
+14 |     pass
+15 | 
+16 | class slice:
+   |       ^^^^^ A001
+17 |     pass
+   |
+
+A001.py:21:23: A001 Variable `ValueError` is shadowing a Python builtin
+   |
+19 | try:
+20 |     ...
+21 | except ImportError as ValueError:
+   |                       ^^^^^^^^^^ A001
+22 |     ...
+   |
+
+A001.py:24:5: A001 Variable `memoryview` is shadowing a Python builtin
+   |
+22 |     ...
+23 | 
+24 | for memoryview, *bytearray in []:
+   |     ^^^^^^^^^^ A001
+25 |     pass
+   |
+
+A001.py:24:18: A001 Variable `bytearray` is shadowing a Python builtin
+   |
+22 |     ...
+23 | 
+24 | for memoryview, *bytearray in []:
+   |                  ^^^^^^^^^ A001
+25 |     pass
+   |
+
+A001.py:27:22: A001 Variable `str` is shadowing a Python builtin
+   |
+25 |     pass
+26 | 
+27 | with open('file') as str, open('file2') as (all, any):
+   |                      ^^^ A001
+28 |     pass
+   |
+
+A001.py:27:45: A001 Variable `all` is shadowing a Python builtin
+   |
+25 |     pass
+26 | 
+27 | with open('file') as str, open('file2') as (all, any):
+   |                                             ^^^ A001
+28 |     pass
+   |
+
+A001.py:27:50: A001 Variable `any` is shadowing a Python builtin
+   |
+25 |     pass
+26 | 
+27 | with open('file') as str, open('file2') as (all, any):
+   |                                                  ^^^ A001
+28 |     pass
+   |
+
+A001.py:30:8: A001 Variable `sum` is shadowing a Python builtin
+   |
+28 |     pass
+29 | 
+30 | [0 for sum in ()]
+   |        ^^^ A001
+   |
+
+

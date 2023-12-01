@@ -59,3 +59,76 @@ a = {
 
 x={  # dangling end of line comment
 }
+
+# Comments between keys and values.
+query = {
+    "must":
+    # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ],
+}
+
+query = {
+    "must":  # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ],
+}
+
+query = {
+    "must": (
+    # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    )
+}
+
+query = {
+    "must": ( # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    )
+}
+
+query = {
+    "must": (
+    # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    )
+}
+
+query = {
+    (
+        "must"  # queries => map(pluck("fragment")) => flatten()
+    ) : [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+}
+
+query = {
+    (
+        "must"
+        # queries => map(pluck("fragment")) => flatten()
+    ) : [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+}

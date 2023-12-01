@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TCH004_11.py:4:24: TCH004 [*] Move import `typing.List` out of type-checking block. Import is used for more than type hinting.
+  |
+3 | if TYPE_CHECKING:
+4 |     from typing import List
+  |                        ^^^^ TCH004
+5 | 
+6 | __all__ = ("List",)
+  |
+  = help: Move out of type-checking block
+
+ℹ Unsafe fix
+1 1 | from typing import TYPE_CHECKING
+  2 |+from typing import List
+2 3 | 
+3 4 | if TYPE_CHECKING:
+4   |-    from typing import List
+  5 |+    pass
+5 6 | 
+6 7 | __all__ = ("List",)
+
+

@@ -10,7 +10,7 @@ indent_style = space
 insert_final_newline = true
 indent_size = 2
 
-[*.{rs,py}]
+[*.{rs,py,pyi}]
 indent_size = 4
 
 [*.snap]

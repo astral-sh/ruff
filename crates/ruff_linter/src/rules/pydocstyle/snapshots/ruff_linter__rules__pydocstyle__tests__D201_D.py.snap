@@ -1,0 +1,88 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
+    |
+135 | def leading_space():
+136 | 
+137 |     """Leading space."""
+    |     ^^^^^^^^^^^^^^^^^^^^ D201
+    |
+    = help: Remove blank line(s) before function docstring
+
+ℹ Safe fix
+133 133 | 
+134 134 | @expect('D201: No blank lines allowed before function docstring (found 1)')
+135 135 | def leading_space():
+136     |-
+137 136 |     """Leading space."""
+138 137 | 
+139 138 | 
+
+D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
+    |
+149 | def trailing_and_leading_space():
+150 | 
+151 |     """Trailing and leading space."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D201
+152 | 
+153 |     pass
+    |
+    = help: Remove blank line(s) before function docstring
+
+ℹ Safe fix
+147 147 | @expect('D201: No blank lines allowed before function docstring (found 1)')
+148 148 | @expect('D202: No blank lines allowed after function docstring (found 1)')
+149 149 | def trailing_and_leading_space():
+150     |-
+151 150 |     """Trailing and leading space."""
+152 151 | 
+153 152 |     pass
+
+D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
+    |
+544 |   def multiline_leading_space():
+545 |   
+546 |       """Leading space.
+    |  _____^
+547 | | 
+548 | |     More content.
+549 | |     """
+    | |_______^ D201
+    |
+    = help: Remove blank line(s) before function docstring
+
+ℹ Safe fix
+542 542 | @expect('D201: No blank lines allowed before function docstring (found 1)')
+543 543 | @expect('D213: Multi-line docstring summary should start at the second line')
+544 544 | def multiline_leading_space():
+545     |-
+546 545 |     """Leading space.
+547 546 | 
+548 547 |     More content.
+
+D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
+    |
+566 |   def multiline_trailing_and_leading_space():
+567 |   
+568 |       """Trailing and leading space.
+    |  _____^
+569 | | 
+570 | |     More content.
+571 | |     """
+    | |_______^ D201
+572 |   
+573 |       pass
+    |
+    = help: Remove blank line(s) before function docstring
+
+ℹ Safe fix
+564 564 | @expect('D202: No blank lines allowed after function docstring (found 1)')
+565 565 | @expect('D213: Multi-line docstring summary should start at the second line')
+566 566 | def multiline_trailing_and_leading_space():
+567     |-
+568 567 |     """Trailing and leading space.
+569 568 | 
+570 569 |     More content.
+
+

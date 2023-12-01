@@ -295,3 +295,118 @@ def f(*args, b, **kwds, ): pass
 def f(*, b, **kwds, ): pass
 def f(a, *args, b, **kwds, ): pass
 def f(a, *, b, **kwds, ): pass
+
+# Handle comments on open parenthesis.
+def f(
+    # first
+    # second
+):
+    ...
+
+
+def f(  # first
+    # second
+):  # third
+    ...
+
+
+def f(  # first
+):  # second
+    ...
+
+
+def f(
+    a,
+    /,
+    # first
+    b
+    # second
+):
+    ...
+
+
+def f(  # first
+    *,
+    # second
+    b
+    # third
+):
+    ...
+
+
+def f(  # first
+    # second
+    *,
+    # third
+    b
+    # fourth
+):
+    ...
+
+
+def f(  # first
+    a,
+    # second
+):  # third
+    ...
+
+
+def f(  # first
+    a
+):  # second
+    ...
+
+
+def f(  # first
+    a
+    # second
+):  # third
+    ...
+
+
+def f(  # first
+    a,
+    / # second
+    ,
+    # third
+):
+    ...
+
+# Walrus operator in return type.
+def this_is_unusual() -> (please := no): ...
+
+def this_is_unusual(x) -> (please := no): ...
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/7465
+try:
+    def test():
+        pass
+    #comment
+except ImportError:
+    pass
+
+# https://github.com/astral-sh/ruff/issues/7603
+def default_arg_comments(
+    a: str = #a
+    "a",
+    b: str =
+    #b
+    "b",
+    c: str =( #c
+        "c"
+    ),
+    d: str =(
+        #d
+        "d"
+    )
+):
+    print(a, b, c, d)
+
+def default_arg_comments2(#
+        x: int#=
+        = #
+        #
+        123#
+        #
+):
+    print(x)

@@ -1,0 +1,115 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_long_strings__type_annotations.py
+---
+## Input
+
+```python
+def func(
+    arg1,
+    arg2,
+) -> Set["this_is_a_very_long_module_name.AndAVeryLongClasName"
+         ".WithAVeryVeryVeryVeryVeryLongSubClassName"]:
+  pass
+
+
+def func(
+    argument: (
+        "VeryLongClassNameWithAwkwardGenericSubtype[int] |"
+        "VeryLongClassNameWithAwkwardGenericSubtype[str]"
+    ),
+) -> (
+    "VeryLongClassNameWithAwkwardGenericSubtype[int] |"
+    "VeryLongClassNameWithAwkwardGenericSubtype[str]"
+):
+  pass
+
+
+def func(
+    argument: (
+        "int |"
+        "str"
+    ),
+) -> Set["int |"
+         " str"]:
+  pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -21,6 +21,6 @@
+ 
+ 
+ def func(
+-    argument: "int |" "str",
++    argument: ("int |" "str"),
+ ) -> Set["int |" " str"]:
+     pass
+```
+
+## Ruff Output
+
+```python
+def func(
+    arg1,
+    arg2,
+) -> Set[
+    "this_is_a_very_long_module_name.AndAVeryLongClasName"
+    ".WithAVeryVeryVeryVeryVeryLongSubClassName"
+]:
+    pass
+
+
+def func(
+    argument: (
+        "VeryLongClassNameWithAwkwardGenericSubtype[int] |"
+        "VeryLongClassNameWithAwkwardGenericSubtype[str]"
+    ),
+) -> (
+    "VeryLongClassNameWithAwkwardGenericSubtype[int] |"
+    "VeryLongClassNameWithAwkwardGenericSubtype[str]"
+):
+    pass
+
+
+def func(
+    argument: ("int |" "str"),
+) -> Set["int |" " str"]:
+    pass
+```
+
+## Black Output
+
+```python
+def func(
+    arg1,
+    arg2,
+) -> Set[
+    "this_is_a_very_long_module_name.AndAVeryLongClasName"
+    ".WithAVeryVeryVeryVeryVeryLongSubClassName"
+]:
+    pass
+
+
+def func(
+    argument: (
+        "VeryLongClassNameWithAwkwardGenericSubtype[int] |"
+        "VeryLongClassNameWithAwkwardGenericSubtype[str]"
+    ),
+) -> (
+    "VeryLongClassNameWithAwkwardGenericSubtype[int] |"
+    "VeryLongClassNameWithAwkwardGenericSubtype[str]"
+):
+    pass
+
+
+def func(
+    argument: "int |" "str",
+) -> Set["int |" " str"]:
+    pass
+```
+
+

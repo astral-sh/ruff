@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/yield_from.py
 ---
 ## Input
-```py
+```python
 l = [1,2,3,4]
 
 
@@ -42,7 +42,7 @@ def foo():
 ```
 
 ## Output
-```py
+```python
 l = [1, 2, 3, 4]
 
 

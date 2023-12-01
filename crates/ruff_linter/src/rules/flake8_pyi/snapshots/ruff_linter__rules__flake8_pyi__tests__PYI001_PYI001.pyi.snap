@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI001.pyi:3:5: PYI001 Name of private `TypeVar` must start with `_`
+  |
+1 | from typing import ParamSpec, TypeVar, TypeVarTuple
+2 | 
+3 | T = TypeVar("T")  # Error: TypeVars in stubs must start with _
+  |     ^^^^^^^^^^^^ PYI001
+4 | 
+5 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
+  |
+
+PYI001.pyi:5:10: PYI001 Name of private `TypeVarTuple` must start with `_`
+  |
+3 | T = TypeVar("T")  # Error: TypeVars in stubs must start with _
+4 | 
+5 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
+  |          ^^^^^^^^^^^^^^^^^^^^^^ PYI001
+6 | 
+7 | P = ParamSpec("P")  # Error: ParamSpecs must start with _
+  |
+
+PYI001.pyi:7:5: PYI001 Name of private `ParamSpec` must start with `_`
+  |
+5 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
+6 | 
+7 | P = ParamSpec("P")  # Error: ParamSpecs must start with _
+  |     ^^^^^^^^^^^^^^ PYI001
+8 | 
+9 | _T = TypeVar("_T")  # OK
+  |
+
+

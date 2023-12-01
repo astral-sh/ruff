@@ -1,7 +1,7 @@
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
-use ruff_formatter::prelude::{space, text};
-use ruff_formatter::{write, Buffer, Format, FormatResult};
+use ruff_formatter::write;
 use ruff_python_ast::TypeParamTypeVar;
+
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatTypeParamTypeVar;
@@ -15,7 +15,7 @@ impl FormatNodeRule<TypeParamTypeVar> for FormatTypeParamTypeVar {
         } = item;
         name.format().fmt(f)?;
         if let Some(bound) = bound {
-            write!(f, [text(":"), space(), bound.format()])?;
+            write!(f, [token(":"), space(), bound.format()])?;
         }
         Ok(())
     }

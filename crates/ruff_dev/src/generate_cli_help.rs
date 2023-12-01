@@ -16,8 +16,11 @@ use crate::ROOT_DIR;
 const COMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated command help. -->\n";
 const COMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated command help. -->";
 
-const SUBCOMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated subcommand help. -->\n";
-const SUBCOMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated subcommand help. -->";
+const CHECK_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated check help. -->\n";
+const CHECK_HELP_END_PRAGMA: &str = "<!-- End auto-generated check help. -->";
+
+const FORMAT_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated format help. -->\n";
+const FORMAT_HELP_END_PRAGMA: &str = "<!-- End auto-generated format help. -->";
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -56,11 +59,15 @@ pub(super) fn main(args: &Args) -> Result<()> {
     let command_help = trim_lines(&help_text());
 
     // Generate `ruff help check`.
-    let subcommand_help = trim_lines(&check_help_text());
+    let check_help = trim_lines(&subcommand_help_text("check")?);
+
+    // Generate `ruff help format`.
+    let format_help = trim_lines(&subcommand_help_text("format")?);
 
     if args.mode.is_dry_run() {
         print!("{command_help}");
-        print!("{subcommand_help}");
+        print!("{check_help}");
+        print!("{format_help}");
         return Ok(());
     }
 
@@ -77,9 +84,15 @@ pub(super) fn main(args: &Args) -> Result<()> {
     )?;
     let new = replace_docs_section(
         &new,
-        &format!("```text\n{subcommand_help}\n```\n\n"),
-        SUBCOMMAND_HELP_BEGIN_PRAGMA,
-        SUBCOMMAND_HELP_END_PRAGMA,
+        &format!("```text\n{check_help}\n```\n\n"),
+        CHECK_HELP_BEGIN_PRAGMA,
+        CHECK_HELP_END_PRAGMA,
+    )?;
+    let new = replace_docs_section(
+        &new,
+        &format!("```text\n{format_help}\n```\n\n"),
+        FORMAT_HELP_BEGIN_PRAGMA,
+        FORMAT_HELP_END_PRAGMA,
     )?;
 
     match args.mode {
@@ -104,18 +117,19 @@ fn help_text() -> String {
     args::Args::command().render_help().to_string()
 }
 
-/// Returns the output of `ruff help check`.
-fn check_help_text() -> String {
+/// Returns the output of a given subcommand (e.g., `ruff help check`).
+fn subcommand_help_text(subcommand: &str) -> Result<String> {
     let mut cmd = args::Args::command();
 
     // The build call is necessary for the help output to contain `Usage: ruff
     // check` instead of `Usage: check` see https://github.com/clap-rs/clap/issues/4685
     cmd.build();
 
-    cmd.find_subcommand_mut("check")
-        .expect("`check` subcommand not found")
+    Ok(cmd
+        .find_subcommand_mut(subcommand)
+        .with_context(|| format!("Unable to find subcommand `{subcommand}`"))?
         .render_help()
-        .to_string()
+        .to_string())
 }
 
 #[cfg(test)]

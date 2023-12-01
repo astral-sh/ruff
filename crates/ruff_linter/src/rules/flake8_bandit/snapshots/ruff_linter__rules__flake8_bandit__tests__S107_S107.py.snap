@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S107.py:5:29: S107 Possible hardcoded password assigned to function default: "password"
+  |
+5 | def default(first, password="default"):
+  |                             ^^^^^^^^^ S107
+6 |     pass
+  |
+
+S107.py:13:45: S107 Possible hardcoded password assigned to function default: "password"
+   |
+13 | def default_posonly(first, /, pos, password="posonly"):
+   |                                             ^^^^^^^^^ S107
+14 |     pass
+   |
+
+S107.py:21:39: S107 Possible hardcoded password assigned to function default: "password"
+   |
+21 | def default_kwonly(first, *, password="kwonly"):
+   |                                       ^^^^^^^^ S107
+22 |     pass
+   |
+
+S107.py:29:39: S107 Possible hardcoded password assigned to function default: "secret"
+   |
+29 | def default_all(first, /, pos, secret="posonly", *, password="kwonly"):
+   |                                       ^^^^^^^^^ S107
+30 |     pass
+   |
+
+S107.py:29:62: S107 Possible hardcoded password assigned to function default: "password"
+   |
+29 | def default_all(first, /, pos, secret="posonly", *, password="kwonly"):
+   |                                                              ^^^^^^^^ S107
+30 |     pass
+   |
+
+

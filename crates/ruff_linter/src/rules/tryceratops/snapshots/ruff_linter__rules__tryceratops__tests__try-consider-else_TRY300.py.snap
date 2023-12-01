@@ -1,0 +1,14 @@
+---
+source: crates/ruff_linter/src/rules/tryceratops/mod.rs
+---
+TRY300.py:20:9: TRY300 Consider moving this statement to an `else` block
+   |
+18 |         a = 1
+19 |         b = process()
+20 |         return b
+   |         ^^^^^^^^ TRY300
+21 |     except MyException:
+22 |         logger.exception("process failed")
+   |
+
+

@@ -15,8 +15,8 @@ impl UniversalNewlines for str {
     }
 }
 
-/// Like [`str#lines`], but accommodates LF, CRLF, and CR line endings,
-/// the latter of which are not supported by [`str#lines`].
+/// Like [`str::lines`], but accommodates LF, CRLF, and CR line endings,
+/// the latter of which are not supported by [`str::lines`].
 ///
 /// ## Examples
 ///
@@ -32,6 +32,7 @@ impl UniversalNewlines for str {
 /// assert_eq!(lines.next_back(), Some(Line::new("\r\n", TextSize::from(8))));
 /// assert_eq!(lines.next(), None);
 /// ```
+#[derive(Clone)]
 pub struct UniversalNewlineIterator<'a> {
     text: &'a str,
     offset: TextSize,
@@ -57,11 +58,7 @@ impl<'a> UniversalNewlineIterator<'a> {
 pub fn find_newline(text: &str) -> Option<(usize, LineEnding)> {
     let bytes = text.as_bytes();
     if let Some(position) = memchr2(b'\n', b'\r', bytes) {
-        // SAFETY: memchr guarantees to return valid positions
-        #[allow(unsafe_code)]
-        let newline_character = unsafe { *bytes.get_unchecked(position) };
-
-        let line_ending = match newline_character {
+        let line_ending = match bytes[position] {
             // Explicit branch for `\n` as this is the most likely path
             b'\n' => LineEnding::Lf,
             // '\r\n'

@@ -81,6 +81,10 @@ type type_params_comments[ # trailing open bracket comment
     D, # trailing comment
     # leading close bracket comment
 ] = int  # trailing value comment
+type type_params_single_comment[ # trailing open bracket comment
+    A,
+    B
+] = int
 type type_params_all_kinds[type_var, *type_var_tuple, **param_spec] = int
 
 # type variable bounds

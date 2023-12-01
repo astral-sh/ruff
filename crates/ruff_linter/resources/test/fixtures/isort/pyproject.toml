@@ -1,0 +1,8 @@
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint.isort]
+lines-after-imports = 3
+lines-between-types = 2
+known-local-folder = ["ruff"]
+force-to-top = ["lib1", "lib3", "lib5", "lib3.lib4", "z"]

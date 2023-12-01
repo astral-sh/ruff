@@ -1,0 +1,124 @@
+---
+source: crates/ruff_linter/src/rules/flake8_blind_except/mod.rs
+---
+BLE.py:25:8: BLE001 Do not catch blind exception: `BaseException`
+   |
+23 | except Exception as e:
+24 |     raise e
+25 | except BaseException:
+   |        ^^^^^^^^^^^^^ BLE001
+26 |     pass
+   |
+
+BLE.py:31:8: BLE001 Do not catch blind exception: `Exception`
+   |
+29 | try:
+30 |     pass
+31 | except Exception:
+   |        ^^^^^^^^^ BLE001
+32 |     pass
+33 | finally:
+   |
+
+BLE.py:42:8: BLE001 Do not catch blind exception: `Exception`
+   |
+40 | try:
+41 |     pass
+42 | except Exception as e:
+   |        ^^^^^^^^^ BLE001
+43 |     try:
+44 |         raise e
+   |
+
+BLE.py:45:12: BLE001 Do not catch blind exception: `BaseException`
+   |
+43 |     try:
+44 |         raise e
+45 |     except BaseException:
+   |            ^^^^^^^^^^^^^ BLE001
+46 |         pass
+   |
+
+BLE.py:54:8: BLE001 Do not catch blind exception: `Exception`
+   |
+52 |     except BaseException as e:
+53 |         raise e
+54 | except Exception:
+   |        ^^^^^^^^^ BLE001
+55 |     pass
+   |
+
+BLE.py:60:8: BLE001 Do not catch blind exception: `Exception`
+   |
+58 | try:
+59 |     pass
+60 | except Exception as e:
+   |        ^^^^^^^^^ BLE001
+61 |     raise bad
+62 | except BaseException:
+   |
+
+BLE.py:62:8: BLE001 Do not catch blind exception: `BaseException`
+   |
+60 | except Exception as e:
+61 |     raise bad
+62 | except BaseException:
+   |        ^^^^^^^^^^^^^ BLE001
+63 |     pass
+   |
+
+BLE.py:69:8: BLE001 Do not catch blind exception: `Exception`
+   |
+67 | try:
+68 |     pass
+69 | except Exception:
+   |        ^^^^^^^^^ BLE001
+70 |     logging.error("...")
+   |
+
+BLE.py:75:8: BLE001 Do not catch blind exception: `Exception`
+   |
+73 | try:
+74 |     pass
+75 | except Exception:
+   |        ^^^^^^^^^ BLE001
+76 |     logging.error("...", exc_info=False)
+   |
+
+BLE.py:81:8: BLE001 Do not catch blind exception: `Exception`
+   |
+79 | try:
+80 |     pass
+81 | except Exception:
+   |        ^^^^^^^^^ BLE001
+82 |     logging.error("...", exc_info=None)
+   |
+
+BLE.py:101:8: BLE001 Do not catch blind exception: `Exception`
+    |
+ 99 | try:
+100 |     pass
+101 | except Exception:
+    |        ^^^^^^^^^ BLE001
+102 |     error("...")
+    |
+
+BLE.py:107:8: BLE001 Do not catch blind exception: `Exception`
+    |
+105 | try:
+106 |     pass
+107 | except Exception:
+    |        ^^^^^^^^^ BLE001
+108 |     error("...", exc_info=False)
+    |
+
+BLE.py:113:8: BLE001 Do not catch blind exception: `Exception`
+    |
+111 | try:
+112 |     pass
+113 | except Exception:
+    |        ^^^^^^^^^ BLE001
+114 |     error("...", exc_info=None)
+    |
+
+

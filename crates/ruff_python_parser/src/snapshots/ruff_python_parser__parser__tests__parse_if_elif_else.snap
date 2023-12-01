@@ -6,26 +6,24 @@ expression: parse_ast
     If(
         StmtIf {
             range: 0..28,
-            test: Constant(
-                ExprConstant {
+            test: NumberLiteral(
+                ExprNumberLiteral {
                     range: 3..4,
                     value: Int(
                         1,
                     ),
-                    kind: None,
                 },
             ),
             body: [
                 Expr(
                     StmtExpr {
                         range: 6..8,
-                        value: Constant(
-                            ExprConstant {
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 6..8,
                                 value: Int(
                                     10,
                                 ),
-                                kind: None,
                             },
                         ),
                     },
@@ -35,13 +33,12 @@ expression: parse_ast
                 ElifElseClause {
                     range: 9..19,
                     test: Some(
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 14..15,
                                 value: Int(
                                     2,
                                 ),
-                                kind: None,
                             },
                         ),
                     ),
@@ -49,13 +46,12 @@ expression: parse_ast
                         Expr(
                             StmtExpr {
                                 range: 17..19,
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 17..19,
                                         value: Int(
                                             20,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },
@@ -69,13 +65,12 @@ expression: parse_ast
                         Expr(
                             StmtExpr {
                                 range: 26..28,
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 26..28,
                                         value: Int(
                                             30,
                                         ),
-                                        kind: None,
                                     },
                                 ),
                             },

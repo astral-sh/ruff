@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B027.py:18:5: B027 `AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
+   |
+17 |   class AbstractClass(ABC):
+18 |       def empty_1(self):  # error
+   |  _____^
+19 | |         ...
+   | |___________^ B027
+20 |   
+21 |       def empty_2(self):  # error
+   |
+
+B027.py:21:5: B027 `AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator
+   |
+19 |           ...
+20 |   
+21 |       def empty_2(self):  # error
+   |  _____^
+22 | |         pass
+   | |____________^ B027
+23 |   
+24 |       def empty_3(self):  # error
+   |
+
+B027.py:24:5: B027 `AbstractClass.empty_3` is an empty method in an abstract base class, but has no abstract decorator
+   |
+22 |           pass
+23 |   
+24 |       def empty_3(self):  # error
+   |  _____^
+25 | |         """docstring"""
+26 | |         ...
+   | |___________^ B027
+27 |   
+28 |       def empty_4(self):  # error
+   |
+
+B027.py:28:5: B027 `AbstractClass.empty_4` is an empty method in an abstract base class, but has no abstract decorator
+   |
+26 |           ...
+27 |   
+28 |       def empty_4(self):  # error
+   |  _____^
+29 | |         """multiple ellipsis/pass"""
+30 | |         ...
+31 | |         pass
+32 | |         ...
+33 | |         pass
+   | |____________^ B027
+34 |   
+35 |       @notabstract
+   |
+
+

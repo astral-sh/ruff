@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+---
+TD001.py:7:3: TD001 Invalid TODO tag: `XXX`
+  |
+6 | # T001 - errors
+7 | # XXX (evanrittenhouse): this is not fine
+  |   ^^^ TD001
+8 | # FIXME (evanrittenhouse): this is not fine
+9 | # foo # XXX: this isn't fine either
+  |
+
+TD001.py:8:3: TD001 Invalid TODO tag: `FIXME`
+  |
+6 | # T001 - errors
+7 | # XXX (evanrittenhouse): this is not fine
+8 | # FIXME (evanrittenhouse): this is not fine
+  |   ^^^^^ TD001
+9 | # foo # XXX: this isn't fine either
+  |
+
+TD001.py:9:9: TD001 Invalid TODO tag: `XXX`
+  |
+7 | # XXX (evanrittenhouse): this is not fine
+8 | # FIXME (evanrittenhouse): this is not fine
+9 | # foo # XXX: this isn't fine either
+  |         ^^^ TD001
+  |
+
+

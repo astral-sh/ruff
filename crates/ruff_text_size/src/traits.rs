@@ -1,4 +1,4 @@
-use {crate::TextSize, std::convert::TryInto};
+use {crate::TextRange, crate::TextSize, std::convert::TryInto};
 
 use priv_in_pub::Sealed;
 mod priv_in_pub {
@@ -33,5 +33,36 @@ impl TextLen for char {
     #[allow(clippy::cast_possible_truncation)]
     fn text_len(self) -> TextSize {
         (self.len_utf8() as u32).into()
+    }
+}
+
+/// A ranged item in the source text.
+pub trait Ranged {
+    /// The range of this item in the source text.
+    fn range(&self) -> TextRange;
+
+    /// The start offset of this item in the source text.
+    fn start(&self) -> TextSize {
+        self.range().start()
+    }
+
+    /// The end offset of this item in the source text.
+    fn end(&self) -> TextSize {
+        self.range().end()
+    }
+}
+
+impl Ranged for TextRange {
+    fn range(&self) -> TextRange {
+        *self
+    }
+}
+
+impl<T> Ranged for &T
+where
+    T: Ranged,
+{
+    fn range(&self) -> TextRange {
+        T::range(self)
     }
 }

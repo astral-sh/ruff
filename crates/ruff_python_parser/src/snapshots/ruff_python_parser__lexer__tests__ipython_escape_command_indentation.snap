@@ -1,0 +1,41 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_jupyter_source(source)
+---
+[
+    (
+        If,
+        0..2,
+    ),
+    (
+        True,
+        3..7,
+    ),
+    (
+        Colon,
+        7..8,
+    ),
+    (
+        Newline,
+        8..9,
+    ),
+    (
+        Indent,
+        9..13,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "matplotlib         --inline",
+            kind: Magic,
+        },
+        13..43,
+    ),
+    (
+        Newline,
+        43..43,
+    ),
+    (
+        Dedent,
+        43..43,
+    ),
+]

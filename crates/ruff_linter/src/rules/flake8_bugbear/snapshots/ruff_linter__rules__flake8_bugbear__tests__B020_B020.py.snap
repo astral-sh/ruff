@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B020.py:8:5: B020 Loop control variable `items` overrides iterable it iterates
+  |
+6 | items = [1, 2, 3]
+7 | 
+8 | for items in items:
+  |     ^^^^^ B020
+9 |     print(items)
+  |
+
+B020.py:21:10: B020 Loop control variable `values` overrides iterable it iterates
+   |
+19 |     print(f"{key}, {value}")
+20 | 
+21 | for key, values in values.items():
+   |          ^^^^^^ B020
+22 |     print(f"{key}, {values}")
+   |
+
+B020.py:36:5: B020 Loop control variable `vars` overrides iterable it iterates
+   |
+35 | # However we still call out reassigning the iterable in the comprehension.
+36 | for vars in [i for i in vars]:
+   |     ^^^^ B020
+37 |     print(vars)
+   |
+
+

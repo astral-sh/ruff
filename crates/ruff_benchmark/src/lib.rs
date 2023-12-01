@@ -1,3 +1,5 @@
+pub mod criterion;
+
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::process::Command;

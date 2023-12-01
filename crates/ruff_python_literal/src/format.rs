@@ -1,12 +1,9 @@
 use itertools::{Itertools, PeekingNext};
 
-use num_traits::{cast::ToPrimitive, FromPrimitive, Signed};
 use std::error::Error;
-use std::ops::Deref;
-use std::{cmp, str::FromStr};
+use std::str::FromStr;
 
-use crate::{float, Case};
-use num_bigint::{BigInt, Sign};
+use crate::Case;
 
 trait FormatParse {
     fn parse(text: &str) -> (Option<Self>, &str)
@@ -186,17 +183,74 @@ impl FormatParse for FormatType {
     }
 }
 
+/// The format specification component of a format field
+///
+/// For example the content would be parsed from `<20` in:
+/// ```python
+/// "hello {name:<20}".format(name="test")
+/// ```
+///
+/// Format specifications allow nested placeholders for dynamic formatting.
+/// For example, the following statements are equivalent:
+/// ```python
+/// "hello {name:{fmt}}".format(name="test", fmt="<20")
+/// "hello {name:{align}{width}}".format(name="test", align="<", width="20")
+/// "hello {name:<20{empty}>}".format(name="test", empty="")
+/// ```
+///
+/// Nested placeholders can include additional format specifiers.
+/// ```python
+/// "hello {name:{fmt:*>}}".format(name="test", fmt="<20")
+/// ```
+///
+/// However, placeholders can only be singly nested (preserving our sanity).
+/// A [`FormatSpecError::PlaceholderRecursionExceeded`] will be raised while parsing in this case.
+/// ```python
+/// "hello {name:{fmt:{not_allowed}}}".format(name="test", fmt="<20")  # Syntax error
+/// ```
+///
+/// When placeholders are present in a format specification, parsing will return a [`DynamicFormatSpec`]
+/// and avoid attempting to parse any of the clauses. Otherwise, a [`StaticFormatSpec`] will be used.
 #[derive(Debug, PartialEq)]
-pub struct FormatSpec {
+pub enum FormatSpec {
+    Static(StaticFormatSpec),
+    Dynamic(DynamicFormatSpec),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct StaticFormatSpec {
+    // Ex) `!s` in `'{!s}'`
     conversion: Option<FormatConversion>,
+    // Ex) `*` in `'{:*^30}'`
     fill: Option<char>,
+    // Ex) `<` in `'{:<30}'`
     align: Option<FormatAlign>,
+    // Ex) `+` in `'{:+f}'`
     sign: Option<FormatSign>,
+    // Ex) `#` in `'{:#x}'`
     alternate_form: bool,
+    // Ex) `30` in `'{:<30}'`
     width: Option<usize>,
+    // Ex) `,` in `'{:,}'`
     grouping_option: Option<FormatGrouping>,
+    // Ex) `2` in `'{:.2}'`
     precision: Option<usize>,
+    // Ex) `f` in `'{:+f}'`
     format_type: Option<FormatType>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DynamicFormatSpec {
+    // Ex) `x` and `y` in `'{:*{x},{y}b}'`
+    pub placeholders: Vec<FormatPart>,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Default)]
+pub enum AllowPlaceholderNesting {
+    #[default]
+    Yes,
+    No,
+    AllowPlaceholderNesting,
 }
 
 fn get_num_digits(text: &str) -> usize {
@@ -273,9 +327,38 @@ fn parse_precision(text: &str) -> Result<(Option<usize>, &str), FormatSpecError>
     })
 }
 
+/// Parses a placeholder format part within a format specification
+fn parse_nested_placeholder(text: &str) -> Result<Option<(FormatPart, &str)>, FormatSpecError> {
+    match FormatString::parse_spec(text, AllowPlaceholderNesting::No) {
+        // Not a nested placeholder, OK
+        Err(FormatParseError::MissingStartBracket) => Ok(None),
+        Err(err) => Err(FormatSpecError::InvalidPlaceholder(err)),
+        Ok((format_part, text)) => Ok(Some((format_part, text))),
+    }
+}
+
+/// Parse all placeholders in a format specification
+/// If no placeholders are present, an empty vector will be returned
+fn parse_nested_placeholders(mut text: &str) -> Result<Vec<FormatPart>, FormatSpecError> {
+    let mut placeholders = vec![];
+    while let Some(bracket) = text.find('{') {
+        if let Some((format_part, rest)) = parse_nested_placeholder(&text[bracket..])? {
+            text = rest;
+            placeholders.push(format_part);
+        } else {
+            text = &text[bracket + 1..];
+        }
+    }
+    Ok(placeholders)
+}
+
 impl FormatSpec {
     pub fn parse(text: &str) -> Result<Self, FormatSpecError> {
-        // get_integer in CPython
+        let placeholders = parse_nested_placeholders(text)?;
+        if !placeholders.is_empty() {
+            return Ok(FormatSpec::Dynamic(DynamicFormatSpec { placeholders }));
+        }
+
         let (conversion, text) = FormatConversion::parse(text);
         let (mut fill, mut align, text) = parse_fill_and_align(text);
         let (sign, text) = FormatSign::parse(text);
@@ -284,6 +367,7 @@ impl FormatSpec {
         let (width, text) = parse_number(text)?;
         let (grouping_option, text) = FormatGrouping::parse(text);
         let (precision, text) = parse_precision(text)?;
+
         let (format_type, _text) = if text.is_empty() {
             (None, text)
         } else {
@@ -304,7 +388,7 @@ impl FormatSpec {
             align = align.or(Some(FormatAlign::AfterSign));
         }
 
-        Ok(FormatSpec {
+        Ok(FormatSpec::Static(StaticFormatSpec {
             conversion,
             fill,
             align,
@@ -314,419 +398,7 @@ impl FormatSpec {
             grouping_option,
             precision,
             format_type,
-        })
-    }
-
-    fn compute_fill_string(fill_char: char, fill_chars_needed: i32) -> String {
-        (0..fill_chars_needed)
-            .map(|_| fill_char)
-            .collect::<String>()
-    }
-
-    #[allow(
-        clippy::cast_possible_wrap,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )]
-    fn add_magnitude_separators_for_char(
-        magnitude_str: &str,
-        inter: i32,
-        sep: char,
-        disp_digit_cnt: i32,
-    ) -> String {
-        // Don't add separators to the floating decimal point of numbers
-        let mut parts = magnitude_str.splitn(2, '.');
-        let magnitude_int_str = parts.next().unwrap().to_string();
-        let dec_digit_cnt = magnitude_str.len() as i32 - magnitude_int_str.len() as i32;
-        let int_digit_cnt = disp_digit_cnt - dec_digit_cnt;
-        let mut result = FormatSpec::separate_integer(magnitude_int_str, inter, sep, int_digit_cnt);
-        if let Some(part) = parts.next() {
-            result.push_str(&format!(".{part}"));
-        }
-        result
-    }
-
-    #[allow(
-        clippy::cast_sign_loss,
-        clippy::cast_possible_wrap,
-        clippy::cast_possible_truncation
-    )]
-    fn separate_integer(
-        magnitude_str: String,
-        inter: i32,
-        sep: char,
-        disp_digit_cnt: i32,
-    ) -> String {
-        let magnitude_len = magnitude_str.len() as i32;
-        let offset = i32::from(disp_digit_cnt % (inter + 1) == 0);
-        let disp_digit_cnt = disp_digit_cnt + offset;
-        let pad_cnt = disp_digit_cnt - magnitude_len;
-        let sep_cnt = disp_digit_cnt / (inter + 1);
-        let diff = pad_cnt - sep_cnt;
-        if pad_cnt > 0 && diff > 0 {
-            // separate with 0 padding
-            let padding = "0".repeat(diff as usize);
-            let padded_num = format!("{padding}{magnitude_str}");
-            FormatSpec::insert_separator(padded_num, inter, sep, sep_cnt)
-        } else {
-            // separate without padding
-            let sep_cnt = (magnitude_len - 1) / inter;
-            FormatSpec::insert_separator(magnitude_str, inter, sep, sep_cnt)
-        }
-    }
-
-    #[allow(
-        clippy::cast_sign_loss,
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap
-    )]
-    fn insert_separator(mut magnitude_str: String, inter: i32, sep: char, sep_cnt: i32) -> String {
-        let magnitude_len = magnitude_str.len() as i32;
-        for i in 1..=sep_cnt {
-            magnitude_str.insert((magnitude_len - inter * i) as usize, sep);
-        }
-        magnitude_str
-    }
-
-    fn validate_format(&self, default_format_type: FormatType) -> Result<(), FormatSpecError> {
-        let format_type = self.format_type.as_ref().unwrap_or(&default_format_type);
-        match (&self.grouping_option, format_type) {
-            (
-                Some(FormatGrouping::Comma),
-                FormatType::String
-                | FormatType::Character
-                | FormatType::Binary
-                | FormatType::Octal
-                | FormatType::Hex(_)
-                | FormatType::Number(_),
-            ) => {
-                let ch = char::from(format_type);
-                Err(FormatSpecError::UnspecifiedFormat(',', ch))
-            }
-            (
-                Some(FormatGrouping::Underscore),
-                FormatType::String | FormatType::Character | FormatType::Number(_),
-            ) => {
-                let ch = char::from(format_type);
-                Err(FormatSpecError::UnspecifiedFormat('_', ch))
-            }
-            _ => Ok(()),
-        }
-    }
-
-    fn get_separator_interval(&self) -> usize {
-        match self.format_type {
-            Some(FormatType::Binary | FormatType::Octal | FormatType::Hex(_)) => 4,
-            Some(FormatType::Decimal | FormatType::Number(_) | FormatType::FixedPoint(_)) => 3,
-            None => 3,
-            _ => panic!("Separators only valid for numbers!"),
-        }
-    }
-
-    #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
-    fn add_magnitude_separators(&self, magnitude_str: String, prefix: &str) -> String {
-        match &self.grouping_option {
-            Some(fg) => {
-                let sep = match fg {
-                    FormatGrouping::Comma => ',',
-                    FormatGrouping::Underscore => '_',
-                };
-                let inter = self.get_separator_interval().try_into().unwrap();
-                let magnitude_len = magnitude_str.len();
-                let width = self.width.unwrap_or(magnitude_len) as i32 - prefix.len() as i32;
-                let disp_digit_cnt = cmp::max(width, magnitude_len as i32);
-                FormatSpec::add_magnitude_separators_for_char(
-                    &magnitude_str,
-                    inter,
-                    sep,
-                    disp_digit_cnt,
-                )
-            }
-            None => magnitude_str,
-        }
-    }
-
-    pub fn format_bool(&self, input: bool) -> Result<String, FormatSpecError> {
-        let x = u8::from(input);
-        match &self.format_type {
-            Some(
-                FormatType::Binary
-                | FormatType::Decimal
-                | FormatType::Octal
-                | FormatType::Number(Case::Lower)
-                | FormatType::Hex(_)
-                | FormatType::GeneralFormat(_)
-                | FormatType::Character,
-            ) => self.format_int(&BigInt::from_u8(x).unwrap()),
-            Some(FormatType::Exponent(_) | FormatType::FixedPoint(_) | FormatType::Percentage) => {
-                self.format_float(f64::from(x))
-            }
-            None => {
-                let first_letter = (input.to_string().as_bytes()[0] as char).to_uppercase();
-                Ok(first_letter.collect::<String>() + &input.to_string()[1..])
-            }
-            _ => Err(FormatSpecError::InvalidFormatSpecifier),
-        }
-    }
-
-    pub fn format_float(&self, num: f64) -> Result<String, FormatSpecError> {
-        self.validate_format(FormatType::FixedPoint(Case::Lower))?;
-        let precision = self.precision.unwrap_or(6);
-        let magnitude = num.abs();
-        let raw_magnitude_str: Result<String, FormatSpecError> = match &self.format_type {
-            Some(FormatType::FixedPoint(case)) => Ok(float::format_fixed(
-                precision,
-                magnitude,
-                *case,
-                self.alternate_form,
-            )),
-            Some(
-                FormatType::Decimal
-                | FormatType::Binary
-                | FormatType::Octal
-                | FormatType::Hex(_)
-                | FormatType::String
-                | FormatType::Character
-                | FormatType::Number(Case::Upper),
-            ) => {
-                let ch = char::from(self.format_type.as_ref().unwrap());
-                Err(FormatSpecError::UnknownFormatCode(ch, "float"))
-            }
-            Some(FormatType::GeneralFormat(case) | FormatType::Number(case)) => {
-                let precision = if precision == 0 { 1 } else { precision };
-                Ok(float::format_general(
-                    precision,
-                    magnitude,
-                    *case,
-                    self.alternate_form,
-                    false,
-                ))
-            }
-            Some(FormatType::Exponent(case)) => Ok(float::format_exponent(
-                precision,
-                magnitude,
-                *case,
-                self.alternate_form,
-            )),
-            Some(FormatType::Percentage) => match magnitude {
-                magnitude if magnitude.is_nan() => Ok("nan%".to_owned()),
-                magnitude if magnitude.is_infinite() => Ok("inf%".to_owned()),
-                _ => {
-                    let result = format!("{:.*}", precision, magnitude * 100.0);
-                    let point = float::decimal_point_or_empty(precision, self.alternate_form);
-                    Ok(format!("{result}{point}%"))
-                }
-            },
-            None => match magnitude {
-                magnitude if magnitude.is_nan() => Ok("nan".to_owned()),
-                magnitude if magnitude.is_infinite() => Ok("inf".to_owned()),
-                _ => match self.precision {
-                    Some(precision) => Ok(float::format_general(
-                        precision,
-                        magnitude,
-                        Case::Lower,
-                        self.alternate_form,
-                        true,
-                    )),
-                    None => Ok(float::to_string(magnitude)),
-                },
-            },
-        };
-        let format_sign = self.sign.unwrap_or(FormatSign::Minus);
-        let sign_str = if num.is_sign_negative() && !num.is_nan() {
-            "-"
-        } else {
-            match format_sign {
-                FormatSign::Plus => "+",
-                FormatSign::Minus => "",
-                FormatSign::MinusOrSpace => " ",
-            }
-        };
-        let magnitude_str = self.add_magnitude_separators(raw_magnitude_str?, sign_str);
-        Ok(
-            self.format_sign_and_align(
-                &AsciiStr::new(&magnitude_str),
-                sign_str,
-                FormatAlign::Right,
-            ),
-        )
-    }
-
-    #[inline]
-    fn format_int_radix(&self, magnitude: &BigInt, radix: u32) -> Result<String, FormatSpecError> {
-        match self.precision {
-            Some(_) => Err(FormatSpecError::PrecisionNotAllowed),
-            None => Ok(magnitude.to_str_radix(radix)),
-        }
-    }
-
-    pub fn format_int(&self, num: &BigInt) -> Result<String, FormatSpecError> {
-        self.validate_format(FormatType::Decimal)?;
-        let magnitude = num.abs();
-        let prefix = if self.alternate_form {
-            match self.format_type {
-                Some(FormatType::Binary) => "0b",
-                Some(FormatType::Octal) => "0o",
-                Some(FormatType::Hex(Case::Lower)) => "0x",
-                Some(FormatType::Hex(Case::Upper)) => "0X",
-                _ => "",
-            }
-        } else {
-            ""
-        };
-        let raw_magnitude_str = match self.format_type {
-            Some(FormatType::Binary) => self.format_int_radix(&magnitude, 2),
-            Some(FormatType::Decimal) => self.format_int_radix(&magnitude, 10),
-            Some(FormatType::Octal) => self.format_int_radix(&magnitude, 8),
-            Some(FormatType::Hex(Case::Lower)) => self.format_int_radix(&magnitude, 16),
-            Some(FormatType::Hex(Case::Upper)) => {
-                if self.precision.is_some() {
-                    Err(FormatSpecError::PrecisionNotAllowed)
-                } else {
-                    let mut result = magnitude.to_str_radix(16);
-                    result.make_ascii_uppercase();
-                    Ok(result)
-                }
-            }
-
-            Some(FormatType::Number(Case::Lower)) => self.format_int_radix(&magnitude, 10),
-            Some(FormatType::Number(Case::Upper)) => {
-                Err(FormatSpecError::UnknownFormatCode('N', "int"))
-            }
-            Some(FormatType::String) => Err(FormatSpecError::UnknownFormatCode('s', "int")),
-            Some(FormatType::Character) => match (self.sign, self.alternate_form) {
-                (Some(_), _) => Err(FormatSpecError::NotAllowed("Sign")),
-                (_, true) => Err(FormatSpecError::NotAllowed("Alternate form (#)")),
-                (_, _) => match num.to_u32() {
-                    Some(n) if n <= 0x0010_ffff => Ok(std::char::from_u32(n).unwrap().to_string()),
-                    Some(_) | None => Err(FormatSpecError::CodeNotInRange),
-                },
-            },
-            Some(
-                FormatType::GeneralFormat(_)
-                | FormatType::FixedPoint(_)
-                | FormatType::Exponent(_)
-                | FormatType::Percentage,
-            ) => match num.to_f64() {
-                Some(float) => return self.format_float(float),
-                _ => Err(FormatSpecError::UnableToConvert),
-            },
-            None => self.format_int_radix(&magnitude, 10),
-        }?;
-        let format_sign = self.sign.unwrap_or(FormatSign::Minus);
-        let sign_str = match num.sign() {
-            Sign::Minus => "-",
-            _ => match format_sign {
-                FormatSign::Plus => "+",
-                FormatSign::Minus => "",
-                FormatSign::MinusOrSpace => " ",
-            },
-        };
-        let sign_prefix = format!("{sign_str}{prefix}");
-        let magnitude_str = self.add_magnitude_separators(raw_magnitude_str, &sign_prefix);
-        Ok(self.format_sign_and_align(
-            &AsciiStr::new(&magnitude_str),
-            &sign_prefix,
-            FormatAlign::Right,
-        ))
-    }
-
-    pub fn format_string<T>(&self, s: &T) -> Result<String, FormatSpecError>
-    where
-        T: CharLen + Deref<Target = str>,
-    {
-        self.validate_format(FormatType::String)?;
-        match self.format_type {
-            Some(FormatType::String) | None => {
-                let mut value = self.format_sign_and_align(s, "", FormatAlign::Left);
-                if let Some(precision) = self.precision {
-                    value.truncate(precision);
-                }
-                Ok(value)
-            }
-            _ => {
-                let ch = char::from(self.format_type.as_ref().unwrap());
-                Err(FormatSpecError::UnknownFormatCode(ch, "str"))
-            }
-        }
-    }
-
-    #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
-    fn format_sign_and_align<T>(
-        &self,
-        magnitude_str: &T,
-        sign_str: &str,
-        default_align: FormatAlign,
-    ) -> String
-    where
-        T: CharLen + Deref<Target = str>,
-    {
-        let align = self.align.unwrap_or(default_align);
-
-        let num_chars = magnitude_str.char_len();
-        let fill_char = self.fill.unwrap_or(' ');
-        let fill_chars_needed: i32 = self.width.map_or(0, |w| {
-            cmp::max(0, (w as i32) - (num_chars as i32) - (sign_str.len() as i32))
-        });
-
-        let magnitude_str = &**magnitude_str;
-        match align {
-            FormatAlign::Left => format!(
-                "{}{}{}",
-                sign_str,
-                magnitude_str,
-                FormatSpec::compute_fill_string(fill_char, fill_chars_needed)
-            ),
-            FormatAlign::Right => format!(
-                "{}{}{}",
-                FormatSpec::compute_fill_string(fill_char, fill_chars_needed),
-                sign_str,
-                magnitude_str
-            ),
-            FormatAlign::AfterSign => format!(
-                "{}{}{}",
-                sign_str,
-                FormatSpec::compute_fill_string(fill_char, fill_chars_needed),
-                magnitude_str
-            ),
-            FormatAlign::Center => {
-                let left_fill_chars_needed = fill_chars_needed / 2;
-                let right_fill_chars_needed = fill_chars_needed - left_fill_chars_needed;
-                let left_fill_string =
-                    FormatSpec::compute_fill_string(fill_char, left_fill_chars_needed);
-                let right_fill_string =
-                    FormatSpec::compute_fill_string(fill_char, right_fill_chars_needed);
-                format!("{left_fill_string}{sign_str}{magnitude_str}{right_fill_string}")
-            }
-        }
-    }
-}
-
-pub trait CharLen {
-    /// Returns the number of characters in the text
-    fn char_len(&self) -> usize;
-}
-
-struct AsciiStr<'a> {
-    inner: &'a str,
-}
-
-impl<'a> AsciiStr<'a> {
-    fn new(inner: &'a str) -> Self {
-        Self { inner }
-    }
-}
-
-impl CharLen for AsciiStr<'_> {
-    fn char_len(&self) -> usize {
-        self.inner.len()
-    }
-}
-
-impl Deref for AsciiStr<'_> {
-    type Target = str;
-    fn deref(&self) -> &Self::Target {
-        self.inner
+        }))
     }
 }
 
@@ -736,6 +408,8 @@ pub enum FormatSpecError {
     PrecisionTooBig,
     InvalidFormatSpecifier,
     InvalidFormatType,
+    InvalidPlaceholder(FormatParseError),
+    PlaceholderRecursionExceeded,
     UnspecifiedFormat(char, char),
     UnknownFormatCode(char, &'static str),
     PrecisionNotAllowed,
@@ -750,7 +424,7 @@ pub enum FormatParseError {
     UnmatchedBracket,
     MissingStartBracket,
     UnescapedStartBracketInLiteral,
-    InvalidFormatSpecifier,
+    PlaceholderRecursionExceeded,
     UnknownConversion,
     EmptyAttribute,
     MissingRightBracket,
@@ -769,8 +443,8 @@ impl std::fmt::Display for FormatParseError {
             Self::UnescapedStartBracketInLiteral => {
                 std::write!(fmt, "unescaped start bracket in literal")
             }
-            Self::InvalidFormatSpecifier => {
-                std::write!(fmt, "invalid format specifier")
+            Self::PlaceholderRecursionExceeded => {
+                std::write!(fmt, "multiply nested placeholder not allowed")
             }
             Self::UnknownConversion => {
                 std::write!(fmt, "unknown conversion")
@@ -970,20 +644,22 @@ impl FormatString {
         })
     }
 
-    fn parse_spec(text: &str) -> Result<(FormatPart, &str), FormatParseError> {
+    fn parse_spec(
+        text: &str,
+        allow_nesting: AllowPlaceholderNesting,
+    ) -> Result<(FormatPart, &str), FormatParseError> {
+        let Some(text) = text.strip_prefix('{') else {
+            return Err(FormatParseError::MissingStartBracket);
+        };
+
         let mut nested = false;
-        let mut end_bracket_pos = None;
         let mut left = String::new();
 
-        // There may be one layer nesting brackets in spec
         for (idx, c) in text.char_indices() {
-            if idx == 0 {
-                if c != '{' {
-                    return Err(FormatParseError::MissingStartBracket);
-                }
-            } else if c == '{' {
-                if nested {
-                    return Err(FormatParseError::InvalidFormatSpecifier);
+            if c == '{' {
+                // There may be one layer nesting brackets in spec
+                if nested || allow_nesting == AllowPlaceholderNesting::No {
+                    return Err(FormatParseError::PlaceholderRecursionExceeded);
                 }
                 nested = true;
                 left.push(c);
@@ -994,19 +670,13 @@ impl FormatString {
                     left.push(c);
                     continue;
                 }
-                end_bracket_pos = Some(idx);
-                break;
-            } else {
-                left.push(c);
+                let (_, right) = text.split_at(idx + 1);
+                let format_part = FormatString::parse_part_in_brackets(&left)?;
+                return Ok((format_part, right));
             }
+            left.push(c);
         }
-        if let Some(pos) = end_bracket_pos {
-            let (_, right) = text.split_at(pos);
-            let format_part = FormatString::parse_part_in_brackets(&left)?;
-            Ok((format_part, &right[1..]))
-        } else {
-            Err(FormatParseError::UnmatchedBracket)
-        }
+        Err(FormatParseError::UnmatchedBracket)
     }
 }
 
@@ -1025,7 +695,7 @@ impl<'a> FromTemplate<'a> for FormatString {
             // Try to parse both literals and bracketed format parts until we
             // run out of text
             cur_text = FormatString::parse_literal(cur_text)
-                .or_else(|_| FormatString::parse_spec(cur_text))
+                .or_else(|_| FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
                 .map(|(part, new_text)| {
                     parts.push(part);
                     new_text
@@ -1067,7 +737,7 @@ mod tests {
 
     #[test]
     fn test_width_only() {
-        let expected = Ok(FormatSpec {
+        let expected = Ok(FormatSpec::Static(StaticFormatSpec {
             conversion: None,
             fill: None,
             align: None,
@@ -1077,13 +747,13 @@ mod tests {
             grouping_option: None,
             precision: None,
             format_type: None,
-        });
+        }));
         assert_eq!(FormatSpec::parse("33"), expected);
     }
 
     #[test]
     fn test_fill_and_width() {
-        let expected = Ok(FormatSpec {
+        let expected = Ok(FormatSpec::Static(StaticFormatSpec {
             conversion: None,
             fill: Some('<'),
             align: Some(FormatAlign::Right),
@@ -1093,13 +763,61 @@ mod tests {
             grouping_option: None,
             precision: None,
             format_type: None,
-        });
+        }));
         assert_eq!(FormatSpec::parse("<>33"), expected);
     }
 
     #[test]
+    fn test_format_part() {
+        let expected = Ok(FormatSpec::Dynamic(DynamicFormatSpec {
+            placeholders: vec![FormatPart::Field {
+                field_name: "x".to_string(),
+                conversion_spec: None,
+                format_spec: String::new(),
+            }],
+        }));
+        assert_eq!(FormatSpec::parse("{x}"), expected);
+    }
+
+    #[test]
+    fn test_dynamic_format_spec() {
+        let expected = Ok(FormatSpec::Dynamic(DynamicFormatSpec {
+            placeholders: vec![
+                FormatPart::Field {
+                    field_name: "x".to_string(),
+                    conversion_spec: None,
+                    format_spec: String::new(),
+                },
+                FormatPart::Field {
+                    field_name: "y".to_string(),
+                    conversion_spec: None,
+                    format_spec: "<2".to_string(),
+                },
+                FormatPart::Field {
+                    field_name: "z".to_string(),
+                    conversion_spec: None,
+                    format_spec: String::new(),
+                },
+            ],
+        }));
+        assert_eq!(FormatSpec::parse("{x}{y:<2}{z}"), expected);
+    }
+
+    #[test]
+    fn test_dynamic_format_spec_with_others() {
+        let expected = Ok(FormatSpec::Dynamic(DynamicFormatSpec {
+            placeholders: vec![FormatPart::Field {
+                field_name: "x".to_string(),
+                conversion_spec: None,
+                format_spec: String::new(),
+            }],
+        }));
+        assert_eq!(FormatSpec::parse("<{x}20b"), expected);
+    }
+
+    #[test]
     fn test_all() {
-        let expected = Ok(FormatSpec {
+        let expected = Ok(FormatSpec::Static(StaticFormatSpec {
             conversion: None,
             fill: Some('<'),
             align: Some(FormatAlign::Right),
@@ -1109,100 +827,8 @@ mod tests {
             grouping_option: Some(FormatGrouping::Comma),
             precision: Some(11),
             format_type: Some(FormatType::Binary),
-        });
+        }));
         assert_eq!(FormatSpec::parse("<>-#23,.11b"), expected);
-    }
-
-    fn format_bool(text: &str, value: bool) -> Result<String, FormatSpecError> {
-        FormatSpec::parse(text).and_then(|spec| spec.format_bool(value))
-    }
-
-    #[test]
-    fn test_format_bool() {
-        assert_eq!(format_bool("b", true), Ok("1".to_owned()));
-        assert_eq!(format_bool("b", false), Ok("0".to_owned()));
-        assert_eq!(format_bool("d", true), Ok("1".to_owned()));
-        assert_eq!(format_bool("d", false), Ok("0".to_owned()));
-        assert_eq!(format_bool("o", true), Ok("1".to_owned()));
-        assert_eq!(format_bool("o", false), Ok("0".to_owned()));
-        assert_eq!(format_bool("n", true), Ok("1".to_owned()));
-        assert_eq!(format_bool("n", false), Ok("0".to_owned()));
-        assert_eq!(format_bool("x", true), Ok("1".to_owned()));
-        assert_eq!(format_bool("x", false), Ok("0".to_owned()));
-        assert_eq!(format_bool("X", true), Ok("1".to_owned()));
-        assert_eq!(format_bool("X", false), Ok("0".to_owned()));
-        assert_eq!(format_bool("g", true), Ok("1".to_owned()));
-        assert_eq!(format_bool("g", false), Ok("0".to_owned()));
-        assert_eq!(format_bool("G", true), Ok("1".to_owned()));
-        assert_eq!(format_bool("G", false), Ok("0".to_owned()));
-        assert_eq!(format_bool("c", true), Ok("\x01".to_owned()));
-        assert_eq!(format_bool("c", false), Ok("\x00".to_owned()));
-        assert_eq!(format_bool("e", true), Ok("1.000000e+00".to_owned()));
-        assert_eq!(format_bool("e", false), Ok("0.000000e+00".to_owned()));
-        assert_eq!(format_bool("E", true), Ok("1.000000E+00".to_owned()));
-        assert_eq!(format_bool("E", false), Ok("0.000000E+00".to_owned()));
-        assert_eq!(format_bool("f", true), Ok("1.000000".to_owned()));
-        assert_eq!(format_bool("f", false), Ok("0.000000".to_owned()));
-        assert_eq!(format_bool("F", true), Ok("1.000000".to_owned()));
-        assert_eq!(format_bool("F", false), Ok("0.000000".to_owned()));
-        assert_eq!(format_bool("%", true), Ok("100.000000%".to_owned()));
-        assert_eq!(format_bool("%", false), Ok("0.000000%".to_owned()));
-    }
-
-    #[test]
-    fn test_format_int() {
-        assert_eq!(
-            FormatSpec::parse("d")
-                .unwrap()
-                .format_int(&BigInt::from_bytes_be(Sign::Plus, b"\x10")),
-            Ok("16".to_owned())
-        );
-        assert_eq!(
-            FormatSpec::parse("x")
-                .unwrap()
-                .format_int(&BigInt::from_bytes_be(Sign::Plus, b"\x10")),
-            Ok("10".to_owned())
-        );
-        assert_eq!(
-            FormatSpec::parse("b")
-                .unwrap()
-                .format_int(&BigInt::from_bytes_be(Sign::Plus, b"\x10")),
-            Ok("10000".to_owned())
-        );
-        assert_eq!(
-            FormatSpec::parse("o")
-                .unwrap()
-                .format_int(&BigInt::from_bytes_be(Sign::Plus, b"\x10")),
-            Ok("20".to_owned())
-        );
-        assert_eq!(
-            FormatSpec::parse("+d")
-                .unwrap()
-                .format_int(&BigInt::from_bytes_be(Sign::Plus, b"\x10")),
-            Ok("+16".to_owned())
-        );
-        assert_eq!(
-            FormatSpec::parse("^ 5d")
-                .unwrap()
-                .format_int(&BigInt::from_bytes_be(Sign::Minus, b"\x10")),
-            Ok(" -16 ".to_owned())
-        );
-        assert_eq!(
-            FormatSpec::parse("0>+#10x")
-                .unwrap()
-                .format_int(&BigInt::from_bytes_be(Sign::Plus, b"\x10")),
-            Ok("00000+0x10".to_owned())
-        );
-    }
-
-    #[test]
-    fn test_format_int_sep() {
-        let spec = FormatSpec::parse(",").expect("");
-        assert_eq!(spec.grouping_option, Some(FormatGrouping::Comma));
-        assert_eq!(
-            spec.format_int(&BigInt::from_str("1234567890123456789012345678").unwrap()),
-            Ok("1,234,567,890,123,456,789,012,345,678".to_owned())
-        );
     }
 
     #[test]
@@ -1225,6 +851,22 @@ mod tests {
         });
 
         assert_eq!(FormatString::from_str("abcd{1}:{key}"), expected);
+    }
+
+    #[test]
+    fn test_format_parse_nested_placeholder() {
+        let expected = Ok(FormatString {
+            format_parts: vec![
+                FormatPart::Literal("abcd".to_owned()),
+                FormatPart::Field {
+                    field_name: "1".to_owned(),
+                    conversion_spec: None,
+                    format_spec: "{a}".to_owned(),
+                },
+            ],
+        });
+
+        assert_eq!(FormatString::from_str("abcd{1:{a}}"), expected);
     }
 
     #[test]
@@ -1282,6 +924,40 @@ mod tests {
         assert_eq!(
             FormatSpec::parse("o!"),
             Err(FormatSpecError::InvalidFormatSpecifier)
+        );
+        assert_eq!(
+            FormatSpec::parse("{"),
+            Err(FormatSpecError::InvalidPlaceholder(
+                FormatParseError::UnmatchedBracket
+            ))
+        );
+        assert_eq!(
+            FormatSpec::parse("{x"),
+            Err(FormatSpecError::InvalidPlaceholder(
+                FormatParseError::UnmatchedBracket
+            ))
+        );
+        assert_eq!(
+            FormatSpec::parse("}"),
+            Err(FormatSpecError::InvalidFormatType)
+        );
+        assert_eq!(
+            FormatSpec::parse("{}}"),
+            // Note this should be an `InvalidFormatType` but we give up
+            // on all other parsing validation when we see a placeholder
+            Ok(FormatSpec::Dynamic(DynamicFormatSpec {
+                placeholders: vec![FormatPart::Field {
+                    field_name: String::new(),
+                    conversion_spec: None,
+                    format_spec: String::new()
+                }]
+            }))
+        );
+        assert_eq!(
+            FormatSpec::parse("{{x}}"),
+            Err(FormatSpecError::InvalidPlaceholder(
+                FormatParseError::PlaceholderRecursionExceeded
+            ))
         );
         assert_eq!(
             FormatSpec::parse("d "),

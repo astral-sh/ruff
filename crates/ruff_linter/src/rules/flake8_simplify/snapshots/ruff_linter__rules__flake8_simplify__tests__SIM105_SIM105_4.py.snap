@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM105_4.py:2:1: SIM105 [*] Use `contextlib.suppress(ImportError)` instead of `try`-`except`-`pass`
+  |
+1 |   ﻿#!/usr/bin/env python
+2 | / try:
+3 | |    from __builtin__ import bytes, str, open, super, range, zip, round, int, pow, object, input
+4 | | except ImportError:    pass
+  | |___________________________^ SIM105
+  |
+  = help: Replace with `contextlib.suppress(ImportError)`
+
+ℹ Unsafe fix
+1 1 | ﻿#!/usr/bin/env python
+2   |-try:
+  2 |+import contextlib
+  3 |+with contextlib.suppress(ImportError):
+3 4 |    from __builtin__ import bytes, str, open, super, range, zip, round, int, pow, object, input
+4   |-except ImportError:    pass
+
+

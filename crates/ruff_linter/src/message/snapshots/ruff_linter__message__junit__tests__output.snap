@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/message/junit.rs
+expression: content
+---
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="ruff" tests="3" failures="3" errors="0">
+    <testsuite name="fib.py" tests="2" disabled="0" errors="0" failures="2" package="org.ruff">
+        <testcase name="org.ruff.F401" classname="fib" line="1" column="8">
+            <failure message="`os` imported but unused">line 1, col 8, `os` imported but unused</failure>
+        </testcase>
+        <testcase name="org.ruff.F841" classname="fib" line="6" column="5">
+            <failure message="Local variable `x` is assigned to but never used">line 6, col 5, Local variable `x` is assigned to but never used</failure>
+        </testcase>
+    </testsuite>
+    <testsuite name="undef.py" tests="1" disabled="0" errors="0" failures="1" package="org.ruff">
+        <testcase name="org.ruff.F821" classname="undef" line="1" column="4">
+            <failure message="Undefined name `a`">line 1, col 4, Undefined name `a`</failure>
+        </testcase>
+    </testsuite>
+</testsuites>
+

@@ -73,3 +73,35 @@ a = [
 aaaaaaaaaaaaaaaaaaaaa = [
     o for o in self.registry.values if o.__class__ is not ModelAdmin
 ]
+
+[
+    task
+    for head_name in head_nodes
+    if (task := self.get_task_by_name(head_name))
+    if not None
+]
+
+[
+    f(x, y,)
+    for head_name in head_nodes if head_name
+]
+
+[
+    f(x, y)
+    for head_name in f(x, y,) if head_name
+]
+
+[
+    x
+    for (x, y,) in z if head_name
+]
+
+[
+     1 for components in  # pylint: disable=undefined-loop-variable
+     b +  # integer 1 may only have decimal 01-09
+     c  # negative decimal
+]
+
+# Parenthesized targets and iterators.
+[x for (x) in y]
+[x for x in (y)]

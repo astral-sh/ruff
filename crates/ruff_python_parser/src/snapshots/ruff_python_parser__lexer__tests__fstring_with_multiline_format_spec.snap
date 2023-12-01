@@ -1,0 +1,244 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        FStringStart,
+        0..4,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        4..6,
+    ),
+    (
+        Lbrace,
+        6..7,
+    ),
+    (
+        NonLogicalNewline,
+        7..8,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        12..13,
+    ),
+    (
+        Colon,
+        13..14,
+    ),
+    (
+        FStringMiddle {
+            value: "d\n",
+            is_raw: false,
+        },
+        14..16,
+    ),
+    (
+        Rbrace,
+        16..17,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        17..19,
+    ),
+    (
+        FStringEnd,
+        19..22,
+    ),
+    (
+        Newline,
+        22..23,
+    ),
+    (
+        FStringStart,
+        23..27,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        27..29,
+    ),
+    (
+        Lbrace,
+        29..30,
+    ),
+    (
+        NonLogicalNewline,
+        30..31,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        35..36,
+    ),
+    (
+        Colon,
+        36..37,
+    ),
+    (
+        FStringMiddle {
+            value: "a\n        b\n          c\n",
+            is_raw: false,
+        },
+        37..61,
+    ),
+    (
+        Rbrace,
+        61..62,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        62..64,
+    ),
+    (
+        FStringEnd,
+        64..67,
+    ),
+    (
+        Newline,
+        67..68,
+    ),
+    (
+        FStringStart,
+        68..70,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        70..72,
+    ),
+    (
+        Lbrace,
+        72..73,
+    ),
+    (
+        NonLogicalNewline,
+        73..74,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        78..79,
+    ),
+    (
+        Colon,
+        79..80,
+    ),
+    (
+        FStringMiddle {
+            value: "d",
+            is_raw: false,
+        },
+        80..81,
+    ),
+    (
+        NonLogicalNewline,
+        81..82,
+    ),
+    (
+        Rbrace,
+        82..83,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        83..85,
+    ),
+    (
+        FStringEnd,
+        85..86,
+    ),
+    (
+        Newline,
+        86..87,
+    ),
+    (
+        FStringStart,
+        87..89,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        89..91,
+    ),
+    (
+        Lbrace,
+        91..92,
+    ),
+    (
+        NonLogicalNewline,
+        92..93,
+    ),
+    (
+        Name {
+            name: "x",
+        },
+        97..98,
+    ),
+    (
+        Colon,
+        98..99,
+    ),
+    (
+        FStringMiddle {
+            value: "a",
+            is_raw: false,
+        },
+        99..100,
+    ),
+    (
+        NonLogicalNewline,
+        100..101,
+    ),
+    (
+        Name {
+            name: "b",
+        },
+        109..110,
+    ),
+    (
+        NonLogicalNewline,
+        110..111,
+    ),
+    (
+        Rbrace,
+        111..112,
+    ),
+    (
+        FStringMiddle {
+            value: "__",
+            is_raw: false,
+        },
+        112..114,
+    ),
+    (
+        FStringEnd,
+        114..115,
+    ),
+    (
+        Newline,
+        115..116,
+    ),
+]

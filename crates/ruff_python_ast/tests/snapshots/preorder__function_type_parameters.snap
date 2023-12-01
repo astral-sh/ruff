@@ -11,6 +11,5 @@ expression: trace
     - TypeParamParamSpec
     - Parameters
     - StmtExpr
-      - ExprConstant
-        - Ellipsis
+      - ExprEllipsisLiteral
 

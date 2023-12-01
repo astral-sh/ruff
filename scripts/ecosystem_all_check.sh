@@ -1,12 +1,14 @@
 #!/bin/bash
 # This is @konstin's setup for checking an entire checkout of ~3k packages for
-# panics, autofix errors and similar problems.
+# panics, fix errors and similar problems.
 #
 # We put this in a docker container because processing random scraped code from GitHub is
 # [kinda dangerous](https://moyix.blogspot.com/2022/09/someones-been-messing-with-my-subnormals.html)
 #
 # Usage:
-# ```
+# ```shell
+# # You can also use any other check_ecosystem.py input file
+# curl https://raw.githubusercontent.com/akx/ruff-usage-aggregate/master/data/known-github-tomls-clean.jsonl > github_search.jsonl
 # cargo build --release --target x86_64-unknown-linux-musl --bin ruff
 # scripts/ecosystem_all_check.sh check --select RUF200
 # ```
@@ -26,7 +28,7 @@ time docker run --rm -it \
   -v "${SCRIPT_DIR}/ecosystem_all_check.py:/app/ecosystem_all_check.py" \
   python:3.11 ./ecosystem_all_check_entrypoint.sh "$@"
 
-# grep the autofix errors
-grep -R "the rule codes" "${SCRIPT_DIR}/../target/ecosystem_all_results" | sort > "${SCRIPT_DIR}/../target/autofix-errors.txt"
+# grep the fix errors
+grep -R "the rule codes" "${SCRIPT_DIR}/../target/ecosystem_all_results" | sort > "${SCRIPT_DIR}/../target/fix-errors.txt"
 # Make sure we didn't have an early exit
 echo "Done"

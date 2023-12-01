@@ -1,28 +1,24 @@
-use anyhow::{bail, format_err, Context, Error};
-use clap::{CommandFactory, FromArgMatches};
-use ignore::DirEntry;
-use indicatif::ProgressStyle;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use ruff::logging::LogLevel;
-use ruff::resolver::python_files_in_path;
-use ruff::settings::types::{FilePattern, FilePatternSet};
-use ruff_cli::args::{CheckArgs, LogLevelArgs};
-use ruff_cli::resolve::resolve;
-use ruff_formatter::{FormatError, LineWidth, PrintError};
-use ruff_python_formatter::{
-    format_module, FormatModuleError, MagicTrailingComma, PyFormatOptions,
-};
-use serde::Deserialize;
-use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::num::NonZeroU16;
 use std::ops::{Add, AddAssign};
 use std::panic::catch_unwind;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
-use std::{fmt, fs, io};
+use std::{fmt, fs, io, iter};
+
+use anyhow::{bail, format_err, Context, Error};
+use clap::{CommandFactory, FromArgMatches};
+use imara_diff::intern::InternedInput;
+use imara_diff::sink::Counter;
+use imara_diff::{diff, Algorithm};
+use indicatif::ProgressStyle;
+#[cfg_attr(feature = "singlethreaded", allow(unused_imports))]
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use serde::Deserialize;
+use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
 use tracing::{debug, error, info, info_span};
 use tracing_indicatif::span_ext::IndicatifSpanExt;
@@ -31,13 +27,30 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
+use ruff_cli::args::{FormatCommand, LogLevelArgs};
+use ruff_cli::resolve::resolve;
+use ruff_formatter::{FormatError, LineWidth, PrintError};
+use ruff_linter::logging::LogLevel;
+use ruff_linter::settings::types::{FilePattern, FilePatternSet};
+use ruff_python_formatter::{
+    format_module_source, FormatModuleError, MagicTrailingComma, PreviewMode, PyFormatOptions,
+};
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile, Resolver};
+
 /// Find files that ruff would check so we can format them. Adapted from `ruff_cli`.
-fn ruff_check_paths(dirs: &[PathBuf]) -> anyhow::Result<Vec<Result<DirEntry, ignore::Error>>> {
-    let args_matches = CheckArgs::command()
+#[allow(clippy::type_complexity)]
+fn ruff_check_paths(
+    dirs: &[PathBuf],
+) -> anyhow::Result<(
+    Vec<Result<ResolvedFile, ignore::Error>>,
+    Resolver,
+    PyprojectConfig,
+)> {
+    let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
-    let check_args: CheckArgs = CheckArgs::from_arg_matches(&args_matches)?;
-    let (cli, overrides) = check_args.partition();
+    let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    let (cli, overrides) = arguments.partition();
     let mut pyproject_config = resolve(
         cli.isolated,
         cli.config.as_deref(),
@@ -45,16 +58,16 @@ fn ruff_check_paths(dirs: &[PathBuf]) -> anyhow::Result<Vec<Result<DirEntry, ign
         cli.stdin_filename.as_deref(),
     )?;
     // We don't want to format pyproject.toml
-    pyproject_config.settings.lib.include = FilePatternSet::try_from_vec(vec![
+    pyproject_config.settings.file_resolver.include = FilePatternSet::try_from_iter([
         FilePattern::Builtin("*.py"),
         FilePattern::Builtin("*.pyi"),
     ])
     .unwrap();
-    let (paths, _resolver) = python_files_in_path(&cli.files, &pyproject_config, &overrides)?;
+    let (paths, resolver) = python_files_in_path(&cli.files, &pyproject_config, &overrides)?;
     if paths.is_empty() {
         bail!("no python files in {:?}", dirs)
     }
-    Ok(paths)
+    Ok((paths, resolver, pyproject_config))
 }
 
 /// Collects statistics over the formatted files to compute the Jaccard index or the similarity
@@ -87,6 +100,8 @@ pub(crate) struct Statistics {
     ruff_output: u32,
     /// The number of matching identical lines
     intersection: u32,
+    /// Files that have differences
+    files_with_differences: u32,
 }
 
 impl Statistics {
@@ -97,18 +112,22 @@ impl Statistics {
                 black_input: 0,
                 ruff_output: 0,
                 intersection,
+                files_with_differences: 0,
             }
         } else {
-            let diff = TextDiff::from_lines(black, ruff);
-            let mut statistics = Self::default();
-            for change in diff.iter_all_changes() {
-                match change.tag() {
-                    ChangeTag::Delete => statistics.black_input += 1,
-                    ChangeTag::Insert => statistics.ruff_output += 1,
-                    ChangeTag::Equal => statistics.intersection += 1,
-                }
+            // `similar` was too slow (for some files >90% diffing instead of formatting)
+            let input = InternedInput::new(black, ruff);
+            let changes = diff(Algorithm::Histogram, &input, Counter::default());
+            assert_eq!(
+                input.before.len() - (changes.removals as usize),
+                input.after.len() - (changes.insertions as usize)
+            );
+            Self {
+                black_input: changes.removals,
+                ruff_output: changes.insertions,
+                intersection: u32::try_from(input.before.len()).unwrap() - changes.removals,
+                files_with_differences: 1,
             }
-            statistics
         }
     }
 
@@ -132,6 +151,7 @@ impl Add<Statistics> for Statistics {
             black_input: self.black_input + rhs.black_input,
             ruff_output: self.ruff_output + rhs.ruff_output,
             intersection: self.intersection + rhs.intersection,
+            files_with_differences: self.files_with_differences + rhs.files_with_differences,
         }
     }
 }
@@ -187,6 +207,9 @@ pub(crate) struct Args {
     /// Write all log messages (same as cli) to this file
     #[arg(long)]
     pub(crate) log_file: Option<PathBuf>,
+    /// Write a markdown table with the similarity indices to this file
+    #[arg(long)]
+    pub(crate) stats_file: Option<PathBuf>,
     /// Assert that there are exactly this many input files with errors. This catches regressions
     /// (or improvements) in the parser.
     #[arg(long)]
@@ -198,8 +221,15 @@ pub(crate) struct Args {
 pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
     setup_logging(&args.log_level_args, args.log_file.as_deref())?;
 
+    let mut error_file = match &args.error_file {
+        Some(error_file) => Some(BufWriter::new(
+            File::create(error_file).context("Couldn't open error file")?,
+        )),
+        None => None,
+    };
+
     let all_success = if args.multi_project {
-        format_dev_multi_project(args)?
+        format_dev_multi_project(args, error_file)?
     } else {
         let result = format_dev_project(&args.files, args.stability_check, args.write)?;
         let error_count = result.error_count();
@@ -207,12 +237,16 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
         if result.error_count() > 0 {
             error!(parent: None, "{}", result.display(args.format));
         }
+        if let Some(error_file) = &mut error_file {
+            write!(error_file, "{}", result.display(args.format)).unwrap();
+        }
         info!(
             parent: None,
-            "Done: {} stability errors, {} files, similarity index {:.5}), took {:.2}s, {} input files contained syntax errors ",
+            "Done: {} stability errors, {} files, similarity index {:.5}), files with differences: {} took {:.2}s, {} input files contained syntax errors ",
             error_count,
             result.file_count,
             result.statistics.similarity_index(),
+            result.statistics.files_with_differences,
             result.duration.as_secs_f32(),
             result.syntax_error_in_input,
         );
@@ -250,7 +284,10 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
             .with_default_directive(log_level.into())
             .parse_lossy("")
     });
-    let indicatif_layer = IndicatifLayer::new();
+    let indicatif_layer = IndicatifLayer::new().with_progress_style(
+        // Default without the spinner
+        ProgressStyle::with_template("{span_child_prefix} {span_name}{{{span_fields}}}").unwrap(),
+    );
     let indicitif_compatible_writer_layer = tracing_subscriber::fmt::layer()
         .with_writer(indicatif_layer.get_stderr_writer())
         .with_target(false);
@@ -269,7 +306,10 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
 }
 
 /// Checks a directory of projects
-fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
+fn format_dev_multi_project(
+    args: &Args,
+    mut error_file: Option<BufWriter<File>>,
+) -> anyhow::Result<bool> {
     let mut total_errors = 0;
     let mut total_files = 0;
     let mut total_syntax_error_in_input = 0;
@@ -295,12 +335,7 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
     pb_span.pb_set_length(project_paths.len() as u64);
     let pb_span_enter = pb_span.enter();
 
-    let mut error_file = match &args.error_file {
-        Some(error_file) => Some(BufWriter::new(
-            File::create(error_file).context("Couldn't open error file")?,
-        )),
-        None => None,
-    };
+    let mut results = Vec::new();
 
     for project_path in project_paths {
         debug!(parent: None, "Starting {}", project_path.display());
@@ -313,11 +348,12 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
 
                 info!(
                     parent: None,
-                    "Finished {}: {} stability errors, {} files, similarity index {:.5}), took {:.2}s, {} input files contained syntax errors ",
+                    "Finished {}: {} stability errors, {} files, similarity index {:.5}), files with differences {}, took {:.2}s, {} input files contained syntax errors ",
                     project_path.display(),
                     result.error_count(),
                     result.file_count,
                     result.statistics.similarity_index(),
+                    result.statistics.files_with_differences,
                     result.duration.as_secs_f32(),
                     result.syntax_error_in_input,
                 );
@@ -330,8 +366,8 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
                 }
                 if let Some(error_file) = &mut error_file {
                     write!(error_file, "{}", result.display(args.format)).unwrap();
-                    error_file.flush().unwrap();
                 }
+                results.push(result);
 
                 pb_span.pb_inc(1);
             }
@@ -352,6 +388,37 @@ fn format_dev_multi_project(args: &Args) -> anyhow::Result<bool> {
         "Finished: {total_errors} stability errors, {total_files} files, tool {}s, {total_syntax_error_in_input} input files contained syntax errors ",
         duration.as_secs_f32(),
     );
+
+    if let Some(stats_file) = &args.stats_file {
+        results.sort_by(|result1, result2| result1.name.cmp(&result2.name));
+        let project_col_len = results
+            .iter()
+            .map(|result| result.name.len())
+            .chain(iter::once("project".len()))
+            .max()
+            .unwrap_or_default();
+        let mut stats_file = BufWriter::new(File::create(stats_file)?);
+        writeln!(
+            stats_file,
+            "| {:<project_col_len$} | similarity index  | total files       | changed files     |",
+            "project"
+        )?;
+        writeln!(
+            stats_file,
+            "|-{:-<project_col_len$}-|------------------:|------------------:|------------------:|",
+            ""
+        )?;
+        for result in results {
+            writeln!(
+                stats_file,
+                "| {:<project_col_len$} |           {:.5} |             {:5} |             {:5} |",
+                result.name,
+                result.statistics.similarity_index(),
+                result.file_count,
+                result.statistics.files_with_differences
+            )?;
+        }
+    }
 
     if let Some(files_with_errors) = args.files_with_errors {
         if total_syntax_error_in_input != files_with_errors {
@@ -387,7 +454,7 @@ fn format_dev_project(
 
     // Find files to check (or in this case, format twice). Adapted from ruff_cli
     // First argument is ignored
-    let paths = ruff_check_paths(files)?;
+    let (paths, resolver, pyproject_config) = ruff_check_paths(files)?;
 
     let results = {
         let pb_span =
@@ -395,14 +462,23 @@ fn format_dev_project(
         pb_span.pb_set_style(&ProgressStyle::default_bar());
         pb_span.pb_set_length(paths.len() as u64);
         let _pb_span_enter = pb_span.enter();
-        paths
-            .into_par_iter()
-            .map(|dir_entry| {
-                let result = format_dir_entry(dir_entry, stability_check, write, &black_options);
-                pb_span.pb_inc(1);
-                result
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?
+        #[cfg(not(feature = "singlethreaded"))]
+        let iter = { paths.into_par_iter() };
+        #[cfg(feature = "singlethreaded")]
+        let iter = { paths.into_iter() };
+        iter.map(|path| {
+            let result = format_dir_entry(
+                path,
+                stability_check,
+                write,
+                &black_options,
+                &resolver,
+                &pyproject_config,
+            );
+            pb_span.pb_inc(1);
+            result
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?
     };
 
     let mut statistics = Statistics::default();
@@ -433,7 +509,13 @@ fn format_dev_project(
 
     let duration = start.elapsed();
 
+    let name = files[0]
+        .file_name()
+        .unwrap_or(files[0].as_os_str())
+        .to_string_lossy()
+        .to_string();
     Ok(CheckRepoResult {
+        name,
         duration,
         file_count: formatted_counter,
         diagnostics,
@@ -444,25 +526,30 @@ fn format_dev_project(
 
 /// Error handling in between walkdir and `format_dev_file`
 fn format_dir_entry(
-    dir_entry: Result<DirEntry, ignore::Error>,
+    resolved_file: Result<ResolvedFile, ignore::Error>,
     stability_check: bool,
     write: bool,
     options: &BlackOptions,
+    resolver: &Resolver,
+    pyproject_config: &PyprojectConfig,
 ) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
-    let dir_entry = match dir_entry.context("Iterating the files in the repository failed") {
-        Ok(dir_entry) => dir_entry,
-        Err(err) => return Err(err),
-    };
-    let file = dir_entry.path().to_path_buf();
+    let resolved_file = resolved_file.context("Iterating the files in the repository failed")?;
     // For some reason it does not filter in the beginning
-    if dir_entry.file_name() == "pyproject.toml" {
-        return Ok((Ok(Statistics::default()), file));
+    if resolved_file.file_name() == "pyproject.toml" {
+        return Ok((Ok(Statistics::default()), resolved_file.into_path()));
     }
 
-    let file = dir_entry.path().to_path_buf();
-    let options = options.to_py_format_options(&file);
+    let path = resolved_file.into_path();
+    let mut options = options.to_py_format_options(&path);
+
+    let settings = resolver.resolve(&path, pyproject_config);
+    // That's a bad way of doing this but it's not worth doing something better for format_dev
+    if settings.formatter.line_width != LineWidth::default() {
+        options = options.with_line_width(settings.formatter.line_width);
+    }
+
     // Handle panics (mostly in `debug_assert!`)
-    let result = match catch_unwind(|| format_dev_file(&file, stability_check, write, options)) {
+    let result = match catch_unwind(|| format_dev_file(&path, stability_check, write, options)) {
         Ok(result) => result,
         Err(panic) => {
             if let Some(message) = panic.downcast_ref::<String>() {
@@ -481,7 +568,7 @@ fn format_dir_entry(
             }
         }
     };
-    Ok((result, file))
+    Ok((result, path))
 }
 
 /// A compact diff that only shows a header and changes, but nothing unchanged. This makes viewing
@@ -511,6 +598,7 @@ fn diff_show_only_changes(
 }
 
 struct CheckRepoResult {
+    name: String,
     duration: Duration,
     file_count: usize,
     diagnostics: Vec<Diagnostic>,
@@ -706,7 +794,7 @@ fn format_dev_file(
     let content = fs::read_to_string(input_path)?;
     #[cfg(not(debug_assertions))]
     let start = Instant::now();
-    let printed = match format_module(&content, options.clone()) {
+    let printed = match format_module_source(&content, options.clone()) {
         Ok(printed) => printed,
         Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
             return Err(CheckFileError::SyntaxErrorInInput(err));
@@ -733,7 +821,7 @@ fn format_dev_file(
     }
 
     if stability_check {
-        let reformatted = match format_module(formatted, options) {
+        let reformatted = match format_module_source(formatted, options) {
             Ok(reformatted) => reformatted,
             Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
                 return Err(CheckFileError::SyntaxErrorInOutput {
@@ -780,20 +868,18 @@ struct PyprojectTomlTool {
 struct BlackOptions {
     // Black actually allows both snake case and kebab case
     #[serde(alias = "line-length")]
-    line_length: u16,
+    line_length: NonZeroU16,
     #[serde(alias = "skip-magic-trailing-comma")]
     skip_magic_trailing_comma: bool,
-    #[allow(unused)]
-    #[serde(alias = "force-exclude")]
-    force_exclude: Option<String>,
+    preview: bool,
 }
 
 impl Default for BlackOptions {
     fn default() -> Self {
         Self {
-            line_length: 88,
+            line_length: NonZeroU16::new(88).unwrap(),
             skip_magic_trailing_comma: false,
-            force_exclude: None,
+            preview: false,
         }
     }
 }
@@ -835,13 +921,16 @@ impl BlackOptions {
 
     fn to_py_format_options(&self, file: &Path) -> PyFormatOptions {
         PyFormatOptions::from_extension(file)
-            .with_line_width(
-                LineWidth::try_from(self.line_length).expect("Invalid line length limit"),
-            )
+            .with_line_width(LineWidth::from(self.line_length))
             .with_magic_trailing_comma(if self.skip_magic_trailing_comma {
                 MagicTrailingComma::Ignore
             } else {
                 MagicTrailingComma::Respect
+            })
+            .with_preview(if self.preview {
+                PreviewMode::Enabled
+            } else {
+                PreviewMode::Disabled
             })
     }
 }

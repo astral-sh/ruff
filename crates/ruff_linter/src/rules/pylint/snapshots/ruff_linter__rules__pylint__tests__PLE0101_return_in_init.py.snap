@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+return_in_init.py:14:9: PLE0101 Explicit return in `__init__`
+   |
+12 | class B:
+13 |     def __init__(self):
+14 |         return 3
+   |         ^^^^^^^^ PLE0101
+15 | 
+16 |     def gen(self):
+   |
+
+return_in_init.py:22:9: PLE0101 Explicit return in `__init__`
+   |
+21 |     def __init__(self):
+22 |         return 1
+   |         ^^^^^^^^ PLE0101
+23 | 
+24 | class MyClass2:
+   |
+
+

@@ -19,7 +19,7 @@ impl<T> Stack<T> for Vec<T> {
     }
 
     fn push(&mut self, value: T) {
-        self.push(value)
+        self.push(value);
     }
 
     fn top(&self) -> Option<&T> {
@@ -35,7 +35,7 @@ impl<T> Stack<T> for Vec<T> {
 #[derive(Debug, Clone)]
 pub(super) struct StackedStack<'a, T> {
     /// The content of the original stack.
-    original: &'a [T],
+    original: std::slice::Iter<'a, T>,
 
     /// Items that have been pushed since the creation of this stack and aren't part of the `original` stack.
     stack: Vec<T>,
@@ -49,7 +49,10 @@ impl<'a, T> StackedStack<'a, T> {
 
     /// Creates a new stack that uses `stack` for storing its elements.
     pub(super) fn with_vec(original: &'a [T], stack: Vec<T>) -> Self {
-        Self { original, stack }
+        Self {
+            original: original.iter(),
+            stack,
+        }
     }
 
     /// Returns the underlying `stack` vector.
@@ -63,13 +66,9 @@ where
     T: Copy,
 {
     fn pop(&mut self) -> Option<T> {
-        self.stack.pop().or_else(|| match self.original {
-            [rest @ .., last] => {
-                self.original = rest;
-                Some(*last)
-            }
-            _ => None,
-        })
+        self.stack
+            .pop()
+            .or_else(|| self.original.next_back().copied())
     }
 
     fn push(&mut self, value: T) {
@@ -77,11 +76,13 @@ where
     }
 
     fn top(&self) -> Option<&T> {
-        self.stack.last().or_else(|| self.original.last())
+        self.stack
+            .last()
+            .or_else(|| self.original.as_slice().last())
     }
 
     fn is_empty(&self) -> bool {
-        self.original.is_empty() && self.stack.is_empty()
+        self.stack.is_empty() && self.original.len() == 0
     }
 }
 

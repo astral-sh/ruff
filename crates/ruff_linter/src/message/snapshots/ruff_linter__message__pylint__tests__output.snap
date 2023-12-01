@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/message/pylint.rs
+expression: content
+---
+fib.py:1: [F401] `os` imported but unused
+fib.py:6: [F841] Local variable `x` is assigned to but never used
+undef.py:1: [F821] Undefined name `a`
+

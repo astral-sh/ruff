@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/message/grouped.rs
+expression: content
+---
+fib.py:
+  1:8 F401 `os` imported but unused
+  6:5 F841 Local variable `x` is assigned to but never used
+
+undef.py:
+  1:4 F821 Undefined name `a`
+
+

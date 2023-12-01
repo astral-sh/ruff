@@ -1,0 +1,121 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:161:5: D203 [*] 1 blank line required before class docstring
+    |
+160 | class LeadingSpaceMissing:
+161 |     """Leading space missing."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D203
+    |
+    = help: Insert 1 blank line before class docstring
+
+ℹ Safe fix
+158 158 | 
+159 159 | 
+160 160 | class LeadingSpaceMissing:
+    161 |+
+161 162 |     """Leading space missing."""
+162 163 | 
+163 164 | 
+
+D.py:192:5: D203 [*] 1 blank line required before class docstring
+    |
+191 | class LeadingAndTrailingSpaceMissing:
+192 |     """Leading and trailing space missing."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D203
+193 |     pass
+    |
+    = help: Insert 1 blank line before class docstring
+
+ℹ Safe fix
+189 189 | 
+190 190 | 
+191 191 | class LeadingAndTrailingSpaceMissing:
+    192 |+
+192 193 |     """Leading and trailing space missing."""
+193 194 |     pass
+194 195 | 
+
+D.py:526:5: D203 [*] 1 blank line required before class docstring
+    |
+524 |   # parameters as functions for Google / Numpy conventions.
+525 |   class Blah:  # noqa: D203,D213
+526 |       """A Blah.
+    |  _____^
+527 | | 
+528 | |     Parameters
+529 | |     ----------
+530 | |     x : int
+531 | | 
+532 | |     """
+    | |_______^ D203
+533 |   
+534 |       def __init__(self, x):
+    |
+    = help: Insert 1 blank line before class docstring
+
+ℹ Safe fix
+523 523 | # This is reproducing a bug where AttributeError is raised when parsing class
+524 524 | # parameters as functions for Google / Numpy conventions.
+525 525 | class Blah:  # noqa: D203,D213
+    526 |+
+526 527 |     """A Blah.
+527 528 | 
+528 529 |     Parameters
+
+D.py:649:5: D203 [*] 1 blank line required before class docstring
+    |
+648 | class StatementOnSameLineAsDocstring:
+649 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D203
+650 |     def sort_services(self):
+651 |         pass
+    |
+    = help: Insert 1 blank line before class docstring
+
+ℹ Safe fix
+646 646 |     "
+647 647 | 
+648 648 | class StatementOnSameLineAsDocstring:
+    649 |+
+649 650 |     "After this docstring there's another statement on the same line separated by a semicolon." ; priorities=1
+650 651 |     def sort_services(self):
+651 652 |         pass
+
+D.py:654:5: D203 [*] 1 blank line required before class docstring
+    |
+653 | class StatementOnSameLineAsDocstring:
+654 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D203
+    |
+    = help: Insert 1 blank line before class docstring
+
+ℹ Safe fix
+651 651 |         pass
+652 652 | 
+653 653 | class StatementOnSameLineAsDocstring:
+    654 |+
+654 655 |     "After this docstring there's another statement on the same line separated by a semicolon."; priorities=1
+655 656 | 
+656 657 | 
+
+D.py:658:5: D203 [*] 1 blank line required before class docstring
+    |
+657 | class CommentAfterDocstring:
+658 |     "After this docstring there's a comment."  # priorities=1
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D203
+659 |     def sort_services(self):
+660 |         pass
+    |
+    = help: Insert 1 blank line before class docstring
+
+ℹ Safe fix
+655 655 | 
+656 656 | 
+657 657 | class CommentAfterDocstring:
+    658 |+
+658 659 |     "After this docstring there's a comment."  # priorities=1
+659 660 |     def sort_services(self):
+660 661 |         pass
+
+

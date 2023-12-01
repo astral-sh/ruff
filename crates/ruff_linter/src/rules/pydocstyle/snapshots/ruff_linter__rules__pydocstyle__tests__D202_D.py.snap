@@ -1,0 +1,92 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:142:5: D202 [*] No blank lines allowed after function docstring (found 1)
+    |
+140 | @expect('D202: No blank lines allowed after function docstring (found 1)')
+141 | def trailing_space():
+142 |     """Leading space."""
+    |     ^^^^^^^^^^^^^^^^^^^^ D202
+143 | 
+144 |     pass
+    |
+    = help: Remove blank line(s) after function docstring
+
+ℹ Safe fix
+140 140 | @expect('D202: No blank lines allowed after function docstring (found 1)')
+141 141 | def trailing_space():
+142 142 |     """Leading space."""
+143     |-
+144 143 |     pass
+145 144 | 
+146 145 | 
+
+D.py:151:5: D202 [*] No blank lines allowed after function docstring (found 1)
+    |
+149 | def trailing_and_leading_space():
+150 | 
+151 |     """Trailing and leading space."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
+152 | 
+153 |     pass
+    |
+    = help: Remove blank line(s) after function docstring
+
+ℹ Safe fix
+149 149 | def trailing_and_leading_space():
+150 150 | 
+151 151 |     """Trailing and leading space."""
+152     |-
+153 152 |     pass
+154 153 | 
+155 154 | 
+
+D.py:555:5: D202 [*] No blank lines allowed after function docstring (found 1)
+    |
+553 |   @expect('D213: Multi-line docstring summary should start at the second line')
+554 |   def multiline_trailing_space():
+555 |       """Leading space.
+    |  _____^
+556 | | 
+557 | |     More content.
+558 | |     """
+    | |_______^ D202
+559 |   
+560 |       pass
+    |
+    = help: Remove blank line(s) after function docstring
+
+ℹ Safe fix
+556 556 | 
+557 557 |     More content.
+558 558 |     """
+559     |-
+560 559 |     pass
+561 560 | 
+562 561 | 
+
+D.py:568:5: D202 [*] No blank lines allowed after function docstring (found 1)
+    |
+566 |   def multiline_trailing_and_leading_space():
+567 |   
+568 |       """Trailing and leading space.
+    |  _____^
+569 | | 
+570 | |     More content.
+571 | |     """
+    | |_______^ D202
+572 |   
+573 |       pass
+    |
+    = help: Remove blank line(s) after function docstring
+
+ℹ Safe fix
+569 569 | 
+570 570 |     More content.
+571 571 |     """
+572     |-
+573 572 |     pass
+574 573 | 
+575 574 | 
+
+

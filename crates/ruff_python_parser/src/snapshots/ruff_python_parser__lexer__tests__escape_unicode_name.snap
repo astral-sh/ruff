@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        String {
+            value: "\\N{EN SPACE}",
+            kind: String,
+            triple_quoted: false,
+        },
+        0..14,
+    ),
+    (
+        Newline,
+        14..14,
+    ),
+]

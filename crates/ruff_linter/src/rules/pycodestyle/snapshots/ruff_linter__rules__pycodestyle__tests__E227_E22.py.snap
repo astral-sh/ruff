@@ -1,0 +1,172 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E22.py:72:13: E227 [*] Missing whitespace around bitwise or shift operator
+   |
+70 | z = (x + 1)** y
+71 | #: E225
+72 | _1kB = _1MB >>10
+   |             ^^ E227
+73 | #: E225
+74 | _1kB = _1MB>> 10
+   |
+   = help: Add missing whitespace
+
+ℹ Safe fix
+69 69 | #: E225
+70 70 | z = (x + 1)** y
+71 71 | #: E225
+72    |-_1kB = _1MB >>10
+   72 |+_1kB = _1MB >> 10
+73 73 | #: E225
+74 74 | _1kB = _1MB>> 10
+75 75 | #: E225 E225
+
+E22.py:74:12: E227 [*] Missing whitespace around bitwise or shift operator
+   |
+72 | _1kB = _1MB >>10
+73 | #: E225
+74 | _1kB = _1MB>> 10
+   |            ^^ E227
+75 | #: E225 E225
+76 | i=i+ 1
+   |
+   = help: Add missing whitespace
+
+ℹ Safe fix
+71 71 | #: E225
+72 72 | _1kB = _1MB >>10
+73 73 | #: E225
+74    |-_1kB = _1MB>> 10
+   74 |+_1kB = _1MB >> 10
+75 75 | #: E225 E225
+76 76 | i=i+ 1
+77 77 | #: E225 E225
+
+E22.py:121:12: E227 [*] Missing whitespace around bitwise or shift operator
+    |
+119 |     return (i//2 for i in range(n))
+120 | #: E227
+121 | _1kB = _1MB>>10
+    |            ^^ E227
+122 | #: E227
+123 | _1MB = _1kB<<10
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+118 118 | def halves(n):
+119 119 |     return (i//2 for i in range(n))
+120 120 | #: E227
+121     |-_1kB = _1MB>>10
+    121 |+_1kB = _1MB >> 10
+122 122 | #: E227
+123 123 | _1MB = _1kB<<10
+124 124 | #: E227
+
+E22.py:123:12: E227 [*] Missing whitespace around bitwise or shift operator
+    |
+121 | _1kB = _1MB>>10
+122 | #: E227
+123 | _1MB = _1kB<<10
+    |            ^^ E227
+124 | #: E227
+125 | a = b|c
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+120 120 | #: E227
+121 121 | _1kB = _1MB>>10
+122 122 | #: E227
+123     |-_1MB = _1kB<<10
+    123 |+_1MB = _1kB << 10
+124 124 | #: E227
+125 125 | a = b|c
+126 126 | #: E227
+
+E22.py:125:6: E227 [*] Missing whitespace around bitwise or shift operator
+    |
+123 | _1MB = _1kB<<10
+124 | #: E227
+125 | a = b|c
+    |      ^ E227
+126 | #: E227
+127 | b = c&a
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+122 122 | #: E227
+123 123 | _1MB = _1kB<<10
+124 124 | #: E227
+125     |-a = b|c
+    125 |+a = b | c
+126 126 | #: E227
+127 127 | b = c&a
+128 128 | #: E227
+
+E22.py:127:6: E227 [*] Missing whitespace around bitwise or shift operator
+    |
+125 | a = b|c
+126 | #: E227
+127 | b = c&a
+    |      ^ E227
+128 | #: E227
+129 | c = b^a
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+124 124 | #: E227
+125 125 | a = b|c
+126 126 | #: E227
+127     |-b = c&a
+    127 |+b = c & a
+128 128 | #: E227
+129 129 | c = b^a
+130 130 | #: E228
+
+E22.py:129:6: E227 [*] Missing whitespace around bitwise or shift operator
+    |
+127 | b = c&a
+128 | #: E227
+129 | c = b^a
+    |      ^ E227
+130 | #: E228
+131 | a = b%c
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+126 126 | #: E227
+127 127 | b = c&a
+128 128 | #: E227
+129     |-c = b^a
+    129 |+c = b ^ a
+130 130 | #: E228
+131 131 | a = b%c
+132 132 | #: E228
+
+E22.py:154:11: E227 [*] Missing whitespace around bitwise or shift operator
+    |
+152 | func2(lambda a, b=h[:], c=0: (a, b, c))
+153 | if not -5 < x < +5:
+154 |     print >>sys.stderr, "x is out of range."
+    |           ^^ E227
+155 | print >> sys.stdout, "x is an integer."
+156 | x = x / 2 - 1
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+151 151 | func1(lambda *args, **kw: (args, kw))
+152 152 | func2(lambda a, b=h[:], c=0: (a, b, c))
+153 153 | if not -5 < x < +5:
+154     |-    print >>sys.stderr, "x is out of range."
+    154 |+    print >> sys.stderr, "x is out of range."
+155 155 | print >> sys.stdout, "x is an integer."
+156 156 | x = x / 2 - 1
+157 157 | x = 1 @ 2
+
+

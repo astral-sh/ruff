@@ -1,0 +1,160 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+bad_str_strip_call.py:2:21: PLE1310 String `strip` call contains duplicate characters
+  |
+1 | # PLE1310
+2 | "Hello World".strip("Hello")
+  |                     ^^^^^^^ PLE1310
+3 | 
+4 | # PLE1310
+  |
+
+bad_str_strip_call.py:5:21: PLE1310 String `strip` call contains duplicate characters
+  |
+4 | # PLE1310
+5 | "Hello World".strip("Hello")
+  |                     ^^^^^^^ PLE1310
+6 | 
+7 | # PLE1310
+  |
+
+bad_str_strip_call.py:8:21: PLE1310 String `strip` call contains duplicate characters
+   |
+ 7 | # PLE1310
+ 8 | "Hello World".strip(u"Hello")
+   |                     ^^^^^^^^ PLE1310
+ 9 | 
+10 | # PLE1310
+   |
+
+bad_str_strip_call.py:11:21: PLE1310 String `strip` call contains duplicate characters
+   |
+10 | # PLE1310
+11 | "Hello World".strip(r"Hello")
+   |                     ^^^^^^^^ PLE1310
+12 | 
+13 | # PLE1310
+   |
+
+bad_str_strip_call.py:14:21: PLE1310 String `strip` call contains duplicate characters
+   |
+13 | # PLE1310
+14 | "Hello World".strip("Hello\t")
+   |                     ^^^^^^^^^ PLE1310
+15 | 
+16 | # PLE1310
+   |
+
+bad_str_strip_call.py:17:21: PLE1310 String `strip` call contains duplicate characters
+   |
+16 | # PLE1310
+17 | "Hello World".strip(r"Hello\t")
+   |                     ^^^^^^^^^^ PLE1310
+18 | 
+19 | # PLE1310
+   |
+
+bad_str_strip_call.py:20:21: PLE1310 String `strip` call contains duplicate characters
+   |
+19 | # PLE1310
+20 | "Hello World".strip("Hello\\")
+   |                     ^^^^^^^^^ PLE1310
+21 | 
+22 | # PLE1310
+   |
+
+bad_str_strip_call.py:23:21: PLE1310 String `strip` call contains duplicate characters
+   |
+22 | # PLE1310
+23 | "Hello World".strip(r"Hello\\")
+   |                     ^^^^^^^^^^ PLE1310
+24 | 
+25 | # PLE1310
+   |
+
+bad_str_strip_call.py:26:21: PLE1310 String `strip` call contains duplicate characters
+   |
+25 | # PLE1310
+26 | "Hello World".strip("🤣🤣🤣🤣🙃👀😀")
+   |                     ^^^^^^^^^^^^^^^^ PLE1310
+27 | 
+28 | # PLE1310
+   |
+
+bad_str_strip_call.py:30:5: PLE1310 String `strip` call contains duplicate characters
+   |
+28 |   # PLE1310
+29 |   "Hello World".strip(
+30 |       """
+   |  _____^
+31 | | there are a lot of characters to strip
+32 | | """
+   | |___^ PLE1310
+33 |   )
+   |
+
+bad_str_strip_call.py:36:21: PLE1310 String `strip` call contains duplicate characters
+   |
+35 |   # PLE1310
+36 |   "Hello World".strip("can we get a long " \
+   |  _____________________^
+37 | |                     "string of characters to strip " \
+38 | |                     "please?")
+   | |_____________________________^ PLE1310
+39 |   
+40 |   # PLE1310
+   |
+
+bad_str_strip_call.py:42:5: PLE1310 String `strip` call contains duplicate characters
+   |
+40 |   # PLE1310
+41 |   "Hello World".strip(
+42 |       "can we get a long "
+   |  _____^
+43 | |     "string of characters to strip "
+44 | |     "please?"
+   | |_____________^ PLE1310
+45 |   )
+   |
+
+bad_str_strip_call.py:49:5: PLE1310 String `strip` call contains duplicate characters
+   |
+47 |   # PLE1310
+48 |   "Hello World".strip(
+49 |       "can \t we get a long"
+   |  _____^
+50 | |     "string \t of characters to strip"
+51 | |     "please?"
+   | |_____________^ PLE1310
+52 |   )
+   |
+
+bad_str_strip_call.py:61:11: PLE1310 String `strip` call contains duplicate characters
+   |
+60 | # PLE1310
+61 | u''.strip('http://')
+   |           ^^^^^^^^^ PLE1310
+62 | 
+63 | # PLE1310
+   |
+
+bad_str_strip_call.py:64:12: PLE1310 String `lstrip` call contains duplicate characters (did you mean `removeprefix`?)
+   |
+63 | # PLE1310
+64 | u''.lstrip('http://')
+   |            ^^^^^^^^^ PLE1310
+65 | 
+66 | # PLE1310
+   |
+
+bad_str_strip_call.py:67:12: PLE1310 String `rstrip` call contains duplicate characters (did you mean `removesuffix`?)
+   |
+66 | # PLE1310
+67 | b''.rstrip('http://')
+   |            ^^^^^^^^^ PLE1310
+68 | 
+69 | # OK
+   |
+
+

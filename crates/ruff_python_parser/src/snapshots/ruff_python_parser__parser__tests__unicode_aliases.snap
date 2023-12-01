@@ -1,0 +1,34 @@
+---
+source: crates/ruff_python_parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Assign(
+        StmtAssign {
+            range: 0..37,
+            targets: [
+                Name(
+                    ExprName {
+                        range: 0..1,
+                        id: "x",
+                        ctx: Store,
+                    },
+                ),
+            ],
+            value: StringLiteral(
+                ExprStringLiteral {
+                    range: 4..37,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 4..37,
+                                value: "\u{8}another cool trick",
+                                unicode: false,
+                            },
+                        ),
+                    },
+                },
+            ),
+        },
+    ),
+]

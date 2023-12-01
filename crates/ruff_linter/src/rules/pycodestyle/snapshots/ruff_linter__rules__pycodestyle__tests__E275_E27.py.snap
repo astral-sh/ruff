@@ -1,0 +1,109 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E27.py:37:8: E275 [*] Missing whitespace after keyword
+   |
+35 | from w import  (e, f)
+36 | #: E275
+37 | from w import(e, f)
+   |        ^^^^^^ E275
+38 | #: E275
+39 | from importable.module import(e, f)
+   |
+   = help: Added missing whitespace after keyword
+
+ℹ Safe fix
+34 34 | #: E271
+35 35 | from w import  (e, f)
+36 36 | #: E275
+37    |-from w import(e, f)
+   37 |+from w import (e, f)
+38 38 | #: E275
+39 39 | from importable.module import(e, f)
+40 40 | #: E275
+
+E27.py:39:24: E275 [*] Missing whitespace after keyword
+   |
+37 | from w import(e, f)
+38 | #: E275
+39 | from importable.module import(e, f)
+   |                        ^^^^^^ E275
+40 | #: E275
+41 | try:
+   |
+   = help: Added missing whitespace after keyword
+
+ℹ Safe fix
+36 36 | #: E275
+37 37 | from w import(e, f)
+38 38 | #: E275
+39    |-from importable.module import(e, f)
+   39 |+from importable.module import (e, f)
+40 40 | #: E275
+41 41 | try:
+42 42 |     from importable.module import(e, f)
+
+E27.py:42:28: E275 [*] Missing whitespace after keyword
+   |
+40 | #: E275
+41 | try:
+42 |     from importable.module import(e, f)
+   |                            ^^^^^^ E275
+43 | except ImportError:
+44 |     pass
+   |
+   = help: Added missing whitespace after keyword
+
+ℹ Safe fix
+39 39 | from importable.module import(e, f)
+40 40 | #: E275
+41 41 | try:
+42    |-    from importable.module import(e, f)
+   42 |+    from importable.module import (e, f)
+43 43 | except ImportError:
+44 44 |     pass
+45 45 | #: E275
+
+E27.py:46:1: E275 [*] Missing whitespace after keyword
+   |
+44 |     pass
+45 | #: E275
+46 | if(foo):
+   | ^^ E275
+47 |     pass
+48 | else:
+   |
+   = help: Added missing whitespace after keyword
+
+ℹ Safe fix
+43 43 | except ImportError:
+44 44 |     pass
+45 45 | #: E275
+46    |-if(foo):
+   46 |+if (foo):
+47 47 |     pass
+48 48 | else:
+49 49 |     pass
+
+E27.py:54:5: E275 [*] Missing whitespace after keyword
+   |
+52 | #: E275:2:11
+53 | if True:
+54 |     assert(1)
+   |     ^^^^^^ E275
+55 | #: Okay
+56 | def f():
+   |
+   = help: Added missing whitespace after keyword
+
+ℹ Safe fix
+51 51 | matched = {"true": True, "false": False}
+52 52 | #: E275:2:11
+53 53 | if True:
+54    |-    assert(1)
+   54 |+    assert (1)
+55 55 | #: Okay
+56 56 | def f():
+57 57 |     print((yield))
+
+

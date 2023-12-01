@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 ---
 ## Input
 
-```py
+```python
 from typing import Union
 
 @bird
@@ -117,7 +117,7 @@ def eggs() -> Union[str, int]: ...
 
 ## Ruff Output
 
-```py
+```python
 from typing import Union
 
 
@@ -180,7 +180,7 @@ def eggs() -> Union[str, int]:
 
 ## Black Output
 
-```py
+```python
 from typing import Union
 
 @bird

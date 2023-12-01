@@ -1,0 +1,175 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF017_0.py:5:1: RUF017 [*] Avoid quadratic list summation
+  |
+4 | # RUF017
+5 | sum([x, y], start=[])
+  | ^^^^^^^^^^^^^^^^^^^^^ RUF017
+6 | sum([x, y], [])
+7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+  |
+  = help: Replace with `functools.reduce`
+
+ℹ Unsafe fix
+  1 |+import functools
+  2 |+import operator
+1 3 | x = [1, 2, 3]
+2 4 | y = [4, 5, 6]
+3 5 | 
+4 6 | # RUF017
+5   |-sum([x, y], start=[])
+  7 |+functools.reduce(operator.iadd, [x, y], [])
+6 8 | sum([x, y], [])
+7 9 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8 10 | sum([[1, 2, 3], [4, 5, 6]], [])
+
+RUF017_0.py:6:1: RUF017 [*] Avoid quadratic list summation
+  |
+4 | # RUF017
+5 | sum([x, y], start=[])
+6 | sum([x, y], [])
+  | ^^^^^^^^^^^^^^^ RUF017
+7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8 | sum([[1, 2, 3], [4, 5, 6]], [])
+  |
+  = help: Replace with `functools.reduce`
+
+ℹ Unsafe fix
+  1 |+import functools
+  2 |+import operator
+1 3 | x = [1, 2, 3]
+2 4 | y = [4, 5, 6]
+3 5 | 
+4 6 | # RUF017
+5 7 | sum([x, y], start=[])
+6   |-sum([x, y], [])
+  8 |+functools.reduce(operator.iadd, [x, y], [])
+7 9 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8 10 | sum([[1, 2, 3], [4, 5, 6]], [])
+9 11 | sum([[1, 2, 3], [4, 5, 6]],
+
+RUF017_0.py:7:1: RUF017 [*] Avoid quadratic list summation
+  |
+5 | sum([x, y], start=[])
+6 | sum([x, y], [])
+7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
+8 | sum([[1, 2, 3], [4, 5, 6]], [])
+9 | sum([[1, 2, 3], [4, 5, 6]],
+  |
+  = help: Replace with `functools.reduce`
+
+ℹ Unsafe fix
+   1  |+import functools
+   2  |+import operator
+1  3  | x = [1, 2, 3]
+2  4  | y = [4, 5, 6]
+3  5  | 
+4  6  | # RUF017
+5  7  | sum([x, y], start=[])
+6  8  | sum([x, y], [])
+7     |-sum([[1, 2, 3], [4, 5, 6]], start=[])
+   9  |+functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
+8  10 | sum([[1, 2, 3], [4, 5, 6]], [])
+9  11 | sum([[1, 2, 3], [4, 5, 6]],
+10 12 |     [])
+
+RUF017_0.py:8:1: RUF017 [*] Avoid quadratic list summation
+   |
+ 6 | sum([x, y], [])
+ 7 | sum([[1, 2, 3], [4, 5, 6]], start=[])
+ 8 | sum([[1, 2, 3], [4, 5, 6]], [])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
+ 9 | sum([[1, 2, 3], [4, 5, 6]],
+10 |     [])
+   |
+   = help: Replace with `functools.reduce`
+
+ℹ Unsafe fix
+   1  |+import functools
+   2  |+import operator
+1  3  | x = [1, 2, 3]
+2  4  | y = [4, 5, 6]
+3  5  | 
+--------------------------------------------------------------------------------
+5  7  | sum([x, y], start=[])
+6  8  | sum([x, y], [])
+7  9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8     |-sum([[1, 2, 3], [4, 5, 6]], [])
+   10 |+functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
+9  11 | sum([[1, 2, 3], [4, 5, 6]],
+10 12 |     [])
+11 13 | 
+
+RUF017_0.py:9:1: RUF017 [*] Avoid quadratic list summation
+   |
+ 7 |   sum([[1, 2, 3], [4, 5, 6]], start=[])
+ 8 |   sum([[1, 2, 3], [4, 5, 6]], [])
+ 9 | / sum([[1, 2, 3], [4, 5, 6]],
+10 | |     [])
+   | |_______^ RUF017
+11 |   
+12 |   # OK
+   |
+   = help: Replace with `functools.reduce`
+
+ℹ Unsafe fix
+   1  |+import functools
+   2  |+import operator
+1  3  | x = [1, 2, 3]
+2  4  | y = [4, 5, 6]
+3  5  | 
+--------------------------------------------------------------------------------
+6  8  | sum([x, y], [])
+7  9  | sum([[1, 2, 3], [4, 5, 6]], start=[])
+8  10 | sum([[1, 2, 3], [4, 5, 6]], [])
+9     |-sum([[1, 2, 3], [4, 5, 6]],
+10    |-    [])
+   11 |+functools.reduce(operator.iadd, [[1, 2, 3], [4, 5, 6]], [])
+11 12 | 
+12 13 | # OK
+13 14 | sum([x, y])
+
+RUF017_0.py:21:5: RUF017 [*] Avoid quadratic list summation
+   |
+19 |     import functools, operator
+20 | 
+21 |     sum([x, y], [])
+   |     ^^^^^^^^^^^^^^^ RUF017
+   |
+   = help: Replace with `functools.reduce`
+
+ℹ Unsafe fix
+18 18 | def func():
+19 19 |     import functools, operator
+20 20 | 
+21    |-    sum([x, y], [])
+   21 |+    functools.reduce(operator.iadd, [x, y], [])
+22 22 | 
+23 23 | 
+24 24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
+
+RUF017_0.py:26:5: RUF017 [*] Avoid quadratic list summation
+   |
+24 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
+25 | def func():
+26 |     sum((factor.dims for factor in bases), [])
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
+   |
+   = help: Replace with `functools.reduce`
+
+ℹ Unsafe fix
+   1  |+import functools
+   2  |+import operator
+1  3  | x = [1, 2, 3]
+2  4  | y = [4, 5, 6]
+3  5  | 
+--------------------------------------------------------------------------------
+23 25 | 
+24 26 | # Regression test for: https://github.com/astral-sh/ruff/issues/7718
+25 27 | def func():
+26    |-    sum((factor.dims for factor in bases), [])
+   28 |+    functools.reduce(operator.iadd, (factor.dims for factor in bases), [])
+
+

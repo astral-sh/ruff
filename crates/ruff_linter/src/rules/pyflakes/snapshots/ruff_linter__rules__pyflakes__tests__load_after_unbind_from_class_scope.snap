@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+<filename>:8:30: F841 [*] Local variable `x` is assigned to but never used
+  |
+6 |         try:
+7 |             pass
+8 |         except ValueError as x:
+  |                              ^ F841
+9 |             pass
+  |
+  = help: Remove assignment to unused variable `x`
+
+ℹ Safe fix
+5 5 |     def f():
+6 6 |         try:
+7 7 |             pass
+8   |-        except ValueError as x:
+  8 |+        except ValueError:
+9 9 |             pass
+10 10 | 
+11 11 |         # This should raise an F821 error, rather than resolving to the
+
+<filename>:13:15: F821 Undefined name `x`
+   |
+11 |         # This should raise an F821 error, rather than resolving to the
+12 |         # `x` in `x = 1`.
+13 |         print(x)
+   |               ^ F821
+   |
+
+

@@ -18,7 +18,7 @@ if [ ! -d corpus/ruff_fix_validity ]; then
     curl -L 'https://zenodo.org/record/3628784/files/python-corpus.tar.gz?download=1' | tar xz
   fi
   curl -L 'https://github.com/python/cpython/archive/refs/tags/v3.12.0b2.tar.gz' | tar xz
-  cp -r "../../../crates/ruff/resources/test" .
+  cp -r "../../../crates/ruff_linter/resources/test" .
   cd -
   cargo fuzz cmin -s none ruff_fix_validity
 fi

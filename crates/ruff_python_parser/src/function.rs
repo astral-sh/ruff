@@ -2,8 +2,8 @@ use std::hash::BuildHasherDefault;
 // Contains functions that perform validation and parsing of arguments and parameters.
 // Checks apply both to functions and to lambdas.
 use crate::lexer::{LexicalError, LexicalErrorType};
-use ruff_python_ast::{self as ast, Ranged};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_ast::{self as ast};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 pub(crate) struct ArgumentList {
@@ -66,7 +66,7 @@ pub(crate) fn validate_pos_params(
     if let Some(invalid) = first_invalid {
         return Err(LexicalError {
             error: LexicalErrorType::DefaultArgumentError,
-            location: invalid.parameter.range.start(),
+            location: invalid.parameter.start(),
         });
     }
     Ok(())

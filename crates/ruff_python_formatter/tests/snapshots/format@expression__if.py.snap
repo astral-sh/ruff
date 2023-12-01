@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/if.py
 ---
 ## Input
-```py
+```python
 a1 = 1 if True else 2
 
 a2 = "this is a very long text that will make the group break to check that parentheses are added" if True else 2
@@ -45,10 +45,79 @@ d1 = [
     ("b") else # 2
     ("c")
 ]
+
+e1 = (
+    a
+    if True # 1
+    else b
+    if False # 2
+    else c
+)
+
+
+# Flattening nested if-expressions.
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        (NamedValuesListIterable
+        if named
+        else FlatValuesListIterable)
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else (FlatValuesListIterable
+        if flat
+        else ValuesListIterable)
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable(1,)
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else (FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable + FlatValuesListIterable
+        if flat
+        else ValuesListIterable)
+    )
 ```
 
 ## Output
-```py
+```python
 a1 = 1 if True else 2
 
 a2 = (
@@ -96,6 +165,81 @@ d1 = [
     # 2
     else ("c")
 ]
+
+e1 = (
+    a
+    if True  # 1
+    else b
+    if False  # 2
+    else c
+)
+
+
+# Flattening nested if-expressions.
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        (NamedValuesListIterable if named else FlatValuesListIterable)
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else (FlatValuesListIterable if flat else ValuesListIterable)
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable(
+            1,
+        )
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else FlatValuesListIterable
+        + FlatValuesListIterable
+        + FlatValuesListIterable
+        + FlatValuesListIterable
+        if flat
+        else ValuesListIterable
+    )
+
+
+def something():
+    clone._iterable_class = (
+        NamedValuesListIterable
+        if named
+        else (
+            FlatValuesListIterable
+            + FlatValuesListIterable
+            + FlatValuesListIterable
+            + FlatValuesListIterable
+            if flat
+            else ValuesListIterable
+        )
+    )
 ```
 
 

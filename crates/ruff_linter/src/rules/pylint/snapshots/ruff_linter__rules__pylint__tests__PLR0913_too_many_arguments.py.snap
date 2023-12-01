@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+too_many_arguments.py:1:5: PLR0913 Too many arguments in function definition (8 > 5)
+  |
+1 | def f(x, y, z, t, u, v, w, r):  # Too many arguments (8/5)
+  |     ^ PLR0913
+2 |     pass
+  |
+
+too_many_arguments.py:17:5: PLR0913 Too many arguments in function definition (6 > 5)
+   |
+17 | def f(x, y, z, u=1, v=1, r=1):  # Too many arguments (6/5)
+   |     ^ PLR0913
+18 |     pass
+   |
+
+too_many_arguments.py:25:5: PLR0913 Too many arguments in function definition (6 > 5)
+   |
+25 | def f(x, y, z, /, u, v, w):  # Too many arguments (6/5)
+   |     ^ PLR0913
+26 |     pass
+   |
+
+too_many_arguments.py:29:5: PLR0913 Too many arguments in function definition (6 > 5)
+   |
+29 | def f(x, y, z, *, u, v, w):  # Too many arguments (6/5)
+   |     ^ PLR0913
+30 |     pass
+   |
+
+too_many_arguments.py:33:5: PLR0913 Too many arguments in function definition (9 > 5)
+   |
+33 | def f(x, y, z, a, b, c, *, u, v, w):  # Too many arguments (9/5)
+   |     ^ PLR0913
+34 |     pass
+   |
+
+

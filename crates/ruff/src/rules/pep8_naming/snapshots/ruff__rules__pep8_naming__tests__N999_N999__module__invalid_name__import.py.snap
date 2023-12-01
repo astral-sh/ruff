@@ -1,8 +1,0 @@
----
-source: crates/ruff/src/rules/pep8_naming/mod.rs
----
-import.py:1:1: N999 Invalid module name: 'import'
- |
- |
-
-

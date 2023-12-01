@@ -1,0 +1,14 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F50x.py:11:1: F508 `%`-format string `*` specifier requires sequence
+   |
+ 9 | '%(bar)s' % (1, 2, 3)  # F502
+10 | '%s %s' % {'k': 'v'}  # F503
+11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ F508
+12 | 
+13 | # ok: single %s with mapping
+   |
+
+

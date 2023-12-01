@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT011.py:13:24: PT011 `pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter or use a more specific exception
+   |
+12 | def test_ok_different_error_from_config():
+13 |     with pytest.raises(ZeroDivisionError):
+   |                        ^^^^^^^^^^^^^^^^^ PT011
+14 |         raise ZeroDivisionError("Can't divide by 0")
+   |
+
+

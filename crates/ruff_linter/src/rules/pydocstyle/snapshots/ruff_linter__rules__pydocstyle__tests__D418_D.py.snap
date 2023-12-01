@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:34:9: D418 Function decorated with `@overload` shouldn't contain a docstring
+   |
+33 |     @overload
+34 |     def overloaded_method(self, a: str) -> str:
+   |         ^^^^^^^^^^^^^^^^^ D418
+35 |         """Foo bar documentation."""
+36 |         ...
+   |
+
+D.py:90:9: D418 Function decorated with `@overload` shouldn't contain a docstring
+   |
+89 |     @overload
+90 |     def nested_overloaded_func(a: str) -> str:
+   |         ^^^^^^^^^^^^^^^^^^^^^^ D418
+91 |         """Foo bar documentation."""
+92 |         ...
+   |
+
+D.py:110:5: D418 Function decorated with `@overload` shouldn't contain a docstring
+    |
+109 | @overload
+110 | def overloaded_func(a: str) -> str:
+    |     ^^^^^^^^^^^^^^^ D418
+111 |     """Foo bar documentation."""
+112 |     ...
+    |
+
+

@@ -20,3 +20,6 @@ ruff_source_file = { path = "../ruff_source_file" }
 
 once_cell = { workspace = true }
 
+[lints]
+workspace = true
+

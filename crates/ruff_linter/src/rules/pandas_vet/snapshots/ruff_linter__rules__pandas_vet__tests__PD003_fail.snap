@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+---
+<filename>:3:9: PD003 `.isna` is preferred to `.isnull`; functionality is equivalent
+  |
+2 | import pandas as pd
+3 | nulls = pd.isnull(val)
+  |         ^^^^^^^^^ PD003
+  |
+
+

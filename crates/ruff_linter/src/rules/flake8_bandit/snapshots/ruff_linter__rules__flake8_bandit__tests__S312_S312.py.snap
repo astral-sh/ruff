@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S312.py:3:1: S312 Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol.
+  |
+1 | from telnetlib import Telnet
+2 | 
+3 | Telnet("localhost", 23)
+  | ^^^^^^^^^^^^^^^^^^^^^^^ S312
+  |
+
+

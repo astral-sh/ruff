@@ -9,21 +9,13 @@ expression: parse_ast
             value: Lambda(
                 ExprLambda {
                     range: 0..9,
-                    parameters: Parameters {
-                        range: 6..6,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    body: Constant(
-                        ExprConstant {
+                    parameters: None,
+                    body: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 8..9,
                             value: Int(
                                 1,
                             ),
-                            kind: None,
                         },
                     ),
                 },

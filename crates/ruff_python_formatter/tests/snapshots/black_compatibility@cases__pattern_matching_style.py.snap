@@ -1,0 +1,186 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/pattern_matching_style.py
+---
+## Input
+
+```python
+match something:
+    case b(): print(1+1)
+    case c(
+        very_complex=True,
+        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-   1
+    ): print(1)
+    case c(
+        very_complex=True,
+        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1,
+    ): print(2)
+    case a: pass
+
+match(
+    arg # comment
+)
+
+match(
+)
+
+match(
+
+
+)
+
+case(
+    arg # comment
+)
+
+case(
+)
+
+case(
+
+
+)
+
+
+re.match(
+    something # fast
+)
+re.match(
+
+
+
+)
+match match(
+
+
+):
+    case case(
+        arg, # comment
+    ):
+        pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -13,20 +13,26 @@
+     case a:
+         pass
+ 
+-match(arg)  # comment
++match(
++    arg  # comment
++)
+ 
+ match()
+ 
+ match()
+ 
+-case(arg)  # comment
++case(
++    arg  # comment
++)
+ 
+ case()
+ 
+ case()
+ 
+ 
+-re.match(something)  # fast
++re.match(
++    something  # fast
++)
+ re.match()
+ match match():
+     case case(
+```
+
+## Ruff Output
+
+```python
+match something:
+    case b():
+        print(1 + 1)
+    case c(
+        very_complex=True, perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1
+    ):
+        print(1)
+    case c(
+        very_complex=True,
+        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1,
+    ):
+        print(2)
+    case a:
+        pass
+
+match(
+    arg  # comment
+)
+
+match()
+
+match()
+
+case(
+    arg  # comment
+)
+
+case()
+
+case()
+
+
+re.match(
+    something  # fast
+)
+re.match()
+match match():
+    case case(
+        arg,  # comment
+    ):
+        pass
+```
+
+## Black Output
+
+```python
+match something:
+    case b():
+        print(1 + 1)
+    case c(
+        very_complex=True, perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1
+    ):
+        print(1)
+    case c(
+        very_complex=True,
+        perhaps_even_loooooooooooooooooooooooooooooooooooooong=-1,
+    ):
+        print(2)
+    case a:
+        pass
+
+match(arg)  # comment
+
+match()
+
+match()
+
+case(arg)  # comment
+
+case()
+
+case()
+
+
+re.match(something)  # fast
+re.match()
+match match():
+    case case(
+        arg,  # comment
+    ):
+        pass
+```
+
+

@@ -1,0 +1,108 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E22.py:28:8: E222 [*] Multiple spaces after operator
+   |
+27 | #: E222
+28 | a = a +  1
+   |        ^^ E222
+29 | b = b + 10
+30 | #: E222 E222
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+25 25 | 
+26 26 | 
+27 27 | #: E222
+28    |-a = a +  1
+   28 |+a = a + 1
+29 29 | b = b + 10
+30 30 | #: E222 E222
+31 31 | x =            -1
+
+E22.py:31:4: E222 [*] Multiple spaces after operator
+   |
+29 | b = b + 10
+30 | #: E222 E222
+31 | x =            -1
+   |    ^^^^^^^^^^^^ E222
+32 | y =            -2
+33 | long_variable = 3
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+28 28 | a = a +  1
+29 29 | b = b + 10
+30 30 | #: E222 E222
+31    |-x =            -1
+   31 |+x = -1
+32 32 | y =            -2
+33 33 | long_variable = 3
+34 34 | #: E222 E222
+
+E22.py:32:4: E222 [*] Multiple spaces after operator
+   |
+30 | #: E222 E222
+31 | x =            -1
+32 | y =            -2
+   |    ^^^^^^^^^^^^ E222
+33 | long_variable = 3
+34 | #: E222 E222
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+29 29 | b = b + 10
+30 30 | #: E222 E222
+31 31 | x =            -1
+32    |-y =            -2
+   32 |+y = -2
+33 33 | long_variable = 3
+34 34 | #: E222 E222
+35 35 | x[0] =          1
+
+E22.py:35:7: E222 [*] Multiple spaces after operator
+   |
+33 | long_variable = 3
+34 | #: E222 E222
+35 | x[0] =          1
+   |       ^^^^^^^^^^ E222
+36 | x[1] =          2
+37 | long_variable = 3
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+32 32 | y =            -2
+33 33 | long_variable = 3
+34 34 | #: E222 E222
+35    |-x[0] =          1
+   35 |+x[0] = 1
+36 36 | x[1] =          2
+37 37 | long_variable = 3
+38 38 | #:
+
+E22.py:36:7: E222 [*] Multiple spaces after operator
+   |
+34 | #: E222 E222
+35 | x[0] =          1
+36 | x[1] =          2
+   |       ^^^^^^^^^^ E222
+37 | long_variable = 3
+38 | #:
+   |
+   = help: Replace with single space
+
+ℹ Safe fix
+33 33 | long_variable = 3
+34 34 | #: E222 E222
+35 35 | x[0] =          1
+36    |-x[1] =          2
+   36 |+x[1] = 2
+37 37 | long_variable = 3
+38 38 | #:
+39 39 | 
+
+

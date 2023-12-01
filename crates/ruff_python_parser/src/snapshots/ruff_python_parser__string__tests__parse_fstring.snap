@@ -3,43 +3,69 @@ source: crates/ruff_python_parser/src/string.rs
 expression: parse_ast
 ---
 [
-    FormattedValue(
-        ExprFormattedValue {
-            range: 2..5,
-            value: Name(
-                ExprName {
-                    range: 3..4,
-                    id: "a",
-                    ctx: Load,
+    Expr(
+        StmtExpr {
+            range: 0..18,
+            value: FString(
+                ExprFString {
+                    range: 0..18,
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..18,
+                                    values: [
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 2..5,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 3..4,
+                                                        id: "a",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 5..10,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 7..8,
+                                                        id: "b",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 10..17,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 10..17,
+                                                            value: "{foo}",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ),
+                    },
                 },
             ),
-            debug_text: None,
-            conversion: None,
-            format_spec: None,
-        },
-    ),
-    FormattedValue(
-        ExprFormattedValue {
-            range: 5..10,
-            value: Name(
-                ExprName {
-                    range: 7..8,
-                    id: "b",
-                    ctx: Load,
-                },
-            ),
-            debug_text: None,
-            conversion: None,
-            format_spec: None,
-        },
-    ),
-    Constant(
-        ExprConstant {
-            range: 10..17,
-            value: Str(
-                "{foo}",
-            ),
-            kind: None,
         },
     ),
 ]

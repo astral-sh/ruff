@@ -1,0 +1,70 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        Lpar,
+        0..1,
+    ),
+    (
+        NonLogicalNewline,
+        1..2,
+    ),
+    (
+        String {
+            value: "a",
+            kind: String,
+            triple_quoted: false,
+        },
+        6..9,
+    ),
+    (
+        NonLogicalNewline,
+        9..10,
+    ),
+    (
+        String {
+            value: "b",
+            kind: String,
+            triple_quoted: false,
+        },
+        14..17,
+    ),
+    (
+        NonLogicalNewline,
+        17..18,
+    ),
+    (
+        NonLogicalNewline,
+        18..19,
+    ),
+    (
+        String {
+            value: "c",
+            kind: String,
+            triple_quoted: false,
+        },
+        23..26,
+    ),
+    (
+        String {
+            value: "d",
+            kind: String,
+            triple_quoted: false,
+        },
+        33..36,
+    ),
+    (
+        NonLogicalNewline,
+        36..37,
+    ),
+    (
+        Rpar,
+        37..38,
+    ),
+    (
+        Newline,
+        38..38,
+    ),
+]

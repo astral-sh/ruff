@@ -1,0 +1,69 @@
+---
+source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+---
+ISC.py:5:5: ISC002 Implicitly concatenated string literals over multiple lines
+  |
+3 |   _ = "abc" + "def"
+4 |   
+5 |   _ = "abc" \
+  |  _____^
+6 | |     "def"
+  | |_________^ ISC002
+7 |   
+8 |   _ = (
+  |
+
+ISC.py:24:3: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+23 |   _ = (
+24 |     "abc"
+   |  ___^
+25 | |   "def"
+   | |_______^ ISC002
+26 |   )
+   |
+
+ISC.py:29:3: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+28 |   _ = (
+29 |     f"abc"
+   |  ___^
+30 | |   "def"
+   | |_______^ ISC002
+31 |   )
+   |
+
+ISC.py:34:3: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+33 |   _ = (
+34 |     b"abc"
+   |  ___^
+35 | |   b"def"
+   | |________^ ISC002
+36 |   )
+   |
+
+ISC.py:67:5: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+65 |   _ = f"""abc {"def" "ghi"} jkl"""
+66 |   _ = f"""abc {
+67 |       "def"
+   |  _____^
+68 | |     "ghi"
+   | |_________^ ISC002
+69 |   } jkl"""
+   |
+
+ISC.py:74:10: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+72 |   _ = "a" f"b {f"c" f"d"} e" "f"
+73 |   _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+74 |   _ = f"b {f"abc" \
+   |  __________^
+75 | |     f"def"} g"
+   | |__________^ ISC002
+76 |   
+77 |   # Explicitly concatenated nested f-strings
+   |
+
+

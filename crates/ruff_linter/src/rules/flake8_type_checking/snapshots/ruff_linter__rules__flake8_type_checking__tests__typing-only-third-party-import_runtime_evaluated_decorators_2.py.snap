@@ -1,0 +1,26 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+runtime_evaluated_decorators_2.py:10:8: TCH002 [*] Move third-party import `numpy` into a type-checking block
+   |
+ 8 | from attrs import frozen
+ 9 | 
+10 | import numpy  # TCH002
+   |        ^^^^^ TCH002
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+7  7  | import pyproj
+8  8  | from attrs import frozen
+9  9  | 
+10    |-import numpy  # TCH002
+   10 |+from typing import TYPE_CHECKING
+   11 |+
+   12 |+if TYPE_CHECKING:
+   13 |+    import numpy
+11 14 | 
+12 15 | 
+13 16 | @attrs.define(auto_attribs=True)
+
+

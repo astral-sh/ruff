@@ -1,0 +1,209 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP034.py:2:7: UP034 [*] Avoid extraneous parentheses
+  |
+1 | # UP034
+2 | print(("foo"))
+  |       ^^^^^^^ UP034
+3 | 
+4 | # UP034
+  |
+  = help: Remove extraneous parentheses
+
+ℹ Safe fix
+1 1 | # UP034
+2   |-print(("foo"))
+  2 |+print("foo")
+3 3 | 
+4 4 | # UP034
+5 5 | print(("hell((goodybe))o"))
+
+UP034.py:5:7: UP034 [*] Avoid extraneous parentheses
+  |
+4 | # UP034
+5 | print(("hell((goodybe))o"))
+  |       ^^^^^^^^^^^^^^^^^^^^ UP034
+6 | 
+7 | # UP034
+  |
+  = help: Remove extraneous parentheses
+
+ℹ Safe fix
+2 2 | print(("foo"))
+3 3 | 
+4 4 | # UP034
+5   |-print(("hell((goodybe))o"))
+  5 |+print("hell((goodybe))o")
+6 6 | 
+7 7 | # UP034
+8 8 | print((("foo")))
+
+UP034.py:8:7: UP034 [*] Avoid extraneous parentheses
+   |
+ 7 | # UP034
+ 8 | print((("foo")))
+   |       ^^^^^^^^^ UP034
+ 9 | 
+10 | # UP034
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Safe fix
+5 5 | print(("hell((goodybe))o"))
+6 6 | 
+7 7 | # UP034
+8   |-print((("foo")))
+  8 |+print(("foo"))
+9 9 | 
+10 10 | # UP034
+11 11 | print((((1))))
+
+UP034.py:11:7: UP034 [*] Avoid extraneous parentheses
+   |
+10 | # UP034
+11 | print((((1))))
+   |       ^^^^^^^ UP034
+12 | 
+13 | # UP034
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Safe fix
+8  8  | print((("foo")))
+9  9  | 
+10 10 | # UP034
+11    |-print((((1))))
+   11 |+print(((1)))
+12 12 | 
+13 13 | # UP034
+14 14 | print(("foo{}".format(1)))
+
+UP034.py:14:7: UP034 [*] Avoid extraneous parentheses
+   |
+13 | # UP034
+14 | print(("foo{}".format(1)))
+   |       ^^^^^^^^^^^^^^^^^^^ UP034
+15 | 
+16 | # UP034
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Safe fix
+11 11 | print((((1))))
+12 12 | 
+13 13 | # UP034
+14    |-print(("foo{}".format(1)))
+   14 |+print("foo{}".format(1))
+15 15 | 
+16 16 | # UP034
+17 17 | print(
+
+UP034.py:18:5: UP034 [*] Avoid extraneous parentheses
+   |
+16 | # UP034
+17 | print(
+18 |     ("foo{}".format(1))
+   |     ^^^^^^^^^^^^^^^^^^^ UP034
+19 | )
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Safe fix
+15 15 | 
+16 16 | # UP034
+17 17 | print(
+18    |-    ("foo{}".format(1))
+   18 |+    "foo{}".format(1)
+19 19 | )
+20 20 | 
+21 21 | # UP034
+
+UP034.py:23:5: UP034 [*] Avoid extraneous parentheses
+   |
+21 |   # UP034
+22 |   print(
+23 |       (
+   |  _____^
+24 | |         "foo"
+25 | |     )
+   | |_____^ UP034
+26 |   )
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Safe fix
+20 20 | 
+21 21 | # UP034
+22 22 | print(
+23    |-    (
+   23 |+    
+24 24 |         "foo"
+25    |-    )
+   25 |+    
+26 26 | )
+27 27 | 
+28 28 | # UP034
+
+UP034.py:30:13: UP034 [*] Avoid extraneous parentheses
+   |
+28 | # UP034
+29 | def f():
+30 |     x = int(((yield 1)))
+   |             ^^^^^^^^^^^ UP034
+31 | 
+32 | # UP034
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Safe fix
+27 27 | 
+28 28 | # UP034
+29 29 | def f():
+30    |-    x = int(((yield 1)))
+   30 |+    x = int((yield 1))
+31 31 | 
+32 32 | # UP034
+33 33 | if True:
+
+UP034.py:35:9: UP034 [*] Avoid extraneous parentheses
+   |
+33 | if True:
+34 |     print(
+35 |         ("foo{}".format(1))
+   |         ^^^^^^^^^^^^^^^^^^^ UP034
+36 |     )
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Safe fix
+32 32 | # UP034
+33 33 | if True:
+34 34 |     print(
+35    |-        ("foo{}".format(1))
+   35 |+        "foo{}".format(1)
+36 36 |     )
+37 37 | 
+38 38 | # UP034
+
+UP034.py:39:7: UP034 [*] Avoid extraneous parentheses
+   |
+38 | # UP034
+39 | print((x for x in range(3)))
+   |       ^^^^^^^^^^^^^^^^^^^^^ UP034
+40 | 
+41 | # OK
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Safe fix
+36 36 |     )
+37 37 | 
+38 38 | # UP034
+39    |-print((x for x in range(3)))
+   39 |+print(x for x in range(3))
+40 40 | 
+41 41 | # OK
+42 42 | print("foo")
+
+

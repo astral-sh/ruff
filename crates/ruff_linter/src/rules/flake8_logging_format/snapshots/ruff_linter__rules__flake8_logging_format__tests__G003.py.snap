@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging_format/mod.rs
+---
+G003.py:3:14: G003 Logging statement uses `+`
+  |
+1 | import logging
+2 | 
+3 | logging.info("Hello" + " " + "World!")
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^ G003
+4 | logging.log(logging.INFO, "Hello" + " " + "World!")
+  |
+
+G003.py:4:27: G003 Logging statement uses `+`
+  |
+3 | logging.info("Hello" + " " + "World!")
+4 | logging.log(logging.INFO, "Hello" + " " + "World!")
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^ G003
+5 | 
+6 | from logging import info, log
+  |
+
+G003.py:8:6: G003 Logging statement uses `+`
+  |
+6 | from logging import info, log
+7 | 
+8 | info("Hello" + " " + "World!")
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^ G003
+9 | log(logging.INFO, "Hello" + " " + "World!")
+  |
+
+G003.py:9:19: G003 Logging statement uses `+`
+  |
+8 | info("Hello" + " " + "World!")
+9 | log(logging.INFO, "Hello" + " " + "World!")
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^ G003
+  |
+
+

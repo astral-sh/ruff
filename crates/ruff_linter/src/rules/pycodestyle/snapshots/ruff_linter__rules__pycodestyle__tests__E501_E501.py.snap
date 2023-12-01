@@ -1,0 +1,59 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E501.py:5:89: E501 Line too long (123 > 88)
+  |
+3 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
+4 | 
+5 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+6 | """
+  |
+
+E501.py:16:85: E501 Line too long (95 > 88)
+   |
+15 | _ = "---------------------------------------------------------------------------AAAAAAA"
+16 | _ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜"
+   |                                                                                         ^^^^^^^ E501
+   |
+
+E501.py:25:89: E501 Line too long (127 > 88)
+   |
+23 | caller(
+24 |     """
+25 |     Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+26 |     """,
+27 | )
+   |
+
+E501.py:40:89: E501 Line too long (132 > 88)
+   |
+38 |     "Lorem ipsum dolor": "sit amet",
+39 |     # E501 Line too long
+40 |     "Lorem ipsum dolor": "sit amet consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+41 |     # E501 Line too long
+42 |     "Lorem ipsum dolor": """
+   |
+
+E501.py:43:89: E501 Line too long (105 > 88)
+   |
+41 |     # E501 Line too long
+42 |     "Lorem ipsum dolor": """
+43 | sit amet  consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+   |                                                                                         ^^^^^^^^^^^^^^^^^ E501
+44 | """,
+45 |     # OK
+   |
+
+E501.py:83:89: E501 Line too long (147 > 88)
+   |
+81 | class Bar:
+82 |     """
+83 |     This is a long sentence that ends with a shortened URL and, therefore, could easily be broken across multiple lines ([source](https://ruff.rs))
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+84 |     """
+   |
+
+

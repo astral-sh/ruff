@@ -1,13 +1,7 @@
 use std::path::Path;
 
-/// Return `true` if the [`Path`] appears to be that of a Python file.
-pub fn is_python_file(path: &Path) -> bool {
-    path.extension()
-        .is_some_and(|ext| ext == "py" || ext == "pyi")
-}
-
 /// Return `true` if the [`Path`] is named `pyproject.toml`.
-pub fn is_project_toml(path: &Path) -> bool {
+pub fn is_pyproject_toml(path: &Path) -> bool {
     path.file_name()
         .is_some_and(|name| name == "pyproject.toml")
 }
@@ -26,22 +20,7 @@ pub fn is_jupyter_notebook(path: &Path) -> bool {
 mod tests {
     use std::path::Path;
 
-    use crate::path::{is_jupyter_notebook, is_python_file};
-
-    #[test]
-    fn inclusions() {
-        let path = Path::new("foo/bar/baz.py");
-        assert!(is_python_file(path));
-
-        let path = Path::new("foo/bar/baz.pyi");
-        assert!(is_python_file(path));
-
-        let path = Path::new("foo/bar/baz.js");
-        assert!(!is_python_file(path));
-
-        let path = Path::new("foo/bar/baz");
-        assert!(!is_python_file(path));
-    }
+    use crate::path::is_jupyter_notebook;
 
     #[test]
     fn test_is_jupyter_notebook() {

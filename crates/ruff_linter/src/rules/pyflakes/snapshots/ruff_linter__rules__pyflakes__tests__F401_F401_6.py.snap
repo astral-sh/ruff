@@ -1,0 +1,75 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401_6.py:7:25: F401 [*] `.background.BackgroundTasks` imported but unused
+  |
+6 | # F401 `background.BackgroundTasks` imported but unused
+7 | from .background import BackgroundTasks
+  |                         ^^^^^^^^^^^^^^^ F401
+8 | 
+9 | # F401 `datastructures.UploadFile` imported but unused
+  |
+  = help: Remove unused import: `.background.BackgroundTasks`
+
+ℹ Safe fix
+4 4 | from .applications import FastAPI as FastAPI
+5 5 | 
+6 6 | # F401 `background.BackgroundTasks` imported but unused
+7   |-from .background import BackgroundTasks
+8 7 | 
+9 8 | # F401 `datastructures.UploadFile` imported but unused
+10 9 | from .datastructures import UploadFile as FileUpload
+
+F401_6.py:10:43: F401 [*] `.datastructures.UploadFile` imported but unused
+   |
+ 9 | # F401 `datastructures.UploadFile` imported but unused
+10 | from .datastructures import UploadFile as FileUpload
+   |                                           ^^^^^^^^^^ F401
+11 | 
+12 | # OK
+   |
+   = help: Remove unused import: `.datastructures.UploadFile`
+
+ℹ Safe fix
+7  7  | from .background import BackgroundTasks
+8  8  | 
+9  9  | # F401 `datastructures.UploadFile` imported but unused
+10    |-from .datastructures import UploadFile as FileUpload
+11 10 | 
+12 11 | # OK
+13 12 | import applications as applications
+
+F401_6.py:16:8: F401 [*] `background` imported but unused
+   |
+15 | # F401 `background` imported but unused
+16 | import background
+   |        ^^^^^^^^^^ F401
+17 | 
+18 | # F401 `datastructures` imported but unused
+   |
+   = help: Remove unused import: `background`
+
+ℹ Safe fix
+13 13 | import applications as applications
+14 14 | 
+15 15 | # F401 `background` imported but unused
+16    |-import background
+17 16 | 
+18 17 | # F401 `datastructures` imported but unused
+19 18 | import datastructures as structures
+
+F401_6.py:19:26: F401 [*] `datastructures` imported but unused
+   |
+18 | # F401 `datastructures` imported but unused
+19 | import datastructures as structures
+   |                          ^^^^^^^^^^ F401
+   |
+   = help: Remove unused import: `datastructures`
+
+ℹ Safe fix
+16 16 | import background
+17 17 | 
+18 18 | # F401 `datastructures` imported but unused
+19    |-import datastructures as structures
+
+

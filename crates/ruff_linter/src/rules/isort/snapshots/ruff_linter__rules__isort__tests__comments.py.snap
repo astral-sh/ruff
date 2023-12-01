@@ -1,0 +1,89 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+comments.py:3:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 1 |   # Comment 1
+ 2 |   # Comment 2
+ 3 | / import D
+ 4 | | 
+ 5 | | # Comment 3a
+ 6 | | import C
+ 7 | | 
+ 8 | | # Comment 3b
+ 9 | | import C
+10 | | 
+11 | | import B  # Comment 4
+12 | | 
+13 | | # Comment 5
+14 | | 
+15 | | # Comment 6
+16 | | from A import (
+17 | |     a,  # Comment 7
+18 | |     b,
+19 | |     c,  # Comment 8
+20 | | )
+21 | | from A import (
+22 | |     a,  # Comment 9
+23 | |     b,  # Comment 10
+24 | |     c,  # Comment 11
+25 | | )
+26 | | 
+27 | | from D import a_long_name_to_force_multiple_lines # Comment 12
+28 | | from D import another_long_name_to_force_multiple_lines # Comment 13
+29 | | 
+30 | | from E import a  # Comment 1
+31 | | 
+32 | | from F import a  # Comment 1
+33 | | from F import b
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+1  1  | # Comment 1
+2  2  | # Comment 2
+3     |-import D
+   3  |+import B  # Comment 4
+4  4  | 
+5  5  | # Comment 3a
+6     |-import C
+7     |-
+8  6  | # Comment 3b
+9  7  | import C
+10    |-
+11    |-import B  # Comment 4
+   8  |+import D
+12 9  | 
+13 10 | # Comment 5
+14    |-
+15 11 | # Comment 6
+16 12 | from A import (
+17    |-    a,  # Comment 7
+18    |-    b,
+19    |-    c,  # Comment 8
+   13 |+    a,  # Comment 7  # Comment 9
+   14 |+    b,  # Comment 10
+   15 |+    c,  # Comment 8  # Comment 11
+20 16 | )
+21    |-from A import (
+22    |-    a,  # Comment 9
+23    |-    b,  # Comment 10
+24    |-    c,  # Comment 11
+   17 |+from D import (
+   18 |+    a_long_name_to_force_multiple_lines,  # Comment 12
+   19 |+    another_long_name_to_force_multiple_lines,  # Comment 13
+25 20 | )
+26    |-
+27    |-from D import a_long_name_to_force_multiple_lines # Comment 12
+28    |-from D import another_long_name_to_force_multiple_lines # Comment 13
+29    |-
+30 21 | from E import a  # Comment 1
+31    |-
+32    |-from F import a  # Comment 1
+33    |-from F import b
+   22 |+from F import (
+   23 |+    a,  # Comment 1
+   24 |+    b,
+   25 |+)
+
+

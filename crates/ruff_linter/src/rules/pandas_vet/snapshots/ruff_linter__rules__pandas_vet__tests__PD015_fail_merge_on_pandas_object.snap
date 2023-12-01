@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+---
+<filename>:5:1: PD015 Use `.merge` method instead of `pd.merge` function. They have equivalent functionality.
+  |
+3 | x = pd.DataFrame()
+4 | y = pd.DataFrame()
+5 | pd.merge(x, y)
+  | ^^^^^^^^ PD015
+  |
+
+

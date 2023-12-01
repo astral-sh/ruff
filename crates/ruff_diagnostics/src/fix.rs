@@ -1,31 +1,26 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use ruff_text_size::TextSize;
+use ruff_text_size::{Ranged, TextSize};
 
 use crate::edit::Edit;
 
-/// Indicates confidence in the correctness of a suggested fix.
-#[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+/// Indicates if a fix can be applied.
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, is_macro::Is)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum Applicability {
-    /// The fix is definitely what the user intended, or maintains the exact meaning of the code.
-    /// This fix should be automatically applied.
-    Automatic,
+    /// The fix is unsafe and should only be displayed for manual application by the user.
+    /// The fix is likely to be incorrect or the resulting code may have invalid syntax.
+    DisplayOnly,
 
-    /// The fix may be what the user intended, but it is uncertain.
-    /// The fix should result in valid code if it is applied.
-    /// The fix can be applied with user opt-in.
-    Suggested,
+    /// The fix is unsafe and should only be applied with user opt-in.
+    /// The fix may be what the user intended, but it is uncertain; the resulting code will have valid syntax.
+    Unsafe,
 
-    /// The fix has a good chance of being incorrect or the code be incomplete.
-    /// The fix may result in invalid code if it is applied.
-    /// The fix should only be manually applied by the user.
-    Manual,
-
-    /// The applicability of the fix is unknown.
-    #[default]
-    Unspecified,
+    /// The fix is safe and can always be applied.
+    /// The fix is definitely what the user intended, or it maintains the exact meaning of the code.
+    Safe,
 }
 
 /// Indicates the level of isolation required to apply a fix.
@@ -52,86 +47,86 @@ pub struct Fix {
 }
 
 impl Fix {
-    /// Create a new [`Fix`] with an unspecified applicability from an [`Edit`] element.
-    #[deprecated(
-        note = "Use `Fix::automatic`, `Fix::suggested`, or `Fix::manual` instead to specify an applicability."
-    )]
-    pub fn unspecified(edit: Edit) -> Self {
+    /// Create a new [`Fix`] that is [safe](Applicability::Safe) to apply from an [`Edit`] element.
+    pub fn safe_edit(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Unspecified,
+            applicability: Applicability::Safe,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with an unspecified applicability from multiple [`Edit`] elements.
-    #[deprecated(
-        note = "Use `Fix::automatic_edits`, `Fix::suggested_edits`, or `Fix::manual_edits` instead to specify an applicability."
-    )]
-    pub fn unspecified_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
-        Self {
-            edits: std::iter::once(edit).chain(rest).collect(),
-            applicability: Applicability::Unspecified,
-            isolation_level: IsolationLevel::default(),
-        }
-    }
-
-    /// Create a new [`Fix`] with [automatic applicability](Applicability::Automatic) from an [`Edit`] element.
-    pub fn automatic(edit: Edit) -> Self {
-        Self {
-            edits: vec![edit],
-            applicability: Applicability::Automatic,
-            isolation_level: IsolationLevel::default(),
-        }
-    }
-
-    /// Create a new [`Fix`] with [automatic applicability](Applicability::Automatic) from multiple [`Edit`] elements.
-    pub fn automatic_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] that is [safe](Applicability::Safe) to apply from multiple [`Edit`] elements.
+    pub fn safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
-        edits.sort_by_key(Edit::start);
+        edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Automatic,
+            applicability: Applicability::Safe,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with [suggested applicability](Applicability::Suggested) from an [`Edit`] element.
-    pub fn suggested(edit: Edit) -> Self {
+    /// Create a new [`Fix`] that is [unsafe](Applicability::Unsafe) to apply from an [`Edit`] element.
+    pub fn unsafe_edit(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Suggested,
+            applicability: Applicability::Unsafe,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with [suggested applicability](Applicability::Suggested) from multiple [`Edit`] elements.
-    pub fn suggested_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] that is [unsafe](Applicability::Unsafe) to apply from multiple [`Edit`] elements.
+    pub fn unsafe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
-        edits.sort_by_key(Edit::start);
+        edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Suggested,
+            applicability: Applicability::Unsafe,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with [manual applicability](Applicability::Manual) from an [`Edit`] element.
-    pub fn manual(edit: Edit) -> Self {
+    /// Create a new [`Fix`] that should only [display](Applicability::DisplayOnly) and not apply from an [`Edit`] element .
+    pub fn display_only_edit(edit: Edit) -> Self {
         Self {
             edits: vec![edit],
-            applicability: Applicability::Manual,
+            applicability: Applicability::DisplayOnly,
             isolation_level: IsolationLevel::default(),
         }
     }
 
-    /// Create a new [`Fix`] with [manual applicability](Applicability::Manual) from multiple [`Edit`] elements.
-    pub fn manual_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+    /// Create a new [`Fix`] that should only [display](Applicability::DisplayOnly) and not apply from multiple [`Edit`] elements.
+    pub fn display_only_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
-        edits.sort_by_key(Edit::start);
+        edits.sort_by_key(|edit| (edit.start(), edit.end()));
         Self {
             edits,
-            applicability: Applicability::Manual,
+            applicability: Applicability::DisplayOnly,
+            isolation_level: IsolationLevel::default(),
+        }
+    }
+
+    /// Create a new [`Fix`] with the specified [`Applicability`] to apply an [`Edit`] element.
+    pub fn applicable_edit(edit: Edit, applicability: Applicability) -> Self {
+        Self {
+            edits: vec![edit],
+            applicability,
+            isolation_level: IsolationLevel::default(),
+        }
+    }
+
+    /// Create a new [`Fix`] with the specified [`Applicability`] to apply multiple [`Edit`] elements.
+    pub fn applicable_edits(
+        edit: Edit,
+        rest: impl IntoIterator<Item = Edit>,
+        applicability: Applicability,
+    ) -> Self {
+        let mut edits: Vec<Edit> = std::iter::once(edit).chain(rest).collect();
+        edits.sort_by_key(|edit| (edit.start(), edit.end()));
+        Self {
+            edits,
+            applicability,
             isolation_level: IsolationLevel::default(),
         }
     }
@@ -160,6 +155,18 @@ impl Fix {
     #[must_use]
     pub fn isolate(mut self, isolation: IsolationLevel) -> Self {
         self.isolation_level = isolation;
+        self
+    }
+
+    /// Return [`true`] if this [`Fix`] should be applied with at a given [`Applicability`].
+    pub fn applies(&self, applicability: Applicability) -> bool {
+        self.applicability >= applicability
+    }
+
+    /// Create a new [`Fix`] with the given [`Applicability`].
+    #[must_use]
+    pub fn with_applicability(mut self, applicability: Applicability) -> Self {
+        self.applicability = applicability;
         self
     }
 }

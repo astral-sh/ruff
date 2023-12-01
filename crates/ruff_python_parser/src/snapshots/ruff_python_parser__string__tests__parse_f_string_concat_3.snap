@@ -6,37 +6,65 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..22,
-            value: JoinedStr(
-                ExprJoinedStr {
+            value: FString(
+                ExprFString {
                     range: 0..22,
-                    values: [
-                        Constant(
-                            ExprConstant {
-                                range: 1..16,
-                                value: Str(
-                                    "Hello world",
-                                ),
-                                kind: None,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 16..21,
-                                value: Constant(
-                                    ExprConstant {
-                                        range: 17..20,
-                                        value: Str(
-                                            "!",
-                                        ),
-                                        kind: None,
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..8,
+                                        value: "Hello ",
+                                        unicode: false,
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                                FString(
+                                    FString {
+                                        range: 9..22,
+                                        values: [
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 11..16,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 11..16,
+                                                                value: "world",
+                                                                unicode: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                            FormattedValue(
+                                                ExprFormattedValue {
+                                                    range: 16..21,
+                                                    value: StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 17..20,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 17..20,
+                                                                        value: "!",
+                                                                        unicode: false,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ],
                         ),
-                    ],
+                    },
                 },
             ),
         },

@@ -6,6 +6,7 @@ expression: parse_ast
     FunctionDef(
         StmtFunctionDef {
             range: 1..49,
+            is_async: false,
             decorator_list: [],
             name: Identifier {
                 id: "args_to_tuple",
@@ -75,11 +76,9 @@ expression: parse_ast
                 Expr(
                     StmtExpr {
                         range: 46..49,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 46..49,
-                                value: Ellipsis,
-                                kind: None,
                             },
                         ),
                     },

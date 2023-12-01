@@ -1,0 +1,14 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+pyproject.toml:9:17: RUF200 Failed to parse pyproject.toml: wanted string or table
+   |
+ 7 | [project]
+ 8 | name = "..."
+ 9 | license-files = [ "license.txt",]
+   |                 ^^^^^^^^^^^^^^^^^ RUF200
+10 | requires-python = ">=3.8"
+11 | requires-dist = [ "maturin>=0.14", "...",]
+   |
+
+

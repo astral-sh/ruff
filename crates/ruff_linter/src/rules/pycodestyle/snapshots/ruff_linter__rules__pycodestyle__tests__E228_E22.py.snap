@@ -1,0 +1,66 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E22.py:131:6: E228 [*] Missing whitespace around modulo operator
+    |
+129 | c = b^a
+130 | #: E228
+131 | a = b%c
+    |      ^ E228
+132 | #: E228
+133 | msg = fmt%(errno, errmsg)
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+128 128 | #: E227
+129 129 | c = b^a
+130 130 | #: E228
+131     |-a = b%c
+    131 |+a = b % c
+132 132 | #: E228
+133 133 | msg = fmt%(errno, errmsg)
+134 134 | #: E228
+
+E22.py:133:10: E228 [*] Missing whitespace around modulo operator
+    |
+131 | a = b%c
+132 | #: E228
+133 | msg = fmt%(errno, errmsg)
+    |          ^ E228
+134 | #: E228
+135 | msg = "Error %d occurred"%errno
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+130 130 | #: E228
+131 131 | a = b%c
+132 132 | #: E228
+133     |-msg = fmt%(errno, errmsg)
+    133 |+msg = fmt % (errno, errmsg)
+134 134 | #: E228
+135 135 | msg = "Error %d occurred"%errno
+136 136 | #:
+
+E22.py:135:26: E228 [*] Missing whitespace around modulo operator
+    |
+133 | msg = fmt%(errno, errmsg)
+134 | #: E228
+135 | msg = "Error %d occurred"%errno
+    |                          ^ E228
+136 | #:
+    |
+    = help: Add missing whitespace
+
+ℹ Safe fix
+132 132 | #: E228
+133 133 | msg = fmt%(errno, errmsg)
+134 134 | #: E228
+135     |-msg = "Error %d occurred"%errno
+    135 |+msg = "Error %d occurred" % errno
+136 136 | #:
+137 137 | 
+138 138 | #: Okay
+
+

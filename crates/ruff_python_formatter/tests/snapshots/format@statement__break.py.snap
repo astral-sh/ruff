@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/break.py
 ---
 ## Input
-```py
+```python
 # leading comment
 while True:  # block comment
     # inside comment
@@ -12,7 +12,7 @@ while True:  # block comment
 ```
 
 ## Output
-```py
+```python
 # leading comment
 while True:  # block comment
     # inside comment

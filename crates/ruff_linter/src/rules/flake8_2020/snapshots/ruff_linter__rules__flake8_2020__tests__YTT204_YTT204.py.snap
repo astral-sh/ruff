@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/flake8_2020/mod.rs
+---
+YTT204.py:4:1: YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple
+  |
+2 | from sys import version_info
+3 | 
+4 | sys.version_info.minor <= 7
+  | ^^^^^^^^^^^^^^^^^^^^^^ YTT204
+5 | version_info.minor > 8
+  |
+
+YTT204.py:5:1: YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple
+  |
+4 | sys.version_info.minor <= 7
+5 | version_info.minor > 8
+  | ^^^^^^^^^^^^^^^^^^ YTT204
+  |
+
+

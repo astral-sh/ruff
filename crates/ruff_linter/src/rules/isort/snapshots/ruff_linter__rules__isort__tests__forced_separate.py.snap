@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+forced_separate.py:3:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 |   # office_helper and tests are both first-party,
+2 |   # but we want tests and experiments to be separated, in that order
+3 | / from office_helper.core import CoreState
+4 | | import tests.common.foo as tcf
+5 | | from tests.common import async_mock_service
+6 | | from experiments.starry import *
+7 | | from experiments.weird import varieties
+8 | | from office_helper.assistants import entity_registry as er
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+1  1  | # office_helper and tests are both first-party,
+2  2  | # but we want tests and experiments to be separated, in that order
+   3  |+from office_helper.assistants import entity_registry as er
+3  4  | from office_helper.core import CoreState
+   5  |+
+4  6  | import tests.common.foo as tcf
+5  7  | from tests.common import async_mock_service
+   8  |+
+6  9  | from experiments.starry import *
+7  10 | from experiments.weird import varieties
+8     |-from office_helper.assistants import entity_registry as er
+
+

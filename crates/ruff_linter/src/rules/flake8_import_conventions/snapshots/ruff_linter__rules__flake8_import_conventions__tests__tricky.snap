@@ -1,0 +1,26 @@
+---
+source: crates/ruff_linter/src/rules/flake8_import_conventions/mod.rs
+---
+tricky.py:7:16: ICN001 [*] `pandas` should be imported as `pd`
+  |
+5 |     try:
+6 |         global pandas
+7 |         import pandas
+  |                ^^^^^^ ICN001
+8 |     except ImportError:
+9 |         return False
+  |
+  = help: Alias `pandas` to `pd`
+
+ℹ Unsafe fix
+3 3 | 
+4 4 | def rename_global():
+5 5 |     try:
+6   |-        global pandas
+7   |-        import pandas
+  6 |+        global pd
+  7 |+        import pandas as pd
+8 8 |     except ImportError:
+9 9 |         return False
+
+

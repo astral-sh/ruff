@@ -1,0 +1,63 @@
+---
+source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
+---
+SIM115.py:8:5: SIM115 Use context handler for opening files
+   |
+ 7 | # SIM115
+ 8 | f = open("foo.txt")
+   |     ^^^^ SIM115
+ 9 | f = Path("foo.txt").open()
+10 | f = pathlib.Path("foo.txt").open()
+   |
+
+SIM115.py:9:5: SIM115 Use context handler for opening files
+   |
+ 7 | # SIM115
+ 8 | f = open("foo.txt")
+ 9 | f = Path("foo.txt").open()
+   |     ^^^^^^^^^^^^^^^^^^^^ SIM115
+10 | f = pathlib.Path("foo.txt").open()
+11 | f = pl.Path("foo.txt").open()
+   |
+
+SIM115.py:10:5: SIM115 Use context handler for opening files
+   |
+ 8 | f = open("foo.txt")
+ 9 | f = Path("foo.txt").open()
+10 | f = pathlib.Path("foo.txt").open()
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM115
+11 | f = pl.Path("foo.txt").open()
+12 | f = P("foo.txt").open()
+   |
+
+SIM115.py:11:5: SIM115 Use context handler for opening files
+   |
+ 9 | f = Path("foo.txt").open()
+10 | f = pathlib.Path("foo.txt").open()
+11 | f = pl.Path("foo.txt").open()
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ SIM115
+12 | f = P("foo.txt").open()
+13 | data = f.read()
+   |
+
+SIM115.py:12:5: SIM115 Use context handler for opening files
+   |
+10 | f = pathlib.Path("foo.txt").open()
+11 | f = pl.Path("foo.txt").open()
+12 | f = P("foo.txt").open()
+   |     ^^^^^^^^^^^^^^^^^ SIM115
+13 | data = f.read()
+14 | f.close()
+   |
+
+SIM115.py:39:9: SIM115 Use context handler for opening files
+   |
+37 | # SIM115
+38 | with contextlib.ExitStack():
+39 |     f = open("filename")
+   |         ^^^^ SIM115
+40 | 
+41 | # OK
+   |
+
+

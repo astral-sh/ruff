@@ -1,0 +1,63 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/fmtskip5.py
+---
+## Input
+
+```python
+a, b, c = 3, 4,       5
+if (
+    a ==    3
+    and b    != 9  # fmt: skip
+    and c is not None
+):
+    print("I'm good!")
+else:
+    print("I'm bad")
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,7 +1,7 @@
+ a, b, c = 3, 4, 5
+ if (
+     a == 3
+-    and b    != 9  # fmt: skip
++    and b != 9  # fmt: skip
+     and c is not None
+ ):
+     print("I'm good!")
+```
+
+## Ruff Output
+
+```python
+a, b, c = 3, 4, 5
+if (
+    a == 3
+    and b != 9  # fmt: skip
+    and c is not None
+):
+    print("I'm good!")
+else:
+    print("I'm bad")
+```
+
+## Black Output
+
+```python
+a, b, c = 3, 4, 5
+if (
+    a == 3
+    and b    != 9  # fmt: skip
+    and c is not None
+):
+    print("I'm good!")
+else:
+    print("I'm bad")
+```
+
+

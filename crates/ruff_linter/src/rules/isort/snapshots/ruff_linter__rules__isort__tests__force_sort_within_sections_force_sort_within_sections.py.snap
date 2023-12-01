@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+force_sort_within_sections.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 1 | / from a import a1  # import_from
+ 2 | | from c import * # import_from_star
+ 3 | | import a  # import
+ 4 | | import c.d
+ 5 | | from z import z1
+ 6 | | import b as b1  # import_as
+ 7 | | import z
+ 8 | | 
+ 9 | | from ..parent import *
+10 | | from .my import fn
+11 | | from . import my
+12 | | from .my.nested import fn2
+13 | | from ...grandparent import fn3
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+1     |-from a import a1  # import_from
+2     |-from c import * # import_from_star
+   1  |+import z
+   2  |+from z import z1
+3  3  | import a  # import
+   4  |+from a import a1  # import_from
+   5  |+import b as b1  # import_as
+   6  |+from c import *  # import_from_star
+4  7  | import c.d
+5     |-from z import z1
+6     |-import b as b1  # import_as
+7     |-import z
+8  8  | 
+   9  |+from ...grandparent import fn3
+9  10 | from ..parent import *
+   11 |+from . import my
+10 12 | from .my import fn
+11    |-from . import my
+12 13 | from .my.nested import fn2
+13    |-from ...grandparent import fn3
+
+

@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT005.py:41:5: PT005 Fixture `_my_fixture` returns a value, remove leading underscore
+   |
+40 | @pytest.fixture()
+41 | def _my_fixture(mocker):  # Error with return
+   |     ^^^^^^^^^^^ PT005
+42 |     return 0
+   |
+
+PT005.py:46:5: PT005 Fixture `_activate_context` returns a value, remove leading underscore
+   |
+45 | @pytest.fixture()
+46 | def _activate_context():  # Error with yield
+   |     ^^^^^^^^^^^^^^^^^ PT005
+47 |     with get_context() as context:
+48 |         yield context
+   |
+
+PT005.py:52:5: PT005 Fixture `_activate_context` returns a value, remove leading underscore
+   |
+51 | @pytest.fixture()
+52 | def _activate_context():  # Error with conditional yield from
+   |     ^^^^^^^^^^^^^^^^^ PT005
+53 |     if some_condition:
+54 |         with get_context() as context:
+   |
+
+

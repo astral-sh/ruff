@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI032.pyi:6:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__eq__`
+  |
+5 | class Bad:
+6 |     def __eq__(self, other: Any) -> bool: ...  # Y032
+  |                             ^^^ PYI032
+7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
+  |
+  = help: Replace with `object`
+
+ℹ Safe fix
+3 3 | 
+4 4 | 
+5 5 | class Bad:
+6   |-    def __eq__(self, other: Any) -> bool: ...  # Y032
+  6 |+    def __eq__(self, other: object) -> bool: ...  # Y032
+7 7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
+8 8 | 
+9 9 | 
+
+PYI032.pyi:7:29: PYI032 [*] Prefer `object` to `Any` for the second parameter to `__ne__`
+  |
+5 | class Bad:
+6 |     def __eq__(self, other: Any) -> bool: ...  # Y032
+7 |     def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
+  |                             ^^^^^^^^^^ PYI032
+  |
+  = help: Replace with `object`
+
+ℹ Safe fix
+4 4 | 
+5 5 | class Bad:
+6 6 |     def __eq__(self, other: Any) -> bool: ...  # Y032
+7   |-    def __ne__(self, other: typing.Any) -> typing.Any: ...  # Y032
+  7 |+    def __ne__(self, other: object) -> typing.Any: ...  # Y032
+8 8 | 
+9 9 | 
+10 10 | class Good:
+
+

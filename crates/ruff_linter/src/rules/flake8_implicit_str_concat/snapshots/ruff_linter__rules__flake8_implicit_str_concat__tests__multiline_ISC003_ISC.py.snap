@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+---
+ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+   |
+ 8 |   _ = (
+ 9 |     "abc" +
+   |  ___^
+10 | |   "def"
+   | |_______^ ISC003
+11 |   )
+   |
+
+ISC.py:14:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+   |
+13 |   _ = (
+14 |     f"abc" +
+   |  ___^
+15 | |   "def"
+   | |_______^ ISC003
+16 |   )
+   |
+
+ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+   |
+18 |   _ = (
+19 |     b"abc" +
+   |  ___^
+20 | |   b"def"
+   | |________^ ISC003
+21 |   )
+   |
+
+ISC.py:78:10: ISC003 Explicitly concatenated string should be implicitly concatenated
+   |
+77 |   # Explicitly concatenated nested f-strings
+78 |   _ = f"a {f"first"
+   |  __________^
+79 | |     + f"second"} d"
+   | |_______________^ ISC003
+80 |   _ = f"a {f"first {f"middle"}"
+81 |       + f"second"} d"
+   |
+
+ISC.py:80:10: ISC003 Explicitly concatenated string should be implicitly concatenated
+   |
+78 |   _ = f"a {f"first"
+79 |       + f"second"} d"
+80 |   _ = f"a {f"first {f"middle"}"
+   |  __________^
+81 | |     + f"second"} d"
+   | |_______________^ ISC003
+   |
+
+

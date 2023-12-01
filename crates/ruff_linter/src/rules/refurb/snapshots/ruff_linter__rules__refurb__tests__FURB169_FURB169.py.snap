@@ -1,0 +1,256 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB169.py:5:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
+  |
+3 | # Error.
+4 | 
+5 | type(foo) is type(None)
+  | ^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+6 | 
+7 | type(None) is type(foo)
+  |
+  = help: Replace with `foo is None`
+
+ℹ Safe fix
+2 2 | 
+3 3 | # Error.
+4 4 | 
+5   |-type(foo) is type(None)
+  5 |+foo is None
+6 6 | 
+7 7 | type(None) is type(foo)
+8 8 | 
+
+FURB169.py:7:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
+  |
+5 | type(foo) is type(None)
+6 | 
+7 | type(None) is type(foo)
+  | ^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+8 | 
+9 | type(None) is type(None)
+  |
+  = help: Replace with `foo is None`
+
+ℹ Safe fix
+4 4 | 
+5 5 | type(foo) is type(None)
+6 6 | 
+7   |-type(None) is type(foo)
+  7 |+foo is None
+8 8 | 
+9 9 | type(None) is type(None)
+10 10 | 
+
+FURB169.py:9:1: FURB169 [*] Compare the identities of `None` and `None` instead of their respective types
+   |
+ 7 | type(None) is type(foo)
+ 8 | 
+ 9 | type(None) is type(None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+10 | 
+11 | type(foo) is not type(None)
+   |
+   = help: Replace with `None is None`
+
+ℹ Safe fix
+6  6  | 
+7  7  | type(None) is type(foo)
+8  8  | 
+9     |-type(None) is type(None)
+   9  |+None is None
+10 10 | 
+11 11 | type(foo) is not type(None)
+12 12 | 
+
+FURB169.py:11:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
+   |
+ 9 | type(None) is type(None)
+10 | 
+11 | type(foo) is not type(None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+12 | 
+13 | type(None) is not type(foo)
+   |
+   = help: Replace with `foo is not None`
+
+ℹ Safe fix
+8  8  | 
+9  9  | type(None) is type(None)
+10 10 | 
+11    |-type(foo) is not type(None)
+   11 |+foo is not None
+12 12 | 
+13 13 | type(None) is not type(foo)
+14 14 | 
+
+FURB169.py:13:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
+   |
+11 | type(foo) is not type(None)
+12 | 
+13 | type(None) is not type(foo)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+14 | 
+15 | type(None) is not type(None)
+   |
+   = help: Replace with `foo is not None`
+
+ℹ Safe fix
+10 10 | 
+11 11 | type(foo) is not type(None)
+12 12 | 
+13    |-type(None) is not type(foo)
+   13 |+foo is not None
+14 14 | 
+15 15 | type(None) is not type(None)
+16 16 | 
+
+FURB169.py:15:1: FURB169 [*] Compare the identities of `None` and `None` instead of their respective types
+   |
+13 | type(None) is not type(foo)
+14 | 
+15 | type(None) is not type(None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+16 | 
+17 | type(foo) == type(None)
+   |
+   = help: Replace with `None is not None`
+
+ℹ Safe fix
+12 12 | 
+13 13 | type(None) is not type(foo)
+14 14 | 
+15    |-type(None) is not type(None)
+   15 |+None is not None
+16 16 | 
+17 17 | type(foo) == type(None)
+18 18 | 
+
+FURB169.py:17:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
+   |
+15 | type(None) is not type(None)
+16 | 
+17 | type(foo) == type(None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+18 | 
+19 | type(None) == type(foo)
+   |
+   = help: Replace with `foo is None`
+
+ℹ Safe fix
+14 14 | 
+15 15 | type(None) is not type(None)
+16 16 | 
+17    |-type(foo) == type(None)
+   17 |+foo is None
+18 18 | 
+19 19 | type(None) == type(foo)
+20 20 | 
+
+FURB169.py:19:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
+   |
+17 | type(foo) == type(None)
+18 | 
+19 | type(None) == type(foo)
+   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+20 | 
+21 | type(None) == type(None)
+   |
+   = help: Replace with `foo is None`
+
+ℹ Safe fix
+16 16 | 
+17 17 | type(foo) == type(None)
+18 18 | 
+19    |-type(None) == type(foo)
+   19 |+foo is None
+20 20 | 
+21 21 | type(None) == type(None)
+22 22 | 
+
+FURB169.py:21:1: FURB169 [*] Compare the identities of `None` and `None` instead of their respective types
+   |
+19 | type(None) == type(foo)
+20 | 
+21 | type(None) == type(None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+22 | 
+23 | type(foo) != type(None)
+   |
+   = help: Replace with `None is None`
+
+ℹ Safe fix
+18 18 | 
+19 19 | type(None) == type(foo)
+20 20 | 
+21    |-type(None) == type(None)
+   21 |+None is None
+22 22 | 
+23 23 | type(foo) != type(None)
+24 24 | 
+
+FURB169.py:23:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
+   |
+21 | type(None) == type(None)
+22 | 
+23 | type(foo) != type(None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+24 | 
+25 | type(None) != type(foo)
+   |
+   = help: Replace with `foo is not None`
+
+ℹ Safe fix
+20 20 | 
+21 21 | type(None) == type(None)
+22 22 | 
+23    |-type(foo) != type(None)
+   23 |+foo is not None
+24 24 | 
+25 25 | type(None) != type(foo)
+26 26 | 
+
+FURB169.py:25:1: FURB169 [*] Compare the identities of `foo` and `None` instead of their respective types
+   |
+23 | type(foo) != type(None)
+24 | 
+25 | type(None) != type(foo)
+   | ^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+26 | 
+27 | type(None) != type(None)
+   |
+   = help: Replace with `foo is not None`
+
+ℹ Safe fix
+22 22 | 
+23 23 | type(foo) != type(None)
+24 24 | 
+25    |-type(None) != type(foo)
+   25 |+foo is not None
+26 26 | 
+27 27 | type(None) != type(None)
+28 28 | 
+
+FURB169.py:27:1: FURB169 [*] Compare the identities of `None` and `None` instead of their respective types
+   |
+25 | type(None) != type(foo)
+26 | 
+27 | type(None) != type(None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ FURB169
+28 | 
+29 | # Ok.
+   |
+   = help: Replace with `None is not None`
+
+ℹ Safe fix
+24 24 | 
+25 25 | type(None) != type(foo)
+26 26 | 
+27    |-type(None) != type(None)
+   27 |+None is not None
+28 28 | 
+29 29 | # Ok.
+30 30 | 
+
+

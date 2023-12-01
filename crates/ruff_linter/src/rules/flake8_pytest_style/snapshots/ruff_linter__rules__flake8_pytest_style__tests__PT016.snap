@@ -1,0 +1,71 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT016.py:19:5: PT016 No message passed to `pytest.fail()`
+   |
+17 | # Errors
+18 | def f():
+19 |     pytest.fail()
+   |     ^^^^^^^^^^^ PT016
+20 |     pytest.fail("")
+21 |     pytest.fail(f"")
+   |
+
+PT016.py:20:5: PT016 No message passed to `pytest.fail()`
+   |
+18 | def f():
+19 |     pytest.fail()
+20 |     pytest.fail("")
+   |     ^^^^^^^^^^^ PT016
+21 |     pytest.fail(f"")
+22 |     pytest.fail(msg="")
+   |
+
+PT016.py:21:5: PT016 No message passed to `pytest.fail()`
+   |
+19 |     pytest.fail()
+20 |     pytest.fail("")
+21 |     pytest.fail(f"")
+   |     ^^^^^^^^^^^ PT016
+22 |     pytest.fail(msg="")
+23 |     pytest.fail(msg=f"")
+   |
+
+PT016.py:22:5: PT016 No message passed to `pytest.fail()`
+   |
+20 |     pytest.fail("")
+21 |     pytest.fail(f"")
+22 |     pytest.fail(msg="")
+   |     ^^^^^^^^^^^ PT016
+23 |     pytest.fail(msg=f"")
+24 |     pytest.fail(reason="")
+   |
+
+PT016.py:23:5: PT016 No message passed to `pytest.fail()`
+   |
+21 |     pytest.fail(f"")
+22 |     pytest.fail(msg="")
+23 |     pytest.fail(msg=f"")
+   |     ^^^^^^^^^^^ PT016
+24 |     pytest.fail(reason="")
+25 |     pytest.fail(reason=f"")
+   |
+
+PT016.py:24:5: PT016 No message passed to `pytest.fail()`
+   |
+22 |     pytest.fail(msg="")
+23 |     pytest.fail(msg=f"")
+24 |     pytest.fail(reason="")
+   |     ^^^^^^^^^^^ PT016
+25 |     pytest.fail(reason=f"")
+   |
+
+PT016.py:25:5: PT016 No message passed to `pytest.fail()`
+   |
+23 |     pytest.fail(msg=f"")
+24 |     pytest.fail(reason="")
+25 |     pytest.fail(reason=f"")
+   |     ^^^^^^^^^^^ PT016
+   |
+
+

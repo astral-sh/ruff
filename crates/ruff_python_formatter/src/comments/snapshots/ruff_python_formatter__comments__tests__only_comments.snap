@@ -8,8 +8,7 @@ expression: comments.debug(test_case.source_code)
         range: 0..0,
         source: ``,
     }: {
-        "leading": [],
-        "dangling": [
+        "leading": [
             SourceComment {
                 text: "# Some comment",
                 position: OwnLine,
@@ -21,6 +20,7 @@ expression: comments.debug(test_case.source_code)
                 formatted: false,
             },
         ],
+        "dangling": [],
         "trailing": [],
     },
 }

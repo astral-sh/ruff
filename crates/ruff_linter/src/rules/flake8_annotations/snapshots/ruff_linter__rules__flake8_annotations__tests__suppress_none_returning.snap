@@ -1,0 +1,51 @@
+---
+source: crates/ruff_linter/src/rules/flake8_annotations/mod.rs
+---
+suppress_none_returning.py:45:5: ANN201 [*] Missing return type annotation for public function `foo`
+   |
+44 | # Error
+45 | def foo():
+   |     ^^^ ANN201
+46 |     return True
+   |
+   = help: Add return type annotation: `bool`
+
+ℹ Unsafe fix
+42 42 | 
+43 43 | 
+44 44 | # Error
+45    |-def foo():
+   45 |+def foo() -> bool:
+46 46 |     return True
+47 47 | 
+48 48 | 
+
+suppress_none_returning.py:50:5: ANN201 [*] Missing return type annotation for public function `foo`
+   |
+49 | # Error
+50 | def foo():
+   |     ^^^ ANN201
+51 |     a = 2 + 2
+52 |     if a == 4:
+   |
+   = help: Add return type annotation: `bool | None`
+
+ℹ Unsafe fix
+47 47 | 
+48 48 | 
+49 49 | # Error
+50    |-def foo():
+   50 |+def foo() -> bool | None:
+51 51 |     a = 2 + 2
+52 52 |     if a == 4:
+53 53 |         return True
+
+suppress_none_returning.py:59:9: ANN001 Missing type annotation for function argument `a`
+   |
+58 | # Error (on the argument, but not the return type)
+59 | def foo(a):
+   |         ^ ANN001
+60 |     a = 2 + 2
+   |
+
+

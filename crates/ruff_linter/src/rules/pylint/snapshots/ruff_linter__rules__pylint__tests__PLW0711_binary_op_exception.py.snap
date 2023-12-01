@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+binary_op_exception.py:3:8: PLW0711 Exception to catch is the result of a binary `or` operation
+  |
+1 | try:
+2 |     1 / 0
+3 | except ZeroDivisionError or ValueError as e:  # [binary-op-exception]
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0711
+4 |     pass
+  |
+
+binary_op_exception.py:8:8: PLW0711 Exception to catch is the result of a binary `and` operation
+  |
+6 | try:
+7 |     raise ValueError
+8 | except ZeroDivisionError and ValueError as e:  # [binary-op-exception]
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW0711
+9 |     print(e)
+  |
+
+

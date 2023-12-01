@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/flake8_logging/mod.rs
+---
+LOG001.py:3:1: LOG001 [*] Use `logging.getLogger()` to instantiate loggers
+  |
+1 | import logging
+2 | 
+3 | logging.Logger(__name__)
+  | ^^^^^^^^^^^^^^ LOG001
+4 | logging.Logger()
+5 | logging.getLogger(__name__)
+  |
+  = help: Replace with `logging.getLogger()`
+
+ℹ Unsafe fix
+1 1 | import logging
+2 2 | 
+3   |-logging.Logger(__name__)
+  3 |+logging.getLogger(__name__)
+4 4 | logging.Logger()
+5 5 | logging.getLogger(__name__)
+
+LOG001.py:4:1: LOG001 [*] Use `logging.getLogger()` to instantiate loggers
+  |
+3 | logging.Logger(__name__)
+4 | logging.Logger()
+  | ^^^^^^^^^^^^^^ LOG001
+5 | logging.getLogger(__name__)
+  |
+  = help: Replace with `logging.getLogger()`
+
+ℹ Unsafe fix
+1 1 | import logging
+2 2 | 
+3 3 | logging.Logger(__name__)
+4   |-logging.Logger()
+  4 |+logging.getLogger()
+5 5 | logging.getLogger(__name__)
+
+

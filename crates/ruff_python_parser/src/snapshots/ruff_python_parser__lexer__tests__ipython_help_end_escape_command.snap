@@ -1,0 +1,182 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_jupyter_source(source)
+---
+[
+    (
+        IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        0..5,
+    ),
+    (
+        Newline,
+        5..6,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        6..15,
+    ),
+    (
+        Newline,
+        15..16,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "   foo  ?",
+            kind: Help2,
+        },
+        16..27,
+    ),
+    (
+        Newline,
+        27..28,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo",
+            kind: Help2,
+        },
+        28..34,
+    ),
+    (
+        Newline,
+        34..35,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo",
+            kind: Help2,
+        },
+        35..42,
+    ),
+    (
+        Newline,
+        42..43,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        43..50,
+    ),
+    (
+        Newline,
+        50..51,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo",
+            kind: Help2,
+        },
+        51..59,
+    ),
+    (
+        Newline,
+        59..60,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo???",
+            kind: Help2,
+        },
+        60..68,
+    ),
+    (
+        Newline,
+        68..69,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "?foo???",
+            kind: Help2,
+        },
+        69..78,
+    ),
+    (
+        Newline,
+        78..79,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo",
+            kind: Help,
+        },
+        79..92,
+    ),
+    (
+        Newline,
+        92..93,
+    ),
+    (
+        IpyEscapeCommand {
+            value: " ?",
+            kind: Help2,
+        },
+        93..99,
+    ),
+    (
+        Newline,
+        99..100,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "??",
+            kind: Help2,
+        },
+        100..104,
+    ),
+    (
+        Newline,
+        104..105,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "%foo",
+            kind: Help,
+        },
+        105..110,
+    ),
+    (
+        Newline,
+        110..111,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "%foo",
+            kind: Help2,
+        },
+        111..117,
+    ),
+    (
+        Newline,
+        117..118,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "foo???",
+            kind: Magic2,
+        },
+        118..126,
+    ),
+    (
+        Newline,
+        126..127,
+    ),
+    (
+        IpyEscapeCommand {
+            value: "pwd",
+            kind: Help,
+        },
+        127..132,
+    ),
+    (
+        Newline,
+        132..132,
+    ),
+]

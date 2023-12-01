@@ -1,7 +1,8 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Fields};
+use syn::{Data, DeriveInput, Error, Field, Fields, Token};
 
 pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
     let fields = match &item.data {
@@ -65,7 +66,15 @@ pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
         }
 
         Data::Struct(item_struct) => {
-            let fields = item_struct.fields.iter().enumerate().map(|(i, field)| {
+            let mut fields = Vec::with_capacity(item_struct.fields.len());
+
+            for (i, field) in item_struct.fields.iter().enumerate() {
+                if let Some(cache_field_attribute) = cache_key_field_attribute(field)? {
+                    if cache_field_attribute.ignore {
+                        continue;
+                    }
+                }
+
                 let field_attr = match &field.ident {
                     Some(ident) => quote!(self.#ident),
                     None => {
@@ -74,8 +83,8 @@ pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
                     }
                 };
 
-                quote!(#field_attr.cache_key(key);)
-            });
+                fields.push(quote!(#field_attr.cache_key(key);));
+            }
 
             quote! {#(#fields)*}
         }
@@ -92,6 +101,7 @@ pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
     let (impl_generics, ty_generics, where_clause) = &item.generics.split_for_impl();
 
     Ok(quote!(
+        #[automatically_derived]
         impl #impl_generics ruff_cache::CacheKey for #name #ty_generics #where_clause {
             fn cache_key(&self, key: &mut ruff_cache::CacheKeyHasher) {
                 use std::hash::Hasher;
@@ -100,4 +110,45 @@ pub(crate) fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
             }
         }
     ))
+}
+
+fn cache_key_field_attribute(field: &Field) -> syn::Result<Option<CacheKeyFieldAttributes>> {
+    if let Some(attribute) = field
+        .attrs
+        .iter()
+        .find(|attribute| attribute.path().is_ident("cache_key"))
+    {
+        attribute.parse_args::<CacheKeyFieldAttributes>().map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
+#[derive(Debug, Default)]
+struct CacheKeyFieldAttributes {
+    ignore: bool,
+}
+
+impl Parse for CacheKeyFieldAttributes {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut attributes = CacheKeyFieldAttributes::default();
+
+        let args = input.parse_terminated(Ident::parse, Token![,])?;
+
+        for arg in args {
+            match arg.to_string().as_str() {
+                "ignore" => {
+                    attributes.ignore = true;
+                }
+                name => {
+                    return Err(Error::new(
+                        arg.span(),
+                        format!("Unknown `cache_field` argument {name}"),
+                    ))
+                }
+            }
+        }
+
+        Ok(attributes)
+    }
 }

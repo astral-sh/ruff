@@ -1,0 +1,78 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP036_3.py:3:15: UP036 [*] Version block is outdated for minimum Python version
+  |
+1 | import sys
+2 | 
+3 | if            sys.version_info < (3,0):
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+4 |     print("py2")
+5 |     for item in range(10):
+  |
+  = help: Remove outdated version block
+
+ℹ Unsafe fix
+1  1  | import sys
+2  2  | 
+3     |-if            sys.version_info < (3,0):
+4     |-    print("py2")
+5     |-    for item in range(10):
+6     |-        print(f"PY2-{item}")
+7     |-else                                :
+8     |-    print("py3")
+9     |-    for item in range(10):
+10    |-        print(f"PY3-{item}")
+   3  |+print("py3")
+   4  |+for item in range(10):
+   5  |+    print(f"PY3-{item}")
+11 6  | 
+12 7  | if False:
+13 8  |     if            sys.version_info < (3,0):
+
+UP036_3.py:13:19: UP036 [*] Version block is outdated for minimum Python version
+   |
+12 | if False:
+13 |     if            sys.version_info < (3,0):
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+14 |         print("py2")
+15 |         for item in range(10):
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+10 10 |         print(f"PY3-{item}")
+11 11 | 
+12 12 | if False:
+13    |-    if            sys.version_info < (3,0):
+14    |-        print("py2")
+15    |-        for item in range(10):
+16    |-            print(f"PY2-{item}")
+17    |-    else                                :
+18    |-        print("py3")
+19    |-        for item in range(10):
+20    |-            print(f"PY3-{item}")
+   13 |+    print("py3")
+   14 |+    for item in range(10):
+   15 |+        print(f"PY3-{item}")
+21 16 | 
+22 17 | 
+23 18 | if            sys.version_info < (3,0): print("PY2!")
+
+UP036_3.py:23:15: UP036 [*] Version block is outdated for minimum Python version
+   |
+23 | if            sys.version_info < (3,0): print("PY2!")
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^ UP036
+24 | else                               : print("PY3!")
+   |
+   = help: Remove outdated version block
+
+ℹ Unsafe fix
+20 20 |             print(f"PY3-{item}")
+21 21 | 
+22 22 | 
+23    |-if            sys.version_info < (3,0): print("PY2!")
+24    |-else                               : print("PY3!")
+   23 |+print("PY3!")
+
+

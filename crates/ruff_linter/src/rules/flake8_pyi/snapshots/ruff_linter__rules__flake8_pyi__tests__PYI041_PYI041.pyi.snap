@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI041.pyi:21:14: PYI041 Use `float` instead of `int | float`
+   |
+21 | def f0(arg1: float | int) -> None: ...  # PYI041
+   |              ^^^^^^^^^^^ PYI041
+   |
+
+PYI041.pyi:24:30: PYI041 Use `complex` instead of `float | complex`
+   |
+24 | def f1(arg1: float, *, arg2: float | list[str] | type[bool] | complex) -> None: ...  # PYI041
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI041
+   |
+
+PYI041.pyi:27:28: PYI041 Use `float` instead of `int | float`
+   |
+27 | def f2(arg1: int, /, arg2: int | int | float) -> None: ...  # PYI041
+   |                            ^^^^^^^^^^^^^^^^^ PYI041
+   |
+
+PYI041.pyi:33:24: PYI041 Use `float` instead of `int | float`
+   |
+33 | async def f4(**kwargs: int | int | float) -> None: ...  # PYI041
+   |                        ^^^^^^^^^^^^^^^^^ PYI041
+   |
+
+PYI041.pyi:39:24: PYI041 Use `complex` instead of `float | complex`
+   |
+37 |     def good(self, arg: int) -> None: ...
+38 | 
+39 |     def bad(self, arg: int | float | complex) -> None: ...  # PYI041
+   |                        ^^^^^^^^^^^^^^^^^^^^^ PYI041
+   |
+
+PYI041.pyi:39:24: PYI041 Use `complex` instead of `int | complex`
+   |
+37 |     def good(self, arg: int) -> None: ...
+38 | 
+39 |     def bad(self, arg: int | float | complex) -> None: ...  # PYI041
+   |                        ^^^^^^^^^^^^^^^^^^^^^ PYI041
+   |
+
+

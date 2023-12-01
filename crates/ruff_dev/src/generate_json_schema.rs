@@ -7,10 +7,9 @@ use anyhow::{bail, Result};
 use pretty_assertions::StrComparison;
 use schemars::schema_for;
 
-use ruff::settings::options::Options;
-
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;
+use ruff_workspace::options::Options;
 
 #[derive(clap::Args)]
 pub(crate) struct Args {

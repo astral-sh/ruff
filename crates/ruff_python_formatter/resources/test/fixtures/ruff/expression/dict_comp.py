@@ -109,3 +109,71 @@ a = {
 aaaaaaaaaaaaaaaaaaaaa = {
     k: o for o in self.registry.values if o.__class__ is not ModelAdmin
 }
+
+# Comments between keys and values.
+query = {
+    key:
+    # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    for key, queries in self._filters.items()
+}
+
+query = {
+    key:  # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    for key, queries in self._filters.items()
+}
+
+query = {
+    key: (
+    # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    )
+    for key, queries in self._filters.items()
+}
+
+query = {
+    key: (  # queries => map(pluck("fragment")) => flatten()
+    [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    )
+    for key, queries in self._filters.items()
+}
+
+query = {
+    (
+        key
+        # queries => map(pluck("fragment")) => flatten()
+    ): [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    for key, queries in self._filters.items()
+}
+
+query = {
+    (
+        key # queries => map(pluck("fragment")) => flatten()
+    ): [
+        clause
+        for kf_pair in queries
+        for clause in kf_pair["fragment"]
+    ]
+    for key, queries in self._filters.items()
+}

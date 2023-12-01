@@ -1,9 +1,10 @@
+use ruff_formatter::{write, FormatContext};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::ExprName;
+
+use crate::comments::SourceComment;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::FormatNodeRule;
-use ruff_formatter::{write, FormatContext};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::ExprName;
 
 #[derive(Default)]
 pub struct FormatExprName;
@@ -20,7 +21,17 @@ impl FormatNodeRule<ExprName> for FormatExprName {
                 .text(f.context().source_code())
         );
 
-        write!(f, [source_text_slice(*range, ContainsNewlines::No)])
+        write!(f, [source_text_slice(*range)])
+    }
+
+    fn fmt_dangling_comments(
+        &self,
+        dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
+        // Node cannot have dangling comments
+        debug_assert!(dangling_comments.is_empty());
+        Ok(())
     }
 }
 
@@ -30,15 +41,14 @@ impl NeedsParentheses for ExprName {
         _parent: AnyNodeRef,
         _context: &PyFormatContext,
     ) -> OptionalParentheses {
-        OptionalParentheses::Never
+        OptionalParentheses::BestFit
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use ruff_python_ast::Ranged;
     use ruff_python_parser::parse_program;
-    use ruff_text_size::{TextRange, TextSize};
+    use ruff_text_size::{Ranged, TextRange, TextSize};
 
     #[test]
     fn name_range_with_comments() {

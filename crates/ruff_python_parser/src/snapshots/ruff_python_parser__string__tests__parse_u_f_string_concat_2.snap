@@ -6,22 +6,50 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..22,
-            value: JoinedStr(
-                ExprJoinedStr {
+            value: FString(
+                ExprFString {
                     range: 0..22,
-                    values: [
-                        Constant(
-                            ExprConstant {
-                                range: 2..21,
-                                value: Str(
-                                    "Hello world!",
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..9,
+                                        value: "Hello ",
+                                        unicode: true,
+                                    },
                                 ),
-                                kind: Some(
-                                    "u",
+                                FString(
+                                    FString {
+                                        range: 10..18,
+                                        values: [
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 12..17,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 12..17,
+                                                                value: "world",
+                                                                unicode: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        ],
+                                    },
                                 ),
-                            },
+                                Literal(
+                                    StringLiteral {
+                                        range: 19..22,
+                                        value: "!",
+                                        unicode: false,
+                                    },
+                                ),
+                            ],
                         ),
-                    ],
+                    },
                 },
             ),
         },

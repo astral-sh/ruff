@@ -1,0 +1,76 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+type_param_name_mismatch.py:5:5: PLC0132 `TypeVar` name `T` does not match assigned variable name `X`
+  |
+3 | # Errors.
+4 | 
+5 | X = TypeVar("T")
+  |     ^^^^^^^^^^^^ PLC0132
+6 | X = TypeVar(name="T")
+  |
+
+type_param_name_mismatch.py:6:5: PLC0132 `TypeVar` name `T` does not match assigned variable name `X`
+  |
+5 | X = TypeVar("T")
+6 | X = TypeVar(name="T")
+  |     ^^^^^^^^^^^^^^^^^ PLC0132
+7 | 
+8 | Y = ParamSpec("T")
+  |
+
+type_param_name_mismatch.py:8:5: PLC0132 `ParamSpec` name `T` does not match assigned variable name `Y`
+  |
+6 | X = TypeVar(name="T")
+7 | 
+8 | Y = ParamSpec("T")
+  |     ^^^^^^^^^^^^^^ PLC0132
+9 | Y = ParamSpec(name="T")
+  |
+
+type_param_name_mismatch.py:9:5: PLC0132 `ParamSpec` name `T` does not match assigned variable name `Y`
+   |
+ 8 | Y = ParamSpec("T")
+ 9 | Y = ParamSpec(name="T")
+   |     ^^^^^^^^^^^^^^^^^^^ PLC0132
+10 | 
+11 | Z = NewType("T", int)
+   |
+
+type_param_name_mismatch.py:11:5: PLC0132 `NewType` name `T` does not match assigned variable name `Z`
+   |
+ 9 | Y = ParamSpec(name="T")
+10 | 
+11 | Z = NewType("T", int)
+   |     ^^^^^^^^^^^^^^^^^ PLC0132
+12 | Z = NewType(name="T", tp=int)
+   |
+
+type_param_name_mismatch.py:12:5: PLC0132 `NewType` name `T` does not match assigned variable name `Z`
+   |
+11 | Z = NewType("T", int)
+12 | Z = NewType(name="T", tp=int)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0132
+13 | 
+14 | Ws = TypeVarTuple("Ts")
+   |
+
+type_param_name_mismatch.py:14:6: PLC0132 `TypeVarTuple` name `Ts` does not match assigned variable name `Ws`
+   |
+12 | Z = NewType(name="T", tp=int)
+13 | 
+14 | Ws = TypeVarTuple("Ts")
+   |      ^^^^^^^^^^^^^^^^^^ PLC0132
+15 | Ws = TypeVarTuple(name="Ts")
+   |
+
+type_param_name_mismatch.py:15:6: PLC0132 `TypeVarTuple` name `Ts` does not match assigned variable name `Ws`
+   |
+14 | Ws = TypeVarTuple("Ts")
+15 | Ws = TypeVarTuple(name="Ts")
+   |      ^^^^^^^^^^^^^^^^^^^^^^^ PLC0132
+16 | 
+17 | # Non-errors.
+   |
+
+

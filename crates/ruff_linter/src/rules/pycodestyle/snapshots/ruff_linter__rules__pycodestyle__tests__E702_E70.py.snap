@@ -1,0 +1,74 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E70.py:6:10: E702 Multiple statements on one line (semicolon)
+  |
+4 | if not header or header[:6] != 'bytes=': return
+5 | #: E702:1:10
+6 | a = False; b = True
+  |          ^ E702
+7 | #: E702:1:17
+8 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
+  |
+
+E70.py:8:17: E702 Multiple statements on one line (semicolon)
+   |
+ 6 | a = False; b = True
+ 7 | #: E702:1:17
+ 8 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
+   |                 ^ E702
+ 9 | #: E703:1:13
+10 | import shlex;
+   |
+
+E70.py:12:9: E702 Multiple statements on one line (semicolon)
+   |
+10 | import shlex;
+11 | #: E702:1:9 E703:1:23
+12 | del a[:]; a.append(42);
+   |         ^ E702
+13 | #: E704:1:1
+14 | def f(x): return 2
+   |
+
+E70.py:25:11: E702 Multiple statements on one line (semicolon)
+   |
+23 |     def f(x): return 2*x
+24 | #: E704:1:8 E702:1:11 E703:1:14
+25 | if True: x; y;
+   |           ^ E702
+26 | #: E701:1:8
+27 | if True: lambda a: b
+   |
+
+E70.py:54:13: E702 Multiple statements on one line (semicolon)
+   |
+52 | def f(): ...
+53 | #: E701:1:8 E702:1:13
+54 | class C: ...; x = 1
+   |             ^ E702
+55 | #: E701:1:8 E702:1:13
+56 | class C: ...; ...
+   |
+
+E70.py:56:13: E702 Multiple statements on one line (semicolon)
+   |
+54 | class C: ...; x = 1
+55 | #: E701:1:8 E702:1:13
+56 | class C: ...; ...
+   |             ^ E702
+57 | #: E701:2:12
+58 | match *0, 1, *2:
+   |
+
+E70.py:65:4: E702 Multiple statements on one line (semicolon)
+   |
+63 | #: E702:2:4
+64 | while 1:
+65 |   1;...
+   |    ^ E702
+66 | #: E703:2:1
+67 | 0\
+   |
+
+

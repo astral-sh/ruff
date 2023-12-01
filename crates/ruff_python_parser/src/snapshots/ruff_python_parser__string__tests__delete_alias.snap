@@ -6,13 +6,18 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..12,
-            value: Constant(
-                ExprConstant {
+            value: StringLiteral(
+                ExprStringLiteral {
                     range: 0..12,
-                    value: Str(
-                        "\u{7f}",
-                    ),
-                    kind: None,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 0..12,
+                                value: "\u{7f}",
+                                unicode: false,
+                            },
+                        ),
+                    },
                 },
             ),
         },

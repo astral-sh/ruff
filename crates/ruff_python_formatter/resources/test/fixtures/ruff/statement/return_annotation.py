@@ -1,0 +1,194 @@
+# Handle comments on empty tuple return types.
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+): ...
+
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+    # comment
+): ...
+
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+    1
+): ...
+
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+    1, 2
+): ...
+
+def zrevrangebylex(self, name: _Key, max: _Value, min: _Value, start: int | None = None, num: int | None = None) -> (  # type: ignore[override]
+    (1, 2)
+): ...
+
+def handleMatch(  # type: ignore[override] # https://github.com/python/mypy/issues/10197
+    self, m: Match[str], data: str
+) -> Union[Tuple[None, None, None], Tuple[Element, int, int]]:
+    ...
+
+def double(a: int # Hello
+) -> (int):
+    return 2 * a
+
+def double(a: int) -> ( # Hello
+    int
+):
+    return 2*a
+
+def double(a: int) -> ( # Hello
+):
+    return 2*a
+
+# Breaking over parameters and return types. (Black adds a trailing comma when the
+# function arguments break here with a single argument; we do not.)
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, a) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> a:
+    ...
+
+def f(a) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]() -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]() -> a:
+    ...
+
+def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
+    ...
+
+def f[aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa](aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) -> a:
+    ...
+
+# Breaking return type annotations. Black adds parentheses if the parameters are
+# empty; otherwise, it leverages the expressions own parentheses if possible.
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
+    Set[
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]
+):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(*args) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(  # foo
+) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    # bar
+) -> Set[
+    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    x) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(
+    x) -> xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (X + Y + foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (X + Y + foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (X and Y and foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (X and Y and foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (X | Y | foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (X | Y | foooooooooooooooooooooooooooooooooooo()):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx() -> (
+    X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
+):
+    ...
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxx(x) -> (
+    X | Y | foooooooooooooooooooooooooooooooooooo()  # comment
+):
+    ...
+
+
+def double() -> first_item and foo.bar.baz().bop(1,):
+    return 2 * a
+
+
+# Dangling comments on return annotations.
+def double(a: int) -> (
+    int # Hello
+):
+    return 2*a
+
+def double(a: int) -> (
+    foo.bar # Hello
+):
+    return 2*a
+
+def double(a: int) -> (
+    [int] # Hello
+):
+    return 2*a
+
+def double(a: int) -> (
+    int | list[int]  # Hello
+):
+    pass
+
+def double(a: int) -> (
+    int | list[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]  # Hello
+):
+    pass
+
+
+def process_board_action(
+    payload: WildValue, action_type: Optional[str]
+) -> Optional[Tuple[str, str]]:
+    pass

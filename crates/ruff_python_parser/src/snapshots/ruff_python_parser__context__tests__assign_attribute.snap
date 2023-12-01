@@ -29,31 +29,28 @@ expression: parse_ast
                 ExprTuple {
                     range: 6..15,
                     elts: [
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 7..8,
                                 value: Int(
                                     1,
                                 ),
-                                kind: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 10..11,
                                 value: Int(
                                     2,
                                 ),
-                                kind: None,
                             },
                         ),
-                        Constant(
-                            ExprConstant {
+                        NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 13..14,
                                 value: Int(
                                     3,
                                 ),
-                                kind: None,
                             },
                         ),
                     ],

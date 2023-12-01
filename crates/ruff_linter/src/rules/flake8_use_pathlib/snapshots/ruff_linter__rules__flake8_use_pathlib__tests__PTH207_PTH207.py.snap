@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+---
+PTH207.py:9:1: PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+   |
+ 8 | # PTH207
+ 9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+   | ^^^^^^^^^ PTH207
+10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+11 | search("*.png")
+   |
+
+PTH207.py:10:6: PTH207 Replace `iglob` with `Path.glob` or `Path.rglob`
+   |
+ 8 | # PTH207
+ 9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+   |      ^^^^^^^^^^ PTH207
+11 | search("*.png")
+   |
+
+PTH207.py:11:1: PTH207 Replace `glob` with `Path.glob` or `Path.rglob`
+   |
+ 9 | glob.glob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp"))
+10 | list(glob.iglob(os.path.join(extensions_dir, "ops", "autograd", "*.cpp")))
+11 | search("*.png")
+   | ^^^^^^ PTH207
+   |
+
+

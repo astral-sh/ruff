@@ -64,7 +64,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
             .iter()
             .find(|attr| attr.path().is_ident("doc"))
         else {
-            return Err(Error::new(variant.span(), r#"expected a doc comment"#));
+            return Err(Error::new(variant.span(), "expected a doc comment"));
         };
 
         let variant_ident = variant.ident;
@@ -111,6 +111,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
     }
 
     Ok(quote! {
+        #[automatically_derived]
         impl crate::registry::RuleNamespace for #ident {
             fn parse_code(code: &str) -> Option<(Self, &str)> {
                 #if_statements
@@ -154,7 +155,7 @@ fn parse_doc_attr(doc_attr: &Attribute) -> syn::Result<(String, String)> {
         .ok_or_else(|| {
             Error::new(
                 doc_lit.span(),
-                r#"expected doc comment to be in the form of `/// [name](https://example.com/)`"#,
+                "expected doc comment to be in the form of `/// [name](https://example.com/)`",
             )
         })
 }

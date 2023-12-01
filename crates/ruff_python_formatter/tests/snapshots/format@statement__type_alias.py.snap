@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/type_alias.py
 ---
 ## Input
-```py
+```python
 # basic usage
 
 type X = int
@@ -87,6 +87,10 @@ type type_params_comments[ # trailing open bracket comment
     D, # trailing comment
     # leading close bracket comment
 ] = int  # trailing value comment
+type type_params_single_comment[ # trailing open bracket comment
+    A,
+    B
+] = int
 type type_params_all_kinds[type_var, *type_var_tuple, **param_spec] = int
 
 # type variable bounds
@@ -97,7 +101,7 @@ type bounds_trailing_comma[T: (a, b,)] = T
 ```
 
 ## Output
-```py
+```python
 # basic usage
 
 type X = int
@@ -201,6 +205,10 @@ type type_params_comments[  # trailing open bracket comment
     D,  # trailing comment
     # leading close bracket comment
 ] = int  # trailing value comment
+type type_params_single_comment[  # trailing open bracket comment
+    A,
+    B,
+] = int
 type type_params_all_kinds[type_var, *type_var_tuple, **param_spec] = int
 
 # type variable bounds

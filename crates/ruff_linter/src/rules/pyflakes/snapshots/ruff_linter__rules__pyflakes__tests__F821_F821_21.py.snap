@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_21.py:4:1: F821 Undefined name `display`
+  |
+3 | x = 1
+4 | display(x)
+  | ^^^^^^^ F821
+  |
+
+

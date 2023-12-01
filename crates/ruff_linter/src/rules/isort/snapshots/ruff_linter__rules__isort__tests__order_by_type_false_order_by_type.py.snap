@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+order_by_type.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 1 | / import StringIO
+ 2 | | import glob
+ 3 | | import os
+ 4 | | import shutil
+ 5 | | import tempfile
+ 6 | | import time
+ 7 | | from subprocess import PIPE, Popen, STDOUT
+ 8 | | from module import Class, CONSTANT, function, BASIC, Apple
+ 9 | | import foo
+10 | | import FOO
+11 | | import BAR
+12 | | import bar
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+1     |-import StringIO
+2  1  | import glob
+3  2  | import os
+4  3  | import shutil
+5  4  | import tempfile
+6  5  | import time
+7  6  | from subprocess import PIPE, Popen, STDOUT
+8     |-from module import Class, CONSTANT, function, BASIC, Apple
+9     |-import foo
+10    |-import FOO
+   7  |+
+11 8  | import BAR
+12 9  | import bar
+   10 |+import FOO
+   11 |+import foo
+   12 |+import StringIO
+   13 |+from module import Apple, BASIC, Class, CONSTANT, function
+
+

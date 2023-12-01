@@ -1,0 +1,163 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB168.py:5:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+  |
+3 | # Errors.
+4 | 
+5 | if isinstance(foo, type(None)):
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+6 |     pass
+  |
+  = help: Replace with `is` operator
+
+ℹ Safe fix
+2 2 | 
+3 3 | # Errors.
+4 4 | 
+5   |-if isinstance(foo, type(None)):
+  5 |+if foo is None:
+6 6 |     pass
+7 7 | 
+8 8 | if isinstance(foo, (type(None))):
+
+FURB168.py:8:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+  |
+6 |     pass
+7 | 
+8 | if isinstance(foo, (type(None))):
+  |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+9 |     pass
+  |
+  = help: Replace with `is` operator
+
+ℹ Safe fix
+5 5 | if isinstance(foo, type(None)):
+6 6 |     pass
+7 7 | 
+8   |-if isinstance(foo, (type(None))):
+  8 |+if foo is None:
+9 9 |     pass
+10 10 | 
+11 11 | if isinstance(foo, (type(None), type(None), type(None))):
+
+FURB168.py:11:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+   |
+ 9 |     pass
+10 | 
+11 | if isinstance(foo, (type(None), type(None), type(None))):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+12 |     pass
+   |
+   = help: Replace with `is` operator
+
+ℹ Safe fix
+8  8  | if isinstance(foo, (type(None))):
+9  9  |     pass
+10 10 | 
+11    |-if isinstance(foo, (type(None), type(None), type(None))):
+   11 |+if foo is None:
+12 12 |     pass
+13 13 | 
+14 14 | if isinstance(foo, None | None):
+
+FURB168.py:14:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+   |
+12 |     pass
+13 | 
+14 | if isinstance(foo, None | None):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+15 |     pass
+   |
+   = help: Replace with `is` operator
+
+ℹ Safe fix
+11 11 | if isinstance(foo, (type(None), type(None), type(None))):
+12 12 |     pass
+13 13 | 
+14    |-if isinstance(foo, None | None):
+   14 |+if foo is None:
+15 15 |     pass
+16 16 | 
+17 17 | if isinstance(foo, (None | None)):
+
+FURB168.py:17:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+   |
+15 |     pass
+16 | 
+17 | if isinstance(foo, (None | None)):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+18 |     pass
+   |
+   = help: Replace with `is` operator
+
+ℹ Safe fix
+14 14 | if isinstance(foo, None | None):
+15 15 |     pass
+16 16 | 
+17    |-if isinstance(foo, (None | None)):
+   17 |+if foo is None:
+18 18 |     pass
+19 19 | 
+20 20 | if isinstance(foo, None | type(None)):
+
+FURB168.py:20:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+   |
+18 |     pass
+19 | 
+20 | if isinstance(foo, None | type(None)):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+21 |     pass
+   |
+   = help: Replace with `is` operator
+
+ℹ Safe fix
+17 17 | if isinstance(foo, (None | None)):
+18 18 |     pass
+19 19 | 
+20    |-if isinstance(foo, None | type(None)):
+   20 |+if foo is None:
+21 21 |     pass
+22 22 | 
+23 23 | if isinstance(foo, (None | type(None))):
+
+FURB168.py:23:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+   |
+21 |     pass
+22 | 
+23 | if isinstance(foo, (None | type(None))):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+24 |     pass
+   |
+   = help: Replace with `is` operator
+
+ℹ Safe fix
+20 20 | if isinstance(foo, None | type(None)):
+21 21 |     pass
+22 22 | 
+23    |-if isinstance(foo, (None | type(None))):
+   23 |+if foo is None:
+24 24 |     pass
+25 25 | 
+26 26 | # A bit contrived, but is both technically valid and equivalent to the above.
+
+FURB168.py:27:4: FURB168 [*] Prefer `is` operator over `isinstance` to check if an object is `None`
+   |
+26 | # A bit contrived, but is both technically valid and equivalent to the above.
+27 | if isinstance(foo, (type(None) | ((((type(None))))) | ((None | type(None))))):
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FURB168
+28 |     pass
+   |
+   = help: Replace with `is` operator
+
+ℹ Safe fix
+24 24 |     pass
+25 25 | 
+26 26 | # A bit contrived, but is both technically valid and equivalent to the above.
+27    |-if isinstance(foo, (type(None) | ((((type(None))))) | ((None | type(None))))):
+   27 |+if foo is None:
+28 28 |     pass
+29 29 | 
+30 30 | 
+
+

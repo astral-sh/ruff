@@ -1,30 +1,36 @@
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::Ranged;
-use ruff_python_trivia::{first_non_trivia_token, SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::ExpressionRef;
+use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{
+    first_non_trivia_token, BackwardsTokenizer, SimpleToken, SimpleTokenKind,
+};
+use ruff_text_size::Ranged;
 
-use crate::comments::{dangling_comments, SourceComment};
+use crate::comments::{
+    dangling_comments, dangling_open_parenthesis_comments, trailing_comments, SourceComment,
+};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
+/// From the perspective of the expression, under which circumstances does it need parentheses
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum OptionalParentheses {
     /// Add parentheses if the expression expands over multiple lines
     Multiline,
 
-    /// Always set parentheses regardless if the expression breaks or if they were
+    /// Always set parentheses regardless if the expression breaks or if they are
     /// present in the source.
     Always,
 
-    /// Never add parentheses
-    Never,
-}
+    /// Add parentheses if it helps to make this expression fit. Otherwise never add parentheses.
+    /// This mode should only be used for expressions that don't have their own split points to the left, e.g. identifiers,
+    /// or constants, calls starting with an identifier, etc.
+    BestFit,
 
-impl OptionalParentheses {
-    pub(crate) const fn is_always(self) -> bool {
-        matches!(self, OptionalParentheses::Always)
-    }
+    /// Never add parentheses. Use it for expressions that have their own parentheses or if the expression body always spans multiple lines (multiline strings).
+    Never,
 }
 
 pub(crate) trait NeedsParentheses {
@@ -36,7 +42,8 @@ pub(crate) trait NeedsParentheses {
     ) -> OptionalParentheses;
 }
 
-/// Configures if the expression should be parenthesized.
+/// From the perspective of the parent statement or expression, when should the child expression
+/// get parentheses?
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Parenthesize {
     /// Parenthesizes the expression if it doesn't fit on a line OR if the expression is parenthesized in the source code.
@@ -45,10 +52,14 @@ pub(crate) enum Parenthesize {
     /// Parenthesizes the expression only if it doesn't fit on a line.
     IfBreaks,
 
-    /// Only adds parentheses if absolutely necessary:
-    /// * The expression is not enclosed by another parenthesized expression and it expands over multiple lines
-    /// * The expression has leading or trailing comments. Adding parentheses is desired to prevent the comments from wandering.
+    /// Only adds parentheses if the expression has leading or trailing comments.
+    /// Adding parentheses is desired to prevent the comments from wandering.
     IfRequired,
+
+    /// Parenthesizes the expression if the group doesn't fit on a line (e.g., even name expressions are parenthesized), or if
+    /// the expression doesn't break, but _does_ reports that it always requires parentheses in this position (e.g., walrus
+    /// operators in function return annotations).
+    IfBreaksOrIfRequired,
 }
 
 impl Parenthesize {
@@ -73,7 +84,11 @@ pub enum Parentheses {
     Never,
 }
 
-pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> bool {
+pub(crate) fn is_expression_parenthesized(
+    expr: ExpressionRef,
+    comment_ranges: &CommentRanges,
+    contents: &str,
+) -> bool {
     // First test if there's a closing parentheses because it tends to be cheaper.
     if matches!(
         first_non_trivia_token(expr.end(), contents),
@@ -82,11 +97,10 @@ pub(crate) fn is_expression_parenthesized(expr: AnyNodeRef, contents: &str) -> b
             ..
         })
     ) {
-        let mut tokenizer =
-            SimpleTokenizer::up_to_without_back_comment(expr.start(), contents).skip_trivia();
-
         matches!(
-            tokenizer.next_back(),
+            BackwardsTokenizer::up_to(expr.start(), contents, comment_ranges)
+                .skip_trivia()
+                .next(),
             Some(SimpleToken {
                 kind: SimpleTokenKind::LParen,
                 ..
@@ -116,25 +130,6 @@ where
     }
 }
 
-/// Formats `content` enclosed by the `left` and `right` parentheses, along with any dangling
-/// comments that on the parentheses themselves.
-pub(crate) fn parenthesized_with_dangling_comments<'content, 'ast, Content>(
-    left: &'static str,
-    comments: &'content [SourceComment],
-    content: &'content Content,
-    right: &'static str,
-) -> FormatParenthesized<'content, 'ast>
-where
-    Content: Format<PyFormatContext<'ast>>,
-{
-    FormatParenthesized {
-        left,
-        comments,
-        content: Argument::new(content),
-        right,
-    }
-}
-
 pub(crate) struct FormatParenthesized<'content, 'ast> {
     left: &'static str,
     comments: &'content [SourceComment],
@@ -142,43 +137,54 @@ pub(crate) struct FormatParenthesized<'content, 'ast> {
     right: &'static str,
 }
 
+impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
+    /// Inserts any dangling comments that should be placed immediately after the open parenthesis.
+    /// For example:
+    /// ```python
+    /// [  # comment
+    ///     1,
+    ///     2,
+    ///     3,
+    /// ]
+    /// ```
+    pub(crate) fn with_dangling_comments(
+        self,
+        comments: &'content [SourceComment],
+    ) -> FormatParenthesized<'content, 'ast> {
+        FormatParenthesized { comments, ..self }
+    }
+}
+
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
+        let current_level = f.context().node_level();
+
+        let content = format_with(|f| {
+            group(&format_args![
+                dangling_open_parenthesis_comments(self.comments),
+                soft_block_indent(&Arguments::from(&self.content))
+            ])
+            .fmt(f)
+        });
+
         let inner = format_with(|f| {
-            if self.comments.is_empty() {
-                group(&format_args![
-                    text(self.left),
-                    &soft_block_indent(&Arguments::from(&self.content)),
-                    text(self.right)
-                ])
-                .fmt(f)
+            if let NodeLevel::Expression(Some(group_id)) = current_level {
+                // Use fits expanded if there's an enclosing group that adds the optional parentheses.
+                // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
+                write!(
+                    f,
+                    [fits_expanded(&content)
+                        .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
+                )
             } else {
-                group(&format_args![
-                    text(self.left),
-                    &line_suffix(&dangling_comments(self.comments)),
-                    &group(&soft_block_indent(&Arguments::from(&self.content))),
-                    text(self.right)
-                ])
-                .fmt(f)
+                // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
+                content.fmt(f)
             }
         });
 
-        let current_level = f.context().node_level();
-
         let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
 
-        if let NodeLevel::Expression(Some(group_id)) = current_level {
-            // Use fits expanded if there's an enclosing group that adds the optional parentheses.
-            // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
-            write!(
-                f,
-                [fits_expanded(&inner)
-                    .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
-            )
-        } else {
-            // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
-            write!(f, [inner])
-        }
+        write!(f, [token(self.left), inner, token(self.right)])
     }
 }
 
@@ -201,8 +207,8 @@ pub(crate) struct FormatOptionalParentheses<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        // The group id is used as a condition in [`in_parentheses_only`] to create a conditional group
-        // that is only active if the optional parentheses group expands.
+        // The group id is used as a condition in [`in_parentheses_only_group`] to create a
+        // conditional group that is only active if the optional parentheses group expands.
         let parens_id = f.group_id("optional_parentheses");
 
         let mut f = WithNodeLevel::new(NodeLevel::Expression(Some(parens_id)), f);
@@ -215,13 +221,13 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatOptionalParentheses<'_, 'ast>
         write!(
             f,
             [group(&format_args![
-                if_group_breaks(&text("(")),
+                if_group_breaks(&token("(")),
                 indent_if_group_breaks(
                     &format_args![soft_line_break(), Arguments::from(&self.content)],
                     parens_id
                 ),
                 soft_line_break(),
-                if_group_breaks(&text(")"))
+                if_group_breaks(&token(")"))
             ])
             .with_group_id(Some(parens_id))]
         )
@@ -248,7 +254,7 @@ pub(crate) enum InParenthesesOnlyLineBreak {
 impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         match f.context().node_level() {
-            NodeLevel::TopLevel | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+            NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
                 match self {
                     InParenthesesOnlyLineBreak::SoftLineBreak => Ok(()),
                     InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => space().fmt(f),
@@ -271,7 +277,8 @@ impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
                 f.write_element(FormatElement::Line(match self {
                     InParenthesesOnlyLineBreak::SoftLineBreak => LineMode::Soft,
                     InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => LineMode::SoftOrSpace,
-                }))
+                }));
+                Ok(())
             }
         }
     }
@@ -296,39 +303,121 @@ pub(crate) struct FormatInParenthesesOnlyGroup<'content, 'ast> {
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatInParenthesesOnlyGroup<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
-        match f.context().node_level() {
-            NodeLevel::Expression(Some(parentheses_id)) => {
-                // If this content is enclosed by a group that adds the optional parentheses, then *disable*
-                // this group *except* if the optional parentheses are shown.
-                conditional_group(
-                    &Arguments::from(&self.content),
-                    Condition::if_group_breaks(parentheses_id),
-                )
-                .fmt(f)
-            }
-            NodeLevel::ParenthesizedExpression => {
-                // Unconditionally group the content if it is not enclosed by an optional parentheses group.
-                group(&Arguments::from(&self.content)).fmt(f)
-            }
-            NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
-                Arguments::from(&self.content).fmt(f)
-            }
+        write_in_parentheses_only_group_start_tag(f);
+        Arguments::from(&self.content).fmt(f)?;
+        write_in_parentheses_only_group_end_tag(f);
+        Ok(())
+    }
+}
+
+pub(super) fn write_in_parentheses_only_group_start_tag(f: &mut PyFormatter) {
+    match f.context().node_level() {
+        NodeLevel::Expression(Some(parentheses_id)) => {
+            f.write_element(FormatElement::Tag(tag::Tag::StartConditionalGroup(
+                tag::ConditionalGroup::new(Condition::if_group_breaks(parentheses_id)),
+            )));
         }
+        NodeLevel::ParenthesizedExpression => {
+            // Unconditionally group the content if it is not enclosed by an optional parentheses group.
+            f.write_element(FormatElement::Tag(tag::Tag::StartGroup(tag::Group::new())));
+        }
+        NodeLevel::Expression(None) | NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement => {
+            // No group
+        }
+    }
+}
+
+pub(super) fn write_in_parentheses_only_group_end_tag(f: &mut PyFormatter) {
+    match f.context().node_level() {
+        NodeLevel::Expression(Some(_)) => {
+            f.write_element(FormatElement::Tag(tag::Tag::EndConditionalGroup));
+        }
+        NodeLevel::ParenthesizedExpression => {
+            // Unconditionally group the content if it is not enclosed by an optional parentheses group.
+            f.write_element(FormatElement::Tag(tag::Tag::EndGroup));
+        }
+        NodeLevel::Expression(None) | NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement => {
+            // No group
+        }
+    }
+}
+
+/// Format comments inside empty parentheses, brackets or curly braces.
+///
+/// Empty `()`, `[]` and `{}` are special because there can be dangling comments, and they can be in
+/// two positions:
+/// ```python
+/// x = [  # end-of-line
+///     # own line
+/// ]
+/// ```
+/// These comments are dangling because they can't be assigned to any element inside as they would
+/// in all other cases.
+pub(crate) fn empty_parenthesized<'content>(
+    left: &'static str,
+    comments: &'content [SourceComment],
+    right: &'static str,
+) -> FormatEmptyParenthesized<'content> {
+    FormatEmptyParenthesized {
+        left,
+        comments,
+        right,
+    }
+}
+
+pub(crate) struct FormatEmptyParenthesized<'content> {
+    left: &'static str,
+    comments: &'content [SourceComment],
+    right: &'static str,
+}
+
+impl Format<PyFormatContext<'_>> for FormatEmptyParenthesized<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        let end_of_line_split = self
+            .comments
+            .partition_point(|comment| comment.line_position().is_end_of_line());
+        debug_assert!(self.comments[end_of_line_split..]
+            .iter()
+            .all(|comment| comment.line_position().is_own_line()));
+        write!(
+            f,
+            [group(&format_args![
+                token(self.left),
+                // end-of-line comments
+                trailing_comments(&self.comments[..end_of_line_split]),
+                // Avoid unstable formatting with
+                // ```python
+                // x = () - (#
+                // )
+                // ```
+                // Without this the comment would go after the empty tuple first, but still expand
+                // the bin op. In the second formatting pass they are trailing bin op comments
+                // so the bin op collapse. Suboptimally we keep parentheses around the bin op in
+                // either case.
+                (!self.comments[..end_of_line_split].is_empty()).then_some(hard_line_break()),
+                // own line comments, which need to be indented
+                soft_block_indent(&dangling_comments(&self.comments[end_of_line_split..])),
+                token(self.right)
+            ])]
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::expression::parentheses::is_expression_parenthesized;
-    use ruff_python_ast::node::AnyNodeRef;
+    use ruff_python_ast::ExpressionRef;
     use ruff_python_parser::parse_expression;
+    use ruff_python_trivia::CommentRanges;
+
+    use crate::expression::parentheses::is_expression_parenthesized;
 
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
         let expr = parse_expression(expression, "<filename>").unwrap();
         assert!(!is_expression_parenthesized(
-            AnyNodeRef::from(&expr),
+            ExpressionRef::from(&expr),
+            &CommentRanges::default(),
             expression
         ));
     }

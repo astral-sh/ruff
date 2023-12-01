@@ -1,0 +1,52 @@
+---
+source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
+---
+PTH204.py:6:1: PTH204 `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+  |
+6 | os.path.getmtime("filename")
+  | ^^^^^^^^^^^^^^^^ PTH204
+7 | os.path.getmtime(b"filename")
+8 | os.path.getmtime(Path("filename"))
+  |
+
+PTH204.py:7:1: PTH204 `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+  |
+6 | os.path.getmtime("filename")
+7 | os.path.getmtime(b"filename")
+  | ^^^^^^^^^^^^^^^^ PTH204
+8 | os.path.getmtime(Path("filename"))
+  |
+
+PTH204.py:8:1: PTH204 `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+  |
+6 | os.path.getmtime("filename")
+7 | os.path.getmtime(b"filename")
+8 | os.path.getmtime(Path("filename"))
+  | ^^^^^^^^^^^^^^^^ PTH204
+  |
+
+PTH204.py:11:1: PTH204 `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+   |
+11 | getmtime("filename")
+   | ^^^^^^^^ PTH204
+12 | getmtime(b"filename")
+13 | getmtime(Path("filename"))
+   |
+
+PTH204.py:12:1: PTH204 `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+   |
+11 | getmtime("filename")
+12 | getmtime(b"filename")
+   | ^^^^^^^^ PTH204
+13 | getmtime(Path("filename"))
+   |
+
+PTH204.py:13:1: PTH204 `os.path.getmtime` should be replaced by `Path.stat().st_mtime`
+   |
+11 | getmtime("filename")
+12 | getmtime(b"filename")
+13 | getmtime(Path("filename"))
+   | ^^^^^^^^ PTH204
+   |
+
+

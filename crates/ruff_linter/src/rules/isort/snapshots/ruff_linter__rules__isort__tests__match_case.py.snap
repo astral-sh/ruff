@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+match_case.py:3:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 |   match 1:
+2 |       case 1:
+3 | /         import sys
+4 | |         import os
+5 | |     case 2:
+  | |_^ I001
+6 |           import collections
+7 |           import abc
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+1 1 | match 1:
+2 2 |     case 1:
+  3 |+        import os
+3 4 |         import sys
+4   |-        import os
+5 5 |     case 2:
+6 6 |         import collections
+7 7 |         import abc
+
+match_case.py:6:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+4 |           import os
+5 |       case 2:
+6 | /         import collections
+7 | |         import abc
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+3 3 |         import sys
+4 4 |         import os
+5 5 |     case 2:
+  6 |+        import abc
+6 7 |         import collections
+7   |-        import abc
+
+

@@ -1,0 +1,33 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F50x.py:2:1: F506 `%`-format string has mixed positional and named placeholders
+  |
+1 | '%(foo)' % {'foo': 'bar'}  # F501
+2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F506
+3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
+4 | '%j' % (1,)  # F509
+  |
+
+F50x.py:3:1: F506 `%`-format string has mixed positional and named placeholders
+  |
+1 | '%(foo)' % {'foo': 'bar'}  # F501
+2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
+3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F506
+4 | '%j' % (1,)  # F509
+5 | '%s %s' % (1,)  # F507
+  |
+
+F50x.py:11:1: F506 `%`-format string has mixed positional and named placeholders
+   |
+ 9 | '%(bar)s' % (1, 2, 3)  # F502
+10 | '%s %s' % {'k': 'v'}  # F503
+11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ F506
+12 | 
+13 | # ok: single %s with mapping
+   |
+
+

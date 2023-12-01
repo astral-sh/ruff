@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/trivia.py
 ---
 ## Input
-```py
+```python
 
 # Removes the line above
 
@@ -23,7 +23,7 @@ class Test:
 c = 30
 
 while a == 10:
-    ...
+    print(a)
 
     # trailing comment with one line before
 
@@ -32,14 +32,14 @@ while a == 10:
 d = 40
 
 while b == 20:
-    ...
+    print(b)
     # no empty line before
 
 e = 50  # one empty line before
 ```
 
 ## Output
-```py
+```python
 # Removes the line above
 
 a = 10  # Keeps the line above
@@ -61,7 +61,7 @@ class Test:
 c = 30
 
 while a == 10:
-    ...
+    print(a)
 
     # trailing comment with one line before
 
@@ -70,7 +70,7 @@ while a == 10:
 d = 40
 
 while b == 20:
-    ...
+    print(b)
     # no empty line before
 
 e = 50  # one empty line before

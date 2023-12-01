@@ -8,20 +8,20 @@ expression: trace
     - PatternMatchClass
       - ExprName
       - PatternMatchValue
-        - ExprConstant
+        - ExprNumberLiteral
       - PatternMatchValue
-        - ExprConstant
+        - ExprNumberLiteral
     - StmtExpr
-      - ExprConstant
+      - ExprEllipsisLiteral
   - MatchCase
     - PatternMatchClass
       - ExprName
       - PatternMatchValue
-        - ExprConstant
+        - ExprNumberLiteral
       - PatternMatchValue
-        - ExprConstant
+        - ExprNumberLiteral
       - PatternMatchValue
-        - ExprConstant
+        - ExprNumberLiteral
     - StmtExpr
-      - ExprConstant
+      - ExprEllipsisLiteral
 

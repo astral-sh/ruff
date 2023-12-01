@@ -1,0 +1,14 @@
+---
+source: crates/ruff_linter/src/rules/pandas_vet/mod.rs
+---
+<filename>:4:9: PD010 `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality
+  |
+2 | import pandas as pd
+3 | x = pd.DataFrame()
+4 | table = pd.pivot(
+  |         ^^^^^^^^ PD010
+5 |     x,
+6 |     index="foo",
+  |
+
+

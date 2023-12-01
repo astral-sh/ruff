@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+module.py:1:8: PLW0406 Module `import_self.module` imports itself
+  |
+1 | import import_self.module
+  |        ^^^^^^^^^^^^^^^^^^ PLW0406
+2 | from import_self import module
+3 | from . import module
+  |
+
+module.py:2:25: PLW0406 Module `import_self.module` imports itself
+  |
+1 | import import_self.module
+2 | from import_self import module
+  |                         ^^^^^^ PLW0406
+3 | from . import module
+  |
+
+module.py:3:15: PLW0406 Module `import_self.module` imports itself
+  |
+1 | import import_self.module
+2 | from import_self import module
+3 | from . import module
+  |               ^^^^^^ PLW0406
+  |
+
+

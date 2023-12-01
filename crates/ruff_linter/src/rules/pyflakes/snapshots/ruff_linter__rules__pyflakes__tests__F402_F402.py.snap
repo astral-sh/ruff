@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F402.py:5:5: F402 Import `os` from line 1 shadowed by loop variable
+  |
+5 | for os in range(3):
+  |     ^^ F402
+6 |     pass
+  |
+
+F402.py:8:5: F402 Import `path` from line 2 shadowed by loop variable
+  |
+6 |     pass
+7 | 
+8 | for path in range(3):
+  |     ^^^^ F402
+9 |     pass
+  |
+
+

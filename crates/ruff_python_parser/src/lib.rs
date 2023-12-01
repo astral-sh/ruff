@@ -85,7 +85,7 @@
 //!    return bool(i & 1)
 //! "#;
 //! let tokens = lex(python_source, Mode::Module);
-//! let ast = parse_tokens(tokens, Mode::Module, "<embedded>");
+//! let ast = parse_tokens(tokens, python_source, Mode::Module, "<embedded>");
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -109,19 +109,21 @@
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
-use crate::lexer::LexResult;
 pub use parser::{
-    parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
-    parse_suite, parse_tokens, ParseError, ParseErrorType,
+    parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
+    parse_starts_at, parse_suite, parse_tokens, ParseError, ParseErrorType,
 };
-use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Ranged, Suite};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Suite};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok, TokenKind};
+
+use crate::lexer::LexResult;
 
 mod function;
 // Skip flattening lexer to distinguish from full ruff_python_parser
 mod context;
+mod invalid;
 pub mod lexer;
 mod parser;
 mod soft_keywords;
@@ -145,37 +147,19 @@ pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
 /// Parse a full Python program from its tokens.
 pub fn parse_program_tokens(
     lxr: Vec<LexResult>,
+    source: &str,
     source_path: &str,
     is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
     let mode = if is_jupyter_notebook {
-        Mode::Jupyter
+        Mode::Ipython
     } else {
         Mode::Module
     };
-    match parse_tokens(lxr, mode, source_path)? {
+    match parse_tokens(lxr, source, mode, source_path)? {
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
-}
-
-/// Return the `Range` of the first `Tok::Colon` token in a `Range`.
-pub fn first_colon_range(
-    range: TextRange,
-    source: &str,
-    is_jupyter_notebook: bool,
-) -> Option<TextRange> {
-    let contents = &source[range];
-    let mode = if is_jupyter_notebook {
-        Mode::Jupyter
-    } else {
-        Mode::Module
-    };
-    let range = lexer::lex_starts_at(contents, mode, range.start())
-        .flatten()
-        .find(|(tok, _)| tok.is_colon())
-        .map(|(_, range)| range);
-    range
 }
 
 /// Extract all [`CmpOp`] operators from an expression snippet, with appropriate
@@ -197,66 +181,85 @@ pub fn locate_cmp_ops(expr: &Expr, source: &str) -> Vec<LocatedCmpOp> {
         .peekable();
 
     let mut ops: Vec<LocatedCmpOp> = vec![];
-    let mut count = 0u32;
+
+    // Track the bracket depth.
+    let mut par_count = 0u32;
+    let mut sqb_count = 0u32;
+    let mut brace_count = 0u32;
+
     loop {
         let Some((tok, range)) = tok_iter.next() else {
             break;
         };
-        if matches!(tok, Tok::Lpar) {
-            count = count.saturating_add(1);
-            continue;
-        } else if matches!(tok, Tok::Rpar) {
-            count = count.saturating_sub(1);
+
+        match tok {
+            Tok::Lpar => {
+                par_count = par_count.saturating_add(1);
+            }
+            Tok::Rpar => {
+                par_count = par_count.saturating_sub(1);
+            }
+            Tok::Lsqb => {
+                sqb_count = sqb_count.saturating_add(1);
+            }
+            Tok::Rsqb => {
+                sqb_count = sqb_count.saturating_sub(1);
+            }
+            Tok::Lbrace => {
+                brace_count = brace_count.saturating_add(1);
+            }
+            Tok::Rbrace => {
+                brace_count = brace_count.saturating_sub(1);
+            }
+            _ => {}
+        }
+
+        if par_count > 0 || sqb_count > 0 || brace_count > 0 {
             continue;
         }
-        if count == 0 {
-            match tok {
-                Tok::Not => {
-                    if let Some((_, next_range)) =
-                        tok_iter.next_if(|(tok, _)| matches!(tok, Tok::In))
-                    {
-                        ops.push(LocatedCmpOp::new(
-                            TextRange::new(range.start(), next_range.end()),
-                            CmpOp::NotIn,
-                        ));
-                    }
+
+        match tok {
+            Tok::Not => {
+                if let Some((_, next_range)) = tok_iter.next_if(|(tok, _)| tok.is_in()) {
+                    ops.push(LocatedCmpOp::new(
+                        TextRange::new(range.start(), next_range.end()),
+                        CmpOp::NotIn,
+                    ));
                 }
-                Tok::In => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::In));
-                }
-                Tok::Is => {
-                    let op = if let Some((_, next_range)) =
-                        tok_iter.next_if(|(tok, _)| matches!(tok, Tok::Not))
-                    {
-                        LocatedCmpOp::new(
-                            TextRange::new(range.start(), next_range.end()),
-                            CmpOp::IsNot,
-                        )
-                    } else {
-                        LocatedCmpOp::new(range, CmpOp::Is)
-                    };
-                    ops.push(op);
-                }
-                Tok::NotEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::NotEq));
-                }
-                Tok::EqEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::Eq));
-                }
-                Tok::GreaterEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::GtE));
-                }
-                Tok::Greater => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::Gt));
-                }
-                Tok::LessEqual => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::LtE));
-                }
-                Tok::Less => {
-                    ops.push(LocatedCmpOp::new(range, CmpOp::Lt));
-                }
-                _ => {}
             }
+            Tok::In => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::In));
+            }
+            Tok::Is => {
+                let op = if let Some((_, next_range)) = tok_iter.next_if(|(tok, _)| tok.is_not()) {
+                    LocatedCmpOp::new(
+                        TextRange::new(range.start(), next_range.end()),
+                        CmpOp::IsNot,
+                    )
+                } else {
+                    LocatedCmpOp::new(range, CmpOp::Is)
+                };
+                ops.push(op);
+            }
+            Tok::NotEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::NotEq));
+            }
+            Tok::EqEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::Eq));
+            }
+            Tok::GreaterEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::GtE));
+            }
+            Tok::Greater => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::Gt));
+            }
+            Tok::LessEqual => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::LtE));
+            }
+            Tok::Less => {
+                ops.push(LocatedCmpOp::new(range, CmpOp::Lt));
+            }
+            _ => {}
         }
     }
     ops
@@ -285,15 +288,8 @@ pub enum Mode {
     Module,
     /// The code consists of a single expression.
     Expression,
-    /// The code consists of a sequence of statements which are part of a
-    /// Jupyter Notebook and thus could include escape commands scoped to
-    /// a single line.
-    ///
-    /// ## Limitations:
-    ///
-    /// For [Dynamic object information], the escape characters (`?`, `??`)
-    /// must be used before an object. For example, `?foo` will be recognized,
-    /// but `foo?` will not.
+    /// The code consists of a sequence of statements which can include the
+    /// escape commands that are part of IPython syntax.
     ///
     /// ## Supported escape commands:
     ///
@@ -308,7 +304,7 @@ pub enum Mode {
     /// [Dynamic object information]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#dynamic-object-information
     /// [System shell access]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#system-shell-access
     /// [Automatic parentheses and quotes]: https://ipython.readthedocs.io/en/stable/interactive/reference.html#automatic-parentheses-and-quotes
-    Jupyter,
+    Ipython,
 }
 
 impl std::str::FromStr for Mode {
@@ -317,7 +313,7 @@ impl std::str::FromStr for Mode {
         match s {
             "exec" | "single" => Ok(Mode::Module),
             "eval" => Ok(Mode::Expression),
-            "jupyter" => Ok(Mode::Jupyter),
+            "ipython" => Ok(Mode::Ipython),
             _ => Err(ModeParseError),
         }
     }
@@ -331,7 +327,7 @@ impl AsMode for PySourceType {
     fn as_mode(&self) -> Mode {
         match self {
             PySourceType::Python | PySourceType::Stub => Mode::Module,
-            PySourceType::Jupyter => Mode::Jupyter,
+            PySourceType::Ipynb => Mode::Ipython,
         }
     }
 }
@@ -342,7 +338,7 @@ pub struct ModeParseError;
 
 impl std::fmt::Display for ModeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, r#"mode must be "exec", "eval", "jupyter", or "single""#)
+        write!(f, r#"mode must be "exec", "eval", "ipython", or "single""#)
     }
 }
 
@@ -373,24 +369,12 @@ mod python {
 
 #[cfg(test)]
 mod tests {
-    use crate::{first_colon_range, locate_cmp_ops, parse_expression, LocatedCmpOp};
     use anyhow::Result;
+
     use ruff_python_ast::CmpOp;
+    use ruff_text_size::TextSize;
 
-    use ruff_text_size::{TextLen, TextRange, TextSize};
-
-    #[test]
-    fn extract_first_colon_range() {
-        let contents = "with a: pass";
-        let range = first_colon_range(
-            TextRange::new(TextSize::from(0), contents.text_len()),
-            contents,
-            false,
-        )
-        .unwrap();
-        assert_eq!(&contents[range], ":");
-        assert_eq!(range, TextRange::new(TextSize::from(6), TextSize::from(7)));
-    }
+    use crate::{locate_cmp_ops, parse_expression, LocatedCmpOp};
 
     #[test]
     fn extract_cmp_op_location() -> Result<()> {

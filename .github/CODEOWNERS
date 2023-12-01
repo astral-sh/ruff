@@ -6,4 +6,4 @@
 # - Order is important. The last matching pattern has the most precedence.
 
 # Jupyter
-/crates/ruff/src/jupyter/ @dhruvmanila
+/crates/ruff_linter/src/jupyter/ @dhruvmanila

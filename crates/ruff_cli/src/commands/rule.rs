@@ -5,8 +5,8 @@ use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
 
-use ruff::registry::{Linter, Rule, RuleNamespace};
-use ruff_diagnostics::AutofixKind;
+use ruff_diagnostics::FixAvailability;
+use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 
 use crate::args::HelpFormat;
 
@@ -17,25 +17,25 @@ struct Explanation<'a> {
     linter: &'a str,
     summary: &'a str,
     message_formats: &'a [&'a str],
-    autofix: String,
+    fix: String,
     explanation: Option<&'a str>,
-    nursery: bool,
+    preview: bool,
 }
 
 impl<'a> Explanation<'a> {
     fn from_rule(rule: &'a Rule) -> Self {
         let code = rule.noqa_code().to_string();
         let (linter, _) = Linter::parse_code(&code).unwrap();
-        let autofix = rule.autofixable().to_string();
+        let fix = rule.fixable().to_string();
         Self {
             name: rule.as_ref(),
             code,
             linter: linter.name(),
             summary: rule.message_formats()[0],
             message_formats: rule.message_formats(),
-            autofix,
+            fix,
             explanation: rule.explanation(),
-            nursery: rule.is_nursery(),
+            preview: rule.is_preview() || rule.is_nursery(),
         }
     }
 }
@@ -51,20 +51,20 @@ fn format_rule_text(rule: Rule) -> String {
     output.push('\n');
     output.push('\n');
 
-    let autofix = rule.autofixable();
-    if matches!(autofix, AutofixKind::Always | AutofixKind::Sometimes) {
-        output.push_str(&autofix.to_string());
+    let fix_availability = rule.fixable();
+    if matches!(
+        fix_availability,
+        FixAvailability::Always | FixAvailability::Sometimes
+    ) {
+        output.push_str(&fix_availability.to_string());
         output.push('\n');
         output.push('\n');
     }
 
-    if rule.is_nursery() {
-        output.push_str(&format!(
-            r#"This rule is part of the **nursery**, a collection of newer lints that are
-still under development. As such, it must be enabled by explicitly selecting
-{}."#,
-            rule.noqa_code()
-        ));
+    if rule.is_preview() || rule.is_nursery() {
+        output.push_str(
+            r"This rule is in preview and is not stable. The `--preview` flag is required for use.",
+        );
         output.push('\n');
         output.push('\n');
     }

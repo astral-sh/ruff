@@ -8,7 +8,7 @@ use syn::{
     Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
 };
 
-use crate::rule_code_prefix::{get_prefix_ident, if_all_same, is_nursery};
+use crate::rule_code_prefix::{get_prefix_ident, if_all_same};
 
 /// A rule entry in the big match statement such a
 /// `(Pycodestyle, "E112") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
@@ -58,7 +58,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     };
 
     // Map from: linter (e.g., `Flake8Bugbear`) to rule code (e.g.,`"002"`) to rule data (e.g.,
-    // `(Rule::UnaryPrefixIncrement, RuleGroup::Unspecified, vec![])`).
+    // `(Rule::UnaryPrefixIncrement, RuleGroup::Stable, vec![])`).
     let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
     for arm in arms {
@@ -113,9 +113,23 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                     Self::#linter(linter)
                 }
             }
+
+            // Rust doesn't yet support `impl const From<RuleCodePrefix> for RuleSelector`
+            // See https://github.com/rust-lang/rust/issues/67792
             impl From<#linter> for crate::rule_selector::RuleSelector {
                 fn from(linter: #linter) -> Self {
-                    Self::Prefix{prefix: RuleCodePrefix::#linter(linter), redirected_from: None}
+                    let prefix = RuleCodePrefix::#linter(linter);
+                    if is_single_rule_selector(&prefix) {
+                        Self::Rule {
+                            prefix,
+                            redirected_from: None,
+                        }
+                    } else {
+                        Self::Prefix {
+                            prefix,
+                            redirected_from: None,
+                        }
+                    }
                 }
             }
         });
@@ -156,7 +170,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
         output.extend(quote! {
             impl #linter {
-                pub fn rules(self) -> ::std::vec::IntoIter<Rule> {
+                pub fn rules(&self) -> ::std::vec::IntoIter<Rule> {
                     match self { #prefix_into_iter_match_arms }
                 }
             }
@@ -172,7 +186,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 })
             }
 
-            pub fn rules(self) -> ::std::vec::IntoIter<Rule> {
+            pub fn rules(&self) -> ::std::vec::IntoIter<Rule> {
                 match self {
                     #(RuleCodePrefix::#linter_idents(prefix) => prefix.clone().rules(),)*
                 }
@@ -195,26 +209,12 @@ fn rules_by_prefix(
     // TODO(charlie): Why do we do this here _and_ in `rule_code_prefix::expand`?
     let mut rules_by_prefix = BTreeMap::new();
 
-    for (code, rule) in rules {
-        // Nursery rules have to be explicitly selected, so we ignore them when looking at
-        // prefix-level selectors (e.g., `--select SIM10`), but add the rule itself under
-        // its fully-qualified code (e.g., `--select SIM101`).
-        if is_nursery(&rule.group) {
-            rules_by_prefix.insert(code.clone(), vec![(rule.path.clone(), rule.attrs.clone())]);
-            continue;
-        }
-
+    for code in rules.keys() {
         for i in 1..=code.len() {
             let prefix = code[..i].to_string();
             let rules: Vec<_> = rules
                 .iter()
                 .filter_map(|(code, rule)| {
-                    // Nursery rules have to be explicitly selected, so we ignore them when
-                    // looking at prefixes.
-                    if is_nursery(&rule.group) {
-                        return None;
-                    }
-
                     if code.starts_with(&prefix) {
                         Some((rule.path.clone(), rule.attrs.clone()))
                     } else {
@@ -311,6 +311,11 @@ See also https://github.com/astral-sh/ruff/issues/2186.
                 }
             }
 
+            pub fn is_preview(&self) -> bool {
+                matches!(self.group(), RuleGroup::Preview)
+            }
+
+            #[allow(deprecated)]
             pub fn is_nursery(&self) -> bool {
                 matches!(self.group(), RuleGroup::Nursery)
             }
@@ -336,12 +341,10 @@ fn generate_iter_impl(
     let mut linter_rules_match_arms = quote!();
     let mut linter_all_rules_match_arms = quote!();
     for (linter, map) in linter_to_rules {
-        let rule_paths = map.values().filter(|rule| !is_nursery(&rule.group)).map(
-            |Rule { attrs, path, .. }| {
-                let rule_name = path.segments.last().unwrap();
-                quote!(#(#attrs)* Rule::#rule_name)
-            },
-        );
+        let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
+            let rule_name = path.segments.last().unwrap();
+            quote!(#(#attrs)* Rule::#rule_name)
+        });
         linter_rules_match_arms.extend(quote! {
             Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
         });
@@ -385,7 +388,7 @@ fn generate_iter_impl(
 fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
-    let mut rule_autofixable_match_arms = quote!();
+    let mut rule_fixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
 
     let mut from_impls_for_diagnostic_kind = quote!();
@@ -401,8 +404,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
         rule_message_formats_match_arms
             .extend(quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::message_formats(),});
-        rule_autofixable_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::AUTOFIX,},
+        rule_fixable_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as ruff_diagnostics::Violation>::FIX_AVAILABILITY,},
         );
         rule_explanation_match_arms
             .extend(quote! {#(#attrs)* Self::#name => #path::explanation(),});
@@ -413,6 +416,8 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     }
 
     quote! {
+        use ruff_diagnostics::Violation;
+
         #[derive(
             EnumIter,
             Debug,
@@ -442,9 +447,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
                 match self { #rule_explanation_match_arms }
             }
 
-            /// Returns the autofix status of this rule.
-            pub const fn autofixable(&self) -> ruff_diagnostics::AutofixKind {
-                match self { #rule_autofixable_match_arms }
+            /// Returns the fix status of this rule.
+            pub const fn fixable(&self) -> ruff_diagnostics::FixAvailability {
+                match self { #rule_fixable_match_arms }
             }
         }
 

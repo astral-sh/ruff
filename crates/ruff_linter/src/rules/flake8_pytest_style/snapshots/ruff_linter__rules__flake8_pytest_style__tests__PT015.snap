@@ -1,0 +1,170 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
+---
+PT015.py:9:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+ 8 | def test_error():
+ 9 |     assert None
+   |     ^^^^^^^^^^^ PT015
+10 |     assert False
+11 |     assert 0
+   |
+
+PT015.py:10:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+ 8 | def test_error():
+ 9 |     assert None
+10 |     assert False
+   |     ^^^^^^^^^^^^ PT015
+11 |     assert 0
+12 |     assert 0.0
+   |
+
+PT015.py:11:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+ 9 |     assert None
+10 |     assert False
+11 |     assert 0
+   |     ^^^^^^^^ PT015
+12 |     assert 0.0
+13 |     assert ""
+   |
+
+PT015.py:12:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+10 |     assert False
+11 |     assert 0
+12 |     assert 0.0
+   |     ^^^^^^^^^^ PT015
+13 |     assert ""
+14 |     assert f""
+   |
+
+PT015.py:13:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+11 |     assert 0
+12 |     assert 0.0
+13 |     assert ""
+   |     ^^^^^^^^^ PT015
+14 |     assert f""
+15 |     assert []
+   |
+
+PT015.py:14:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+12 |     assert 0.0
+13 |     assert ""
+14 |     assert f""
+   |     ^^^^^^^^^^ PT015
+15 |     assert []
+16 |     assert ()
+   |
+
+PT015.py:15:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+13 |     assert ""
+14 |     assert f""
+15 |     assert []
+   |     ^^^^^^^^^ PT015
+16 |     assert ()
+17 |     assert {}
+   |
+
+PT015.py:16:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+14 |     assert f""
+15 |     assert []
+16 |     assert ()
+   |     ^^^^^^^^^ PT015
+17 |     assert {}
+18 |     assert list()
+   |
+
+PT015.py:17:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+15 |     assert []
+16 |     assert ()
+17 |     assert {}
+   |     ^^^^^^^^^ PT015
+18 |     assert list()
+19 |     assert set()
+   |
+
+PT015.py:18:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+16 |     assert ()
+17 |     assert {}
+18 |     assert list()
+   |     ^^^^^^^^^^^^^ PT015
+19 |     assert set()
+20 |     assert tuple()
+   |
+
+PT015.py:19:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+17 |     assert {}
+18 |     assert list()
+19 |     assert set()
+   |     ^^^^^^^^^^^^ PT015
+20 |     assert tuple()
+21 |     assert dict()
+   |
+
+PT015.py:20:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+18 |     assert list()
+19 |     assert set()
+20 |     assert tuple()
+   |     ^^^^^^^^^^^^^^ PT015
+21 |     assert dict()
+22 |     assert frozenset()
+   |
+
+PT015.py:21:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+19 |     assert set()
+20 |     assert tuple()
+21 |     assert dict()
+   |     ^^^^^^^^^^^^^ PT015
+22 |     assert frozenset()
+23 |     assert list([])
+   |
+
+PT015.py:22:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+20 |     assert tuple()
+21 |     assert dict()
+22 |     assert frozenset()
+   |     ^^^^^^^^^^^^^^^^^^ PT015
+23 |     assert list([])
+24 |     assert set(set())
+   |
+
+PT015.py:23:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+21 |     assert dict()
+22 |     assert frozenset()
+23 |     assert list([])
+   |     ^^^^^^^^^^^^^^^ PT015
+24 |     assert set(set())
+25 |     assert tuple("")
+   |
+
+PT015.py:24:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+22 |     assert frozenset()
+23 |     assert list([])
+24 |     assert set(set())
+   |     ^^^^^^^^^^^^^^^^^ PT015
+25 |     assert tuple("")
+   |
+
+PT015.py:25:5: PT015 Assertion always fails, replace with `pytest.fail()`
+   |
+23 |     assert list([])
+24 |     assert set(set())
+25 |     assert tuple("")
+   |     ^^^^^^^^^^^^^^^^ PT015
+   |
+
+

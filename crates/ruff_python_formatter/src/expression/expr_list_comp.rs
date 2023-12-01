@@ -1,14 +1,11 @@
 use ruff_formatter::{format_args, write, FormatResult};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprListComp;
 
-use crate::context::PyFormatContext;
-use crate::expression::parentheses::{
-    parenthesized_with_dangling_comments, NeedsParentheses, OptionalParentheses,
-};
+use crate::comments::SourceComment;
+
+use crate::expression::parentheses::{parenthesized, NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
-use crate::AsFormat;
-use crate::{FormatNodeRule, PyFormatter};
 
 #[derive(Default)]
 pub struct FormatExprListComp;
@@ -28,26 +25,26 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
         });
 
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
+        let dangling = comments.dangling(item);
 
         write!(
             f,
-            [parenthesized_with_dangling_comments(
+            [parenthesized(
                 "[",
-                dangling,
                 &group(&format_args![
                     group(&elt.format()),
                     soft_line_break_or_space(),
-                    &joined
+                    joined
                 ]),
                 "]"
-            )]
+            )
+            .with_dangling_comments(dangling)]
         )
     }
 
     fn fmt_dangling_comments(
         &self,
-        _node: &ExprListComp,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled as part of `fmt_fields`

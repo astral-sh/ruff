@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+combine_as_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / from module import Class as C
+2 | | from module import CONSTANT
+3 | | from module import function
+4 | | from module import function as f
+  |
+  = help: Organize imports
+
+ℹ Safe fix
+  1 |+from module import CONSTANT, function
+1 2 | from module import Class as C
+2   |-from module import CONSTANT
+3   |-from module import function
+4 3 | from module import function as f
+
+

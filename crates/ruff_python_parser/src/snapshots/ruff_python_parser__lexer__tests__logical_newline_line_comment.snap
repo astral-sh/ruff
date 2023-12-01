@@ -1,0 +1,26 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+[
+    (
+        Comment(
+            "#Hello",
+        ),
+        0..6,
+    ),
+    (
+        NonLogicalNewline,
+        6..7,
+    ),
+    (
+        Comment(
+            "#World",
+        ),
+        7..13,
+    ),
+    (
+        NonLogicalNewline,
+        13..14,
+    ),
+]

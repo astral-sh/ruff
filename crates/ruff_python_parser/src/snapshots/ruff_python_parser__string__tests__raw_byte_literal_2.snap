@@ -6,16 +6,20 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..6,
-            value: Constant(
-                ExprConstant {
+            value: BytesLiteral(
+                ExprBytesLiteral {
                     range: 0..6,
-                    value: Bytes(
-                        [
-                            92,
-                            92,
-                        ],
-                    ),
-                    kind: None,
+                    value: BytesLiteralValue {
+                        inner: Single(
+                            BytesLiteral {
+                                range: 0..6,
+                                value: [
+                                    92,
+                                    92,
+                                ],
+                            },
+                        ),
+                    },
                 },
             ),
         },

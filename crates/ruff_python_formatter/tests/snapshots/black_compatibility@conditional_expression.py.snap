@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/condition
 ---
 ## Input
 
-```py
+```python
 long_kwargs_single_line = my_function(
     foo="test, this is a sample value",
     bar=some_long_value_name_foo_bar_baz if some_boolean_variable else some_fallback_value_foo_bar_baz,
@@ -136,11 +136,20 @@ def something():
      for some_boolean_variable in some_iterable
  )
  
+@@ -86,5 +78,7 @@
+     clone._iterable_class = (
+         NamedValuesListIterable
+         if named
+-        else FlatValuesListIterable if flat else ValuesListIterable
++        else FlatValuesListIterable
++        if flat
++        else ValuesListIterable
+     )
 ```
 
 ## Ruff Output
 
-```py
+```python
 long_kwargs_single_line = my_function(
     foo="test, this is a sample value",
     bar=some_long_value_name_foo_bar_baz
@@ -221,13 +230,15 @@ def something():
     clone._iterable_class = (
         NamedValuesListIterable
         if named
-        else FlatValuesListIterable if flat else ValuesListIterable
+        else FlatValuesListIterable
+        if flat
+        else ValuesListIterable
     )
 ```
 
 ## Black Output
 
-```py
+```python
 long_kwargs_single_line = my_function(
     foo="test, this is a sample value",
     bar=(

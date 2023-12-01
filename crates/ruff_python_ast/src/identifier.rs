@@ -10,14 +10,40 @@
 //!
 //! This module can be used to identify the [`TextRange`] of the `except` token.
 
-use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Ranged, Stmt};
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use crate::{self as ast, Alias, ExceptHandler, Parameter, ParameterWithDefault, Stmt};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use ruff_python_trivia::{is_python_whitespace, Cursor};
 
 pub trait Identifier {
     /// Return the [`TextRange`] of the identifier in the given AST node.
     fn identifier(&self) -> TextRange;
+}
+
+impl Identifier for ast::StmtFunctionDef {
+    /// Return the [`TextRange`] of the identifier in the given function definition.
+    ///
+    /// For example, return the range of `f` in:
+    /// ```python
+    /// def f():
+    ///     ...
+    /// ```
+    fn identifier(&self) -> TextRange {
+        self.name.range()
+    }
+}
+
+impl Identifier for ast::StmtClassDef {
+    /// Return the [`TextRange`] of the identifier in the given class definition.
+    ///
+    /// For example, return the range of `C` in:
+    /// ```python
+    /// class C():
+    ///     ...
+    /// ```
+    fn identifier(&self) -> TextRange {
+        self.name.range()
+    }
 }
 
 impl Identifier for Stmt {
@@ -30,9 +56,8 @@ impl Identifier for Stmt {
     /// ```
     fn identifier(&self) -> TextRange {
         match self {
-            Stmt::ClassDef(ast::StmtClassDef { name, .. })
-            | Stmt::FunctionDef(ast::StmtFunctionDef { name, .. })
-            | Stmt::AsyncFunctionDef(ast::StmtAsyncFunctionDef { name, .. }) => name.range(),
+            Stmt::ClassDef(class) => class.identifier(),
+            Stmt::FunctionDef(function) => function.identifier(),
             _ => self.range(),
         }
     }
@@ -85,10 +110,9 @@ pub fn except(handler: &ExceptHandler, source: &str) -> TextRange {
         .expect("Failed to find `except` token in `ExceptHandler`")
 }
 
-/// Return the [`TextRange`] of the `else` token in a `For`, `AsyncFor`, or `While` statement.
+/// Return the [`TextRange`] of the `else` token in a `For` or `While` statement.
 pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
     let (Stmt::For(ast::StmtFor { body, orelse, .. })
-    | Stmt::AsyncFor(ast::StmtAsyncFor { body, orelse, .. })
     | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
     else {
         return None;
@@ -205,7 +229,7 @@ mod tests {
 
     #[test]
     fn extract_global_names() {
-        let contents = r#"global X,Y, Z"#.trim();
+        let contents = r"global X,Y, Z".trim();
 
         let mut names = IdentifierTokenizer::new(
             contents,

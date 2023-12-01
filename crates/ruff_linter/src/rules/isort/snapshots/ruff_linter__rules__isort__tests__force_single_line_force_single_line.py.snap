@@ -1,0 +1,85 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+force_single_line.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 1 | / import sys, math
+ 2 | | from os import path, uname
+ 3 | | from json import detect_encoding
+ 4 | | from json import dump
+ 5 | | from json import dumps as json_dumps
+ 6 | | from json import load
+ 7 | | from json import loads as json_loads
+ 8 | | from logging.handlers import StreamHandler, FileHandler
+ 9 | | 
+10 | | # comment 1
+11 | | from third_party import lib1, lib2, \
+12 | |      lib3, lib7, lib5, lib6
+13 | | # comment 2
+14 | | from third_party import lib4
+15 | | 
+16 | | from foo import bar  # comment 3
+17 | | from foo2 import bar2  # comment 4
+18 | | from foo3 import bar3, baz3  # comment 5
+19 | | 
+20 | | # comment 6
+21 | | from bar import (
+22 | |      a, # comment 7
+23 | |      b, # comment 8
+24 | | )
+25 | | 
+26 | | # comment 9
+27 | | from baz import *  # comment 10
+   |
+   = help: Organize imports
+
+ℹ Safe fix
+1     |-import sys, math
+2     |-from os import path, uname
+   1  |+import math
+   2  |+import sys
+3  3  | from json import detect_encoding
+4  4  | from json import dump
+5  5  | from json import dumps as json_dumps
+6  6  | from json import load
+7  7  | from json import loads as json_loads
+8     |-from logging.handlers import StreamHandler, FileHandler
+   8  |+from logging.handlers import FileHandler, StreamHandler
+   9  |+from os import path, uname
+9  10 | 
+10    |-# comment 1
+11    |-from third_party import lib1, lib2, \
+12    |-     lib3, lib7, lib5, lib6
+13    |-# comment 2
+14    |-from third_party import lib4
+   11 |+# comment 6
+   12 |+from bar import a  # comment 7
+   13 |+from bar import b  # comment 8
+15 14 | 
+   15 |+# comment 9
+   16 |+from baz import *  # comment 10
+16 17 | from foo import bar  # comment 3
+17 18 | from foo2 import bar2  # comment 4
+18    |-from foo3 import bar3, baz3  # comment 5
+   19 |+from foo3 import bar3  # comment 5
+   20 |+from foo3 import baz3  # comment 5
+19 21 | 
+20    |-# comment 6
+21    |-from bar import (
+22    |-     a, # comment 7
+23    |-     b, # comment 8
+24    |-)
+   22 |+# comment 1
+   23 |+from third_party import lib1
+   24 |+from third_party import lib2
+   25 |+from third_party import lib3
+25 26 | 
+26    |-# comment 9
+27    |-from baz import *  # comment 10
+   27 |+# comment 2
+   28 |+from third_party import lib4
+   29 |+from third_party import lib5
+   30 |+from third_party import lib6
+   31 |+from third_party import lib7
+
+

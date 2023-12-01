@@ -6,20 +6,43 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..17,
-            value: JoinedStr(
-                ExprJoinedStr {
+            value: FString(
+                ExprFString {
                     range: 0..17,
-                    values: [
-                        Constant(
-                            ExprConstant {
-                                range: 1..16,
-                                value: Str(
-                                    "Hello world",
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..8,
+                                        value: "Hello ",
+                                        unicode: false,
+                                    },
                                 ),
-                                kind: None,
-                            },
+                                FString(
+                                    FString {
+                                        range: 9..17,
+                                        values: [
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 11..16,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 11..16,
+                                                                value: "world",
+                                                                unicode: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ],
                         ),
-                    ],
+                    },
                 },
             ),
         },

@@ -1,0 +1,82 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF019.py:3:4: RUF019 [*] Unnecessary key check before dictionary access
+  |
+1 | d = {}
+2 | # RUF019
+3 | if "k" in d and d["k"]:
+  |    ^^^^^^^^^^^^^^^^^^^ RUF019
+4 |     pass
+  |
+  = help: Replace with `dict.get`
+
+ℹ Safe fix
+1 1 | d = {}
+2 2 | # RUF019
+3   |-if "k" in d and d["k"]:
+  3 |+if d.get("k"):
+4 4 |     pass
+5 5 | 
+6 6 | k = "k"
+
+RUF019.py:7:4: RUF019 [*] Unnecessary key check before dictionary access
+  |
+6 | k = "k"
+7 | if k in d and d[k]:
+  |    ^^^^^^^^^^^^^^^ RUF019
+8 |     pass
+  |
+  = help: Replace with `dict.get`
+
+ℹ Safe fix
+4 4 |     pass
+5 5 | 
+6 6 | k = "k"
+7   |-if k in d and d[k]:
+  7 |+if d.get(k):
+8 8 |     pass
+9 9 | 
+10 10 | if (k) in d and d[k]:
+
+RUF019.py:10:4: RUF019 [*] Unnecessary key check before dictionary access
+   |
+ 8 |     pass
+ 9 | 
+10 | if (k) in d and d[k]:
+   |    ^^^^^^^^^^^^^^^^^ RUF019
+11 |     pass
+   |
+   = help: Replace with `dict.get`
+
+ℹ Safe fix
+7  7  | if k in d and d[k]:
+8  8  |     pass
+9  9  | 
+10    |-if (k) in d and d[k]:
+   10 |+if d.get(k):
+11 11 |     pass
+12 12 | 
+13 13 | if k in d and d[(k)]:
+
+RUF019.py:13:4: RUF019 [*] Unnecessary key check before dictionary access
+   |
+11 |     pass
+12 | 
+13 | if k in d and d[(k)]:
+   |    ^^^^^^^^^^^^^^^^^ RUF019
+14 |     pass
+   |
+   = help: Replace with `dict.get`
+
+ℹ Safe fix
+10 10 | if (k) in d and d[k]:
+11 11 |     pass
+12 12 | 
+13    |-if k in d and d[(k)]:
+   13 |+if d.get((k)):
+14 14 |     pass
+15 15 | 
+16 16 | # OK
+
+

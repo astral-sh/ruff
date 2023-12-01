@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/flake8_boolean_trap/mod.rs
+---
+FBT.py:12:5: FBT002 Boolean default positional argument in function definition
+   |
+10 |     posorkw_nonvalued_boolhint: bool,
+11 |     posorkw_nonvalued_boolstrhint: "bool",
+12 |     posorkw_boolvalued_nohint=True,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ FBT002
+13 |     posorkw_boolvalued_nonboolhint: int = True,
+14 |     posorkw_boolvalued_boolhint: bool = True,
+   |
+
+FBT.py:13:5: FBT002 Boolean default positional argument in function definition
+   |
+11 |     posorkw_nonvalued_boolstrhint: "bool",
+12 |     posorkw_boolvalued_nohint=True,
+13 |     posorkw_boolvalued_nonboolhint: int = True,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FBT002
+14 |     posorkw_boolvalued_boolhint: bool = True,
+15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
+   |
+
+FBT.py:14:5: FBT002 Boolean default positional argument in function definition
+   |
+12 |     posorkw_boolvalued_nohint=True,
+13 |     posorkw_boolvalued_nonboolhint: int = True,
+14 |     posorkw_boolvalued_boolhint: bool = True,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ FBT002
+15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
+16 |     posorkw_nonboolvalued_nohint=1,
+   |
+
+FBT.py:15:5: FBT002 Boolean default positional argument in function definition
+   |
+13 |     posorkw_boolvalued_nonboolhint: int = True,
+14 |     posorkw_boolvalued_boolhint: bool = True,
+15 |     posorkw_boolvalued_boolstrhint: "bool" = True,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FBT002
+16 |     posorkw_nonboolvalued_nohint=1,
+17 |     posorkw_nonboolvalued_nonboolhint: int = 2,
+   |
+
+

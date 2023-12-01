@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F503.py:17:1: F503 `%`-format string expected sequence but got mapping
+   |
+15 | # Multiple placeholders
+16 | "%s %s" % dog
+17 | "%s %s" % {"bob": "bob"}  # F503
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ F503
+18 | "%s %s" % {**{"bob": "bob"}}  # F503
+19 | "%s %s" % ["bob"]
+   |
+
+F503.py:18:1: F503 `%`-format string expected sequence but got mapping
+   |
+16 | "%s %s" % dog
+17 | "%s %s" % {"bob": "bob"}  # F503
+18 | "%s %s" % {**{"bob": "bob"}}  # F503
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F503
+19 | "%s %s" % ["bob"]
+20 | "%s %s" % ("bob",)
+   |
+
+F503.py:23:1: F503 `%`-format string expected sequence but got mapping
+   |
+21 | "%s %s" % {"bob"}
+22 | "%s %s" % [*["bob"]]
+23 | "%s %s" % {"bob": "bob" for _ in range(1)}  # F503
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F503
+24 | "%s %s" % ["bob" for _ in range(1)]
+25 | "%s %s" % ("bob" for _ in range(1))
+   |
+
+

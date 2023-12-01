@@ -1,22 +1,24 @@
+#![allow(clippy::print_stdout)]
+
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::CommandFactory;
+use colored::Colorize;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
-use ruff::logging::{set_up_logging, LogLevel};
-use ruff::settings::types::SerializationFormat;
-use ruff::settings::{flags, CliSettings};
-use ruff::{fs, warn_user_once};
-use ruff_python_formatter::{format_module, PyFormatOptions};
+use ruff_linter::logging::{set_up_logging, LogLevel};
+use ruff_linter::settings::flags::FixMode;
+use ruff_linter::settings::types::SerializationFormat;
+use ruff_linter::{fs, warn_user, warn_user_once};
+use ruff_workspace::Settings;
 
-use crate::args::{Args, CheckArgs, Command};
-use crate::commands::run_stdin::read_from_stdin;
+use crate::args::{Args, CheckCommand, Command, FormatCommand, HelpFormat};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -26,6 +28,8 @@ mod diagnostics;
 mod panic;
 mod printer;
 pub mod resolve;
+mod stdin;
+mod version;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -77,7 +81,7 @@ fn change_detected(paths: &[PathBuf]) -> Option<ChangeKind> {
     None
 }
 
-/// Returns true if the linter should read from standard input.
+/// Returns true if the command should read from standard input.
 fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     // If the user provided a `--stdin-filename`, always read from standard input.
     if stdin_filename.is_some() {
@@ -90,12 +94,33 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
         return true;
     }
 
+    let [file] = files else {
+        return false;
+    };
     // If the user provided exactly `-`, read from standard input.
-    if files.len() == 1 && files[0] == Path::new("-") {
-        return true;
-    }
+    file == Path::new("-")
+}
 
-    false
+/// Returns the default set of files if none are provided, otherwise returns `None`.
+fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
+    if files.is_empty() {
+        if is_stdin {
+            vec![Path::new("-").to_path_buf()]
+        } else {
+            vec![Path::new(".").to_path_buf()]
+        }
+    } else {
+        files
+    }
+}
+
+/// Get the actual value of the `format` desired from either `output_format`
+/// or `format`, and warn the user if they're using the deprecated form.
+fn resolve_help_output_format(output_format: HelpFormat, format: Option<HelpFormat>) -> HelpFormat {
+    if format.is_some() {
+        warn_user!("The `--format` argument is deprecated. Use `--output-format` instead.");
+    }
+    format.unwrap_or(output_format)
 }
 
 pub fn run(
@@ -105,21 +130,21 @@ pub fn run(
     }: Args,
 ) -> Result<ExitStatus> {
     {
-        use colored::Colorize;
-
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             #[allow(clippy::print_stderr)]
             {
                 eprintln!(
                     r#"
-{}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
+{}{} {} If you could open an issue at:
 
-https://github.com/astral-sh/ruff/issues/new?title=%5BPanic%5D
+    https://github.com/astral-sh/ruff/issues/new?title=%5BPanic%5D
 
-quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
+...quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
 "#,
                     "error".red().bold(),
+                    ":".bold(),
+                    "Ruff crashed.".bold(),
                 );
             }
             default_panic_hook(info);
@@ -134,56 +159,61 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, all, format } => {
+        Command::Version { output_format } => {
+            commands::version::version(output_format)?;
+            Ok(ExitStatus::Success)
+        }
+        Command::Rule {
+            rule,
+            all,
+            format,
+            mut output_format,
+        } => {
+            output_format = resolve_help_output_format(output_format, format);
             if all {
-                commands::rule::rules(format)?;
+                commands::rule::rules(output_format)?;
             }
             if let Some(rule) = rule {
-                commands::rule::rule(rule, format)?;
+                commands::rule::rule(rule, output_format)?;
             }
+            Ok(ExitStatus::Success)
         }
-        Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
-        Command::Linter { format } => commands::linter::linter(format)?,
-        Command::Clean => commands::clean::clean(log_level)?,
+        Command::Config { option } => {
+            commands::config::config(option.as_deref())?;
+            Ok(ExitStatus::Success)
+        }
+        Command::Linter {
+            format,
+            mut output_format,
+        } => {
+            output_format = resolve_help_output_format(output_format, format);
+            commands::linter::linter(output_format)?;
+            Ok(ExitStatus::Success)
+        }
+        Command::Clean => {
+            commands::clean::clean(log_level)?;
+            Ok(ExitStatus::Success)
+        }
         Command::GenerateShellCompletion { shell } => {
-            shell.generate(&mut Args::command(), &mut io::stdout());
+            shell.generate(&mut Args::command(), &mut stdout());
+            Ok(ExitStatus::Success)
         }
-        Command::Check(args) => return check(args, log_level),
-        Command::Format { files } => return format(&files),
+        Command::Check(args) => check(args, log_level),
+        Command::Format(args) => format(args, log_level),
     }
-
-    Ok(ExitStatus::Success)
 }
 
-fn format(files: &[PathBuf]) -> Result<ExitStatus> {
-    warn_user_once!(
-        "`ruff format` is a work-in-progress, subject to change at any time, and intended for \
-        internal use only."
-    );
+fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
+    let (cli, overrides) = args.partition();
 
-    match &files {
-        // Check if we should read from stdin
-        [path] if path == Path::new("-") => {
-            let unformatted = read_from_stdin()?;
-            let options = PyFormatOptions::from_extension(Path::new("stdin.py"));
-            let formatted = format_module(&unformatted, options)?;
-            stdout().lock().write_all(formatted.as_code().as_bytes())?;
-        }
-        _ => {
-            for file in files {
-                let unformatted = std::fs::read_to_string(file)
-                    .with_context(|| format!("Could not read {}: ", file.display()))?;
-                let options = PyFormatOptions::from_extension(file);
-                let formatted = format_module(&unformatted, options)?;
-                std::fs::write(file, formatted.as_code().as_bytes())
-                    .with_context(|| format!("Could not write to {}, exiting", file.display()))?;
-            }
-        }
+    if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
+        commands::format_stdin::format_stdin(&cli, &overrides)
+    } else {
+        commands::format::format(cli, &overrides, log_level)
     }
-    Ok(ExitStatus::Success)
 }
 
-pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
+pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -203,45 +233,48 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         }
         _ => Box::new(BufWriter::new(io::stdout())),
     };
+    let stderr_writer = Box::new(BufWriter::new(io::stderr()));
+
+    let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
+    let files = resolve_default_files(cli.files, is_stdin);
 
     if cli.show_settings {
-        commands::show_settings::show_settings(
-            &cli.files,
-            &pyproject_config,
-            &overrides,
-            &mut writer,
-        )?;
+        commands::show_settings::show_settings(&files, &pyproject_config, &overrides, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides, &mut writer)?;
+        commands::show_files::show_files(&files, &pyproject_config, &overrides, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
-    let CliSettings {
+    let Settings {
         fix,
         fix_only,
-        format,
+        unsafe_fixes,
+        output_format,
         show_fixes,
         show_source,
         ..
-    } = pyproject_config.settings.cli;
+    } = pyproject_config.settings;
 
-    // Autofix rules are as follows:
+    // Fix rules are as follows:
     // - By default, generate all fixes, but don't apply them to the filesystem.
-    // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
+    // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
-    // - If `--diff` or `--fix-only` are set, don't print any violations (only
-    //   fixes).
-    let autofix = if cli.diff {
-        flags::FixMode::Diff
+    // - If `--diff` or `--fix-only` are set, don't print any violations (only applicable fixes)
+    // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
+    //   `--unsafe-fixes` is set, then [`Applicablility::Suggested`] fixes are included.
+
+    let fix_mode = if cli.diff {
+        FixMode::Diff
     } else if fix || fix_only {
-        flags::FixMode::Apply
+        FixMode::Apply
     } else {
-        flags::FixMode::Generate
+        FixMode::Generate
     };
+
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
     let mut printer_flags = PrinterFlags::empty();
@@ -255,7 +288,7 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
     if cli.ecosystem_ci {
-        warn_user_once!(
+        warn_user!(
             "The formatting of fixes emitted by this option is a work-in-progress, subject to \
             change at any time, and intended only for internal use."
         );
@@ -266,15 +299,14 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     if cache {
         // `--no-cache` doesn't respect code changes, and so is often confusing during
         // development.
-        warn_user_once!("Detected debug build without --no-cache.");
+        warn_user!("Detected debug build without --no-cache.");
     }
 
     if cli.add_noqa {
-        if !autofix.is_generate() {
-            warn_user_once!("--fix is incompatible with --add-noqa.");
+        if !fix_mode.is_generate() {
+            warn_user!("--fix is incompatible with --add-noqa.");
         }
-        let modifications =
-            commands::add_noqa::add_noqa(&cli.files, &pyproject_config, &overrides)?;
+        let modifications = commands::add_noqa::add_noqa(&files, &pyproject_config, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
@@ -285,17 +317,23 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(format, log_level, autofix, printer_flags);
+    let printer = Printer::new(
+        output_format,
+        log_level,
+        fix_mode,
+        unsafe_fixes,
+        printer_flags,
+    );
 
     if cli.watch {
-        if format != SerializationFormat::Text {
-            warn_user_once!("--format 'text' is used in watch mode.");
+        if output_format != SerializationFormat::Text {
+            warn_user!("`--output-format text` is always used in watch mode.");
         }
 
         // Configure the file watcher.
         let (tx, rx) = channel();
         let mut watcher = recommended_watcher(tx)?;
-        for file in &cli.files {
+        for file in &files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
         if let Some(file) = pyproject_config.path.as_ref() {
@@ -306,13 +344,14 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::run::run(
-            &cli.files,
+        let messages = commands::check::check(
+            &files,
             &pyproject_config,
             &overrides,
             cache.into(),
             noqa.into(),
-            autofix,
+            fix_mode,
+            unsafe_fixes,
         )?;
         printer.write_continuously(&mut writer, &messages)?;
 
@@ -338,13 +377,14 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
 
-                    let messages = commands::run::run(
-                        &cli.files,
+                    let messages = commands::check::check(
+                        &files,
                         &pyproject_config,
                         &overrides,
                         cache.into(),
                         noqa.into(),
-                        autofix,
+                        fix_mode,
+                        unsafe_fixes,
                     )?;
                     printer.write_continuously(&mut writer, &messages)?;
                 }
@@ -352,37 +392,39 @@ pub fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             }
         }
     } else {
-        let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
-
         // Generate lint violations.
         let diagnostics = if is_stdin {
-            commands::run_stdin::run_stdin(
+            commands::check_stdin::check_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_config,
                 &overrides,
                 noqa.into(),
-                autofix,
+                fix_mode,
             )?
         } else {
-            commands::run::run(
-                &cli.files,
+            commands::check::check(
+                &files,
                 &pyproject_config,
                 &overrides,
                 cache.into(),
                 noqa.into(),
-                autofix,
+                fix_mode,
+                unsafe_fixes,
             )?
         };
 
-        // Always try to print violations (the printer itself may suppress output),
-        // unless we're writing fixes via stdin (in which case, the transformed
-        // source code goes to stdout).
-        if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
-            if cli.statistics {
-                printer.write_statistics(&diagnostics, &mut writer)?;
-            } else {
-                printer.write_once(&diagnostics, &mut writer)?;
-            }
+        // Always try to print violations (though the printer itself may suppress output)
+        // If we're writing fixes via stdin, the transformed source code goes to the writer
+        // so send the summary to stderr instead
+        let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
+            stderr_writer
+        } else {
+            writer
+        };
+        if cli.statistics {
+            printer.write_statistics(&diagnostics, &mut summary_writer)?;
+        } else {
+            printer.write_once(&diagnostics, &mut summary_writer)?;
         }
 
         if !cli.exit_zero {

@@ -1,13 +1,25 @@
 //! Utility to generate Ruff's `pyproject.toml` section from a Flake8 INI file.
 
+mod black;
+mod converter;
+mod external_config;
+mod isort;
+mod parser;
+mod pep621;
+mod plugin;
+mod pyproject;
+
 use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
 use configparser::ini::Ini;
 
-use ruff::flake8_to_ruff::{self, ExternalConfig};
-use ruff::logging::{set_up_logging, LogLevel};
+use crate::converter::convert;
+use crate::external_config::ExternalConfig;
+use crate::plugin::Plugin;
+use crate::pyproject::parse;
+use ruff_linter::logging::{set_up_logging, LogLevel};
 
 #[derive(Parser)]
 #[command(
@@ -25,7 +37,7 @@ struct Args {
     pyproject: Option<PathBuf>,
     /// List of plugins to enable.
     #[arg(long, value_delimiter = ',')]
-    plugin: Option<Vec<flake8_to_ruff::Plugin>>,
+    plugin: Option<Vec<Plugin>>,
 }
 
 fn main() -> Result<()> {
@@ -39,7 +51,7 @@ fn main() -> Result<()> {
     let config = ini.load(args.file).map_err(|msg| anyhow::anyhow!(msg))?;
 
     // Read the pyproject.toml file.
-    let pyproject = args.pyproject.map(flake8_to_ruff::parse).transpose()?;
+    let pyproject = args.pyproject.map(parse).transpose()?;
     let external_config = pyproject
         .as_ref()
         .and_then(|pyproject| pyproject.tool.as_ref())
@@ -57,7 +69,7 @@ fn main() -> Result<()> {
     };
 
     // Create Ruff's pyproject.toml section.
-    let pyproject = flake8_to_ruff::convert(&config, &external_config, args.plugin)?;
+    let pyproject = convert(&config, &external_config, args.plugin);
 
     #[allow(clippy::print_stdout)]
     {

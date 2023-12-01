@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+---
+TD002.py:11:3: TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+   |
+ 9 | # TODO @mayrholu and more: this has an author
+10 | # T002 - errors
+11 | # TODO: this has no author
+   |   ^^^^ TD002
+12 | # FIXME: neither does this
+13 | # TODO : and neither does this
+   |
+
+TD002.py:12:3: TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+   |
+10 | # T002 - errors
+11 | # TODO: this has no author
+12 | # FIXME: neither does this
+   |   ^^^^^ TD002
+13 | # TODO : and neither does this
+14 | # foo # TODO: this doesn't either
+   |
+
+TD002.py:13:3: TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+   |
+11 | # TODO: this has no author
+12 | # FIXME: neither does this
+13 | # TODO : and neither does this
+   |   ^^^^ TD002
+14 | # foo # TODO: this doesn't either
+   |
+
+TD002.py:14:9: TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+   |
+12 | # FIXME: neither does this
+13 | # TODO : and neither does this
+14 | # foo # TODO: this doesn't either
+   |         ^^^^ TD002
+   |
+
+

@@ -1,11 +1,13 @@
-use ruff_formatter::prelude::{dynamic_text, format_with, space, text};
-use ruff_formatter::{write, Buffer, Format, FormatResult};
-use ruff_python_ast::node::AstNode;
-use ruff_python_ast::{Ranged, StmtImportFrom};
+use ruff_formatter::write;
+use ruff_python_ast::AstNode;
+use ruff_python_ast::StmtImportFrom;
+use ruff_text_size::Ranged;
 
-use crate::builders::{parenthesize_if_expands, PyFormatterExtensions};
-use crate::comments::trailing_comments;
-use crate::{AsFormat, FormatNodeRule, PyFormatter};
+use crate::builders::{parenthesize_if_expands, PyFormatterExtensions, TrailingComma};
+use crate::comments::{SourceComment, SuppressionKind};
+use crate::expression::parentheses::parenthesized;
+use crate::other::identifier::DotDelimitedIdentifier;
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatStmtImportFrom;
@@ -15,23 +17,24 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         let StmtImportFrom {
             module,
             names,
-            range: _,
             level,
+            range: _,
         } = item;
-
-        let level_str = level
-            .map(|level| ".".repeat(level.to_usize()))
-            .unwrap_or(String::default());
 
         write!(
             f,
             [
-                text("from"),
+                token("from"),
                 space(),
-                dynamic_text(&level_str, None),
-                module.as_ref().map(AsFormat::format),
+                format_with(|f| {
+                    for _ in 0..level.unwrap_or(0) {
+                        token(".").fmt(f)?;
+                    }
+                    Ok(())
+                }),
+                module.as_ref().map(DotDelimitedIdentifier::new),
                 space(),
-                text("import"),
+                token("import"),
                 space(),
             ]
         )?;
@@ -39,28 +42,50 @@ impl FormatNodeRule<StmtImportFrom> for FormatStmtImportFrom {
         if let [name] = names.as_slice() {
             // star can't be surrounded by parentheses
             if name.name.as_str() == "*" {
-                return text("*").fmt(f);
+                return token("*").fmt(f);
             }
         }
 
-        let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling_comments(item.as_any_node_ref());
-        write!(f, [trailing_comments(dangling_comments)])?;
-
         let names = format_with(|f| {
             f.join_comma_separated(item.end())
+                .with_trailing_comma(TrailingComma::OneOrMore)
                 .entries(names.iter().map(|name| (name, name.format())))
                 .finish()
         });
-        parenthesize_if_expands(&names).fmt(f)
+
+        // A dangling comment on an import is a parenthesized comment, like:
+        // ```python
+        // from example import (  # comment
+        //     A,
+        //     B,
+        // )
+        // ```
+        let comments = f.context().comments().clone();
+        let parenthesized_comments = comments.dangling(item.as_any_node_ref());
+
+        if parenthesized_comments.is_empty() {
+            parenthesize_if_expands(&names).fmt(f)
+        } else {
+            parenthesized("(", &names, ")")
+                .with_dangling_comments(parenthesized_comments)
+                .fmt(f)
+        }
     }
 
     fn fmt_dangling_comments(
         &self,
-        _node: &StmtImportFrom,
+        _dangling_comments: &[SourceComment],
         _f: &mut PyFormatter,
     ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
+    }
+
+    fn is_suppressed(
+        &self,
+        trailing_comments: &[SourceComment],
+        context: &PyFormatContext,
+    ) -> bool {
+        SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
 }

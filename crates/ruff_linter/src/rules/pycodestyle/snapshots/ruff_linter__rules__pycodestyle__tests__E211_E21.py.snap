@@ -1,0 +1,145 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E21.py:2:5: E211 [*] Whitespace before '('
+  |
+1 | #: E211
+2 | spam (1)
+  |     ^ E211
+3 | #: E211 E211
+4 | dict ['key'] = list [index]
+  |
+  = help: Removed whitespace before '('
+
+ℹ Safe fix
+1 1 | #: E211
+2   |-spam (1)
+  2 |+spam(1)
+3 3 | #: E211 E211
+4 4 | dict ['key'] = list [index]
+5 5 | #: E211
+
+E21.py:4:5: E211 [*] Whitespace before '['
+  |
+2 | spam (1)
+3 | #: E211 E211
+4 | dict ['key'] = list [index]
+  |     ^ E211
+5 | #: E211
+6 | dict['key'] ['subkey'] = list[index]
+  |
+  = help: Removed whitespace before '['
+
+ℹ Safe fix
+1 1 | #: E211
+2 2 | spam (1)
+3 3 | #: E211 E211
+4   |-dict ['key'] = list [index]
+  4 |+dict['key'] = list [index]
+5 5 | #: E211
+6 6 | dict['key'] ['subkey'] = list[index]
+7 7 | #: Okay
+
+E21.py:4:20: E211 [*] Whitespace before '['
+  |
+2 | spam (1)
+3 | #: E211 E211
+4 | dict ['key'] = list [index]
+  |                    ^ E211
+5 | #: E211
+6 | dict['key'] ['subkey'] = list[index]
+  |
+  = help: Removed whitespace before '['
+
+ℹ Safe fix
+1 1 | #: E211
+2 2 | spam (1)
+3 3 | #: E211 E211
+4   |-dict ['key'] = list [index]
+  4 |+dict ['key'] = list[index]
+5 5 | #: E211
+6 6 | dict['key'] ['subkey'] = list[index]
+7 7 | #: Okay
+
+E21.py:6:12: E211 [*] Whitespace before '['
+  |
+4 | dict ['key'] = list [index]
+5 | #: E211
+6 | dict['key'] ['subkey'] = list[index]
+  |            ^ E211
+7 | #: Okay
+8 | spam(1)
+  |
+  = help: Removed whitespace before '['
+
+ℹ Safe fix
+3 3 | #: E211 E211
+4 4 | dict ['key'] = list [index]
+5 5 | #: E211
+6   |-dict['key'] ['subkey'] = list[index]
+  6 |+dict['key']['subkey'] = list[index]
+7 7 | #: Okay
+8 8 | spam(1)
+9 9 | dict['key'] = list[index]
+
+E21.py:17:15: E211 [*] Whitespace before '('
+   |
+17 | def fetch_name () -> Union[str, None]:
+   |               ^ E211
+18 |     """Fetch name from --person-name in sys.argv.
+   |
+   = help: Removed whitespace before '('
+
+ℹ Safe fix
+14 14 |     pass
+15 15 | 
+16 16 | 
+17    |-def fetch_name () -> Union[str, None]:
+   17 |+def fetch_name() -> Union[str, None]:
+18 18 |     """Fetch name from --person-name in sys.argv.
+19 19 | 
+20 20 |    Returns:
+
+E21.py:27:19: E211 [*] Whitespace before '('
+   |
+25 |     # test commented code
+26 |     # Logger.info("test code")
+27 |     for i in range (0, len (sys.argv)) :
+   |                   ^ E211
+28 |         if sys.argv[i] == "--name" :
+29 |             return sys.argv[i + 1]
+   |
+   = help: Removed whitespace before '('
+
+ℹ Safe fix
+24 24 |     Logger.info(test)
+25 25 |     # test commented code
+26 26 |     # Logger.info("test code")
+27    |-    for i in range (0, len (sys.argv)) :
+   27 |+    for i in range(0, len (sys.argv)) :
+28 28 |         if sys.argv[i] == "--name" :
+29 29 |             return sys.argv[i + 1]
+30 30 |     return None
+
+E21.py:27:27: E211 [*] Whitespace before '('
+   |
+25 |     # test commented code
+26 |     # Logger.info("test code")
+27 |     for i in range (0, len (sys.argv)) :
+   |                           ^ E211
+28 |         if sys.argv[i] == "--name" :
+29 |             return sys.argv[i + 1]
+   |
+   = help: Removed whitespace before '('
+
+ℹ Safe fix
+24 24 |     Logger.info(test)
+25 25 |     # test commented code
+26 26 |     # Logger.info("test code")
+27    |-    for i in range (0, len (sys.argv)) :
+   27 |+    for i in range (0, len(sys.argv)) :
+28 28 |         if sys.argv[i] == "--name" :
+29 29 |             return sys.argv[i + 1]
+30 30 |     return None
+
+

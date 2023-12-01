@@ -1,0 +1,20 @@
+---
+source: crates/ruff_python_parser/src/invalid.rs
+expression: ast
+---
+Ok(
+    Module(
+        ModModule {
+            range: 0..9,
+            body: [
+                IpyEscapeCommand(
+                    StmtIpyEscapeCommand {
+                        range: 0..9,
+                        kind: Shell,
+                        value: "foo = 42",
+                    },
+                ),
+            ],
+        },
+    ),
+)

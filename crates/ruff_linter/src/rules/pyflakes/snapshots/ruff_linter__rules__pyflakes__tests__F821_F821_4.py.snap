@@ -1,0 +1,44 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_4.py:4:11: F821 Undefined name `Model`
+  |
+2 | from typing import List
+3 | 
+4 | _ = List["Model"]
+  |           ^^^^^ F821
+  |
+
+F821_4.py:9:12: F821 Undefined name `Model`
+  |
+7 | from typing import List as IList
+8 | 
+9 | _ = IList["Model"]
+  |            ^^^^^ F821
+  |
+
+F821_4.py:14:16: F821 Undefined name `Model`
+   |
+12 | from collections.abc import ItemsView
+13 | 
+14 | _ = ItemsView["Model"]
+   |                ^^^^^ F821
+   |
+
+F821_4.py:19:32: F821 Undefined name `Model`
+   |
+17 | import collections.abc
+18 | 
+19 | _ = collections.abc.ItemsView["Model"]
+   |                                ^^^^^ F821
+   |
+
+F821_4.py:24:20: F821 Undefined name `Model`
+   |
+22 | from collections import abc
+23 | 
+24 | _ = abc.ItemsView["Model"]
+   |                    ^^^^^ F821
+   |
+
+

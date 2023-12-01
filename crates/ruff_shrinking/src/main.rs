@@ -35,9 +35,9 @@ use fs_err as fs;
 use regex::Regex;
 use ruff_python_ast::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
 use ruff_python_ast::visitor::{walk_expr, Visitor};
-use ruff_python_ast::{Expr, Ranged, Stmt, Suite};
+use ruff_python_ast::{Expr, Stmt, Suite};
 use ruff_python_parser::Mode;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -87,10 +87,8 @@ impl Strategy for StrategyRemoveModuleMember {
     ) -> Result<Box<dyn ExactSizeStringIter + 'a>> {
         let iter = ast.iter().map(|stmt| {
             // trim the newlines the range misses
-            input[..stmt.range().start().to_usize()]
-                .trim_end()
-                .to_string()
-                + input[stmt.range().end().to_usize()..].trim_start()
+            input[..stmt.start().to_usize()].trim_end().to_string()
+                + input[stmt.end().to_usize()..].trim_start()
         });
         Ok(Box::new(iter))
     }
@@ -322,7 +320,7 @@ fn minimization_step(
     last_strategy_and_idx: Option<(&'static dyn Strategy, usize)>,
 ) -> Result<Option<(&'static dyn Strategy, usize, String)>> {
     let tokens = ruff_python_parser::tokenize(input, Mode::Module);
-    let ast = ruff_python_parser::parse_program_tokens(tokens, "input.py", false)
+    let ast = ruff_python_parser::parse_program_tokens(tokens, input, "input.py", false)
         .context("not valid python")?;
 
     // Try the last succeeding strategy first, skipping all that failed last time

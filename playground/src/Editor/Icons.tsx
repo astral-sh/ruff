@@ -124,3 +124,19 @@ export function FormatterIRIcon() {
     </svg>
   );
 }
+export function CommentsIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      width={24}
+      height={24}
+    >
+      <path
+        d="M7.7,18.3H19.4a2.1,2.1,0,0,0,2.1-2.1V4.6a2.1,2.1,0,0,0-2.1-2.1H4.6A2.1,2.1,0,0,0,2.5,4.6V21.5Z"
+        stroke="#ffffff"
+        fill="none"
+      ></path>
+    </svg>
+  );
+}

@@ -1,5 +1,6 @@
 [files]
-extend-exclude = ["resources", "snapshots"]
+# https://github.com/crate-ci/typos/issues/868
+extend-exclude = ["**/resources/**/*", "**/snapshots/**/*"]
 
 [default.extend-words]
 hel = "hel"

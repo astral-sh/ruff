@@ -30,13 +30,21 @@ impl<'a> Cursor<'a> {
         self.chars.clone().next().unwrap_or(EOF_CHAR)
     }
 
+    /// Peeks the second character from the input stream without consuming it.
+    /// Returns [`EOF_CHAR`] if the position is past the end of the file.
+    pub fn second(&self) -> char {
+        let mut chars = self.chars.clone();
+        chars.next();
+        chars.next().unwrap_or(EOF_CHAR)
+    }
+
     /// Peeks the next character from the input stream without consuming it.
     /// Returns [`EOF_CHAR`] if the file is at the end of the file.
     pub fn last(&self) -> char {
         self.chars.clone().next_back().unwrap_or(EOF_CHAR)
     }
 
-    // SAFETY: THe `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
+    // SAFETY: The `source.text_len` call in `new` would panic if the string length is larger than a `u32`.
     #[allow(clippy::cast_possible_truncation)]
     pub fn text_len(&self) -> TextSize {
         TextSize::new(self.chars.as_str().len() as u32)

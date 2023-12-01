@@ -1,22 +1,20 @@
 use std::usize;
 
-use ruff_python_ast::{Parameters, Ranged};
-use ruff_text_size::{TextRange, TextSize};
-
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::Parameters;
+use ruff_python_ast::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{
-    dangling_comments, leading_comments, leading_node_comments, trailing_comments,
-    CommentLinePosition, SourceComment,
+    dangling_comments, dangling_open_parenthesis_comments, leading_comments, leading_node_comments,
+    trailing_comments, CommentLinePosition, SourceComment,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
-use crate::expression::parentheses::parenthesized;
+use crate::expression::parentheses::empty_parenthesized;
 use crate::prelude::*;
-use crate::FormatNodeRule;
 
-#[derive(Eq, PartialEq, Debug, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub enum ParametersParentheses {
     /// By default, parameters will always preserve their surrounding parentheses.
     #[default]
@@ -61,12 +59,58 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             kwarg,
         } = item;
 
+        let (slash, star) = find_parameter_separators(f.context().source(), item);
+
         let comments = f.context().comments().clone();
-        let dangling = comments.dangling_comments(item);
-        let (slash, star) = find_argument_separators(f.context().source(), item);
+        let dangling = comments.dangling(item);
+
+        // First dangling comment: trailing the opening parenthesis, e.g.:
+        // ```python
+        // def f(  # comment
+        //     x,
+        //     y,
+        //     z,
+        // ): ...
+        // TODO(charlie): We already identified this comment as such in placement.rs. Consider
+        // labeling it as such. See: https://github.com/astral-sh/ruff/issues/5247.
+        let parenthesis_comments_end = usize::from(dangling.first().is_some_and(|comment| {
+            if comment.line_position().is_end_of_line() {
+                // Ensure that there are no tokens between the open bracket and the comment.
+                let mut lexer = SimpleTokenizer::new(
+                    f.context().source(),
+                    TextRange::new(item.start(), comment.start()),
+                )
+                .skip_trivia()
+                .skip_while(|t| {
+                    matches!(
+                        t.kind(),
+                        SimpleTokenKind::LParen
+                            | SimpleTokenKind::LBrace
+                            | SimpleTokenKind::LBracket
+                    )
+                });
+                if lexer.next().is_none() {
+                    return true;
+                }
+            }
+            false
+        }));
+
+        // Separate into (dangling comments on the open parenthesis) and (dangling comments on the
+        // argument separators, e.g., `*` or `/`).
+        let (parenthesis_dangling, parameters_dangling) =
+            dangling.split_at(parenthesis_comments_end);
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            let separator = format_with(|f| write!(f, [text(","), soft_line_break_or_space()]));
+            let separator = format_with(|f: &mut PyFormatter| {
+                token(",").fmt(f)?;
+
+                if f.context().node_level().is_parenthesized() {
+                    soft_line_break_or_space().fmt(f)
+                } else {
+                    space().fmt(f)
+                }
+            });
             let mut joiner = f.join_with(separator);
             let mut last_node: Option<AnyNodeRef> = None;
 
@@ -76,14 +120,22 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 last_node = Some(parameter_with_default.into());
             }
 
+            // Second dangling comment: trailing the slash, e.g.:
+            // ```python
+            // def f(
+            //     x,
+            //     /,  # comment
+            //     y,
+            //     z,
+            // ): ...
             let slash_comments_end = if posonlyargs.is_empty() {
                 0
             } else {
-                let slash_comments_end = dangling.partition_point(|comment| {
+                let slash_comments_end = parameters_dangling.partition_point(|comment| {
                     let assignment = assign_argument_separator_comment_placement(
                         slash.as_ref(),
                         star.as_ref(),
-                        comment.slice().range(),
+                        comment.range(),
                         comment.line_position(),
                     )
                     .expect("Unexpected dangling comment type in function parameters");
@@ -95,7 +147,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 });
                 joiner.entry(&CommentsAroundText {
                     text: "/",
-                    comments: &dangling[..slash_comments_end],
+                    comments: &parameters_dangling[..slash_comments_end],
                 });
                 slash_comments_end
             };
@@ -112,7 +164,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             if let Some(vararg) = vararg {
                 joiner.entry(&format_args![
                     leading_node_comments(vararg.as_ref()),
-                    text("*"),
+                    token("*"),
                     vararg.format()
                 ]);
                 last_node = Some(vararg.as_any_node_ref());
@@ -135,7 +187,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 // ```
                 joiner.entry(&CommentsAroundText {
                     text: "*",
-                    comments: &dangling[slash_comments_end..],
+                    comments: &parameters_dangling[slash_comments_end..],
                 });
             }
 
@@ -148,7 +200,7 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             if let Some(kwarg) = kwarg {
                 joiner.entry(&format_args![
                     leading_node_comments(kwarg.as_ref()),
-                    text("**"),
+                    token("**"),
                     kwarg.format()
                 ]);
                 last_node = Some(kwarg.as_any_node_ref());
@@ -172,10 +224,10 @@ impl FormatNodeRule<Parameters> for FormatParameters {
                 // For lambdas (no parentheses), preserve the trailing comma. It doesn't
                 // behave like a magic trailing comma, it's just preserved
                 if has_trailing_comma(item, last_node, f.context().source()) {
-                    write!(f, [text(",")])?;
+                    write!(f, [token(",")])?;
                 }
             } else {
-                write!(f, [if_group_breaks(&text(","))])?;
+                write!(f, [if_group_breaks(&token(","))])?;
 
                 if f.options().magic_trailing_comma().is_respect()
                     && has_trailing_comma(item, last_node, f.context().source())
@@ -188,8 +240,6 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             Ok(())
         });
 
-        let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-
         let num_parameters = posonlyargs.len()
             + args.len()
             + usize::from(vararg.is_some())
@@ -197,23 +247,33 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             + usize::from(kwarg.is_some());
 
         if self.parentheses == ParametersParentheses::Never {
-            write!(f, [group(&format_inner)])
+            write!(f, [group(&format_inner), dangling_comments(dangling)])
         } else if num_parameters == 0 {
+            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
             // No parameters, format any dangling comments between `()`
+            write!(f, [empty_parenthesized("(", dangling, ")")])
+        } else {
+            // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
+            // We want parameters to be grouped alongside return types, one level up, so we
+            // format them "inline" here.
+            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
             write!(
                 f,
                 [
-                    text("("),
-                    block_indent(&dangling_comments(dangling)),
-                    text(")")
+                    token("("),
+                    dangling_open_parenthesis_comments(parenthesis_dangling),
+                    soft_block_indent(&group(&format_inner)),
+                    token(")")
                 ]
             )
-        } else {
-            write!(f, [parenthesized("(", &group(&format_inner), ")")])
         }
     }
 
-    fn fmt_dangling_comments(&self, _node: &Parameters, _f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_dangling_comments(
+        &self,
+        _dangling_comments: &[SourceComment],
+        _f: &mut PyFormatter,
+    ) -> FormatResult<()> {
         // Handled in `fmt_fields`
         Ok(())
     }
@@ -227,7 +287,7 @@ struct CommentsAroundText<'a> {
 impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         if self.comments.is_empty() {
-            text(self.text).fmt(f)
+            token(self.text).fmt(f)
         } else {
             // There might be own line comments in trailing, but those are weird and we can kinda
             // ignore them
@@ -249,7 +309,7 @@ impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
                 f,
                 [
                     leading_comments(leading),
-                    text(self.text),
+                    token(self.text),
                     trailing_comments(trailing)
                 ]
             )
@@ -269,7 +329,7 @@ impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
 ///                           ^ star following start
 /// ```
 #[derive(Debug)]
-pub(crate) struct ArgumentSeparator {
+pub(crate) struct ParameterSeparator {
     /// The end of the last node or separator before this separator
     pub(crate) preceding_end: TextSize,
     /// The range of the separator itself
@@ -281,10 +341,10 @@ pub(crate) struct ArgumentSeparator {
 /// Finds slash and star in `f(a, /, b, *, c)` or `lambda a, /, b, *, c: 1`.
 ///
 /// Returns the location of the slash and star separators, if any.
-pub(crate) fn find_argument_separators(
+pub(crate) fn find_parameter_separators(
     contents: &str,
     parameters: &Parameters,
-) -> (Option<ArgumentSeparator>, Option<ArgumentSeparator>) {
+) -> (Option<ParameterSeparator>, Option<ParameterSeparator>) {
     // We only compute preceding_end and token location here since following_start depends on the
     // star location, but the star location depends on slash's position
     let slash = if let Some(preceding_end) = parameters.posonlyargs.last().map(Ranged::end) {
@@ -339,7 +399,7 @@ pub(crate) fn find_argument_separators(
                 .expect("The function definition can't end here");
             debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
 
-            Some(ArgumentSeparator {
+            Some(ParameterSeparator {
                 preceding_end,
                 separator: star.range,
                 following_start: first_keyword_argument.start(),
@@ -362,8 +422,8 @@ pub(crate) fn find_argument_separators(
             };
             debug_assert!(star.kind() == SimpleTokenKind::Star, "{star:?}");
 
-            Some(ArgumentSeparator {
-                preceding_end: parameters.range.start(),
+            Some(ParameterSeparator {
+                preceding_end: parameters.start(),
                 separator: star.range,
                 following_start: first_keyword_argument.start(),
             })
@@ -385,7 +445,7 @@ pub(crate) fn find_argument_separators(
         .or(parameters.vararg.as_ref().map(|first| first.start()))
         .or(star.as_ref().map(|star| star.separator.start()))
         .unwrap_or(parameters.end());
-    let slash = slash.map(|(preceding_end, slash)| ArgumentSeparator {
+    let slash = slash.map(|(preceding_end, slash)| ParameterSeparator {
         preceding_end,
         separator: slash,
         following_start: slash_following_start,
@@ -485,12 +545,12 @@ pub(crate) fn find_argument_separators(
 ///                     ^^^^^^ keyword only parameters (kwargs)
 /// ```
 pub(crate) fn assign_argument_separator_comment_placement(
-    slash: Option<&ArgumentSeparator>,
-    star: Option<&ArgumentSeparator>,
+    slash: Option<&ParameterSeparator>,
+    star: Option<&ParameterSeparator>,
     comment_range: TextRange,
     text_position: CommentLinePosition,
 ) -> Option<ArgumentSeparatorCommentLocation> {
-    if let Some(ArgumentSeparator {
+    if let Some(ParameterSeparator {
         preceding_end,
         separator: slash,
         following_start,
@@ -529,7 +589,7 @@ pub(crate) fn assign_argument_separator_comment_placement(
         }
     }
 
-    if let Some(ArgumentSeparator {
+    if let Some(ParameterSeparator {
         preceding_end,
         separator: star,
         following_start,

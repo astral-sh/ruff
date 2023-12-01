@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/pygrep_hooks/mod.rs
+---
+PGH003_1.py:1:8: PGH003 Use specific rule codes when ignoring type issues
+  |
+1 | x = 1  # pyright: ignore
+  |        ^^^^^^^^^^^^^^^^^ PGH003
+2 | x = 1  # pyright:ignore
+3 | x = 1  # pyright: ignore[attr-defined]  # pyright: ignore
+  |
+
+PGH003_1.py:2:8: PGH003 Use specific rule codes when ignoring type issues
+  |
+1 | x = 1  # pyright: ignore
+2 | x = 1  # pyright:ignore
+  |        ^^^^^^^^^^^^^^^^ PGH003
+3 | x = 1  # pyright: ignore[attr-defined]  # pyright: ignore
+  |
+
+PGH003_1.py:3:41: PGH003 Use specific rule codes when ignoring type issues
+  |
+1 | x = 1  # pyright: ignore
+2 | x = 1  # pyright:ignore
+3 | x = 1  # pyright: ignore[attr-defined]  # pyright: ignore
+  |                                         ^^^^^^^^^^^^^^^^^ PGH003
+4 | 
+5 | x = 1
+  |
+
+

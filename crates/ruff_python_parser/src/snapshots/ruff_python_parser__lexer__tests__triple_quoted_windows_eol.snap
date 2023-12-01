@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: triple_quoted_eol(WINDOWS_EOL)
+---
+[
+    (
+        String {
+            value: "\r\n test string\r\n ",
+            kind: String,
+            triple_quoted: true,
+        },
+        0..23,
+    ),
+    (
+        Newline,
+        23..23,
+    ),
+]

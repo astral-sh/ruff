@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S601.py:3:1: S601 Possible shell injection via Paramiko call; check inputs are properly sanitized
+  |
+1 | import paramiko
+2 | 
+3 | paramiko.exec_command('something; really; unsafe')
+  | ^^^^^^^^^^^^^^^^^^^^^ S601
+  |
+
+

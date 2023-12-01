@@ -1,0 +1,14 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S612.py:3:5: S612 Use of insecure `logging.config.listen` detected
+  |
+1 | import logging.config
+2 | 
+3 | t = logging.config.listen(9999)
+  |     ^^^^^^^^^^^^^^^^^^^^^ S612
+4 | 
+5 | def verify_func():
+  |
+
+

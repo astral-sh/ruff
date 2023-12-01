@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_9.py:22:20: F821 Undefined name `captured`
+   |
+20 |     match provided:
+21 |         case True:
+22 |             return captured  # F821
+   |                    ^^^^^^^^ F821
+   |
+
+

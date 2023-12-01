@@ -1,6 +1,7 @@
-use crate::prelude::*;
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
 use ruff_python_ast::TypeParam;
+
+use crate::prelude::*;
 
 pub(crate) mod type_param_param_spec;
 pub(crate) mod type_param_type_var;

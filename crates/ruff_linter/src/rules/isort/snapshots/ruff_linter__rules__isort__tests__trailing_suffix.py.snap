@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+trailing_suffix.py:1:1: I001 Import block is un-sorted or un-formatted
+  |
+1 | / import sys
+2 | | import os; x = 1
+  | |_________^ I001
+3 |   
+4 |   if True:
+  |
+  = help: Organize imports
+
+trailing_suffix.py:5:5: I001 Import block is un-sorted or un-formatted
+  |
+4 |   if True:
+5 |       import sys
+  |  _____^
+6 | |     import os; x = 1
+  | |_____________^ I001
+  |
+  = help: Organize imports
+
+

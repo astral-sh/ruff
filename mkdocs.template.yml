@@ -13,24 +13,33 @@ theme:
     - navigation.path
     - navigation.top
     - content.code.copy
+    - content.tabs.link
   palette:
+    # Note: Using the system theme works with the insiders version
+    # https://squidfunk.github.io/mkdocs-material/setup/changing-the-colors/#automatic-light-dark-mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
     - media: "(prefers-color-scheme: light)"
       scheme: astral-light
       toggle:
-        icon: material/weather-sunny
+        icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: astral-dark
       toggle:
-        icon: material/weather-night
-        name: Switch to light mode
+        icon: material/brightness-4
+        name: Switch to system preference
   custom_dir: docs/.overrides
 repo_url: https://github.com/astral-sh/ruff
 repo_name: ruff
 site_author: charliermarsh
-site_url: https://beta.ruff.rs/docs/
-site_dir: site/docs
+site_url: https://docs.astral.sh/ruff/
+site_dir: site/ruff
 markdown_extensions:
+  - admonition
+  - pymdownx.details
   - toc:
       permalink: "#"
   - pymdownx.snippets:
@@ -47,10 +56,16 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.highlight:
       anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
 plugins:
   - search
+  - typeset
 extra_css:
   - stylesheets/extra.css
+not_in_nav: |
+  /rules/*
+  /formatter/*
 extra:
   analytics:
     provider: fathom

@@ -1,0 +1,224 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B023.py:12:30: B023 Function definition does not bind loop variable `x`
+   |
+10 |     y = x + 1
+11 |     # Subject to late-binding problems
+12 |     functions.append(lambda: x)
+   |                              ^ B023
+13 |     functions.append(lambda: y)  # not just the loop var
+   |
+
+B023.py:13:30: B023 Function definition does not bind loop variable `y`
+   |
+11 |     # Subject to late-binding problems
+12 |     functions.append(lambda: x)
+13 |     functions.append(lambda: y)  # not just the loop var
+   |                              ^ B023
+14 | 
+15 |     def f_bad_1():
+   |
+
+B023.py:16:16: B023 Function definition does not bind loop variable `x`
+   |
+15 |     def f_bad_1():
+16 |         return x
+   |                ^ B023
+17 | 
+18 |     # Actually OK
+   |
+
+B023.py:28:19: B023 Function definition does not bind loop variable `x`
+   |
+27 | def check_inside_functions_too():
+28 |     ls = [lambda: x for x in range(2)]  # error
+   |                   ^ B023
+29 |     st = {lambda: x for x in range(2)}  # error
+30 |     gn = (lambda: x for x in range(2))  # error
+   |
+
+B023.py:29:19: B023 Function definition does not bind loop variable `x`
+   |
+27 | def check_inside_functions_too():
+28 |     ls = [lambda: x for x in range(2)]  # error
+29 |     st = {lambda: x for x in range(2)}  # error
+   |                   ^ B023
+30 |     gn = (lambda: x for x in range(2))  # error
+31 |     dt = {x: lambda: x for x in range(2)}  # error
+   |
+
+B023.py:30:19: B023 Function definition does not bind loop variable `x`
+   |
+28 |     ls = [lambda: x for x in range(2)]  # error
+29 |     st = {lambda: x for x in range(2)}  # error
+30 |     gn = (lambda: x for x in range(2))  # error
+   |                   ^ B023
+31 |     dt = {x: lambda: x for x in range(2)}  # error
+   |
+
+B023.py:31:22: B023 Function definition does not bind loop variable `x`
+   |
+29 |     st = {lambda: x for x in range(2)}  # error
+30 |     gn = (lambda: x for x in range(2))  # error
+31 |     dt = {x: lambda: x for x in range(2)}  # error
+   |                      ^ B023
+   |
+
+B023.py:40:34: B023 Function definition does not bind loop variable `x`
+   |
+38 | async def container_for_problems():
+39 |     async for x in pointless_async_iterable():
+40 |         functions.append(lambda: x)  # error
+   |                                  ^ B023
+41 | 
+42 |     [lambda: x async for x in pointless_async_iterable()]  # error
+   |
+
+B023.py:42:14: B023 Function definition does not bind loop variable `x`
+   |
+40 |         functions.append(lambda: x)  # error
+41 | 
+42 |     [lambda: x async for x in pointless_async_iterable()]  # error
+   |              ^ B023
+   |
+
+B023.py:50:30: B023 Function definition does not bind loop variable `a`
+   |
+48 |     a = a_ = a - 1
+49 |     b += 1
+50 |     functions.append(lambda: a)  # error
+   |                              ^ B023
+51 |     functions.append(lambda: a_)  # error
+52 |     functions.append(lambda: b)  # error
+   |
+
+B023.py:51:30: B023 Function definition does not bind loop variable `a_`
+   |
+49 |     b += 1
+50 |     functions.append(lambda: a)  # error
+51 |     functions.append(lambda: a_)  # error
+   |                              ^^ B023
+52 |     functions.append(lambda: b)  # error
+53 |     functions.append(lambda: c)  # error, but not a name error due to late binding
+   |
+
+B023.py:52:30: B023 Function definition does not bind loop variable `b`
+   |
+50 |     functions.append(lambda: a)  # error
+51 |     functions.append(lambda: a_)  # error
+52 |     functions.append(lambda: b)  # error
+   |                              ^ B023
+53 |     functions.append(lambda: c)  # error, but not a name error due to late binding
+54 |     c: bool = a > 3
+   |
+
+B023.py:53:30: B023 Function definition does not bind loop variable `c`
+   |
+51 |     functions.append(lambda: a_)  # error
+52 |     functions.append(lambda: b)  # error
+53 |     functions.append(lambda: c)  # error, but not a name error due to late binding
+   |                              ^ B023
+54 |     c: bool = a > 3
+55 |     if not c:
+   |
+
+B023.py:61:17: B023 Function definition does not bind loop variable `j`
+   |
+59 | for j in range(2):
+60 |     for k in range(3):
+61 |         lambda: j * k  # error
+   |                 ^ B023
+   |
+
+B023.py:61:21: B023 Function definition does not bind loop variable `k`
+   |
+59 | for j in range(2):
+60 |     for k in range(3):
+61 |         lambda: j * k  # error
+   |                     ^ B023
+   |
+
+B023.py:68:10: B023 Function definition does not bind loop variable `l`
+   |
+66 |     def f():
+67 |         j = None  # OK because it's an assignment
+68 |         [l for k in range(2)]  # error for l, not for k
+   |          ^ B023
+69 | 
+70 |         assert a and functions
+   |
+
+B023.py:82:16: B023 Function definition does not bind loop variable `i`
+   |
+81 | for i in range(3):
+82 |     lambda: f"{i}"
+   |                ^ B023
+   |
+
+B023.py:117:24: B023 Function definition does not bind loop variable `x`
+    |
+115 | for x in range(2):
+116 |     # It's not a complete get-out-of-linting-free construct - these should fail:
+117 |     min([None, lambda: x], key=repr)
+    |                        ^ B023
+118 |     sorted([None, lambda: x], key=repr)
+119 |     any(filter(bool, [None, lambda: x]))
+    |
+
+B023.py:118:27: B023 Function definition does not bind loop variable `x`
+    |
+116 |     # It's not a complete get-out-of-linting-free construct - these should fail:
+117 |     min([None, lambda: x], key=repr)
+118 |     sorted([None, lambda: x], key=repr)
+    |                           ^ B023
+119 |     any(filter(bool, [None, lambda: x]))
+120 |     list(filter(bool, [None, lambda: x]))
+    |
+
+B023.py:119:37: B023 Function definition does not bind loop variable `x`
+    |
+117 |     min([None, lambda: x], key=repr)
+118 |     sorted([None, lambda: x], key=repr)
+119 |     any(filter(bool, [None, lambda: x]))
+    |                                     ^ B023
+120 |     list(filter(bool, [None, lambda: x]))
+121 |     all(reduce(bool, [None, lambda: x]))
+    |
+
+B023.py:120:38: B023 Function definition does not bind loop variable `x`
+    |
+118 |     sorted([None, lambda: x], key=repr)
+119 |     any(filter(bool, [None, lambda: x]))
+120 |     list(filter(bool, [None, lambda: x]))
+    |                                      ^ B023
+121 |     all(reduce(bool, [None, lambda: x]))
+    |
+
+B023.py:121:37: B023 Function definition does not bind loop variable `x`
+    |
+119 |     any(filter(bool, [None, lambda: x]))
+120 |     list(filter(bool, [None, lambda: x]))
+121 |     all(reduce(bool, [None, lambda: x]))
+    |                                     ^ B023
+122 | 
+123 |     # But all these should be OK:
+    |
+
+B023.py:171:29: B023 Function definition does not bind loop variable `name`
+    |
+170 |         if foo(name):
+171 |             return [lambda: name]  # known false alarm
+    |                             ^^^^ B023
+172 | 
+173 |         if False:
+    |
+
+B023.py:174:29: B023 Function definition does not bind loop variable `i`
+    |
+173 |         if False:
+174 |             return [lambda: i for i in range(3)]  # error
+    |                             ^ B023
+    |
+
+

@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D.py:333:5: D301 [*] Use `r"""` if any backslashes in a docstring
+    |
+331 | @expect('D301: Use r""" if any backslashes in a docstring')
+332 | def double_quotes_backslash():
+333 |     """Sum\\mary."""
+    |     ^^^^^^^^^^^^^^^^ D301
+    |
+    = help: Add `r` prefix
+
+ℹ Unsafe fix
+330 330 | 
+331 331 | @expect('D301: Use r""" if any backslashes in a docstring')
+332 332 | def double_quotes_backslash():
+333     |-    """Sum\\mary."""
+    333 |+    r"""Sum\\mary."""
+334 334 | 
+335 335 | 
+336 336 | @expect('D301: Use r""" if any backslashes in a docstring')
+
+

@@ -341,7 +341,7 @@ impl AsciiEscape<'_> {
         let mut single_count = 0;
         let mut double_count = 0;
 
-        for ch in source.iter() {
+        for ch in source {
             let incr = match ch {
                 b'\'' => {
                     single_count += 1;
@@ -415,17 +415,15 @@ impl<'a> Escape for AsciiEscape<'a> {
     fn layout(&self) -> &EscapeLayout {
         &self.layout
     }
-    #[allow(unsafe_code)]
     fn write_source(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        formatter.write_str(unsafe {
-            // SAFETY: this function must be called only when source is printable ascii characters
-            std::str::from_utf8_unchecked(self.source)
-        })
+        // OK because function must be called only when source is printable ascii characters.
+        let string = std::str::from_utf8(self.source).expect("ASCII bytes");
+        formatter.write_str(string)
     }
 
     #[cold]
     fn write_body_slow(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        for ch in self.source.iter() {
+        for ch in self.source {
             Self::write_char(*ch, self.layout().quote, formatter)?;
         }
         Ok(())

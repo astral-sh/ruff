@@ -1,0 +1,7 @@
+[tool.ruff]
+src = [".", "python_modules/*"]
+exclude = ["examples/excluded"]
+
+[tool.ruff.lint]
+extend-select = ["I001"]
+extend-ignore = ["F841"]

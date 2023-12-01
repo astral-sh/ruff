@@ -1,0 +1,19 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/module_comment.py
+---
+## Input
+```python
+
+
+
+# hehehe >:)a
+```
+
+## Output
+```python
+# hehehe >:)a
+```
+
+
+

@@ -1,0 +1,28 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/stub_files/comments.pyi
+---
+## Input
+```python
+class SupportsAnext:
+    def __anext__(self): ...
+
+# Comparison protocols
+
+class SupportsDunderLT:
+    def __init__(self): ...
+```
+
+## Output
+```python
+class SupportsAnext:
+    def __anext__(self): ...
+
+# Comparison protocols
+
+class SupportsDunderLT:
+    def __init__(self): ...
+```
+
+
+

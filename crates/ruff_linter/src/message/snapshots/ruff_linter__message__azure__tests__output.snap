@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/message/azure.rs
+expression: content
+---
+##vso[task.logissue type=error;sourcepath=fib.py;linenumber=1;columnnumber=8;code=F401;]`os` imported but unused
+##vso[task.logissue type=error;sourcepath=fib.py;linenumber=6;columnnumber=5;code=F841;]Local variable `x` is assigned to but never used
+##vso[task.logissue type=error;sourcepath=undef.py;linenumber=1;columnnumber=4;code=F821;]Undefined name `a`
+

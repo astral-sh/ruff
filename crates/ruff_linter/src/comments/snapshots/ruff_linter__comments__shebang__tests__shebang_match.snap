@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/comments/shebang.rs
+expression: "ShebangDirective::try_extract(source)"
+---
+Some(
+    ShebangDirective(
+        "/usr/bin/env python",
+    ),
+)

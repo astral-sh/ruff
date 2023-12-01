@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/flake8_self/mod.rs
+---
+SLF001_extended.py:6:5: SLF001 Private member accessed: `_asdict`
+  |
+5 | def foo(obj):
+6 |     obj._asdict  # SLF001
+  |     ^^^^^^^^^^^ SLF001
+  |
+
+SLF001_extended.py:10:5: SLF001 Private member accessed: `_bar`
+   |
+ 9 | def foo(obj):
+10 |     obj._bar  # SLF001
+   |     ^^^^^^^^ SLF001
+   |
+
+

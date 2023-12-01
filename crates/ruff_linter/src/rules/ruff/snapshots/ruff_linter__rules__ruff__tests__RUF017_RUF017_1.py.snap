@@ -1,0 +1,17 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF017_1.py:1:1: RUF017 [*] Avoid quadratic list summation
+  |
+1 | sum((factor.dims for factor in bases), [])
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF017
+  |
+  = help: Replace with `functools.reduce`
+
+ℹ Unsafe fix
+1   |-sum((factor.dims for factor in bases), [])
+  1 |+import functools
+  2 |+import operator
+  3 |+functools.reduce(operator.iadd, (factor.dims for factor in bases), [])
+
+

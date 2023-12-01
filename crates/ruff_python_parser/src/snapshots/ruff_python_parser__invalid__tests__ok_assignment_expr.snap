@@ -1,0 +1,33 @@
+---
+source: crates/ruff_python_parser/src/invalid.rs
+expression: ast
+---
+Ok(
+    [
+        Expr(
+            StmtExpr {
+                range: 0..8,
+                value: NamedExpr(
+                    ExprNamedExpr {
+                        range: 1..7,
+                        target: Name(
+                            ExprName {
+                                range: 1..2,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 6..7,
+                                value: Int(
+                                    5,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+)

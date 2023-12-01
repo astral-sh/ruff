@@ -1,0 +1,43 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+bidirectional_unicode.py:2:1: PLE2502 Contains control characters that can permit obfuscated code
+  |
+1 |   # E2502
+2 | / print("שלום‬")
+3 | | 
+  | |_^ PLE2502
+4 |   # E2502
+5 |   example = "x‏" * 100  #    "‏x" is assigned
+  |
+
+bidirectional_unicode.py:5:1: PLE2502 Contains control characters that can permit obfuscated code
+  |
+4 |   # E2502
+5 | / example = "x‏" * 100  #    "‏x" is assigned
+6 | | 
+  | |_^ PLE2502
+7 |   # E2502
+8 |   if access_level != "none‮⁦":  # Check if admin ⁩⁦' and access_level != 'user
+  |
+
+bidirectional_unicode.py:8:1: PLE2502 Contains control characters that can permit obfuscated code
+  |
+7 |   # E2502
+8 | / if access_level != "none‮⁦":  # Check if admin ⁩⁦' and access_level != 'user
+9 | |     print("You are an admin.")
+  | |_^ PLE2502
+  |
+
+bidirectional_unicode.py:14:1: PLE2502 Contains control characters that can permit obfuscated code
+   |
+12 |   # E2502
+13 |   def subtract_funds(account: str, amount: int):
+14 | /     """Subtract funds from bank account then ⁧"""
+15 | |     return
+   | |_^ PLE2502
+16 |       bank[account] -= amount
+17 |       return
+   |
+
+

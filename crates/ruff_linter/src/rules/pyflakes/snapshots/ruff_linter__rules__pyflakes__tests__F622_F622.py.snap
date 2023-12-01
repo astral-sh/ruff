@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F622.py:1:1: F622 Two starred expressions in assignment
+  |
+1 | *a, *b, c = (1, 2, 3)
+  | ^^^^^^^^^ F622
+2 | *a, b, c = (1, 2, 3)
+3 | a, b, *c = (1, 2, 3)
+  |
+
+

@@ -1,0 +1,97 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_format_unicode_escape_seq.py
+---
+## Input
+
+```python
+x = "\x1F"
+x = "\\x1B"
+x = "\\\x1B"
+x = "\U0001F60E"
+x = "\u0001F60E"
+x = r"\u0001F60E"
+x = "don't format me"
+x = "\xA3"
+x = "\u2717"
+x = "\uFaCe"
+x = "\N{ox}\N{OX}"
+x = "\N{lAtIn smaLL letteR x}"
+x = "\N{CYRILLIC small LETTER BYELORUSSIAN-UKRAINIAN I}"
+x = b"\x1Fdon't byte"
+x = rb"\x1Fdon't format"
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,15 +1,15 @@
+-x = "\x1f"
++x = "\x1F"
+ x = "\\x1B"
+-x = "\\\x1b"
+-x = "\U0001f60e"
++x = "\\\x1B"
++x = "\U0001F60E"
+ x = "\u0001F60E"
+ x = r"\u0001F60E"
+ x = "don't format me"
+-x = "\xa3"
++x = "\xA3"
+ x = "\u2717"
+-x = "\uface"
+-x = "\N{OX}\N{OX}"
+-x = "\N{LATIN SMALL LETTER X}"
+-x = "\N{CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I}"
+-x = b"\x1fdon't byte"
++x = "\uFaCe"
++x = "\N{ox}\N{OX}"
++x = "\N{lAtIn smaLL letteR x}"
++x = "\N{CYRILLIC small LETTER BYELORUSSIAN-UKRAINIAN I}"
++x = b"\x1Fdon't byte"
+ x = rb"\x1Fdon't format"
+```
+
+## Ruff Output
+
+```python
+x = "\x1F"
+x = "\\x1B"
+x = "\\\x1B"
+x = "\U0001F60E"
+x = "\u0001F60E"
+x = r"\u0001F60E"
+x = "don't format me"
+x = "\xA3"
+x = "\u2717"
+x = "\uFaCe"
+x = "\N{ox}\N{OX}"
+x = "\N{lAtIn smaLL letteR x}"
+x = "\N{CYRILLIC small LETTER BYELORUSSIAN-UKRAINIAN I}"
+x = b"\x1Fdon't byte"
+x = rb"\x1Fdon't format"
+```
+
+## Black Output
+
+```python
+x = "\x1f"
+x = "\\x1B"
+x = "\\\x1b"
+x = "\U0001f60e"
+x = "\u0001F60E"
+x = r"\u0001F60E"
+x = "don't format me"
+x = "\xa3"
+x = "\u2717"
+x = "\uface"
+x = "\N{OX}\N{OX}"
+x = "\N{LATIN SMALL LETTER X}"
+x = "\N{CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I}"
+x = b"\x1fdon't byte"
+x = rb"\x1Fdon't format"
+```
+
+

@@ -4,8 +4,10 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "12:00"
-      timezone: "America/New_York"
-    commit-message:
-      prefix: "ci(deps)"
+    labels: ["internal"]
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["internal"]
