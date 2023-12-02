@@ -1,40 +1,54 @@
+# Same as `W605_0.py` but using f-strings instead.
+
 #: W605:1:10
-regex = '\.png$'
+regex = f'\.png$'
 
 #: W605:2:1
-regex = '''
+regex = f'''
 \.png$
 '''
 
 #: W605:2:6
 f(
-    '\_'
+    f'\_'
 )
 
 #: W605:4:6
-"""
+f"""
 multi-line
 literal
 with \_ somewhere
 in the middle
 """
 
+#: W605:1:38
+value = f'new line\nand invalid escape \_ here'
 
-def f():
-    #: W605:1:11
-    return'\.png$'
 
 #: Okay
-regex = r'\.png$'
-regex = '\\.png$'
-regex = r'''
+regex = fr'\.png$'
+regex = f'\\.png$'
+regex = fr'''
 \.png$
 '''
-regex = r'''
+regex = fr'''
 \\.png$
 '''
-s = '\\'
-regex = '\w'  # noqa
-regex = '''
+s = f'\\'
+regex = f'\w'  # noqa
+regex = f'''
 \w
 '''  # noqa
+
+regex = f'\\\_'
+value = f'\{{1}}'
+value = f'\{1}'
+value = f'{1:\}'
+value = f"{f"\{1}"}"
+value = rf"{f"\{1}"}"
+
+# Okay
+value = rf'\{{1}}'
+value = rf'\{1}'
+value = rf'{1:\}'
+value = f"{rf"\{1}"}"

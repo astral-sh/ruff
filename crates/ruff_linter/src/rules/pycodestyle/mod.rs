@@ -31,7 +31,6 @@ mod tests {
     #[test_case(Rule::BlankLineWithWhitespace, Path::new("W29.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_0.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_1.py"))]
-    #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_2.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501_3.py"))]
     #[test_case(Rule::MixedSpacesAndTabs, Path::new("E101.py"))]
