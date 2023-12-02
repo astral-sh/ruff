@@ -80,7 +80,7 @@ unnecessary_list_index_lookup.py:12:15: PLR1736 [*] Unnecessary lookup of list i
    12 |+        print(letter)  # PLR1736
 13 13 |         blah = letters[index]  # PLR1736
 14 14 |         assert letters[index]  == "d"  # PLR1736
-15 15 |     
+15 15 | 
 
 unnecessary_list_index_lookup.py:13:16: PLR1736 [*] Unnecessary lookup of list item by index
    |
@@ -99,7 +99,7 @@ unnecessary_list_index_lookup.py:13:16: PLR1736 [*] Unnecessary lookup of list i
 13    |-        blah = letters[index]  # PLR1736
    13 |+        blah = letter  # PLR1736
 14 14 |         assert letters[index]  == "d"  # PLR1736
-15 15 |     
+15 15 | 
 16 16 |     for index, letter in builtins.enumerate(letters):
 
 unnecessary_list_index_lookup.py:14:16: PLR1736 [*] Unnecessary lookup of list item by index
@@ -108,7 +108,7 @@ unnecessary_list_index_lookup.py:14:16: PLR1736 [*] Unnecessary lookup of list i
 13 |         blah = letters[index]  # PLR1736
 14 |         assert letters[index]  == "d"  # PLR1736
    |                ^^^^^^^^^^^^^^ PLR1736
-15 |     
+15 | 
 16 |     for index, letter in builtins.enumerate(letters):
    |
    = help: Use existing variable
@@ -119,7 +119,7 @@ unnecessary_list_index_lookup.py:14:16: PLR1736 [*] Unnecessary lookup of list i
 13 13 |         blah = letters[index]  # PLR1736
 14    |-        assert letters[index]  == "d"  # PLR1736
    14 |+        assert letter  == "d"  # PLR1736
-15 15 |     
+15 15 | 
 16 16 |     for index, letter in builtins.enumerate(letters):
 17 17 |         print(letters[index])  # PLR1736
 
@@ -135,7 +135,7 @@ unnecessary_list_index_lookup.py:17:15: PLR1736 [*] Unnecessary lookup of list i
 
 ℹ Safe fix
 14 14 |         assert letters[index]  == "d"  # PLR1736
-15 15 |     
+15 15 | 
 16 16 |     for index, letter in builtins.enumerate(letters):
 17    |-        print(letters[index])  # PLR1736
    17 |+        print(letter)  # PLR1736
@@ -154,7 +154,7 @@ unnecessary_list_index_lookup.py:18:16: PLR1736 [*] Unnecessary lookup of list i
    = help: Use existing variable
 
 ℹ Safe fix
-15 15 |     
+15 15 | 
 16 16 |     for index, letter in builtins.enumerate(letters):
 17 17 |         print(letters[index])  # PLR1736
 18    |-        blah = letters[index]  # PLR1736
