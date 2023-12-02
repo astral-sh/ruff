@@ -1534,6 +1534,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
         }
+        Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {
+            if checker.enabled(Rule::SnakeCaseTypeAlias) {
+                flake8_pyi::rules::snake_case_type_alias(checker, name);
+            }
+            if checker.enabled(Rule::TSuffixedTypeAlias) {
+                flake8_pyi::rules::t_suffixed_type_alias(checker, name);
+            }
+        }
         Stmt::Delete(delete @ ast::StmtDelete { targets, range: _ }) => {
             if checker.enabled(Rule::GlobalStatement) {
                 for target in targets {
