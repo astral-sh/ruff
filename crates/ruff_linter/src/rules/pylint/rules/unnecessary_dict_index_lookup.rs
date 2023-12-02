@@ -1,13 +1,10 @@
-use ast::Stmt;
-use ruff_python_ast::{self as ast, Expr, StmtFor};
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_text_size::TextRange;
+use ruff_python_ast::{self as ast, Expr, StmtFor};
 
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::SequenceIndexVisitor;
 
 /// ## What it does
 /// Checks for key-based dict accesses during `.items()` iterations.
@@ -54,10 +51,10 @@ pub(crate) fn unnecessary_dict_index_lookup(checker: &mut Checker, stmt_for: &St
     };
 
     let ranges = {
-        let mut visitor = SubscriptVisitor::new(dict_name, index_name);
+        let mut visitor = SequenceIndexVisitor::new(dict_name, index_name, value_name);
         visitor.visit_body(&stmt_for.body);
         visitor.visit_body(&stmt_for.orelse);
-        visitor.diagnostic_ranges
+        visitor.into_accesses()
     };
 
     for range in ranges {
@@ -96,12 +93,12 @@ pub(crate) fn unnecessary_dict_index_lookup_comprehension(checker: &mut Checker,
         };
 
         let ranges = {
-            let mut visitor = SubscriptVisitor::new(dict_name, index_name);
+            let mut visitor = SequenceIndexVisitor::new(dict_name, index_name, value_name);
             visitor.visit_expr(elt.as_ref());
             for expr in &comp.ifs {
                 visitor.visit_expr(expr);
             }
-            visitor.diagnostic_ranges
+            visitor.into_accesses()
         };
 
         for range in ranges {
@@ -160,95 +157,4 @@ fn dict_items<'a>(
     }
 
     Some((dict_name, index_name, value_name))
-}
-
-#[derive(Debug)]
-struct SubscriptVisitor<'a> {
-    dict_name: &'a str,
-    index_name: &'a str,
-    diagnostic_ranges: Vec<TextRange>,
-    modified: bool,
-}
-
-impl<'a> SubscriptVisitor<'a> {
-    fn new(dict_name: &'a str, index_name: &'a str) -> Self {
-        Self {
-            dict_name,
-            index_name,
-            diagnostic_ranges: Vec::new(),
-            modified: false,
-        }
-    }
-}
-
-impl SubscriptVisitor<'_> {
-    fn is_assignment(&self, expr: &Expr) -> bool {
-        let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr else {
-            return false;
-        };
-        let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
-            return false;
-        };
-        if id == self.dict_name {
-            let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
-                return false;
-            };
-            if id == self.index_name {
-                return true;
-            }
-        }
-        false
-    }
-}
-
-impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        if self.modified {
-            return;
-        }
-        match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
-                self.visit_expr(value);
-            }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                if let Some(value) = value {
-                    self.modified = self.is_assignment(target);
-                    self.visit_expr(value);
-                }
-            }
-            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                self.modified = self.is_assignment(target);
-                self.visit_expr(value);
-            }
-            _ => visitor::walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &Expr) {
-        if self.modified {
-            return;
-        }
-        match expr {
-            Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice,
-                range,
-                ..
-            }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
-                    return;
-                };
-                if id == self.dict_name {
-                    let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
-                        return;
-                    };
-                    if id == self.index_name {
-                        self.diagnostic_ranges.push(*range);
-                    }
-                }
-            }
-            _ => visitor::walk_expr(self, expr),
-        }
-    }
 }
