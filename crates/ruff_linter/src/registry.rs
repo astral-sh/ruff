@@ -208,7 +208,7 @@ pub enum Linter {
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
-    /// [Array-agnosticism](https://data-apis.org/array-api/latest/)
+    /// [Array-agnosticism](https://github.com/data-apis/array-api)
     #[prefix = "XP"]
     XP,
 }
