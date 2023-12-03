@@ -251,7 +251,8 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(line.start()));
                 let edit = if indent.is_empty() {
-                    Edit::deletion(line.start(), line_indent.text_len())
+                    // Delete the entire indent.
+                    Edit::range_deletion(TextRange::at(line.start(), line_indent.text_len()))
                 } else {
                     // Convert the character count to an offset within the source.
                     let offset = checker
