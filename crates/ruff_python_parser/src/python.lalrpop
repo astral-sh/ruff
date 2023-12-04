@@ -11,7 +11,7 @@ use crate::{
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::{StringType, concatenated_strings, parse_fstring_middle, parse_string_literal},
+    string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
     token::{self, StringKind},
     invalid,
 };
@@ -1611,23 +1611,23 @@ StringLiteral: StringType = {
 };
 
 FStringExpr: StringType = {
-    <location:@L> FStringStart <values:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
+    <location:@L> FStringStart <elements:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
         StringType::FString(ast::FString {
-            values,
+            elements,
             range: (location..end_location).into()
         })
     }
 };
 
-FStringMiddlePattern: ast::Expr = {
+FStringMiddlePattern: ast::FStringElement = {
     FStringReplacementField,
     <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
         let (source, is_raw) = fstring_middle;
-        Ok(parse_fstring_middle(&source, is_raw, (location..end_location).into())?)
+        Ok(parse_fstring_literal_element(&source, is_raw, (location..end_location).into())?)
     }
 };
 
-FStringReplacementField: ast::Expr = {
+FStringReplacementField: ast::FStringElement = {
     <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> =>? {
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
             return Err(LexicalError {
@@ -1651,30 +1651,27 @@ FStringReplacementField: ast::Expr = {
             }
         });
         Ok(
-            ast::ExprFormattedValue {
-                value: Box::new(value.into()),
+            ast::FStringElement::Expression(ast::FStringExpressionElement {
+                expression: Box::new(value.into()),
                 debug_text,
                 conversion: conversion.map_or(ast::ConversionFlag::None, |(_, conversion_flag)| {
                     conversion_flag
                 }),
                 format_spec: format_spec.map(Box::new),
                 range: (location..end_location).into(),
-            }
-            .into()
+            })
         )
     }
 };
 
-FStringFormatSpecSuffix: ast::Expr = {
+FStringFormatSpecSuffix: ast::FStringFormatSpec = {
     ":" <format_spec:FStringFormatSpec> => format_spec
 };
 
-FStringFormatSpec: ast::Expr = {
-    <location:@L> <values:FStringMiddlePattern*> <end_location:@R> => {
-        ast::FString {
-            values,
-            range: (location..end_location).into()
-        }.into()
+FStringFormatSpec: ast::FStringFormatSpec = {
+    <location:@L> <elements:FStringMiddlePattern*> <end_location:@R> => ast::FStringFormatSpec {
+        elements,
+        range: (location..end_location).into(),
     },
 };
 
