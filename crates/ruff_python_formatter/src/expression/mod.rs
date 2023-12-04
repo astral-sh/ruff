@@ -21,7 +21,7 @@ use crate::expression::parentheses::{
     OptionalParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::PyFormatOptions;
+use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -129,7 +129,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             let node_comments = comments.leading_dangling_trailing(expression);
             if !node_comments.has_leading() && !node_comments.has_trailing() {
                 parenthesized("(", &format_expr, ")")
-                    .with_indent(!is_expression_huggable(expression, f.options()))
+                    .with_indent(!is_expression_huggable(expression, f.context()))
                     .fmt(f)
             } else {
                 format_with_parentheses_comments(expression, &node_comments, f)
@@ -448,7 +448,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
             OptionalParentheses::Never => match parenthesize {
                 Parenthesize::IfBreaksOrIfRequired => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
-                        .with_indent(!is_expression_huggable(expression, f.options()))
+                        .with_indent(!is_expression_huggable(expression, f.context()))
                         .fmt(f)
                 }
 
@@ -1061,8 +1061,8 @@ pub(crate) fn has_own_parentheses(
 ///     ]
 /// )
 /// ```
-pub(crate) fn is_expression_huggable(expr: &Expr, options: &PyFormatOptions) -> bool {
-    if !options.preview().is_enabled() {
+pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> bool {
+    if !is_hug_parens_with_braces_and_square_brackets_enabled(context) {
         return false;
     }
 

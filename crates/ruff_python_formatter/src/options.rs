@@ -119,7 +119,7 @@ impl PyFormatOptions {
         self.docstring_code
     }
 
-    pub fn preview(&self) -> PreviewMode {
+    pub const fn preview(&self) -> PreviewMode {
         self.preview
     }
 
