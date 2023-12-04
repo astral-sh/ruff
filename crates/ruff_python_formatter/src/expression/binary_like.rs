@@ -3,7 +3,7 @@ use std::ops::{Deref, Index};
 
 use smallvec::SmallVec;
 
-use ruff_formatter::{write, FormatContext};
+use ruff_formatter::write;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprBinOp, ExprBoolOp, ExprCompare, ExprUnaryOp, UnaryOp,
 };
@@ -21,6 +21,7 @@ use crate::expression::parentheses::{
 use crate::expression::string::{AnyString, FormatString, StringLayout};
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
+use crate::preview::is_fix_power_op_line_length_enabled;
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
@@ -719,7 +720,7 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                 {
                     hard_line_break().fmt(f)?;
                 } else if is_pow {
-                    if f.context().options().preview().is_enabled() {
+                    if is_fix_power_op_line_length_enabled(f.context()) {
                         in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
                     }
                 } else {
