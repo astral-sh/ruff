@@ -34,7 +34,7 @@ harness = false
 once_cell.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-url = "2.3.1"
+url = "2.5.0"
 ureq = "2.8.0"
 criterion = { version = "0.5.1", default-features = false }
 codspeed-criterion-compat = { version="2.3.3", default-features = false, optional = true}
