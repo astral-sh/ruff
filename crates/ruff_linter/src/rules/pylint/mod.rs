@@ -251,12 +251,12 @@ mod tests {
     }
 
     #[test]
-    fn max_pos_args() -> Result<()> {
+    fn max_positional_args() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_positional_params.py"),
             &LinterSettings {
                 pylint: pylint::settings::Settings {
-                    max_pos_args: 4,
+                    max_positional_args: 4,
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::TooManyPositional)

@@ -2369,6 +2369,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-positional-args": {
+          "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-public-methods": {
           "description": "Maximum number of public methods allowed for a class (see: `PLR0904`).",
           "type": [
@@ -3117,6 +3126,7 @@
         "PLR0913",
         "PLR0915",
         "PLR0916",
+        "PLR0917",
         "PLR1",
         "PLR17",
         "PLR170",
