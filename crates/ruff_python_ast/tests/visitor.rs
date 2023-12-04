@@ -7,13 +7,15 @@ use ruff_python_parser::{parse_tokens, Mode};
 
 use ruff_python_ast::visitor::{
     walk_alias, walk_bytes_literal, walk_comprehension, walk_except_handler, walk_expr,
-    walk_keyword, walk_match_case, walk_parameter, walk_parameters, walk_pattern, walk_stmt,
-    walk_string_literal, walk_type_param, walk_with_item, Visitor,
+    walk_f_string, walk_f_string_element, walk_keyword, walk_match_case, walk_parameter,
+    walk_parameters, walk_pattern, walk_stmt, walk_string_literal, walk_type_param, walk_with_item,
+    Visitor,
 };
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
-    Alias, BoolOp, BytesLiteral, CmpOp, Comprehension, ExceptHandler, Expr, Keyword, MatchCase,
-    Operator, Parameter, Parameters, Pattern, Stmt, StringLiteral, TypeParam, UnaryOp, WithItem,
+    Alias, BoolOp, BytesLiteral, CmpOp, Comprehension, ExceptHandler, Expr, FString,
+    FStringElement, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern, Stmt,
+    StringLiteral, TypeParam, UnaryOp, WithItem,
 };
 
 #[test]
@@ -255,12 +257,6 @@ impl Visitor<'_> for RecordVisitor {
         self.exit_node();
     }
 
-    fn visit_format_spec(&mut self, format_spec: &Expr) {
-        self.enter_node(format_spec);
-        walk_expr(self, format_spec);
-        self.exit_node();
-    }
-
     fn visit_parameters(&mut self, parameters: &Parameters) {
         self.enter_node(parameters);
         walk_parameters(self, parameters);
@@ -318,6 +314,18 @@ impl Visitor<'_> for RecordVisitor {
     fn visit_bytes_literal(&mut self, bytes_literal: &BytesLiteral) {
         self.enter_node(bytes_literal);
         walk_bytes_literal(self, bytes_literal);
+        self.exit_node();
+    }
+
+    fn visit_f_string(&mut self, f_string: &FString) {
+        self.enter_node(f_string);
+        walk_f_string(self, f_string);
+        self.exit_node();
+    }
+
+    fn visit_f_string_element(&mut self, f_string_element: &FStringElement) {
+        self.enter_node(f_string_element);
+        walk_f_string_element(self, f_string_element);
         self.exit_node();
     }
 }

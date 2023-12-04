@@ -7,19 +7,12 @@ expression: trace
     - ExprFString
       - StringLiteral
       - FString
-        - ExprStringLiteral
-          - StringLiteral
-        - ExprFormattedValue
+        - FStringLiteralElement
+        - FStringExpressionElement
           - ExprName
-          - ExprFString
-            - ExprFString
-              - FString
-                - ExprStringLiteral
-                  - StringLiteral
-                - ExprFormattedValue
-                  - ExprName
-                - ExprStringLiteral
-                  - StringLiteral
-        - ExprStringLiteral
-          - StringLiteral
+          - FStringLiteralElement
+          - FStringExpressionElement
+            - ExprName
+          - FStringLiteralElement
+        - FStringLiteralElement
 
