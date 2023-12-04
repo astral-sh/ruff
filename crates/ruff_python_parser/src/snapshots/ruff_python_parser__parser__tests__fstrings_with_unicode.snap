@@ -22,11 +22,11 @@ expression: parse_ast
                                 FString(
                                     FString {
                                         range: 7..15,
-                                        values: [
-                                            FormattedValue(
-                                                ExprFormattedValue {
+                                        elements: [
+                                            Expression(
+                                                FStringExpressionElement {
                                                     range: 9..14,
-                                                    value: Name(
+                                                    expression: Name(
                                                         ExprName {
                                                             range: 10..13,
                                                             id: "bar",
@@ -81,11 +81,11 @@ expression: parse_ast
                                 FString(
                                     FString {
                                         range: 36..44,
-                                        values: [
-                                            FormattedValue(
-                                                ExprFormattedValue {
+                                        elements: [
+                                            Expression(
+                                                FStringExpressionElement {
                                                     range: 38..43,
-                                                    value: Name(
+                                                    expression: Name(
                                                         ExprName {
                                                             range: 39..42,
                                                             id: "bar",
@@ -140,11 +140,11 @@ expression: parse_ast
                                 FString(
                                     FString {
                                         range: 66..74,
-                                        values: [
-                                            FormattedValue(
-                                                ExprFormattedValue {
+                                        elements: [
+                                            Expression(
+                                                FStringExpressionElement {
                                                     range: 68..73,
-                                                    value: Name(
+                                                    expression: Name(
                                                         ExprName {
                                                             range: 69..72,
                                                             id: "bar",
@@ -199,25 +199,17 @@ expression: parse_ast
                                 FString(
                                     FString {
                                         range: 97..116,
-                                        values: [
-                                            StringLiteral(
-                                                ExprStringLiteral {
+                                        elements: [
+                                            Literal(
+                                                FStringLiteralElement {
                                                     range: 99..103,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 99..103,
-                                                                value: "bar ",
-                                                                unicode: false,
-                                                            },
-                                                        ),
-                                                    },
+                                                    value: "bar ",
                                                 },
                                             ),
-                                            FormattedValue(
-                                                ExprFormattedValue {
+                                            Expression(
+                                                FStringExpressionElement {
                                                     range: 103..108,
-                                                    value: Name(
+                                                    expression: Name(
                                                         ExprName {
                                                             range: 104..107,
                                                             id: "baz",
@@ -229,18 +221,10 @@ expression: parse_ast
                                                     format_spec: None,
                                                 },
                                             ),
-                                            StringLiteral(
-                                                ExprStringLiteral {
+                                            Literal(
+                                                FStringLiteralElement {
                                                     range: 108..115,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 108..115,
-                                                                value: " really",
-                                                                unicode: false,
-                                                            },
-                                                        ),
-                                                    },
+                                                    value: " really",
                                                 },
                                             ),
                                         ],

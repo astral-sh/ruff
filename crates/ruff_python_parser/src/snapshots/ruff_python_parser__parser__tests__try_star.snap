@@ -204,25 +204,17 @@ expression: parse_ast
                                                                     FString(
                                                                         FString {
                                                                             range: 133..179,
-                                                                            values: [
-                                                                                StringLiteral(
-                                                                                    ExprStringLiteral {
+                                                                            elements: [
+                                                                                Literal(
+                                                                                    FStringLiteralElement {
                                                                                         range: 135..142,
-                                                                                        value: StringLiteralValue {
-                                                                                            inner: Single(
-                                                                                                StringLiteral {
-                                                                                                    range: 135..142,
-                                                                                                    value: "caught ",
-                                                                                                    unicode: false,
-                                                                                                },
-                                                                                            ),
-                                                                                        },
+                                                                                        value: "caught ",
                                                                                     },
                                                                                 ),
-                                                                                FormattedValue(
-                                                                                    ExprFormattedValue {
+                                                                                Expression(
+                                                                                    FStringExpressionElement {
                                                                                         range: 142..151,
-                                                                                        value: Call(
+                                                                                        expression: Call(
                                                                                             ExprCall {
                                                                                                 range: 143..150,
                                                                                                 func: Name(
@@ -252,24 +244,16 @@ expression: parse_ast
                                                                                         format_spec: None,
                                                                                     },
                                                                                 ),
-                                                                                StringLiteral(
-                                                                                    ExprStringLiteral {
+                                                                                Literal(
+                                                                                    FStringLiteralElement {
                                                                                         range: 151..164,
-                                                                                        value: StringLiteralValue {
-                                                                                            inner: Single(
-                                                                                                StringLiteral {
-                                                                                                    range: 151..164,
-                                                                                                    value: " with nested ",
-                                                                                                    unicode: false,
-                                                                                                },
-                                                                                            ),
-                                                                                        },
+                                                                                        value: " with nested ",
                                                                                     },
                                                                                 ),
-                                                                                FormattedValue(
-                                                                                    ExprFormattedValue {
+                                                                                Expression(
+                                                                                    FStringExpressionElement {
                                                                                         range: 164..178,
-                                                                                        value: Attribute(
+                                                                                        expression: Attribute(
                                                                                             ExprAttribute {
                                                                                                 range: 165..177,
                                                                                                 value: Name(
@@ -351,25 +335,17 @@ expression: parse_ast
                                                                     FString(
                                                                         FString {
                                                                             range: 213..259,
-                                                                            values: [
-                                                                                StringLiteral(
-                                                                                    ExprStringLiteral {
+                                                                            elements: [
+                                                                                Literal(
+                                                                                    FStringLiteralElement {
                                                                                         range: 215..222,
-                                                                                        value: StringLiteralValue {
-                                                                                            inner: Single(
-                                                                                                StringLiteral {
-                                                                                                    range: 215..222,
-                                                                                                    value: "caught ",
-                                                                                                    unicode: false,
-                                                                                                },
-                                                                                            ),
-                                                                                        },
+                                                                                        value: "caught ",
                                                                                     },
                                                                                 ),
-                                                                                FormattedValue(
-                                                                                    ExprFormattedValue {
+                                                                                Expression(
+                                                                                    FStringExpressionElement {
                                                                                         range: 222..231,
-                                                                                        value: Call(
+                                                                                        expression: Call(
                                                                                             ExprCall {
                                                                                                 range: 223..230,
                                                                                                 func: Name(
@@ -399,24 +375,16 @@ expression: parse_ast
                                                                                         format_spec: None,
                                                                                     },
                                                                                 ),
-                                                                                StringLiteral(
-                                                                                    ExprStringLiteral {
+                                                                                Literal(
+                                                                                    FStringLiteralElement {
                                                                                         range: 231..244,
-                                                                                        value: StringLiteralValue {
-                                                                                            inner: Single(
-                                                                                                StringLiteral {
-                                                                                                    range: 231..244,
-                                                                                                    value: " with nested ",
-                                                                                                    unicode: false,
-                                                                                                },
-                                                                                            ),
-                                                                                        },
+                                                                                        value: " with nested ",
                                                                                     },
                                                                                 ),
-                                                                                FormattedValue(
-                                                                                    ExprFormattedValue {
+                                                                                Expression(
+                                                                                    FStringExpressionElement {
                                                                                         range: 244..258,
-                                                                                        value: Attribute(
+                                                                                        expression: Attribute(
                                                                                             ExprAttribute {
                                                                                                 range: 245..257,
                                                                                                 value: Name(
