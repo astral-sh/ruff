@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E402.ipynb:9:1: E402 Module level import not at top of cell
+   |
+ 7 | os.path
+ 8 | 
+ 9 | import pathlib
+   | ^^^^^^^^^^^^^^ E402
+10 | 
+11 | import a
+   |
+
+E402.ipynb:22:1: E402 Module level import not at top of cell
+   |
+20 | __some__magic = 1
+21 | 
+22 | import c
+   | ^^^^^^^^ E402
+23 | import ok
+   |
+
+E402.ipynb:30:1: E402 Module level import not at top of cell
+   |
+30 | import no_ok
+   | ^^^^^^^^^^^^ E402
+   |
+
+

@@ -37,11 +37,11 @@ impl NeedsParentheses for ExprCompare {
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
             OptionalParentheses::Always
-        } else if self.left.is_literal_expr() {
+        } else if let Some(literal_expr) = self.left.as_literal_expr() {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
-            if !self.left.is_implicit_concatenated_string()
-                && is_multiline_string(self.left.as_ref().into(), context.source())
-                && !context.comments().has(self.left.as_ref())
+            if !literal_expr.is_implicit_concatenated()
+                && is_multiline_string(literal_expr.into(), context.source())
+                && !context.comments().has(literal_expr)
                 && self.comparators.first().is_some_and(|right| {
                     has_parentheses(right, context).is_some() && !context.comments().has(right)
                 })

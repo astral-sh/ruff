@@ -133,9 +133,11 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         return true;
     }
     match expr {
-        Expr::BoolOp(ast::ExprBoolOp { values, .. })
-        | Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
+        }
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            value.elements().any(|expr| any_over_expr(expr, func))
         }
         Expr::NamedExpr(ast::ExprNamedExpr {
             target,
@@ -909,6 +911,180 @@ where
     }
 }
 
+/// Returns `true` if the function has an implicit return.
+pub fn implicit_return(function: &ast::StmtFunctionDef) -> bool {
+    /// Returns `true` if the body may break via a `break` statement.
+    fn sometimes_breaks(stmts: &[Stmt]) -> bool {
+        for stmt in stmts {
+            match stmt {
+                Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+                    if returns(body) {
+                        return false;
+                    }
+                    if sometimes_breaks(orelse) {
+                        return true;
+                    }
+                }
+                Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+                    if returns(body) {
+                        return false;
+                    }
+                    if sometimes_breaks(orelse) {
+                        return true;
+                    }
+                }
+                Stmt::If(ast::StmtIf {
+                    body,
+                    elif_else_clauses,
+                    ..
+                }) => {
+                    if std::iter::once(body)
+                        .chain(elif_else_clauses.iter().map(|clause| &clause.body))
+                        .any(|body| sometimes_breaks(body))
+                    {
+                        return true;
+                    }
+                }
+                Stmt::Match(ast::StmtMatch { cases, .. }) => {
+                    if cases.iter().any(|case| sometimes_breaks(&case.body)) {
+                        return true;
+                    }
+                }
+                Stmt::Try(ast::StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                }) => {
+                    if sometimes_breaks(body)
+                        || handlers.iter().any(|handler| {
+                            let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                                body,
+                                ..
+                            }) = handler;
+                            sometimes_breaks(body)
+                        })
+                        || sometimes_breaks(orelse)
+                        || sometimes_breaks(finalbody)
+                    {
+                        return true;
+                    }
+                }
+                Stmt::With(ast::StmtWith { body, .. }) => {
+                    if sometimes_breaks(body) {
+                        return true;
+                    }
+                }
+                Stmt::Break(_) => return true,
+                Stmt::Return(_) => return false,
+                Stmt::Raise(_) => return false,
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// Returns `true` if the body may break via a `break` statement.
+    fn always_breaks(stmts: &[Stmt]) -> bool {
+        for stmt in stmts {
+            match stmt {
+                Stmt::Break(_) => return true,
+                Stmt::Return(_) => return false,
+                Stmt::Raise(_) => return false,
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// Returns `true` if the body contains a branch that ends without an explicit `return` or
+    /// `raise` statement.
+    fn returns(stmts: &[Stmt]) -> bool {
+        for stmt in stmts.iter().rev() {
+            match stmt {
+                Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+                    if always_breaks(body) {
+                        return false;
+                    }
+                    if returns(body) {
+                        return true;
+                    }
+                    if returns(orelse) && !sometimes_breaks(body) {
+                        return true;
+                    }
+                }
+                Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+                    if always_breaks(body) {
+                        return false;
+                    }
+                    if returns(body) {
+                        return true;
+                    }
+                    if returns(orelse) && !sometimes_breaks(body) {
+                        return true;
+                    }
+                }
+                Stmt::If(ast::StmtIf {
+                    body,
+                    elif_else_clauses,
+                    ..
+                }) => {
+                    if elif_else_clauses.iter().any(|clause| clause.test.is_none())
+                        && std::iter::once(body)
+                            .chain(elif_else_clauses.iter().map(|clause| &clause.body))
+                            .all(|body| returns(body))
+                    {
+                        return true;
+                    }
+                }
+                Stmt::Match(ast::StmtMatch { cases, .. }) => {
+                    // Note: we assume the `match` is exhaustive.
+                    if cases.iter().all(|case| returns(&case.body)) {
+                        return true;
+                    }
+                }
+                Stmt::Try(ast::StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                }) => {
+                    // If the `finally` block returns, the `try` block must also return.
+                    if returns(finalbody) {
+                        return true;
+                    }
+
+                    // If the `body` or the `else` block returns, the `try` block must also return.
+                    if (returns(body) || returns(orelse))
+                        && handlers.iter().all(|handler| {
+                            let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                                body,
+                                ..
+                            }) = handler;
+                            returns(body)
+                        })
+                    {
+                        return true;
+                    }
+                }
+                Stmt::With(ast::StmtWith { body, .. }) => {
+                    if returns(body) {
+                        return true;
+                    }
+                }
+                Stmt::Return(_) => return true,
+                Stmt::Raise(_) => return true,
+                _ => {}
+            }
+        }
+        false
+    }
+
+    !returns(&function.body)
+}
+
 /// A [`StatementVisitor`] that collects all `raise` statements in a function or method.
 #[derive(Default)]
 pub struct RaiseStatementVisitor<'a> {
@@ -1139,11 +1315,14 @@ impl Truthiness {
             }
             Expr::NoneLiteral(_) => Self::Falsey,
             Expr::EllipsisLiteral(_) => Self::Truthy,
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                if values.is_empty() {
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                if value.parts().all(|part| match part {
+                    ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
+                    ast::FStringPart::FString(f_string) => f_string.values.is_empty(),
+                }) {
                     Self::Falsey
-                } else if values.iter().any(|value| {
-                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &value {
+                } else if value.elements().any(|expr| {
+                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &expr {
                         !value.is_empty()
                     } else {
                         false
@@ -1286,6 +1465,50 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
             range: TextRange::default(),
         }),
     }
+}
+
+pub fn typing_optional(elt: Expr, binding: String) -> Expr {
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(elt),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
+}
+
+pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
+    fn tuple(elts: &[Expr]) -> Expr {
+        match elts {
+            [] => Expr::Tuple(ast::ExprTuple {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            }),
+            [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
+            [elt] => elt.clone(),
+            [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(tuple(rest)),
+                op: Operator::BitOr,
+                right: Box::new(elt.clone()),
+                range: TextRange::default(),
+            }),
+        }
+    }
+
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(tuple(elts)),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
 }
 
 #[cfg(test)]

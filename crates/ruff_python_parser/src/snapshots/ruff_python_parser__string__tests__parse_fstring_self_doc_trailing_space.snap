@@ -9,29 +9,37 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..10,
-                    values: [
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 2..9,
-                                value: Name(
-                                    ExprName {
-                                        range: 3..4,
-                                        id: "x",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: Some(
-                                    DebugText {
-                                        leading: "",
-                                        trailing: "=   ",
-                                    },
-                                ),
-                                conversion: None,
-                                format_spec: None,
-                            },
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..10,
+                                    values: [
+                                        FormattedValue(
+                                            ExprFormattedValue {
+                                                range: 2..9,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 3..4,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: Some(
+                                                    DebugText {
+                                                        leading: "",
+                                                        trailing: "=   ",
+                                                    },
+                                                ),
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
                         ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

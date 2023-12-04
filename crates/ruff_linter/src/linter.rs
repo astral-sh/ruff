@@ -9,6 +9,7 @@ use log::error;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_notebook::Notebook;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::PySourceType;
 use ruff_python_codegen::Stylist;
@@ -107,7 +108,8 @@ pub fn check_path(
             locator,
             indexer,
             settings,
-            source_type.is_stub(),
+            source_type,
+            source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
         ));
     }
 
@@ -149,6 +151,7 @@ pub fn check_path(
             source_type.is_ipynb(),
         ) {
             Ok(python_ast) => {
+                let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
                 if use_ast {
                     diagnostics.extend(check_ast(
                         &python_ast,
@@ -161,6 +164,7 @@ pub fn check_path(
                         path,
                         package,
                         source_type,
+                        cell_offsets,
                     ));
                 }
                 if use_imports {
@@ -173,8 +177,8 @@ pub fn check_path(
                         stylist,
                         path,
                         package,
-                        source_kind,
                         source_type,
+                        cell_offsets,
                     );
                     imports = module_imports;
                     diagnostics.extend(import_diagnostics);

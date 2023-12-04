@@ -24,7 +24,7 @@ where
     fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut DunderAllFlags) {
         for elt in elts {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
-                names.push(value);
+                names.push(value.to_str());
             } else {
                 *flags |= DunderAllFlags::INVALID_OBJECT;
             }

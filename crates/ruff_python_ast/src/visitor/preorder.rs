@@ -1,7 +1,8 @@
 use crate::{
-    Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause, ExceptHandler, Expr,
-    Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault, Parameters, Pattern,
-    PatternArguments, PatternKeyword, Singleton, Stmt, TypeParam, TypeParams, UnaryOp, WithItem,
+    Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
+    ExceptHandler, Expr, FString, Keyword, MatchCase, Mod, Operator, Parameter,
+    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
+    StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
 };
 use crate::{AnyNodeRef, AstNode};
 
@@ -151,6 +152,21 @@ pub trait PreorderVisitor<'a> {
     #[inline]
     fn visit_elif_else_clause(&mut self, elif_else_clause: &'a ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
+    }
+
+    #[inline]
+    fn visit_f_string(&mut self, f_string: &'a FString) {
+        walk_f_string(self, f_string);
+    }
+
+    #[inline]
+    fn visit_string_literal(&mut self, string_literal: &'a StringLiteral) {
+        walk_string_literal(self, string_literal);
+    }
+
+    #[inline]
+    fn visit_bytes_literal(&mut self, bytes_literal: &'a BytesLiteral) {
+        walk_bytes_literal(self, bytes_literal);
     }
 }
 
@@ -528,6 +544,42 @@ pub fn walk_cmp_op<'a, V>(_visitor: &mut V, _cmp_op: &'a CmpOp)
 where
     V: PreorderVisitor<'a> + ?Sized,
 {
+}
+
+#[inline]
+pub fn walk_f_string<'a, V>(visitor: &mut V, f_string: &'a FString)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(f_string);
+    if visitor.enter_node(node).is_traverse() {
+        f_string.visit_preorder(visitor);
+    }
+    visitor.leave_node(node);
+}
+
+#[inline]
+pub fn walk_string_literal<'a, V>(visitor: &mut V, string_literal: &'a StringLiteral)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(string_literal);
+    if visitor.enter_node(node).is_traverse() {
+        string_literal.visit_preorder(visitor);
+    }
+    visitor.leave_node(node);
+}
+
+#[inline]
+pub fn walk_bytes_literal<'a, V>(visitor: &mut V, bytes_literal: &'a BytesLiteral)
+where
+    V: PreorderVisitor<'a> + ?Sized,
+{
+    let node = AnyNodeRef::from(bytes_literal);
+    if visitor.enter_node(node).is_traverse() {
+        bytes_literal.visit_preorder(visitor);
+    }
+    visitor.leave_node(node);
 }
 
 #[inline]

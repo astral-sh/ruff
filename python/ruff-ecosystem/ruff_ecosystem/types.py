@@ -75,7 +75,7 @@ class Result(Serializable):
     The result of an ecosystem check for a collection of projects.
     """
 
-    errored: list[tuple[Project, Exception]]
+    errored: list[tuple[Project, BaseException]]
     completed: list[tuple[Project, Comparison]]
 
 

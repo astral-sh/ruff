@@ -534,6 +534,9 @@ pub(crate) fn not_missing(
             kind: ModuleKind::Module,
             ..
         }) => {
+            if checker.source_type.is_ipynb() {
+                return true;
+            }
             if checker.enabled(Rule::UndocumentedPublicModule) {
                 checker.diagnostics.push(Diagnostic::new(
                     UndocumentedPublicModule,

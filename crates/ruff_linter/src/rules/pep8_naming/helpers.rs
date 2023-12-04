@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
 
 use ruff_python_semantic::SemanticModel;
@@ -72,6 +73,7 @@ pub(super) fn is_type_alias_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
     }
 }
 
+/// Returns `true` if the statement is an assignment to a `TypedDict`.
 pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
     arguments.is_some_and(|arguments| {
         arguments
@@ -79,6 +81,71 @@ pub(super) fn is_typed_dict_class(arguments: Option<&Arguments>, semantic: &Sema
             .iter()
             .any(|base| semantic.match_typing_expr(base, "TypedDict"))
     })
+}
+
+/// Returns `true` if a statement appears to be a dynamic import of a Django model.
+///
+/// For example, in Django, it's common to use `get_model` to access a model dynamically, as in:
+/// ```python
+/// def migrate_existing_attachment_data(
+///     apps: StateApps, schema_editor: BaseDatabaseSchemaEditor
+/// ) -> None:
+///     Attachment = apps.get_model("zerver", "Attachment")
+/// ```
+pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &SemanticModel) -> bool {
+    fn match_model_import(name: &str, expr: &Expr, semantic: &SemanticModel) -> bool {
+        let Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) = expr
+        else {
+            return false;
+        };
+
+        if arguments.is_empty() {
+            return false;
+        }
+
+        // Match against, e.g., `apps.get_model("zerver", "Attachment")`.
+        if let Some(call_path) = collect_call_path(func.as_ref()) {
+            if matches!(call_path.as_slice(), [.., "get_model"]) {
+                if let Some(argument) =
+                    arguments.find_argument("model_name", arguments.args.len().saturating_sub(1))
+                {
+                    if let Some(string_literal) = argument.as_string_literal_expr() {
+                        return string_literal.value.to_str() == name;
+                    }
+                }
+            }
+        }
+
+        // Match against, e.g., `import_string("zerver.models.Attachment")`.
+        if let Some(call_path) = semantic.resolve_call_path(func.as_ref()) {
+            if matches!(
+                call_path.as_slice(),
+                ["django", "utils", "module_loading", "import_string"]
+            ) {
+                if let Some(argument) = arguments.find_argument("dotted_path", 0) {
+                    if let Some(string_literal) = argument.as_string_literal_expr() {
+                        if let Some((.., model)) = string_literal.value.to_str().rsplit_once('.') {
+                            return model == name;
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    match stmt {
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        }) => match_model_import(name, value.as_ref(), semantic),
+        Stmt::Assign(ast::StmtAssign { value, .. }) => {
+            match_model_import(name, value.as_ref(), semantic)
+        }
+        _ => false,
+    }
 }
 
 #[cfg(test)]

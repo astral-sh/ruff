@@ -154,6 +154,16 @@ mod tests {
         Rule::RepeatedKeywordArgument,
         Path::new("repeated_keyword_argument.py")
     )]
+    #[test_case(
+        Rule::UnnecessaryListIndexLookup,
+        Path::new("unnecessary_list_index_lookup.py")
+    )]
+    #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(
+        Rule::UnnecessaryDictIndexLookup,
+        Path::new("unnecessary_dict_index_lookup.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -314,6 +324,17 @@ mod tests {
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
             },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn unspecified_encoding_python39_or_lower() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/unspecified_encoding.py"),
+            &LinterSettings::for_rule(Rule::UnspecifiedEncoding)
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
         Ok(())

@@ -19,7 +19,7 @@ ruff_workspace = { path = "../ruff_workspace" }
 anyhow = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }
-configparser = { version = "3.0.2" }
+configparser = { version = "3.0.3" }
 itertools = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }

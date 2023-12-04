@@ -1,12 +1,15 @@
-use ruff_formatter::write;
+use ruff_formatter::{write, FormatContext};
 use ruff_python_ast::{ArgOrKeyword, Arguments, Expr};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::SourceComment;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
+use crate::expression::is_expression_huggable;
 use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
+use crate::other::commas;
 use crate::prelude::*;
+use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 #[derive(Default)]
 pub struct FormatArguments;
@@ -104,6 +107,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 // )
                 // ```
                 parenthesized("(", &group(&all_arguments), ")")
+                    .with_indent(!is_argument_huggable(item, f.context()))
                     .with_dangling_comments(dangling_comments)
             ]
         )
@@ -142,4 +146,70 @@ fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source:
     }
 
     false
+}
+/// Returns `true` if the arguments can hug directly to the enclosing parentheses in the call, as
+/// in Black's `hug_parens_with_braces_and_square_brackets` preview style behavior.
+///
+/// For example, in preview style, given:
+/// ```python
+/// func([1, 2, 3,])
+/// ```
+///
+/// We want to format it as:
+/// ```python
+/// func([
+///     1,
+///     2,
+///     3,
+/// ])
+/// ```
+///
+/// As opposed to:
+/// ```python
+/// func(
+///     [
+///         1,
+///         2,
+///         3,
+///     ]
+/// )
+/// ```
+///
+/// Hugging should only be applied to single-argument collections, like lists, or starred versions
+/// of those collections.
+fn is_argument_huggable(item: &Arguments, context: &PyFormatContext) -> bool {
+    if !is_hug_parens_with_braces_and_square_brackets_enabled(context) {
+        return false;
+    }
+
+    // Find the lone argument or `**kwargs` keyword.
+    let arg = match (item.args.as_slice(), item.keywords.as_slice()) {
+        ([arg], []) => arg,
+        ([], [keyword]) if keyword.arg.is_none() && !context.comments().has(keyword) => {
+            &keyword.value
+        }
+        _ => return false,
+    };
+
+    // If the expression itself isn't huggable, then we can't hug it.
+    if !is_expression_huggable(arg, context) {
+        return false;
+    }
+
+    // If the expression has leading or trailing comments, then we can't hug it.
+    let comments = context.comments().leading_dangling_trailing(arg);
+    if comments.has_leading() || comments.has_trailing() {
+        return false;
+    }
+
+    let options = context.options();
+
+    // If the expression has a trailing comma, then we can't hug it.
+    if options.magic_trailing_comma().is_respect()
+        && commas::has_magic_trailing_comma(TextRange::new(arg.end(), item.end()), options, context)
+    {
+        return false;
+    }
+
+    true
 }

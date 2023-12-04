@@ -81,7 +81,7 @@ pub(crate) fn variable_name_task_id(
     let ast::ExprStringLiteral { value: task_id, .. } = keyword.value.as_string_literal_expr()?;
 
     // If the target name is the same as the task_id, no violation.
-    if id == task_id {
+    if task_id == id {
         return None;
     }
 

@@ -9,33 +9,62 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..22,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 1..16,
-                                value: "Hello world",
-                                unicode: false,
-                                implicit_concatenated: true,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 16..21,
-                                value: StringLiteral(
-                                    ExprStringLiteral {
-                                        range: 17..20,
-                                        value: "!",
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..8,
+                                        value: "Hello ",
                                         unicode: false,
-                                        implicit_concatenated: false,
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                                FString(
+                                    FString {
+                                        range: 9..22,
+                                        values: [
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 11..16,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 11..16,
+                                                                value: "world",
+                                                                unicode: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                            FormattedValue(
+                                                ExprFormattedValue {
+                                                    range: 16..21,
+                                                    value: StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 17..20,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 17..20,
+                                                                        value: "!",
+                                                                        unicode: false,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ],
                         ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },

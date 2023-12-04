@@ -9,40 +9,55 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..29,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 2..5,
-                                value: "foo",
-                                unicode: true,
-                                implicit_concatenated: true,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 9..14,
-                                value: Name(
-                                    ExprName {
-                                        range: 10..13,
-                                        id: "bar",
-                                        ctx: Load,
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..6,
+                                        value: "foo",
+                                        unicode: true,
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                                FString(
+                                    FString {
+                                        range: 7..15,
+                                        values: [
+                                            FormattedValue(
+                                                ExprFormattedValue {
+                                                    range: 9..14,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 10..13,
+                                                            id: "bar",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 16..21,
+                                        value: "baz",
+                                        unicode: false,
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 22..29,
+                                        value: " some",
+                                        unicode: false,
+                                    },
+                                ),
+                            ],
                         ),
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 17..28,
-                                value: "baz some",
-                                unicode: false,
-                                implicit_concatenated: true,
-                            },
-                        ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },
@@ -53,40 +68,55 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 30..59,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 31..34,
-                                value: "foo",
-                                unicode: false,
-                                implicit_concatenated: true,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 38..43,
-                                value: Name(
-                                    ExprName {
-                                        range: 39..42,
-                                        id: "bar",
-                                        ctx: Load,
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 30..35,
+                                        value: "foo",
+                                        unicode: false,
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                                FString(
+                                    FString {
+                                        range: 36..44,
+                                        values: [
+                                            FormattedValue(
+                                                ExprFormattedValue {
+                                                    range: 38..43,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 39..42,
+                                                            id: "bar",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 45..51,
+                                        value: "baz",
+                                        unicode: true,
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 52..59,
+                                        value: " some",
+                                        unicode: false,
+                                    },
+                                ),
+                            ],
                         ),
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 47..58,
-                                value: "baz some",
-                                unicode: true,
-                                implicit_concatenated: true,
-                            },
-                        ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },
@@ -97,40 +127,55 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 60..89,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 61..64,
-                                value: "foo",
-                                unicode: false,
-                                implicit_concatenated: true,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 68..73,
-                                value: Name(
-                                    ExprName {
-                                        range: 69..72,
-                                        id: "bar",
-                                        ctx: Load,
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 60..65,
+                                        value: "foo",
+                                        unicode: false,
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                                FString(
+                                    FString {
+                                        range: 66..74,
+                                        values: [
+                                            FormattedValue(
+                                                ExprFormattedValue {
+                                                    range: 68..73,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 69..72,
+                                                            id: "bar",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 75..80,
+                                        value: "baz",
+                                        unicode: false,
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 81..89,
+                                        value: " some",
+                                        unicode: true,
+                                    },
+                                ),
+                            ],
                         ),
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 76..88,
-                                value: "baz some",
-                                unicode: false,
-                                implicit_concatenated: true,
-                            },
-                        ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },
@@ -141,40 +186,83 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 90..128,
-                    values: [
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 92..103,
-                                value: "foobar ",
-                                unicode: true,
-                                implicit_concatenated: true,
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 103..108,
-                                value: Name(
-                                    ExprName {
-                                        range: 104..107,
-                                        id: "baz",
-                                        ctx: Load,
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 90..96,
+                                        value: "foo",
+                                        unicode: true,
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                                FString(
+                                    FString {
+                                        range: 97..116,
+                                        values: [
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 99..103,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 99..103,
+                                                                value: "bar ",
+                                                                unicode: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                            FormattedValue(
+                                                ExprFormattedValue {
+                                                    range: 103..108,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 104..107,
+                                                            id: "baz",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 108..115,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 108..115,
+                                                                value: " really",
+                                                                unicode: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 117..123,
+                                        value: "bar",
+                                        unicode: true,
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 124..128,
+                                        value: "no",
+                                        unicode: false,
+                                    },
+                                ),
+                            ],
                         ),
-                        StringLiteral(
-                            ExprStringLiteral {
-                                range: 108..127,
-                                value: " reallybarno",
-                                unicode: false,
-                                implicit_concatenated: true,
-                            },
-                        ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },

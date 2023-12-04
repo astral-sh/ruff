@@ -248,7 +248,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::property_with_parameters(checker, stmt, decorator_list, parameters);
             }
             if checker.enabled(Rule::TooManyArguments) {
-                pylint::rules::too_many_arguments(checker, parameters, stmt);
+                pylint::rules::too_many_arguments(checker, function_def);
             }
             if checker.enabled(Rule::TooManyReturnStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_return_statements(
@@ -384,6 +384,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::NoClassmethodDecorator) {
+                pylint::rules::no_classmethod_decorator(checker, class_def);
+            }
+            if checker.enabled(Rule::NoStaticmethodDecorator) {
+                pylint::rules::no_staticmethod_decorator(checker, class_def);
+            }
             if checker.enabled(Rule::DjangoNullableModelStringField) {
                 flake8_django::rules::nullable_model_string_field(checker, body);
             }
@@ -1271,6 +1277,12 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryListCast) {
                 perflint::rules::unnecessary_list_cast(checker, iter, body);
             }
+            if checker.enabled(Rule::UnnecessaryListIndexLookup) {
+                pylint::rules::unnecessary_list_index_lookup(checker, for_stmt);
+            }
+            if checker.enabled(Rule::UnnecessaryDictIndexLookup) {
+                pylint::rules::unnecessary_dict_index_lookup(checker, for_stmt);
+            }
             if !is_async {
                 if checker.enabled(Rule::ReimplementedBuiltin) {
                     flake8_simplify::rules::convert_for_loop_to_any_all(checker, stmt);
@@ -1355,7 +1367,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
-            checker.enabled(Rule::NonAsciiName);
             if checker.enabled(Rule::LambdaAssignment) {
                 if let [target] = &targets[..] {
                     pycodestyle::rules::lambda_assignment(checker, target, value, None, stmt);
@@ -1407,9 +1418,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.settings.rules.enabled(Rule::SelfAssigningVariable) {
-                if let [target] = targets.as_slice() {
-                    pylint::rules::self_assigning_variable(checker, target, value);
-                }
+                pylint::rules::self_assignment(checker, assign);
             }
             if checker.settings.rules.enabled(Rule::TypeParamNameMismatch) {
                 pylint::rules::type_param_name_mismatch(checker, value, targets);
@@ -1479,9 +1488,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                     );
                 }
-                if checker.enabled(Rule::SelfAssigningVariable) {
-                    pylint::rules::self_assigning_variable(checker, target, value);
-                }
+            }
+            if checker.enabled(Rule::SelfAssigningVariable) {
+                pylint::rules::self_annotated_assignment(checker, assign_stmt);
             }
             if checker.enabled(Rule::UnintentionalTypeAnnotation) {
                 flake8_bugbear::rules::unintentional_type_annotation(
@@ -1523,6 +1532,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::TSuffixedTypeAlias) {
                     flake8_pyi::rules::t_suffixed_type_alias(checker, target);
                 }
+            }
+        }
+        Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {
+            if checker.enabled(Rule::SnakeCaseTypeAlias) {
+                flake8_pyi::rules::snake_case_type_alias(checker, name);
+            }
+            if checker.enabled(Rule::TSuffixedTypeAlias) {
+                flake8_pyi::rules::t_suffixed_type_alias(checker, name);
             }
         }
         Stmt::Delete(delete @ ast::StmtDelete { targets, range: _ }) => {

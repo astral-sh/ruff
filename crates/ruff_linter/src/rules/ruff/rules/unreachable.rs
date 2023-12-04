@@ -2,8 +2,8 @@ use std::{fmt, iter, usize};
 
 use log::error;
 use ruff_python_ast::{
-    Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs, Stmt, StmtFor,
-    StmtMatch, StmtReturn, StmtTry, StmtWhile, StmtWith,
+    Expr, ExprBooleanLiteral, Identifier, MatchCase, Pattern, PatternMatchAs, PatternMatchOr, Stmt,
+    StmtFor, StmtMatch, StmtReturn, StmtTry, StmtWhile, StmtWith,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -416,13 +416,6 @@ fn match_case<'stmt>(
         }
         last_statement_index
     };
-    // TODO: handle named arguments, e.g.
-    // ```python
-    // match $subject:
-    //   case $binding:
-    //     print($binding)
-    // ```
-    // These should also return `NextBlock::Always`.
     let next = if is_wildcard(case) {
         // Wildcard case is always taken.
         NextBlock::Always(next_block_index)
@@ -436,10 +429,25 @@ fn match_case<'stmt>(
     BasicBlock { stmts, next }
 }
 
-/// Returns true if `pattern` is a wildcard (`_`) pattern.
+/// Returns true if the [`MatchCase`] is a wildcard pattern.
 fn is_wildcard(pattern: &MatchCase) -> bool {
-    pattern.guard.is_none()
-        && matches!(&pattern.pattern, Pattern::MatchAs(PatternMatchAs { pattern, name, .. }) if pattern.is_none() && name.is_none())
+    /// Returns true if the [`Pattern`] is a wildcard pattern.
+    fn is_wildcard_pattern(pattern: &Pattern) -> bool {
+        match pattern {
+            Pattern::MatchValue(_)
+            | Pattern::MatchSingleton(_)
+            | Pattern::MatchSequence(_)
+            | Pattern::MatchMapping(_)
+            | Pattern::MatchClass(_)
+            | Pattern::MatchStar(_) => false,
+            Pattern::MatchAs(PatternMatchAs { pattern, .. }) => pattern.is_none(),
+            Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
+                patterns.iter().all(is_wildcard_pattern)
+            }
+        }
+    }
+
+    pattern.guard.is_none() && is_wildcard_pattern(&pattern.pattern)
 }
 
 #[derive(Debug, Default)]
@@ -477,6 +485,8 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                 | Stmt::AugAssign(_)
                 | Stmt::AnnAssign(_)
                 | Stmt::Break(_)
+                | Stmt::TypeAlias(_)
+                | Stmt::IpyEscapeCommand(_)
                 | Stmt::Pass(_) => self.unconditional_next_block(after),
                 Stmt::Continue(_) => {
                     // NOTE: the next branch gets fixed up in `change_next_block`.
@@ -638,6 +648,7 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Starred(_)
                         | Expr::Name(_)
                         | Expr::List(_)
+                        | Expr::IpyEscapeCommand(_)
                         | Expr::Tuple(_)
                         | Expr::Slice(_) => self.unconditional_next_block(after),
                         // TODO: handle these expressions.
@@ -651,13 +662,10 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Await(_)
                         | Expr::Yield(_)
                         | Expr::YieldFrom(_) => self.unconditional_next_block(after),
-                        Expr::IpyEscapeCommand(_) => todo!(),
                     }
                 }
                 // The tough branches are done, here is an easy one.
                 Stmt::Return(_) => NextBlock::Terminate,
-                Stmt::TypeAlias(_) => todo!(),
-                Stmt::IpyEscapeCommand(_) => todo!(),
             };
 
             // Include any statements in the block that don't divert the control flow.
@@ -890,6 +898,8 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
         | Stmt::AnnAssign(_)
         | Stmt::Expr(_)
         | Stmt::Pass(_)
+        | Stmt::TypeAlias(_)
+        | Stmt::IpyEscapeCommand(_)
         // TODO: check below.
         | Stmt::Break(_)
         | Stmt::Continue(_)
@@ -899,8 +909,6 @@ fn needs_next_block(stmts: &[Stmt]) -> bool {
         | Stmt::Match(_)
         | Stmt::Try(_)
         | Stmt::Assert(_) => true,
-        Stmt::TypeAlias(_) => todo!(),
-        Stmt::IpyEscapeCommand(_) => todo!(),
     }
 }
 
@@ -919,6 +927,8 @@ fn is_control_flow_stmt(stmt: &Stmt) -> bool {
         | Stmt::AugAssign(_)
         | Stmt::AnnAssign(_)
         | Stmt::Expr(_)
+        | Stmt::TypeAlias(_)
+        | Stmt::IpyEscapeCommand(_)
         | Stmt::Pass(_) => false,
         Stmt::Return(_)
         | Stmt::For(_)
@@ -931,8 +941,6 @@ fn is_control_flow_stmt(stmt: &Stmt) -> bool {
         | Stmt::Assert(_)
         | Stmt::Break(_)
         | Stmt::Continue(_) => true,
-        Stmt::TypeAlias(_) => todo!(),
-        Stmt::IpyEscapeCommand(_) => todo!(),
     }
 }
 

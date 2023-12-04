@@ -22,10 +22,12 @@ type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[Aaaaaaaaaaaaaaaaaaaaaaaaaaaa] = int
 type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[Aaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbb] = int
 type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = Tttttttttttttttttttttttttttttttttttttttttttttttttttttttt
+type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = Tttttttttttttttttttttttttttttttttttttttttttttttttttttttt # with comment
 
 # long value
 type X = Ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt
 type X = Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | Ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+type XXXXXXXXXXXXX = Tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt # with comment
 
 # soft keyword as alias name
 type type = int
@@ -127,6 +129,9 @@ type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     Bbbbbbbbbbbbb,
 ] = int
 type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = Tttttttttttttttttttttttttttttttttttttttttttttttttttttttt
+type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = (
+    Tttttttttttttttttttttttttttttttttttttttttttttttttttttttt  # with comment
+)
 
 # long value
 type X = Ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt
@@ -134,6 +139,9 @@ type X = (
     Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
     | Ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+)
+type XXXXXXXXXXXXX = (
+    Tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt  # with comment
 )
 
 # soft keyword as alias name

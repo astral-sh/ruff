@@ -15,7 +15,9 @@ use crate::comments::{
     dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
-pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
+pub use crate::options::{
+    DocstringCode, MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle,
+};
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
 use crate::verbatim::suppressed_node;
 
@@ -30,6 +32,7 @@ mod options;
 pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
+mod preview;
 mod shared_traits;
 pub(crate) mod statement;
 pub(crate) mod type_param;

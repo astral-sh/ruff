@@ -34,7 +34,7 @@ impl NeedsParentheses for ExprFString {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if self.implicit_concatenated {
+        if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
         } else if memchr2(b'\n', b'\r', context.source()[self.range].as_bytes()).is_none() {
             OptionalParentheses::BestFit

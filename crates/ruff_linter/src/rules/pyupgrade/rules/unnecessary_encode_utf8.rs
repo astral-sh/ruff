@@ -74,7 +74,7 @@ fn match_encoded_variable(func: &Expr) -> Option<&Expr> {
 
 fn is_utf8_encoding_arg(arg: &Expr) -> bool {
     if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &arg {
-        UTF8_LITERALS.contains(&value.to_lowercase().as_str())
+        UTF8_LITERALS.contains(&value.to_str().to_lowercase().as_str())
     } else {
         false
     }
@@ -161,7 +161,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &mut Checker, call: &ast::ExprCal
         Expr::StringLiteral(ast::ExprStringLiteral { value: literal, .. }) => {
             // Ex) `"str".encode()`, `"str".encode("utf-8")`
             if let Some(encoding_arg) = match_encoding_arg(&call.arguments) {
-                if literal.is_ascii() {
+                if literal.to_str().is_ascii() {
                     // Ex) Convert `"foo".encode()` to `b"foo"`.
                     let mut diagnostic = Diagnostic::new(
                         UnnecessaryEncodeUTF8 {

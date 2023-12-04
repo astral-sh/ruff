@@ -37,6 +37,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
+use ruff_notebook::CellOffsets;
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{
     collect_import_from_member, extract_handled_exceptions, to_module_path,
@@ -78,6 +79,8 @@ pub(crate) struct Checker<'a> {
     module_path: Option<&'a [String]>,
     /// The [`PySourceType`] of the current file.
     pub(crate) source_type: PySourceType,
+    /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
+    cell_offsets: Option<&'a CellOffsets>,
     /// The [`flags::Noqa`] for the current analysis (i.e., whether to respect suppression
     /// comments).
     noqa: flags::Noqa,
@@ -104,6 +107,8 @@ pub(crate) struct Checker<'a> {
     pub(crate) diagnostics: Vec<Diagnostic>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
     pub(crate) flake8_bugbear_seen: Vec<TextRange>,
+    /// The end offset of the last visited statement.
+    last_stmt_end: TextSize,
 }
 
 impl<'a> Checker<'a> {
@@ -120,6 +125,7 @@ impl<'a> Checker<'a> {
         indexer: &'a Indexer,
         importer: Importer<'a>,
         source_type: PySourceType,
+        cell_offsets: Option<&'a CellOffsets>,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -137,6 +143,8 @@ impl<'a> Checker<'a> {
             deferred: Deferred::default(),
             diagnostics: Vec::default(),
             flake8_bugbear_seen: Vec::default(),
+            cell_offsets,
+            last_stmt_end: TextSize::default(),
         }
     }
 }
@@ -225,6 +233,11 @@ impl<'a> Checker<'a> {
         self.package
     }
 
+    /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
+    pub(crate) const fn cell_offsets(&self) -> Option<&'a CellOffsets> {
+        self.cell_offsets
+    }
+
     /// Returns whether the given rule should be checked.
     #[inline]
     pub(crate) const fn enabled(&self, rule: Rule) -> bool {
@@ -257,6 +270,18 @@ where
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
+
+        // For Jupyter Notebooks, we'll reset the `IMPORT_BOUNDARY` flag when
+        // we encounter a cell boundary.
+        if self.source_type.is_ipynb()
+            && self.semantic.at_top_level()
+            && self.semantic.seen_import_boundary()
+            && self.cell_offsets.is_some_and(|cell_offsets| {
+                cell_offsets.has_cell_boundary(TextRange::new(self.last_stmt_end, stmt.start()))
+            })
+        {
+            self.semantic.flags -= SemanticModelFlags::IMPORT_BOUNDARY;
+        }
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
@@ -467,6 +492,13 @@ where
                 // are enabled.
                 let runtime_annotation = !self.semantic.future_annotations();
 
+                // The first parameter may be a single dispatch.
+                let mut singledispatch =
+                    flake8_type_checking::helpers::is_singledispatch_implementation(
+                        function_def,
+                        self.semantic(),
+                    );
+
                 self.semantic.push_scope(ScopeKind::Type);
 
                 if let Some(type_params) = type_params {
@@ -480,7 +512,7 @@ where
                     .chain(&parameters.kwonlyargs)
                 {
                     if let Some(expr) = &parameter_with_default.parameter.annotation {
-                        if runtime_annotation {
+                        if runtime_annotation || singledispatch {
                             self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
@@ -489,6 +521,7 @@ where
                     if let Some(expr) = &parameter_with_default.default {
                         self.visit_expr(expr);
                     }
+                    singledispatch = false;
                 }
                 if let Some(arg) = &parameters.vararg {
                     if let Some(expr) = &arg.annotation {
@@ -645,23 +678,24 @@ where
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 let runtime_annotation = if self.semantic.future_annotations() {
-                    if self.semantic.current_scope().kind.is_class() {
-                        let baseclasses = &self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_base_classes;
-                        let decorators = &self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_decorators;
-                        flake8_type_checking::helpers::runtime_evaluated(
-                            baseclasses,
-                            decorators,
-                            &self.semantic,
-                        )
-                    } else {
-                        false
-                    }
+                    self.semantic
+                        .current_scope()
+                        .kind
+                        .as_class()
+                        .is_some_and(|class_def| {
+                            flake8_type_checking::helpers::runtime_evaluated_class(
+                                class_def,
+                                &self
+                                    .settings
+                                    .flake8_type_checking
+                                    .runtime_evaluated_base_classes,
+                                &self
+                                    .settings
+                                    .flake8_type_checking
+                                    .runtime_evaluated_decorators,
+                                &self.semantic,
+                            )
+                        })
                 } else {
                     matches!(
                         self.semantic.current_scope().kind,
@@ -769,6 +803,7 @@ where
 
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
+        self.last_stmt_end = stmt.end();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -789,7 +824,7 @@ where
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.deferred.string_type_definitions.push((
                     expr.range(),
-                    value,
+                    value.to_str(),
                     self.semantic.snapshot(),
                 ));
             } else {
@@ -1209,7 +1244,7 @@ where
                 {
                     self.deferred.string_type_definitions.push((
                         expr.range(),
-                        value,
+                        value.to_str(),
                         self.semantic.snapshot(),
                     ));
                 }
@@ -1293,9 +1328,9 @@ where
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
         match format_spec {
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                for value in values {
-                    self.visit_expr(value);
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                for expr in value.elements() {
+                    self.visit_expr(expr);
                 }
             }
             _ => unreachable!("Unexpected expression for format_spec"),
@@ -1942,6 +1977,7 @@ pub(crate) fn check_ast(
     path: &Path,
     package: Option<&Path>,
     source_type: PySourceType,
+    cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {
     let module_path = package.and_then(|package| to_module_path(package, path));
     let module = Module {
@@ -1970,6 +2006,7 @@ pub(crate) fn check_ast(
         indexer,
         Importer::new(python_ast, locator, stylist),
         source_type,
+        cell_offsets,
     );
     checker.bind_builtins();
 
