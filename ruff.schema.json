@@ -2370,7 +2370,7 @@
           "minimum": 0.0
         },
         "max-positional-args": {
-          "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).",
+          "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
           "type": [
             "integer",
             "null"
