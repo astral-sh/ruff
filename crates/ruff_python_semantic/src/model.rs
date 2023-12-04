@@ -1359,8 +1359,8 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if the model is in a `typing::Literal` annotation.
-    pub const fn in_literal(&self) -> bool {
-        self.flags.intersects(SemanticModelFlags::LITERAL)
+    pub const fn in_typing_literal(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::TYPING_LITERAL)
     }
 
     /// Return `true` if the model is in a subscript expression.
@@ -1576,7 +1576,7 @@ bitflags! {
         /// def f(x: Literal["A", "B", "C"]):
         ///     ...
         /// ```
-        const LITERAL = 1 << 9;
+        const TYPING_LITERAL = 1 << 9;
 
         /// The model is in a subscript expression.
         ///
