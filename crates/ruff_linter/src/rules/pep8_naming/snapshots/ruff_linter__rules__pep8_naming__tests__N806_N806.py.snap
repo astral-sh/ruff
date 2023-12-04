@@ -38,4 +38,20 @@ N806.py:53:5: N806 Variable `Bad` in function should be lowercase
 54 |     ValidationError = import_string("django.core.exceptions.ValidationError")  # OK
    |
 
+N806.py:56:5: N806 Variable `Bad` in function should be lowercase
+   |
+54 |     ValidationError = import_string("django.core.exceptions.ValidationError")  # OK
+55 | 
+56 |     Bad = apps.get_model()  # N806
+   |     ^^^ N806
+57 |     Bad = apps.get_model(model_name="Stream")  # N806
+   |
+
+N806.py:57:5: N806 Variable `Bad` in function should be lowercase
+   |
+56 |     Bad = apps.get_model()  # N806
+57 |     Bad = apps.get_model(model_name="Stream")  # N806
+   |     ^^^ N806
+   |
+
 

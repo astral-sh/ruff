@@ -3,9 +3,9 @@ use memchr::memchr_iter;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
-use ruff_python_parser::Tok;
+use ruff_python_parser::{StringKind, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::fix::edits::pad_start;
 
@@ -56,18 +56,6 @@ impl AlwaysFixableViolation for InvalidEscapeSequence {
             FixTitle::UseRawStringLiteral => format!("Use a raw string literal"),
         }
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum FixTitle {
-    AddBackslash,
-    UseRawStringLiteral,
-}
-
-#[derive(Debug)]
-struct InvalidEscapeChar {
-    ch: char,
-    range: TextRange,
 }
 
 /// W605
@@ -195,41 +183,77 @@ pub(crate) fn invalid_escape_sequence(
     if contains_valid_escape_sequence {
         // Escape with backslash.
         for invalid_escape_char in &invalid_escape_chars {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 InvalidEscapeSequence {
                     ch: invalid_escape_char.ch,
                     fix_title: FixTitle::AddBackslash,
                 },
-                invalid_escape_char.range,
-            )
-            .with_fix(Fix::safe_edit(Edit::insertion(
+                invalid_escape_char.range(),
+            );
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                 r"\".to_string(),
-                invalid_escape_char.range.start() + TextSize::from(1),
+                invalid_escape_char.start() + TextSize::from(1),
             )));
             invalid_escape_sequence.push(diagnostic);
         }
     } else {
         // Turn into raw string.
         for invalid_escape_char in &invalid_escape_chars {
-            let diagnostic = Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 InvalidEscapeSequence {
                     ch: invalid_escape_char.ch,
                     fix_title: FixTitle::UseRawStringLiteral,
                 },
-                invalid_escape_char.range,
-            )
-            .with_fix(
-                // If necessary, add a space between any leading keyword (`return`, `yield`,
-                // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
-                // `returnr"foo"` is not.
-                Fix::safe_edit(Edit::insertion(
-                    pad_start("r".to_string(), string_start_location, locator),
-                    string_start_location,
-                )),
+                invalid_escape_char.range(),
             );
+
+            if matches!(
+                token,
+                Tok::String {
+                    kind: StringKind::Unicode,
+                    ..
+                }
+            ) {
+                // Replace the Unicode prefix with `r`.
+                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                    "r".to_string(),
+                    string_start_location,
+                    string_start_location + TextSize::from(1),
+                )));
+            } else {
+                // Insert the `r` prefix.
+                diagnostic.set_fix(
+                    // If necessary, add a space between any leading keyword (`return`, `yield`,
+                    // `assert`, etc.) and the string. For example, `return"foo"` is valid, but
+                    // `returnr"foo"` is not.
+                    Fix::safe_edit(Edit::insertion(
+                        pad_start("r".to_string(), string_start_location, locator),
+                        string_start_location,
+                    )),
+                );
+            }
+
             invalid_escape_sequence.push(diagnostic);
         }
     }
 
     diagnostics.extend(invalid_escape_sequence);
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum FixTitle {
+    AddBackslash,
+    UseRawStringLiteral,
+}
+
+#[derive(Debug)]
+struct InvalidEscapeChar {
+    ch: char,
+    range: TextRange,
+}
+
+impl Ranged for InvalidEscapeChar {
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }

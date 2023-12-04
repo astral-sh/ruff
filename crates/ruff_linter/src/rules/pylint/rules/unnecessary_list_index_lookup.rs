@@ -1,13 +1,11 @@
-use ruff_python_ast::{self as ast, Expr, Stmt, StmtFor};
-
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr, StmtFor};
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::rules::pylint::helpers::SequenceIndexVisitor;
 
 /// ## What it does
 /// Checks for index-based list accesses during `enumerate` iterations.
@@ -55,10 +53,10 @@ pub(crate) fn unnecessary_list_index_lookup(checker: &mut Checker, stmt_for: &St
     };
 
     let ranges = {
-        let mut visitor = SubscriptVisitor::new(sequence, index_name);
+        let mut visitor = SequenceIndexVisitor::new(sequence, index_name, value_name);
         visitor.visit_body(&stmt_for.body);
         visitor.visit_body(&stmt_for.orelse);
-        visitor.diagnostic_ranges
+        visitor.into_accesses()
     };
 
     for range in ranges {
@@ -99,9 +97,9 @@ pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &mut Checker,
         };
 
         let ranges = {
-            let mut visitor = SubscriptVisitor::new(sequence, index_name);
+            let mut visitor = SequenceIndexVisitor::new(sequence, index_name, value_name);
             visitor.visit_expr(elt.as_ref());
-            visitor.diagnostic_ranges
+            visitor.into_accesses()
         };
 
         for range in ranges {
@@ -160,105 +158,4 @@ fn enumerate_items<'a>(
     };
 
     Some((sequence, index_name, value_name))
-}
-
-#[derive(Debug)]
-struct SubscriptVisitor<'a> {
-    sequence_name: &'a str,
-    index_name: &'a str,
-    diagnostic_ranges: Vec<TextRange>,
-    modified: bool,
-}
-
-impl<'a> SubscriptVisitor<'a> {
-    fn new(sequence_name: &'a str, index_name: &'a str) -> Self {
-        Self {
-            sequence_name,
-            index_name,
-            diagnostic_ranges: Vec::new(),
-            modified: false,
-        }
-    }
-}
-
-impl SubscriptVisitor<'_> {
-    fn is_assignment(&self, expr: &Expr) -> bool {
-        // If we see the sequence, a subscript, or the index being modified, we'll stop emitting
-        // diagnostics.
-        match expr {
-            Expr::Name(ast::ExprName { id, .. }) => {
-                id == self.sequence_name || id == self.index_name
-            }
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
-                    return false;
-                };
-                if id == self.sequence_name {
-                    let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
-                        return false;
-                    };
-                    if id == self.index_name {
-                        return true;
-                    }
-                }
-                false
-            }
-            _ => false,
-        }
-    }
-}
-
-impl<'a> Visitor<'_> for SubscriptVisitor<'a> {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        if self.modified {
-            return;
-        }
-        match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
-                self.visit_expr(value);
-            }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                if let Some(value) = value {
-                    self.modified = self.is_assignment(target);
-                    self.visit_expr(value);
-                }
-            }
-            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                self.modified = self.is_assignment(target);
-                self.visit_expr(value);
-            }
-            Stmt::Delete(ast::StmtDelete { targets, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
-            }
-            _ => visitor::walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &Expr) {
-        if self.modified {
-            return;
-        }
-        match expr {
-            Expr::Subscript(ast::ExprSubscript {
-                value,
-                slice,
-                range,
-                ..
-            }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
-                    return;
-                };
-                if id == self.sequence_name {
-                    let Expr::Name(ast::ExprName { id, .. }) = slice.as_ref() else {
-                        return;
-                    };
-                    if id == self.index_name {
-                        self.diagnostic_ranges.push(*range);
-                    }
-                }
-            }
-            _ => visitor::walk_expr(self, expr),
-        }
-    }
 }

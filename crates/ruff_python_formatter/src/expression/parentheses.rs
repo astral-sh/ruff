@@ -355,6 +355,26 @@ pub(super) fn write_in_parentheses_only_group_end_tag(f: &mut PyFormatter) {
     }
 }
 
+/// Shows prints `content` only if the expression is enclosed by (optional) parentheses (`()`, `[]`, or `{}`)
+/// and splits across multiple lines.
+pub(super) fn in_parentheses_only_if_group_breaks<'a, T>(
+    content: T,
+) -> impl Format<PyFormatContext<'a>>
+where
+    T: Format<PyFormatContext<'a>>,
+{
+    format_with(move |f: &mut PyFormatter| match f.context().node_level() {
+        NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+            // no-op, not parenthesized
+            Ok(())
+        }
+        NodeLevel::Expression(Some(parentheses_id)) => if_group_breaks(&content)
+            .with_group_id(Some(parentheses_id))
+            .fmt(f),
+        NodeLevel::ParenthesizedExpression => if_group_breaks(&content).fmt(f),
+    })
+}
+
 /// Format comments inside empty parentheses, brackets or curly braces.
 ///
 /// Empty `()`, `[]` and `{}` are special because there can be dangling comments, and they can be in

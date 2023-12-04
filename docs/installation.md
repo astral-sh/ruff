@@ -27,6 +27,13 @@ For **Conda** users, Ruff is also available as [`ruff`](https://anaconda.org/con
 conda install -c conda-forge ruff
 ```
 
+For **pkgx** users, Ruff is also available as [`ruff`](https://pkgx.dev/pkgs/github.com/charliermarsh/ruff/)
+on the `pkgx` registry:
+
+```shell
+pkgx install ruff
+```
+
 For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/extra/x86_64/ruff/)
 on the official repositories:
 
