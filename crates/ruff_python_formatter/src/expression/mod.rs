@@ -1185,7 +1185,6 @@ pub(crate) fn is_expression_huggable(expr: &Expr, options: &PyFormatOptions) -> 
         | Expr::YieldFrom(_)
         | Expr::Compare(_)
         | Expr::Call(_)
-        | Expr::FormattedValue(_)
         | Expr::FString(_)
         | Expr::Attribute(_)
         | Expr::Subscript(_)

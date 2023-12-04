@@ -3944,6 +3944,7 @@ mod size_assertions {
     assert_eq_size!(StmtClassDef, [u8; 104]);
     assert_eq_size!(StmtTry, [u8; 112]);
     assert_eq_size!(Expr, [u8; 80]);
+    assert_eq_size!(ParenthesizedExpr, [u8; 88]);
     assert_eq_size!(Pattern, [u8; 96]);
     assert_eq_size!(Mod, [u8; 32]);
 }
