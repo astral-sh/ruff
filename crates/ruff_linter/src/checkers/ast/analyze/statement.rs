@@ -250,6 +250,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TooManyArguments) {
                 pylint::rules::too_many_arguments(checker, parameters, stmt);
             }
+            if checker.enabled(Rule::TooManyPositional) {
+                pylint::rules::too_many_positional(checker, parameters, stmt);
+            }
             if checker.enabled(Rule::TooManyReturnStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_return_statements(
                     stmt,
