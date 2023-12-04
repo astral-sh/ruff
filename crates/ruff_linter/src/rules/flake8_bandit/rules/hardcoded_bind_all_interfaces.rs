@@ -1,6 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::ExprStringLiteral;
+use ruff_text_size::TextRange;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for hardcoded bindings to all network interfaces (`0.0.0.0`).
@@ -34,10 +36,10 @@ impl Violation for HardcodedBindAllInterfaces {
 }
 
 /// S104
-pub(crate) fn hardcoded_bind_all_interfaces(string: &ExprStringLiteral) -> Option<Diagnostic> {
-    if string.value.to_str() == "0.0.0.0" {
-        Some(Diagnostic::new(HardcodedBindAllInterfaces, string.range))
-    } else {
-        None
+pub(crate) fn hardcoded_bind_all_interfaces(checker: &mut Checker, value: &str, range: TextRange) {
+    if value == "0.0.0.0" {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(HardcodedBindAllInterfaces, range));
     }
 }

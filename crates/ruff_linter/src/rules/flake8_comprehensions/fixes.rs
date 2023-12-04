@@ -1083,7 +1083,7 @@ pub(crate) fn fix_unnecessary_map(
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
     if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
-        if parent.is_some_and(Expr::is_formatted_value_expr) {
+        if parent.is_some_and(Expr::is_f_string_expr) {
             content = format!(" {content} ");
         }
     }
