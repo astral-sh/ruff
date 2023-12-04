@@ -54,13 +54,13 @@ subprocess_run_without_check.py:6:1: PLW1510 [*] `subprocess.run` without explic
   = help: Add explicit `check=False`
 
 ℹ Safe fix
-6  6  | subprocess.run(
-7  7  |     ["ls"],
-8  8  |     shell=False,
-9     |-)
-   9  |+check=False)
+5 5 | subprocess.run("ls", shell=True)
+6 6 | subprocess.run(
+7 7 |     ["ls"],
+8   |-    shell=False,
+  8 |+    shell=False, check=False,
+9 9 | )
 10 10 | 
 11 11 | # Non-errors.
-12 12 | subprocess.run("ls", check=True)
 
 

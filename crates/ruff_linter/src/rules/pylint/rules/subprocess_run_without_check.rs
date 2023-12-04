@@ -1,9 +1,8 @@
-use ruff_text_size::TextSize;
-
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
+use crate::fix::edits::add_argument;
 
 use crate::checkers::ast::Checker;
 
@@ -63,19 +62,14 @@ pub(crate) fn subprocess_run_without_check(checker: &mut Checker, call: &ast::Ex
     {
         if call.arguments.find_keyword("check").is_none() {
             let mut diagnostic = Diagnostic::new(SubprocessRunWithoutCheck, call.func.range());
-            let text: &str = checker.locator().slice(call.range());
-            let ends_with_comma = text[..text.len() - 1].trim_end().ends_with(',');
-            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                {
-                    if ends_with_comma {
-                        "check=False"
-                    } else {
-                        ", check=False"
-                    }
-                }
-                .to_string(),
-                call.range().end() - TextSize::from(1),
-            )));
+            diagnostic.set_fix(Fix::safe_edit(
+            add_argument(
+                "check=False",
+                &call.arguments,
+                checker.indexer().comment_ranges(),
+                checker.locator().contents(),
+            )
+            ));
             checker.diagnostics.push(diagnostic);
         }
     }
