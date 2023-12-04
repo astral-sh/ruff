@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{identifier::Identifier, Parameters, Stmt};
+use ruff_python_ast::{self as ast, identifier::Identifier};
+use ruff_python_semantic::analyze::visibility;
 
 use crate::checkers::ast::Checker;
 
@@ -55,11 +56,12 @@ impl Violation for TooManyPositional {
 }
 
 /// PLR0917
-pub(crate) fn too_many_positional(checker: &mut Checker, parameters: &Parameters, stmt: &Stmt) {
-    let num_positional_args = parameters
+pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
+    let num_positional_args = function_def
+        .parameters
         .args
         .iter()
-        .chain(&parameters.posonlyargs)
+        .chain(&function_def.parameters.posonlyargs)
         .filter(|arg| {
             !checker
                 .settings
@@ -67,13 +69,22 @@ pub(crate) fn too_many_positional(checker: &mut Checker, parameters: &Parameters
                 .is_match(&arg.parameter.name)
         })
         .count();
+
     if num_positional_args > checker.settings.pylint.max_positional_args {
+        // Allow excessive arguments in `@override` or `@overload` methods, since they're required
+        // to adhere to the parent signature.
+        if visibility::is_override(&function_def.decorator_list, checker.semantic())
+            || visibility::is_overload(&function_def.decorator_list, checker.semantic())
+        {
+            return;
+        }
+
         checker.diagnostics.push(Diagnostic::new(
             TooManyPositional {
                 c_pos: num_positional_args,
                 max_pos: checker.settings.pylint.max_positional_args,
             },
-            stmt.identifier(),
+            function_def.identifier(),
         ));
     }
 }
