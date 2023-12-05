@@ -106,6 +106,8 @@ PIE804.py:11:1: PIE804 [*] Unnecessary `dict` kwargs
 10 | 
 11 | foo(**{})
    | ^^^^^^^^^ PIE804
+12 | 
+13 | foo(**{**data, "foo": "buzz"})
    |
    = help: Remove unnecessary kwargs
 
@@ -116,7 +118,23 @@ PIE804.py:11:1: PIE804 [*] Unnecessary `dict` kwargs
 11    |-foo(**{})
    11 |+foo()
 12 12 | 
-13 13 | 
-14 14 | foo(**{**data, "foo": "buzz"})
+13 13 | foo(**{**data, "foo": "buzz"})
+14 14 | foo(**buzz)
+
+PIE804.py:23:1: PIE804 [*] Unnecessary `dict` kwargs
+   |
+21 | abc(**{"for": 3})
+22 | 
+23 | foo(**{},)
+   | ^^^^^^^^^^ PIE804
+   |
+   = help: Remove unnecessary kwargs
+
+ℹ Safe fix
+20 20 | foo(**{f"buzz__{bar}": True})
+21 21 | abc(**{"for": 3})
+22 22 | 
+23    |-foo(**{},)
+   23 |+foo()
 
 
