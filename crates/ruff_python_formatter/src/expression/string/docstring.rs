@@ -13,9 +13,9 @@ use {
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
-use crate::{prelude::*, FormatModuleError, QuoteStyle};
+use crate::{prelude::*, FormatModuleError};
 
-use super::NormalizedString;
+use super::{NormalizedString, QuoteChar};
 
 /// Format a docstring by trimming whitespace and adjusting the indentation.
 ///
@@ -139,7 +139,7 @@ pub(super) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
 
     // Edge case: The first line is `""" "content`, so we need to insert chaperone space that keep
     // inner quotes and closing quotes from getting to close to avoid `""""content`
-    if trim_both.starts_with(normalized.quotes.style.as_char()) {
+    if trim_both.starts_with(normalized.quotes.quote_char.as_char()) {
         space().fmt(f)?;
     }
 
@@ -192,7 +192,7 @@ pub(super) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         offset,
         stripped_indentation_length,
         already_normalized,
-        quote_style: normalized.quotes.style,
+        quote_char: normalized.quotes.quote_char,
         code_example: CodeExample::default(),
     }
     .add_iter(lines)?;
@@ -250,8 +250,8 @@ struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// is, the formatter can take a fast path.
     already_normalized: bool,
 
-    /// The quote style used by the docstring being printed.
-    quote_style: QuoteStyle,
+    /// The quote character used by the docstring being printed.
+    quote_char: QuoteChar,
 
     /// The current code example detected in the docstring.
     code_example: CodeExample<'src>,
@@ -466,7 +466,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             // instead of later, and as a result, get more consistent
             // results.
             .with_indent_style(IndentStyle::Space);
-        let printed = match docstring_format_source(options, self.quote_style, &codeblob) {
+        let printed = match docstring_format_source(options, self.quote_char, &codeblob) {
             Ok(printed) => printed,
             Err(FormatModuleError::FormatError(err)) => return Err(err),
             Err(
@@ -488,9 +488,9 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         // a docstring. As we fix corner cases over time, we can perhaps
         // remove this check. See the `doctest_invalid_skipped` tests in
         // `docstring_code_examples.py` for when this check is relevant.
-        let wrapped = match self.quote_style {
-            QuoteStyle::Single => std::format!("'''{}'''", printed.as_code()),
-            QuoteStyle::Double | QuoteStyle::Preserve => {
+        let wrapped = match self.quote_char {
+            QuoteChar::Single => std::format!("'''{}'''", printed.as_code()),
+            QuoteChar::Double => {
                 std::format!(r#""""{}""""#, printed.as_code())
             }
         };
@@ -1233,7 +1233,7 @@ enum CodeExampleAddAction<'src> {
 /// inside of a docstring.
 fn docstring_format_source(
     options: crate::PyFormatOptions,
-    docstring_quote_style: QuoteStyle,
+    docstring_quote_style: QuoteChar,
     source: &str,
 ) -> Result<Printed, FormatModuleError> {
     use ruff_python_parser::AsMode;
@@ -1260,7 +1260,7 @@ fn docstring_format_source(
 /// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
 /// so `content\\ """` doesn't need a space while `content\\\ """` does.
 fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool {
-    trim_end.ends_with(normalized.quotes.style.as_char())
+    trim_end.ends_with(normalized.quotes.quote_char.as_char())
         || trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
 }
 

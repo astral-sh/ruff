@@ -210,37 +210,6 @@ pub enum QuoteStyle {
     Preserve,
 }
 
-impl QuoteStyle {
-    pub const fn as_char(self) -> char {
-        match self {
-            QuoteStyle::Single => '\'',
-            QuoteStyle::Double => '"',
-            QuoteStyle::Preserve => '"', // not used
-        }
-    }
-
-    #[must_use]
-    pub const fn invert(self) -> QuoteStyle {
-        match self {
-            QuoteStyle::Single => QuoteStyle::Double,
-            QuoteStyle::Double => QuoteStyle::Single,
-            QuoteStyle::Preserve => QuoteStyle::Preserve,
-        }
-    }
-}
-
-impl TryFrom<char> for QuoteStyle {
-    type Error = ();
-
-    fn try_from(value: char) -> std::result::Result<Self, Self::Error> {
-        match value {
-            '\'' => Ok(QuoteStyle::Single),
-            '"' => Ok(QuoteStyle::Double),
-            _ => Err(()),
-        }
-    }
-}
-
 impl FromStr for QuoteStyle {
     type Err = &'static str;
 
