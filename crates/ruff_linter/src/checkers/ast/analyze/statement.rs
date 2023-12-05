@@ -518,6 +518,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     checker.diagnostics.push(diagnostic)
                 }
             }
+            if checker.enabled(Rule::TooManyMethods) {
+                if let Some(diagnostic) = wemake_python_styleguide::too_many_methods(checker, class_def) {
+                    checker.diagnostics.push(diagnostic)
+                }
+            }
         }
         Stmt::Import(ast::StmtImport { names, range: _ }) => {
             if checker.enabled(Rule::MultipleImportsOnOneLine) {
