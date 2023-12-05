@@ -225,6 +225,7 @@ fn contains_unescaped_newline(haystack: &str) -> bool {
 /// An abstraction for printing each line of a docstring.
 struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     f: &'fmt mut PyFormatter<'ast, 'buf>,
+
     /// A queue of actions to perform.
     ///
     /// Whenever we process a line, it is possible for it to generate multiple
@@ -236,17 +237,22 @@ struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// Actions are pushed on to the end of the queue and popped from the
     /// beginning.
     action_queue: VecDeque<CodeExampleAddAction<'src>>,
+
     /// The source offset of the beginning of the line that is currently being
     /// printed.
     offset: TextSize,
+
     /// Indentation alignment based on the least indented line in the
     /// docstring.
     stripped_indentation_length: TextSize,
+
     /// Whether the docstring is overall already considered normalized. When it
     /// is, the formatter can take a fast path.
     already_normalized: bool,
+
     /// The quote style used by the docstring being printed.
     quote_style: QuoteStyle,
+
     /// The current code example detected in the docstring.
     code_example: CodeExample<'src>,
 }
@@ -525,8 +531,10 @@ struct InputDocstringLine<'src> {
     /// unformatted line in a docstring, and owned when it corresponds to a
     /// reformatted line (e.g., from a code snippet) in a docstring.
     line: &'src str,
+
     /// The offset into the source document which this line corresponds to.
     offset: TextSize,
+
     /// For any input line that isn't the last line, this contains a reference
     /// to the line immediately following this one.
     ///
@@ -565,9 +573,11 @@ struct OutputDocstringLine<'src> {
     /// a line from a reformatted code snippet. In other cases, it is borrowed
     /// from the input docstring line as-is.
     line: Cow<'src, str>,
+
     /// The offset into the source document which this line corresponds to.
     /// Currently, this is an estimate.
     offset: TextSize,
+
     /// Whether this is the last line in a docstring or not. This is determined
     /// by whether the last line in the code snippet was also the last line in
     /// the docstring. If it was, then it follows that the last line in the
@@ -730,6 +740,7 @@ impl<'src> CodeExampleKind<'src> {
 struct CodeExampleDoctest<'src> {
     /// The lines that have been seen so far that make up the doctest.
     lines: Vec<CodeExampleLine<'src>>,
+
     /// The indent observed in the first doctest line.
     ///
     /// More precisely, this corresponds to the whitespace observed before
@@ -832,15 +843,19 @@ impl<'src> CodeExampleDoctest<'src> {
 struct CodeExampleRst<'src> {
     /// The lines that have been seen so far that make up the block.
     lines: Vec<CodeExampleLine<'src>>,
-    /// The indent of the line "opening" this block. It can either be the
-    /// indent of a line ending with `::` (for a literal block) or the indent
-    /// of a line starting with `.. ` (a directive).
+
+    /// The indent of the line "opening" this block measured via
+    /// `indentation_length`.
+    ///
+    /// It can either be the indent of a line ending with `::` (for a literal
+    /// block) or the indent of a line starting with `.. ` (a directive).
     ///
     /// The content body of a block needs to be indented more than the line
     /// opening the block, so we use this indentation to look for indentation
     /// that is "more than" it.
     opening_indent: TextSize,
-    /// The minimum indent of the block.
+
+    /// The minimum indent of the block measured via `indentation_length`.
     ///
     /// This is `None` until the first such line is seen. If no such line is
     /// found, then we consider it an invalid block and bail out of trying to
@@ -858,6 +873,7 @@ struct CodeExampleRst<'src> {
     /// reformatted. The minimum indent is stripped from each line when it is
     /// re-built.
     min_indent: Option<TextSize>,
+
     /// Whether this is a directive block or not. When not a directive, this is
     /// a literal block. The main difference between them is that they start
     /// differently. A literal block is started merely by trailing a line with
@@ -1159,6 +1175,7 @@ struct CodeExampleLine<'src> {
     /// example, contain a `>>> ` or `... ` prefix if this code example is a
     /// doctest.
     original: InputDocstringLine<'src>,
+
     /// The code extracted from the line.
     code: &'src str,
 }
