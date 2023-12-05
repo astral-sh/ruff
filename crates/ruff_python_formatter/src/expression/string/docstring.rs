@@ -1,8 +1,14 @@
-use std::borrow::Cow;
+// This gives tons of false positives in this file because of
+// "reStructuredText."
+#![allow(clippy::doc_markdown)]
 
-use ruff_python_trivia::PythonWhitespace;
+use std::{borrow::Cow, collections::VecDeque};
+
+use {once_cell::sync::Lazy, regex::Regex};
+
 use {
-    ruff_formatter::{write, Printed},
+    ruff_formatter::{write, IndentStyle, Printed},
+    ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
     ruff_source_file::Locator,
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
@@ -182,6 +188,7 @@ pub(super) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
 
     DocstringLinePrinter {
         f,
+        action_queue: VecDeque::new(),
         offset,
         stripped_indentation_length,
         already_normalized,
@@ -218,17 +225,34 @@ fn contains_unescaped_newline(haystack: &str) -> bool {
 /// An abstraction for printing each line of a docstring.
 struct DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     f: &'fmt mut PyFormatter<'ast, 'buf>,
+
+    /// A queue of actions to perform.
+    ///
+    /// Whenever we process a line, it is possible for it to generate multiple
+    /// actions to take. The most basic, and most common case, is for the line
+    /// to just simply be printed as-is. But in some cases, a line is part of
+    /// a code example that we'd like to reformat. In those cases, the actions
+    /// can be more complicated.
+    ///
+    /// Actions are pushed on to the end of the queue and popped from the
+    /// beginning.
+    action_queue: VecDeque<CodeExampleAddAction<'src>>,
+
     /// The source offset of the beginning of the line that is currently being
     /// printed.
     offset: TextSize,
+
     /// Indentation alignment based on the least indented line in the
     /// docstring.
     stripped_indentation_length: TextSize,
+
     /// Whether the docstring is overall already considered normalized. When it
     /// is, the formatter can take a fast path.
     already_normalized: bool,
+
     /// The quote style used by the docstring being printed.
     quote_style: QuoteStyle,
+
     /// The current code example detected in the docstring.
     code_example: CodeExample<'src>,
 }
@@ -253,7 +277,8 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             self.offset += line.line.text_len() + "\n".text_len();
             self.add_one(line)?;
         }
-        Ok(())
+        self.code_example.finish(&mut self.action_queue);
+        self.run_action_queue()
     }
 
     /// Adds the given line to this printer.
@@ -273,34 +298,40 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         {
             return self.print_one(&line.as_output());
         }
-        match self.code_example.add(line) {
-            CodeExampleAddAction::Print { original } => self.print_one(&original.as_output())?,
-            CodeExampleAddAction::Kept => {}
-            CodeExampleAddAction::Reset { code, original } => {
-                for codeline in code {
-                    self.print_one(&codeline.original.as_output())?;
+        self.code_example.add(line, &mut self.action_queue);
+        self.run_action_queue()
+    }
+
+    /// Process any actions in this printer's queue until the queue is empty.
+    fn run_action_queue(&mut self) -> FormatResult<()> {
+        while let Some(action) = self.action_queue.pop_front() {
+            match action {
+                CodeExampleAddAction::Print { original } => {
+                    self.print_one(&original.as_output())?;
                 }
-                self.print_one(&original.as_output())?;
-            }
-            CodeExampleAddAction::Format { mut kind, original } => {
-                let Some(formatted_lines) = self.format(kind.code())? else {
-                    // If formatting failed in a way that should not be
-                    // allowed, we back out what we're doing and print the
-                    // original lines we found as-is as if we did nothing.
-                    for codeline in kind.code() {
+                CodeExampleAddAction::Kept => {}
+                CodeExampleAddAction::Reset { code } => {
+                    for codeline in code {
                         self.print_one(&codeline.original.as_output())?;
                     }
-                    if let Some(original) = original {
-                        self.print_one(&original.as_output())?;
-                    }
-                    return Ok(());
-                };
+                }
+                CodeExampleAddAction::Format { mut kind } => {
+                    let Some(formatted_lines) = self.format(kind.code())? else {
+                        // Since we've failed to emit these lines, we need to
+                        // put them back in the queue but have them jump to the
+                        // front of the queue to get processed before any other
+                        // action.
+                        self.action_queue.push_front(CodeExampleAddAction::Reset {
+                            code: kind.into_code(),
+                        });
+                        continue;
+                    };
 
-                self.already_normalized = false;
-                match kind {
-                    CodeExampleKind::Doctest(CodeExampleDoctest { ps1_indent, .. }) => {
-                        let mut lines = formatted_lines.into_iter();
-                        if let Some(first) = lines.next() {
+                    self.already_normalized = false;
+                    match kind {
+                        CodeExampleKind::Doctest(CodeExampleDoctest { ps1_indent, .. }) => {
+                            let mut lines = formatted_lines.into_iter();
+                            let Some(first) = lines.next() else { continue };
                             self.print_one(
                                 &first.map(|line| std::format!("{ps1_indent}>>> {line}")),
                             )?;
@@ -310,10 +341,20 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                                 )?;
                             }
                         }
+                        CodeExampleKind::Rst(litblock) => {
+                            let Some(min_indent) = litblock.min_indent else {
+                                continue;
+                            };
+                            // This looks suspicious, but it's consistent with the whitespace
+                            // normalization that will occur anyway.
+                            let indent = " ".repeat(min_indent.to_usize());
+                            for docline in formatted_lines {
+                                self.print_one(
+                                    &docline.map(|line| std::format!("{indent}{line}")),
+                                )?;
+                            }
+                        }
                     }
-                }
-                if let Some(original) = original {
-                    self.print_one(&original.as_output())?;
                 }
             }
         }
@@ -395,32 +436,37 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// routine is silent about it. So from the user's perspective, this will
     /// fail silently. Ideally, this would at least emit a warning message,
     /// but at time of writing, it wasn't clear to me how to best do that.
-    ///
-    /// # Panics
-    ///
-    /// This panics when the given slice is empty.
     fn format(
         &mut self,
         code: &[CodeExampleLine<'_>],
     ) -> FormatResult<Option<Vec<OutputDocstringLine<'static>>>> {
         use ruff_python_parser::AsMode;
 
-        let offset = code
-            .get(0)
-            .expect("code blob must be non-empty")
-            .original
-            .offset;
-        let last_line_is_last = code
-            .last()
-            .expect("code blob must be non-empty")
-            .original
-            .is_last();
+        let (Some(unformatted_first), Some(unformatted_last)) = (code.first(), code.last()) else {
+            return Ok(None);
+        };
         let codeblob = code
             .iter()
             .map(|line| line.code)
             .collect::<Vec<&str>>()
             .join("\n");
-        let printed = match docstring_format_source(self.f.options(), self.quote_style, &codeblob) {
+        let options = self
+            .f
+            .options()
+            .clone()
+            // It's perhaps a little odd to be hard-coding the indent
+            // style here, but I believe it is necessary as a result
+            // of the whitespace normalization otherwise done in
+            // docstrings. Namely, tabs are rewritten with ASCII
+            // spaces. If code examples in docstrings are formatted
+            // with tabs and those tabs end up getting rewritten, this
+            // winds up screwing with the indentation in ways that
+            // results in formatting no longer being idempotent. Since
+            // tabs will get erased anyway, we just clobber them here
+            // instead of later, and as a result, get more consistent
+            // results.
+            .with_indent_style(IndentStyle::Space);
+        let printed = match docstring_format_source(options, self.quote_style, &codeblob) {
             Ok(printed) => printed,
             Err(FormatModuleError::FormatError(err)) => return Err(err),
             Err(
@@ -461,12 +507,12 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             .lines()
             .map(|line| OutputDocstringLine {
                 line: Cow::Owned(line.to_string()),
-                offset,
+                offset: unformatted_first.original.offset,
                 is_last: false,
             })
             .collect::<Vec<_>>();
-        if let Some(last) = lines.last_mut() {
-            last.is_last = last_line_is_last;
+        if let Some(reformatted_last) = lines.last_mut() {
+            reformatted_last.is_last = unformatted_last.original.is_last();
         }
         Ok(Some(lines))
     }
@@ -485,8 +531,10 @@ struct InputDocstringLine<'src> {
     /// unformatted line in a docstring, and owned when it corresponds to a
     /// reformatted line (e.g., from a code snippet) in a docstring.
     line: &'src str,
+
     /// The offset into the source document which this line corresponds to.
     offset: TextSize,
+
     /// For any input line that isn't the last line, this contains a reference
     /// to the line immediately following this one.
     ///
@@ -525,9 +573,11 @@ struct OutputDocstringLine<'src> {
     /// a line from a reformatted code snippet. In other cases, it is borrowed
     /// from the input docstring line as-is.
     line: Cow<'src, str>,
+
     /// The offset into the source document which this line corresponds to.
     /// Currently, this is an estimate.
     offset: TextSize,
+
     /// Whether this is the last line in a docstring or not. This is determined
     /// by whether the last line in the code snippet was also the last line in
     /// the docstring. If it was, then it follows that the last line in the
@@ -568,38 +618,51 @@ impl<'src> CodeExample<'src> {
     /// Attempt to add an original line from a docstring to this code example.
     ///
     /// Based on the line and the internal state of whether a code example is
-    /// currently being collected or not, this will return an "action" for
-    /// the caller to perform. The typical case is a "print" action, which
-    /// instructs the caller to just print the line as though it were not part
-    /// of a code snippet.
-    fn add(&mut self, original: InputDocstringLine<'src>) -> CodeExampleAddAction<'src> {
+    /// currently being collected or not, this will push an "action" to the
+    /// given queue for the caller to perform. The typical case is a "print"
+    /// action, which instructs the caller to just print the line as though it
+    /// were not part of a code snippet.
+    fn add(
+        &mut self,
+        original: InputDocstringLine<'src>,
+        queue: &mut VecDeque<CodeExampleAddAction<'src>>,
+    ) {
         match self.kind.take() {
             // There's no existing code example being built, so we look for
             // the start of one or otherwise tell the caller we couldn't find
             // anything.
-            None => match self.add_start(original) {
-                None => CodeExampleAddAction::Kept,
-                Some(original) => CodeExampleAddAction::Print { original },
-            },
-            Some(CodeExampleKind::Doctest(mut doctest)) => {
-                if doctest.add_code_line(original) {
-                    // Stay with the doctest kind while we accumulate all
-                    // PS2 prompts.
-                    self.kind = Some(CodeExampleKind::Doctest(doctest));
-                    return CodeExampleAddAction::Kept;
-                }
-                let original = self.add_start(original);
-                CodeExampleAddAction::Format {
-                    kind: CodeExampleKind::Doctest(doctest),
-                    original,
-                }
+            None => {
+                self.add_start(original, queue);
+            }
+            Some(CodeExampleKind::Doctest(doctest)) => {
+                let Some(doctest) = doctest.add_code_line(original, queue) else {
+                    self.add_start(original, queue);
+                    return;
+                };
+                self.kind = Some(CodeExampleKind::Doctest(doctest));
+            }
+            Some(CodeExampleKind::Rst(litblock)) => {
+                let Some(litblock) = litblock.add_code_line(original, queue) else {
+                    self.add_start(original, queue);
+                    return;
+                };
+                self.kind = Some(CodeExampleKind::Rst(litblock));
             }
         }
     }
 
+    /// Finish the code example by generating any final actions if applicable.
+    ///
+    /// This typically adds an action when the end of a code example coincides
+    /// with the end of the docstring.
+    fn finish(&mut self, queue: &mut VecDeque<CodeExampleAddAction<'src>>) {
+        let Some(kind) = self.kind.take() else { return };
+        queue.push_back(CodeExampleAddAction::Format { kind });
+    }
+
     /// Looks for the start of a code example. If one was found, then the given
     /// line is kept and added as part of the code example. Otherwise, the line
-    /// is returned unchanged and no code example was found.
+    /// is pushed onto the queue unchanged to be printed as-is.
     ///
     /// # Panics
     ///
@@ -609,13 +672,18 @@ impl<'src> CodeExample<'src> {
     fn add_start(
         &mut self,
         original: InputDocstringLine<'src>,
-    ) -> Option<InputDocstringLine<'src>> {
+        queue: &mut VecDeque<CodeExampleAddAction<'src>>,
+    ) {
         assert!(self.kind.is_none(), "expected no existing code example");
         if let Some(doctest) = CodeExampleDoctest::new(original) {
             self.kind = Some(CodeExampleKind::Doctest(doctest));
-            return None;
+            queue.push_back(CodeExampleAddAction::Kept);
+        } else if let Some(litblock) = CodeExampleRst::new(original) {
+            self.kind = Some(CodeExampleKind::Rst(litblock));
+            queue.push_back(CodeExampleAddAction::Print { original });
+        } else {
+            queue.push_back(CodeExampleAddAction::Print { original });
         }
-        Some(original)
     }
 }
 
@@ -633,6 +701,12 @@ enum CodeExampleKind<'src> {
     ///
     /// [regex matching]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L611-L622
     Doctest(CodeExampleDoctest<'src>),
+    /// Code found from a reStructuredText "[literal block]" or "[code block
+    /// directive]".
+    ///
+    /// [literal block]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
+    /// [code block directive]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+    Rst(CodeExampleRst<'src>),
 }
 
 impl<'src> CodeExampleKind<'src> {
@@ -643,6 +717,20 @@ impl<'src> CodeExampleKind<'src> {
     fn code(&mut self) -> &[CodeExampleLine<'src>] {
         match *self {
             CodeExampleKind::Doctest(ref doctest) => &doctest.lines,
+            CodeExampleKind::Rst(ref mut litblock) => litblock.indented_code(),
+        }
+    }
+
+    /// Consume this code example and return only the lines that have been
+    /// accrued so far.
+    ///
+    /// This is useful when the code example being collected has been
+    /// determined to be invalid, and one wants to "give up" and print the
+    /// original lines through unchanged without attempting formatting.
+    fn into_code(self) -> Vec<CodeExampleLine<'src>> {
+        match self {
+            CodeExampleKind::Doctest(doctest) => doctest.lines,
+            CodeExampleKind::Rst(litblock) => litblock.lines,
         }
     }
 }
@@ -652,6 +740,7 @@ impl<'src> CodeExampleKind<'src> {
 struct CodeExampleDoctest<'src> {
     /// The lines that have been seen so far that make up the doctest.
     lines: Vec<CodeExampleLine<'src>>,
+
     /// The indent observed in the first doctest line.
     ///
     /// More precisely, this corresponds to the whitespace observed before
@@ -681,19 +770,24 @@ impl<'src> CodeExampleDoctest<'src> {
         Some(doctest)
     }
 
-    /// Looks for a valid doctest PS2 prompt in the line given.
+    /// Looks for a valid doctest PS2 prompt in the line given. If one is
+    /// found, it is added to this code example and ownership of the example is
+    /// returned to the caller. In this case, callers should continue trying to
+    /// add PS2 prompt lines.
     ///
-    /// If one is found, then the code portion of the line following the PS2 prompt
-    /// is returned.
+    /// But if one isn't found, then the given line is not part of the code
+    /// example and ownership of this example is not returned.
     ///
-    /// Callers must provide a string containing the original indentation of the
-    /// PS1 prompt that started the doctest containing the potential PS2 prompt
-    /// in the line given. If the line contains a PS2 prompt, its indentation must
-    /// match the indentation used for the corresponding PS1 prompt (otherwise
-    /// `None` will be returned).
-    fn add_code_line(&mut self, original: InputDocstringLine<'src>) -> bool {
+    /// In either case, relevant actions will be added to the given queue to
+    /// process.
+    fn add_code_line(
+        mut self,
+        original: InputDocstringLine<'src>,
+        queue: &mut VecDeque<CodeExampleAddAction<'src>>,
+    ) -> Option<CodeExampleDoctest<'src>> {
         let Some((ps2_indent, ps2_after)) = original.line.split_once("...") else {
-            return false;
+            queue.push_back(self.into_format_action());
+            return None;
         };
         // PS2 prompts must have the same indentation as their
         // corresponding PS1 prompt.[1] While the 'doctest' Python
@@ -702,7 +796,8 @@ impl<'src> CodeExampleDoctest<'src> {
         //
         // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L733
         if self.ps1_indent != ps2_indent {
-            return false;
+            queue.push_back(self.into_format_action());
+            return None;
         }
         // PS2 prompts must be followed by an ASCII space character unless
         // it's an otherwise empty line[1].
@@ -710,11 +805,354 @@ impl<'src> CodeExampleDoctest<'src> {
         // [1]: https://github.com/python/cpython/blob/0ff6368519ed7542ad8b443de01108690102420a/Lib/doctest.py#L809-L812
         let code = match ps2_after.strip_prefix(' ') {
             None if ps2_after.is_empty() => "",
-            None => return false,
+            None => {
+                queue.push_back(self.into_format_action());
+                return None;
+            }
             Some(code) => code,
         };
         self.lines.push(CodeExampleLine { original, code });
-        true
+        queue.push_back(CodeExampleAddAction::Kept);
+        Some(self)
+    }
+
+    /// Consume this doctest and turn it into a formatting action.
+    fn into_format_action(self) -> CodeExampleAddAction<'src> {
+        CodeExampleAddAction::Format {
+            kind: CodeExampleKind::Doctest(self),
+        }
+    }
+}
+
+/// State corresponding to a single reStructuredText literal block or
+/// code-block directive.
+///
+/// While a literal block and code-block directive are technically two
+/// different reStructuredText constructs, we use one type to represent
+/// both because they are exceptionally similar. Basically, they are
+/// the same with two main differences:
+///
+/// 1. Literal blocks are began with a line that ends with `::`. Code block
+/// directives are began with a line like `.. code-block:: python`.
+/// 2. Code block directives permit a list of options as a "field list"
+/// immediately after the opening line. Literal blocks have no options.
+///
+/// Otherwise, everything else, including the indentation structure, is the
+/// same.
+#[derive(Debug)]
+struct CodeExampleRst<'src> {
+    /// The lines that have been seen so far that make up the block.
+    lines: Vec<CodeExampleLine<'src>>,
+
+    /// The indent of the line "opening" this block measured via
+    /// `indentation_length`.
+    ///
+    /// It can either be the indent of a line ending with `::` (for a literal
+    /// block) or the indent of a line starting with `.. ` (a directive).
+    ///
+    /// The content body of a block needs to be indented more than the line
+    /// opening the block, so we use this indentation to look for indentation
+    /// that is "more than" it.
+    opening_indent: TextSize,
+
+    /// The minimum indent of the block measured via `indentation_length`.
+    ///
+    /// This is `None` until the first such line is seen. If no such line is
+    /// found, then we consider it an invalid block and bail out of trying to
+    /// find a code snippet. Otherwise, we update this indentation as we see
+    /// lines in the block with less indentation. (Usually, the minimum is the
+    /// indentation of the first block, but this is not required.)
+    ///
+    /// By construction, all lines part of the block must have at least this
+    /// indentation. Additionally, it is guaranteed that the indentation length
+    /// of the opening indent is strictly less than the indentation of the
+    /// minimum indent. Namely, the block ends once we find a line that has
+    /// been unindented to at most the indent of the opening line.
+    ///
+    /// When the code snippet has been extracted, it is re-built before being
+    /// reformatted. The minimum indent is stripped from each line when it is
+    /// re-built.
+    min_indent: Option<TextSize>,
+
+    /// Whether this is a directive block or not. When not a directive, this is
+    /// a literal block. The main difference between them is that they start
+    /// differently. A literal block is started merely by trailing a line with
+    /// `::`. A directive block is started with `.. code-block:: python`.
+    ///
+    /// The other difference is that directive blocks can have options
+    /// (represented as a reStructuredText "field list") after the beginning of
+    /// the directive and before the body content of the directive.
+    is_directive: bool,
+}
+
+impl<'src> CodeExampleRst<'src> {
+    /// Looks for the start of a reStructuredText [literal block] or [code
+    /// block directive].
+    ///
+    /// If the start of a block is found, then this returns a correctly
+    /// initialized reStructuredText block. Callers should print the line as
+    /// given as it is not retained as part of the block.
+    ///
+    /// [literal block]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
+    /// [code block directive]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleRst> {
+        let (opening_indent, rest) = indent_with_suffix(original.line);
+        if rest.starts_with(".. ") {
+            if let Some(litblock) = CodeExampleRst::new_code_block(original) {
+                return Some(litblock);
+            }
+            // In theory, we could still have something that looks like a literal block,
+            // but if the line starts with `.. `, then it seems like it probably shouldn't
+            // be a literal block. For example:
+            //
+            //     .. code-block::
+            //
+            //         cool_stuff( 1 )
+            //
+            // The above is not valid because the `language` argument is missing from
+            // the `code-block` directive. Because of how we handle it here, the above
+            // is not treated as a code snippet.
+            return None;
+        }
+        // At this point, we know we didn't find a code block, so the only
+        // thing we can hope for is a literal block which must end with a `::`.
+        if !rest.trim_end().ends_with("::") {
+            return None;
+        }
+        Some(CodeExampleRst {
+            lines: vec![],
+            opening_indent: indentation_length(opening_indent),
+            min_indent: None,
+            is_directive: false,
+        })
+    }
+
+    /// Attempts to create a new reStructuredText code example from a
+    /// `code-block` or `sourcecode` directive. If one couldn't be found, then
+    /// `None` is returned.
+    fn new_code_block(original: InputDocstringLine<'src>) -> Option<CodeExampleRst> {
+        // This regex attempts to parse the start of a reStructuredText code
+        // block [directive]. From the reStructuredText spec:
+        //
+        // > Directives are indicated by an explicit markup start (".. ")
+        // > followed by the directive type, two colons, and whitespace
+        // > (together called the "directive marker"). Directive types
+        // > are case-insensitive single words (alphanumerics plus
+        // > isolated internal hyphens, underscores, plus signs, colons,
+        // > and periods; no whitespace).
+        //
+        // The language names matched here (e.g., `python` or `py`) are taken
+        // from the [Pygments lexer names], which is referenced from the docs
+        // for the [code-block] directive.
+        //
+        // [directives]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#directives
+        // [Pygments lexer names]: https://pygments.org/docs/lexers/
+        // [code-block]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+        static DIRECTIVE_START: Lazy<Regex> = Lazy::new(|| {
+            Regex::new(
+                r"(?m)^\s*\.\. \s*(?i:code-block|sourcecode)::\s*(?i:python|py|python3|py3)$",
+            )
+            .unwrap()
+        });
+        if !DIRECTIVE_START.is_match(original.line) {
+            return None;
+        }
+        Some(CodeExampleRst {
+            lines: vec![],
+            opening_indent: indentation_length(original.line),
+            min_indent: None,
+            is_directive: true,
+        })
+    }
+
+    /// Returns the code collected in this example as a sequence of lines.
+    ///
+    /// The lines returned have the minimum indentation stripped from their
+    /// prefix in-place. Based on the definition of minimum indentation, this
+    /// implies there is at least one line in the slice returned with no
+    /// whitespace prefix.
+    fn indented_code(&mut self) -> &[CodeExampleLine<'src>] {
+        let Some(min_indent) = self.min_indent else {
+            return &[];
+        };
+        for line in &mut self.lines {
+            line.code = if line.original.line.trim().is_empty() {
+                ""
+            } else {
+                indentation_trim(min_indent, line.original.line)
+            };
+        }
+        &self.lines
+    }
+
+    /// Attempts to add the given line from a docstring to the reStructuredText
+    /// code snippet being collected.
+    ///
+    /// This takes ownership of `self`, and if ownership is returned to the
+    /// caller, that means the caller should continue trying to add lines to
+    /// this code snippet. Otherwise, if ownership is not returned, then this
+    /// implies at least one action was added to the give queue to either reset
+    /// the code block or format. That is, the code snippet was either found to
+    /// be invalid or it was completed and should be reformatted.
+    ///
+    /// Note that actions may be added even if ownership is returned. For
+    /// example, empty lines immediately preceding the actual code snippet will
+    /// be returned back as an action to print them verbatim, but the caller
+    /// should still continue to try to add lines to this code snippet.
+    fn add_code_line(
+        mut self,
+        original: InputDocstringLine<'src>,
+        queue: &mut VecDeque<CodeExampleAddAction<'src>>,
+    ) -> Option<CodeExampleRst<'src>> {
+        // If we haven't started populating the minimum indent yet, then
+        // we haven't found the first code line and may need to find and
+        // pass through leading empty lines.
+        let Some(min_indent) = self.min_indent else {
+            return self.add_first_line(original, queue);
+        };
+        let (indent, rest) = indent_with_suffix(original.line);
+        if rest.is_empty() {
+            // This is the standard way we close a block: when we see
+            // an empty line followed by an unindented non-empty line.
+            if let Some(next) = original.next {
+                let (next_indent, next_rest) = indent_with_suffix(next);
+                if !next_rest.is_empty() && indentation_length(next_indent) <= self.opening_indent {
+                    self.push_format_action(queue);
+                    return None;
+                }
+            } else {
+                self.push_format_action(queue);
+                return None;
+            }
+            self.push(original);
+            queue.push_back(CodeExampleAddAction::Kept);
+            return Some(self);
+        }
+        let indent_len = indentation_length(indent);
+        if indent_len <= self.opening_indent {
+            // If we find an unindented non-empty line at the same (or less)
+            // indentation of the opening line at this point, then we know it
+            // must be wrong because we didn't see it immediately following an
+            // empty line.
+            queue.push_back(self.into_reset_action());
+            return None;
+        } else if indent_len < min_indent {
+            // While the minimum indent is usually the indentation of the first
+            // line in a code snippet, it is not guaranteed to be the case.
+            // And indeed, reST is happy to let blocks have a first line whose
+            // indentation is greater than a subsequent line in the block. The
+            // only real restriction is that every line in the block must be
+            // indented at least past the indentation of the `::` line.
+            self.min_indent = Some(indent_len);
+        }
+        self.push(original);
+        queue.push_back(CodeExampleAddAction::Kept);
+        Some(self)
+    }
+
+    /// Looks for the first line in a literal or code block.
+    ///
+    /// If a first line is found, then this returns true. Otherwise, an empty
+    /// line has been found and the caller should pass it through to the
+    /// docstring unchanged. (Empty lines are allowed to precede a
+    /// block. And there must be at least one of them.)
+    ///
+    /// If the given line is invalid for a reStructuredText block (i.e., no
+    /// empty lines seen between the opening line), then an error variant is
+    /// returned. In this case, callers should bail out of parsing this code
+    /// example.
+    ///
+    /// When this returns `true`, it is guaranteed that `self.min_indent` is
+    /// set to a non-None value.
+    ///
+    /// # Panics
+    ///
+    /// Callers must only call this when the first indentation has not yet been
+    /// found. If it has, then this panics.
+    fn add_first_line(
+        mut self,
+        original: InputDocstringLine<'src>,
+        queue: &mut VecDeque<CodeExampleAddAction<'src>>,
+    ) -> Option<CodeExampleRst<'src>> {
+        assert!(self.min_indent.is_none());
+
+        // While the rst spec isn't completely clear on this point, through
+        // experimentation, I found that multiple empty lines before the first
+        // non-empty line are ignored.
+        let (indent, rest) = indent_with_suffix(original.line);
+        if rest.is_empty() {
+            queue.push_back(CodeExampleAddAction::Print { original });
+            return Some(self);
+        }
+        // Ignore parameters in field lists. These can only occur in
+        // directives, not literal blocks.
+        if self.is_directive && is_rst_option(rest) {
+            queue.push_back(CodeExampleAddAction::Print { original });
+            return Some(self);
+        }
+        let min_indent = indentation_length(indent);
+        // At this point, we found a non-empty line. The only thing we require
+        // is that its indentation is strictly greater than the indentation of
+        // the line containing the `::`. Otherwise, we treat this as an invalid
+        // block and bail.
+        if min_indent <= self.opening_indent {
+            queue.push_back(self.into_reset_action());
+            return None;
+        }
+        self.min_indent = Some(min_indent);
+        self.push(original);
+        queue.push_back(CodeExampleAddAction::Kept);
+        Some(self)
+    }
+
+    /// Pushes the given line as part of this code example.
+    fn push(&mut self, original: InputDocstringLine<'src>) {
+        // N.B. We record the code portion as identical to the original line.
+        // When we go to reformat the code lines, we change them by removing
+        // the `min_indent`. This design is necessary because the true value of
+        // `min_indent` isn't known until the entire block has been parsed.
+        let code = original.line;
+        self.lines.push(CodeExampleLine { original, code });
+    }
+
+    /// Consume this block and add actions to the give queue for formatting.
+    ///
+    /// This may trim lines from the end of the block and add them to the queue
+    /// for printing as-is. For example, this happens when there are trailing
+    /// empty lines, as we would like to preserve those since they aren't
+    /// generally treated as part of the code block.
+    fn push_format_action(mut self, queue: &mut VecDeque<CodeExampleAddAction<'src>>) {
+        let has_non_whitespace = |line: &CodeExampleLine| {
+            line.original
+                .line
+                .chars()
+                .any(|ch| !is_python_whitespace(ch))
+        };
+        let first_trailing_empty_line = self
+            .lines
+            .iter()
+            .rposition(has_non_whitespace)
+            .map_or(0, |i| i + 1);
+        let trailing_lines = self.lines.split_off(first_trailing_empty_line);
+        queue.push_back(CodeExampleAddAction::Format {
+            kind: CodeExampleKind::Rst(self),
+        });
+        queue.extend(
+            trailing_lines
+                .into_iter()
+                .map(|line| CodeExampleAddAction::Print {
+                    original: line.original,
+                }),
+        );
+    }
+
+    /// Consume this block and turn it into a reset action.
+    ///
+    /// This occurs when we started collecting a code example from something
+    /// that looked like a block, but later determined that it wasn't a valid
+    /// block.
+    fn into_reset_action(self) -> CodeExampleAddAction<'src> {
+        CodeExampleAddAction::Reset { code: self.lines }
     }
 }
 
@@ -737,6 +1175,7 @@ struct CodeExampleLine<'src> {
     /// example, contain a `>>> ` or `... ` prefix if this code example is a
     /// doctest.
     original: InputDocstringLine<'src>,
+
     /// The code extracted from the line.
     code: &'src str,
 }
@@ -763,20 +1202,10 @@ enum CodeExampleAddAction<'src> {
     Kept,
     /// The line added indicated that the code example is finished and should
     /// be formatted and printed. The line added is not treated as part of
-    /// the code example. If the line added indicated the start of another
-    /// code example, then is won't be returned to the caller here. Otherwise,
-    /// callers should pass it through to the formatter as-is.
+    /// the code example.
     Format {
         /// The kind of code example that was found.
-        ///
-        /// This is guaranteed to have a non-empty code snippet.
         kind: CodeExampleKind<'src>,
-        /// When set, the line is considered not part of any code example and
-        /// should be formatted as if the [`Print`] action were returned.
-        /// Otherwise, if there is no line, then either one does not exist
-        /// or it is part of another code example and should be treated as a
-        /// [`Kept`] action.
-        original: Option<InputDocstringLine<'src>>,
     },
     /// This occurs when adding a line to an existing code example
     /// results in that code example becoming invalid. In this case,
@@ -787,9 +1216,6 @@ enum CodeExampleAddAction<'src> {
         /// The lines of code that we collected but should be printed back to
         /// the docstring as-is and not formatted.
         code: Vec<CodeExampleLine<'src>>,
-        /// The line that was added and triggered this reset to occur. It
-        /// should be written back to the docstring as-is after the code lines.
-        original: InputDocstringLine<'src>,
     },
 }
 
@@ -804,7 +1230,7 @@ enum CodeExampleAddAction<'src> {
 /// explicitly sets the context to indicate that formatting is taking place
 /// inside of a docstring.
 fn docstring_format_source(
-    options: &crate::PyFormatOptions,
+    options: crate::PyFormatOptions,
     docstring_quote_style: QuoteStyle,
     source: &str,
 ) -> Result<Printed, FormatModuleError> {
@@ -818,7 +1244,7 @@ fn docstring_format_source(
     let comments = crate::Comments::from_ast(&module, source_code, &comment_ranges);
     let locator = Locator::new(source);
 
-    let ctx = PyFormatContext::new(options.clone(), locator.contents(), comments)
+    let ctx = PyFormatContext::new(options, locator.contents(), comments)
         .in_docstring(docstring_quote_style);
     let formatted = crate::format!(ctx, [module.format()])?;
     formatted
@@ -853,6 +1279,59 @@ fn indentation_length(line: &str) -> TextSize {
         }
     }
     TextSize::new(indentation)
+}
+
+/// Trims at most `indent_len` indentation from the beginning of `line`.
+///
+/// This treats indentation in precisely the same way as `indentation_length`.
+/// As such, it is expected that `indent_len` is computed from
+/// `indentation_length`. This is useful when one needs to trim some minimum
+/// level of indentation from a code snippet collected from a docstring before
+/// attempting to reformat it.
+fn indentation_trim(indent_len: TextSize, line: &str) -> &str {
+    let mut seen_indent_len = 0u32;
+    let mut trimmed = line;
+    for char in line.chars() {
+        if seen_indent_len >= indent_len.to_u32() {
+            return trimmed;
+        }
+        if char == '\t' {
+            // Pad to the next multiple of tab_width
+            seen_indent_len += 8 - (seen_indent_len.rem_euclid(8));
+            trimmed = &trimmed[1..];
+        } else if char.is_whitespace() {
+            seen_indent_len += u32::from(char.text_len());
+            trimmed = &trimmed[char.len_utf8()..];
+        } else {
+            break;
+        }
+    }
+    line
+}
+
+/// Returns the indentation of the given line and everything following it.
+fn indent_with_suffix(line: &str) -> (&str, &str) {
+    let suffix = line.trim_whitespace_start();
+    let indent_len = line
+        .len()
+        .checked_sub(suffix.len())
+        .expect("suffix <= line");
+    let indent = &line[..indent_len];
+    (indent, suffix)
+}
+
+/// Returns true if this line looks like a reStructuredText option in a
+/// field list.
+///
+/// That is, a line that looks like `:name: optional-value`.
+fn is_rst_option(line: &str) -> bool {
+    let line = line.trim_start();
+    if !line.starts_with(':') {
+        return false;
+    }
+    line.chars()
+        .take_while(|&ch| !is_python_whitespace(ch))
+        .any(|ch| ch == ':')
 }
 
 #[cfg(test)]

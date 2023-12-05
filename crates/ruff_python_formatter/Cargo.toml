@@ -28,6 +28,7 @@ countme = "3.0.1"
 itertools = { workspace = true }
 memchr = { workspace = true }
 once_cell = { workspace = true }
+regex = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
