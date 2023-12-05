@@ -36,3 +36,15 @@ br"""br double triple"""
 'single1' "double2"
 "double1" 'single2'
 "double1" "double2"
+
+def docstring_single_triple():
+    '''single triple'''
+
+def docstring_double_triple():
+    """double triple"""
+
+def docstring_double():
+    "double triple"
+
+def docstring_single():
+    'single'
