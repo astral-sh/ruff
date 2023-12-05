@@ -86,7 +86,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-x86_64-apple-darwin.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-x86_64-apple-darwin.tar.gz
           tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -125,7 +125,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-aarch64-apple-darwin.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-aarch64-apple-darwin.tar.gz
           tar czvf $ARCHIVE_FILE -C target/aarch64-apple-darwin/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -177,7 +177,7 @@ jobs:
       - name: "Archive binary"
         shell: bash
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.zip
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.zip
           7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -224,7 +224,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -291,7 +291,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -343,7 +343,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -399,7 +399,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
