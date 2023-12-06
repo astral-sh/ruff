@@ -1,0 +1,54 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+missing_return_doc.py:28:5: PLW9011 Docstring missing documentation on what is returned
+   |
+27 |   def google_good(a: int, b: int):
+28 |       """Returns sum of two integers.
+   |  _____^
+29 | | 
+30 | |     Args:
+31 | |         a: first integer
+32 | |         b: second integer
+33 | | 
+34 | |     Returns:
+35 | |         sum
+36 | |     """
+   | |_______^ PLW9011
+37 |       return a + b
+   |
+
+missing_return_doc.py:41:5: PLW9011 Docstring missing documentation on what is returned
+   |
+40 |   def numpy_good(a: int, b: int):
+41 |       """Returns sum of two integers.
+   |  _____^
+42 | | 
+43 | |     Parameters
+44 | |     ----------
+45 | |     a:
+46 | |         first integer
+47 | |     b:
+48 | |         second integer
+49 | | 
+50 | |     Returns
+51 | |     -------
+52 | |         sum
+53 | |     """
+   | |_______^ PLW9011
+54 |       return a + b
+   |
+
+missing_return_doc.py:66:5: PLW9011 Docstring missing documentation on what is returned
+   |
+65 |   def return_bad(a: int, b: int):  # [missing-return-doc]
+66 |       """Returns sum of two integers.
+   |  _____^
+67 | |     :param a: first integer
+68 | |     :param b: second integer
+69 | |     """
+   | |_______^ PLW9011
+70 |       return a + b
+   |
+
+

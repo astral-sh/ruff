@@ -6,10 +6,12 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, docstrings::Docstring};
+use crate::{
+    checkers::ast::Checker, docstrings::Docstring, rules::pydocstyle::settings::Convention,
+};
 
 /// ## What it does
-/// Checks that ReST docstring contains documentation on what is returned.
+/// Checks that docstring contains documentation on what is returned.
 ///
 /// ## Why is this bad?
 /// Docstrings are a good way to document the code,
@@ -36,6 +38,9 @@ use crate::{checkers::ast::Checker, docstrings::Docstring};
 ///     """
 ///     return a + b
 /// ```
+///
+/// ## Options
+/// - `pylint.convention`
 #[violation]
 pub struct MissingReturnDoc;
 
@@ -52,31 +57,36 @@ pub(crate) fn missing_return_doc(checker: &mut Checker, docstring: &Docstring) {
     static NUMPY: Lazy<Regex> = Lazy::new(|| Regex::new(r"Returns\n\s*-------\n").unwrap());
     static GOOGLE: Lazy<Regex> = Lazy::new(|| Regex::new(r"Returns:\n").unwrap());
 
-    let has_return_documentation = [&REST, &NUMPY, &GOOGLE]
-        .iter()
-        .any(|return_regex| return_regex.is_match(docstring.contents));
+    if let Some(convention) = checker.settings.pylint.convention {
+        let has_return_documentation = match convention {
+            Convention::Google => &GOOGLE,
+            Convention::Numpy => &NUMPY,
+            Convention::Pep257 => &REST,
+        }
+        .is_match(docstring.contents);
 
-    let is_public_method_with_return =
-        docstring
-            .definition
-            .as_function_def()
-            .map_or(false, |function| {
-                !function.name.starts_with('_')
-                    && function
-                        .body
-                        .iter()
-                        .filter_map(|statement| statement.as_return_stmt())
-                        .any(|return_statement| {
-                            return_statement
-                                .value
-                                .as_deref()
-                                .is_some_and(|value| !value.is_none_literal_expr())
-                        })
-            });
+        let is_public_method_with_return =
+            docstring
+                .definition
+                .as_function_def()
+                .map_or(false, |function| {
+                    !function.name.starts_with('_')
+                        && function
+                            .body
+                            .iter()
+                            .filter_map(|statement| statement.as_return_stmt())
+                            .any(|return_statement| {
+                                return_statement
+                                    .value
+                                    .as_deref()
+                                    .is_some_and(|value| !value.is_none_literal_expr())
+                            })
+                });
 
-    if is_public_method_with_return && !has_return_documentation {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(MissingReturnDoc, docstring.range()));
+        if is_public_method_with_return && !has_return_documentation {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(MissingReturnDoc, docstring.range()));
+        }
     }
 }

@@ -13,7 +13,9 @@ mod tests {
     use test_case::test_case;
 
     use crate::assert_messages;
+    use crate::message::Message;
     use crate::registry::Rule;
+    use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::pylint;
     use crate::settings::types::PythonVersion;
     use crate::settings::LinterSettings;
@@ -300,6 +302,40 @@ mod tests {
                 ..LinterSettings::for_rule(Rule::TooManyReturnStatements)
             },
         )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    fn missing_return_doc_convention(convention: Convention) -> Result<Vec<Message>> {
+        test_path(
+            Path::new("pylint/missing_return_doc.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    convention: Some(convention),
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::MissingReturnDoc])
+            },
+        )
+    }
+
+    #[test]
+    fn missing_return_doc_pep257() -> Result<()> {
+        let diagnostics = missing_return_doc_convention(Convention::Pep257)?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn missing_return_doc_google() -> Result<()> {
+        let diagnostics = missing_return_doc_convention(Convention::Google)?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn missing_return_doc_numpy() -> Result<()> {
+        let diagnostics = missing_return_doc_convention(Convention::Numpy)?;
         assert_messages!(diagnostics);
         Ok(())
     }

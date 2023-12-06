@@ -3,6 +3,7 @@
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 
+use crate::rules::pydocstyle::settings::Convention;
 use ruff_macros::CacheKey;
 use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number};
 
@@ -38,6 +39,7 @@ impl ConstantType {
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
     pub allow_dunder_method_names: FxHashSet<String>,
+    pub convention: Option<Convention>,
     pub max_args: usize,
     pub max_returns: usize,
     pub max_bool_expr: usize,
@@ -51,6 +53,7 @@ impl Default for Settings {
         Self {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
             allow_dunder_method_names: FxHashSet::default(),
+            convention: None,
             max_args: 5,
             max_returns: 6,
             max_bool_expr: 5,

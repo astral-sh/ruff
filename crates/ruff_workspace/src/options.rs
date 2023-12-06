@@ -2620,6 +2620,17 @@ pub struct PylintOptions {
     )]
     pub allow_dunder_method_names: Option<FxHashSet<String>>,
 
+    /// Whether to use Google-style, NumPy-style, or PEP 257 (reST) docstring conventions.
+    #[option(
+        default = r#"null"#,
+        value_type = r#""google" | "numpy" | "pep257""#,
+        example = r#"
+            # Use Google-style docstrings.
+            convention = "google"
+        "#
+    )]
+    pub convention: Option<Convention>,
+
     /// Maximum number of branches allowed for a function or method body (see:
     /// `PLR0912`).
     #[option(default = r"12", value_type = "int", example = r"max-branches = 12")]
@@ -2662,6 +2673,7 @@ impl PylintOptions {
                 .allow_magic_value_types
                 .unwrap_or(defaults.allow_magic_value_types),
             allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
+            convention: self.convention,
             max_args: self.max_args.unwrap_or(defaults.max_args),
             max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),

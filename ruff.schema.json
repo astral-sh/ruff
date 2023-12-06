@@ -2342,6 +2342,17 @@
             "$ref": "#/definitions/ConstantType"
           }
         },
+        "convention": {
+          "description": "Whether to use Google-style, NumPy-style, or PEP 257 (reST) docstring conventions.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Convention"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "max-args": {
           "description": "Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).",
           "type": [
