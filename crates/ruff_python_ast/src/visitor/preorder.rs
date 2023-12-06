@@ -139,7 +139,6 @@ pub trait PreorderVisitor<'a> {
     }
 
     #[inline]
-
     fn visit_pattern_keyword(&mut self, pattern_keyword: &'a PatternKeyword) {
         walk_pattern_keyword(self, pattern_keyword);
     }
