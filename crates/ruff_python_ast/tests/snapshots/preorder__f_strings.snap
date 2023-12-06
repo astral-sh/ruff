@@ -6,17 +6,20 @@ expression: trace
   - StmtExpr
     - ExprFString
       - StringLiteral
-      - ExprStringLiteral
-        - StringLiteral
-      - ExprFormattedValue
-        - ExprName
-        - ExprFString
-          - ExprStringLiteral
-            - StringLiteral
-          - ExprFormattedValue
-            - ExprName
-          - ExprStringLiteral
-            - StringLiteral
-      - ExprStringLiteral
-        - StringLiteral
+      - FString
+        - ExprStringLiteral
+          - StringLiteral
+        - ExprFormattedValue
+          - ExprName
+          - ExprFString
+            - ExprFString
+              - FString
+                - ExprStringLiteral
+                  - StringLiteral
+                - ExprFormattedValue
+                  - ExprName
+                - ExprStringLiteral
+                  - StringLiteral
+        - ExprStringLiteral
+          - StringLiteral
 
