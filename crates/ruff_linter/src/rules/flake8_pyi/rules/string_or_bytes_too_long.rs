@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -43,30 +43,27 @@ impl AlwaysFixableViolation for StringOrBytesTooLong {
 }
 
 /// PYI053
-pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, node: AnyNodeRef) {
+pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike) {
     // Ignore docstrings.
     if is_docstring_stmt(checker.semantic().current_statement()) {
         return;
     }
 
-    let length = match node {
-        AnyNodeRef::ExprStringLiteral(ast::ExprStringLiteral { value, .. }) => {
+    let length = match string {
+        StringLike::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.chars().count(),
+        StringLike::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.len(),
+        StringLike::FStringLiteral(ast::FStringLiteralElement { value, .. }) => {
             value.chars().count()
         }
-        AnyNodeRef::ExprBytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.len(),
-        AnyNodeRef::FStringLiteralElement(ast::FStringLiteralElement { value, .. }) => {
-            value.chars().count()
-        }
-        _ => return,
     };
     if length <= 50 {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, node.range());
+    let mut diagnostic = Diagnostic::new(StringOrBytesTooLong, string.range());
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         "...".to_string(),
-        node.range(),
+        string.range(),
     )));
     checker.diagnostics.push(diagnostic);
 }
