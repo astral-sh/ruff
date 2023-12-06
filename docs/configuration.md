@@ -338,7 +338,7 @@ You can also change the default selection using the [`include`](settings.md#incl
 
 !!! warning
     Paths provided to `include` _must_ match files. For example, `include = ["src"]` will fail since it
-matches a directory.
+    matches a directory.
 
 ## Jupyter Notebook discovery
 
