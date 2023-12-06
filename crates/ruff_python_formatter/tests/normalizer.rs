@@ -82,6 +82,10 @@ impl Transformer for Normalizer {
             // everything after it. Talk about a hammer.
             Regex::new(r#"::(?s:.*)"#).unwrap()
         });
+        static STRIP_MARKDOWN_BLOCKS: Lazy<Regex> = Lazy::new(|| {
+            // This covers more than valid Markdown blocks, but that's OK.
+            Regex::new(r#"(```|~~~)\p{any}*(```|~~~|$)"#).unwrap()
+        });
 
         // Start by (1) stripping everything that looks like a code
         // snippet, since code snippets may be completely reformatted if
@@ -96,6 +100,12 @@ impl Transformer for Normalizer {
             .replace_all(
                 &string_literal.value,
                 "<RSTBLOCK-CODE-SNIPPET: Removed by normalizer>\n",
+            )
+            .into_owned();
+        string_literal.value = STRIP_MARKDOWN_BLOCKS
+            .replace_all(
+                &string_literal.value,
+                "<MARKDOWN-CODE-SNIPPET: Removed by normalizer>\n",
             )
             .into_owned();
         // Normalize a string by (2) stripping any leading and trailing space from each

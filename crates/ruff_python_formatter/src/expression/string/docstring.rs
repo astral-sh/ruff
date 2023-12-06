@@ -354,6 +354,16 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                                 )?;
                             }
                         }
+                        CodeExampleKind::Markdown(fenced) => {
+                            // This looks suspicious, but it's consistent with the whitespace
+                            // normalization that will occur anyway.
+                            let indent = " ".repeat(fenced.opening_fence_indent.to_usize());
+                            for docline in formatted_lines {
+                                self.print_one(
+                                    &docline.map(|line| std::format!("{indent}{line}")),
+                                )?;
+                            }
+                        }
                     }
                 }
             }
@@ -648,6 +658,18 @@ impl<'src> CodeExample<'src> {
                 };
                 self.kind = Some(CodeExampleKind::Rst(litblock));
             }
+            Some(CodeExampleKind::Markdown(fenced)) => {
+                let Some(fenced) = fenced.add_code_line(original, queue) else {
+                    // For Markdown, the last line in a block should be printed
+                    // as-is. Especially since the last line in many Markdown
+                    // fenced code blocks is identical to the start of a code
+                    // block. So if we try to start a new code block with
+                    // the last line, we risk opening another Markdown block
+                    // inappropriately.
+                    return;
+                };
+                self.kind = Some(CodeExampleKind::Markdown(fenced));
+            }
         }
     }
 
@@ -681,6 +703,9 @@ impl<'src> CodeExample<'src> {
         } else if let Some(litblock) = CodeExampleRst::new(original) {
             self.kind = Some(CodeExampleKind::Rst(litblock));
             queue.push_back(CodeExampleAddAction::Print { original });
+        } else if let Some(fenced) = CodeExampleMarkdown::new(original) {
+            self.kind = Some(CodeExampleKind::Markdown(fenced));
+            queue.push_back(CodeExampleAddAction::Print { original });
         } else {
             queue.push_back(CodeExampleAddAction::Print { original });
         }
@@ -707,6 +732,10 @@ enum CodeExampleKind<'src> {
     /// [literal block]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
     /// [code block directive]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
     Rst(CodeExampleRst<'src>),
+    /// Code found from a Markdown "[fenced code block]".
+    ///
+    /// [fenced code block]: https://spec.commonmark.org/0.30/#fenced-code-blocks
+    Markdown(CodeExampleMarkdown<'src>),
 }
 
 impl<'src> CodeExampleKind<'src> {
@@ -718,6 +747,7 @@ impl<'src> CodeExampleKind<'src> {
         match *self {
             CodeExampleKind::Doctest(ref doctest) => &doctest.lines,
             CodeExampleKind::Rst(ref mut litblock) => litblock.indented_code(),
+            CodeExampleKind::Markdown(ref fenced) => &fenced.lines,
         }
     }
 
@@ -731,6 +761,7 @@ impl<'src> CodeExampleKind<'src> {
         match self {
             CodeExampleKind::Doctest(doctest) => doctest.lines,
             CodeExampleKind::Rst(litblock) => litblock.lines,
+            CodeExampleKind::Markdown(fenced) => fenced.lines,
         }
     }
 }
@@ -1153,6 +1184,227 @@ impl<'src> CodeExampleRst<'src> {
     /// block.
     fn into_reset_action(self) -> CodeExampleAddAction<'src> {
         CodeExampleAddAction::Reset { code: self.lines }
+    }
+}
+
+/// Represents a code example extracted from a Markdown [fenced code block].
+///
+/// [fenced code block]: https://spec.commonmark.org/0.30/#fenced-code-blocks
+#[derive(Debug)]
+struct CodeExampleMarkdown<'src> {
+    /// The lines that have been seen so far that make up the block.
+    lines: Vec<CodeExampleLine<'src>>,
+
+    /// The indent of the line "opening" fence of this block measured via
+    /// `indentation_length`.
+    ///
+    /// This indentation is trimmed from the indentation of every line in the
+    /// body of the code block,
+    opening_fence_indent: TextSize,
+
+    /// The kind of fence, backticks or tildes, used for this block. We need to
+    /// keep track of which kind was used to open the block in order to look
+    /// for a correct close of the block.
+    fence_kind: MarkdownFenceKind,
+
+    /// The size of the fence, in codepoints, in the opening line. A correct
+    /// close of the fence must use *at least* this many characters. In other
+    /// words, this is the number of backticks or tildes that opened the fenced
+    /// code block.
+    fence_len: usize,
+}
+
+impl<'src> CodeExampleMarkdown<'src> {
+    /// Looks for the start of a Markdown [fenced code block].
+    ///
+    /// If the start of a block is found, then this returns a correctly
+    /// initialized Markdown code block. Callers should print the line as given
+    /// as it is not retained as part of the block.
+    ///
+    /// [fenced code block]: https://spec.commonmark.org/0.30/#fenced-code-blocks
+    fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleMarkdown<'src>> {
+        static FENCE_START: Lazy<Regex> = Lazy::new(|| {
+            Regex::new(
+                r"(?xm)
+                ^
+                (?:
+                    # In the backtick case, info strings (following the fence)
+                    # cannot contain backticks themselves, since it would
+                    # introduce ambiguity with parsing inline code. In other
+                    # words, if we didn't specifically exclude matching `
+                    # in the info string for backtick fences, then we might
+                    # erroneously consider something to be a code fence block
+                    # that is actually inline code.
+                    #
+                    # NOTE: The `ticklang` and `tildlang` capture groups are
+                    # currently unused, but there was some discussion about not
+                    # assuming unlabeled blocks were Python. At the time of
+                    # writing, we do assume unlabeled blocks are Python, but
+                    # one could inspect the `ticklang` and `tildlang` capture
+                    # groups to determine whether the block is labeled or not.
+                    (?<ticks>```+)(?:\s*(?<ticklang>(?i:python|py|python3|py3))[^`]*)?
+                    |
+                    (?<tilds>~~~+)(?:\s*(?<tildlang>(?i:python|py|python3|py3))\p{any}*)?
+                )
+                $
+                ",
+            )
+            .unwrap()
+        });
+
+        let (opening_fence_indent, rest) = indent_with_suffix(original.line);
+        // Quit quickly in the vast majority of cases.
+        if !rest.starts_with("```") && !rest.starts_with("~~~") {
+            return None;
+        }
+
+        let caps = FENCE_START.captures(rest)?;
+        let (fence_kind, fence_len) = if let Some(ticks) = caps.name("ticks") {
+            (MarkdownFenceKind::Backtick, ticks.as_str().chars().count())
+        } else {
+            let tildes = caps
+                .name("tilds")
+                .expect("no ticks means it must be tildes");
+            (MarkdownFenceKind::Tilde, tildes.as_str().chars().count())
+        };
+        Some(CodeExampleMarkdown {
+            lines: vec![],
+            opening_fence_indent: indentation_length(opening_fence_indent),
+            fence_kind,
+            fence_len,
+        })
+    }
+
+    /// Attempts to add the given line from a docstring to the Markdown code
+    /// snippet being collected.
+    ///
+    /// In this case, ownership is only not returned when the end of the block
+    /// was found, or if the block was determined to be invalid. A formatting
+    /// action is then pushed onto the queue.
+    fn add_code_line(
+        mut self,
+        original: InputDocstringLine<'src>,
+        queue: &mut VecDeque<CodeExampleAddAction<'src>>,
+    ) -> Option<CodeExampleMarkdown<'src>> {
+        if self.is_end(original) {
+            queue.push_back(self.into_format_action());
+            queue.push_back(CodeExampleAddAction::Print { original });
+            return None;
+        }
+        // When a line in a Markdown fenced closed block is indented *less*
+        // than the opening indent, we treat the entire block as invalid.
+        //
+        // I believe that code blocks of this form are actually valid Markdown
+        // in some cases, but the interplay between it and our docstring
+        // whitespace normalization leads to undesirable outcomes. For example,
+        // if the line here is unindented out beyond the initial indent of the
+        // docstring itself, then this causes the entire docstring to have
+        // its indent normalized. And, at the time of writing, a subsequent
+        // formatting run undoes this indentation, thus violating idempotency.
+        if !original.line.trim_whitespace().is_empty()
+            && indentation_length(original.line) < self.opening_fence_indent
+        {
+            queue.push_back(self.into_reset_action());
+            queue.push_back(CodeExampleAddAction::Print { original });
+            return None;
+        }
+        self.push(original);
+        queue.push_back(CodeExampleAddAction::Kept);
+        Some(self)
+    }
+
+    /// Returns true when given line ends this fenced code block.
+    fn is_end(&self, original: InputDocstringLine<'src>) -> bool {
+        let (_, rest) = indent_with_suffix(original.line);
+        // We can bail early if we don't have at least three backticks or
+        // tildes.
+        if !rest.starts_with("```") && !rest.starts_with("~~~") {
+            return false;
+        }
+        // We do need to check that we have the right number of
+        // backticks/tildes...
+        let fence_len = rest
+            .chars()
+            .take_while(|&ch| ch == self.fence_kind.to_char())
+            .count();
+        // A closing fence only needs *at least* the number of ticks/tildes
+        // that are in the opening fence.
+        if fence_len < self.fence_len {
+            return false;
+        }
+        // And, also, there can only be trailing whitespace. Nothing else.
+        assert!(
+            self.fence_kind.to_char().is_ascii(),
+            "fence char should be ASCII",
+        );
+        if !rest[fence_len..].chars().all(is_python_whitespace) {
+            return false;
+        }
+        true
+    }
+
+    /// Pushes the given line as part of this code example.
+    fn push(&mut self, original: InputDocstringLine<'src>) {
+        // Unlike reStructuredText blocks, for Markdown fenced code blocks, the
+        // indentation that we want to strip from each line is known when the
+        // block is opened. So we can strip it as we collect lines.
+        let code = indentation_trim(self.opening_fence_indent, original.line);
+        self.lines.push(CodeExampleLine { original, code });
+    }
+
+    /// Consume this block and turn it into a reset action.
+    ///
+    /// This occurs when we started collecting a code example from something
+    /// that looked like a block, but later determined that it wasn't a valid
+    /// block.
+    fn into_format_action(self) -> CodeExampleAddAction<'src> {
+        // Note that unlike in reStructuredText blocks, if a Markdown fenced
+        // code block is unclosed, then *all* remaining lines should be treated
+        // as part of the block[1]:
+        //
+        // > If the end of the containing block (or document) is reached and no
+        // > closing code fence has been found, the code block contains all of the
+        // > lines after the opening code fence until the end of the containing
+        // > block (or document).
+        //
+        // This means that we don't need to try and trim trailing empty lines.
+        // Those will get fed into the code formatter and ultimately stripped,
+        // which is what you'd expect if those lines are treated as part of the
+        // block.
+        //
+        // [1]: https://spec.commonmark.org/0.30/#fenced-code-blocks
+        CodeExampleAddAction::Format {
+            kind: CodeExampleKind::Markdown(self),
+        }
+    }
+
+    /// Consume this block and turn it into a reset action.
+    ///
+    /// This occurs when we started collecting a code example from something
+    /// that looked like a code fence, but later determined that it wasn't a
+    /// valid.
+    fn into_reset_action(self) -> CodeExampleAddAction<'src> {
+        CodeExampleAddAction::Reset { code: self.lines }
+    }
+}
+
+/// The kind of fence used in a Markdown code block.
+///
+/// This indicates that the fence is either surrounded by fences made from
+/// backticks, or fences made from tildes.
+#[derive(Clone, Copy, Debug)]
+enum MarkdownFenceKind {
+    Backtick,
+    Tilde,
+}
+
+impl MarkdownFenceKind {
+    /// Convert the fence kind to the actual character used to build the fence.
+    fn to_char(self) -> char {
+        match self {
+            MarkdownFenceKind::Backtick => '`',
+            MarkdownFenceKind::Tilde => '~',
+        }
     }
 }
 

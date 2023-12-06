@@ -795,6 +795,19 @@ def rst_literal_skipped_doctest():
     pass
 
 
+def rst_literal_skipped_markdown():
+    """
+    Do cool stuff::
+
+        ```py
+        cool_stuff( 1 )
+        ```
+
+    Done.
+    """
+    pass
+
+
 def rst_directive_skipped_not_indented():
     """
     .. code-block:: python
@@ -824,6 +837,499 @@ def rst_directive_skipped_doctest():
     .. code-block:: python
 
         >>> cool_stuff( 1 )
+
+    Done.
+    """
+    pass
+
+
+###############################################################################
+# Markdown CODE EXAMPLES
+#
+# This section shows examples of docstrings that contain code snippets in
+# Markdown fenced code blocks.
+#
+# See: https://spec.commonmark.org/0.30/#fenced-code-blocks
+###############################################################################
+
+
+def markdown_simple():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )
+    ```
+
+    Done.
+    """
+    pass
+
+
+def markdown_simple_continued():
+    """
+    Do cool stuff.
+
+    ```python
+    def cool_stuff( x ):
+        print( f"hi {x}" );
+    ```
+
+    Done.
+    """
+    pass
+
+
+# Tests that unlabeled Markdown fenced code blocks are assumed to be Python.
+def markdown_unlabeled():
+    """
+    Do cool stuff.
+
+    ```
+    cool_stuff( 1 )
+    ```
+
+    Done.
+    """
+    pass
+
+
+# Tests that fenced code blocks using tildes work.
+def markdown_tildes():
+    """
+    Do cool stuff.
+
+    ~~~py
+    cool_stuff( 1 )
+    ~~~
+
+    Done.
+    """
+    pass
+
+
+# Tests that a longer closing fence is just fine and dandy.
+def markdown_longer_closing_fence():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )
+    ``````
+
+    Done.
+    """
+    pass
+
+
+# Tests that an invalid closing fence is treated as invalid.
+#
+# We embed it into a docstring so that the surrounding Python
+# remains valid.
+def markdown_longer_closing_fence():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )
+    '''
+    ```invalid
+    '''
+    cool_stuff( 2 )
+    ```
+
+    Done.
+    """
+    pass
+
+
+# Tests that one can nest fenced code blocks by using different numbers of
+# backticks.
+def markdown_nested_fences():
+    """
+    Do cool stuff.
+
+    ``````
+    do_something( '''
+    ```
+    did i trick you?
+    ```
+    ''' )
+    ``````
+
+    Done.
+    """
+    pass
+
+
+# Tests that an unclosed block gobbles up everything remaining in the
+# docstring. When it's only empty lines, those are passed into the formatter
+# and thus stripped.
+def markdown_unclosed_empty_lines():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )
+
+
+
+    """
+    pass
+
+
+# Tests that we can end the block on the second to last line of the
+# docstring.
+def markdown_second_to_last():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )
+    ```
+    """
+    pass
+
+
+# Tests that an unclosed block with one extra line at the end is treated
+# correctly. As per the CommonMark spec, an unclosed fenced code block contains
+# everything following the opening fences. Since formatting the code snippet
+# trims lines, the last empty line is removed here.
+def markdown_second_to_last():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )
+    """
+    pass
+
+
+# Tests that we can end the block on the actual last line of the docstring.
+def markdown_actually_last():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )
+    ```"""
+    pass
+
+
+# Tests that an unclosed block that ends on the last line of a docstring
+# is handled correctly.
+def markdown_unclosed_actually_last():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )"""
+    pass
+
+
+def markdown_with_blank_lines():
+    """
+    Do cool stuff.
+
+    ```py
+    def cool_stuff( x ):
+        print( f"hi {x}" );
+
+    def other_stuff( y ):
+        print(    y     )
+    ```
+
+    Done.
+    """
+    pass
+
+
+def markdown_first_line_indent_uses_tabs_4spaces():
+    """
+    Do cool stuff.
+
+    ```py
+	cool_stuff( 1 )
+    ```
+
+    Done.
+    """
+    pass
+
+
+def markdown_first_line_indent_uses_tabs_4spaces_multiple():
+    """
+    Do cool stuff.
+
+    ```py
+	cool_stuff( 1 )
+	cool_stuff( 2 )
+    ```
+
+    Done.
+    """
+    pass
+
+
+def markdown_first_line_indent_uses_tabs_8spaces():
+        """
+        Do cool stuff.
+
+	 ```py
+	 cool_stuff( 1 )
+	 ```
+
+        Done.
+        """
+        pass
+
+
+def markdown_first_line_indent_uses_tabs_8spaces_multiple():
+        """
+        Do cool stuff.
+
+	 ```py
+	 cool_stuff( 1 )
+	 cool_stuff( 2 )
+	 ```
+
+        Done.
+        """
+        pass
+
+
+def markdown_first_line_tab_second_line_spaces():
+    """
+    Do cool stuff.
+
+	```py
+	cool_stuff( 1 )
+        cool_stuff( 2 )
+	```
+
+    Done.
+    """
+    pass
+
+
+def markdown_odd_indentation():
+    """
+    Do cool stuff.
+
+	```py
+	cool_stuff( 1 )
+        cool_stuff( 2 )
+	```
+
+    Done.
+    """
+    pass
+
+
+# Extra blanks should be *not* be preserved (unlike reST) because they are part
+# of the code snippet (per CommonMark spec), and thus get trimmed as part of
+# code formatting.
+def markdown_extra_blanks():
+    """
+    Do cool stuff.
+
+    ```py
+
+
+    cool_stuff( 1 )
+
+
+    ```
+
+    Done.
+    """
+    pass
+
+
+# A block can contain many empty lines within it.
+def markdown_extra_blanks_in_snippet():
+    """
+    Do cool stuff.
+
+    ```py
+
+    cool_stuff( 1 )
+
+
+    cool_stuff( 2 )
+    ```
+
+    Done.
+    """
+    pass
+
+
+def markdown_weird_closing():
+    """
+  Code block with weirdly placed closing fences.
+
+    ```python
+    cool_stuff( 1 )
+
+         ```
+      # The above fences look like it shouldn't close the block, but we
+      # allow it to. The fences below re-open a block (until the end of
+      # the docstring), but it's invalid Python and thus doesn't get
+      # reformatted.
+        a = 10
+    ```
+
+    Now the code block is closed
+    """
+    pass
+
+
+def markdown_over_indented():
+    """
+    A docstring
+        over intended
+        ```python
+        print( 5 )
+        ```
+    """
+    pass
+
+
+# Tests that an unclosed block gobbles up everything remaining in the
+# docstring, even if it isn't valid Python. Since it isn't valid Python,
+# reformatting fails and the entire thing is skipped.
+def markdown_skipped_unclosed_non_python():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )
+
+    I forgot to close the code block, and this is definitely not
+    Python. So nothing here gets formatted.
+    """
+    pass
+
+
+# This has a Python snippet with a docstring that contains a closing fence.
+# This splits the embedded docstring and makes the overall snippet invalid.
+def markdown_skipped_accidental_closure():
+    """
+    Do cool stuff.
+
+    ```py
+    cool_stuff( 1 )
+    '''
+    ```
+    '''
+    ```
+
+    Done.
+    """
+    pass
+
+
+# When a line is unindented all the way out before the standard indent of the
+# docstring, the code reformatting ends up interacting poorly with the standard
+# docstring whitespace normalization logic. This is probably a bug, and we
+# should probably treat the Markdown block as valid, but for now, we detect
+# the unindented line and declare the block as invalid and thus do no code
+# reformatting.
+#
+# FIXME: Fixing this (if we think it's a bug) probably requires refactoring the
+# docstring whitespace normalization to be aware of code snippets. Or perhaps
+# plausibly, to do normalization *after* code snippets have been formatted.
+def markdown_skipped_unindented_completely():
+    """
+    Do cool stuff.
+
+        ```py
+cool_stuff( 1 )
+        ```
+
+    Done.
+    """
+    pass
+
+
+# This test is fallout from treating fenced code blocks with unindented lines
+# as invalid. We probably should treat this as a valid block. Indeed, if we
+# remove the logic that makes the `markdown_skipped_unindented_completely` test
+# pass, then this code snippet will get reformatted correctly.
+def markdown_skipped_unindented_somewhat():
+    """
+    Do cool stuff.
+
+        ```py
+    cool_stuff( 1 )
+        ```
+
+    Done.
+    """
+    pass
+
+
+# This tests that if a Markdown block contains a line that has less of an
+# indent than another line.
+#
+# There is some judgment involved in what the right behavior is here. We
+# could "normalize" the indentation so that the minimum is the indent of the
+# opening fence line. If we did that here, then the code snippet would become
+# valid and format as Python. But at time of writing, we don't, which leads to
+# inconsistent indentation and thus invalid Python.
+def markdown_skipped_unindented_with_inconsistent_indentation():
+    """
+    Do cool stuff.
+
+        ```py
+    cool_stuff( 1 )
+        cool_stuff( 2 )
+        ```
+
+    Done.
+    """
+    pass
+
+
+def markdown_skipped_doctest():
+    """
+    Do cool stuff.
+
+    ```py
+    >>> cool_stuff( 1 )
+    ```
+
+    Done.
+    """
+    pass
+
+
+def markdown_skipped_rst_literal():
+    """
+    Do cool stuff.
+
+    ```py
+    And do this::
+
+        cool_stuff( 1 )
+
+    ```
+
+    Done.
+    """
+    pass
+
+
+def markdown_skipped_rst_directive():
+    """
+    Do cool stuff.
+
+    ```py
+    .. code-block:: python
+
+        cool_stuff( 1 )
+
+    ```
 
     Done.
     """
