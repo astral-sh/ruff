@@ -9,3 +9,12 @@ class MyClass:
     # fmt: on
     def method():
         print   ( "str" )
+
+    @decor(
+        a=1,
+        # fmt: off
+        b=(2,   3),
+        # fmt: on
+    )
+    def func():
+          pass

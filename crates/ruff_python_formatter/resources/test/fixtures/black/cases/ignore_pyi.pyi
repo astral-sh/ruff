@@ -15,7 +15,6 @@ def g():
     # hi
     ...
 
-# FIXME(#8905): Uncomment, leads to unstable formatting
-# def h():
-#     ...
-#     # bye
+def h():
+    ...
+    # bye

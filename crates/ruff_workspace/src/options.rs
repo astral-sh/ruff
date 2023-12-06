@@ -2635,6 +2635,13 @@ pub struct PylintOptions {
     #[option(default = r"5", value_type = "int", example = r"max-args = 5")]
     pub max_args: Option<usize>,
 
+    /// Maximum number of positional arguments allowed for a function or method definition
+    /// (see: `PLR0917`).
+    ///
+    /// If not specified, defaults to the value of `max-args`.
+    #[option(default = r"3", value_type = "int", example = r"max-pos-args = 3")]
+    pub max_positional_args: Option<usize>,
+
     /// Maximum number of statements allowed for a function or method body (see:
     /// `PLR0915`).
     #[option(default = r"50", value_type = "int", example = r"max-statements = 50")]
@@ -2663,6 +2670,10 @@ impl PylintOptions {
                 .unwrap_or(defaults.allow_magic_value_types),
             allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
+            max_positional_args: self
+                .max_positional_args
+                .or(self.max_args)
+                .unwrap_or(defaults.max_positional_args),
             max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),

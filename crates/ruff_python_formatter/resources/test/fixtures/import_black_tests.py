@@ -48,7 +48,8 @@ def import_fixture(fixture: Path, fixture_set: str):
             if "--line-length=" in flags:
                 [_, length_and_rest] = flags.split("--line-length=", 1)
                 length = length_and_rest.split(" ", 1)[0]
-                options["line_length"] = int(length)
+                length = int(length)
+                options["line_width"] = 1 if length == 0 else length
 
             if "--skip-magic-trailing-comma" in flags:
                 options["magic_trailing_comma"] = "ignore"
