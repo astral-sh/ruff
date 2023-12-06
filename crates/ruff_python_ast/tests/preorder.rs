@@ -3,14 +3,15 @@ use std::fmt::{Debug, Write};
 use insta::assert_snapshot;
 
 use ruff_python_ast::visitor::preorder::{
-    walk_alias, walk_comprehension, walk_except_handler, walk_expr, walk_keyword, walk_match_case,
-    walk_module, walk_parameter, walk_parameters, walk_pattern, walk_stmt, walk_type_param,
-    walk_with_item, PreorderVisitor,
+    walk_alias, walk_bytes_literal, walk_comprehension, walk_except_handler, walk_expr,
+    walk_keyword, walk_match_case, walk_module, walk_parameter, walk_parameters, walk_pattern,
+    walk_stmt, walk_string_literal, walk_type_param, walk_with_item, PreorderVisitor,
 };
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
-    Alias, BoolOp, CmpOp, Comprehension, ExceptHandler, Expr, Keyword, MatchCase, Mod, Operator,
-    Parameter, Parameters, Pattern, Singleton, Stmt, TypeParam, UnaryOp, WithItem,
+    Alias, BoolOp, BytesLiteral, CmpOp, Comprehension, ExceptHandler, Expr, Keyword, MatchCase,
+    Mod, Operator, Parameter, Parameters, Pattern, Singleton, Stmt, StringLiteral, TypeParam,
+    UnaryOp, WithItem,
 };
 use ruff_python_parser::lexer::lex;
 use ruff_python_parser::{parse_tokens, Mode};
@@ -122,6 +123,33 @@ fn class_type_parameters() {
 #[test]
 fn function_type_parameters() {
     let source = r"def X[T: str, U, *Ts, **P](): ...";
+
+    let trace = trace_preorder_visitation(source);
+
+    assert_snapshot!(trace);
+}
+
+#[test]
+fn string_literals() {
+    let source = r"'a' 'b' 'c'";
+
+    let trace = trace_preorder_visitation(source);
+
+    assert_snapshot!(trace);
+}
+
+#[test]
+fn bytes_literals() {
+    let source = r"b'a' b'b' b'c'";
+
+    let trace = trace_preorder_visitation(source);
+
+    assert_snapshot!(trace);
+}
+
+#[test]
+fn f_strings() {
+    let source = r"'pre' f'foo {bar:.{x}f} baz'";
 
     let trace = trace_preorder_visitation(source);
 
@@ -276,6 +304,18 @@ impl PreorderVisitor<'_> for RecordVisitor {
     fn visit_type_param(&mut self, type_param: &TypeParam) {
         self.enter_node(type_param);
         walk_type_param(self, type_param);
+        self.exit_node();
+    }
+
+    fn visit_string_literal(&mut self, string_literal: &StringLiteral) {
+        self.enter_node(string_literal);
+        walk_string_literal(self, string_literal);
+        self.exit_node();
+    }
+
+    fn visit_bytes_literal(&mut self, bytes_literal: &BytesLiteral) {
+        self.enter_node(bytes_literal);
+        walk_bytes_literal(self, bytes_literal);
         self.exit_node();
     }
 }
