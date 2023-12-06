@@ -322,13 +322,6 @@ pub(crate) fn not_array_agnostic_numpy(checker: &mut Checker, expr: &Expr) {
                     name: "bitwise_left_shift",
                 },
             }),
-            ["numpy", "arccos"] => Some(Replacement {
-                existing: "arccos",
-                details: Details::AutoImport {
-                    path: "numpy",
-                    name: "acos",
-                },
-            }),
             ["numpy", "invert"] => Some(Replacement {
                 existing: "invert",
                 details: Details::AutoImport {
@@ -371,7 +364,7 @@ pub(crate) fn not_array_agnostic_numpy(checker: &mut Checker, expr: &Expr) {
                     guideline: Some(concat!(
                         "xp.",
                         stringify!($func),
-                        "is not in the array API standard"
+                        " is not in the array API standard"
                     )),
                 },
             }),
