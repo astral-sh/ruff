@@ -262,6 +262,10 @@ const ARRAY_API_FUNCTIONS: [&str; 168] = [
 
 ///XP001
 pub(crate) fn not_array_agnostic_numpy(checker: &mut Checker, expr: &Expr) {
+    fn is_array_api_function(func: &str) -> bool {
+        matches!(func, _ if ARRAY_API_FUNCTIONS.contains(&func))
+    }
+
     let maybe_replacement = checker
         .semantic()
         .resolve_call_path(expr)
@@ -357,7 +361,7 @@ pub(crate) fn not_array_agnostic_numpy(checker: &mut Checker, expr: &Expr) {
                     name: "pow",
                 },
             }),
-            ["numpy", func] if ARRAY_API_FUNCTIONS.contains(func) => None,
+            ["numpy", func] if is_array_api_function(func) => None,
             ["numpy", func] => Some(Replacement {
                 existing: func,
                 details: Details::Manual {
