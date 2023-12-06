@@ -816,7 +816,7 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         // Step 0: Pre-processing
         if !self.semantic.in_f_string()
-            && !self.semantic.in_literal()
+            && !self.semantic.in_typing_literal()
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
             && self.semantic.future_annotations()
@@ -1198,7 +1198,7 @@ where
                     ) {
                         // Ex) Literal["Class"]
                         Some(typing::SubscriptKind::Literal) => {
-                            self.semantic.flags |= SemanticModelFlags::LITERAL;
+                            self.semantic.flags |= SemanticModelFlags::TYPING_LITERAL;
 
                             self.visit_expr(slice);
                             self.visit_expr_context(ctx);
@@ -1239,7 +1239,7 @@ where
             }
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 if self.semantic.in_type_definition()
-                    && !self.semantic.in_literal()
+                    && !self.semantic.in_typing_literal()
                     && !self.semantic.in_f_string()
                 {
                     self.deferred.string_type_definitions.push((

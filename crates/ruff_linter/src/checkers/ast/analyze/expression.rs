@@ -543,7 +543,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bugbear::rules::no_explicit_stacklevel(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDictKwargs) {
-                flake8_pie::rules::unnecessary_dict_kwargs(checker, expr, keywords);
+                flake8_pie::rules::unnecessary_dict_kwargs(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryRangeStart) {
                 flake8_pie::rules::unnecessary_range_start(checker, call);
