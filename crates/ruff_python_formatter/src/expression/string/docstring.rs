@@ -1306,7 +1306,7 @@ fn indentation_trim(indent_len: TextSize, line: &str) -> &str {
             break;
         }
     }
-    line
+    trimmed
 }
 
 /// Returns the indentation of the given line and everything following it.
