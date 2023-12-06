@@ -75,195 +75,194 @@ impl Details<'_> {
     }
 }
 
-const ARRAY_API_FUNCTIONS: [&str; 168] = [
-    // methods
-    "__abs__",
-    "__add__",
-    "__and__",
-    "__array_namespace__",
-    "__bool__",
-    "__complex__",
-    "__dlpack__",
-    "__dlpack_device__",
-    "__eq__",
-    "__float__",
-    "__floordiv__",
-    "__ge__",
-    "__getitem__",
-    "__gt__",
-    "__index__",
-    "__int__",
-    "__invert__",
-    "__le__",
-    "__lshift__",
-    "__lt__",
-    "__matmul__",
-    "__mod__",
-    "__mul__",
-    "__ne__",
-    "__neg__",
-    "__or__",
-    "__pos__",
-    "__pow__",
-    "__rshift__",
-    "__setitem__",
-    "__sub__",
-    "__truediv__",
-    "__xor__",
-    "to_device",
-    // constants
-    "e",
-    "inf",
-    "nan",
-    "newaxis",
-    "pi",
-    // creation functions
-    "arange",
-    "asarray",
-    "empty",
-    "empty_like",
-    "eye",
-    "from_dlpack",
-    "full",
-    "full_like",
-    "linspace",
-    "meshgrid",
-    "ones",
-    "ones_like",
-    "tril",
-    "triu",
-    "zeros",
-    "zeros_like",
-    // data type functions
-    "astype",
-    "can_cast",
-    "finfo",
-    "iinfo",
-    "isdtype",
-    "result_type",
-    // data types
-    "bool",
-    "int8",
-    "int16",
-    "int32",
-    "int64",
-    "uint8",
-    "uint16",
-    "uint32",
-    "uint64",
-    "float32",
-    "float64",
-    "complex64",
-    "complex128",
-    // element-wise functions
-    "abs",
-    "acos",
-    "acosh",
-    "add",
-    "asin",
-    "asinh",
-    "atan",
-    "atan2",
-    "atanh",
-    "bitwise_and",
-    "bitwise_left_shift",
-    "bitwise_invert",
-    "bitwise_or",
-    "bitwise_right_shift",
-    "bitwise_xor",
-    "ceil",
-    "conj",
-    "cos",
-    "cosh",
-    "divide",
-    "equal",
-    "exp",
-    "expm1",
-    "floor",
-    "floor_divide",
-    "greater",
-    "greater_equal",
-    "imag",
-    "isfinite",
-    "isinf",
-    "isnan",
-    "less",
-    "less_equal",
-    "log",
-    "log1p",
-    "log2",
-    "log10",
-    "logaddexp",
-    "logical_and",
-    "logical_not",
-    "logical_or",
-    "logical_xor",
-    "multiply",
-    "negative",
-    "not_equal",
-    "positive",
-    "pow",
-    "real",
-    "remainder",
-    "round",
-    "sign",
-    "sin",
-    "sinh",
-    "square",
-    "sqrt",
-    "subtract",
-    "tan",
-    "tanh",
-    "trunc",
-    // indexing functions
-    "take",
-    // linear algebra functions
-    "matmul",
-    "matrix_transpose",
-    "tensordot",
-    "vecdot",
-    // manipulation functions
-    "broadcast_arrays",
-    "broadcast_to",
-    "concat",
-    "expand_dims",
-    "flip",
-    "permute_dims",
-    "reshape",
-    "roll",
-    "squeeze",
-    "stack",
-    // searching functions
-    "argmax",
-    "argmin",
-    "nonzero",
-    "where",
-    // set functions
-    "unique_all",
-    "unique_counts",
-    "unique_inverse",
-    "unique_values",
-    // sorting functions
-    "argsort",
-    "sort",
-    // statistical functions
-    "max",
-    "mean",
-    "min",
-    "prod",
-    "std",
-    "sum",
-    "var",
-    "all",
-    "any",
-    // version
-    "__array_api_version__",
-];
-
 ///XP001
 pub(crate) fn not_array_agnostic_numpy(checker: &mut Checker, expr: &Expr) {
     fn is_array_api_function(func: &str) -> bool {
-        matches!(func, _ if ARRAY_API_FUNCTIONS.contains(&func))
+        matches!(
+            func,
+            // methods
+            "__abs__" |
+            "__add__" |
+            "__and__" |
+            "__array_namespace__" |
+            "__bool__" |
+            "__complex__" |
+            "__dlpack__" |
+            "__dlpack_device__" |
+            "__eq__" |
+            "__float__" |
+            "__floordiv__" |
+            "__ge__" |
+            "__getitem__" |
+            "__gt__" |
+            "__index__" |
+            "__int__" |
+            "__invert__" |
+            "__le__" |
+            "__lshift__" |
+            "__lt__" |
+            "__matmul__" |
+            "__mod__" |
+            "__mul__" |
+            "__ne__" |
+            "__neg__" |
+            "__or__" |
+            "__pos__" |
+            "__pow__" |
+            "__rshift__" |
+            "__setitem__" |
+            "__sub__" |
+            "__truediv__" |
+            "__xor__" |
+            "to_device" |
+            // constants
+            "e" |
+            "inf" |
+            "nan" |
+            "newaxis" |
+            "pi" |
+            // creation functions
+            "arange" |
+            "asarray" |
+            "empty" |
+            "empty_like" |
+            "eye" |
+            "from_dlpack" |
+            "full" |
+            "full_like" |
+            "linspace" |
+            "meshgrid" |
+            "ones" |
+            "ones_like" |
+            "tril" |
+            "triu" |
+            "zeros" |
+            "zeros_like" |
+            // data type functions
+            "astype" |
+            "can_cast" |
+            "finfo" |
+            "iinfo" |
+            "isdtype" |
+            "result_type" |
+            // data types
+            "bool" |
+            "int8" |
+            "int16" |
+            "int32" |
+            "int64" |
+            "uint8" |
+            "uint16" |
+            "uint32" |
+            "uint64" |
+            "float32" |
+            "float64" |
+            "complex64" |
+            "complex128" |
+            // element-wise functions
+            "abs" |
+            "acos" |
+            "acosh" |
+            "add" |
+            "asin" |
+            "asinh" |
+            "atan" |
+            "atan2" |
+            "atanh" |
+            "bitwise_and" |
+            "bitwise_left_shift" |
+            "bitwise_invert" |
+            "bitwise_or" |
+            "bitwise_right_shift" |
+            "bitwise_xor" |
+            "ceil" |
+            "conj" |
+            "cos" |
+            "cosh" |
+            "divide" |
+            "equal" |
+            "exp" |
+            "expm1" |
+            "floor" |
+            "floor_divide" |
+            "greater" |
+            "greater_equal" |
+            "imag" |
+            "isfinite" |
+            "isinf" |
+            "isnan" |
+            "less" |
+            "less_equal" |
+            "log" |
+            "log1p" |
+            "log2" |
+            "log10" |
+            "logaddexp" |
+            "logical_and" |
+            "logical_not" |
+            "logical_or" |
+            "logical_xor" |
+            "multiply" |
+            "negative" |
+            "not_equal" |
+            "positive" |
+            "pow" |
+            "real" |
+            "remainder" |
+            "round" |
+            "sign" |
+            "sin" |
+            "sinh" |
+            "square" |
+            "sqrt" |
+            "subtract" |
+            "tan" |
+            "tanh" |
+            "trunc" |
+            // indexing functions
+            "take" |
+            // linear algebra functions
+            "matmul" |
+            "matrix_transpose" |
+            "tensordot" |
+            "vecdot" |
+            // manipulation functions
+            "broadcast_arrays" |
+            "broadcast_to" |
+            "concat" |
+            "expand_dims" |
+            "flip" |
+            "permute_dims" |
+            "reshape" |
+            "roll" |
+            "squeeze" |
+            "stack" |
+            // searching functions
+            "argmax" |
+            "argmin" |
+            "nonzero" |
+            "where" |
+            // set functions
+            "unique_all" |
+            "unique_counts" |
+            "unique_inverse" |
+            "unique_values" |
+            // sorting functions
+            "argsort" |
+            "sort" |
+            // statistical functions
+            "max" |
+            "mean" |
+            "min" |
+            "prod" |
+            "std" |
+            "sum" |
+            "var" |
+            "all" |
+            "any" |
+            // version
+            "__array_api_version__"
+        )
     }
 
     let maybe_replacement = checker
