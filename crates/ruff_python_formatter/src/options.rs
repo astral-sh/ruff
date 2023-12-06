@@ -11,7 +11,7 @@ use std::str::FromStr;
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
-    serde(default)
+    serde(default, deny_unknown_fields)
 )]
 pub struct PyFormatOptions {
     /// Whether we're in a `.py` file or `.pyi` file, which have different rules.
