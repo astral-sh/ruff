@@ -88,6 +88,97 @@ pub(crate) fn not_array_agnostic_numpy(checker: &mut Checker, expr: &Expr) {
                     name: "acos",
                 },
             }),
+            ["numpy", "arccosh"] => Some(Replacement {
+                existing: "arccosh",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "acosh",
+                },
+            }),
+            ["numpy", "arcsin"] => Some(Replacement {
+                existing: "arcsin",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "asin",
+                },
+            }),
+            ["numpy", "arcsinh"] => Some(Replacement {
+                existing: "arcsinh",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "asinh",
+                },
+            }),
+            ["numpy", "arctan"] => Some(Replacement {
+                existing: "arctan",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "atan",
+                },
+            }),
+            ["numpy", "arctan2"] => Some(Replacement {
+                existing: "arctan2",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "atan2",
+                },
+            }),
+            ["numpy", "arctanh"] => Some(Replacement {
+                existing: "arctanh",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "atanh",
+                },
+            }),
+            ["numpy", "left_shift"] => Some(Replacement {
+                existing: "left_shift",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "bitwise_left_shift",
+                },
+            }),
+            ["numpy", "arccos"] => Some(Replacement {
+                existing: "arccos",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "acos",
+                },
+            }),
+            ["numpy", "invert"] => Some(Replacement {
+                existing: "invert",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "bitwise_invert",
+                },
+            }),
+            ["numpy", "right_shift"] => Some(Replacement {
+                existing: "right_shift",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "bitwise_right_shift",
+                },
+            }),
+            ["numpy", "bool_"] => Some(Replacement {
+                existing: "bool_",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "bool",
+                },
+            }),
+            ["numpy", "concatenate"] => Some(Replacement {
+                existing: "concatenate",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "concat",
+                },
+            }),
+            ["numpy", "power"] => Some(Replacement {
+                existing: "power",
+                details: Details::AutoImport {
+                    path: "numpy",
+                    name: "pow",
+                },
+            }),
             _ => None,
         });
 
