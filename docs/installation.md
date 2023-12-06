@@ -48,7 +48,7 @@ on the testing repositories:
 apk add ruff
 ```
 
-For **openSUSE Tumbleweed** users, Ruff is also available in distribution repository:
+For **openSUSE Tumbleweed** users, Ruff is also available in the distribution repository:
 
 ```shell
 sudo zypper install python3-ruff
