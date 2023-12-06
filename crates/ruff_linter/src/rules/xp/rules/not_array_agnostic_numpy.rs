@@ -75,7 +75,7 @@ impl Details<'_> {
     }
 }
 
-const array_api_functions: [&str; ...] = [
+const ARRAY_API_FUNCTIONS: [&str; 168] = [
     // methods
     "__abs__",
     "__add__",
@@ -257,8 +257,8 @@ const array_api_functions: [&str; ...] = [
     "all",
     "any",
     // version
-    "__array_api_version__"
-]
+    "__array_api_version__",
+];
 
 ///XP001
 pub(crate) fn not_array_agnostic_numpy(checker: &mut Checker, expr: &Expr) {
@@ -364,13 +364,15 @@ pub(crate) fn not_array_agnostic_numpy(checker: &mut Checker, expr: &Expr) {
                     name: "pow",
                 },
             }),
-            ["numpy", func] if &array_api_functions.contains(func) => None,
+            ["numpy", func] if ARRAY_API_FUNCTIONS.contains(func) => None,
             ["numpy", func] => Some(Replacement {
                 existing: func,
                 details: Details::Manual {
-                    guideline: Some(
-                        format!("xp.{} is not in the array API standard", func)
-                    ),
+                    guideline: Some(concat!(
+                        "xp.",
+                        stringify!($func),
+                        "is not in the array API standard"
+                    )),
                 },
             }),
             _ => None,
