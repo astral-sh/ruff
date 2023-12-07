@@ -213,7 +213,8 @@ impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
                 let normalized = string_part.normalize(
                     Quoting::CanChange,
                     &locator,
-                    f.options().quote_style(),
+                    // Per PEP 8 and PEP 257, always prefer double quotes for docstrings
+                    QuoteStyle::Double,
                     parent_docstring_quote_style,
                 );
                 docstring::format(&normalized, f)
@@ -323,9 +324,7 @@ impl StringPart {
         configured_style: QuoteStyle,
         parent_docstring_quote_style: Option<QuoteStyle>,
     ) -> NormalizedString<'a> {
-        // Per PEP 8 and PEP 257, always prefer double quotes for docstrings
-        // and triple-quoted strings. (We assume docstrings are always
-        // triple-quoted.)
+        // Per PEP 8, always prefer double quotes for triple-quoted strings.
         let preferred_style = if self.quotes.triple {
             // ... unless we're formatting a code snippet inside a docstring,
             // then we specifically want to invert our quote style to avoid
