@@ -1,5 +1,6 @@
 use crate::comments::Comments;
-use crate::{PyFormatOptions, QuoteStyle};
+use crate::expression::string::QuoteChar;
+use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, SourceCode};
 use ruff_source_file::Locator;
 use std::fmt::{Debug, Formatter};
@@ -12,14 +13,14 @@ pub struct PyFormatContext<'a> {
     comments: Comments<'a>,
     node_level: NodeLevel,
     /// Set to a non-None value when the formatter is running on a code
-    /// snippet within a docstring. The value should be the quote style of the
+    /// snippet within a docstring. The value should be the quote character of the
     /// docstring containing the code snippet.
     ///
     /// Various parts of the formatter may inspect this state to change how it
     /// works. For example, multi-line strings will always be written with a
     /// quote style that is inverted from the one here in order to ensure that
     /// the formatted Python code will be valid.
-    docstring: Option<QuoteStyle>,
+    docstring: Option<QuoteChar>,
 }
 
 impl<'a> PyFormatContext<'a> {
@@ -57,20 +58,20 @@ impl<'a> PyFormatContext<'a> {
     /// Returns a non-None value only if the formatter is running on a code
     /// snippet within a docstring.
     ///
-    /// The quote style returned corresponds to the quoting used for the
+    /// The quote character returned corresponds to the quoting used for the
     /// docstring containing the code snippet currently being formatted.
-    pub(crate) fn docstring(&self) -> Option<QuoteStyle> {
+    pub(crate) fn docstring(&self) -> Option<QuoteChar> {
         self.docstring
     }
 
     /// Return a new context suitable for formatting code snippets within a
     /// docstring.
     ///
-    /// The quote style given should correspond to the style of quoting used
+    /// The quote character given should correspond to the quote character used
     /// for the docstring containing the code snippets.
-    pub(crate) fn in_docstring(self, style: QuoteStyle) -> PyFormatContext<'a> {
+    pub(crate) fn in_docstring(self, quote: QuoteChar) -> PyFormatContext<'a> {
         PyFormatContext {
-            docstring: Some(style),
+            docstring: Some(quote),
             ..self
         }
     }

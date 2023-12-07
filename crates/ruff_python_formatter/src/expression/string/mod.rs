@@ -325,7 +325,7 @@ impl StringPart {
         quoting: Quoting,
         locator: &'a Locator,
         configured_style: QuoteStyle,
-        parent_docstring_quote_style: Option<QuoteStyle>,
+        parent_docstring_quote_char: Option<QuoteChar>,
     ) -> NormalizedString<'a> {
         // Per PEP 8, always prefer double quotes for triple-quoted strings.
         let preferred_style = if self.quotes.triple {
@@ -374,8 +374,8 @@ impl StringPart {
             // Overall this is a bit of a corner case and just inverting the
             // style from what the parent ultimately decided upon works, even
             // if it doesn't have perfect alignment with PEP8.
-            if let Some(style) = parent_docstring_quote_style {
-                style.invert()
+            if let Some(quote) = parent_docstring_quote_char {
+                QuoteStyle::from(quote.invert())
             } else {
                 QuoteStyle::Double
             }
@@ -388,10 +388,14 @@ impl StringPart {
         let quotes = match quoting {
             Quoting::Preserve => self.quotes,
             Quoting::CanChange => {
-                if self.prefix.is_raw_string() {
-                    choose_quotes_raw(raw_content, self.quotes, preferred_style)
+                if let Some(preferred_quote) = QuoteChar::from_style(preferred_style) {
+                    if self.prefix.is_raw_string() {
+                        choose_quotes_raw(raw_content, self.quotes, preferred_quote)
+                    } else {
+                        choose_quotes(raw_content, self.quotes, preferred_quote)
+                    }
                 } else {
-                    choose_quotes(raw_content, self.quotes, preferred_style)
+                    self.quotes
                 }
             }
         };
@@ -526,9 +530,9 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
 fn choose_quotes_raw(
     input: &str,
     quotes: StringQuotes,
-    preferred_style: QuoteStyle,
+    preferred_quote: QuoteChar,
 ) -> StringQuotes {
-    let preferred_quote_char = preferred_style.as_char();
+    let preferred_quote_char = preferred_quote.as_char();
     let mut chars = input.chars().peekable();
     let contains_unescaped_configured_quotes = loop {
         match chars.next() {
@@ -566,10 +570,10 @@ fn choose_quotes_raw(
 
     StringQuotes {
         triple: quotes.triple,
-        style: if contains_unescaped_configured_quotes {
-            quotes.style
+        quote_char: if contains_unescaped_configured_quotes {
+            quotes.quote_char
         } else {
-            preferred_style
+            preferred_quote
         },
     }
 }
@@ -582,14 +586,14 @@ fn choose_quotes_raw(
 /// For triple quoted strings, the preferred quote style is always used, unless the string contains
 /// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
 /// used unless the string contains `"""`).
-fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle) -> StringQuotes {
-    let style = if quotes.triple {
+fn choose_quotes(input: &str, quotes: StringQuotes, preferred_quote: QuoteChar) -> StringQuotes {
+    let quote = if quotes.triple {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
         let mut chars = input.chars().peekable();
 
         while let Some(c) = chars.next() {
-            let preferred_quote_char = preferred_style.as_char();
+            let preferred_quote_char = preferred_quote.as_char();
             match c {
                 '\\' => {
                     if matches!(chars.peek(), Some('"' | '\\')) {
@@ -637,9 +641,9 @@ fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle)
         if uses_triple_quotes {
             // String contains a triple quote sequence of the configured quote style.
             // Keep the existing quote style.
-            quotes.style
+            quotes.quote_char
         } else {
-            preferred_style
+            preferred_quote
         }
     } else {
         let mut single_quotes = 0u32;
@@ -659,19 +663,19 @@ fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle)
             }
         }
 
-        match preferred_style {
-            QuoteStyle::Single => {
+        match preferred_quote {
+            QuoteChar::Single => {
                 if single_quotes > double_quotes {
-                    QuoteStyle::Double
+                    QuoteChar::Double
                 } else {
-                    QuoteStyle::Single
+                    QuoteChar::Single
                 }
             }
-            QuoteStyle::Double => {
+            QuoteChar::Double => {
                 if double_quotes > single_quotes {
-                    QuoteStyle::Single
+                    QuoteChar::Single
                 } else {
-                    QuoteStyle::Double
+                    QuoteChar::Double
                 }
             }
         }
@@ -679,14 +683,14 @@ fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle)
 
     StringQuotes {
         triple: quotes.triple,
-        style,
+        quote_char: quote,
     }
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(super) struct StringQuotes {
     triple: bool,
-    style: QuoteStyle,
+    quote_char: QuoteChar,
 }
 
 impl StringQuotes {
@@ -694,11 +698,14 @@ impl StringQuotes {
         let mut chars = input.chars();
 
         let quote_char = chars.next()?;
-        let style = QuoteStyle::try_from(quote_char).ok()?;
+        let quote = QuoteChar::try_from(quote_char).ok()?;
 
         let triple = chars.next() == Some(quote_char) && chars.next() == Some(quote_char);
 
-        Some(Self { triple, style })
+        Some(Self {
+            triple,
+            quote_char: quote,
+        })
     }
 
     pub(super) const fn is_triple(self) -> bool {
@@ -716,14 +723,71 @@ impl StringQuotes {
 
 impl Format<PyFormatContext<'_>> for StringQuotes {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let quotes = match (self.style, self.triple) {
-            (QuoteStyle::Single, false) => "'",
-            (QuoteStyle::Single, true) => "'''",
-            (QuoteStyle::Double, false) => "\"",
-            (QuoteStyle::Double, true) => "\"\"\"",
+        let quotes = match (self.quote_char, self.triple) {
+            (QuoteChar::Single, false) => "'",
+            (QuoteChar::Single, true) => "'''",
+            (QuoteChar::Double, false) => "\"",
+            (QuoteChar::Double, true) => "\"\"\"",
         };
 
         token(quotes).fmt(f)
+    }
+}
+
+/// The quotation character used to quote a string, byte, or fstring literal.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum QuoteChar {
+    /// A single quote: `'`
+    Single,
+
+    /// A double quote: '"'
+    Double,
+}
+
+impl QuoteChar {
+    pub const fn as_char(self) -> char {
+        match self {
+            QuoteChar::Single => '\'',
+            QuoteChar::Double => '"',
+        }
+    }
+
+    #[must_use]
+    pub const fn invert(self) -> QuoteChar {
+        match self {
+            QuoteChar::Single => QuoteChar::Double,
+            QuoteChar::Double => QuoteChar::Single,
+        }
+    }
+
+    #[must_use]
+    pub const fn from_style(style: QuoteStyle) -> Option<QuoteChar> {
+        match style {
+            QuoteStyle::Single => Some(QuoteChar::Single),
+            QuoteStyle::Double => Some(QuoteChar::Double),
+            QuoteStyle::Preserve => None,
+        }
+    }
+}
+
+impl From<QuoteChar> for QuoteStyle {
+    fn from(value: QuoteChar) -> Self {
+        match value {
+            QuoteChar::Single => QuoteStyle::Single,
+            QuoteChar::Double => QuoteStyle::Double,
+        }
+    }
+}
+
+impl TryFrom<char> for QuoteChar {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '\'' => Ok(QuoteChar::Single),
+            '"' => Ok(QuoteChar::Double),
+            _ => Err(()),
+        }
     }
 }
 
@@ -739,9 +803,9 @@ fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> 
     // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
     let mut last_index = 0;
 
-    let style = quotes.style;
-    let preferred_quote = style.as_char();
-    let opposite_quote = style.invert().as_char();
+    let quote = quotes.quote_char;
+    let preferred_quote = quote.as_char();
+    let opposite_quote = quote.invert().as_char();
 
     let mut chars = input.char_indices().peekable();
 
