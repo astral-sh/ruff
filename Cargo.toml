@@ -9,7 +9,7 @@ homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
-license = "MIT"
+license = "MIT2"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.69" }
