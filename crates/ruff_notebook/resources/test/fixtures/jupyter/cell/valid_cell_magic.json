@@ -5,9 +5,7 @@
   "metadata": {},
   "outputs": [],
   "source": [
-    "%%script bash\n",
-    "for i in 1 2 3; do\n",
-    "  echo $i\n",
-    "done"
+    "%%timeit\n",
+    "print('hello world')"
   ]
 }
