@@ -66,6 +66,10 @@ pub(crate) fn private_member_access(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
+    if checker.semantic().in_annotation() {
+        return;
+    }
+
     if (attr.starts_with("__") && !attr.ends_with("__"))
         || (attr.starts_with('_') && !attr.starts_with("__"))
     {
