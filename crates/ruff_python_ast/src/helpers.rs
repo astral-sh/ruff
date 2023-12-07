@@ -714,7 +714,9 @@ where
 /// assert_eq!(format_import_from(Some(1), Some("foo")), ".foo".to_string());
 /// ```
 pub fn format_import_from(level: Option<u32>, module: Option<&str>) -> String {
-    let mut module_name = String::with_capacity(16);
+    let mut module_name = String::with_capacity(
+        (level.unwrap_or(0) as usize) + module.as_ref().map_or(0, |module| module.len()),
+    );
     if let Some(level) = level {
         for _ in 0..level {
             module_name.push('.');

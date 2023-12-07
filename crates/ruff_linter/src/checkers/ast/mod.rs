@@ -374,7 +374,7 @@ where
                 names,
                 module,
                 level,
-                range: _,
+                range,
             }) => {
                 let module = module.as_deref();
                 let level = *level;
@@ -388,9 +388,16 @@ where
                             BindingFlags::empty(),
                         );
                     } else if &alias.name == "*" {
-                        self.semantic
-                            .current_scope_mut()
-                            .add_star_import(StarImport { level, module });
+                        if let Some(node_id) = self.semantic.current_statement_id() {
+                            self.semantic
+                                .current_scope_mut()
+                                .add_star_import(StarImport {
+                                    level,
+                                    module,
+                                    node_id,
+                                    range: *range,
+                                });
+                        }
                     } else {
                         let mut flags = BindingFlags::EXTERNAL;
                         if alias.asname.is_some() {

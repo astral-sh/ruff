@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Exceptions, Imported, NodeId, Scope};
+use ruff_python_semantic::{AnyImport, Exceptions, Imported, NodeId, Scope, StarImport};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -27,6 +27,9 @@ enum UnusedImportContext {
 ///
 /// If an import statement is used to check for the availability or existence
 /// of a module, consider using `importlib.util.find_spec` instead.
+///
+/// In [preview], this rule will also mark wildcard imports as unused if there
+/// are no unresolved references in the importing module.
 ///
 /// ## Example
 /// ```python
@@ -59,6 +62,8 @@ enum UnusedImportContext {
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct UnusedImport {
     name: String,
@@ -155,7 +160,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         let multiple = imports.len() > 1;
 
         let fix = if !in_init && !in_except_handler {
-            fix_imports(checker, node_id, &imports).ok()
+            remove_unused_imports(checker, node_id, &imports).ok()
         } else {
             None
         };
@@ -213,6 +218,27 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
         }
         diagnostics.push(diagnostic);
     }
+
+    // Finally, if there are no unresolved references in the module, generate a diagnostic for every
+    // unused star (wildcard) import.
+    if checker.settings.preview.is_enabled() {
+        if checker.semantic().unresolved_references().next().is_none() {
+            if !checker.path().ends_with("__init__.py") {
+                for star_import in scope.star_imports() {
+                    let mut diagnostic = Diagnostic::new(
+                        UnusedImport {
+                            name: star_import.qualified_name(),
+                            context: None,
+                            multiple: false,
+                        },
+                        star_import.range(),
+                    );
+                    diagnostic.set_fix(remove_unused_star_import(checker, star_import));
+                    diagnostics.push(diagnostic);
+                }
+            }
+        }
+    }
 }
 
 /// An unused import with its surrounding context.
@@ -233,7 +259,11 @@ impl Ranged for ImportBinding<'_> {
 }
 
 /// Generate a [`Fix`] to remove unused imports from a statement.
-fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+fn remove_unused_imports(
+    checker: &Checker,
+    node_id: NodeId,
+    imports: &[ImportBinding],
+) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
@@ -254,4 +284,14 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
     Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
     )))
+}
+
+/// Generate a [`Fix`] to remove an unused star (wildcard) import statement.
+fn remove_unused_star_import(checker: &Checker, star_import: &StarImport) -> Fix {
+    let statement = checker.semantic().statement(star_import.node_id);
+    let parent = checker.semantic().parent_statement(star_import.node_id);
+    let edit = fix::edits::delete_stmt(statement, parent, checker.locator(), checker.indexer());
+    Fix::safe_edit(edit).isolate(Checker::isolation(
+        checker.semantic().parent_statement_id(star_import.node_id),
+    ))
 }

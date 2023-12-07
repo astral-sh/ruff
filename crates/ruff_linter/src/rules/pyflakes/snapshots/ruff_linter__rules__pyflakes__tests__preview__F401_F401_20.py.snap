@@ -1,0 +1,62 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401_20.py:6:1: F401 [*] `from . import *` imported but unused
+  |
+4 | """
+5 | 
+6 | from . import *
+  | ^^^^^^^^^^^^^^^ F401
+7 | from foo import *
+8 | from .foo import *
+  |
+  = help: Remove unused import: `from . import *`
+
+ℹ Safe fix
+3 3 | Only applies to preview mode.
+4 4 | """
+5 5 | 
+6   |-from . import *
+7 6 | from foo import *
+8 7 | from .foo import *
+9 8 | 
+
+F401_20.py:7:1: F401 [*] `foo.*` imported but unused
+  |
+6 | from . import *
+7 | from foo import *
+  | ^^^^^^^^^^^^^^^^^ F401
+8 | from .foo import *
+  |
+  = help: Remove unused import: `foo.*`
+
+ℹ Safe fix
+4 4 | """
+5 5 | 
+6 6 | from . import *
+7   |-from foo import *
+8 7 | from .foo import *
+9 8 | 
+10 9 | x = 1
+
+F401_20.py:8:1: F401 [*] `.foo.*` imported but unused
+   |
+ 6 | from . import *
+ 7 | from foo import *
+ 8 | from .foo import *
+   | ^^^^^^^^^^^^^^^^^^ F401
+ 9 | 
+10 | x = 1
+   |
+   = help: Remove unused import: `.foo.*`
+
+ℹ Safe fix
+5 5 | 
+6 6 | from . import *
+7 7 | from foo import *
+8   |-from .foo import *
+9 8 | 
+10 9 | x = 1
+11 10 | print(x + 1)
+
+
