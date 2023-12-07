@@ -86,7 +86,7 @@ jobs:
     name: "cargo clippy"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -102,7 +102,7 @@ jobs:
   cargo-test-linux:
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     name: "cargo test (linux)"
     steps:
       - uses: actions/checkout@v4
@@ -128,7 +128,7 @@ jobs:
   cargo-test-windows:
     runs-on: windows-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     name: "cargo test (windows)"
     steps:
       - uses: actions/checkout@v4
@@ -147,7 +147,7 @@ jobs:
   cargo-test-wasm:
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     name: "cargo test (wasm)"
     steps:
       - uses: actions/checkout@v4
@@ -168,7 +168,7 @@ jobs:
   cargo-fuzz:
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     name: "cargo fuzz"
     steps:
       - uses: actions/checkout@v4
@@ -187,7 +187,7 @@ jobs:
     name: "test scripts"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
       - name: "Install Rust toolchain"
@@ -321,7 +321,7 @@ jobs:
     name: "cargo udeps"
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
       - name: "Install nightly Rust toolchain"
@@ -444,7 +444,7 @@ jobs:
     needs:
       - cargo-test-linux
       - determine_changes
-    if: needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
       - uses: extractions/setup-just@v1
         env:
@@ -483,7 +483,7 @@ jobs:
   benchmarks:
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main'
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@v4
