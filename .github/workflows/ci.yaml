@@ -49,6 +49,7 @@ jobs:
               - "!crates/ruff_shrinking/**"
               - scripts/*
               - python/**
+              - .github/workflows/ci.yaml
 
             formatter:
               - Cargo.toml
@@ -64,6 +65,7 @@ jobs:
               - crates/ruff_dev/**
               - scripts/*
               - python/**
+              - .github/workflows/ci.yaml
 
             code:
               - "**/*"
