@@ -68,7 +68,7 @@ jobs:
               - .github/workflows/ci.yaml
 
             code:
-              - "*/**"
+              - */**
               - "!**/*.md"
               - "!docs/**"
               - "!assets/**"
