@@ -2812,13 +2812,18 @@ pub struct FormatOptions {
     )]
     pub indent_style: Option<IndentStyle>,
 
-    /// Whether to prefer single `'` or double `"` quotes for strings. Defaults to double quotes.
+    /// Configures the preferred quote character for strings. Valid options are:
+    ///
+    /// * `double` (default): Use double quotes `"`
+    /// * `single`: Use single quotes `'`
+    /// * `preserve` (preview only): Keeps the existing quote character. We don't recommend using this option except for projects
+    ///    that already use a mixture of single and double quotes and can't migrate to using double or single quotes.
     ///
     /// In compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/),
     /// Ruff prefers double quotes for multiline strings and docstrings, regardless of the
     /// configured quote style.
     ///
-    /// Ruff may also deviate from this option if using the configured quotes would require
+    /// Ruff may also deviate from using the configured quotes if doing so requires
     /// escaping quote characters within the string. For example, given:
     ///
     /// ```python
@@ -2827,11 +2832,11 @@ pub struct FormatOptions {
     /// ```
     ///
     /// Ruff will change `a` to use single quotes when using `quote-style = "single"`. However,
-    /// `b` will be unchanged, as converting to single quotes would require the inner `'` to be
-    /// escaped, which leads to less readable code: `'It\'s monday morning'`.
+    /// `b` remains unchanged, as converting to single quotes requires escaping the inner `'`,
+    /// which leads to less readable code: `'It\'s monday morning'`. This does not apply when using `preserve`.
     #[option(
         default = r#"double"#,
-        value_type = r#""double" | "single""#,
+        value_type = r#""double" | "single" | "preserve""#,
         example = r#"
             # Prefer single quotes over double quotes.
             quote-style = "single"
