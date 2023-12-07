@@ -1069,18 +1069,6 @@ impl<'a> Generator<'a> {
                 }
                 self.p(")");
             }
-            Expr::FormattedValue(ast::ExprFormattedValue {
-                value,
-                debug_text,
-                conversion,
-                format_spec,
-                range: _,
-            }) => self.unparse_formatted(
-                value,
-                debug_text.as_ref(),
-                *conversion,
-                format_spec.as_deref(),
-            ),
             Expr::FString(ast::ExprFString { value, .. }) => {
                 self.unparse_f_string_value(value, false);
             }
@@ -1300,24 +1288,24 @@ impl<'a> Generator<'a> {
                     self.unparse_string_literal(string_literal);
                 }
                 ast::FStringPart::FString(f_string) => {
-                    self.unparse_f_string(&f_string.values, is_spec);
+                    self.unparse_f_string(&f_string.elements, is_spec);
                 }
             }
         }
     }
 
-    fn unparse_f_string_body(&mut self, values: &[Expr], is_spec: bool) {
+    fn unparse_f_string_body(&mut self, values: &[ast::FStringElement]) {
         for value in values {
-            self.unparse_f_string_elem(value, is_spec);
+            self.unparse_f_string_element(value);
         }
     }
 
-    fn unparse_formatted(
+    fn unparse_f_string_expression_element(
         &mut self,
         val: &Expr,
         debug_text: Option<&DebugText>,
         conversion: ConversionFlag,
-        spec: Option<&Expr>,
+        spec: Option<&ast::FStringFormatSpec>,
     ) {
         let mut generator = Generator::new(self.indent, self.quote, self.line_ending);
         generator.unparse_expr(val, precedence::FORMATTED_VALUE);
@@ -1347,44 +1335,40 @@ impl<'a> Generator<'a> {
 
         if let Some(spec) = spec {
             self.p(":");
-            self.unparse_f_string_elem(spec, true);
+            self.unparse_f_string(&spec.elements, true);
         }
 
         self.p("}");
     }
 
-    fn unparse_f_string_elem(&mut self, expr: &Expr, is_spec: bool) {
-        match expr {
-            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                self.unparse_f_string_literal(value.to_str());
+    fn unparse_f_string_element(&mut self, element: &ast::FStringElement) {
+        match element {
+            ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
+                self.unparse_f_string_literal_element(value);
             }
-            Expr::FString(ast::ExprFString { value, .. }) => {
-                self.unparse_f_string_value(value, is_spec);
-            }
-            Expr::FormattedValue(ast::ExprFormattedValue {
-                value,
+            ast::FStringElement::Expression(ast::FStringExpressionElement {
+                expression,
                 debug_text,
                 conversion,
                 format_spec,
                 range: _,
-            }) => self.unparse_formatted(
-                value,
+            }) => self.unparse_f_string_expression_element(
+                expression,
                 debug_text.as_ref(),
                 *conversion,
                 format_spec.as_deref(),
             ),
-            _ => unreachable!(),
         }
     }
 
-    fn unparse_f_string_literal(&mut self, s: &str) {
+    fn unparse_f_string_literal_element(&mut self, s: &str) {
         let s = s.replace('{', "{{").replace('}', "}}");
         self.p(&s);
     }
 
-    fn unparse_f_string(&mut self, values: &[Expr], is_spec: bool) {
+    fn unparse_f_string(&mut self, values: &[ast::FStringElement], is_spec: bool) {
         if is_spec {
-            self.unparse_f_string_body(values, is_spec);
+            self.unparse_f_string_body(values);
         } else {
             self.p("f");
             let mut generator = Generator::new(
@@ -1395,7 +1379,7 @@ impl<'a> Generator<'a> {
                 },
                 self.line_ending,
             );
-            generator.unparse_f_string_body(values, is_spec);
+            generator.unparse_f_string_body(values);
             let body = &generator.buffer;
             self.p_str_repr(body);
         }
@@ -1716,7 +1700,7 @@ class Foo:
     }
 
     #[test]
-    fn self_documenting_f_string() {
+    fn self_documenting_fstring() {
         assert_round_trip!(r#"f"{ chr(65)  =   }""#);
         assert_round_trip!(r#"f"{ chr(65)  =   !s}""#);
         assert_round_trip!(r#"f"{ chr(65)  =   !r}""#);

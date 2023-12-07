@@ -22,19 +22,11 @@ expression: parse_ast
                                 FString(
                                     FString {
                                         range: 10..18,
-                                        values: [
-                                            StringLiteral(
-                                                ExprStringLiteral {
+                                        elements: [
+                                            Literal(
+                                                FStringLiteralElement {
                                                     range: 12..17,
-                                                    value: StringLiteralValue {
-                                                        inner: Single(
-                                                            StringLiteral {
-                                                                range: 12..17,
-                                                                value: "world",
-                                                                unicode: false,
-                                                            },
-                                                        ),
-                                                    },
+                                                    value: "world",
                                                 },
                                             ),
                                         ],

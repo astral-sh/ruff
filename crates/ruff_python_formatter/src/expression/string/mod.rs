@@ -52,8 +52,11 @@ impl<'a> AnyString<'a> {
                     .trim_start_matches(|c| c != '"' && c != '\'');
                 let triple_quoted =
                     unprefixed.starts_with(r#"""""#) || unprefixed.starts_with(r"'''");
-                if f_string.value.elements().any(|value| match value {
-                    Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
+                if f_string.value.elements().any(|element| match element {
+                    ast::FStringElement::Expression(ast::FStringExpressionElement {
+                        range,
+                        ..
+                    }) => {
                         let string_content = locator.slice(*range);
                         if triple_quoted {
                             string_content.contains(r#"""""#) || string_content.contains("'''")
@@ -61,7 +64,7 @@ impl<'a> AnyString<'a> {
                             string_content.contains(['"', '\''])
                         }
                     }
-                    _ => false,
+                    ast::FStringElement::Literal(_) => false,
                 }) {
                     Quoting::Preserve
                 } else {

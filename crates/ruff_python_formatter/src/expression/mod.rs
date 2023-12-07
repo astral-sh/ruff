@@ -36,7 +36,6 @@ pub(crate) mod expr_dict;
 pub(crate) mod expr_dict_comp;
 pub(crate) mod expr_ellipsis_literal;
 pub(crate) mod expr_f_string;
-pub(crate) mod expr_formatted_value;
 pub(crate) mod expr_generator_exp;
 pub(crate) mod expr_if_exp;
 pub(crate) mod expr_ipy_escape_command;
@@ -97,7 +96,6 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::YieldFrom(expr) => expr.format().fmt(f),
             Expr::Compare(expr) => expr.format().fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
-            Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::FString(expr) => expr.format().fmt(f),
             Expr::StringLiteral(expr) => expr.format().fmt(f),
             Expr::BytesLiteral(expr) => expr.format().fmt(f),
@@ -286,7 +284,6 @@ fn format_with_parentheses_comments(
         Expr::YieldFrom(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::FormattedValue(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::StringLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::BytesLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
@@ -488,7 +485,6 @@ impl NeedsParentheses for Expr {
             Expr::YieldFrom(expr) => expr.needs_parentheses(parent, context),
             Expr::Compare(expr) => expr.needs_parentheses(parent, context),
             Expr::Call(expr) => expr.needs_parentheses(parent, context),
-            Expr::FormattedValue(expr) => expr.needs_parentheses(parent, context),
             Expr::FString(expr) => expr.needs_parentheses(parent, context),
             Expr::StringLiteral(expr) => expr.needs_parentheses(parent, context),
             Expr::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
@@ -746,7 +742,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::Tuple(_)
             | Expr::NamedExpr(_)
             | Expr::GeneratorExp(_)
-            | Expr::FormattedValue(_)
             | Expr::FString(_)
             | Expr::StringLiteral(_)
             | Expr::BytesLiteral(_)
@@ -1098,7 +1093,6 @@ pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> 
         | Expr::YieldFrom(_)
         | Expr::Compare(_)
         | Expr::Call(_)
-        | Expr::FormattedValue(_)
         | Expr::FString(_)
         | Expr::Attribute(_)
         | Expr::Subscript(_)

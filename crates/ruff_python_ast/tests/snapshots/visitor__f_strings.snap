@@ -5,17 +5,13 @@ expression: trace
 - StmtExpr
   - ExprFString
     - StringLiteral
-    - ExprStringLiteral
-      - StringLiteral
-    - ExprFormattedValue
-      - ExprName
-      - ExprFString
-        - ExprStringLiteral
-          - StringLiteral
-        - ExprFormattedValue
+    - FString
+      - FStringLiteralElement
+      - FStringExpressionElement
+        - ExprName
+        - FStringLiteralElement
+        - FStringExpressionElement
           - ExprName
-        - ExprStringLiteral
-          - StringLiteral
-    - ExprStringLiteral
-      - StringLiteral
+        - FStringLiteralElement
+      - FStringLiteralElement
 

@@ -815,8 +815,7 @@ where
 
     fn visit_expr(&mut self, expr: &'b Expr) {
         // Step 0: Pre-processing
-        if !self.semantic.in_f_string()
-            && !self.semantic.in_typing_literal()
+        if !self.semantic.in_typing_literal()
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
             && self.semantic.future_annotations()
@@ -1238,10 +1237,7 @@ where
                 }
             }
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                if self.semantic.in_type_definition()
-                    && !self.semantic.in_typing_literal()
-                    && !self.semantic.in_f_string()
-                {
+                if self.semantic.in_type_definition() && !self.semantic.in_typing_literal() {
                     self.deferred.string_type_definitions.push((
                         expr.range(),
                         value.to_str(),
@@ -1324,17 +1320,6 @@ where
         analyze::except_handler(except_handler, self);
 
         self.semantic.flags = flags_snapshot;
-    }
-
-    fn visit_format_spec(&mut self, format_spec: &'b Expr) {
-        match format_spec {
-            Expr::FString(ast::ExprFString { value, .. }) => {
-                for expr in value.elements() {
-                    self.visit_expr(expr);
-                }
-            }
-            _ => unreachable!("Unexpected expression for format_spec"),
-        }
     }
 
     fn visit_parameters(&mut self, parameters: &'b Parameters) {
