@@ -29,7 +29,7 @@ jobs:
       formatter: ${{ steps.changed.outputs.formatter_any_changed }}
       # Flag that is raised when any code is changed
       # This is superset of the linter and formatter
-      code: ${{ steps.changed.outputs.code_any_changed || steps.changed.outputs.formatter_any_changed || steps.changed.outputs.linter_any_changed }}
+      code: ${{ steps.changed.outputs.code_any_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,7 +48,6 @@ jobs:
               - "!crates/ruff_dev/**"
               - "!crates/ruff_shrinking/**"
               - scripts/*
-              - .github/workflows/ci.yaml
               - python/**
 
             formatter:
@@ -65,7 +64,6 @@ jobs:
               - crates/ruff_dev/**
               - scripts/*
               - python/**
-              - .github/workflows/ci.yaml
 
             code:
               - */**
