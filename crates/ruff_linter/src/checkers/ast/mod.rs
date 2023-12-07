@@ -44,7 +44,7 @@ use ruff_python_ast::helpers::{
 };
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
-use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
+use ruff_python_ast::visitor::{walk_except_handler, walk_f_string_element, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Quote, Stylist};
 use ruff_python_index::Indexer;
@@ -1267,6 +1267,13 @@ where
 
         // Step 4: Analysis
         analyze::expression(expr, self);
+        match expr {
+            Expr::StringLiteral(string_literal) => {
+                analyze::string_like(string_literal.into(), self);
+            }
+            Expr::BytesLiteral(bytes_literal) => analyze::string_like(bytes_literal.into(), self),
+            _ => {}
+        }
 
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
@@ -1429,6 +1436,16 @@ where
             self.deferred
                 .type_param_definitions
                 .push((bound, self.semantic.snapshot()));
+        }
+    }
+
+    fn visit_f_string_element(&mut self, f_string_element: &'b ast::FStringElement) {
+        // Step 2: Traversal
+        walk_f_string_element(self, f_string_element);
+
+        // Step 4: Analysis
+        if let Some(literal) = f_string_element.as_literal() {
+            analyze::string_like(literal.into(), self);
         }
     }
 }

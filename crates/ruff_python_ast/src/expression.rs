@@ -393,3 +393,41 @@ impl LiteralExpressionRef<'_> {
         }
     }
 }
+
+/// An enum that holds a reference to a string-like literal from the AST.
+/// This includes string literals, bytes literals, and the literal parts of
+/// f-strings.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum StringLike<'a> {
+    StringLiteral(&'a ast::ExprStringLiteral),
+    BytesLiteral(&'a ast::ExprBytesLiteral),
+    FStringLiteral(&'a ast::FStringLiteralElement),
+}
+
+impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
+    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+        StringLike::StringLiteral(value)
+    }
+}
+
+impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
+    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+        StringLike::BytesLiteral(value)
+    }
+}
+
+impl<'a> From<&'a ast::FStringLiteralElement> for StringLike<'a> {
+    fn from(value: &'a ast::FStringLiteralElement) -> Self {
+        StringLike::FStringLiteral(value)
+    }
+}
+
+impl Ranged for StringLike<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            StringLike::StringLiteral(literal) => literal.range(),
+            StringLike::BytesLiteral(literal) => literal.range(),
+            StringLike::FStringLiteral(literal) => literal.range(),
+        }
+    }
+}
