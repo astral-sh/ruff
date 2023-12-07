@@ -29,7 +29,7 @@ jobs:
       formatter: ${{ steps.changed.outputs.formatter_any_changed }}
       # Flag that is raised when any code is changed
       # This is superset of the linter and formatter
-      code: ${{ steps.changed.outputs.code_any_changed }}
+      code: ${{ steps.changed.outputs.code_any_changed || steps.changed.outputs.formatter_any_changed || steps.changed.outputs.linter_any_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
