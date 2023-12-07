@@ -200,6 +200,7 @@ fn format_import_block(
                     // Add a blank lines between direct and from imports.
                     if settings.from_first
                         && lines_between_types > 0
+                        && !settings.force_sort_within_sections
                         && line_insertion == Some(LineInsertion::Necessary)
                     {
                         for _ in 0..lines_between_types {
@@ -225,6 +226,7 @@ fn format_import_block(
                     // Add a blank lines between direct and from imports.
                     if !settings.from_first
                         && lines_between_types > 0
+                        && !settings.force_sort_within_sections
                         && line_insertion == Some(LineInsertion::Necessary)
                     {
                         for _ in 0..lines_between_types {
@@ -711,6 +713,26 @@ mod tests {
                 isort: super::settings::Settings {
                     force_sort_within_sections: true,
                     force_to_top: BTreeSet::from(["z".to_string()]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(Ranged::start);
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("force_sort_within_sections_lines_between.py"))]
+    fn force_sort_within_sections_lines_between(path: &Path) -> Result<()> {
+        let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
+        let mut diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    force_sort_within_sections: true,
+                    lines_between_types: 2,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
