@@ -180,7 +180,7 @@ fn format_import_block(
             continue;
         };
 
-        let imports = order_imports(import_block, settings);
+        let imports = order_imports(import_block, import_section, settings);
 
         // Add a blank line between every section.
         if is_first_block {
@@ -291,6 +291,7 @@ mod tests {
     #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_to_top.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
+    #[test_case(Path::new("future_from.py"))]
     #[test_case(Path::new("if_elif_else.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("inline_comments.py"))]
@@ -701,6 +702,7 @@ mod tests {
 
     #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_sort_within_sections_with_as_names.py"))]
+    #[test_case(Path::new("force_sort_within_sections_future.py"))]
     fn force_sort_within_sections(path: &Path) -> Result<()> {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
         let mut diagnostics = test_path(
