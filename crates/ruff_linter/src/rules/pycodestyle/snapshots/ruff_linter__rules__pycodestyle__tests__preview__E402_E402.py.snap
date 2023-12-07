@@ -1,16 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E402.py:25:1: E402 Module level import not at top of file
-   |
-23 | sys.path.insert(0, "some/path")
-24 | 
-25 | import f
-   | ^^^^^^^^ E402
-26 | 
-27 | __some__magic = 1
-   |
-
 E402.py:29:1: E402 Module level import not at top of file
    |
 27 | __some__magic = 1

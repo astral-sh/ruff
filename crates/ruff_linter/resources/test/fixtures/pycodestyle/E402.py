@@ -19,21 +19,26 @@ if x > 0:
 else:
     import e
 
-__some__magic = 1
+import sys
+sys.path.insert(0, "some/path")
 
 import f
 
+__some__magic = 1
+
+import g
+
 
 def foo() -> None:
-    import e
+    import h
 
 
 if __name__ == "__main__":
-    import g
+    import i
 
-import h; import i
+import j; import k
 
 
 if __name__ == "__main__":
-    import j; \
-import k
+    import l; \
+import m
