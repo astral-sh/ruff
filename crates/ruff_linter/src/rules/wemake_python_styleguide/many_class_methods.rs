@@ -30,17 +30,13 @@ pub(crate) fn too_many_methods(checker: &mut Checker, class_def: &ast::StmtClass
     let mut methods = 0;
 
     for stmt in class_def.body.iter() {
-        match stmt {
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef {decorator_list, .. }) => {
-
-                // Ignore any functions that are `@overload`.
-                if visibility::is_overload(decorator_list, checker.semantic()) {
-                    continue;
-                } else {
-                    methods += 1
-                }
+        if let ast::Stmt::FunctionDef(ast::StmtFunctionDef {decorator_list, ..}) = stmt {
+            // Ignore any functions that are `@overload`.
+            if visibility::is_overload(decorator_list, checker.semantic()) {
+                continue;
+            } else {
+                methods += 1
             }
-            _ => {}
         }
     }
 
