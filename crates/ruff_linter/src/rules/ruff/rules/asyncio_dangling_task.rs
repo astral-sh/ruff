@@ -127,7 +127,7 @@ pub(crate) fn asyncio_dangling_task_unused(
         else {
             continue;
         };
-        asyncio_dangling_task(checker, value, diagnostics)
+        asyncio_dangling_task(checker, value, diagnostics);
     }
 }
 
