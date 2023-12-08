@@ -12306,7 +12306,7 @@ quote-style                = Double
 line-ending                = LineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Enabled
-docstring-code-line-width  = LineWidth(88)
+docstring-code-line-width  = 60
 preview                    = Disabled
 ```
 
@@ -12550,11 +12550,22 @@ def doctest_long_lines():
     This won't get wrapped even though it exceeds our configured
     line width because it doesn't exceed the line width within this
     docstring. e.g, the `f` in `foo` is treated as the first column.
-    >>> foo, bar, quux = this_is_a_long_line(lion, giraffe, hippo, zeba, lemur, penguin, monkey)
+    >>> foo, bar, quux = this_is_a_long_line(
+    ...     lion, giraffe, hippo, zeba, lemur, penguin, monkey
+    ... )
 
     But this one is long enough to get wrapped.
     >>> foo, bar, quux = this_is_a_long_line(
-    ...     lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
+    ...     lion,
+    ...     giraffe,
+    ...     hippo,
+    ...     zeba,
+    ...     lemur,
+    ...     penguin,
+    ...     monkey,
+    ...     spider,
+    ...     bear,
+    ...     leopard,
     ... )
     """
     # This demostrates a normal line that will get wrapped but won't
