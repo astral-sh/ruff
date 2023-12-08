@@ -68,7 +68,7 @@ def f():
     task = asyncio.create_task(coordinator.ws_connect())
 
 
-# OK
+# OK (potential false negative)
 def f():
     task = asyncio.create_task(coordinator.ws_connect())
     background_tasks.add(task)

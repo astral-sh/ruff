@@ -300,7 +300,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         if checker.enabled(Rule::AsyncioDanglingTask) {
             ruff::rules::asyncio_dangling_task_unused(checker, scope, &mut diagnostics);
         }
-        
+
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
             if enforce_typing_imports {
                 let runtime_imports: Vec<&Binding> = checker
