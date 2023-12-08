@@ -63,9 +63,21 @@ def f():
     tasks = [asyncio.create_task(task) for task in tasks]
 
 
-# OK (false negative)
+# Error
 def f():
     task = asyncio.create_task(coordinator.ws_connect())
+
+
+# OK
+def f():
+    task = asyncio.create_task(coordinator.ws_connect())
+    background_tasks.add(task)
+
+
+# OK
+async def f():
+    task = asyncio.create_task(coordinator.ws_connect())
+    await task
 
 
 # OK (potential false negative)

@@ -1,10 +1,11 @@
 use std::fmt;
 
+use ast::Stmt;
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::analyze::typing;
+use ruff_python_semantic::{analyze::typing, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -66,7 +67,11 @@ impl Violation for AsyncioDanglingTask {
 }
 
 /// RUF006
-pub(crate) fn asyncio_dangling_task(checker: &mut Checker, expr: &Expr) {
+pub(crate) fn asyncio_dangling_task(
+    checker: &Checker,
+    expr: &Expr,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return;
     };
@@ -81,7 +86,7 @@ pub(crate) fn asyncio_dangling_task(checker: &mut Checker, expr: &Expr) {
             _ => None,
         })
     {
-        checker.diagnostics.push(Diagnostic::new(
+        diagnostics.push(Diagnostic::new(
             AsyncioDanglingTask { method },
             expr.range(),
         ));
@@ -94,7 +99,7 @@ pub(crate) fn asyncio_dangling_task(checker: &mut Checker, expr: &Expr) {
             if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
                 matches!(call_path.as_slice(), ["asyncio", "get_running_loop"])
             }) {
-                checker.diagnostics.push(Diagnostic::new(
+                diagnostics.push(Diagnostic::new(
                     AsyncioDanglingTask {
                         method: Method::CreateTask,
                     },
@@ -102,6 +107,27 @@ pub(crate) fn asyncio_dangling_task(checker: &mut Checker, expr: &Expr) {
                 ));
             }
         }
+    }
+}
+
+pub(crate) fn asyncio_dangling_task_unused(
+    checker: &Checker,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for binding in scope
+        .binding_ids()
+        .map(|binding_id| checker.semantic().binding(binding_id))
+        .filter(|binding| binding.kind.is_assignment() && !binding.is_used())
+    {
+        let Some(source) = binding.source else {
+            continue;
+        };
+        let Stmt::Assign(ast::StmtAssign { value, .. }) = checker.semantic().statement(source)
+        else {
+            continue;
+        };
+        asyncio_dangling_task(checker, value, diagnostics)
     }
 }
 

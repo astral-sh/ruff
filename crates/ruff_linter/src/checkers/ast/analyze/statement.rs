@@ -1560,7 +1560,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::named_expr_without_context(checker, value);
             }
             if checker.enabled(Rule::AsyncioDanglingTask) {
-                ruff::rules::asyncio_dangling_task(checker, value);
+                let mut diagnostics: Vec<Diagnostic> = vec![];
+                ruff::rules::asyncio_dangling_task(checker, value, &mut diagnostics);
+                checker.diagnostics.extend(diagnostics)
             }
             if checker.enabled(Rule::RepeatedAppend) {
                 refurb::rules::repeated_append(checker, stmt);
