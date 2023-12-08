@@ -1195,6 +1195,20 @@ def markdown_over_indented():
     pass
 
 
+# This tests that we can have additional text after the language specifier.
+def markdown_additional_info_string():
+    """
+    Do cool stuff.
+
+    ```python tab="plugin.py"
+    cool_stuff( 1 )
+    ```
+
+    Done.
+    """
+    pass
+
+
 # Tests that an unclosed block gobbles up everything remaining in the
 # docstring, even if it isn't valid Python. Since it isn't valid Python,
 # reformatting fails and the entire thing is skipped.
