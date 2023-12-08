@@ -1359,14 +1359,15 @@ def markdown_skipped_rst_directive():
 ## Outputs
 ### Output 1
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -2728,14 +2729,15 @@ def markdown_skipped_rst_directive():
 
 ### Output 2
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 2
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 2
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -4097,14 +4099,15 @@ def markdown_skipped_rst_directive():
 
 ### Output 3
 ```
-indent-style            = tab
-line-width              = 88
-indent-width            = 8
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = tab
+line-width                 = 88
+indent-width               = 8
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -5466,14 +5469,15 @@ def markdown_skipped_rst_directive():
 
 ### Output 4
 ```
-indent-style            = tab
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = tab
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -6835,14 +6839,15 @@ def markdown_skipped_rst_directive():
 
 ### Output 5
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Enabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Enabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -8199,14 +8204,15 @@ def markdown_skipped_rst_directive():
 
 ### Output 6
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 2
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Enabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 2
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Enabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -9563,14 +9569,15 @@ def markdown_skipped_rst_directive():
 
 ### Output 7
 ```
-indent-style            = tab
-line-width              = 88
-indent-width            = 8
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Enabled
-preview                 = Disabled
+indent-style               = tab
+line-width                 = 88
+indent-width               = 8
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Enabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -10927,14 +10934,15 @@ def markdown_skipped_rst_directive():
 
 ### Output 8
 ```
-indent-style            = tab
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Enabled
-preview                 = Disabled
+indent-style               = tab
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Enabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python

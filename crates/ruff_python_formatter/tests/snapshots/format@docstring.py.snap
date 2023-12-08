@@ -166,14 +166,15 @@ def single_quoted():
 ## Outputs
 ### Output 1
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -339,14 +340,15 @@ def single_quoted():
 
 ### Output 2
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 2
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 2
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -512,14 +514,15 @@ def single_quoted():
 
 ### Output 3
 ```
-indent-style            = tab
-line-width              = 88
-indent-width            = 8
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = tab
+line-width                 = 88
+indent-width               = 8
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -685,14 +688,15 @@ def single_quoted():
 
 ### Output 4
 ```
-indent-style            = tab
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = tab
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -858,14 +862,15 @@ def single_quoted():
 
 ### Output 5
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Single
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Single
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
