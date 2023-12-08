@@ -347,14 +347,15 @@ impl fmt::Display for DisplayPyOptions<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            r#"indent-style            = {indent_style}
-line-width              = {line_width}
-indent-width            = {indent_width}
-quote-style             = {quote_style:?}
-line-ending             = {line_ending:?}
-magic-trailing-comma    = {magic_trailing_comma:?}
-docstring-code          = {docstring_code:?}
-preview                 = {preview:?}"#,
+            r#"indent-style               = {indent_style}
+line-width                 = {line_width}
+indent-width               = {indent_width}
+quote-style                = {quote_style:?}
+line-ending                = {line_ending:?}
+magic-trailing-comma       = {magic_trailing_comma:?}
+docstring-code             = {docstring_code:?}
+docstring-code-line-width  = {docstring_code_line_width:?}
+preview                    = {preview:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
@@ -362,6 +363,7 @@ preview                 = {preview:?}"#,
             line_ending = self.0.line_ending(),
             magic_trailing_comma = self.0.magic_trailing_comma(),
             docstring_code = self.0.docstring_code(),
+            docstring_code_line_width = self.0.docstring_code_line_width().value(),
             preview = self.0.preview()
         )
     }
