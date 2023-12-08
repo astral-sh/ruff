@@ -43,6 +43,7 @@ FURB152.py:5:5: FURB152 [*] Replace `6.28` with `math.tau`
   6 |+C = math.tau * r  # FURB152
 6 7 | 
 7 8 | e = 2.71  # FURB152
+8 9 | 
 
 FURB152.py:7:5: FURB152 [*] Replace `2.71` with `math.e`
   |
@@ -50,6 +51,8 @@ FURB152.py:7:5: FURB152 [*] Replace `2.71` with `math.e`
 6 | 
 7 | e = 2.71  # FURB152
   |     ^^^^ FURB152
+8 | 
+9 | r = 3.15  # OK
   |
   = help: Use `math.e`
 
@@ -63,5 +66,59 @@ FURB152.py:7:5: FURB152 [*] Replace `2.71` with `math.e`
 6 7 | 
 7   |-e = 2.71  # FURB152
   8 |+e = math.e  # FURB152
+8 9 | 
+9 10 | r = 3.15  # OK
+10 11 | 
+
+FURB152.py:11:5: FURB152 [*] Replace `3.141` with `math.pi`
+   |
+ 9 | r = 3.15  # OK
+10 | 
+11 | r = 3.141  # FURB152
+   |     ^^^^^ FURB152
+12 | 
+13 | r = 3.1415  # FURB152
+   |
+   = help: Use `math.pi`
+
+ℹ Safe fix
+   1  |+import math
+1  2  | r = 3.1  # OK
+2  3  | 
+3  4  | A = 3.14 * r ** 2  # FURB152
+--------------------------------------------------------------------------------
+8  9  | 
+9  10 | r = 3.15  # OK
+10 11 | 
+11    |-r = 3.141  # FURB152
+   12 |+r = math.pi  # FURB152
+12 13 | 
+13 14 | r = 3.1415  # FURB152
+14 15 | 
+
+FURB152.py:13:5: FURB152 [*] Replace `3.1415` with `math.pi`
+   |
+11 | r = 3.141  # FURB152
+12 | 
+13 | r = 3.1415  # FURB152
+   |     ^^^^^^ FURB152
+14 | 
+15 | e = 2.7 # OK
+   |
+   = help: Use `math.pi`
+
+ℹ Safe fix
+   1  |+import math
+1  2  | r = 3.1  # OK
+2  3  | 
+3  4  | A = 3.14 * r ** 2  # FURB152
+--------------------------------------------------------------------------------
+10 11 | 
+11 12 | r = 3.141  # FURB152
+12 13 | 
+13    |-r = 3.1415  # FURB152
+   14 |+r = math.pi  # FURB152
+14 15 | 
+15 16 | e = 2.7 # OK
 
 
