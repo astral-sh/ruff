@@ -191,15 +191,13 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                             if let Some(indentation) =
                                 whitespace::indentation(checker.locator(), stmt)
                             {
-                                if checker.semantic().is_available("msg") {
-                                    diagnostic.set_fix(generate_fix(
-                                        stmt,
-                                        first,
-                                        indentation,
-                                        checker.stylist(),
-                                        checker.locator(),
-                                    ));
-                                }
+                                diagnostic.set_fix(generate_fix(
+                                    stmt,
+                                    first,
+                                    indentation,
+                                    checker.stylist(),
+                                    checker.locator(),
+                                ));
                             }
                             checker.diagnostics.push(diagnostic);
                         }
@@ -211,15 +209,13 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                         let mut diagnostic = Diagnostic::new(FStringInException, first.range());
                         if let Some(indentation) = whitespace::indentation(checker.locator(), stmt)
                         {
-                            if checker.semantic().is_available("msg") {
-                                diagnostic.set_fix(generate_fix(
-                                    stmt,
-                                    first,
-                                    indentation,
-                                    checker.stylist(),
-                                    checker.locator(),
-                                ));
-                            }
+                            diagnostic.set_fix(generate_fix(
+                                stmt,
+                                first,
+                                indentation,
+                                checker.stylist(),
+                                checker.locator(),
+                            ));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -236,15 +232,13 @@ pub(crate) fn string_in_exception(checker: &mut Checker, stmt: &Stmt, exc: &Expr
                                 if let Some(indentation) =
                                     whitespace::indentation(checker.locator(), stmt)
                                 {
-                                    if checker.semantic().is_available("msg") {
-                                        diagnostic.set_fix(generate_fix(
-                                            stmt,
-                                            first,
-                                            indentation,
-                                            checker.stylist(),
-                                            checker.locator(),
-                                        ));
-                                    }
+                                    diagnostic.set_fix(generate_fix(
+                                        stmt,
+                                        first,
+                                        indentation,
+                                        checker.stylist(),
+                                        checker.locator(),
+                                    ));
                                 }
                                 checker.diagnostics.push(diagnostic);
                             }

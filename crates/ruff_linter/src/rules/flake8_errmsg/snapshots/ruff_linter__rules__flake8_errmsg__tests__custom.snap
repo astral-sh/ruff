@@ -59,14 +59,25 @@ EM.py:22:24: EM103 [*] Exception must not use a `.format()` string directly, ass
 24 25 | 
 25 26 | def f_ok():
 
-EM.py:32:24: EM101 Exception must not use a string literal, assign to variable first
+EM.py:32:24: EM101 [*] Exception must not use a string literal, assign to variable first
    |
-30 | def f_unfixable():
+30 | def f_msg_defined():
 31 |     msg = "hello"
 32 |     raise RuntimeError("This is an example exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal
+
+ℹ Unsafe fix
+29 29 | 
+30 30 | def f_msg_defined():
+31 31 |     msg = "hello"
+32    |-    raise RuntimeError("This is an example exception")
+   32 |+    msg = "This is an example exception"
+   33 |+    raise RuntimeError(msg)
+33 34 | 
+34 35 | 
+35 36 | def f_msg_in_nested_scope():
 
 EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variable first
    |
@@ -88,13 +99,24 @@ EM.py:39:24: EM101 [*] Exception must not use a string literal, assign to variab
 41 42 | 
 42 43 | def f_msg_in_parent_scope():
 
-EM.py:46:28: EM101 Exception must not use a string literal, assign to variable first
+EM.py:46:28: EM101 [*] Exception must not use a string literal, assign to variable first
    |
 45 |     def nested():
 46 |         raise RuntimeError("This is an example exception")
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
    |
    = help: Assign to variable; remove string literal
+
+ℹ Unsafe fix
+43 43 |     msg = "hello"
+44 44 | 
+45 45 |     def nested():
+46    |-        raise RuntimeError("This is an example exception")
+   46 |+        msg = "This is an example exception"
+   47 |+        raise RuntimeError(msg)
+47 48 | 
+48 49 | 
+49 50 | def f_fix_indentation_check(foo):
 
 EM.py:51:28: EM101 [*] Exception must not use a string literal, assign to variable first
    |
