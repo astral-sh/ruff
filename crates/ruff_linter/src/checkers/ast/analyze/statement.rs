@@ -1571,7 +1571,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::named_expr_without_context(checker, value);
             }
             if checker.enabled(Rule::AsyncioDanglingTask) {
-                if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(checker, value) {
+                if let Some(diagnostic) =
+                    ruff::rules::asyncio_dangling_task(value, checker.semantic())
+                {
                     checker.diagnostics.push(diagnostic);
                 }
             }

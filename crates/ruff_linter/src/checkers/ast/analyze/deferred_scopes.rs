@@ -5,9 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{
-    flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint, ruff,
-};
+use crate::rules::{flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint};
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
 pub(crate) fn deferred_scopes(checker: &mut Checker) {
@@ -33,7 +31,6 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
-        Rule::AsyncioDanglingTask,
         Rule::NoSelfUse,
     ]) {
         return;
@@ -295,10 +292,6 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                     );
                 }
             }
-        }
-
-        if checker.enabled(Rule::AsyncioDanglingTask) {
-            ruff::rules::asyncio_dangling_task_unused(checker, scope, &mut diagnostics);
         }
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {

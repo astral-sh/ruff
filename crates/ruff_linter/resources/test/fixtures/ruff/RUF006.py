@@ -106,3 +106,19 @@ def f():
 def f():
     loop = asyncio.get_running_loop()
     loop.do_thing(coordinator.ws_connect())
+
+
+# OK
+async def f():
+    task = unused = asyncio.create_task(coordinator.ws_connect())
+    await task
+
+
+# OK (false negative)
+async def f():
+    task = unused = asyncio.create_task(coordinator.ws_connect())
+
+
+# OK
+async def f():
+    task[i] = asyncio.create_task(coordinator.ws_connect())

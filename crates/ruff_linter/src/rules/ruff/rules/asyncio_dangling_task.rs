@@ -1,14 +1,11 @@
 use std::fmt;
 
 use ast::Stmt;
-use ruff_python_ast::{self as ast, Expr};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{analyze::typing, Scope};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::{analyze::typing, Binding, SemanticModel};
 use ruff_text_size::Ranged;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls
@@ -67,20 +64,20 @@ impl Violation for AsyncioDanglingTask {
 }
 
 /// RUF006
-pub(crate) fn asyncio_dangling_task(checker: &Checker, expr: &Expr) -> Option<Diagnostic> {
+pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Option<Diagnostic> {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
         return None;
     };
 
     // Ex) `asyncio.create_task(...)`
-    if let Some(method) = checker
-        .semantic()
-        .resolve_call_path(func)
-        .and_then(|call_path| match call_path.as_slice() {
-            ["asyncio", "create_task"] => Some(Method::CreateTask),
-            ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),
-            _ => None,
-        })
+    if let Some(method) =
+        semantic
+            .resolve_call_path(func)
+            .and_then(|call_path| match call_path.as_slice() {
+                ["asyncio", "create_task"] => Some(Method::CreateTask),
+                ["asyncio", "ensure_future"] => Some(Method::EnsureFuture),
+                _ => None,
+            })
     {
         return Some(Diagnostic::new(
             AsyncioDanglingTask { method },
@@ -91,7 +88,7 @@ pub(crate) fn asyncio_dangling_task(checker: &Checker, expr: &Expr) -> Option<Di
     // Ex) `loop = asyncio.get_running_loop(); loop.create_task(...)`
     if let Expr::Attribute(ast::ExprAttribute { attr, value, .. }) = func.as_ref() {
         if attr == "create_task" {
-            if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
+            if typing::resolve_assignment(value, semantic).is_some_and(|call_path| {
                 matches!(call_path.as_slice(), ["asyncio", "get_running_loop"])
             }) {
                 return Some(Diagnostic::new(
@@ -106,29 +103,24 @@ pub(crate) fn asyncio_dangling_task(checker: &Checker, expr: &Expr) -> Option<Di
     None
 }
 
-pub(crate) fn asyncio_dangling_task_unused(
-    checker: &Checker,
-    scope: &Scope,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
-    for binding in scope
-        .binding_ids()
-        .map(|binding_id| checker.semantic().binding(binding_id))
-        .filter(|binding| binding.kind.is_assignment() && !binding.is_used())
-    {
-        let Some(source) = binding.source else {
-            continue;
-        };
-        let (Stmt::Assign(ast::StmtAssign { value, .. })
-        | Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value), ..
-        })) = checker.semantic().statement(source)
-        else {
-            continue;
-        };
-        if let Some(diagnostic) = asyncio_dangling_task(checker, value) {
-            diagnostics.push(diagnostic);
+/// RUF006
+pub(crate) fn asyncio_dangling_binding(
+    binding: &Binding,
+    semantic: &SemanticModel,
+) -> Option<Diagnostic> {
+    if binding.is_used() || !binding.kind.is_assignment() {
+        return None;
+    }
+
+    let source = binding.source?;
+    match semantic.statement(source) {
+        Stmt::Assign(ast::StmtAssign { value, targets, .. }) if targets.len() == 1 => {
+            asyncio_dangling_task(value, semantic)
         }
+        Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        }) => asyncio_dangling_task(value, semantic),
+        _ => None,
     }
 }
 
