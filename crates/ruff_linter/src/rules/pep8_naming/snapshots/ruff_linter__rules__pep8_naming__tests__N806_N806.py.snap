@@ -52,6 +52,15 @@ N806.py:57:5: N806 Variable `Bad` in function should be lowercase
 56 |     Bad = apps.get_model()  # N806
 57 |     Bad = apps.get_model(model_name="Stream")  # N806
    |     ^^^ N806
+58 | 
+59 |     Address: Type = apps.get_model("zerver", variable)  # OK
+   |
+
+N806.py:60:5: N806 Variable `ValidationError` in function should be lowercase
+   |
+59 |     Address: Type = apps.get_model("zerver", variable)  # OK
+60 |     ValidationError = import_string(variable)  # N806
+   |     ^^^^^^^^^^^^^^^ N806
    |
 
 
