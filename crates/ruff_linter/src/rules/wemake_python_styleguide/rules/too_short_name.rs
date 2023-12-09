@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ruff_python_ast::{Alias, Expr, ExprAttribute, ExprName, Identifier, Parameter};
+use ruff_python_ast::{Alias, Expr, ExprAttribute, Identifier, Parameter};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -52,71 +52,68 @@ impl Violation for TooShortName {
     }
 }
 
-pub(crate) struct Checkable(Identifier);
+pub(crate) enum Checkable<'a> {
+    Identifier(&'a Identifier),
+    Parameter(&'a Parameter),
+    Alias(&'a Alias),
+    Expr(&'a Expr),
+}
 
-impl From<&Identifier> for Checkable {
-    fn from(value: &Identifier) -> Self {
-        Self(value.clone())
+impl<'a> From<&'a Identifier> for Checkable<'a> {
+    fn from(value: &'a Identifier) -> Self {
+        Checkable::Identifier(value)
     }
 }
 
-impl From<&Parameter> for Checkable {
-    fn from(value: &Parameter) -> Self {
-        (&value.name).into()
+impl<'a> From<&'a Parameter> for Checkable<'a> {
+    fn from(value: &'a Parameter) -> Self {
+        Checkable::Parameter(value)
     }
 }
 
-impl TryFrom<&Alias> for Checkable {
-    type Error = ();
-
-    fn try_from(value: &Alias) -> Result<Self, Self::Error> {
-        match value {
-            Alias {
-                asname: Some(identifier),
-                ..
-            } => Ok(identifier.into()),
-            _ => Err(()),
-        }
+impl<'a> From<&'a Alias> for Checkable<'a> {
+    fn from(value: &'a Alias) -> Self {
+        Checkable::Alias(value)
     }
 }
 
-impl TryFrom<&Expr> for Checkable {
-    type Error = ();
-
-    fn try_from(value: &Expr) -> Result<Self, Self::Error> {
-        match value {
-            Expr::Name(ExprName { id, range, .. }) => Ok(Self(Identifier::new(id, *range))),
-            Expr::Attribute(ExprAttribute { attr, .. }) => Ok(attr.into()),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<&Box<Expr>> for Checkable {
-    type Error = ();
-
-    fn try_from(value: &Box<Expr>) -> Result<Self, Self::Error> {
-        (&(**value)).try_into()
+impl<'a> From<&'a Expr> for Checkable<'a> {
+    fn from(value: &'a Expr) -> Self {
+        Checkable::Expr(value)
     }
 }
 
 /// WPS111
-pub(crate) fn too_short_name(checker: &mut Checker, node: impl TryInto<Checkable>) {
-    if let Ok(Checkable(identifier)) = node.try_into() {
+pub(crate) fn too_short_name<'a, 'b>(checker: &'a mut Checker, node: impl Into<Checkable<'b>>) {
+    if let Some((name, range)) = match node.into() {
+        Checkable::Identifier(identifier)
+        | Checkable::Parameter(Parameter {
+            name: identifier, ..
+        })
+        | Checkable::Alias(Alias {
+            asname: Some(identifier),
+            ..
+        })
+        | Checkable::Expr(Expr::Attribute(ExprAttribute {
+            attr: identifier, ..
+        })) => Some((identifier.as_str(), identifier.range())),
+        Checkable::Expr(Expr::Name(name)) => Some((name.id.as_str(), name.range())),
+        _ => None,
+    } {
         if naming::is_too_short_name(
-            identifier.as_str(),
+            name,
             checker.settings.wemake_python_styleguide.min_name_length,
             true,
         ) {
             checker.diagnostics.push(Diagnostic::new(
                 TooShortName {
-                    name: identifier.to_string(),
+                    name: name.to_string(),
                     is_module: false,
                 },
-                identifier.range(),
+                range,
             ));
         }
-    };
+    }
 }
 
 /// WPS111 (for filesystem)
