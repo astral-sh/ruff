@@ -67,13 +67,9 @@ impl Violation for AsyncioDanglingTask {
 }
 
 /// RUF006
-pub(crate) fn asyncio_dangling_task(
-    checker: &Checker,
-    expr: &Expr,
-    diagnostics: &mut Vec<Diagnostic>,
-) {
+pub(crate) fn asyncio_dangling_task(checker: &Checker, expr: &Expr) -> Option<Diagnostic> {
     let Expr::Call(ast::ExprCall { func, .. }) = expr else {
-        return;
+        return None;
     };
 
     // Ex) `asyncio.create_task(...)`
@@ -86,11 +82,10 @@ pub(crate) fn asyncio_dangling_task(
             _ => None,
         })
     {
-        diagnostics.push(Diagnostic::new(
+        return Some(Diagnostic::new(
             AsyncioDanglingTask { method },
             expr.range(),
         ));
-        return;
     }
 
     // Ex) `loop = asyncio.get_running_loop(); loop.create_task(...)`
@@ -99,7 +94,7 @@ pub(crate) fn asyncio_dangling_task(
             if typing::resolve_assignment(value, checker.semantic()).is_some_and(|call_path| {
                 matches!(call_path.as_slice(), ["asyncio", "get_running_loop"])
             }) {
-                diagnostics.push(Diagnostic::new(
+                return Some(Diagnostic::new(
                     AsyncioDanglingTask {
                         method: Method::CreateTask,
                     },
@@ -108,6 +103,7 @@ pub(crate) fn asyncio_dangling_task(
             }
         }
     }
+    None
 }
 
 pub(crate) fn asyncio_dangling_task_unused(
@@ -127,7 +123,9 @@ pub(crate) fn asyncio_dangling_task_unused(
         else {
             continue;
         };
-        asyncio_dangling_task(checker, value, diagnostics);
+        if let Some(diagnostic) = asyncio_dangling_task(checker, value) {
+            diagnostics.push(diagnostic);
+        }
     }
 }
 
