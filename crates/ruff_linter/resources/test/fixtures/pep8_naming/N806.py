@@ -55,3 +55,6 @@ def model_assign() -> None:
 
     Bad = apps.get_model()  # N806
     Bad = apps.get_model(model_name="Stream")  # N806
+
+    Address: Type = apps.get_model("zerver", variable)  # OK
+    ValidationError = import_string(variable)  # N806
