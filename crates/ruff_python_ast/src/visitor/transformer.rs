@@ -1,8 +1,8 @@
 use crate::{
     self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
-    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, Keyword, MatchCase, Operator,
-    Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt, StringLiteral,
-    TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
+    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, Keyword, MatchCase,
+    Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
+    StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for transforming ASTs. Visits all nodes in the AST recursively in evaluation-order.
@@ -39,9 +39,6 @@ pub trait Transformer {
     }
     fn visit_except_handler(&self, except_handler: &mut ExceptHandler) {
         walk_except_handler(self, except_handler);
-    }
-    fn visit_format_spec(&self, format_spec: &mut Expr) {
-        walk_format_spec(self, format_spec);
     }
     fn visit_arguments(&self, arguments: &mut Arguments) {
         walk_arguments(self, arguments);
@@ -87,6 +84,9 @@ pub trait Transformer {
     }
     fn visit_f_string(&self, f_string: &mut FString) {
         walk_f_string(self, f_string);
+    }
+    fn visit_f_string_element(&self, f_string_element: &mut FStringElement) {
+        walk_f_string_element(self, f_string_element);
     }
     fn visit_string_literal(&self, string_literal: &mut StringLiteral) {
         walk_string_literal(self, string_literal);
@@ -463,14 +463,6 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             visitor.visit_expr(func);
             visitor.visit_arguments(arguments);
         }
-        Expr::FormattedValue(ast::ExprFormattedValue {
-            value, format_spec, ..
-        }) => {
-            visitor.visit_expr(value);
-            if let Some(expr) = format_spec {
-                visitor.visit_format_spec(expr);
-            }
-        }
         Expr::FString(ast::ExprFString { value, .. }) => {
             for f_string_part in value.parts_mut() {
                 match f_string_part {
@@ -582,16 +574,6 @@ pub fn walk_except_handler<V: Transformer + ?Sized>(
             visitor.visit_body(body);
         }
     }
-}
-
-pub fn walk_f_string<V: Transformer + ?Sized>(visitor: &V, f_string: &mut FString) {
-    for expr in &mut f_string.values {
-        visitor.visit_expr(expr);
-    }
-}
-
-pub fn walk_format_spec<V: Transformer + ?Sized>(visitor: &V, format_spec: &mut Expr) {
-    visitor.visit_expr(format_spec);
 }
 
 pub fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Arguments) {
@@ -741,6 +723,31 @@ pub fn walk_pattern_keyword<V: Transformer + ?Sized>(
     pattern_keyword: &mut PatternKeyword,
 ) {
     visitor.visit_pattern(&mut pattern_keyword.pattern);
+}
+
+pub fn walk_f_string<V: Transformer + ?Sized>(visitor: &V, f_string: &mut FString) {
+    for element in &mut f_string.elements {
+        visitor.visit_f_string_element(element);
+    }
+}
+
+pub fn walk_f_string_element<V: Transformer + ?Sized>(
+    visitor: &V,
+    f_string_element: &mut FStringElement,
+) {
+    if let ast::FStringElement::Expression(ast::FStringExpressionElement {
+        expression,
+        format_spec,
+        ..
+    }) = f_string_element
+    {
+        visitor.visit_expr(expression);
+        if let Some(format_spec) = format_spec {
+            for spec_element in &mut format_spec.elements {
+                visitor.visit_f_string_element(spec_element);
+            }
+        }
+    }
 }
 
 pub fn walk_expr_context<V: Transformer + ?Sized>(_visitor: &V, _expr_context: &mut ExprContext) {}

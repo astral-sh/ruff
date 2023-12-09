@@ -30,10 +30,14 @@ nodes_file = (
 node_lines = (
     nodes_file.split("pub enum AnyNode {")[1].split("}")[0].strip().splitlines()
 )
-nodes = [
-    node_line.split("(")[1].split(")")[0].split("::")[-1].split("<")[0]
-    for node_line in node_lines
-]
+nodes = []
+for node_line in node_lines:
+    node = node_line.split("(")[1].split(")")[0].split("::")[-1].split("<")[0]
+    # These nodes aren't used in the formatter as the formatting of them is handled
+    # in one of the other nodes containing them.
+    if node in ("FStringLiteralElement", "FStringExpressionElement"):
+        continue
+    nodes.append(node)
 print(nodes)
 
 # %%

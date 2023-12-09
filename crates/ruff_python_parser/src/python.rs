@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: c7c0b9368fa05f7d2fc1d06a665ff4232555f276a1d9569afdbc86d0905b3a2a
+// sha3: 031689e389556292d9dbd8a1b1ff8ca29bac76d83f1b345630481d620b89e1c2
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::{StringType, concatenated_strings, parse_fstring_middle, parse_string_literal},
+    string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
     token::{self, StringKind},
     invalid,
 };
@@ -32,7 +32,7 @@ mod __parse__Top {
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::{StringType, concatenated_strings, parse_fstring_middle, parse_string_literal},
+    string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
     token::{self, StringKind},
     invalid,
 };
@@ -62,9 +62,9 @@ mod __parse__Top {
         Variant12(alloc::vec::Vec<ast::ParameterWithDefault>),
         Variant13((Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)),
         Variant14(core::option::Option<(Option<Box<ast::Parameter>>, Vec<ast::ParameterWithDefault>, Option<Box<ast::Parameter>>)>),
-        Variant15(ast::ParenthesizedExpr),
-        Variant16(core::option::Option<ast::ParenthesizedExpr>),
-        Variant17(alloc::vec::Vec<ast::ParenthesizedExpr>),
+        Variant15(crate::parser::ParenthesizedExpr),
+        Variant16(core::option::Option<crate::parser::ParenthesizedExpr>),
+        Variant17(alloc::vec::Vec<crate::parser::ParenthesizedExpr>),
         Variant18(ast::WithItem),
         Variant19(alloc::vec::Vec<ast::WithItem>),
         Variant20((token::Tok, ast::Identifier)),
@@ -74,23 +74,23 @@ mod __parse__Top {
         Variant24(core::option::Option<ast::Identifier>),
         Variant25(ast::Suite),
         Variant26(core::option::Option<ast::Suite>),
-        Variant27((TextSize, ast::ParenthesizedExpr, ast::Suite)),
-        Variant28(alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>),
+        Variant27((TextSize, crate::parser::ParenthesizedExpr, ast::Suite)),
+        Variant28(alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>),
         Variant29((TextSize, ast::Suite)),
         Variant30(core::option::Option<(TextSize, ast::Suite)>),
         Variant31((Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)),
         Variant32(alloc::vec::Vec<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>),
-        Variant33(Vec<ast::ParenthesizedExpr>),
-        Variant34(core::option::Option<Vec<ast::ParenthesizedExpr>>),
+        Variant33(Vec<crate::parser::ParenthesizedExpr>),
+        Variant34(core::option::Option<Vec<crate::parser::ParenthesizedExpr>>),
         Variant35(ast::Pattern),
         Variant36(alloc::vec::Vec<ast::Pattern>),
         Variant37(ast::Stmt),
         Variant38(alloc::vec::Vec<ast::Stmt>),
-        Variant39((ast::ParenthesizedExpr, ast::Identifier)),
+        Variant39((crate::parser::ParenthesizedExpr, ast::Identifier)),
         Variant40(Vec<ast::WithItem>),
         Variant41(core::option::Option<Vec<ast::WithItem>>),
-        Variant42((ast::CmpOp, ast::ParenthesizedExpr)),
-        Variant43(alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>),
+        Variant42((ast::CmpOp, crate::parser::ParenthesizedExpr)),
+        Variant43(alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>),
         Variant44(ast::Expr),
         Variant45(core::option::Option<ast::Expr>),
         Variant46(ast::Parameters),
@@ -106,10 +106,10 @@ mod __parse__Top {
         Variant56(ast::CmpOp),
         Variant57(ast::Decorator),
         Variant58(alloc::vec::Vec<ast::Decorator>),
-        Variant59((Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)),
-        Variant60((ast::ParenthesizedExpr, ast::ParenthesizedExpr)),
-        Variant61(Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>),
-        Variant62(core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>),
+        Variant59((Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)),
+        Variant60((crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr)),
+        Variant61(Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>),
+        Variant62(core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>),
         Variant63(ast::Parameter),
         Variant64(core::option::Option<ast::Parameter>),
         Variant65(ast::ExceptHandler),
@@ -117,38 +117,41 @@ mod __parse__Top {
         Variant67((TextSize, ast::ConversionFlag)),
         Variant68(core::option::Option<(TextSize, ast::ConversionFlag)>),
         Variant69(StringType),
-        Variant70(alloc::vec::Vec<ast::Expr>),
-        Variant71(core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>),
-        Variant72(ast::Alias),
-        Variant73(Vec<ast::Alias>),
-        Variant74(u32),
-        Variant75(alloc::vec::Vec<u32>),
-        Variant76((Option<u32>, Option<ast::Identifier>)),
-        Variant77(ast::MatchCase),
-        Variant78(alloc::vec::Vec<ast::MatchCase>),
-        Variant79(ast::PatternKeyword),
-        Variant80((ast::Expr, ast::Pattern)),
-        Variant81(ast::Number),
-        Variant82(Vec<ast::Identifier>),
-        Variant83(Vec<ast::PatternKeyword>),
-        Variant84(Vec<(ast::Expr, ast::Pattern)>),
-        Variant85(Vec<ast::ParameterWithDefault>),
-        Variant86(Vec<ast::TypeParam>),
-        Variant87((Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)),
-        Variant88(core::option::Option<ast::Pattern>),
-        Variant89(ast::PatternArguments),
-        Variant90(ast::Comprehension),
-        Variant91(alloc::vec::Vec<ast::Comprehension>),
-        Variant92(Option<ast::ParenthesizedExpr>),
-        Variant93(core::option::Option<Option<ast::ParenthesizedExpr>>),
-        Variant94(Vec<ast::Stmt>),
-        Variant95(ast::Mod),
-        Variant96(Vec<StringType>),
-        Variant97(ast::TypeParam),
-        Variant98(ast::TypeParams),
-        Variant99(core::option::Option<ast::TypeParams>),
-        Variant100(ast::UnaryOp),
-        Variant101(core::option::Option<(String, bool)>),
+        Variant70(ast::FStringFormatSpec),
+        Variant71(core::option::Option<ast::FStringFormatSpec>),
+        Variant72(ast::FStringElement),
+        Variant73(alloc::vec::Vec<ast::FStringElement>),
+        Variant74(core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>),
+        Variant75(ast::Alias),
+        Variant76(Vec<ast::Alias>),
+        Variant77(u32),
+        Variant78(alloc::vec::Vec<u32>),
+        Variant79((Option<u32>, Option<ast::Identifier>)),
+        Variant80(ast::MatchCase),
+        Variant81(alloc::vec::Vec<ast::MatchCase>),
+        Variant82(ast::PatternKeyword),
+        Variant83((ast::Expr, ast::Pattern)),
+        Variant84(ast::Number),
+        Variant85(Vec<ast::Identifier>),
+        Variant86(Vec<ast::PatternKeyword>),
+        Variant87(Vec<(ast::Expr, ast::Pattern)>),
+        Variant88(Vec<ast::ParameterWithDefault>),
+        Variant89(Vec<ast::TypeParam>),
+        Variant90((Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>)),
+        Variant91(core::option::Option<ast::Pattern>),
+        Variant92(ast::PatternArguments),
+        Variant93(ast::Comprehension),
+        Variant94(alloc::vec::Vec<ast::Comprehension>),
+        Variant95(Option<crate::parser::ParenthesizedExpr>),
+        Variant96(core::option::Option<Option<crate::parser::ParenthesizedExpr>>),
+        Variant97(Vec<ast::Stmt>),
+        Variant98(ast::Mod),
+        Variant99(Vec<StringType>),
+        Variant100(ast::TypeParam),
+        Variant101(ast::TypeParams),
+        Variant102(core::option::Option<ast::TypeParams>),
+        Variant103(ast::UnaryOp),
+        Variant104(core::option::Option<(String, bool)>),
     }
     const __ACTION: &[i16] = &[
         // State 0
@@ -13866,7 +13869,7 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant72(__nt), __end));
                 (1, 144)
             }
             374 => {
@@ -13885,7 +13888,7 @@ mod __parse__Top {
                 // FStringReplacementField = "{", TestListOrYieldExpr, "=", FStringConversion, FStringFormatSpecSuffix, "}" => ActionFn(1581);
                 assert!(__symbols.len() >= 6);
                 let __sym5 = __pop_Variant0(__symbols);
-                let __sym4 = __pop_Variant44(__symbols);
+                let __sym4 = __pop_Variant70(__symbols);
                 let __sym3 = __pop_Variant67(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant15(__symbols);
@@ -13896,7 +13899,7 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant72(__nt), __end));
                 (6, 147)
             }
             379 => {
@@ -13913,14 +13916,14 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant72(__nt), __end));
                 (5, 147)
             }
             380 => {
                 // FStringReplacementField = "{", TestListOrYieldExpr, "=", FStringFormatSpecSuffix, "}" => ActionFn(1583);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant44(__symbols);
+                let __sym3 = __pop_Variant70(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant15(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
@@ -13930,7 +13933,7 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant72(__nt), __end));
                 (5, 147)
             }
             381 => {
@@ -13946,14 +13949,14 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant72(__nt), __end));
                 (4, 147)
             }
             382 => {
                 // FStringReplacementField = "{", TestListOrYieldExpr, FStringConversion, FStringFormatSpecSuffix, "}" => ActionFn(1585);
                 assert!(__symbols.len() >= 5);
                 let __sym4 = __pop_Variant0(__symbols);
-                let __sym3 = __pop_Variant44(__symbols);
+                let __sym3 = __pop_Variant70(__symbols);
                 let __sym2 = __pop_Variant67(__symbols);
                 let __sym1 = __pop_Variant15(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
@@ -13963,7 +13966,7 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant72(__nt), __end));
                 (5, 147)
             }
             383 => {
@@ -13979,14 +13982,14 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant72(__nt), __end));
                 (4, 147)
             }
             384 => {
                 // FStringReplacementField = "{", TestListOrYieldExpr, FStringFormatSpecSuffix, "}" => ActionFn(1587);
                 assert!(__symbols.len() >= 4);
                 let __sym3 = __pop_Variant0(__symbols);
-                let __sym2 = __pop_Variant44(__symbols);
+                let __sym2 = __pop_Variant70(__symbols);
                 let __sym1 = __pop_Variant15(__symbols);
                 let __sym0 = __pop_Variant0(__symbols);
                 let __start = __sym0.0;
@@ -13995,7 +13998,7 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant72(__nt), __end));
                 (4, 147)
             }
             385 => {
@@ -14010,7 +14013,7 @@ mod __parse__Top {
                     Ok(v) => v,
                     Err(e) => return Some(Err(e)),
                 };
-                __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+                __symbols.push((__start, __Symbol::Variant72(__nt), __end));
                 (3, 147)
             }
             386 => {
@@ -14360,7 +14363,7 @@ mod __parse__Top {
             }
             474 => {
                 // LiteralPattern = TwoOrMore<StringLiteral> => ActionFn(1354);
-                let __sym0 = __pop_Variant96(__symbols);
+                let __sym0 = __pop_Variant99(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
                 let __nt = match super::__action1354::<>(source_code, mode, __sym0) {
@@ -14670,7 +14673,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1607::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -14691,7 +14694,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1608::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -14713,7 +14716,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
                 let __nt = match super::__action1609::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
@@ -14731,7 +14734,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1610::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -14751,7 +14754,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1611::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -14772,7 +14775,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1612::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -14792,7 +14795,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1613::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -14814,7 +14817,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
                 let __nt = match super::__action1614::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
@@ -14837,7 +14840,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym10.2;
                 let __nt = match super::__action1615::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
@@ -14856,7 +14859,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1616::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -14877,7 +14880,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1617::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -14899,7 +14902,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
                 let __nt = match super::__action1618::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
@@ -14916,7 +14919,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1619::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -14935,7 +14938,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1620::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -14955,7 +14958,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1621::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -14971,7 +14974,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1622::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -14989,7 +14992,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1623::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -15008,7 +15011,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1624::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -15026,7 +15029,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1625::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -15046,7 +15049,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1626::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -15067,7 +15070,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1627::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -15084,7 +15087,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1628::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -15103,7 +15106,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1629::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -15123,7 +15126,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1630::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -15137,7 +15140,7 @@ mod __parse__Top {
                 // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>>, "," => ActionFn(1631);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
                 let __nt = match super::__action1631::<>(source_code, mode, __sym0, __sym1) {
@@ -15153,7 +15156,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1632::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -15170,7 +15173,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1633::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -15188,7 +15191,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1634::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -15208,7 +15211,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1635::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -15229,7 +15232,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1636::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -15246,7 +15249,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1637::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -15265,7 +15268,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1638::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -15285,7 +15288,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1639::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -15304,7 +15307,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1640::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -15325,7 +15328,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1641::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -15347,7 +15350,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
                 let __nt = match super::__action1642::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
@@ -15365,7 +15368,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1643::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -15385,7 +15388,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1644::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -15406,7 +15409,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1645::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -15422,7 +15425,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1646::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -15440,7 +15443,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1647::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -15459,7 +15462,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1648::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -15474,7 +15477,7 @@ mod __parse__Top {
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
                 let __nt = match super::__action1649::<>(source_code, mode, __sym0, __sym1, __sym2) {
@@ -15491,7 +15494,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1650::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -15509,7 +15512,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1651::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -15526,7 +15529,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1652::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -15545,7 +15548,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1653::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -15565,7 +15568,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1654::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -15581,7 +15584,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1655::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -15599,7 +15602,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1656::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -15618,7 +15621,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1657::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -15630,7 +15633,7 @@ mod __parse__Top {
             }
             623 => {
                 // ParameterList<TypedParameter, StarTypedParameter, DoubleStarTypedParameter> = OneOrMore<ParameterDef<TypedParameter>> => ActionFn(1658);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
                 let __nt = match super::__action1658::<>(source_code, mode, __sym0) {
@@ -15645,7 +15648,7 @@ mod __parse__Top {
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
                 let __nt = match super::__action1659::<>(source_code, mode, __sym0, __sym1, __sym2) {
@@ -15661,7 +15664,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1660::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -15677,7 +15680,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1661::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -15695,7 +15698,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1662::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -15714,7 +15717,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1663::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -15729,7 +15732,7 @@ mod __parse__Top {
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
                 let __nt = match super::__action1664::<>(source_code, mode, __sym0, __sym1, __sym2) {
@@ -15746,7 +15749,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1665::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -15764,7 +15767,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1666::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16036,7 +16039,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1667::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16057,7 +16060,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1668::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -16079,7 +16082,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
                 let __nt = match super::__action1669::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
@@ -16097,7 +16100,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1670::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16117,7 +16120,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1671::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -16138,7 +16141,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1672::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -16158,7 +16161,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1673::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -16180,7 +16183,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
                 let __nt = match super::__action1674::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
@@ -16203,7 +16206,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym10.2;
                 let __nt = match super::__action1675::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9, __sym10) {
@@ -16222,7 +16225,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1676::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16243,7 +16246,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1677::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -16265,7 +16268,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
                 let __nt = match super::__action1678::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
@@ -16282,7 +16285,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1679::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -16301,7 +16304,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1680::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16321,7 +16324,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1681::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -16337,7 +16340,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1682::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -16355,7 +16358,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1683::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16374,7 +16377,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1684::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16392,7 +16395,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1685::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16412,7 +16415,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1686::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -16433,7 +16436,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1687::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -16450,7 +16453,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1688::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -16469,7 +16472,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1689::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16489,7 +16492,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1690::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -16503,7 +16506,7 @@ mod __parse__Top {
                 // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>>, "," => ActionFn(1691);
                 assert!(__symbols.len() >= 2);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym1.2;
                 let __nt = match super::__action1691::<>(source_code, mode, __sym0, __sym1) {
@@ -16519,7 +16522,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1692::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -16536,7 +16539,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1693::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -16554,7 +16557,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1694::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16574,7 +16577,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1695::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -16595,7 +16598,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1696::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -16612,7 +16615,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1697::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -16631,7 +16634,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1698::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16651,7 +16654,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1699::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -16670,7 +16673,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1700::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16691,7 +16694,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1701::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -16713,7 +16716,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym9.2;
                 let __nt = match super::__action1702::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8, __sym9) {
@@ -16731,7 +16734,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1703::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16751,7 +16754,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1704::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -16772,7 +16775,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym8.2;
                 let __nt = match super::__action1705::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7, __sym8) {
@@ -16788,7 +16791,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1706::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -16806,7 +16809,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1707::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16825,7 +16828,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1708::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16840,7 +16843,7 @@ mod __parse__Top {
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
                 let __nt = match super::__action1709::<>(source_code, mode, __sym0, __sym1, __sym2) {
@@ -16857,7 +16860,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1710::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -16875,7 +16878,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1711::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16892,7 +16895,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant63(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1712::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -16911,7 +16914,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1713::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16931,7 +16934,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym7.2;
                 let __nt = match super::__action1714::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6, __sym7) {
@@ -16947,7 +16950,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1715::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -16965,7 +16968,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1716::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -16984,7 +16987,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1717::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -16996,7 +16999,7 @@ mod __parse__Top {
             }
             701 => {
                 // ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>> => ActionFn(1718);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
                 let __nt = match super::__action1718::<>(source_code, mode, __sym0) {
@@ -17011,7 +17014,7 @@ mod __parse__Top {
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
                 let __nt = match super::__action1719::<>(source_code, mode, __sym0, __sym1, __sym2) {
@@ -17027,7 +17030,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1720::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -17043,7 +17046,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym3.2;
                 let __nt = match super::__action1721::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3) {
@@ -17061,7 +17064,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1722::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -17080,7 +17083,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym6.2;
                 let __nt = match super::__action1723::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5, __sym6) {
@@ -17095,7 +17098,7 @@ mod __parse__Top {
                 assert!(__symbols.len() >= 3);
                 let __sym2 = __pop_Variant9(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym2.2;
                 let __nt = match super::__action1724::<>(source_code, mode, __sym0, __sym1, __sym2) {
@@ -17112,7 +17115,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant0(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym4.2;
                 let __nt = match super::__action1725::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4) {
@@ -17130,7 +17133,7 @@ mod __parse__Top {
                 let __sym3 = __pop_Variant12(__symbols);
                 let __sym2 = __pop_Variant0(__symbols);
                 let __sym1 = __pop_Variant0(__symbols);
-                let __sym0 = __pop_Variant85(__symbols);
+                let __sym0 = __pop_Variant88(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym5.2;
                 let __nt = match super::__action1726::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5) {
@@ -17932,7 +17935,7 @@ mod __parse__Top {
             }
             836 => {
                 // String = TwoOrMore<StringLiteralOrFString> => ActionFn(1493);
-                let __sym0 = __pop_Variant96(__symbols);
+                let __sym0 = __pop_Variant99(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
                 let __nt = match super::__action1493::<>(source_code, mode, __sym0) {
@@ -18295,7 +18298,7 @@ mod __parse__Top {
             }
             951 => {
                 // __Top = Top => ActionFn(0);
-                let __sym0 = __pop_Variant95(__symbols);
+                let __sym0 = __pop_Variant98(__symbols);
                 let __start = __sym0.0;
                 let __end = __sym0.2;
                 let __nt = super::__action0::<>(source_code, mode, __sym0);
@@ -18353,20 +18356,20 @@ mod __parse__Top {
     fn __pop_Variant59<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr), TextSize)
+    ) -> (TextSize, (Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant59(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant76<
+    fn __pop_Variant79<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, (Option<u32>, Option<ast::Identifier>), TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant76(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant79(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18400,16 +18403,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant27<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (TextSize, ast::ParenthesizedExpr, ast::Suite), TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant27(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant29<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18420,40 +18413,50 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant87<
+    fn __pop_Variant27<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, (TextSize, crate::parser::ParenthesizedExpr, ast::Suite), TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant27(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant90<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, (Vec<ast::ParameterWithDefault>, Vec<ast::ParameterWithDefault>), TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant87(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant90(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
     fn __pop_Variant42<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (ast::CmpOp, ast::ParenthesizedExpr), TextSize)
+    ) -> (TextSize, (ast::CmpOp, crate::parser::ParenthesizedExpr), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant42(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant80<
+    fn __pop_Variant83<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, (ast::Expr, ast::Pattern), TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant80(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant83(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
     fn __pop_Variant39<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (ast::ParenthesizedExpr, ast::Identifier), TextSize)
+    ) -> (TextSize, (crate::parser::ParenthesizedExpr, ast::Identifier), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant39(__v), __r)) => (__l, __v, __r),
@@ -18463,7 +18466,7 @@ mod __parse__Top {
     fn __pop_Variant60<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (ast::ParenthesizedExpr, ast::ParenthesizedExpr), TextSize)
+    ) -> (TextSize, (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr), TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant60(__v), __r)) => (__l, __v, __r),
@@ -18510,13 +18513,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant92<
+    fn __pop_Variant95<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, Option<ast::ParenthesizedExpr>, TextSize)
+    ) -> (TextSize, Option<crate::parser::ParenthesizedExpr>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant92(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant95(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18563,40 +18566,40 @@ mod __parse__Top {
     fn __pop_Variant61<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize)
+    ) -> (TextSize, Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant61(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant84<
+    fn __pop_Variant87<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<(ast::Expr, ast::Pattern)>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant84(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant87(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant96<
+    fn __pop_Variant99<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<StringType>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant96(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant99(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant73<
+    fn __pop_Variant76<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::Alias>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant73(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant76(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18610,33 +18613,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant82<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, Vec<ast::Identifier>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant82(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant85<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, Vec<ast::ParameterWithDefault>, TextSize)
+    ) -> (TextSize, Vec<ast::Identifier>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant85(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant33<
+    fn __pop_Variant88<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, Vec<ast::ParenthesizedExpr>, TextSize)
+    ) -> (TextSize, Vec<ast::ParameterWithDefault>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant33(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant88(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18650,33 +18643,33 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant83<
+    fn __pop_Variant86<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::PatternKeyword>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant83(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant86(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant94<
+    fn __pop_Variant97<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::Stmt>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant94(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant97(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant86<
+    fn __pop_Variant89<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, Vec<ast::TypeParam>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant86(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant89(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18687,6 +18680,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant40(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant33<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant33(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18703,7 +18706,7 @@ mod __parse__Top {
     fn __pop_Variant28<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>, TextSize)
+    ) -> (TextSize, alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant28(__v), __r)) => (__l, __v, __r),
@@ -18713,7 +18716,7 @@ mod __parse__Top {
     fn __pop_Variant43<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>, TextSize)
+    ) -> (TextSize, alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant43(__v), __r)) => (__l, __v, __r),
@@ -18730,13 +18733,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant91<
+    fn __pop_Variant94<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, alloc::vec::Vec<ast::Comprehension>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant91(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant94(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18760,23 +18763,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant70<
+    fn __pop_Variant73<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, alloc::vec::Vec<ast::Expr>, TextSize)
+    ) -> (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant70(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant73(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant78<
+    fn __pop_Variant81<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, alloc::vec::Vec<ast::MatchCase>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant78(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant81(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18787,16 +18790,6 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant12(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant17<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant17(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18830,6 +18823,16 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
+    fn __pop_Variant17<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant17(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
     fn __pop_Variant22<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18840,23 +18843,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant75<
+    fn __pop_Variant78<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, alloc::vec::Vec<u32>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant75(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant78(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant72<
+    fn __pop_Variant75<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::Alias, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant72(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant75(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18880,13 +18883,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant90<
+    fn __pop_Variant93<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::Comprehension, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant90(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant93(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -18920,6 +18923,26 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
+    fn __pop_Variant72<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, ast::FStringElement, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant72(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant70<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, ast::FStringFormatSpec, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant70(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
     fn __pop_Variant23<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18930,33 +18953,33 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant77<
+    fn __pop_Variant80<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::MatchCase, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant77(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant80(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant95<
+    fn __pop_Variant98<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::Mod, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant95(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant98(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant81<
+    fn __pop_Variant84<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::Number, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant81(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant84(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19000,16 +19023,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant15<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, ast::ParenthesizedExpr, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant15(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant35<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -19020,23 +19033,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant89<
+    fn __pop_Variant92<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::PatternArguments, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant89(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant92(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant79<
+    fn __pop_Variant82<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::PatternKeyword, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant79(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant82(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19060,33 +19073,33 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant97<
+    fn __pop_Variant100<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::TypeParam, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant97(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant100(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant98<
+    fn __pop_Variant101<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::TypeParams, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant98(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant101(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant100<
+    fn __pop_Variant103<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, ast::UnaryOp, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant100(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant103(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19100,13 +19113,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant71<
+    fn __pop_Variant74<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, core::option::Option<(Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant71(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant74(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19120,13 +19133,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant101<
+    fn __pop_Variant104<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, core::option::Option<(String, bool)>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant101(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant104(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19160,20 +19173,20 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant93<
+    fn __pop_Variant96<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<Option<ast::ParenthesizedExpr>>, TextSize)
+    ) -> (TextSize, core::option::Option<Option<crate::parser::ParenthesizedExpr>>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant93(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant96(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
     fn __pop_Variant62<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>, TextSize)
+    ) -> (TextSize, core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>, TextSize)
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant62(__v), __r)) => (__l, __v, __r),
@@ -19190,16 +19203,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant34<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant34(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant41<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -19207,6 +19210,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant41(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant34<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant34(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19227,6 +19240,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant45(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant71<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant71(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19260,23 +19283,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant16<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant16(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
-    fn __pop_Variant88<
+    fn __pop_Variant91<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, core::option::Option<ast::Pattern>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant88(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant91(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19290,13 +19303,23 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant99<
+    fn __pop_Variant102<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, core::option::Option<ast::TypeParams>, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant99(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant102(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant16<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant16(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19307,6 +19330,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant8(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant15<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, crate::parser::ParenthesizedExpr, TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant15(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -19330,13 +19363,13 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant74<
+    fn __pop_Variant77<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
     ) -> (TextSize, u32, TextSize)
      {
         match __symbols.pop() {
-            Some((__l, __Symbol::Variant74(__v), __r)) => (__l, __v, __r),
+            Some((__l, __Symbol::Variant77(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -21983,7 +22016,7 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // Atom<"all"> = Number => ActionFn(1239);
-        let __sym0 = __pop_Variant81(__symbols);
+        let __sym0 = __pop_Variant84(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1239::<>(source_code, mode, __sym0);
@@ -22364,7 +22397,7 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // Atom<"no-withitems"> = Number => ActionFn(1265);
-        let __sym0 = __pop_Variant81(__symbols);
+        let __sym0 = __pop_Variant84(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1265::<>(source_code, mode, __sym0);
@@ -23155,7 +23188,7 @@ mod __parse__Top {
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant50(__symbols);
-        let __sym2 = __pop_Variant98(__symbols);
+        let __sym2 = __pop_Variant101(__symbols);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -23200,7 +23233,7 @@ mod __parse__Top {
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant50(__symbols);
-        let __sym3 = __pop_Variant98(__symbols);
+        let __sym3 = __pop_Variant101(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant58(__symbols);
@@ -23246,7 +23279,7 @@ mod __parse__Top {
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant25(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant98(__symbols);
+        let __sym2 = __pop_Variant101(__symbols);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -23289,7 +23322,7 @@ mod __parse__Top {
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant98(__symbols);
+        let __sym3 = __pop_Variant101(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant58(__symbols);
@@ -23332,7 +23365,7 @@ mod __parse__Top {
     {
         // ClassPattern = MatchName, PatternArguments => ActionFn(1298);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant89(__symbols);
+        let __sym1 = __pop_Variant92(__symbols);
         let __sym0 = __pop_Variant44(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
@@ -23351,7 +23384,7 @@ mod __parse__Top {
     {
         // ClassPattern = MatchNameOrAttr, PatternArguments => ActionFn(1299);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant89(__symbols);
+        let __sym1 = __pop_Variant92(__symbols);
         let __sym0 = __pop_Variant44(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
@@ -23626,7 +23659,7 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // CompFor = SingleForComprehension+ => ActionFn(237);
-        let __sym0 = __pop_Variant91(__symbols);
+        let __sym0 = __pop_Variant94(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action237::<>(source_code, mode, __sym0);
@@ -24899,7 +24932,7 @@ mod __parse__Top {
         // FStringExpr = FStringStart, FStringMiddlePattern+, FStringEnd => ActionFn(1590);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant70(__symbols);
+        let __sym1 = __pop_Variant73(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
@@ -24920,7 +24953,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action1591::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (0, 141)
     }
     pub(crate) fn __reduce368<
@@ -24933,11 +24966,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringFormatSpec = FStringMiddlePattern+ => ActionFn(1592);
-        let __sym0 = __pop_Variant70(__symbols);
+        let __sym0 = __pop_Variant73(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1592::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (1, 141)
     }
     pub(crate) fn __reduce369<
@@ -24951,12 +24984,12 @@ mod __parse__Top {
     {
         // FStringFormatSpecSuffix = ":", FStringFormatSpec => ActionFn(222);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant44(__symbols);
+        let __sym1 = __pop_Variant70(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action222::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
         (2, 142)
     }
     pub(crate) fn __reduce370<
@@ -24969,11 +25002,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringFormatSpecSuffix? = FStringFormatSpecSuffix => ActionFn(267);
-        let __sym0 = __pop_Variant44(__symbols);
+        let __sym0 = __pop_Variant70(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action267::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant45(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (1, 143)
     }
     pub(crate) fn __reduce371<
@@ -24989,7 +25022,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action268::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant45(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
         (0, 143)
     }
     pub(crate) fn __reduce372<
@@ -25002,11 +25035,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringMiddlePattern = FStringReplacementField => ActionFn(219);
-        let __sym0 = __pop_Variant44(__symbols);
+        let __sym0 = __pop_Variant72(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action219::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant44(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
         (1, 144)
     }
     pub(crate) fn __reduce374<
@@ -25022,7 +25055,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action273::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (0, 145)
     }
     pub(crate) fn __reduce375<
@@ -25035,11 +25068,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringMiddlePattern* = FStringMiddlePattern+ => ActionFn(274);
-        let __sym0 = __pop_Variant70(__symbols);
+        let __sym0 = __pop_Variant73(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action274::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (1, 145)
     }
     pub(crate) fn __reduce376<
@@ -25052,11 +25085,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // FStringMiddlePattern+ = FStringMiddlePattern => ActionFn(456);
-        let __sym0 = __pop_Variant44(__symbols);
+        let __sym0 = __pop_Variant72(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action456::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (1, 146)
     }
     pub(crate) fn __reduce377<
@@ -25070,12 +25103,12 @@ mod __parse__Top {
     {
         // FStringMiddlePattern+ = FStringMiddlePattern+, FStringMiddlePattern => ActionFn(457);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant44(__symbols);
-        let __sym0 = __pop_Variant70(__symbols);
+        let __sym1 = __pop_Variant72(__symbols);
+        let __sym0 = __pop_Variant73(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action457::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant70(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
         (2, 146)
     }
     pub(crate) fn __reduce386<
@@ -25090,7 +25123,7 @@ mod __parse__Top {
         // Factor<"all"> = UnaryOp, Factor<"all"> => ActionFn(1318);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
-        let __sym0 = __pop_Variant100(__symbols);
+        let __sym0 = __pop_Variant103(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1318::<>(source_code, mode, __sym0, __sym1);
@@ -25126,7 +25159,7 @@ mod __parse__Top {
         // Factor<"no-withitems"> = UnaryOp, Factor<"all"> => ActionFn(1319);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant15(__symbols);
-        let __sym0 = __pop_Variant100(__symbols);
+        let __sym0 = __pop_Variant103(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1319::<>(source_code, mode, __sym0, __sym1);
@@ -25370,7 +25403,7 @@ mod __parse__Top {
         let __sym6 = __pop_Variant15(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant46(__symbols);
-        let __sym3 = __pop_Variant98(__symbols);
+        let __sym3 = __pop_Variant101(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
@@ -25421,7 +25454,7 @@ mod __parse__Top {
         let __sym7 = __pop_Variant15(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant46(__symbols);
-        let __sym4 = __pop_Variant98(__symbols);
+        let __sym4 = __pop_Variant101(__symbols);
         let __sym3 = __pop_Variant23(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
@@ -25472,7 +25505,7 @@ mod __parse__Top {
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant46(__symbols);
-        let __sym3 = __pop_Variant98(__symbols);
+        let __sym3 = __pop_Variant101(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
@@ -25519,7 +25552,7 @@ mod __parse__Top {
         let __sym7 = __pop_Variant25(__symbols);
         let __sym6 = __pop_Variant0(__symbols);
         let __sym5 = __pop_Variant46(__symbols);
-        let __sym4 = __pop_Variant98(__symbols);
+        let __sym4 = __pop_Variant101(__symbols);
         let __sym3 = __pop_Variant23(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
@@ -25570,7 +25603,7 @@ mod __parse__Top {
         let __sym5 = __pop_Variant15(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant46(__symbols);
-        let __sym2 = __pop_Variant98(__symbols);
+        let __sym2 = __pop_Variant101(__symbols);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -25619,7 +25652,7 @@ mod __parse__Top {
         let __sym6 = __pop_Variant15(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant46(__symbols);
-        let __sym3 = __pop_Variant98(__symbols);
+        let __sym3 = __pop_Variant101(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant58(__symbols);
@@ -25668,7 +25701,7 @@ mod __parse__Top {
         let __sym5 = __pop_Variant25(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant46(__symbols);
-        let __sym2 = __pop_Variant98(__symbols);
+        let __sym2 = __pop_Variant101(__symbols);
         let __sym1 = __pop_Variant23(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -25713,7 +25746,7 @@ mod __parse__Top {
         let __sym6 = __pop_Variant25(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant46(__symbols);
-        let __sym3 = __pop_Variant98(__symbols);
+        let __sym3 = __pop_Variant101(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant58(__symbols);
@@ -25854,7 +25887,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action467::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (1, 154)
     }
     pub(crate) fn __reduce422<
@@ -25870,7 +25903,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action468::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant71(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
         (0, 154)
     }
     pub(crate) fn __reduce423<
@@ -25956,7 +25989,7 @@ mod __parse__Top {
     {
         // GlobalStatement = "global", OneOrMore<Identifier> => ActionFn(1332);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant82(__symbols);
+        let __sym1 = __pop_Variant85(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
@@ -26109,7 +26142,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1334::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (3, 161)
     }
     pub(crate) fn __reduce435<
@@ -26126,7 +26159,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1335::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (1, 161)
     }
     pub(crate) fn __reduce436<
@@ -26146,7 +26179,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1336::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (3, 162)
     }
     pub(crate) fn __reduce437<
@@ -26163,7 +26196,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1337::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant72(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
         (1, 162)
     }
     pub(crate) fn __reduce438<
@@ -26176,11 +26209,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ImportAsNames = OneOrMore<ImportAsAlias<Identifier>> => ActionFn(1338);
-        let __sym0 = __pop_Variant73(__symbols);
+        let __sym0 = __pop_Variant76(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1338::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (1, 163)
     }
     pub(crate) fn __reduce439<
@@ -26196,12 +26229,12 @@ mod __parse__Top {
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant73(__symbols);
+        let __sym1 = __pop_Variant76(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1339::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (4, 163)
     }
     pub(crate) fn __reduce440<
@@ -26216,12 +26249,12 @@ mod __parse__Top {
         // ImportAsNames = "(", OneOrMore<ImportAsAlias<Identifier>>, ")" => ActionFn(1340);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant73(__symbols);
+        let __sym1 = __pop_Variant76(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1340::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (3, 163)
     }
     pub(crate) fn __reduce441<
@@ -26238,7 +26271,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1341::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (1, 163)
     }
     pub(crate) fn __reduce442<
@@ -26255,7 +26288,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action64::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
         (1, 164)
     }
     pub(crate) fn __reduce443<
@@ -26272,7 +26305,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action65::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant74(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
         (1, 164)
     }
     pub(crate) fn __reduce444<
@@ -26288,7 +26321,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action391::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
         (0, 165)
     }
     pub(crate) fn __reduce445<
@@ -26301,11 +26334,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ImportDots* = ImportDots+ => ActionFn(392);
-        let __sym0 = __pop_Variant75(__symbols);
+        let __sym0 = __pop_Variant78(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action392::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
         (1, 165)
     }
     pub(crate) fn __reduce446<
@@ -26318,11 +26351,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ImportDots+ = ImportDots => ActionFn(389);
-        let __sym0 = __pop_Variant74(__symbols);
+        let __sym0 = __pop_Variant77(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action389::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
         (1, 166)
     }
     pub(crate) fn __reduce447<
@@ -26336,12 +26369,12 @@ mod __parse__Top {
     {
         // ImportDots+ = ImportDots+, ImportDots => ActionFn(390);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant74(__symbols);
-        let __sym0 = __pop_Variant75(__symbols);
+        let __sym1 = __pop_Variant77(__symbols);
+        let __sym0 = __pop_Variant78(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action390::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant75(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
         (2, 166)
     }
     pub(crate) fn __reduce448<
@@ -26358,7 +26391,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1601::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant79(__nt), __end));
         (1, 167)
     }
     pub(crate) fn __reduce449<
@@ -26373,11 +26406,11 @@ mod __parse__Top {
         // ImportFromLocation = ImportDots+, DottedName => ActionFn(1602);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant23(__symbols);
-        let __sym0 = __pop_Variant75(__symbols);
+        let __sym0 = __pop_Variant78(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1602::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant79(__nt), __end));
         (2, 167)
     }
     pub(crate) fn __reduce450<
@@ -26390,11 +26423,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ImportFromLocation = ImportDots+ => ActionFn(63);
-        let __sym0 = __pop_Variant75(__symbols);
+        let __sym0 = __pop_Variant78(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action63::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant79(__nt), __end));
         (1, 167)
     }
     pub(crate) fn __reduce451<
@@ -26408,7 +26441,7 @@ mod __parse__Top {
     {
         // ImportStatement = "import", OneOrMore<ImportAsAlias<DottedName>> => ActionFn(1342);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant73(__symbols);
+        let __sym1 = __pop_Variant76(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
@@ -26427,9 +26460,9 @@ mod __parse__Top {
     {
         // ImportStatement = "from", ImportFromLocation, "import", ImportAsNames => ActionFn(1343);
         assert!(__symbols.len() >= 4);
-        let __sym3 = __pop_Variant73(__symbols);
+        let __sym3 = __pop_Variant76(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant76(__symbols);
+        let __sym1 = __pop_Variant79(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
@@ -26831,7 +26864,7 @@ mod __parse__Top {
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant84(__symbols);
+        let __sym1 = __pop_Variant87(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
@@ -26851,7 +26884,7 @@ mod __parse__Top {
         // MappingPattern = "{", OneOrMore<MatchMappingEntry>, "}" => ActionFn(1360);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant84(__symbols);
+        let __sym1 = __pop_Variant87(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
@@ -26918,7 +26951,7 @@ mod __parse__Top {
         let __sym4 = __pop_Variant23(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant84(__symbols);
+        let __sym1 = __pop_Variant87(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym6.2;
@@ -26941,7 +26974,7 @@ mod __parse__Top {
         let __sym4 = __pop_Variant23(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant84(__symbols);
+        let __sym1 = __pop_Variant87(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
@@ -26968,7 +27001,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym4.2;
         let __nt = super::__action1223::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant80(__nt), __end));
         (5, 180)
     }
     pub(crate) fn __reduce490<
@@ -26989,7 +27022,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1224::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant77(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant80(__nt), __end));
         (4, 180)
     }
     pub(crate) fn __reduce491<
@@ -27002,11 +27035,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // MatchCase+ = MatchCase => ActionFn(369);
-        let __sym0 = __pop_Variant77(__symbols);
+        let __sym0 = __pop_Variant80(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action369::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant81(__nt), __end));
         (1, 181)
     }
     pub(crate) fn __reduce492<
@@ -27020,12 +27053,12 @@ mod __parse__Top {
     {
         // MatchCase+ = MatchCase+, MatchCase => ActionFn(370);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant77(__symbols);
-        let __sym0 = __pop_Variant78(__symbols);
+        let __sym1 = __pop_Variant80(__symbols);
+        let __sym0 = __pop_Variant81(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action370::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant78(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant81(__nt), __end));
         (2, 181)
     }
     pub(crate) fn __reduce493<
@@ -27045,7 +27078,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1365::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant79(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant82(__nt), __end));
         (3, 182)
     }
     pub(crate) fn __reduce494<
@@ -27065,7 +27098,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action134::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant80(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant83(__nt), __end));
         (3, 183)
     }
     pub(crate) fn __reduce495<
@@ -27137,7 +27170,7 @@ mod __parse__Top {
         // MatchStatement = "match", TestOrStarNamedExpr, ":", "\n", Indent, MatchCase+, Dedent => ActionFn(862);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
-        let __sym5 = __pop_Variant78(__symbols);
+        let __sym5 = __pop_Variant81(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -27161,7 +27194,7 @@ mod __parse__Top {
         // MatchStatement = "match", TestOrStarNamedExpr, ",", ":", "\n", Indent, MatchCase+, Dedent => ActionFn(1369);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant0(__symbols);
-        let __sym6 = __pop_Variant78(__symbols);
+        let __sym6 = __pop_Variant81(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -27186,7 +27219,7 @@ mod __parse__Top {
         // MatchStatement = "match", TwoOrMoreSep<TestOrStarNamedExpr, ",">, ",", ":", "\n", Indent, MatchCase+, Dedent => ActionFn(1370);
         assert!(__symbols.len() >= 8);
         let __sym7 = __pop_Variant0(__symbols);
-        let __sym6 = __pop_Variant78(__symbols);
+        let __sym6 = __pop_Variant81(__symbols);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
@@ -27211,7 +27244,7 @@ mod __parse__Top {
         // MatchStatement = "match", TwoOrMoreSep<TestOrStarNamedExpr, ",">, ":", "\n", Indent, MatchCase+, Dedent => ActionFn(1371);
         assert!(__symbols.len() >= 7);
         let __sym6 = __pop_Variant0(__symbols);
-        let __sym5 = __pop_Variant78(__symbols);
+        let __sym5 = __pop_Variant81(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
@@ -27424,7 +27457,7 @@ mod __parse__Top {
     {
         // NonlocalStatement = "nonlocal", OneOrMore<Identifier> => ActionFn(1374);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant82(__symbols);
+        let __sym1 = __pop_Variant85(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
@@ -27518,7 +27551,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action246::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant81(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant84(__nt), __end));
         (1, 195)
     }
     pub(crate) fn __reduce519<
@@ -27535,7 +27568,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action247::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant81(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant84(__nt), __end));
         (1, 195)
     }
     pub(crate) fn __reduce520<
@@ -27552,7 +27585,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action248::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant81(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant84(__nt), __end));
         (1, 195)
     }
     pub(crate) fn __reduce521<
@@ -27565,7 +27598,7 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // NumberAtom = Number => ActionFn(1377);
-        let __sym0 = __pop_Variant81(__symbols);
+        let __sym0 = __pop_Variant84(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1377::<>(source_code, mode, __sym0);
@@ -27696,7 +27729,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action379::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant82(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (1, 200)
     }
     pub(crate) fn __reduce529<
@@ -27712,11 +27745,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant82(__symbols);
+        let __sym0 = __pop_Variant85(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action380::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant82(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
         (3, 200)
     }
     pub(crate) fn __reduce530<
@@ -27736,7 +27769,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1593::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (3, 201)
     }
     pub(crate) fn __reduce531<
@@ -27753,7 +27786,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1594::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (1, 201)
     }
     pub(crate) fn __reduce532<
@@ -27771,11 +27804,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant73(__symbols);
+        let __sym0 = __pop_Variant76(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
         let __nt = super::__action1595::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (5, 201)
     }
     pub(crate) fn __reduce533<
@@ -27791,11 +27824,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant73(__symbols);
+        let __sym0 = __pop_Variant76(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1596::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (3, 201)
     }
     pub(crate) fn __reduce534<
@@ -27815,7 +27848,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1597::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (3, 202)
     }
     pub(crate) fn __reduce535<
@@ -27832,7 +27865,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1598::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (1, 202)
     }
     pub(crate) fn __reduce536<
@@ -27850,11 +27883,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant73(__symbols);
+        let __sym0 = __pop_Variant76(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
         let __nt = super::__action1599::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (5, 202)
     }
     pub(crate) fn __reduce537<
@@ -27870,11 +27903,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant23(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant73(__symbols);
+        let __sym0 = __pop_Variant76(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1600::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant73(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant76(__nt), __end));
         (3, 202)
     }
     pub(crate) fn __reduce538<
@@ -27887,11 +27920,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // OneOrMore<MatchKeywordEntry> = MatchKeywordEntry => ActionFn(348);
-        let __sym0 = __pop_Variant79(__symbols);
+        let __sym0 = __pop_Variant82(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action348::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant83(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (1, 203)
     }
     pub(crate) fn __reduce539<
@@ -27905,13 +27938,13 @@ mod __parse__Top {
     {
         // OneOrMore<MatchKeywordEntry> = OneOrMore<MatchKeywordEntry>, ",", MatchKeywordEntry => ActionFn(349);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant79(__symbols);
+        let __sym2 = __pop_Variant82(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant83(__symbols);
+        let __sym0 = __pop_Variant86(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action349::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant83(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
         (3, 203)
     }
     pub(crate) fn __reduce540<
@@ -27924,11 +27957,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // OneOrMore<MatchMappingEntry> = MatchMappingEntry => ActionFn(352);
-        let __sym0 = __pop_Variant80(__symbols);
+        let __sym0 = __pop_Variant83(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action352::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant84(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
         (1, 204)
     }
     pub(crate) fn __reduce541<
@@ -27942,13 +27975,13 @@ mod __parse__Top {
     {
         // OneOrMore<MatchMappingEntry> = OneOrMore<MatchMappingEntry>, ",", MatchMappingEntry => ActionFn(353);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant80(__symbols);
+        let __sym2 = __pop_Variant83(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant84(__symbols);
+        let __sym0 = __pop_Variant87(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action353::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant84(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
         (3, 204)
     }
     pub(crate) fn __reduce542<
@@ -27965,7 +27998,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action490::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (1, 205)
     }
     pub(crate) fn __reduce543<
@@ -27981,11 +28014,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant11(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant88(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action491::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (3, 205)
     }
     pub(crate) fn __reduce544<
@@ -28002,7 +28035,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action479::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (1, 206)
     }
     pub(crate) fn __reduce545<
@@ -28018,11 +28051,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant11(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant88(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action480::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant85(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
         (3, 206)
     }
     pub(crate) fn __reduce546<
@@ -28183,11 +28216,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // OneOrMore<TypeParam> = TypeParam => ActionFn(289);
-        let __sym0 = __pop_Variant97(__symbols);
+        let __sym0 = __pop_Variant100(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action289::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
         (1, 211)
     }
     pub(crate) fn __reduce555<
@@ -28201,13 +28234,13 @@ mod __parse__Top {
     {
         // OneOrMore<TypeParam> = OneOrMore<TypeParam>, ",", TypeParam => ActionFn(290);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant97(__symbols);
+        let __sym2 = __pop_Variant100(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant86(__symbols);
+        let __sym0 = __pop_Variant89(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action290::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant86(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
         (3, 211)
     }
     pub(crate) fn __reduce556<
@@ -28400,11 +28433,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ParameterDefs<TypedParameter> = OneOrMore<ParameterDef<TypedParameter>> => ActionFn(446);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant88(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action446::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (1, 217)
     }
     pub(crate) fn __reduce567<
@@ -28420,11 +28453,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant88(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action701::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (3, 217)
     }
     pub(crate) fn __reduce568<
@@ -28441,11 +28474,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant12(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant88(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action702::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (4, 217)
     }
     pub(crate) fn __reduce569<
@@ -28458,11 +28491,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // ParameterDefs<UntypedParameter> = OneOrMore<ParameterDef<UntypedParameter>> => ActionFn(454);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant88(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action454::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (1, 218)
     }
     pub(crate) fn __reduce570<
@@ -28478,11 +28511,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant88(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action709::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (3, 218)
     }
     pub(crate) fn __reduce571<
@@ -28499,11 +28532,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant12(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
-        let __sym0 = __pop_Variant85(__symbols);
+        let __sym0 = __pop_Variant88(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action710::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant87(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
         (4, 218)
     }
     pub(crate) fn __reduce648<
@@ -28676,7 +28709,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action429::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (1, 227)
     }
     pub(crate) fn __reduce752<
@@ -28692,7 +28725,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action430::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant88(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
         (0, 227)
     }
     pub(crate) fn __reduce753<
@@ -28708,14 +28741,14 @@ mod __parse__Top {
         assert!(__symbols.len() >= 6);
         let __sym5 = __pop_Variant0(__symbols);
         let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant83(__symbols);
+        let __sym3 = __pop_Variant86(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant53(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym5.2;
         let __nt = super::__action1463::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (6, 228)
     }
     pub(crate) fn __reduce754<
@@ -28730,14 +28763,14 @@ mod __parse__Top {
         // PatternArguments = "(", OneOrMore<Pattern>, ",", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1464);
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant0(__symbols);
-        let __sym3 = __pop_Variant83(__symbols);
+        let __sym3 = __pop_Variant86(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant53(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
         let __nt = super::__action1464::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (5, 228)
     }
     pub(crate) fn __reduce755<
@@ -28758,7 +28791,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1465::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (4, 228)
     }
     pub(crate) fn __reduce756<
@@ -28778,7 +28811,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1466::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (3, 228)
     }
     pub(crate) fn __reduce757<
@@ -28794,12 +28827,12 @@ mod __parse__Top {
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant83(__symbols);
+        let __sym1 = __pop_Variant86(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1467::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (4, 228)
     }
     pub(crate) fn __reduce758<
@@ -28814,12 +28847,12 @@ mod __parse__Top {
         // PatternArguments = "(", OneOrMore<MatchKeywordEntry>, ")" => ActionFn(1468);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant83(__symbols);
+        let __sym1 = __pop_Variant86(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1468::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (3, 228)
     }
     pub(crate) fn __reduce759<
@@ -28838,7 +28871,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1469::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant89(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
         (2, 228)
     }
     pub(crate) fn __reduce760<
@@ -29528,7 +29561,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym4.2;
         let __nt = super::__action1555::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (5, 239)
     }
     pub(crate) fn __reduce796<
@@ -29551,7 +29584,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym5.2;
         let __nt = super::__action1556::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4, __sym5);
-        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (6, 239)
     }
     pub(crate) fn __reduce797<
@@ -29572,7 +29605,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1557::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (4, 239)
     }
     pub(crate) fn __reduce798<
@@ -29594,7 +29627,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym4.2;
         let __nt = super::__action1558::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant90(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
         (5, 239)
     }
     pub(crate) fn __reduce799<
@@ -29607,11 +29640,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // SingleForComprehension+ = SingleForComprehension => ActionFn(257);
-        let __sym0 = __pop_Variant90(__symbols);
+        let __sym0 = __pop_Variant93(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action257::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
         (1, 240)
     }
     pub(crate) fn __reduce800<
@@ -29625,12 +29658,12 @@ mod __parse__Top {
     {
         // SingleForComprehension+ = SingleForComprehension+, SingleForComprehension => ActionFn(258);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant90(__symbols);
-        let __sym0 = __pop_Variant91(__symbols);
+        let __sym1 = __pop_Variant93(__symbols);
+        let __sym0 = __pop_Variant94(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action258::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant91(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
         (2, 240)
     }
     pub(crate) fn __reduce801<
@@ -29649,7 +29682,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1733::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (2, 241)
     }
     pub(crate) fn __reduce802<
@@ -29666,7 +29699,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1734::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant92(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
         (1, 241)
     }
     pub(crate) fn __reduce803<
@@ -29679,11 +29712,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // SliceOp? = SliceOp => ActionFn(277);
-        let __sym0 = __pop_Variant92(__symbols);
+        let __sym0 = __pop_Variant95(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action277::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
         (1, 242)
     }
     pub(crate) fn __reduce804<
@@ -29699,7 +29732,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action278::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant93(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
         (0, 242)
     }
     pub(crate) fn __reduce805<
@@ -30064,7 +30097,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1194::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (3, 250)
     }
     pub(crate) fn __reduce826<
@@ -30085,7 +30118,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1195::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (4, 250)
     }
     pub(crate) fn __reduce827<
@@ -30104,7 +30137,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1196::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (2, 250)
     }
     pub(crate) fn __reduce828<
@@ -30124,7 +30157,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1197::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (3, 250)
     }
     pub(crate) fn __reduce829<
@@ -30141,7 +30174,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action10::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (1, 250)
     }
     pub(crate) fn __reduce830<
@@ -30156,11 +30189,11 @@ mod __parse__Top {
         // Statements = Statements, CompoundStatement => ActionFn(11);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant37(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant97(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action11::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (2, 250)
     }
     pub(crate) fn __reduce831<
@@ -30177,11 +30210,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant37(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant97(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1198::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (4, 250)
     }
     pub(crate) fn __reduce832<
@@ -30199,11 +30232,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant37(__symbols);
         let __sym1 = __pop_Variant38(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant97(__symbols);
         let __start = __sym0.0;
         let __end = __sym4.2;
         let __nt = super::__action1199::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3, __sym4);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (5, 250)
     }
     pub(crate) fn __reduce833<
@@ -30219,11 +30252,11 @@ mod __parse__Top {
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
         let __sym1 = __pop_Variant37(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant97(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1200::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (3, 250)
     }
     pub(crate) fn __reduce834<
@@ -30240,11 +30273,11 @@ mod __parse__Top {
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant37(__symbols);
         let __sym1 = __pop_Variant38(__symbols);
-        let __sym0 = __pop_Variant94(__symbols);
+        let __sym0 = __pop_Variant97(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1201::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant94(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
         (4, 250)
     }
     pub(crate) fn __reduce835<
@@ -30326,7 +30359,7 @@ mod __parse__Top {
     {
         // Subscript = Test<"all">, ":", Test<"all">, SliceOp => ActionFn(1735);
         assert!(__symbols.len() >= 4);
-        let __sym3 = __pop_Variant92(__symbols);
+        let __sym3 = __pop_Variant95(__symbols);
         let __sym2 = __pop_Variant15(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
@@ -30347,7 +30380,7 @@ mod __parse__Top {
     {
         // Subscript = Test<"all">, ":", SliceOp => ActionFn(1736);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant92(__symbols);
+        let __sym2 = __pop_Variant95(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant15(__symbols);
         let __start = __sym0.0;
@@ -30367,7 +30400,7 @@ mod __parse__Top {
     {
         // Subscript = ":", Test<"all">, SliceOp => ActionFn(1737);
         assert!(__symbols.len() >= 3);
-        let __sym2 = __pop_Variant92(__symbols);
+        let __sym2 = __pop_Variant95(__symbols);
         let __sym1 = __pop_Variant15(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -30387,7 +30420,7 @@ mod __parse__Top {
     {
         // Subscript = ":", SliceOp => ActionFn(1738);
         assert!(__symbols.len() >= 2);
-        let __sym1 = __pop_Variant92(__symbols);
+        let __sym1 = __pop_Variant95(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
@@ -30634,7 +30667,7 @@ mod __parse__Top {
         // Suite = "\n", Indent, Statements, Dedent => ActionFn(8);
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant94(__symbols);
+        let __sym2 = __pop_Variant97(__symbols);
         let __sym1 = __pop_Variant0(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -31047,7 +31080,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1503::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (2, 268)
     }
     pub(crate) fn __reduce881<
@@ -31066,7 +31099,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1750::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (2, 268)
     }
     pub(crate) fn __reduce882<
@@ -31086,7 +31119,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1751::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant95(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
         (3, 268)
     }
     pub(crate) fn __reduce883<
@@ -31320,7 +31353,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action354::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
         (2, 270)
     }
     pub(crate) fn __reduce893<
@@ -31335,11 +31368,11 @@ mod __parse__Top {
         // TwoOrMore<StringLiteral> = TwoOrMore<StringLiteral>, StringLiteral => ActionFn(355);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant69(__symbols);
-        let __sym0 = __pop_Variant96(__symbols);
+        let __sym0 = __pop_Variant99(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action355::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
         (2, 270)
     }
     pub(crate) fn __reduce894<
@@ -31358,7 +31391,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action275::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
         (2, 271)
     }
     pub(crate) fn __reduce895<
@@ -31373,11 +31406,11 @@ mod __parse__Top {
         // TwoOrMore<StringLiteralOrFString> = TwoOrMore<StringLiteralOrFString>, StringLiteralOrFString => ActionFn(276);
         assert!(__symbols.len() >= 2);
         let __sym1 = __pop_Variant69(__symbols);
-        let __sym0 = __pop_Variant96(__symbols);
+        let __sym0 = __pop_Variant99(__symbols);
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action276::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant96(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
         (2, 271)
     }
     pub(crate) fn __reduce896<
@@ -31570,7 +31603,7 @@ mod __parse__Top {
         assert!(__symbols.len() >= 5);
         let __sym4 = __pop_Variant15(__symbols);
         let __sym3 = __pop_Variant0(__symbols);
-        let __sym2 = __pop_Variant98(__symbols);
+        let __sym2 = __pop_Variant101(__symbols);
         let __sym1 = __pop_Variant44(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
@@ -31617,7 +31650,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1516::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant100(__nt), __end));
         (3, 278)
     }
     pub(crate) fn __reduce908<
@@ -31634,7 +31667,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action1517::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant100(__nt), __end));
         (1, 278)
     }
     pub(crate) fn __reduce909<
@@ -31653,7 +31686,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1518::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant100(__nt), __end));
         (2, 278)
     }
     pub(crate) fn __reduce910<
@@ -31672,7 +31705,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym1.2;
         let __nt = super::__action1519::<>(source_code, mode, __sym0, __sym1);
-        __symbols.push((__start, __Symbol::Variant97(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant100(__nt), __end));
         (2, 278)
     }
     pub(crate) fn __reduce911<
@@ -31688,12 +31721,12 @@ mod __parse__Top {
         assert!(__symbols.len() >= 4);
         let __sym3 = __pop_Variant0(__symbols);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant86(__symbols);
+        let __sym1 = __pop_Variant89(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym3.2;
         let __nt = super::__action1520::<>(source_code, mode, __sym0, __sym1, __sym2, __sym3);
-        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant101(__nt), __end));
         (4, 279)
     }
     pub(crate) fn __reduce912<
@@ -31708,12 +31741,12 @@ mod __parse__Top {
         // TypeParams = "[", OneOrMore<TypeParam>, "]" => ActionFn(1521);
         assert!(__symbols.len() >= 3);
         let __sym2 = __pop_Variant0(__symbols);
-        let __sym1 = __pop_Variant86(__symbols);
+        let __sym1 = __pop_Variant89(__symbols);
         let __sym0 = __pop_Variant0(__symbols);
         let __start = __sym0.0;
         let __end = __sym2.2;
         let __nt = super::__action1521::<>(source_code, mode, __sym0, __sym1, __sym2);
-        __symbols.push((__start, __Symbol::Variant98(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant101(__nt), __end));
         (3, 279)
     }
     pub(crate) fn __reduce913<
@@ -31726,11 +31759,11 @@ mod __parse__Top {
     ) -> (usize, usize)
     {
         // TypeParams? = TypeParams => ActionFn(309);
-        let __sym0 = __pop_Variant98(__symbols);
+        let __sym0 = __pop_Variant101(__symbols);
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action309::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant102(__nt), __end));
         (1, 280)
     }
     pub(crate) fn __reduce914<
@@ -31746,7 +31779,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action310::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant99(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant102(__nt), __end));
         (0, 280)
     }
     pub(crate) fn __reduce915<
@@ -31800,7 +31833,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action204::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant100(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant103(__nt), __end));
         (1, 282)
     }
     pub(crate) fn __reduce918<
@@ -31817,7 +31850,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action205::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant100(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant103(__nt), __end));
         (1, 282)
     }
     pub(crate) fn __reduce919<
@@ -31834,7 +31867,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action206::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant100(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant103(__nt), __end));
         (1, 282)
     }
     pub(crate) fn __reduce920<
@@ -32461,7 +32494,7 @@ mod __parse__Top {
         let __start = __sym0.0;
         let __end = __sym0.2;
         let __nt = super::__action281::<>(source_code, mode, __sym0);
-        __symbols.push((__start, __Symbol::Variant101(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant104(__nt), __end));
         (1, 296)
     }
     pub(crate) fn __reduce953<
@@ -32477,7 +32510,7 @@ mod __parse__Top {
         let __start = __lookahead_start.cloned().or_else(|| __symbols.last().map(|s| s.2.clone())).unwrap_or_default();
         let __end = __start.clone();
         let __nt = super::__action282::<>(source_code, mode, &__start, &__end);
-        __symbols.push((__start, __Symbol::Variant101(__nt), __end));
+        __symbols.push((__start, __Symbol::Variant104(__nt), __end));
         (0, 296)
     }
 }
@@ -32518,7 +32551,7 @@ fn __action2<
     mode: Mode,
     (_, start, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, body, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, body, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, alloc::vec::Vec<token::Tok>, TextSize),
     (_, end, _): (TextSize, TextSize, TextSize),
 ) -> ast::Mod
@@ -32843,7 +32876,7 @@ fn __action25<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, targets, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, targets, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -32861,8 +32894,8 @@ fn __action26<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, expression, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-    (_, suffix, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, expression, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    (_, suffix, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -32896,9 +32929,9 @@ fn __action27<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, target, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, target, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, op, _): (TextSize, ast::Operator, TextSize),
-    (_, rhs, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, rhs, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -32922,10 +32955,10 @@ fn __action28<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, target, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, target, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, annotation, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-    (_, rhs, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, annotation, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    (_, rhs, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -32951,8 +32984,8 @@ fn __action29<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     e
 }
@@ -32964,8 +32997,8 @@ fn __action30<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     e
 }
@@ -32976,8 +33009,8 @@ fn __action31<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -32988,8 +33021,8 @@ fn __action32<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -33000,8 +33033,8 @@ fn __action33<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -33012,8 +33045,8 @@ fn __action34<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -33024,8 +33057,8 @@ fn __action35<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -33036,8 +33069,8 @@ fn __action36<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -33048,8 +33081,8 @@ fn __action37<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -33060,8 +33093,8 @@ fn __action38<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -33072,8 +33105,8 @@ fn __action39<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -33275,7 +33308,7 @@ fn __action55<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, value, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -33293,7 +33326,7 @@ fn __action56<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, expression, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, expression, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -33342,8 +33375,8 @@ fn __action59<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, exc, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-    (_, cause, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, exc, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    (_, cause, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -33583,8 +33616,8 @@ fn __action73<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, test, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-    (_, msg, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, test, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    (_, msg, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -33637,7 +33670,7 @@ fn __action75<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, c, _): (TextSize, (IpyEscapeKind, String), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         if mode == Mode::Ipython {
@@ -33669,7 +33702,7 @@ fn __action76<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, suffix, _): (TextSize, alloc::vec::Vec<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -33846,7 +33879,7 @@ fn __action85<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, subject, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, subject, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
@@ -33881,7 +33914,7 @@ fn __action86<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, tuple_location, _): (TextSize, TextSize, TextSize),
-    (_, subject, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, subject, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, tuple_end_location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
@@ -33924,7 +33957,7 @@ fn __action87<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, tuple_location, _): (TextSize, TextSize, TextSize),
-    (_, elts, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, elts, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, tuple_end_location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
@@ -33992,7 +34025,7 @@ fn __action89<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, guard, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, guard, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Expr
 {
     {
@@ -34350,7 +34383,7 @@ fn __action111<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, value, _): (TextSize, ast::Number, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::Expr::NumberLiteral(
         ast::ExprNumberLiteral { value, range: (location..end_location).into() }
@@ -34363,8 +34396,8 @@ fn __action112<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -34377,9 +34410,9 @@ fn __action113<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, operand, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, operand, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::Expr::UnaryOp(
         ast::ExprUnaryOp {
@@ -34397,11 +34430,11 @@ fn __action114<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, op, _): (TextSize, ast::Operator, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -34469,7 +34502,7 @@ fn __action118<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Pattern
 {
@@ -34486,7 +34519,7 @@ fn __action119<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Pattern
 {
@@ -34653,7 +34686,7 @@ fn __action129<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Expr
 {
     e.into()
@@ -34665,7 +34698,7 @@ fn __action130<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Expr
 {
     e.into()
@@ -35001,10 +35034,10 @@ fn __action146<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, test, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, test, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
-    (_, s2, _): (TextSize, alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>, TextSize),
+    (_, s2, _): (TextSize, alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>, TextSize),
     (_, s3, _): (TextSize, core::option::Option<(TextSize, ast::Suite)>, TextSize),
 ) -> ast::Stmt
 {
@@ -35037,7 +35070,7 @@ fn __action147<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, test, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, test, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
     (_, s2, _): (TextSize, core::option::Option<ast::Suite>, TextSize),
@@ -35070,9 +35103,9 @@ fn __action148<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, is_async, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, target, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, target, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, iter, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, iter, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
     (_, orelse, _): (TextSize, core::option::Option<ast::Suite>, TextSize),
@@ -35206,7 +35239,7 @@ fn __action152<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, typ, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, typ, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
 ) -> ast::ExceptHandler
@@ -35233,7 +35266,7 @@ fn __action153<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, x, _): (TextSize, (ast::ParenthesizedExpr, ast::Identifier), TextSize),
+    (_, x, _): (TextSize, (crate::parser::ParenthesizedExpr, ast::Identifier), TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
 ) -> ast::ExceptHandler
@@ -35259,7 +35292,7 @@ fn __action154<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, typ, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, typ, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
 ) -> ast::ExceptHandler
@@ -35285,7 +35318,7 @@ fn __action155<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, x, _): (TextSize, (ast::ParenthesizedExpr, ast::Identifier), TextSize),
+    (_, x, _): (TextSize, (crate::parser::ParenthesizedExpr, ast::Identifier), TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
 ) -> ast::ExceptHandler
@@ -35408,7 +35441,7 @@ fn __action161<
 >(
     source_code: &str,
     mode: Mode,
-    (_, all, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, all, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> Vec<ast::WithItem>
 {
     {
@@ -35427,9 +35460,9 @@ fn __action162<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, context_expr, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, context_expr, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, optional_vars, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, optional_vars, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::WithItem
 {
@@ -35456,7 +35489,7 @@ fn __action163<
     (_, name, _): (TextSize, ast::Identifier, TextSize),
     (_, type_params, _): (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     (_, parameters, _): (TextSize, ast::Parameters, TextSize),
-    (_, returns, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, returns, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, body, _): (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -35507,7 +35540,7 @@ fn __action165<
     (_, name, _): (TextSize, ast::Expr, TextSize),
     (_, type_params, _): (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -35589,7 +35622,7 @@ fn __action169<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
-    (_, annotation, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, annotation, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParameterWithDefault
 {
@@ -35608,7 +35641,7 @@ fn __action170<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
-    (_, annotation, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, annotation, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Parameter
 {
@@ -35626,7 +35659,7 @@ fn __action171<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
-    (_, annotation, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, annotation, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Parameter
 {
@@ -35697,7 +35730,7 @@ fn __action174<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, name, _): (TextSize, ast::Identifier, TextSize),
-    (_, bound, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, bound, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::TypeParam
 {
@@ -35754,7 +35787,7 @@ fn __action177<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, expression, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, expression, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
 ) -> ast::Decorator
@@ -35772,9 +35805,9 @@ fn __action178<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, value, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprYield {
         value: value.map(ast::Expr::from).map(Box::new),
@@ -35791,9 +35824,9 @@ fn __action179<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprYieldFrom {
         value: Box::new(value.into()),
@@ -35807,8 +35840,8 @@ fn __action180<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -35819,8 +35852,8 @@ fn __action181<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -35834,7 +35867,7 @@ fn __action182<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, id, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprName {
         id: id.into(),
@@ -35850,11 +35883,11 @@ fn __action183<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, target, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, target, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         ast::ExprNamedExpr {
@@ -35878,9 +35911,9 @@ fn __action184<
     (_, end_location_args, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, fstring_middle, _): (TextSize, core::option::Option<(String, bool)>, TextSize),
-    (_, body, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, body, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         if fstring_middle.is_some() {
@@ -36171,8 +36204,8 @@ fn __action207<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -36184,10 +36217,10 @@ fn __action208<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, s1, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, s1, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         ast::ExprTuple {
@@ -36205,10 +36238,10 @@ fn __action209<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, elts, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, elts, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let elts = elts.into_iter().map(ast::Expr::from).collect();
@@ -36226,8 +36259,8 @@ fn __action210<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -36239,12 +36272,12 @@ fn __action211<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, lower, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    (_, lower, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, upper, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
-    (_, step, _): (TextSize, core::option::Option<Option<ast::ParenthesizedExpr>>, TextSize),
+    (_, upper, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, step, _): (TextSize, core::option::Option<Option<crate::parser::ParenthesizedExpr>>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let lower = lower.map(ast::Expr::from).map(Box::new);
@@ -36264,8 +36297,8 @@ fn __action212<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
-) -> Option<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> Option<crate::parser::ParenthesizedExpr>
 {
     e
 }
@@ -36348,14 +36381,14 @@ fn __action218<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, values, _): (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    (_, elements, _): (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> StringType
 {
     {
         StringType::FString(ast::FString {
-            values,
+            elements,
             range: (location..end_location).into()
         })
     }
@@ -36367,8 +36400,8 @@ fn __action219<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
+    (_, __0, _): (TextSize, ast::FStringElement, TextSize),
+) -> ast::FStringElement
 {
     __0
 }
@@ -36382,11 +36415,11 @@ fn __action220<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, fstring_middle, _): (TextSize, (String, bool), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         let (source, is_raw) = fstring_middle;
-        Ok(parse_fstring_middle(&source, is_raw, (location..end_location).into())?)
+        Ok(parse_fstring_literal_element(&source, is_raw, (location..end_location).into())?)
     }
 }
 
@@ -36398,13 +36431,13 @@ fn __action221<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, debug, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, conversion, _): (TextSize, core::option::Option<(TextSize, ast::ConversionFlag)>, TextSize),
-    (_, format_spec, _): (TextSize, core::option::Option<ast::Expr>, TextSize),
+    (_, format_spec, _): (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
@@ -36429,16 +36462,15 @@ fn __action221<
             }
         });
         Ok(
-            ast::ExprFormattedValue {
-                value: Box::new(value.into()),
+            ast::FStringElement::Expression(ast::FStringExpressionElement {
+                expression: Box::new(value.into()),
                 debug_text,
                 conversion: conversion.map_or(ast::ConversionFlag::None, |(_, conversion_flag)| {
                     conversion_flag
                 }),
                 format_spec: format_spec.map(Box::new),
                 range: (location..end_location).into(),
-            }
-            .into()
+            })
         )
     }
 }
@@ -36450,8 +36482,8 @@ fn __action222<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, format_spec, _): (TextSize, ast::Expr, TextSize),
-) -> ast::Expr
+    (_, format_spec, _): (TextSize, ast::FStringFormatSpec, TextSize),
+) -> ast::FStringFormatSpec
 {
     format_spec
 }
@@ -36463,15 +36495,13 @@ fn __action223<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, values, _): (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    (_, elements, _): (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::Expr
+) -> ast::FStringFormatSpec
 {
-    {
-        ast::FString {
-            values,
-            range: (location..end_location).into()
-        }.into()
+    ast::FStringFormatSpec {
+        elements,
+        range: (location..end_location).into(),
     }
 }
 
@@ -36507,9 +36537,9 @@ fn __action225<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, e, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     e
 }
@@ -36520,9 +36550,9 @@ fn __action226<
 >(
     source_code: &str,
     mode: Mode,
-    (_, elements, _): (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize),
+    (_, elements, _): (TextSize, Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
-) -> Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>
+) -> Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>
 {
     elements
 }
@@ -36533,10 +36563,10 @@ fn __action227<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e1, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e1, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e2, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> (ast::ParenthesizedExpr, ast::ParenthesizedExpr)
+    (_, e2, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr)
 {
     (e1, e2)
 }
@@ -36547,8 +36577,8 @@ fn __action228<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e, _): (TextSize, (ast::ParenthesizedExpr, ast::ParenthesizedExpr), TextSize),
-) -> (Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)
+    (_, e, _): (TextSize, (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr), TextSize),
+) -> (Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)
 {
     (Some(Box::new(e.0)), e.1)
 }
@@ -36560,8 +36590,8 @@ fn __action229<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> (Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> (Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)
 {
     (None, e)
 }
@@ -36572,9 +36602,9 @@ fn __action230<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e1, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, e1, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     e1
 }
@@ -36585,8 +36615,8 @@ fn __action231<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -36597,8 +36627,8 @@ fn __action232<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -36609,8 +36639,8 @@ fn __action233<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -36621,9 +36651,9 @@ fn __action234<
 >(
     source_code: &str,
     mode: Mode,
-    (_, elements, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, elements, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, core::option::Option<token::Tok>, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     elements
 }
@@ -36634,8 +36664,8 @@ fn __action235<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -36648,9 +36678,9 @@ fn __action236<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprStarred {
         value: Box::new(value.into()),
@@ -36680,10 +36710,10 @@ fn __action238<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, is_async, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, target, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, target, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, iter, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-    (_, ifs, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, iter, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    (_, ifs, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::Comprehension
 {
@@ -36706,8 +36736,8 @@ fn __action239<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -36719,8 +36749,8 @@ fn __action240<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, c, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, c, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     c
 }
@@ -36755,7 +36785,7 @@ fn __action242<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, elt, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, elt, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, generators, _): (TextSize, core::option::Option<Vec<ast::Comprehension>>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
@@ -36784,7 +36814,7 @@ fn __action243<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, i, _): (TextSize, ast::Identifier, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
@@ -36799,7 +36829,7 @@ fn __action244<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
@@ -36819,7 +36849,7 @@ fn __action245<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
@@ -36927,7 +36957,7 @@ fn __action253<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     alloc::vec![]
 }
@@ -36938,8 +36968,8 @@ fn __action254<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, v, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     v
 }
@@ -36951,10 +36981,10 @@ fn __action255<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, values, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, last, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, values, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, last, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let values = values.into_iter().chain(std::iter::once(last)).map(ast::Expr::from).collect();
@@ -36968,8 +36998,8 @@ fn __action256<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -37006,14 +37036,14 @@ fn __action259<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, elts, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, elts, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, trailing_comma, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         if elts.len() == 1 && trailing_comma.is_none() {
-            ast::ParenthesizedExpr {
+            crate::parser::ParenthesizedExpr {
               expr: elts.into_iter().next().unwrap().into(),
               range: (location..end_location).into(),
             }
@@ -37030,8 +37060,8 @@ fn __action260<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     vec![e]
 }
@@ -37042,10 +37072,10 @@ fn __action261<
 >(
     source_code: &str,
     mode: Mode,
-    (_, mut v, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, mut v, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     {
         v.push(e);
@@ -37060,14 +37090,14 @@ fn __action262<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, elts, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, elts, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, trailing_comma, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         if elts.len() == 1 && trailing_comma.is_none() {
-            ast::ParenthesizedExpr {
+            crate::parser::ParenthesizedExpr {
               expr: elts.into_iter().next().unwrap().into(),
               range: (location..end_location).into(),
             }
@@ -37084,8 +37114,8 @@ fn __action263<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e, _): (TextSize, (Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr), TextSize),
-) -> Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>
+    (_, e, _): (TextSize, (Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr), TextSize),
+) -> Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>
 {
     vec![e]
 }
@@ -37096,10 +37126,10 @@ fn __action264<
 >(
     source_code: &str,
     mode: Mode,
-    (_, mut v, _): (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize),
+    (_, mut v, _): (TextSize, Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, (Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr), TextSize),
-) -> Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>
+    (_, e, _): (TextSize, (Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr), TextSize),
+) -> Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>
 {
     {
         v.push(e);
@@ -37113,8 +37143,8 @@ fn __action265<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     vec![e]
 }
@@ -37125,10 +37155,10 @@ fn __action266<
 >(
     source_code: &str,
     mode: Mode,
-    (_, mut v, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, mut v, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     {
         v.push(e);
@@ -37142,8 +37172,8 @@ fn __action267<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Expr, TextSize),
-) -> core::option::Option<ast::Expr>
+    (_, __0, _): (TextSize, ast::FStringFormatSpec, TextSize),
+) -> core::option::Option<ast::FStringFormatSpec>
 {
     Some(__0)
 }
@@ -37156,7 +37186,7 @@ fn __action268<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::Expr>
+) -> core::option::Option<ast::FStringFormatSpec>
 {
     None
 }
@@ -37219,7 +37249,7 @@ fn __action273<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> alloc::vec::Vec<ast::Expr>
+) -> alloc::vec::Vec<ast::FStringElement>
 {
     alloc::vec![]
 }
@@ -37230,8 +37260,8 @@ fn __action274<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-) -> alloc::vec::Vec<ast::Expr>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
+) -> alloc::vec::Vec<ast::FStringElement>
 {
     v
 }
@@ -37271,8 +37301,8 @@ fn __action277<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, Option<ast::ParenthesizedExpr>, TextSize),
-) -> core::option::Option<Option<ast::ParenthesizedExpr>>
+    (_, __0, _): (TextSize, Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> core::option::Option<Option<crate::parser::ParenthesizedExpr>>
 {
     Some(__0)
 }
@@ -37285,7 +37315,7 @@ fn __action278<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<Option<ast::ParenthesizedExpr>>
+) -> core::option::Option<Option<crate::parser::ParenthesizedExpr>>
 {
     None
 }
@@ -37296,10 +37326,10 @@ fn __action279<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e1, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e1, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e2, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e2, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     vec![e1, e2]
 }
@@ -37310,10 +37340,10 @@ fn __action280<
 >(
     source_code: &str,
     mode: Mode,
-    (_, mut v, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, mut v, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     {
         v.push(e);
@@ -37544,8 +37574,8 @@ fn __action293<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     Some(__0)
 }
@@ -37558,7 +37588,7 @@ fn __action294<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::ParenthesizedExpr>
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     None
 }
@@ -37570,8 +37600,8 @@ fn __action295<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -37582,8 +37612,8 @@ fn __action296<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     Some(__0)
 }
@@ -37596,7 +37626,7 @@ fn __action297<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::ParenthesizedExpr>
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     None
 }
@@ -37608,8 +37638,8 @@ fn __action298<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -37770,8 +37800,8 @@ fn __action306<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     Some(__0)
 }
@@ -37784,7 +37814,7 @@ fn __action307<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::ParenthesizedExpr>
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     None
 }
@@ -37796,8 +37826,8 @@ fn __action308<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -37858,8 +37888,8 @@ fn __action313<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     vec![e]
 }
@@ -37870,10 +37900,10 @@ fn __action314<
 >(
     source_code: &str,
     mode: Mode,
-    (_, mut v, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, mut v, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     {
         v.push(e);
@@ -37912,7 +37942,7 @@ fn __action317<
 >(
     source_code: &str,
     mode: Mode,
-    (_, context_expr, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, context_expr, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::WithItem
 {
     {
@@ -37980,7 +38010,7 @@ fn __action322<
 >(
     source_code: &str,
     mode: Mode,
-    (_, context_expr, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, context_expr, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::WithItem
 {
     {
@@ -38048,8 +38078,8 @@ fn __action327<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     Some(__0)
 }
@@ -38062,7 +38092,7 @@ fn __action328<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::ParenthesizedExpr>
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     None
 }
@@ -38073,10 +38103,10 @@ fn __action329<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, __1, _): (TextSize, ast::Identifier, TextSize),
-) -> (ast::ParenthesizedExpr, ast::Identifier)
+) -> (crate::parser::ParenthesizedExpr, ast::Identifier)
 {
     (__0, __1)
 }
@@ -38282,7 +38312,7 @@ fn __action345<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>
+) -> alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>
 {
     alloc::vec![]
 }
@@ -38293,8 +38323,8 @@ fn __action346<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>, TextSize),
-) -> alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>
+    (_, v, _): (TextSize, alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>, TextSize),
+) -> alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>
 {
     v
 }
@@ -38307,10 +38337,10 @@ fn __action347<
     mode: Mode,
     (_, __0, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __1, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, __1, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, __2, _): (TextSize, ast::Suite, TextSize),
-) -> (TextSize, ast::ParenthesizedExpr, ast::Suite)
+) -> (TextSize, crate::parser::ParenthesizedExpr, ast::Suite)
 {
     (__0, __1, __2)
 }
@@ -38592,10 +38622,10 @@ fn __action367<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e1, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e1, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e2, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e2, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     vec![e1, e2]
 }
@@ -38606,10 +38636,10 @@ fn __action368<
 >(
     source_code: &str,
     mode: Mode,
-    (_, mut v, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, mut v, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     {
         v.push(e);
@@ -38686,11 +38716,11 @@ fn __action374<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -38706,8 +38736,8 @@ fn __action375<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -38718,8 +38748,8 @@ fn __action376<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     Some(__0)
 }
@@ -38732,7 +38762,7 @@ fn __action377<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::ParenthesizedExpr>
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     None
 }
@@ -38744,8 +38774,8 @@ fn __action378<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -38986,8 +39016,8 @@ fn __action396<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     Some(__0)
 }
@@ -39000,7 +39030,7 @@ fn __action397<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::ParenthesizedExpr>
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     None
 }
@@ -39012,8 +39042,8 @@ fn __action398<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -39024,8 +39054,8 @@ fn __action399<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     Some(__0)
 }
@@ -39038,7 +39068,7 @@ fn __action400<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::ParenthesizedExpr>
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     None
 }
@@ -39049,8 +39079,8 @@ fn __action401<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     Some(__0)
 }
@@ -39063,7 +39093,7 @@ fn __action402<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<ast::ParenthesizedExpr>
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     None
 }
@@ -39075,13 +39105,13 @@ fn __action403<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, body, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, body, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, test, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, test, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, orelse, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, orelse, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprIfExp {
         test: Box::new(test.into()),
@@ -39097,8 +39127,8 @@ fn __action404<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -39109,8 +39139,8 @@ fn __action405<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -39123,7 +39153,7 @@ fn __action406<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     alloc::vec![]
 }
@@ -39134,8 +39164,8 @@ fn __action407<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, v, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     v
 }
@@ -39320,8 +39350,8 @@ fn __action422<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     alloc::vec![__0]
 }
@@ -39332,9 +39362,9 @@ fn __action423<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, v, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -39384,11 +39414,11 @@ fn __action427<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -39404,8 +39434,8 @@ fn __action428<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -39466,8 +39496,8 @@ fn __action433<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, (TextSize, ast::ParenthesizedExpr, ast::Suite), TextSize),
-) -> alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>
+    (_, __0, _): (TextSize, (TextSize, crate::parser::ParenthesizedExpr, ast::Suite), TextSize),
+) -> alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>
 {
     alloc::vec![__0]
 }
@@ -39478,9 +39508,9 @@ fn __action434<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>, TextSize),
-    (_, e, _): (TextSize, (TextSize, ast::ParenthesizedExpr, ast::Suite), TextSize),
-) -> alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>
+    (_, v, _): (TextSize, alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>, TextSize),
+    (_, e, _): (TextSize, (TextSize, crate::parser::ParenthesizedExpr, ast::Suite), TextSize),
+) -> alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -39492,13 +39522,13 @@ fn __action435<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, body, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, body, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, test, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, test, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, orelse, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, orelse, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprIfExp {
         test: Box::new(test.into()),
@@ -39514,8 +39544,8 @@ fn __action436<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -39526,8 +39556,8 @@ fn __action437<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -39813,8 +39843,8 @@ fn __action456<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::Expr, TextSize),
-) -> alloc::vec::Vec<ast::Expr>
+    (_, __0, _): (TextSize, ast::FStringElement, TextSize),
+) -> alloc::vec::Vec<ast::FStringElement>
 {
     alloc::vec![__0]
 }
@@ -39825,9 +39855,9 @@ fn __action457<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-    (_, e, _): (TextSize, ast::Expr, TextSize),
-) -> alloc::vec::Vec<ast::Expr>
+    (_, v, _): (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
+    (_, e, _): (TextSize, ast::FStringElement, TextSize),
+) -> alloc::vec::Vec<ast::FStringElement>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -39838,8 +39868,8 @@ fn __action458<
 >(
     source_code: &str,
     mode: Mode,
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     vec![e]
 }
@@ -39850,10 +39880,10 @@ fn __action459<
 >(
     source_code: &str,
     mode: Mode,
-    (_, mut v, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, mut v, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     {
         v.push(e);
@@ -39867,8 +39897,8 @@ fn __action460<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     alloc::vec![__0]
 }
@@ -39879,9 +39909,9 @@ fn __action461<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, v, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -39892,9 +39922,9 @@ fn __action462<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -39906,10 +39936,10 @@ fn __action463<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, values, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, last, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, values, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, last, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let values = values.into_iter().chain(std::iter::once(last)).map(ast::Expr::from).collect();
@@ -39923,8 +39953,8 @@ fn __action464<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -39935,8 +39965,8 @@ fn __action465<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     alloc::vec![__0]
 }
@@ -39947,9 +39977,9 @@ fn __action466<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, v, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -40048,8 +40078,8 @@ fn __action474<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     alloc::vec![__0]
 }
@@ -40060,9 +40090,9 @@ fn __action475<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, v, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -40073,9 +40103,9 @@ fn __action476<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40088,9 +40118,9 @@ fn __action477<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, operand, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, operand, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprUnaryOp {
         operand: Box::new(operand.into()),
@@ -40105,8 +40135,8 @@ fn __action478<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40223,7 +40253,7 @@ fn __action487<
     mode: Mode,
     (_, mut i, _): (TextSize, ast::ParameterWithDefault, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, default, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, default, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParameterWithDefault
 {
@@ -40371,7 +40401,7 @@ fn __action498<
     mode: Mode,
     (_, mut i, _): (TextSize, ast::ParameterWithDefault, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, default, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, default, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> ast::ParameterWithDefault
 {
@@ -40439,10 +40469,10 @@ fn __action503<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, values, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, last, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, values, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, last, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let values = values.into_iter().chain(std::iter::once(last)).map(ast::Expr::from).collect();
@@ -40456,8 +40486,8 @@ fn __action504<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40469,11 +40499,11 @@ fn __action505<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -40489,8 +40519,8 @@ fn __action506<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40502,11 +40532,11 @@ fn __action507<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, op, _): (TextSize, ast::Operator, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -40522,8 +40552,8 @@ fn __action508<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40535,10 +40565,10 @@ fn __action509<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, values, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, last, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, values, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, last, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let values = values.into_iter().chain(std::iter::once(last)).map(ast::Expr::from).collect();
@@ -40552,8 +40582,8 @@ fn __action510<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40615,10 +40645,10 @@ fn __action515<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-    (_, comparisons, _): (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    (_, comparisons, _): (TextSize, alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
@@ -40632,8 +40662,8 @@ fn __action516<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40644,8 +40674,8 @@ fn __action517<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, (ast::CmpOp, ast::ParenthesizedExpr), TextSize),
-) -> alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>
+    (_, __0, _): (TextSize, (ast::CmpOp, crate::parser::ParenthesizedExpr), TextSize),
+) -> alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>
 {
     alloc::vec![__0]
 }
@@ -40656,9 +40686,9 @@ fn __action518<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>, TextSize),
-    (_, e, _): (TextSize, (ast::CmpOp, ast::ParenthesizedExpr), TextSize),
-) -> alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>
+    (_, v, _): (TextSize, alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>, TextSize),
+    (_, e, _): (TextSize, (ast::CmpOp, crate::parser::ParenthesizedExpr), TextSize),
+) -> alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -40670,8 +40700,8 @@ fn __action519<
     source_code: &str,
     mode: Mode,
     (_, __0, _): (TextSize, ast::CmpOp, TextSize),
-    (_, __1, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> (ast::CmpOp, ast::ParenthesizedExpr)
+    (_, __1, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> (ast::CmpOp, crate::parser::ParenthesizedExpr)
 {
     (__0, __1)
 }
@@ -40684,9 +40714,9 @@ fn __action520<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, operand, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, operand, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprUnaryOp {
         operand: Box::new(operand.into()),
@@ -40701,8 +40731,8 @@ fn __action521<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40714,11 +40744,11 @@ fn __action522<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, op, _): (TextSize, ast::Operator, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -40734,8 +40764,8 @@ fn __action523<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40747,11 +40777,11 @@ fn __action524<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, op, _): (TextSize, ast::Operator, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -40767,8 +40797,8 @@ fn __action525<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40780,10 +40810,10 @@ fn __action526<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-    (_, comparisons, _): (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    (_, comparisons, _): (TextSize, alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
@@ -40797,8 +40827,8 @@ fn __action527<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40810,11 +40840,11 @@ fn __action528<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -40830,8 +40860,8 @@ fn __action529<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40844,9 +40874,9 @@ fn __action530<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, op, _): (TextSize, ast::UnaryOp, TextSize),
-    (_, operand, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, operand, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprUnaryOp {
         operand: Box::new(operand.into()),
@@ -40861,8 +40891,8 @@ fn __action531<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40874,11 +40904,11 @@ fn __action532<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -40894,8 +40924,8 @@ fn __action533<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40907,11 +40937,11 @@ fn __action534<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -40927,8 +40957,8 @@ fn __action535<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40940,11 +40970,11 @@ fn __action536<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -40960,8 +40990,8 @@ fn __action537<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -40974,9 +41004,9 @@ fn __action538<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         ast::ExprAwait { value: Box::new(value.into()), range: (location..end_location).into() }.into()
@@ -40989,8 +41019,8 @@ fn __action539<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41001,8 +41031,8 @@ fn __action540<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41014,10 +41044,10 @@ fn __action541<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, func, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, func, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, arguments, _): (TextSize, ast::Arguments, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprCall {
         func: Box::new(func.into()),
@@ -41033,12 +41063,12 @@ fn __action542<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, slice, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, slice, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprSubscript {
         value: Box::new(value.into()),
@@ -41055,11 +41085,11 @@ fn __action543<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, attr, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprAttribute {
         value: Box::new(value.into()),
@@ -41076,11 +41106,11 @@ fn __action544<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, op, _): (TextSize, ast::Operator, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -41096,8 +41126,8 @@ fn __action545<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41109,11 +41139,11 @@ fn __action546<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, op, _): (TextSize, ast::Operator, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -41129,8 +41159,8 @@ fn __action547<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41142,7 +41172,7 @@ fn __action548<
     source_code: &str,
     mode: Mode,
     (_, expr, _): (TextSize, ast::Expr, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     expr.into()
 }
@@ -41156,7 +41186,7 @@ fn __action549<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, value, _): (TextSize, ast::Number, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprNumberLiteral {
         value,
@@ -41173,7 +41203,7 @@ fn __action550<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, id, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprName {
         id: id.into(),
@@ -41190,10 +41220,10 @@ fn __action551<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elts, _): (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
+    (_, elts, _): (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let elts = elts.into_iter().flatten().map(ast::Expr::from).collect();
@@ -41209,11 +41239,11 @@ fn __action552<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elt, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, elt, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, generators, _): (TextSize, Vec<ast::Comprehension>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         ast::ExprListComp { elt: Box::new(elt.into()), generators, range: (location..end_location).into() }.into()
@@ -41228,15 +41258,15 @@ fn __action553<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elts, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, elts, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, trailing_comma, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         if elts.len() == 1 && trailing_comma.is_none() {
-            ast::ParenthesizedExpr {
+            crate::parser::ParenthesizedExpr {
                 expr: elts.into_iter().next().unwrap().into(),
                 range: (location..end_location).into(),
             }
@@ -41255,13 +41285,13 @@ fn __action554<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, left, _): (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    (_, mid, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-    (_, right, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, left, _): (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    (_, mid, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, trailing_comma, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
@@ -41271,7 +41301,7 @@ fn __action554<
                     location: mid.start(),
                 })?;
             }
-            Ok(ast::ParenthesizedExpr {
+            Ok(crate::parser::ParenthesizedExpr {
                 expr: mid.into(),
                 range: (location..end_location).into(),
             })
@@ -41292,7 +41322,7 @@ fn __action555<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprTuple {
         elts: Vec::new(),
@@ -41309,12 +41339,12 @@ fn __action556<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
-    ast::ParenthesizedExpr {
+    crate::parser::ParenthesizedExpr {
         expr: e.into(),
         range: (location..end_location).into(),
     }
@@ -41328,11 +41358,11 @@ fn __action557<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elt, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, elt, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, generators, _): (TextSize, Vec<ast::Comprehension>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprGeneratorExp {
         elt: Box::new(elt.into()),
@@ -41350,10 +41380,10 @@ fn __action558<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         Err(LexicalError{
@@ -41371,10 +41401,10 @@ fn __action559<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>, TextSize),
+    (_, e, _): (TextSize, core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let (keys, values) = e
@@ -41394,11 +41424,11 @@ fn __action560<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e1, _): (TextSize, (ast::ParenthesizedExpr, ast::ParenthesizedExpr), TextSize),
+    (_, e1, _): (TextSize, (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr), TextSize),
     (_, generators, _): (TextSize, Vec<ast::Comprehension>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         ast::ExprDictComp {
@@ -41418,10 +41448,10 @@ fn __action561<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elts, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, elts, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let elts = elts.into_iter().map(ast::Expr::from).collect();
@@ -41440,11 +41470,11 @@ fn __action562<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elt, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, elt, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, generators, _): (TextSize, Vec<ast::Comprehension>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprSetComp {
         elt: Box::new(elt.into()),
@@ -41462,7 +41492,7 @@ fn __action563<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBooleanLiteral { value: true, range: (location..end_location).into() }.into()
 }
@@ -41476,7 +41506,7 @@ fn __action564<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBooleanLiteral { value: false, range: (location..end_location).into() }.into()
 }
@@ -41490,7 +41520,7 @@ fn __action565<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprNoneLiteral { range: (location..end_location).into() }.into()
 }
@@ -41504,7 +41534,7 @@ fn __action566<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprEllipsisLiteral { range: (location..end_location).into() }.into()
 }
@@ -41515,8 +41545,8 @@ fn __action567<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize),
-) -> core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>
+    (_, __0, _): (TextSize, Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>, TextSize),
+) -> core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>
 {
     Some(__0)
 }
@@ -41529,7 +41559,7 @@ fn __action568<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>
+) -> core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>
 {
     None
 }
@@ -41542,7 +41572,7 @@ fn __action569<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     alloc::vec![]
 }
@@ -41553,8 +41583,8 @@ fn __action570<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, v, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     v
 }
@@ -41566,8 +41596,8 @@ fn __action571<
     source_code: &str,
     mode: Mode,
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41578,8 +41608,8 @@ fn __action572<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
-) -> core::option::Option<Vec<ast::ParenthesizedExpr>>
+    (_, __0, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> core::option::Option<Vec<crate::parser::ParenthesizedExpr>>
 {
     Some(__0)
 }
@@ -41592,7 +41622,7 @@ fn __action573<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<Vec<ast::ParenthesizedExpr>>
+) -> core::option::Option<Vec<crate::parser::ParenthesizedExpr>>
 {
     None
 }
@@ -41603,9 +41633,9 @@ fn __action574<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, __0, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     __0
 }
@@ -41616,8 +41646,8 @@ fn __action575<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
-) -> core::option::Option<Vec<ast::ParenthesizedExpr>>
+    (_, __0, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> core::option::Option<Vec<crate::parser::ParenthesizedExpr>>
 {
     Some(__0)
 }
@@ -41630,7 +41660,7 @@ fn __action576<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> core::option::Option<Vec<ast::ParenthesizedExpr>>
+) -> core::option::Option<Vec<crate::parser::ParenthesizedExpr>>
 {
     None
 }
@@ -41642,11 +41672,11 @@ fn __action577<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, op, _): (TextSize, ast::Operator, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -41662,8 +41692,8 @@ fn __action578<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41676,9 +41706,9 @@ fn __action579<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, op, _): (TextSize, ast::UnaryOp, TextSize),
-    (_, operand, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, operand, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprUnaryOp {
         operand: Box::new(operand.into()),
@@ -41693,8 +41723,8 @@ fn __action580<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41705,8 +41735,8 @@ fn __action581<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     alloc::vec![__0]
 }
@@ -41717,9 +41747,9 @@ fn __action582<
 >(
     source_code: &str,
     mode: Mode,
-    (_, v, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    (_, v, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     { let mut v = v; v.push(e); v }
 }
@@ -41731,11 +41761,11 @@ fn __action583<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, left, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, left, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, right, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBinOp {
         left: Box::new(left.into()),
@@ -41751,8 +41781,8 @@ fn __action584<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41765,9 +41795,9 @@ fn __action585<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         ast::ExprAwait { value: Box::new(value.into()), range: (location..end_location).into() }.into()
@@ -41780,8 +41810,8 @@ fn __action586<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41792,8 +41822,8 @@ fn __action587<
 >(
     source_code: &str,
     mode: Mode,
-    (_, __0, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    (_, __0, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     __0
 }
@@ -41805,10 +41835,10 @@ fn __action588<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, func, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, func, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, arguments, _): (TextSize, ast::Arguments, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprCall {
         func: Box::new(func.into()),
@@ -41824,12 +41854,12 @@ fn __action589<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, slice, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, slice, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprSubscript {
         value: Box::new(value.into()),
@@ -41846,11 +41876,11 @@ fn __action590<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, value, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, value, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, attr, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprAttribute {
         value: Box::new(value.into()),
@@ -41867,7 +41897,7 @@ fn __action591<
     source_code: &str,
     mode: Mode,
     (_, expr, _): (TextSize, ast::Expr, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     expr.into()
 }
@@ -41881,7 +41911,7 @@ fn __action592<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, value, _): (TextSize, ast::Number, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprNumberLiteral {
         value,
@@ -41898,7 +41928,7 @@ fn __action593<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, id, _): (TextSize, ast::Identifier, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprName {
         id: id.into(),
@@ -41915,10 +41945,10 @@ fn __action594<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elts, _): (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
+    (_, elts, _): (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let elts = elts.into_iter().flatten().map(ast::Expr::from).collect();
@@ -41934,11 +41964,11 @@ fn __action595<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elt, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, elt, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, generators, _): (TextSize, Vec<ast::Comprehension>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         ast::ExprListComp { elt: Box::new(elt.into()), generators, range: (location..end_location).into() }.into()
@@ -41953,13 +41983,13 @@ fn __action596<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, left, _): (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    (_, mid, _): (TextSize, ast::ParenthesizedExpr, TextSize),
-    (_, right, _): (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, left, _): (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    (_, mid, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    (_, right, _): (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, trailing_comma, _): (TextSize, core::option::Option<token::Tok>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         if left.is_none() && right.is_empty() && trailing_comma.is_none() {
@@ -41969,7 +41999,7 @@ fn __action596<
                     location: mid.start(),
                 })?;
             }
-            Ok(ast::ParenthesizedExpr {
+            Ok(crate::parser::ParenthesizedExpr {
                 expr: mid.into(),
                 range: (location..end_location).into(),
             })
@@ -41990,7 +42020,7 @@ fn __action597<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprTuple {
         elts: Vec::new(),
@@ -42007,12 +42037,12 @@ fn __action598<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
-    ast::ParenthesizedExpr {
+    crate::parser::ParenthesizedExpr {
         expr: e.into(),
         range: (location..end_location).into(),
     }
@@ -42026,11 +42056,11 @@ fn __action599<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elt, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, elt, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, generators, _): (TextSize, Vec<ast::Comprehension>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprGeneratorExp {
         elt: Box::new(elt.into()),
@@ -42048,10 +42078,10 @@ fn __action600<
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, e, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
         Err(LexicalError{
@@ -42069,10 +42099,10 @@ fn __action601<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e, _): (TextSize, core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>, TextSize),
+    (_, e, _): (TextSize, core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let (keys, values) = e
@@ -42092,11 +42122,11 @@ fn __action602<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, e1, _): (TextSize, (ast::ParenthesizedExpr, ast::ParenthesizedExpr), TextSize),
+    (_, e1, _): (TextSize, (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr), TextSize),
     (_, generators, _): (TextSize, Vec<ast::Comprehension>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         ast::ExprDictComp {
@@ -42116,10 +42146,10 @@ fn __action603<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elts, _): (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    (_, elts, _): (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     {
         let elts = elts.into_iter().map(ast::Expr::from).collect();
@@ -42138,11 +42168,11 @@ fn __action604<
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
-    (_, elt, _): (TextSize, ast::ParenthesizedExpr, TextSize),
+    (_, elt, _): (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     (_, generators, _): (TextSize, Vec<ast::Comprehension>, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprSetComp {
         elt: Box::new(elt.into()),
@@ -42160,7 +42190,7 @@ fn __action605<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBooleanLiteral { value: true, range: (location..end_location).into() }.into()
 }
@@ -42174,7 +42204,7 @@ fn __action606<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprBooleanLiteral { value: false, range: (location..end_location).into() }.into()
 }
@@ -42188,7 +42218,7 @@ fn __action607<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprNoneLiteral { range: (location..end_location).into() }.into()
 }
@@ -42202,7 +42232,7 @@ fn __action608<
     (_, location, _): (TextSize, TextSize, TextSize),
     (_, _, _): (TextSize, token::Tok, TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     ast::ExprEllipsisLiteral { range: (location..end_location).into() }.into()
 }
@@ -42215,11 +42245,11 @@ fn __action609<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __2: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -42249,10 +42279,10 @@ fn __action610<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __2: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -42283,13 +42313,13 @@ fn __action611<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __2: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.0;
     let __end0 = __5.2;
@@ -42321,12 +42351,12 @@ fn __action612<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __2: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __5.0;
@@ -42359,13 +42389,13 @@ fn __action613<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __2: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.0;
     let __end0 = __5.2;
@@ -42397,12 +42427,12 @@ fn __action614<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __2: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __5.0;
@@ -42433,9 +42463,9 @@ fn __action615<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize),
+    __0: (TextSize, Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>
+) -> Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -42459,8 +42489,8 @@ fn __action616<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize),
-) -> Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>
+    __0: (TextSize, Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>, TextSize),
+) -> Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -42485,9 +42515,9 @@ fn __action617<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -42511,8 +42541,8 @@ fn __action618<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -42538,10 +42568,10 @@ fn __action619<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -42568,9 +42598,9 @@ fn __action620<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -42598,10 +42628,10 @@ fn __action621<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -42628,9 +42658,9 @@ fn __action622<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -42725,9 +42755,9 @@ fn __action625<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -42751,8 +42781,8 @@ fn __action626<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -43000,7 +43030,7 @@ fn __action633<
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-    __3: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -43044,7 +43074,7 @@ fn __action634<
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-    __3: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, TextSize, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -43925,9 +43955,9 @@ fn __action661<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -43951,8 +43981,8 @@ fn __action662<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
-) -> Vec<ast::ParenthesizedExpr>
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -43978,10 +44008,10 @@ fn __action663<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -44008,9 +44038,9 @@ fn __action664<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -44483,13 +44513,13 @@ fn __action679<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, core::option::Option<(TextSize, ast::ConversionFlag)>, TextSize),
-    __5: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __5: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -44521,12 +44551,12 @@ fn __action680<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, core::option::Option<(TextSize, ast::ConversionFlag)>, TextSize),
-    __4: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __4: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -44560,9 +44590,9 @@ fn __action681<
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __5: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
     __8: (TextSize, core::option::Option<ast::Suite>, TextSize),
@@ -44599,9 +44629,9 @@ fn __action682<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
     __7: (TextSize, core::option::Option<ast::Suite>, TextSize),
@@ -44644,7 +44674,7 @@ fn __action683<
     __4: (TextSize, ast::Identifier, TextSize),
     __5: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __6: (TextSize, ast::Parameters, TextSize),
-    __7: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __7: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __8: (TextSize, token::Tok, TextSize),
     __9: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -44685,7 +44715,7 @@ fn __action684<
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
-    __6: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __6: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -44724,10 +44754,10 @@ fn __action685<
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __6: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __5: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __6: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __7: (TextSize, TextSize, TextSize),
 ) -> ast::Comprehension
 {
@@ -44761,10 +44791,10 @@ fn __action686<
     mode: Mode,
     __0: (TextSize, TextSize, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __5: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __6: (TextSize, TextSize, TextSize),
 ) -> ast::Comprehension
 {
@@ -45914,10 +45944,10 @@ fn __action723<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
-) -> (TextSize, ast::ParenthesizedExpr, ast::Suite)
+) -> (TextSize, crate::parser::ParenthesizedExpr, ast::Suite)
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -45975,11 +46005,11 @@ fn __action725<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46007,11 +46037,11 @@ fn __action726<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46039,11 +46069,11 @@ fn __action727<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46071,10 +46101,10 @@ fn __action728<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46101,10 +46131,10 @@ fn __action729<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46163,11 +46193,11 @@ fn __action731<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46195,11 +46225,11 @@ fn __action732<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46260,8 +46290,8 @@ fn __action734<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -46293,7 +46323,7 @@ fn __action735<
     mode: Mode,
     __0: (TextSize, ast::Number, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46321,7 +46351,7 @@ fn __action736<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46348,10 +46378,10 @@ fn __action737<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46380,11 +46410,11 @@ fn __action738<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46414,11 +46444,11 @@ fn __action739<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46448,10 +46478,10 @@ fn __action740<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46480,13 +46510,13 @@ fn __action741<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46518,12 +46548,12 @@ fn __action742<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46556,7 +46586,7 @@ fn __action743<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46584,10 +46614,10 @@ fn __action744<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46616,11 +46646,11 @@ fn __action745<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46651,10 +46681,10 @@ fn __action746<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -46684,10 +46714,10 @@ fn __action747<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46716,11 +46746,11 @@ fn __action748<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, (ast::ParenthesizedExpr, ast::ParenthesizedExpr), TextSize),
+    __1: (TextSize, (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr), TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46750,10 +46780,10 @@ fn __action749<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46782,11 +46812,11 @@ fn __action750<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46817,7 +46847,7 @@ fn __action751<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46845,7 +46875,7 @@ fn __action752<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46873,7 +46903,7 @@ fn __action753<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46901,7 +46931,7 @@ fn __action754<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46929,7 +46959,7 @@ fn __action755<
     mode: Mode,
     __0: (TextSize, ast::Number, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46957,7 +46987,7 @@ fn __action756<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -46984,10 +47014,10 @@ fn __action757<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47016,11 +47046,11 @@ fn __action758<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47050,13 +47080,13 @@ fn __action759<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47088,12 +47118,12 @@ fn __action760<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47126,7 +47156,7 @@ fn __action761<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47154,10 +47184,10 @@ fn __action762<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47186,11 +47216,11 @@ fn __action763<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47221,10 +47251,10 @@ fn __action764<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -47254,10 +47284,10 @@ fn __action765<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47286,11 +47316,11 @@ fn __action766<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, (ast::ParenthesizedExpr, ast::ParenthesizedExpr), TextSize),
+    __1: (TextSize, (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr), TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47320,10 +47350,10 @@ fn __action767<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47352,11 +47382,11 @@ fn __action768<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47387,7 +47417,7 @@ fn __action769<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47415,7 +47445,7 @@ fn __action770<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47443,7 +47473,7 @@ fn __action771<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47471,7 +47501,7 @@ fn __action772<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47497,10 +47527,10 @@ fn __action773<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Arguments, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47527,12 +47557,12 @@ fn __action774<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47561,11 +47591,11 @@ fn __action775<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47593,10 +47623,10 @@ fn __action776<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Arguments, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47623,12 +47653,12 @@ fn __action777<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47657,11 +47687,11 @@ fn __action778<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47690,9 +47720,9 @@ fn __action779<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47720,9 +47750,9 @@ fn __action780<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47875,10 +47905,10 @@ fn __action785<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47905,10 +47935,10 @@ fn __action786<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -47936,7 +47966,7 @@ fn __action787<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
     __3: (TextSize, token::Tok, TextSize),
 ) -> ast::Decorator
@@ -47968,7 +47998,7 @@ fn __action788<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -48056,7 +48086,7 @@ fn __action791<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Parameter
 {
@@ -48086,7 +48116,7 @@ fn __action792<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
 ) -> ast::ExceptHandler
@@ -48118,7 +48148,7 @@ fn __action793<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, (ast::ParenthesizedExpr, ast::Identifier), TextSize),
+    __1: (TextSize, (crate::parser::ParenthesizedExpr, ast::Identifier), TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
 ) -> ast::ExceptHandler
@@ -48151,7 +48181,7 @@ fn __action794<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
 ) -> ast::ExceptHandler
@@ -48185,7 +48215,7 @@ fn __action795<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, (ast::ParenthesizedExpr, ast::Identifier), TextSize),
+    __2: (TextSize, (crate::parser::ParenthesizedExpr, ast::Identifier), TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
 ) -> ast::ExceptHandler
@@ -48217,11 +48247,11 @@ fn __action796<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48249,11 +48279,11 @@ fn __action797<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48281,8 +48311,8 @@ fn __action798<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -48311,9 +48341,9 @@ fn __action799<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -48343,10 +48373,10 @@ fn __action800<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -48416,7 +48446,7 @@ fn __action802<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> StringType
@@ -48447,9 +48477,9 @@ fn __action803<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::Expr
+) -> ast::FStringFormatSpec
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48477,7 +48507,7 @@ fn __action804<
     mode: Mode,
     __0: (TextSize, (String, bool), TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48504,13 +48534,13 @@ fn __action805<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, core::option::Option<(TextSize, ast::ConversionFlag)>, TextSize),
-    __4: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __4: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48542,12 +48572,12 @@ fn __action806<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, core::option::Option<(TextSize, ast::ConversionFlag)>, TextSize),
-    __3: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __3: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48578,9 +48608,9 @@ fn __action807<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::UnaryOp, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48608,9 +48638,9 @@ fn __action808<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::UnaryOp, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -48694,7 +48724,7 @@ fn __action811<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -48723,7 +48753,7 @@ fn __action812<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -48753,9 +48783,9 @@ fn __action813<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
     __7: (TextSize, core::option::Option<ast::Suite>, TextSize),
@@ -48792,9 +48822,9 @@ fn __action814<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
     __6: (TextSize, core::option::Option<ast::Suite>, TextSize),
@@ -48835,7 +48865,7 @@ fn __action815<
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
-    __6: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __6: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -48876,7 +48906,7 @@ fn __action816<
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
-    __5: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __5: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -48911,7 +48941,7 @@ fn __action817<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Comprehension>>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
@@ -48943,7 +48973,7 @@ fn __action818<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
@@ -48974,7 +49004,7 @@ fn __action819<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
@@ -49004,7 +49034,7 @@ fn __action820<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
@@ -49033,10 +49063,10 @@ fn __action821<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49063,9 +49093,9 @@ fn __action822<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49091,10 +49121,10 @@ fn __action823<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49121,9 +49151,9 @@ fn __action824<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49208,10 +49238,10 @@ fn __action827<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
-    __4: (TextSize, alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>, TextSize),
+    __4: (TextSize, alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>, TextSize),
     __5: (TextSize, core::option::Option<(TextSize, ast::Suite)>, TextSize),
 ) -> ast::Stmt
 {
@@ -49491,7 +49521,7 @@ fn __action836<
     mode: Mode,
     __0: (TextSize, (IpyEscapeKind, String), TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49545,7 +49575,7 @@ fn __action838<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, alloc::vec::Vec<token::Tok>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
@@ -49580,9 +49610,9 @@ fn __action839<
     __2: (TextSize, TextSize, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, core::option::Option<(String, bool)>, TextSize),
-    __5: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __5: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -49707,7 +49737,7 @@ fn __action843<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> ast::Pattern
 {
@@ -49735,7 +49765,7 @@ fn __action844<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> ast::Pattern
 {
@@ -50306,7 +50336,7 @@ fn __action862<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -50344,7 +50374,7 @@ fn __action863<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -50396,7 +50426,7 @@ fn __action864<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -50448,7 +50478,7 @@ fn __action865<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -50497,11 +50527,11 @@ fn __action866<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -50531,7 +50561,7 @@ fn __action867<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -50588,9 +50618,9 @@ fn __action869<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -50618,9 +50648,9 @@ fn __action870<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -50649,7 +50679,7 @@ fn __action871<
     mode: Mode,
     __0: (TextSize, ast::Number, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -50676,9 +50706,9 @@ fn __action872<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -50733,10 +50763,10 @@ fn __action874<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -50763,10 +50793,10 @@ fn __action875<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52029,11 +52059,11 @@ fn __action916<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52061,11 +52091,11 @@ fn __action917<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52122,8 +52152,8 @@ fn __action919<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -52351,11 +52381,11 @@ fn __action926<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52383,11 +52413,11 @@ fn __action927<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52417,10 +52447,10 @@ fn __action928<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __5: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __6: (TextSize, TextSize, TextSize),
 ) -> ast::Comprehension
 {
@@ -52454,10 +52484,10 @@ fn __action929<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, TextSize, TextSize),
 ) -> ast::Comprehension
 {
@@ -52490,8 +52520,8 @@ fn __action930<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
-) -> Option<ast::ParenthesizedExpr>
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> Option<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52518,9 +52548,9 @@ fn __action931<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52578,7 +52608,7 @@ fn __action933<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Parameter
 {
@@ -52717,12 +52747,12 @@ fn __action938<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
-    __3: (TextSize, core::option::Option<Option<ast::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, core::option::Option<Option<crate::parser::ParenthesizedExpr>>, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52751,10 +52781,10 @@ fn __action939<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52781,10 +52811,10 @@ fn __action940<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52811,9 +52841,9 @@ fn __action941<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52839,11 +52869,11 @@ fn __action942<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52871,11 +52901,11 @@ fn __action943<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52903,13 +52933,13 @@ fn __action944<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -52939,13 +52969,13 @@ fn __action945<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -53006,7 +53036,7 @@ fn __action947<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, alloc::vec::Vec<token::Tok>, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> ast::Mod
@@ -53177,7 +53207,7 @@ fn __action952<
     __1: (TextSize, ast::Expr, TextSize),
     __2: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -53210,7 +53240,7 @@ fn __action953<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::TypeParam
 {
@@ -53366,7 +53396,7 @@ fn __action958<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::ParameterWithDefault
 {
@@ -53452,7 +53482,7 @@ fn __action961<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
     __4: (TextSize, core::option::Option<ast::Suite>, TextSize),
@@ -53485,9 +53515,9 @@ fn __action962<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> ast::WithItem
 {
@@ -53583,11 +53613,11 @@ fn __action965<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -53615,11 +53645,11 @@ fn __action966<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -53648,9 +53678,9 @@ fn __action967<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -53679,9 +53709,9 @@ fn __action968<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -57182,8 +57212,8 @@ fn __action1079<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -57208,9 +57238,9 @@ fn __action1080<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -57240,7 +57270,7 @@ fn __action1081<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -57270,8 +57300,8 @@ fn __action1082<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -57295,10 +57325,10 @@ fn __action1083<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -57324,12 +57354,12 @@ fn __action1084<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -57360,13 +57390,13 @@ fn __action1085<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -57396,11 +57426,11 @@ fn __action1086<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -57430,12 +57460,12 @@ fn __action1087<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -57464,12 +57494,12 @@ fn __action1088<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -57500,13 +57530,13 @@ fn __action1089<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -57536,11 +57566,11 @@ fn __action1090<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -57570,12 +57600,12 @@ fn __action1091<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -57790,8 +57820,8 @@ fn __action1098<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -57822,7 +57852,7 @@ fn __action1099<
     __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __7: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __8: (TextSize, token::Tok, TextSize),
     __9: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -57903,7 +57933,7 @@ fn __action1101<
     __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __6: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -58030,8 +58060,8 @@ fn __action1105<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -58057,7 +58087,7 @@ fn __action1106<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> ast::Parameter
 {
@@ -58115,7 +58145,7 @@ fn __action1108<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> ast::TypeParam
 {
@@ -58173,7 +58203,7 @@ fn __action1110<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> ast::ParameterWithDefault
 {
@@ -58230,8 +58260,8 @@ fn __action1112<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -58257,7 +58287,7 @@ fn __action1113<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> ast::Parameter
 {
@@ -58414,7 +58444,7 @@ fn __action1119<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Mod
 {
@@ -58444,7 +58474,7 @@ fn __action1120<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, alloc::vec::Vec<token::Tok>, TextSize),
     __3: (TextSize, TextSize, TextSize),
 ) -> ast::Mod
@@ -58645,9 +58675,9 @@ fn __action1127<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -58687,9 +58717,9 @@ fn __action1128<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -58724,9 +58754,9 @@ fn __action1129<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -58764,9 +58794,9 @@ fn __action1130<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -58952,7 +58982,7 @@ fn __action1135<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -58988,7 +59018,7 @@ fn __action1136<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -59394,8 +59424,8 @@ fn __action1147<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -59420,9 +59450,9 @@ fn __action1148<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -59452,7 +59482,7 @@ fn __action1149<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, TextSize, TextSize),
 ) -> ast::Stmt
 {
@@ -59482,10 +59512,10 @@ fn __action1150<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
-) -> alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>
+) -> alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>
 {
     let __start0 = __0.0;
     let __end0 = __3.2;
@@ -59511,12 +59541,12 @@ fn __action1151<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Suite, TextSize),
-) -> alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>
+) -> alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>
 {
     let __start0 = __1.0;
     let __end0 = __4.2;
@@ -59544,7 +59574,7 @@ fn __action1152<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
     __4: (TextSize, core::option::Option<(TextSize, ast::Suite)>, TextSize),
@@ -59578,10 +59608,10 @@ fn __action1153<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
-    __4: (TextSize, alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>, TextSize),
+    __4: (TextSize, alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>, TextSize),
     __5: (TextSize, core::option::Option<(TextSize, ast::Suite)>, TextSize),
 ) -> ast::Stmt
 {
@@ -59640,7 +59670,7 @@ fn __action1155<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -59676,7 +59706,7 @@ fn __action1156<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -59708,10 +59738,10 @@ fn __action1157<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
-    __4: (TextSize, alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>, TextSize),
+    __4: (TextSize, alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
@@ -59746,10 +59776,10 @@ fn __action1158<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
-    __4: (TextSize, alloc::vec::Vec<(TextSize, ast::ParenthesizedExpr, ast::Suite)>, TextSize),
+    __4: (TextSize, alloc::vec::Vec<(TextSize, crate::parser::ParenthesizedExpr, ast::Suite)>, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __4.2;
@@ -59779,9 +59809,9 @@ fn __action1159<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -59805,10 +59835,10 @@ fn __action1160<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -59939,9 +59969,9 @@ fn __action1165<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -59965,10 +59995,10 @@ fn __action1166<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> alloc::vec::Vec<ast::ParenthesizedExpr>
+) -> alloc::vec::Vec<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -59993,9 +60023,9 @@ fn __action1167<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> core::option::Option<Vec<ast::ParenthesizedExpr>>
+) -> core::option::Option<Vec<crate::parser::ParenthesizedExpr>>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -60020,13 +60050,13 @@ fn __action1168<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -60056,11 +60086,11 @@ fn __action1169<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -60090,14 +60120,14 @@ fn __action1170<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -60128,12 +60158,12 @@ fn __action1171<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -60164,12 +60194,12 @@ fn __action1172<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -60198,10 +60228,10 @@ fn __action1173<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -60230,13 +60260,13 @@ fn __action1174<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -60266,11 +60296,11 @@ fn __action1175<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -60300,13 +60330,13 @@ fn __action1176<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -60336,11 +60366,11 @@ fn __action1177<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -60370,14 +60400,14 @@ fn __action1178<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -60408,12 +60438,12 @@ fn __action1179<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -60444,12 +60474,12 @@ fn __action1180<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -60478,10 +60508,10 @@ fn __action1181<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -60510,13 +60540,13 @@ fn __action1182<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -60546,11 +60576,11 @@ fn __action1183<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, TextSize, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -61220,7 +61250,7 @@ fn __action1206<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -61255,7 +61285,7 @@ fn __action1207<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, ast::Identifier, TextSize),
     __5: (TextSize, token::Tok, TextSize),
@@ -61289,7 +61319,7 @@ fn __action1208<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
 ) -> Vec<ast::WithItem>
 {
@@ -61316,7 +61346,7 @@ fn __action1209<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
 ) -> Vec<ast::WithItem>
@@ -61346,7 +61376,7 @@ fn __action1210<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
 ) -> Vec<ast::WithItem>
 {
@@ -61373,7 +61403,7 @@ fn __action1211<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
 ) -> core::option::Option<Vec<ast::WithItem>>
 {
@@ -61400,7 +61430,7 @@ fn __action1212<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::WithItem, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -61466,7 +61496,7 @@ fn __action1214<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::WithItem, TextSize),
     __4: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
@@ -61536,7 +61566,7 @@ fn __action1216<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::WithItem, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -61598,7 +61628,7 @@ fn __action1218<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::WithItem, TextSize),
     __4: (TextSize, alloc::vec::Vec<ast::WithItem>, TextSize),
@@ -61664,8 +61694,8 @@ fn __action1220<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::CmpOp, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>
 {
     let __start0 = __0.0;
     let __end0 = __1.2;
@@ -61689,10 +61719,10 @@ fn __action1221<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>, TextSize),
+    __0: (TextSize, alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>, TextSize),
     __1: (TextSize, ast::CmpOp, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>
 {
     let __start0 = __1.0;
     let __end0 = __2.2;
@@ -61889,10 +61919,10 @@ fn __action1228<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -61919,10 +61949,10 @@ fn __action1229<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -61949,10 +61979,10 @@ fn __action1230<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -61979,9 +62009,9 @@ fn __action1231<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -62007,9 +62037,9 @@ fn __action1232<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -62065,10 +62095,10 @@ fn __action1234<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62095,10 +62125,10 @@ fn __action1235<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62156,9 +62186,9 @@ fn __action1237<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __3.2;
@@ -62188,7 +62218,7 @@ fn __action1238<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __1.2;
@@ -62216,7 +62246,7 @@ fn __action1239<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Number, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -62242,7 +62272,7 @@ fn __action1240<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -62268,9 +62298,9 @@ fn __action1241<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62298,10 +62328,10 @@ fn __action1242<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62330,10 +62360,10 @@ fn __action1243<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62362,9 +62392,9 @@ fn __action1244<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62392,12 +62422,12 @@ fn __action1245<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -62428,10 +62458,10 @@ fn __action1246<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62460,13 +62490,13 @@ fn __action1247<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __6.2;
     let __end0 = __6.2;
@@ -62498,11 +62528,11 @@ fn __action1248<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -62532,11 +62562,11 @@ fn __action1249<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -62566,9 +62596,9 @@ fn __action1250<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62596,12 +62626,12 @@ fn __action1251<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -62632,10 +62662,10 @@ fn __action1252<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62665,7 +62695,7 @@ fn __action1253<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -62692,9 +62722,9 @@ fn __action1254<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62722,10 +62752,10 @@ fn __action1255<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62755,9 +62785,9 @@ fn __action1256<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62786,9 +62816,9 @@ fn __action1257<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62816,10 +62846,10 @@ fn __action1258<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, (ast::ParenthesizedExpr, ast::ParenthesizedExpr), TextSize),
+    __1: (TextSize, (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr), TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62848,9 +62878,9 @@ fn __action1259<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -62878,10 +62908,10 @@ fn __action1260<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -62910,7 +62940,7 @@ fn __action1261<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -62936,7 +62966,7 @@ fn __action1262<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -62962,7 +62992,7 @@ fn __action1263<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -62988,7 +63018,7 @@ fn __action1264<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63014,7 +63044,7 @@ fn __action1265<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Number, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63040,7 +63070,7 @@ fn __action1266<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63066,9 +63096,9 @@ fn __action1267<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<ast::ParenthesizedExpr>>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<crate::parser::ParenthesizedExpr>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63096,10 +63126,10 @@ fn __action1268<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -63128,12 +63158,12 @@ fn __action1269<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -63164,10 +63194,10 @@ fn __action1270<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -63196,13 +63226,13 @@ fn __action1271<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __6.2;
     let __end0 = __6.2;
@@ -63234,11 +63264,11 @@ fn __action1272<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -63268,11 +63298,11 @@ fn __action1273<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -63302,9 +63332,9 @@ fn __action1274<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63332,12 +63362,12 @@ fn __action1275<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -63368,10 +63398,10 @@ fn __action1276<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -63401,7 +63431,7 @@ fn __action1277<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -63428,9 +63458,9 @@ fn __action1278<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63458,10 +63488,10 @@ fn __action1279<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -63491,9 +63521,9 @@ fn __action1280<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -63522,9 +63552,9 @@ fn __action1281<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>>, TextSize),
+    __1: (TextSize, core::option::Option<Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63552,10 +63582,10 @@ fn __action1282<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, (ast::ParenthesizedExpr, ast::ParenthesizedExpr), TextSize),
+    __1: (TextSize, (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr), TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -63584,9 +63614,9 @@ fn __action1283<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63614,10 +63644,10 @@ fn __action1284<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, Vec<ast::Comprehension>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -63646,7 +63676,7 @@ fn __action1285<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63672,7 +63702,7 @@ fn __action1286<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63698,7 +63728,7 @@ fn __action1287<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63724,7 +63754,7 @@ fn __action1288<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -63749,9 +63779,9 @@ fn __action1289<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Arguments, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -63777,11 +63807,11 @@ fn __action1290<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -63809,10 +63839,10 @@ fn __action1291<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63839,9 +63869,9 @@ fn __action1292<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Arguments, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -63867,11 +63897,11 @@ fn __action1293<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -63899,10 +63929,10 @@ fn __action1294<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, ast::Identifier, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -63930,8 +63960,8 @@ fn __action1295<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -63958,8 +63988,8 @@ fn __action1296<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -64067,9 +64097,9 @@ fn __action1300<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -64095,9 +64125,9 @@ fn __action1301<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, ast::ParenthesizedExpr)>, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<(ast::CmpOp, crate::parser::ParenthesizedExpr)>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -64124,7 +64154,7 @@ fn __action1302<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
 ) -> ast::Decorator
 {
@@ -64154,7 +64184,7 @@ fn __action1303<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __1.2;
@@ -64237,7 +64267,7 @@ fn __action1306<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Parameter
 {
     let __start0 = __2.2;
@@ -64291,10 +64321,10 @@ fn __action1308<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -64321,10 +64351,10 @@ fn __action1309<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -64351,8 +64381,8 @@ fn __action1310<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
@@ -64379,9 +64409,9 @@ fn __action1311<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
@@ -64409,10 +64439,10 @@ fn __action1312<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
@@ -64442,7 +64472,7 @@ fn __action1313<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
 ) -> StringType
 {
@@ -64471,8 +64501,8 @@ fn __action1314<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-) -> ast::Expr
+    __0: (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
+) -> ast::FStringFormatSpec
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -64498,7 +64528,7 @@ fn __action1315<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, (String, bool), TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -64524,12 +64554,12 @@ fn __action1316<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, core::option::Option<(TextSize, ast::ConversionFlag)>, TextSize),
-    __4: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __4: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __5.2;
     let __end0 = __5.2;
@@ -64560,11 +64590,11 @@ fn __action1317<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, core::option::Option<(TextSize, ast::ConversionFlag)>, TextSize),
-    __3: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __3: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -64594,8 +64624,8 @@ fn __action1318<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::UnaryOp, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -64622,8 +64652,8 @@ fn __action1319<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::UnaryOp, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -64702,7 +64732,7 @@ fn __action1322<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __1.2;
@@ -64729,7 +64759,7 @@ fn __action1323<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __0.2;
@@ -64755,7 +64785,7 @@ fn __action1324<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, core::option::Option<Vec<ast::Comprehension>>, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
@@ -64785,7 +64815,7 @@ fn __action1325<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
     let __start0 = __2.2;
@@ -64814,7 +64844,7 @@ fn __action1326<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
     let __start0 = __1.2;
@@ -64842,7 +64872,7 @@ fn __action1327<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
     let __start0 = __1.2;
@@ -64869,9 +64899,9 @@ fn __action1328<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -64897,8 +64927,8 @@ fn __action1329<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -64923,9 +64953,9 @@ fn __action1330<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -64951,8 +64981,8 @@ fn __action1331<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -65318,7 +65348,7 @@ fn __action1344<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, (IpyEscapeKind, String), TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -65369,7 +65399,7 @@ fn __action1346<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, alloc::vec::Vec<token::Tok>, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -65401,8 +65431,8 @@ fn __action1347<
     __1: (TextSize, core::option::Option<ast::Parameters>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, core::option::Option<(String, bool)>, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -65519,7 +65549,7 @@ fn __action1351<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Pattern
 {
     let __start0 = __0.2;
@@ -65545,7 +65575,7 @@ fn __action1352<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Pattern
 {
     let __start0 = __0.2;
@@ -66048,7 +66078,7 @@ fn __action1369<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -66088,7 +66118,7 @@ fn __action1370<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -66128,7 +66158,7 @@ fn __action1371<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
     __4: (TextSize, token::Tok, TextSize),
@@ -66165,10 +66195,10 @@ fn __action1372<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -66196,7 +66226,7 @@ fn __action1373<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -66250,8 +66280,8 @@ fn __action1375<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -66278,8 +66308,8 @@ fn __action1376<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -66306,7 +66336,7 @@ fn __action1377<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, ast::Number, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -66332,8 +66362,8 @@ fn __action1378<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -66385,9 +66415,9 @@ fn __action1380<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -66413,9 +66443,9 @@ fn __action1381<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -66443,7 +66473,7 @@ fn __action1382<
     mode: Mode,
     __0: (TextSize, ast::ParameterWithDefault, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::ParameterWithDefault
 {
     let __start0 = __2.2;
@@ -66473,7 +66503,7 @@ fn __action1383<
     mode: Mode,
     __0: (TextSize, ast::ParameterWithDefault, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::ParameterWithDefault
 {
     let __start0 = __2.2;
@@ -69341,10 +69371,10 @@ fn __action1473<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -69371,10 +69401,10 @@ fn __action1474<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -69428,9 +69458,9 @@ fn __action1476<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __3.2;
@@ -69460,7 +69490,7 @@ fn __action1477<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __1.2;
@@ -69673,10 +69703,10 @@ fn __action1484<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -69703,10 +69733,10 @@ fn __action1485<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -69735,10 +69765,10 @@ fn __action1486<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __5: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> ast::Comprehension
 {
     let __start0 = __5.2;
@@ -69770,10 +69800,10 @@ fn __action1487<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> ast::Comprehension
 {
     let __start0 = __4.2;
@@ -69804,8 +69834,8 @@ fn __action1488<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -69861,7 +69891,7 @@ fn __action1490<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Parameter
 {
     let __start0 = __2.2;
@@ -69993,11 +70023,11 @@ fn __action1495<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
-    __3: (TextSize, core::option::Option<Option<ast::ParenthesizedExpr>>, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, core::option::Option<Option<crate::parser::ParenthesizedExpr>>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.2;
     let __end0 = __3.2;
@@ -70025,9 +70055,9 @@ fn __action1496<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -70053,9 +70083,9 @@ fn __action1497<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -70081,8 +70111,8 @@ fn __action1498<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -70107,10 +70137,10 @@ fn __action1499<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -70137,10 +70167,10 @@ fn __action1500<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -70167,12 +70197,12 @@ fn __action1501<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -70201,12 +70231,12 @@ fn __action1502<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __4.2;
     let __end0 = __4.2;
@@ -70264,7 +70294,7 @@ fn __action1504<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Mod
 {
     let __start0 = __1.2;
@@ -70292,7 +70322,7 @@ fn __action1505<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, alloc::vec::Vec<token::Tok>, TextSize),
 ) -> ast::Mod
 {
@@ -70655,7 +70685,7 @@ fn __action1515<
     __1: (TextSize, ast::Expr, TextSize),
     __2: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __4.2;
@@ -70687,7 +70717,7 @@ fn __action1516<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::TypeParam
 {
     let __start0 = __2.2;
@@ -70861,7 +70891,7 @@ fn __action1522<
     mode: Mode,
     __0: (TextSize, ast::Identifier, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::ParameterWithDefault
 {
     let __start0 = __2.2;
@@ -70967,9 +70997,9 @@ fn __action1526<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::WithItem
 {
     let __start0 = __2.2;
@@ -70997,10 +71027,10 @@ fn __action1527<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -71027,10 +71057,10 @@ fn __action1528<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -71058,8 +71088,8 @@ fn __action1529<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.2;
     let __end0 = __1.2;
@@ -71087,8 +71117,8 @@ fn __action1530<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -71187,7 +71217,7 @@ fn __action1533<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
@@ -71213,8 +71243,8 @@ fn __action1534<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
@@ -71239,10 +71269,10 @@ fn __action1535<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
@@ -71269,9 +71299,9 @@ fn __action1536<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
@@ -71731,7 +71761,7 @@ fn __action1553<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, Vec<ast::Comprehension>, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
@@ -71757,7 +71787,7 @@ fn __action1554<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> (Option<(TextSize, TextSize, Option<ast::Identifier>)>, ast::Expr)
 {
     let __start0 = __0.2;
@@ -71785,9 +71815,9 @@ fn __action1555<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Comprehension
 {
     let __start0 = __4.2;
@@ -71819,10 +71849,10 @@ fn __action1556<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __5: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __5: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> ast::Comprehension
 {
     let __start0 = __5.0;
@@ -71852,9 +71882,9 @@ fn __action1557<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Comprehension
 {
     let __start0 = __3.2;
@@ -71884,10 +71914,10 @@ fn __action1558<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __4: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __4: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> ast::Comprehension
 {
     let __start0 = __4.0;
@@ -72061,7 +72091,7 @@ fn __action1563<
     __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __6: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72104,7 +72134,7 @@ fn __action1564<
     __4: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __7: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __8: (TextSize, token::Tok, TextSize),
     __9: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72220,7 +72250,7 @@ fn __action1567<
     __2: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __5: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72261,7 +72291,7 @@ fn __action1568<
     __3: (TextSize, core::option::Option<ast::TypeParams>, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __6: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -72368,9 +72398,9 @@ fn __action1571<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize),
+    __1: (TextSize, Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -72397,7 +72427,7 @@ fn __action1572<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -72424,9 +72454,9 @@ fn __action1573<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)>, TextSize),
+    __1: (TextSize, Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -72453,7 +72483,7 @@ fn __action1574<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -72532,12 +72562,12 @@ fn __action1577<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
-    __4: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __4: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -72566,11 +72596,11 @@ fn __action1578<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __3: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -72600,11 +72630,11 @@ fn __action1579<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
-    __3: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __3: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -72632,10 +72662,10 @@ fn __action1580<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, core::option::Option<ast::Expr>, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, core::option::Option<ast::FStringFormatSpec>, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -72664,12 +72694,12 @@ fn __action1581<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
-    __4: (TextSize, ast::Expr, TextSize),
+    __4: (TextSize, ast::FStringFormatSpec, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __4.0;
     let __end0 = __4.2;
@@ -72698,11 +72728,11 @@ fn __action1582<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.2;
     let __end0 = __4.0;
@@ -72732,11 +72762,11 @@ fn __action1583<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::Expr, TextSize),
+    __3: (TextSize, ast::FStringFormatSpec, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -72764,10 +72794,10 @@ fn __action1584<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -72796,11 +72826,11 @@ fn __action1585<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
-    __3: (TextSize, ast::Expr, TextSize),
+    __3: (TextSize, ast::FStringFormatSpec, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -72828,10 +72858,10 @@ fn __action1586<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, (TextSize, ast::ConversionFlag), TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -72860,10 +72890,10 @@ fn __action1587<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, ast::Expr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, ast::FStringFormatSpec, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -72890,9 +72920,9 @@ fn __action1588<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> Result<ast::Expr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+) -> Result<ast::FStringElement,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __2.0;
@@ -72948,7 +72978,7 @@ fn __action1590<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
+    __1: (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
 ) -> StringType
 {
@@ -72977,7 +73007,7 @@ fn __action1591<
     mode: Mode,
     __lookbehind: &TextSize,
     __lookahead: &TextSize,
-) -> ast::Expr
+) -> ast::FStringFormatSpec
 {
     let __start0 = *__lookbehind;
     let __end0 = *__lookahead;
@@ -73001,8 +73031,8 @@ fn __action1592<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, alloc::vec::Vec<ast::Expr>, TextSize),
-) -> ast::Expr
+    __0: (TextSize, alloc::vec::Vec<ast::FStringElement>, TextSize),
+) -> ast::FStringFormatSpec
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -73302,9 +73332,9 @@ fn __action1603<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -73331,7 +73361,7 @@ fn __action1604<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -73358,9 +73388,9 @@ fn __action1605<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Vec<ast::ParenthesizedExpr>, TextSize),
+    __1: (TextSize, Vec<crate::parser::ParenthesizedExpr>, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -73387,7 +73417,7 @@ fn __action1606<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -77633,8 +77663,8 @@ fn __action1727<
     __1: (TextSize, ast::Parameters, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, core::option::Option<(String, bool)>, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -77664,8 +77694,8 @@ fn __action1728<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, core::option::Option<(String, bool)>, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;
     let __end0 = __1.0;
@@ -77693,11 +77723,11 @@ fn __action1729<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
-    __3: (TextSize, Option<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
+    __3: (TextSize, Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -77723,10 +77753,10 @@ fn __action1730<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, core::option::Option<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, core::option::Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __2.2;
     let __end0 = __2.2;
@@ -77754,7 +77784,7 @@ fn __action1731<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, ast::Suite, TextSize),
 ) -> ast::ExceptHandler
@@ -77814,8 +77844,8 @@ fn __action1733<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Option<ast::ParenthesizedExpr>
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Option<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -77840,7 +77870,7 @@ fn __action1734<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> Option<ast::ParenthesizedExpr>
+) -> Option<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -77865,11 +77895,11 @@ fn __action1735<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __3: (TextSize, Option<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __3: (TextSize, Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -77903,10 +77933,10 @@ fn __action1736<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, Option<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -77942,9 +77972,9 @@ fn __action1737<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __2: (TextSize, Option<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __2: (TextSize, Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -77980,8 +78010,8 @@ fn __action1738<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, Option<ast::ParenthesizedExpr>, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, Option<crate::parser::ParenthesizedExpr>, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -78017,10 +78047,10 @@ fn __action1739<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -78053,9 +78083,9 @@ fn __action1740<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -78090,8 +78120,8 @@ fn __action1741<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -78126,7 +78156,7 @@ fn __action1742<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.0;
@@ -78163,9 +78193,9 @@ fn __action1743<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
     __7: (TextSize, token::Tok, TextSize),
@@ -78205,9 +78235,9 @@ fn __action1744<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -78240,9 +78270,9 @@ fn __action1745<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
     __6: (TextSize, token::Tok, TextSize),
@@ -78280,9 +78310,9 @@ fn __action1746<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __4: (TextSize, token::Tok, TextSize),
     __5: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -78313,8 +78343,8 @@ fn __action1747<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> core::option::Option<ast::ParenthesizedExpr>
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> core::option::Option<crate::parser::ParenthesizedExpr>
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -78337,8 +78367,8 @@ fn __action1748<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -78361,8 +78391,8 @@ fn __action1749<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.0;
     let __end0 = __0.2;
@@ -78386,7 +78416,7 @@ fn __action1750<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Mod
 {
     let __start0 = __1.0;
@@ -78412,7 +78442,7 @@ fn __action1751<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __2: (TextSize, alloc::vec::Vec<token::Tok>, TextSize),
 ) -> ast::Mod
 {
@@ -78440,7 +78470,7 @@ fn __action1752<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __1.0;
@@ -78492,8 +78522,8 @@ fn __action1754<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-    __1: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> ast::ParenthesizedExpr
+    __1: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __1.0;
     let __end0 = __1.2;
@@ -78518,7 +78548,7 @@ fn __action1755<
     source_code: &str,
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
-) -> ast::ParenthesizedExpr
+) -> crate::parser::ParenthesizedExpr
 {
     let __start0 = __0.2;
     let __end0 = __0.2;
@@ -78543,7 +78573,7 @@ fn __action1756<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
@@ -78567,8 +78597,8 @@ fn __action1757<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
-    __1: (TextSize, alloc::vec::Vec<ast::ParenthesizedExpr>, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+    __1: (TextSize, alloc::vec::Vec<crate::parser::ParenthesizedExpr>, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
@@ -78593,9 +78623,9 @@ fn __action1758<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __0: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __1: (TextSize, ast::Operator, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> Result<ast::Stmt,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.0;
@@ -78899,7 +78929,7 @@ fn __action1767<
     __3: (TextSize, ast::TypeParams, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __6: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -78938,7 +78968,7 @@ fn __action1768<
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __5: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -78980,7 +79010,7 @@ fn __action1769<
     __4: (TextSize, ast::TypeParams, TextSize),
     __5: (TextSize, ast::Parameters, TextSize),
     __6: (TextSize, token::Tok, TextSize),
-    __7: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __7: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __8: (TextSize, token::Tok, TextSize),
     __9: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -79021,7 +79051,7 @@ fn __action1770<
     __3: (TextSize, ast::Identifier, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __6: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -79210,7 +79240,7 @@ fn __action1775<
     __2: (TextSize, ast::TypeParams, TextSize),
     __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __5: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -79247,7 +79277,7 @@ fn __action1776<
     __1: (TextSize, ast::Identifier, TextSize),
     __2: (TextSize, ast::Parameters, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __5: (TextSize, token::Tok, TextSize),
     __6: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -79287,7 +79317,7 @@ fn __action1777<
     __3: (TextSize, ast::TypeParams, TextSize),
     __4: (TextSize, ast::Parameters, TextSize),
     __5: (TextSize, token::Tok, TextSize),
-    __6: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __6: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __7: (TextSize, token::Tok, TextSize),
     __8: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -79326,7 +79356,7 @@ fn __action1778<
     __2: (TextSize, ast::Identifier, TextSize),
     __3: (TextSize, ast::Parameters, TextSize),
     __4: (TextSize, token::Tok, TextSize),
-    __5: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __5: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
     __6: (TextSize, token::Tok, TextSize),
     __7: (TextSize, ast::Suite, TextSize),
 ) -> ast::Stmt
@@ -79505,7 +79535,7 @@ fn __action1783<
     __1: (TextSize, ast::Expr, TextSize),
     __2: (TextSize, ast::TypeParams, TextSize),
     __3: (TextSize, token::Tok, TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __2.0;
@@ -79536,7 +79566,7 @@ fn __action1784<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Expr, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
 ) -> ast::Stmt
 {
     let __start0 = __1.2;
@@ -79569,8 +79599,8 @@ fn __action1785<
     __1: (TextSize, ast::Parameters, TextSize),
     __2: (TextSize, token::Tok, TextSize),
     __3: (TextSize, (String, bool), TextSize),
-    __4: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __4: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __3.0;
     let __end0 = __3.2;
@@ -79600,8 +79630,8 @@ fn __action1786<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, ast::Parameters, TextSize),
     __2: (TextSize, token::Tok, TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.2;
     let __end0 = __3.0;
@@ -79632,8 +79662,8 @@ fn __action1787<
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
     __2: (TextSize, (String, bool), TextSize),
-    __3: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __3: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __2.0;
     let __end0 = __2.2;
@@ -79661,8 +79691,8 @@ fn __action1788<
     mode: Mode,
     __0: (TextSize, token::Tok, TextSize),
     __1: (TextSize, token::Tok, TextSize),
-    __2: (TextSize, ast::ParenthesizedExpr, TextSize),
-) -> Result<ast::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
+    __2: (TextSize, crate::parser::ParenthesizedExpr, TextSize),
+) -> Result<crate::parser::ParenthesizedExpr,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __1.2;
     let __end0 = __2.0;

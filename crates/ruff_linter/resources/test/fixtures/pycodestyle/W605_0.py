@@ -43,3 +43,6 @@ regex = '''
 '''  # noqa
 
 regex = '\\\_'
+
+#: W605:1:7
+u'foo\ bar'

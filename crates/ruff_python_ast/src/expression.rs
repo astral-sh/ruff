@@ -23,7 +23,6 @@ pub enum ExpressionRef<'a> {
     YieldFrom(&'a ast::ExprYieldFrom),
     Compare(&'a ast::ExprCompare),
     Call(&'a ast::ExprCall),
-    FormattedValue(&'a ast::ExprFormattedValue),
     FString(&'a ast::ExprFString),
     StringLiteral(&'a ast::ExprStringLiteral),
     BytesLiteral(&'a ast::ExprBytesLiteral),
@@ -67,7 +66,6 @@ impl<'a> From<&'a Expr> for ExpressionRef<'a> {
             Expr::YieldFrom(value) => ExpressionRef::YieldFrom(value),
             Expr::Compare(value) => ExpressionRef::Compare(value),
             Expr::Call(value) => ExpressionRef::Call(value),
-            Expr::FormattedValue(value) => ExpressionRef::FormattedValue(value),
             Expr::FString(value) => ExpressionRef::FString(value),
             Expr::StringLiteral(value) => ExpressionRef::StringLiteral(value),
             Expr::BytesLiteral(value) => ExpressionRef::BytesLiteral(value),
@@ -172,11 +170,6 @@ impl<'a> From<&'a ast::ExprCall> for ExpressionRef<'a> {
         Self::Call(value)
     }
 }
-impl<'a> From<&'a ast::ExprFormattedValue> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprFormattedValue) -> Self {
-        Self::FormattedValue(value)
-    }
-}
 impl<'a> From<&'a ast::ExprFString> for ExpressionRef<'a> {
     fn from(value: &'a ast::ExprFString) -> Self {
         Self::FString(value)
@@ -273,7 +266,6 @@ impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
             ExpressionRef::YieldFrom(expression) => AnyNodeRef::ExprYieldFrom(expression),
             ExpressionRef::Compare(expression) => AnyNodeRef::ExprCompare(expression),
             ExpressionRef::Call(expression) => AnyNodeRef::ExprCall(expression),
-            ExpressionRef::FormattedValue(expression) => AnyNodeRef::ExprFormattedValue(expression),
             ExpressionRef::FString(expression) => AnyNodeRef::ExprFString(expression),
             ExpressionRef::StringLiteral(expression) => AnyNodeRef::ExprStringLiteral(expression),
             ExpressionRef::BytesLiteral(expression) => AnyNodeRef::ExprBytesLiteral(expression),
@@ -317,7 +309,6 @@ impl Ranged for ExpressionRef<'_> {
             ExpressionRef::YieldFrom(expression) => expression.range(),
             ExpressionRef::Compare(expression) => expression.range(),
             ExpressionRef::Call(expression) => expression.range(),
-            ExpressionRef::FormattedValue(expression) => expression.range(),
             ExpressionRef::FString(expression) => expression.range(),
             ExpressionRef::StringLiteral(expression) => expression.range(),
             ExpressionRef::BytesLiteral(expression) => expression.range(),
@@ -399,6 +390,44 @@ impl LiteralExpressionRef<'_> {
                 expression.value.is_implicit_concatenated()
             }
             _ => false,
+        }
+    }
+}
+
+/// An enum that holds a reference to a string-like literal from the AST.
+/// This includes string literals, bytes literals, and the literal parts of
+/// f-strings.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum StringLike<'a> {
+    StringLiteral(&'a ast::ExprStringLiteral),
+    BytesLiteral(&'a ast::ExprBytesLiteral),
+    FStringLiteral(&'a ast::FStringLiteralElement),
+}
+
+impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
+    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+        StringLike::StringLiteral(value)
+    }
+}
+
+impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
+    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+        StringLike::BytesLiteral(value)
+    }
+}
+
+impl<'a> From<&'a ast::FStringLiteralElement> for StringLike<'a> {
+    fn from(value: &'a ast::FStringLiteralElement) -> Self {
+        StringLike::FStringLiteral(value)
+    }
+}
+
+impl Ranged for StringLike<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            StringLike::StringLiteral(literal) => literal.range(),
+            StringLike::BytesLiteral(literal) => literal.range(),
+            StringLike::FStringLiteral(literal) => literal.range(),
         }
     }
 }

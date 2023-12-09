@@ -53,10 +53,12 @@ impl AlwaysFixableViolation for ExplicitFStringTypeConversion {
 
 /// RUF010
 pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string: &ast::FString) {
-    for (index, expr) in f_string.values.iter().enumerate() {
-        let Some(ast::ExprFormattedValue {
-            value, conversion, ..
-        }) = expr.as_formatted_value_expr()
+    for (index, element) in f_string.elements.iter().enumerate() {
+        let Some(ast::FStringExpressionElement {
+            expression,
+            conversion,
+            ..
+        }) = element.as_expression()
         else {
             continue;
         };
@@ -75,7 +77,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string:
                     range: _,
                 },
             ..
-        }) = value.as_ref()
+        }) = expression.as_ref()
         else {
             continue;
         };
@@ -110,7 +112,7 @@ pub(crate) fn explicit_f_string_type_conversion(checker: &mut Checker, f_string:
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, value.range());
+        let mut diagnostic = Diagnostic::new(ExplicitFStringTypeConversion, expression.range());
         diagnostic.try_set_fix(|| {
             convert_call_to_conversion_flag(f_string, index, checker.locator(), checker.stylist())
         });

@@ -12,9 +12,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::{
-    leading_comments, trailing_comments, LeadingDanglingTrailingComments, SourceComment,
-};
+use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_generator_exp::is_generator_parenthesized;
 use crate::expression::expr_tuple::is_tuple_parenthesized;
@@ -23,7 +21,7 @@ use crate::expression::parentheses::{
     OptionalParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
-use crate::PyFormatOptions;
+use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -38,7 +36,6 @@ pub(crate) mod expr_dict;
 pub(crate) mod expr_dict_comp;
 pub(crate) mod expr_ellipsis_literal;
 pub(crate) mod expr_f_string;
-pub(crate) mod expr_formatted_value;
 pub(crate) mod expr_generator_exp;
 pub(crate) mod expr_if_exp;
 pub(crate) mod expr_ipy_escape_command;
@@ -99,7 +96,6 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::YieldFrom(expr) => expr.format().fmt(f),
             Expr::Compare(expr) => expr.format().fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
-            Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::FString(expr) => expr.format().fmt(f),
             Expr::StringLiteral(expr) => expr.format().fmt(f),
             Expr::BytesLiteral(expr) => expr.format().fmt(f),
@@ -131,7 +127,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             let node_comments = comments.leading_dangling_trailing(expression);
             if !node_comments.has_leading() && !node_comments.has_trailing() {
                 parenthesized("(", &format_expr, ")")
-                    .with_indent(!is_expression_huggable(expression, f.options()))
+                    .with_indent(!is_expression_huggable(expression, f.context()))
                     .fmt(f)
             } else {
                 format_with_parentheses_comments(expression, &node_comments, f)
@@ -288,7 +284,6 @@ fn format_with_parentheses_comments(
         Expr::YieldFrom(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::FormattedValue(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::StringLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::BytesLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
@@ -434,113 +429,23 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 }
 
                 Parenthesize::IfBreaks => {
-                    // Is the expression the last token in the parent statement.
-                    // Excludes `await` and `yield` for which Black doesn't seem to apply the layout?
-                    let last_expression = parent.is_stmt_assign()
-                        || parent.is_stmt_ann_assign()
-                        || parent.is_stmt_aug_assign()
-                        || parent.is_stmt_return();
-
-                    // Format the statements and value's trailing end of line comments:
-                    // * after the expression if the expression needs no parentheses (necessary or the `expand_parent` makes the group never fit).
-                    // * inside the parentheses if the expression exceeds the line-width.
-                    //
-                    // ```python
-                    // a = long # with_comment
-                    // b = (
-                    //     short # with_comment
-                    // )
-                    //
-                    // # formatted
-                    // a = (
-                    //     long # with comment
-                    // )
-                    // b = short # with comment
-                    // ```
-                    // This matches Black's formatting with the exception that ruff applies this style also for
-                    // attribute chains and non-fluent call expressions. See https://github.com/psf/black/issues/4001#issuecomment-1786681792
-                    //
-                    // This logic isn't implemented in [`place_comment`] by associating trailing statement comments to the expression because
-                    // doing so breaks the suite empty lines formatting that relies on trailing comments to be stored on the statement.
-                    let (inline_comments, expression_trailing_comments) = if last_expression
-                        && !(
-                            // Ignore non-fluent attribute chains for black compatibility.
-                            // See https://github.com/psf/black/issues/4001#issuecomment-1786681792
-                            expression.is_attribute_expr()
-                                || expression.is_call_expr()
-                                || expression.is_yield_from_expr()
-                                || expression.is_yield_expr()
-                                || expression.is_await_expr()
-                        ) {
-                        let parent_trailing_comments = comments.trailing(*parent);
-                        let after_end_of_line = parent_trailing_comments
-                            .partition_point(|comment| comment.line_position().is_end_of_line());
-                        let (stmt_inline_comments, _) =
-                            parent_trailing_comments.split_at(after_end_of_line);
-
-                        let after_end_of_line = node_comments
-                            .trailing
-                            .partition_point(|comment| comment.line_position().is_end_of_line());
-
-                        let (expression_inline_comments, expression_trailing_comments) =
-                            node_comments.trailing.split_at(after_end_of_line);
-
-                        (
-                            OptionalParenthesesInlinedComments {
-                                expression: expression_inline_comments,
-                                statement: stmt_inline_comments,
-                            },
-                            expression_trailing_comments,
-                        )
+                    if node_comments.has_trailing() {
+                        expression.format().with_options(Parentheses::Always).fmt(f)
                     } else {
-                        (
-                            OptionalParenthesesInlinedComments::default(),
-                            node_comments.trailing,
-                        )
-                    };
-
-                    if expression_trailing_comments.is_empty() {
                         // The group id is necessary because the nested expressions may reference it.
                         let group_id = f.group_id("optional_parentheses");
                         let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
 
-                        best_fit_parenthesize(&format_with(|f| {
-                            inline_comments.mark_formatted();
-
-                            expression
-                                .format()
-                                .with_options(Parentheses::Never)
-                                .fmt(f)?;
-
-                            if !inline_comments.is_empty() {
-                                // If the expressions exceeds the line width, format the comments in the parentheses
-                                if_group_breaks(&inline_comments)
-                                    .with_group_id(Some(group_id))
-                                    .fmt(f)?;
-                            }
-
-                            Ok(())
-                        }))
-                        .with_group_id(Some(group_id))
-                        .fmt(f)?;
-
-                        if !inline_comments.is_empty() {
-                            // If the line fits into the line width, format the comments after the parenthesized expression
-                            if_group_fits_on_line(&inline_comments)
-                                .with_group_id(Some(group_id))
-                                .fmt(f)?;
-                        }
-
-                        Ok(())
-                    } else {
-                        expression.format().with_options(Parentheses::Always).fmt(f)
+                        best_fit_parenthesize(&expression.format().with_options(Parentheses::Never))
+                            .with_group_id(Some(group_id))
+                            .fmt(f)
                     }
                 }
             },
             OptionalParentheses::Never => match parenthesize {
                 Parenthesize::IfBreaksOrIfRequired => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
-                        .with_indent(!is_expression_huggable(expression, f.options()))
+                        .with_indent(!is_expression_huggable(expression, f.context()))
                         .fmt(f)
                 }
 
@@ -580,7 +485,6 @@ impl NeedsParentheses for Expr {
             Expr::YieldFrom(expr) => expr.needs_parentheses(parent, context),
             Expr::Compare(expr) => expr.needs_parentheses(parent, context),
             Expr::Call(expr) => expr.needs_parentheses(parent, context),
-            Expr::FormattedValue(expr) => expr.needs_parentheses(parent, context),
             Expr::FString(expr) => expr.needs_parentheses(parent, context),
             Expr::StringLiteral(expr) => expr.needs_parentheses(parent, context),
             Expr::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
@@ -838,7 +742,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             Expr::Tuple(_)
             | Expr::NamedExpr(_)
             | Expr::GeneratorExp(_)
-            | Expr::FormattedValue(_)
             | Expr::FString(_)
             | Expr::StringLiteral(_)
             | Expr::BytesLiteral(_)
@@ -1153,8 +1056,8 @@ pub(crate) fn has_own_parentheses(
 ///     ]
 /// )
 /// ```
-pub(crate) fn is_expression_huggable(expr: &Expr, options: &PyFormatOptions) -> bool {
-    if !options.preview().is_enabled() {
+pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> bool {
+    if !is_hug_parens_with_braces_and_square_brackets_enabled(context) {
         return false;
     }
 
@@ -1190,7 +1093,6 @@ pub(crate) fn is_expression_huggable(expr: &Expr, options: &PyFormatOptions) -> 
         | Expr::YieldFrom(_)
         | Expr::Compare(_)
         | Expr::Call(_)
-        | Expr::FormattedValue(_)
         | Expr::FString(_)
         | Expr::Attribute(_)
         | Expr::Subscript(_)
@@ -1246,43 +1148,5 @@ impl From<Operator> for OperatorPrecedence {
             Operator::BitXor => OperatorPrecedence::BitwiseXor,
             Operator::BitAnd => OperatorPrecedence::BitwiseAnd,
         }
-    }
-}
-
-#[derive(Debug, Default)]
-struct OptionalParenthesesInlinedComments<'a> {
-    expression: &'a [SourceComment],
-    statement: &'a [SourceComment],
-}
-
-impl<'a> OptionalParenthesesInlinedComments<'a> {
-    fn is_empty(&self) -> bool {
-        self.expression.is_empty() && self.statement.is_empty()
-    }
-
-    fn iter_comments(&self) -> impl Iterator<Item = &'a SourceComment> {
-        self.expression.iter().chain(self.statement)
-    }
-
-    fn mark_formatted(&self) {
-        for comment in self.iter_comments() {
-            comment.mark_formatted();
-        }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for OptionalParenthesesInlinedComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        for comment in self.iter_comments() {
-            comment.mark_unformatted();
-        }
-
-        write!(
-            f,
-            [
-                trailing_comments(self.expression),
-                trailing_comments(self.statement)
-            ]
-        )
     }
 }

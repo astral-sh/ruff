@@ -90,7 +90,7 @@ PYI053.pyi:30:14: PYI053 [*] String and bytes literals longer than 50 characters
 30 | qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
 31 | 
-32 | class Demo:
+32 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
    |
    = help: Replace with `...`
 
@@ -101,7 +101,28 @@ PYI053.pyi:30:14: PYI053 [*] String and bytes literals longer than 50 characters
 30    |-qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
    30 |+qux: bytes = ...  # Error: PYI053
 31 31 | 
-32 32 | class Demo:
-33 33 |     """Docstrings are excluded from this rule. Some padding."""  # OK
+32 32 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
+33 33 | 
+
+PYI053.pyi:34:15: PYI053 [*] String and bytes literals longer than 50 characters are not permitted
+   |
+32 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
+33 | 
+34 | fbar: str = f"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI053
+35 | 
+36 | class Demo:
+   |
+   = help: Replace with `...`
+
+ℹ Safe fix
+31 31 | 
+32 32 | ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
+33 33 | 
+34    |-fbar: str = f"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
+   34 |+fbar: str = f"..."  # Error: PYI053
+35 35 | 
+36 36 | class Demo:
+37 37 |     """Docstrings are excluded from this rule. Some padding."""  # OK
 
 

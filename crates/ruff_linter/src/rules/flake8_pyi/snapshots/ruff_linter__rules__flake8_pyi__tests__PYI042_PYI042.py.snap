@@ -29,4 +29,12 @@ PYI042.py:20:1: PYI042 Type alias `_snake_case_alias2` should be CamelCase
 21 | Snake_case_alias: TypeAlias = int | float  # PYI042, since not camel case
    |
 
+PYI042.py:27:6: PYI042 Type alias `foo_bar` should be CamelCase
+   |
+26 | # PEP 695
+27 | type foo_bar = int | str
+   |      ^^^^^^^ PYI042
+28 | type FooBar = int | str
+   |
+
 

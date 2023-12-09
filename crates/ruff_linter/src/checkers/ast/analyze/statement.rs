@@ -250,6 +250,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TooManyArguments) {
                 pylint::rules::too_many_arguments(checker, function_def);
             }
+            if checker.enabled(Rule::TooManyPositional) {
+                pylint::rules::too_many_positional(checker, function_def);
+            }
             if checker.enabled(Rule::TooManyReturnStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_return_statements(
                     stmt,
@@ -1532,6 +1535,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.enabled(Rule::TSuffixedTypeAlias) {
                     flake8_pyi::rules::t_suffixed_type_alias(checker, target);
                 }
+            }
+        }
+        Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {
+            if checker.enabled(Rule::SnakeCaseTypeAlias) {
+                flake8_pyi::rules::snake_case_type_alias(checker, name);
+            }
+            if checker.enabled(Rule::TSuffixedTypeAlias) {
+                flake8_pyi::rules::t_suffixed_type_alias(checker, name);
             }
         }
         Stmt::Delete(delete @ ast::StmtDelete { targets, range: _ }) => {

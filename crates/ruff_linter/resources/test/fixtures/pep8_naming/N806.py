@@ -52,3 +52,9 @@ def model_assign() -> None:
 
     Bad = import_string("django.core.exceptions.ValidationError")  # N806
     ValidationError = import_string("django.core.exceptions.ValidationError")  # OK
+
+    Bad = apps.get_model()  # N806
+    Bad = apps.get_model(model_name="Stream")  # N806
+
+    Address: Type = apps.get_model("zerver", variable)  # OK
+    ValidationError = import_string(variable)  # N806

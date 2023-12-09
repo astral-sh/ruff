@@ -2109,6 +2109,13 @@ impl IsortOptions {
             warn_user_once!("`sections` is ignored when `no-sections` is set to `true`");
         }
 
+        // Verify that if `force_sort_within_sections` is `True`, then `lines_between_types` is set to `0`.
+        let force_sort_within_sections = self.force_sort_within_sections.unwrap_or_default();
+        let lines_between_types = self.lines_between_types.unwrap_or_default();
+        if force_sort_within_sections && lines_between_types != 0 {
+            warn_user_once!("`lines-between-types` is ignored when `force-sort-within-sections` is set to `true`");
+        }
+
         // Extract any configuration options that deal with user-defined sections.
         let mut section_order: Vec<_> = self
             .section_order
@@ -2240,7 +2247,7 @@ impl IsortOptions {
             required_imports: BTreeSet::from_iter(self.required_imports.unwrap_or_default()),
             combine_as_imports: self.combine_as_imports.unwrap_or(false),
             force_single_line: self.force_single_line.unwrap_or(false),
-            force_sort_within_sections: self.force_sort_within_sections.unwrap_or(false),
+            force_sort_within_sections,
             case_sensitive: self.case_sensitive.unwrap_or(false),
             force_wrap_aliases: self.force_wrap_aliases.unwrap_or(false),
             detect_same_package: self.detect_same_package.unwrap_or(true),
@@ -2263,7 +2270,7 @@ impl IsortOptions {
             variables: BTreeSet::from_iter(self.variables.unwrap_or_default()),
             no_lines_before: BTreeSet::from_iter(no_lines_before),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
-            lines_between_types: self.lines_between_types.unwrap_or_default(),
+            lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
             section_order,
             no_sections,
@@ -2635,6 +2642,13 @@ pub struct PylintOptions {
     #[option(default = r"5", value_type = "int", example = r"max-args = 5")]
     pub max_args: Option<usize>,
 
+    /// Maximum number of positional arguments allowed for a function or method definition
+    /// (see: `PLR0917`).
+    ///
+    /// If not specified, defaults to the value of `max-args`.
+    #[option(default = r"3", value_type = "int", example = r"max-pos-args = 3")]
+    pub max_positional_args: Option<usize>,
+
     /// Maximum number of statements allowed for a function or method body (see:
     /// `PLR0915`).
     #[option(default = r"50", value_type = "int", example = r"max-statements = 50")]
@@ -2663,6 +2677,10 @@ impl PylintOptions {
                 .unwrap_or(defaults.allow_magic_value_types),
             allow_dunder_method_names: self.allow_dunder_method_names.unwrap_or_default(),
             max_args: self.max_args.unwrap_or(defaults.max_args),
+            max_positional_args: self
+                .max_positional_args
+                .or(self.max_args)
+                .unwrap_or(defaults.max_positional_args),
             max_bool_expr: self.max_bool_expr.unwrap_or(defaults.max_bool_expr),
             max_returns: self.max_returns.unwrap_or(defaults.max_returns),
             max_branches: self.max_branches.unwrap_or(defaults.max_branches),
@@ -2801,13 +2819,18 @@ pub struct FormatOptions {
     )]
     pub indent_style: Option<IndentStyle>,
 
-    /// Whether to prefer single `'` or double `"` quotes for strings. Defaults to double quotes.
+    /// Configures the preferred quote character for strings. Valid options are:
+    ///
+    /// * `double` (default): Use double quotes `"`
+    /// * `single`: Use single quotes `'`
+    /// * `preserve` (preview only): Keeps the existing quote character. We don't recommend using this option except for projects
+    ///    that already use a mixture of single and double quotes and can't migrate to using double or single quotes.
     ///
     /// In compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/),
     /// Ruff prefers double quotes for multiline strings and docstrings, regardless of the
     /// configured quote style.
     ///
-    /// Ruff may also deviate from this option if using the configured quotes would require
+    /// Ruff may also deviate from using the configured quotes if doing so requires
     /// escaping quote characters within the string. For example, given:
     ///
     /// ```python
@@ -2816,11 +2839,11 @@ pub struct FormatOptions {
     /// ```
     ///
     /// Ruff will change `a` to use single quotes when using `quote-style = "single"`. However,
-    /// `b` will be unchanged, as converting to single quotes would require the inner `'` to be
-    /// escaped, which leads to less readable code: `'It\'s monday morning'`.
+    /// `b` remains unchanged, as converting to single quotes requires escaping the inner `'`,
+    /// which leads to less readable code: `'It\'s monday morning'`. This does not apply when using `preserve`.
     #[option(
         default = r#"double"#,
-        value_type = r#""double" | "single""#,
+        value_type = r#""double" | "single" | "preserve""#,
         example = r#"
             # Prefer single quotes over double quotes.
             quote-style = "single"

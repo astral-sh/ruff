@@ -32,6 +32,7 @@ def f8(x: bytes = b"50 character byte stringgggggggggggggggggggggggggg\xff") -> 
 
 foo: str = "50 character stringggggggggggggggggggggggggggggggg"
 bar: str = "51 character stringgggggggggggggggggggggggggggggggg"
+baz: str = f"51 character stringgggggggggggggggggggggggggggggggg"
 
 baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"
 

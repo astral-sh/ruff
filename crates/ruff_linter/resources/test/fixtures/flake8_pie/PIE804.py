@@ -10,7 +10,6 @@ Foo.objects.create(**{**bar})  # PIE804
 
 foo(**{})
 
-
 foo(**{**data, "foo": "buzz"})
 foo(**buzz)
 foo(**{"bar-foo": True})
@@ -20,3 +19,5 @@ foo(**{buzz: True})
 foo(**{"": True})
 foo(**{f"buzz__{bar}": True})
 abc(**{"for": 3})
+
+foo(**{},)

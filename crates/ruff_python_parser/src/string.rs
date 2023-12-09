@@ -202,7 +202,7 @@ impl<'a> StringParser<'a> {
         Ok(())
     }
 
-    fn parse_fstring_middle(&mut self) -> Result<Expr, LexicalError> {
+    fn parse_fstring_middle(&mut self) -> Result<ast::FStringElement, LexicalError> {
         let mut value = String::new();
         while let Some(ch) = self.next_char() {
             match ch {
@@ -239,9 +239,8 @@ impl<'a> StringParser<'a> {
                 ch => value.push(ch),
             }
         }
-        Ok(Expr::from(ast::StringLiteral {
+        Ok(ast::FStringElement::Literal(ast::FStringLiteralElement {
             value,
-            unicode: false,
             range: self.range,
         }))
     }
@@ -324,11 +323,11 @@ pub(crate) fn parse_string_literal(
     StringParser::new(source, kind, start_location, range).parse()
 }
 
-pub(crate) fn parse_fstring_middle(
+pub(crate) fn parse_fstring_literal_element(
     source: &str,
     is_raw: bool,
     range: TextRange,
-) -> Result<Expr, LexicalError> {
+) -> Result<ast::FStringElement, LexicalError> {
     let kind = if is_raw {
         StringKind::RawString
     } else {

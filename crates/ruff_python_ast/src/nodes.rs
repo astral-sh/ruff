@@ -590,8 +590,6 @@ pub enum Expr {
     Compare(ExprCompare),
     #[is(name = "call_expr")]
     Call(ExprCall),
-    #[is(name = "formatted_value_expr")]
-    FormattedValue(ExprFormattedValue),
     #[is(name = "f_string_expr")]
     FString(ExprFString),
     #[is(name = "string_literal_expr")]
@@ -919,19 +917,51 @@ impl From<ExprCall> for Expr {
     }
 }
 
-/// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
 #[derive(Clone, Debug, PartialEq)]
-pub struct ExprFormattedValue {
+pub struct FStringFormatSpec {
     pub range: TextRange,
-    pub value: Box<Expr>,
-    pub debug_text: Option<DebugText>,
-    pub conversion: ConversionFlag,
-    pub format_spec: Option<Box<Expr>>,
+    pub elements: Vec<FStringElement>,
 }
 
-impl From<ExprFormattedValue> for Expr {
-    fn from(payload: ExprFormattedValue) -> Self {
-        Expr::FormattedValue(payload)
+impl Ranged for FStringFormatSpec {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+/// See also [FormattedValue](https://docs.python.org/3/library/ast.html#ast.FormattedValue)
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringExpressionElement {
+    pub range: TextRange,
+    pub expression: Box<Expr>,
+    pub debug_text: Option<DebugText>,
+    pub conversion: ConversionFlag,
+    pub format_spec: Option<Box<FStringFormatSpec>>,
+}
+
+impl Ranged for FStringExpressionElement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringLiteralElement {
+    pub range: TextRange,
+    pub value: String,
+}
+
+impl Ranged for FStringLiteralElement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl Deref for FStringLiteralElement {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.value.as_str()
     }
 }
 
@@ -1064,7 +1094,7 @@ impl FStringValue {
         self.parts().filter_map(|part| part.as_f_string())
     }
 
-    /// Returns an iterator over all the f-string elements contained in this value.
+    /// Returns an iterator over all the [`FStringElement`] contained in this value.
     ///
     /// An f-string element is what makes up an [`FString`] i.e., it is either a
     /// string literal or an expression. In the following example,
@@ -1075,8 +1105,8 @@ impl FStringValue {
     ///
     /// The f-string elements returned would be string literal (`"bar "`),
     /// expression (`x`) and string literal (`"qux"`).
-    pub fn elements(&self) -> impl Iterator<Item = &Expr> {
-        self.f_strings().flat_map(|fstring| fstring.values.iter())
+    pub fn elements(&self) -> impl Iterator<Item = &FStringElement> {
+        self.f_strings().flat_map(|fstring| fstring.elements.iter())
     }
 }
 
@@ -1113,7 +1143,7 @@ impl Ranged for FStringPart {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FString {
     pub range: TextRange,
-    pub values: Vec<Expr>,
+    pub elements: Vec<FStringElement>,
 }
 
 impl Ranged for FString {
@@ -1129,6 +1159,21 @@ impl From<FString> for Expr {
             value: FStringValue::single(payload),
         }
         .into()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, is_macro::Is)]
+pub enum FStringElement {
+    Literal(FStringLiteralElement),
+    Expression(FStringExpressionElement),
+}
+
+impl Ranged for FStringElement {
+    fn range(&self) -> TextRange {
+        match self {
+            FStringElement::Literal(node) => node.range(),
+            FStringElement::Expression(node) => node.range(),
+        }
     }
 }
 
@@ -3483,11 +3528,6 @@ impl Ranged for crate::nodes::ExprCall {
         self.range
     }
 }
-impl Ranged for crate::nodes::ExprFormattedValue {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
 impl Ranged for crate::nodes::ExprFString {
     fn range(&self) -> TextRange {
         self.range
@@ -3553,7 +3593,6 @@ impl Ranged for crate::Expr {
             Self::YieldFrom(node) => node.range(),
             Self::Compare(node) => node.range(),
             Self::Call(node) => node.range(),
-            Self::FormattedValue(node) => node.range(),
             Self::FString(node) => node.range(),
             Self::StringLiteral(node) => node.range(),
             Self::BytesLiteral(node) => node.range(),
@@ -3726,204 +3765,6 @@ impl Ranged for crate::nodes::Parameters {
 impl Ranged for crate::nodes::ParameterWithDefault {
     fn range(&self) -> TextRange {
         self.range
-    }
-}
-
-/// An expression that may be parenthesized.
-#[derive(Clone, Debug)]
-pub struct ParenthesizedExpr {
-    /// The range of the expression, including any parentheses.
-    pub range: TextRange,
-    /// The underlying expression.
-    pub expr: Expr,
-}
-impl ParenthesizedExpr {
-    /// Returns `true` if the expression is may be parenthesized.
-    pub fn is_parenthesized(&self) -> bool {
-        self.range != self.expr.range()
-    }
-}
-impl Ranged for ParenthesizedExpr {
-    fn range(&self) -> TextRange {
-        self.range
-    }
-}
-impl From<Expr> for ParenthesizedExpr {
-    fn from(expr: Expr) -> Self {
-        ParenthesizedExpr {
-            range: expr.range(),
-            expr,
-        }
-    }
-}
-impl From<ParenthesizedExpr> for Expr {
-    fn from(parenthesized_expr: ParenthesizedExpr) -> Self {
-        parenthesized_expr.expr
-    }
-}
-impl From<ExprIpyEscapeCommand> for ParenthesizedExpr {
-    fn from(payload: ExprIpyEscapeCommand) -> Self {
-        Expr::IpyEscapeCommand(payload).into()
-    }
-}
-impl From<ExprBoolOp> for ParenthesizedExpr {
-    fn from(payload: ExprBoolOp) -> Self {
-        Expr::BoolOp(payload).into()
-    }
-}
-impl From<ExprNamedExpr> for ParenthesizedExpr {
-    fn from(payload: ExprNamedExpr) -> Self {
-        Expr::NamedExpr(payload).into()
-    }
-}
-impl From<ExprBinOp> for ParenthesizedExpr {
-    fn from(payload: ExprBinOp) -> Self {
-        Expr::BinOp(payload).into()
-    }
-}
-impl From<ExprUnaryOp> for ParenthesizedExpr {
-    fn from(payload: ExprUnaryOp) -> Self {
-        Expr::UnaryOp(payload).into()
-    }
-}
-impl From<ExprLambda> for ParenthesizedExpr {
-    fn from(payload: ExprLambda) -> Self {
-        Expr::Lambda(payload).into()
-    }
-}
-impl From<ExprIfExp> for ParenthesizedExpr {
-    fn from(payload: ExprIfExp) -> Self {
-        Expr::IfExp(payload).into()
-    }
-}
-impl From<ExprDict> for ParenthesizedExpr {
-    fn from(payload: ExprDict) -> Self {
-        Expr::Dict(payload).into()
-    }
-}
-impl From<ExprSet> for ParenthesizedExpr {
-    fn from(payload: ExprSet) -> Self {
-        Expr::Set(payload).into()
-    }
-}
-impl From<ExprListComp> for ParenthesizedExpr {
-    fn from(payload: ExprListComp) -> Self {
-        Expr::ListComp(payload).into()
-    }
-}
-impl From<ExprSetComp> for ParenthesizedExpr {
-    fn from(payload: ExprSetComp) -> Self {
-        Expr::SetComp(payload).into()
-    }
-}
-impl From<ExprDictComp> for ParenthesizedExpr {
-    fn from(payload: ExprDictComp) -> Self {
-        Expr::DictComp(payload).into()
-    }
-}
-impl From<ExprGeneratorExp> for ParenthesizedExpr {
-    fn from(payload: ExprGeneratorExp) -> Self {
-        Expr::GeneratorExp(payload).into()
-    }
-}
-impl From<ExprAwait> for ParenthesizedExpr {
-    fn from(payload: ExprAwait) -> Self {
-        Expr::Await(payload).into()
-    }
-}
-impl From<ExprYield> for ParenthesizedExpr {
-    fn from(payload: ExprYield) -> Self {
-        Expr::Yield(payload).into()
-    }
-}
-impl From<ExprYieldFrom> for ParenthesizedExpr {
-    fn from(payload: ExprYieldFrom) -> Self {
-        Expr::YieldFrom(payload).into()
-    }
-}
-impl From<ExprCompare> for ParenthesizedExpr {
-    fn from(payload: ExprCompare) -> Self {
-        Expr::Compare(payload).into()
-    }
-}
-impl From<ExprCall> for ParenthesizedExpr {
-    fn from(payload: ExprCall) -> Self {
-        Expr::Call(payload).into()
-    }
-}
-impl From<ExprFormattedValue> for ParenthesizedExpr {
-    fn from(payload: ExprFormattedValue) -> Self {
-        Expr::FormattedValue(payload).into()
-    }
-}
-impl From<ExprFString> for ParenthesizedExpr {
-    fn from(payload: ExprFString) -> Self {
-        Expr::FString(payload).into()
-    }
-}
-impl From<ExprStringLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprStringLiteral) -> Self {
-        Expr::StringLiteral(payload).into()
-    }
-}
-impl From<ExprBytesLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprBytesLiteral) -> Self {
-        Expr::BytesLiteral(payload).into()
-    }
-}
-impl From<ExprNumberLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprNumberLiteral) -> Self {
-        Expr::NumberLiteral(payload).into()
-    }
-}
-impl From<ExprBooleanLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprBooleanLiteral) -> Self {
-        Expr::BooleanLiteral(payload).into()
-    }
-}
-impl From<ExprNoneLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprNoneLiteral) -> Self {
-        Expr::NoneLiteral(payload).into()
-    }
-}
-impl From<ExprEllipsisLiteral> for ParenthesizedExpr {
-    fn from(payload: ExprEllipsisLiteral) -> Self {
-        Expr::EllipsisLiteral(payload).into()
-    }
-}
-impl From<ExprAttribute> for ParenthesizedExpr {
-    fn from(payload: ExprAttribute) -> Self {
-        Expr::Attribute(payload).into()
-    }
-}
-impl From<ExprSubscript> for ParenthesizedExpr {
-    fn from(payload: ExprSubscript) -> Self {
-        Expr::Subscript(payload).into()
-    }
-}
-impl From<ExprStarred> for ParenthesizedExpr {
-    fn from(payload: ExprStarred) -> Self {
-        Expr::Starred(payload).into()
-    }
-}
-impl From<ExprName> for ParenthesizedExpr {
-    fn from(payload: ExprName) -> Self {
-        Expr::Name(payload).into()
-    }
-}
-impl From<ExprList> for ParenthesizedExpr {
-    fn from(payload: ExprList) -> Self {
-        Expr::List(payload).into()
-    }
-}
-impl From<ExprTuple> for ParenthesizedExpr {
-    fn from(payload: ExprTuple) -> Self {
-        Expr::Tuple(payload).into()
-    }
-}
-impl From<ExprSlice> for ParenthesizedExpr {
-    fn from(payload: ExprSlice) -> Self {
-        Expr::Slice(payload).into()
     }
 }
 

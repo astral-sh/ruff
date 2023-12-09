@@ -3,10 +3,10 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{CommentRanges, PythonWhitespace};
 use ruff_source_file::Locator;
 
 use crate::noqa;
@@ -200,17 +200,11 @@ fn delete_noqa(range: TextRange, locator: &Locator) -> Edit {
 
     // Compute the leading space.
     let prefix = locator.slice(TextRange::new(line_range.start(), range.start()));
-    let leading_space = prefix
-        .rfind(|c: char| !c.is_whitespace())
-        .map_or(prefix.len(), |i| prefix.len() - i - 1);
-    let leading_space_len = TextSize::try_from(leading_space).unwrap();
+    let leading_space_len = prefix.text_len() - prefix.trim_whitespace_end().text_len();
 
     // Compute the trailing space.
     let suffix = locator.slice(TextRange::new(range.end(), line_range.end()));
-    let trailing_space = suffix
-        .find(|c: char| !c.is_whitespace())
-        .map_or(suffix.len(), |i| i);
-    let trailing_space_len = TextSize::try_from(trailing_space).unwrap();
+    let trailing_space_len = suffix.text_len() - suffix.trim_whitespace_start().text_len();
 
     // Ex) `# noqa`
     if line_range

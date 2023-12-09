@@ -101,14 +101,22 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
             return false;
         };
 
+        if arguments.is_empty() {
+            return false;
+        }
+
         // Match against, e.g., `apps.get_model("zerver", "Attachment")`.
         if let Some(call_path) = collect_call_path(func.as_ref()) {
             if matches!(call_path.as_slice(), [.., "get_model"]) {
                 if let Some(argument) =
-                    arguments.find_argument("model_name", arguments.args.len() - 1)
+                    arguments.find_argument("model_name", arguments.args.len().saturating_sub(1))
                 {
                     if let Some(string_literal) = argument.as_string_literal_expr() {
-                        return string_literal.value.to_str() == name;
+                        if string_literal.value.to_str() == name {
+                            return true;
+                        }
+                    } else {
+                        return true;
                     }
                 }
             }
@@ -123,7 +131,9 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
                 if let Some(argument) = arguments.find_argument("dotted_path", 0) {
                     if let Some(string_literal) = argument.as_string_literal_expr() {
                         if let Some((.., model)) = string_literal.value.to_str().rsplit_once('.') {
-                            return model == name;
+                            if model == name {
+                                return true;
+                            }
                         }
                     }
                 }

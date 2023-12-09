@@ -180,7 +180,6 @@ fn is_allowed_value(expr: &Expr) -> bool {
         | Expr::GeneratorExp(_)
         | Expr::Compare(_)
         | Expr::Call(_)
-        | Expr::FormattedValue(_)
         | Expr::FString(_)
         | Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)

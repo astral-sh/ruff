@@ -21,6 +21,14 @@ use crate::rules::pylint::helpers::CmpOpExt;
 /// foo == foo
 /// ```
 ///
+/// In some cases, self-comparisons are used to determine whether a float is
+/// NaN. Instead, prefer `math.isnan`:
+/// ```python
+/// import math
+///
+/// math.isnan(foo)
+/// ```
+///
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[violation]

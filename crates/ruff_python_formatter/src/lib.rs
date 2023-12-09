@@ -32,6 +32,7 @@ mod options;
 pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
+mod preview;
 mod shared_traits;
 pub(crate) mod statement;
 pub(crate) mod type_param;

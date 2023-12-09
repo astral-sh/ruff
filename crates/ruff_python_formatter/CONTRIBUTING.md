@@ -218,7 +218,7 @@ call, for single items `.format().fmt(f)` or `.fmt(f)` is sufficient.
 impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
     fn fmt_fields(&self, item: &StmtReturn, f: &mut PyFormatter) -> FormatResult<()> {
         // Here we destructure item and make sure each field is listed.
-        // We generally don't need range is it's underscore-ignored
+        // We generally don't need range if it's underscore-ignored
         let StmtReturn { range: _, value } = item;
         // Implement some formatting logic, in this case no space (and no value) after a return with
         // no value
