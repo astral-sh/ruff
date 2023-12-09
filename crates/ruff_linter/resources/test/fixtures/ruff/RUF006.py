@@ -68,6 +68,12 @@ def f():
     task = asyncio.create_task(coordinator.ws_connect())
 
 
+# Error
+def f():
+    loop = asyncio.get_running_loop()
+    task: asyncio.Task = loop.create_task(coordinator.ws_connect())
+
+
 # OK (potential false negative)
 def f():
     task = asyncio.create_task(coordinator.ws_connect())

@@ -25,11 +25,19 @@ RUF006.py:68:12: RUF006 Store a reference to the return value of `asyncio.create
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
    |
 
-RUF006.py:91:5: RUF006 Store a reference to the return value of `asyncio.create_task`
+RUF006.py:74:26: RUF006 Store a reference to the return value of `asyncio.create_task`
    |
-89 | def f():
-90 |     loop = asyncio.get_running_loop()
-91 |     loop.create_task(coordinator.ws_connect())  # Error
+72 | def f():
+73 |     loop = asyncio.get_running_loop()
+74 |     task: asyncio.Task = loop.create_task(coordinator.ws_connect())
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+   |
+
+RUF006.py:97:5: RUF006 Store a reference to the return value of `asyncio.create_task`
+   |
+95 | def f():
+96 |     loop = asyncio.get_running_loop()
+97 |     loop.create_task(coordinator.ws_connect())  # Error
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
    |
 

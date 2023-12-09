@@ -119,7 +119,10 @@ pub(crate) fn asyncio_dangling_task_unused(
         let Some(source) = binding.source else {
             continue;
         };
-        let Stmt::Assign(ast::StmtAssign { value, .. }) = checker.semantic().statement(source)
+        let (Stmt::Assign(ast::StmtAssign { value, .. })
+        | Stmt::AnnAssign(ast::StmtAnnAssign {
+            value: Some(value), ..
+        })) = checker.semantic().statement(source)
         else {
             continue;
         };
