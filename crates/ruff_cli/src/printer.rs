@@ -7,13 +7,15 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
+use ruff_workspace::resolver::PyprojectConfig;
+use rustc_hash::FxHashMap;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, TextEmitter, SarifEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
@@ -210,6 +212,7 @@ impl Printer {
         &self,
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
+        config: &PyprojectConfig,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -290,6 +293,11 @@ impl Printer {
             }
             SerializationFormat::Azure => {
                 AzureEmitter.emit(writer, &diagnostics.messages, &context)?;
+            }
+            SerializationFormat::Sarif => {
+                SarifEmitter::default()
+                    .with_applied_rules(config.settings.linter.rules)
+                    .emit(writer, &diagnostics.messages, &context)?;
             }
         }
 

@@ -1,0 +1,82 @@
+---
+source: crates/ruff_linter/src/message/sarif.rs
+expression: content
+---
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "results": [
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///fib.py"
+                },
+                "region": {
+                  "startColumn": 8,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "UnusedImport"
+          },
+          "ruleId": "F401"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///fib.py"
+                },
+                "region": {
+                  "startColumn": 5,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "UnusedVariable"
+          },
+          "ruleId": "F841"
+        },
+        {
+          "level": "error",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "file:///undef.py"
+                },
+                "region": {
+                  "startColumn": 4,
+                  "startLine": 1
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "UndefinedName"
+          },
+          "ruleId": "F821"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://github.com/astral-sh/ruff",
+          "name": "ruff",
+          "rules": [],
+          "version": "0.1.7"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

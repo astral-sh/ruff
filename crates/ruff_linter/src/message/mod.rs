@@ -13,6 +13,7 @@ pub use json::JsonEmitter;
 pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
+pub use sarif::SarifEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceLocation};
@@ -29,6 +30,7 @@ mod json_lines;
 mod junit;
 mod pylint;
 mod text;
+mod sarif;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Message {
@@ -184,7 +186,7 @@ def fibonacci(n):
             TextSize::from(10),
         ))));
 
-        let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
+        let fib_source = SourceFileBuilder::new("/fib.py", fib).finish();
 
         let unused_variable = Diagnostic::new(
             DiagnosticKind {
@@ -210,7 +212,7 @@ def fibonacci(n):
             TextRange::new(TextSize::from(3), TextSize::from(4)),
         );
 
-        let file_2_source = SourceFileBuilder::new("undef.py", file_2).finish();
+        let file_2_source = SourceFileBuilder::new("/undef.py", file_2).finish();
 
         let unused_import_start = unused_import.start();
         let unused_variable_start = unused_variable.start();
