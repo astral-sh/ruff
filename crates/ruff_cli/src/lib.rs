@@ -200,6 +200,7 @@ pub fn run(
         }
         Command::Check(args) => check(args, log_level),
         Command::Format(args) => format(args, log_level),
+        Command::ImportMap(args) => commands::import_map::import_map(args),
     }
 }
 

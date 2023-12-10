@@ -76,6 +76,8 @@ pub enum Command {
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
     Format(FormatCommand),
+    /// (Experimental.) Generate a mapping of module imports.
+    ImportMap(ImportMapCommand),
     /// Display Ruff's version
     Version {
         #[arg(long, value_enum, default_value = "text")]
@@ -432,6 +434,19 @@ pub struct FormatCommand {
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
+}
+
+#[derive(Clone, Debug, clap::Parser)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct ImportMapCommand {
+    /// List of files or directories to inspect.
+    #[clap(help = "List of files or directories to inspect [default: .]")]
+    pub files: Vec<PathBuf>,
+    /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
+    #[arg(long, conflicts_with = "isolated")]
+    pub config: Option<PathBuf>,
+    #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
+    pub isolated: bool,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
