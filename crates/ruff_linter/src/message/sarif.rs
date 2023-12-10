@@ -175,7 +175,6 @@ mod tests {
         capture_emitter_output(&mut emitter, &create_messages())
     }
 
-
     #[test]
     fn valid_json() {
         let content = get_output();
