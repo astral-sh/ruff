@@ -60,7 +60,6 @@ impl Emitter for SarifEmitter<'_> {
     }
 }
 
-
 #[derive(Debug, Clone)]
 struct SarifRule<'a> {
     name: &'a str,
@@ -110,7 +109,6 @@ impl Serialize for SarifRule<'_> {
         .serialize(serializer)
     }
 }
-
 
 struct SarifResult {
     rule: Rule,

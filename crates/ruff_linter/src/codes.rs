@@ -10,8 +10,6 @@ use crate::registry::{AsRule, Linter};
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
-
-
 use strum_macros::{AsRefStr, EnumIter};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Serialize)]

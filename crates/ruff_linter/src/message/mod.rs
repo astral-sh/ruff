@@ -13,11 +13,11 @@ pub use json::JsonEmitter;
 pub use json_lines::JsonLinesEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
-pub use sarif::SarifEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
 
 mod azure;
@@ -29,8 +29,8 @@ mod json;
 mod json_lines;
 mod junit;
 mod pylint;
-mod text;
 mod sarif;
+mod text;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Message {
