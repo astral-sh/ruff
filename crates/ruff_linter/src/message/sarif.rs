@@ -6,6 +6,7 @@ use serde_json::json;
 
 use ruff_source_file::OneIndexed;
 
+use crate::fs::normalize_path;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::{AsRule, Linter, Rule, RuleNamespace};
 use crate::settings::rule_table::RuleTable;
@@ -17,11 +18,12 @@ pub struct SarifEmitter<'a> {
 }
 
 impl SarifEmitter<'_> {
+    #[must_use]
     pub fn with_applied_rules(mut self, rule_table: RuleTable) -> Self {
         let mut applied_rules = Vec::new();
 
         for rule in rule_table.iter_enabled() {
-            applied_rules.push(SarifRule::from_rule(rule.to_owned()).to_owned());
+            applied_rules.push(SarifRule::from_rule(rule));
         }
         self.applied_rules = applied_rules;
         self
@@ -37,7 +39,7 @@ impl Emitter for SarifEmitter<'_> {
     ) -> anyhow::Result<()> {
         let results = messages
             .iter()
-            .map(|message| SarifResult::from_message(message))
+            .map(SarifResult::from_message)
             .collect::<Vec<_>>();
 
         let output = json!({
@@ -75,7 +77,7 @@ impl<'a> SarifRule<'a> {
         let code = rule.noqa_code().to_string();
         let (linter, _) = Linter::parse_code(&code).unwrap();
         Self {
-            name: rule.to_owned().into(),
+            name: rule.into(),
             code,
             linter: linter.name(),
             summary: rule.message_formats()[0],
@@ -110,6 +112,7 @@ impl Serialize for SarifRule<'_> {
     }
 }
 
+#[derive(Debug)]
 struct SarifResult {
     rule: Rule,
     level: String,
@@ -122,11 +125,12 @@ struct SarifResult {
 impl SarifResult {
     fn from_message(message: &Message) -> Self {
         let start_location = message.compute_start_location();
+        let abs_filepath = normalize_path(message.filename());
         Self {
             rule: message.kind.rule(),
             level: "error".to_string(),
-            message: message.kind.name.to_owned(),
-            uri: Url::from_file_path(message.filename()).unwrap().to_string(),
+            message: message.kind.name.clone(),
+            uri: Url::from_file_path(abs_filepath).unwrap().to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
         }

@@ -8,7 +8,6 @@ use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
 use ruff_workspace::resolver::PyprojectConfig;
-use rustc_hash::FxHashMap;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;

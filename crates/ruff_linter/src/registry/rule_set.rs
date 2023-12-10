@@ -257,7 +257,7 @@ impl RuleSet {
     /// ```
     pub fn iter(&self) -> RuleSetIterator {
         RuleSetIterator {
-            set: self.clone(),
+            set: *self,
             index: 0,
         }
     }

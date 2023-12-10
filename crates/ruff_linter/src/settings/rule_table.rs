@@ -66,7 +66,7 @@ impl FromIterator<Rule> for RuleTable {
     fn from_iter<T: IntoIterator<Item = Rule>>(iter: T) -> Self {
         let rules = RuleSet::from_iter(iter);
         Self {
-            enabled: rules.clone(),
+            enabled: rules,
             should_fix: rules,
         }
     }
