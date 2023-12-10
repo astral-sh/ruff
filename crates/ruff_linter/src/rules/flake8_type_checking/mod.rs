@@ -37,6 +37,7 @@ mod tests {
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("TCH002.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("singledispatch.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("typing_modules_1.py"))]

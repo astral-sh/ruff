@@ -3,9 +3,14 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Binding, Imported, NodeId, ResolvedReferenceId, Scope};
+use ruff_python_ast::Expr;
+use ruff_python_codegen::Stylist;
+use ruff_python_semantic::{
+    AnyImport, Binding, Imported, NodeId, ResolvedReferenceId, Scope, SemanticModel,
+};
+use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -253,13 +258,19 @@ pub(crate) fn typing_only_runtime_import(
         };
 
         if binding.context.is_runtime()
-            && binding.references().all(|reference_id| {
-                checker
-                    .semantic()
-                    .reference(reference_id)
-                    .context()
-                    .is_typing()
-            })
+            && binding
+                .references()
+                .map(|reference_id| checker.semantic().reference(reference_id))
+                .all(|reference| {
+                    // All references should be in a typing context _or_ a runtime-evaluated
+                    // annotation (as opposed to a runtime-required annotation), which we can
+                    // quote.
+                    reference.in_type_checking_block()
+                        || reference.in_typing_only_annotation()
+                        || reference.in_runtime_evaluated_annotation()
+                        || reference.in_complex_string_type_definition()
+                        || reference.in_simple_string_type_definition()
+                })
         {
             let qualified_name = import.qualified_name();
 
@@ -310,6 +321,7 @@ pub(crate) fn typing_only_runtime_import(
             let import = ImportBinding {
                 import,
                 reference_id,
+                binding,
                 range: binding.range(),
                 parent_range: binding.parent_range(checker.semantic()),
             };
@@ -380,6 +392,8 @@ pub(crate) fn typing_only_runtime_import(
 struct ImportBinding<'a> {
     /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
     import: AnyImport<'a>,
+    /// The binding for the imported symbol.
+    binding: &'a Binding<'a>,
     /// The first reference to the imported symbol.
     reference_id: ResolvedReferenceId,
     /// The trimmed range of the import (e.g., `List` in `from typing import List`).
@@ -482,9 +496,91 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         checker.source_type,
     )?;
 
-    Ok(
-        Fix::unsafe_edits(remove_import_edit, add_import_edit.into_edits()).isolate(
-            Checker::isolation(checker.semantic().parent_statement_id(node_id)),
-        ),
+    // Step 3) Quote any runtime usages of the referenced symbol.
+    let quote_reference_edits = imports
+        .iter()
+        .flat_map(|ImportBinding { binding, .. }| {
+            binding.references.iter().filter_map(|reference_id| {
+                let reference = checker.semantic().reference(*reference_id);
+                if reference.context().is_runtime() {
+                    Some(quote_annotation(
+                        reference.node_id()?,
+                        checker.semantic(),
+                        checker.locator(),
+                        checker.stylist(),
+                    ))
+                } else {
+                    None
+                }
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(Fix::unsafe_edits(
+        remove_import_edit,
+        add_import_edit
+            .into_edits()
+            .into_iter()
+            .chain(quote_reference_edits),
     )
+    .isolate(Checker::isolation(
+        checker.semantic().parent_statement_id(node_id),
+    )))
+}
+
+/// Wrap a type annotation in quotes.
+///
+/// This requires more than just wrapping the reference itself in quotes. For example:
+/// - When quoting `Series` in `Series[pd.Timestamp]`, we want `"Series[pd.Timestamp]"`.
+/// - When quoting `kubernetes` in `kubernetes.SecurityContext`, we want `"kubernetes.SecurityContext"`.
+/// - When quoting `Series` in `Series["pd.Timestamp"]`, we want `"Series[pd.Timestamp]"`.
+/// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`.
+fn quote_annotation(
+    node_id: NodeId,
+    semantic: &SemanticModel,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<Edit> {
+    let expr = semantic.expression(node_id);
+    if let Some(parent_id) = semantic.parent_expression_id(node_id) {
+        match semantic.expression(parent_id) {
+            Expr::Subscript(parent) => {
+                if expr == parent.value.as_ref() {
+                    // If we're quoting the value of a subscript, we need to quote the entire
+                    // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
+                    // should generate `"DataFrame[int]"`.
+                    return quote_annotation(parent_id, semantic, locator, stylist);
+                }
+            }
+            Expr::Attribute(parent) => {
+                if expr == parent.value.as_ref() {
+                    // If we're quoting the value of an attribute, we need to quote the entire
+                    // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
+                    // should generate `"pd.DataFrame"`.
+                    return quote_annotation(parent_id, semantic, locator, stylist);
+                }
+            }
+            Expr::BinOp(parent) => {
+                if parent.op.is_bit_or() {
+                    // If we're quoting the left or right side of a binary operation, we need to
+                    // quote the entire expression. For example, when quoting `DataFrame` in
+                    // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
+                    return quote_annotation(parent_id, semantic, locator, stylist);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let annotation = locator.slice(expr);
+
+    // If the annotation already contains a quote, avoid attempting to re-quote it.
+    if annotation.contains('\'') || annotation.contains('"') {
+        return Err(anyhow::anyhow!("Annotation already contains a quote"));
+    }
+
+    // If we're quoting a name, we need to quote the entire expression.
+    let quote = stylist.quote();
+    let annotation = format!("{quote}{annotation}{quote}");
+    Ok(Edit::range_replacement(annotation, expr.range()))
 }

@@ -12,28 +12,37 @@ pub(crate) fn is_valid_runtime_import(binding: &Binding, semantic: &SemanticMode
         binding.context.is_runtime()
             && binding
                 .references()
-                .any(|reference_id| semantic.reference(reference_id).context().is_runtime())
+                .map(|reference_id| semantic.reference(reference_id))
+                .any(|reference| {
+                    // Are we in a typing-only context _or_ a runtime-evaluated context? We're
+                    // willing to quote runtime-evaluated, but not runtime-required annotations.
+                    !(reference.in_type_checking_block()
+                        || reference.in_typing_only_annotation()
+                        || reference.in_runtime_evaluated_annotation()
+                        || reference.in_complex_string_type_definition()
+                        || reference.in_simple_string_type_definition())
+                })
     } else {
         false
     }
 }
 
-pub(crate) fn runtime_evaluated_class(
+pub(crate) fn runtime_required_class(
     class_def: &ast::StmtClassDef,
     base_classes: &[String],
     decorators: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    if runtime_evaluated_base_class(class_def, base_classes, semantic) {
+    if runtime_required_base_class(class_def, base_classes, semantic) {
         return true;
     }
-    if runtime_evaluated_decorators(class_def, decorators, semantic) {
+    if runtime_required_decorators(class_def, decorators, semantic) {
         return true;
     }
     false
 }
 
-fn runtime_evaluated_base_class(
+fn runtime_required_base_class(
     class_def: &ast::StmtClassDef,
     base_classes: &[String],
     semantic: &SemanticModel,
@@ -45,7 +54,7 @@ fn runtime_evaluated_base_class(
         seen: &mut FxHashSet<BindingId>,
     ) -> bool {
         class_def.bases().iter().any(|expr| {
-            // If the base class is itself runtime-evaluated, then this is too.
+            // If the base class is itself runtime-required, then this is too.
             // Ex) `class Foo(BaseModel): ...`
             if semantic
                 .resolve_call_path(map_subscript(expr))
@@ -58,7 +67,7 @@ fn runtime_evaluated_base_class(
                 return true;
             }
 
-            // If the base class extends a runtime-evaluated class, then this does too.
+            // If the base class extends a runtime-required class, then this does too.
             // Ex) `class Bar(BaseModel): ...; class Foo(Bar): ...`
             if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
                 if seen.insert(id) {
@@ -86,7 +95,7 @@ fn runtime_evaluated_base_class(
     inner(class_def, base_classes, semantic, &mut FxHashSet::default())
 }
 
-fn runtime_evaluated_decorators(
+fn runtime_required_decorators(
     class_def: &ast::StmtClassDef,
     decorators: &[String],
     semantic: &SemanticModel,

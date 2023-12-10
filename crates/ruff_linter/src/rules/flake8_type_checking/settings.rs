@@ -14,7 +14,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             strict: false,
-            exempt_modules: vec!["typing".to_string()],
+            exempt_modules: vec!["typing".to_string(), "typing_extensions".to_string()],
             runtime_evaluated_base_classes: vec![],
             runtime_evaluated_decorators: vec![],
         }
