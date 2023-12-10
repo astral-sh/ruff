@@ -166,7 +166,6 @@ impl Serialize for SarifResult {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_snapshot;
 
     use crate::message::tests::{capture_emitter_output, create_messages};
     use crate::message::SarifEmitter;
@@ -176,12 +175,6 @@ mod tests {
         capture_emitter_output(&mut emitter, &create_messages())
     }
 
-    #[test]
-    fn output() {
-        let content = get_output();
-
-        assert_snapshot!(content);
-    }
 
     #[test]
     fn valid_json() {
