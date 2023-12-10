@@ -1,7 +1,9 @@
-use ruff_text_size::TextRange;
+use crate::Stmt;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 /// A representation of an individual name imported via any import statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -168,5 +170,52 @@ impl<'a> IntoIterator for &'a ImportMap {
 
     fn into_iter(self) -> Self::IntoIter {
         self.module_to_imports.iter()
+    }
+}
+
+pub fn populate_module_imports(
+    module_imports: &mut Vec<ModuleImport>,
+    module_path: &Vec<String>,
+    stmt: &Stmt,
+) {
+    match stmt {
+        Stmt::Import(crate::StmtImport { names, range: _ }) => {
+            module_imports.extend(
+                names
+                    .iter()
+                    .map(|name| ModuleImport::new(name.name.to_string(), stmt.range())),
+            );
+        }
+        Stmt::ImportFrom(crate::StmtImportFrom {
+            module,
+            names,
+            level,
+            range: _,
+        }) => {
+            let level = level.unwrap_or_default() as usize;
+            let module = if let Some(module) = module {
+                let module: &String = module.as_ref();
+                if level == 0 {
+                    Cow::Borrowed(module)
+                } else {
+                    if module_path.len() <= level {
+                        return;
+                    }
+                    let prefix = module_path[..module_path.len() - level].join(".");
+                    Cow::Owned(format!("{prefix}.{module}"))
+                }
+            } else {
+                if module_path.len() <= level {
+                    return;
+                }
+                Cow::Owned(module_path[..module_path.len() - level].join("."))
+            };
+            module_imports.extend(
+                names.iter().map(|name| {
+                    ModuleImport::new(format!("{}.{}", module, name.name), name.range())
+                }),
+            );
+        }
+        _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),
     }
 }
