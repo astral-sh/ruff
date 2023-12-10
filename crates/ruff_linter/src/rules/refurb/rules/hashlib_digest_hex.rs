@@ -6,10 +6,12 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for the use of `.digest().hex()`.
+/// Checks for the use of `.digest().hex()` on a hashlib hash, like `sha512`.
 ///
 /// ## Why is this bad?
-/// Use `.hexdigest()` to get a hex digest from a hash.
+/// When generating a hex digest from a hash, it's preferable to use the
+/// `.hexdigest()` method, rather than calling `.digest()` and then `.hex()`,
+/// as the former is more concise and readable.
 ///
 /// ## Example
 /// ```python
@@ -25,8 +27,13 @@ use crate::checkers::ast::Checker;
 /// hashed = sha512(b"some data").hexdigest()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as the target of the `.digest()` call
+/// could be a user-defined class that implements a `.hex()` method, rather
+/// than a hashlib hash object.
+///
 /// ## References
-/// - [Python documentation: `hashlib` — Secure hashes and message digests](https://docs.python.org/3/library/hashlib.html)
+/// - [Python documentation: `hashlib`](https://docs.python.org/3/library/hashlib.html)
 #[violation]
 pub struct HashlibDigestHex;
 
@@ -35,11 +42,11 @@ impl Violation for HashlibDigestHex {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use of hashlib `.digest().hex()`")
+        format!("Use of hashlib's `.digest().hex()`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Replace hashlib `.digest().hex()` with `.hexdigest()`".to_string())
+        Some("Replace with `.hexdigest()`".to_string())
     }
 }
 
@@ -72,14 +79,11 @@ pub(crate) fn hashlib_digest_hex(checker: &mut Checker, call: &ExprCall) {
         return;
     }
 
-    let Expr::Call(ExprCall {
-        func, range: r3, ..
-    }) = value.as_ref()
-    else {
+    let Expr::Call(ExprCall { func, .. }) = value.as_ref() else {
         return;
     };
 
-    if !checker.semantic().resolve_call_path(func).is_some_and(
+    if checker.semantic().resolve_call_path(func).is_some_and(
         |call_path: smallvec::SmallVec<[&str; 8]>| {
             matches!(
                 call_path.as_slice(),
@@ -104,15 +108,13 @@ pub(crate) fn hashlib_digest_hex(checker: &mut Checker, call: &ExprCall) {
             )
         },
     ) {
-        return;
+        let mut diagnostic = Diagnostic::new(HashlibDigestHex, call.range());
+        if arguments.is_empty() {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                ".hexdigest".to_string(),
+                TextRange::new(value.end(), call.func.end()),
+            )));
+        }
+        checker.diagnostics.push(diagnostic);
     }
-    let mut diagnostic = Diagnostic::new(HashlibDigestHex, call.range());
-    if arguments.is_empty() {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            ".hexdigest".to_string(),
-            TextRange::new(r3.end(), call.func.end()),
-        )));
-    }
-
-    checker.diagnostics.push(diagnostic);
 }
