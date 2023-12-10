@@ -123,6 +123,7 @@ struct SarifResult {
 }
 
 impl SarifResult {
+    #[cfg(not(target_arch = "wasm32"))]
     fn from_message(message: &Message) -> Self {
         let start_location = message.compute_start_location();
         let abs_filepath = normalize_path(message.filename());
@@ -131,6 +132,19 @@ impl SarifResult {
             level: "error".to_string(),
             message: message.kind.name.clone(),
             uri: Url::from_file_path(abs_filepath).unwrap().to_string(),
+            start_line: start_location.row,
+            start_column: start_location.column,
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    fn from_message(message: &Message) -> Self {
+        let start_location = message.compute_start_location();
+        let abs_filepath = normalize_path(message.filename());
+        Self {
+            rule: message.kind.rule(),
+            level: "error".to_string(),
+            message: message.kind.name.clone(),
+            uri: abs_filepath.display().to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
         }
