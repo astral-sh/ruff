@@ -8,30 +8,50 @@ E402.py:25:1: E402 Module level import not at top of file
 25 | import f
    | ^^^^^^^^ E402
 26 | 
-27 | __some__magic = 1
+27 | import matplotlib
    |
 
-E402.py:29:1: E402 Module level import not at top of file
+E402.py:27:1: E402 Module level import not at top of file
    |
-27 | __some__magic = 1
+25 | import f
+26 | 
+27 | import matplotlib
+   | ^^^^^^^^^^^^^^^^^ E402
 28 | 
-29 | import g
+29 | matplotlib.use("Agg")
+   |
+
+E402.py:31:1: E402 Module level import not at top of file
+   |
+29 | matplotlib.use("Agg")
+30 | 
+31 | import g
+   | ^^^^^^^^ E402
+32 | 
+33 | __some__magic = 1
+   |
+
+E402.py:35:1: E402 Module level import not at top of file
+   |
+33 | __some__magic = 1
+34 | 
+35 | import h
    | ^^^^^^^^ E402
    |
 
-E402.py:39:1: E402 Module level import not at top of file
+E402.py:45:1: E402 Module level import not at top of file
    |
-37 |     import i
-38 | 
-39 | import j; import k
+43 |     import j
+44 | 
+45 | import k; import l
    | ^^^^^^^^ E402
    |
 
-E402.py:39:11: E402 Module level import not at top of file
+E402.py:45:11: E402 Module level import not at top of file
    |
-37 |     import i
-38 | 
-39 | import j; import k
+43 |     import j
+44 | 
+45 | import k; import l
    |           ^^^^^^^^ E402
    |
 
