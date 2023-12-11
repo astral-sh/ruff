@@ -1159,6 +1159,44 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
 }
 
 #[test]
+fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601,UP034", "--no-unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    -:2:7: UP034 [*] Avoid extraneous parentheses
+    Found 2 errors.
+    [*] 1 fixable with the --fix option.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
+fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "F601", "--no-unsafe-fixes"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("x = {'a': 1, 'a': 1}\n"),
+        @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:14: F601 Dictionary key literal `'a'` repeated
+    Found 1 error.
+
+    ----- stderr -----
+    "###);
+}
+
+#[test]
 fn check_shows_unsafe_fixes_with_opt_in() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "F601,UP034", "--unsafe-fixes"])
