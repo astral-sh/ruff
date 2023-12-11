@@ -17,7 +17,7 @@ bitflags = { version = "2.4.1" }
 chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
 clap = { version = "4.4.7", features = ["derive"] }
 colored = { version = "2.0.0" }
-filetime = { version = "0.2.20" }
+filetime = { version = "0.2.23" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 ignore = { version = "0.4.20" }
