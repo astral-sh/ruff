@@ -16,7 +16,8 @@ use crate::comments::{
 };
 pub use crate::context::PyFormatContext;
 pub use crate::options::{
-    DocstringCode, MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle,
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
+    QuoteStyle,
 };
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
 use crate::verbatim::suppressed_node;
