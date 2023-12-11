@@ -1,10 +1,20 @@
+use crate::rules::flake8_type_checking::settings::Settings;
+use anyhow::Result;
+use ruff_diagnostics::Edit;
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{Binding, BindingId, BindingKind, SemanticModel};
+use ruff_python_codegen::Stylist;
+use ruff_python_semantic::{Binding, BindingId, BindingKind, NodeId, SemanticModel};
+use ruff_source_file::Locator;
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 
-pub(crate) fn is_valid_runtime_import(binding: &Binding, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_valid_runtime_import(
+    binding: &Binding,
+    semantic: &SemanticModel,
+    settings: &Settings,
+) -> bool {
     if matches!(
         binding.kind,
         BindingKind::Import(..) | BindingKind::FromImport(..) | BindingKind::SubmoduleImport(..)
@@ -18,9 +28,10 @@ pub(crate) fn is_valid_runtime_import(binding: &Binding, semantic: &SemanticMode
                     // willing to quote runtime-evaluated, but not runtime-required annotations.
                     !(reference.in_type_checking_block()
                         || reference.in_typing_only_annotation()
-                        || reference.in_runtime_evaluated_annotation()
                         || reference.in_complex_string_type_definition()
-                        || reference.in_simple_string_type_definition())
+                        || reference.in_simple_string_type_definition()
+                        || (settings.annotation_strategy.is_quote()
+                            && reference.in_runtime_evaluated_annotation()))
                 })
     } else {
         false
@@ -182,4 +193,61 @@ pub(crate) fn is_singledispatch_implementation(
 
         is_singledispatch_interface(function_def, semantic)
     })
+}
+
+/// Wrap a type annotation in quotes.
+///
+/// This requires more than just wrapping the reference itself in quotes. For example:
+/// - When quoting `Series` in `Series[pd.Timestamp]`, we want `"Series[pd.Timestamp]"`.
+/// - When quoting `kubernetes` in `kubernetes.SecurityContext`, we want `"kubernetes.SecurityContext"`.
+/// - When quoting `Series` in `Series["pd.Timestamp"]`, we want `"Series[pd.Timestamp]"`.
+/// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`.
+pub(crate) fn quote_annotation(
+    node_id: NodeId,
+    semantic: &SemanticModel,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<Edit> {
+    let expr = semantic.expression(node_id);
+    if let Some(parent_id) = semantic.parent_expression_id(node_id) {
+        match semantic.expression(parent_id) {
+            Expr::Subscript(parent) => {
+                if expr == parent.value.as_ref() {
+                    // If we're quoting the value of a subscript, we need to quote the entire
+                    // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
+                    // should generate `"DataFrame[int]"`.
+                    return quote_annotation(parent_id, semantic, locator, stylist);
+                }
+            }
+            Expr::Attribute(parent) => {
+                if expr == parent.value.as_ref() {
+                    // If we're quoting the value of an attribute, we need to quote the entire
+                    // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
+                    // should generate `"pd.DataFrame"`.
+                    return quote_annotation(parent_id, semantic, locator, stylist);
+                }
+            }
+            Expr::BinOp(parent) => {
+                if parent.op.is_bit_or() {
+                    // If we're quoting the left or right side of a binary operation, we need to
+                    // quote the entire expression. For example, when quoting `DataFrame` in
+                    // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
+                    return quote_annotation(parent_id, semantic, locator, stylist);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let annotation = locator.slice(expr);
+
+    // If the annotation already contains a quote, avoid attempting to re-quote it.
+    if annotation.contains('\'') || annotation.contains('"') {
+        return Err(anyhow::anyhow!("Annotation already contains a quote"));
+    }
+
+    // If we're quoting a name, we need to quote the entire expression.
+    let quote = stylist.quote();
+    let annotation = format!("{quote}{annotation}{quote}");
+    Ok(Edit::range_replacement(annotation, expr.range()))
 }

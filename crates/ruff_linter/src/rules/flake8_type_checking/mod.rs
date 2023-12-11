@@ -1,5 +1,6 @@
 //! Rules from [flake8-type-checking](https://pypi.org/project/flake8-type-checking/).
 pub(crate) mod helpers;
+mod imports;
 pub(crate) mod rules;
 pub mod settings;
 
@@ -12,6 +13,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::AnnotationStrategy;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
@@ -33,6 +35,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_7.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
@@ -47,6 +50,24 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote.py"))]
+    fn quote(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("quote_{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    annotation_strategy: AnnotationStrategy::Quote,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())

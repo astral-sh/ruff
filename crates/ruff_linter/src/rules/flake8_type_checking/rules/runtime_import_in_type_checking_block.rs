@@ -5,13 +5,15 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::{AnyImport, Imported, NodeId, ResolvedReferenceId, Scope};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_semantic::{Imported, NodeId, Scope};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
+use crate::rules::flake8_type_checking::helpers::quote_annotation;
+use crate::rules::flake8_type_checking::imports::ImportBinding;
 
 /// ## What it does
 /// Checks for runtime imports defined in a type-checking block.
@@ -19,6 +21,11 @@ use crate::importer::ImportedMembers;
 /// ## Why is this bad?
 /// The type-checking block is not executed at runtime, so the import will not
 /// be available at runtime.
+///
+/// If [`flake8-type-checking.annotation-strategy`] is set to `"quote"`,
+/// annotations will be wrapped in quotes if doing so would enable the
+/// corresponding import to remain in the type-checking block.
+///
 ///
 /// ## Example
 /// ```python
@@ -41,11 +48,15 @@ use crate::importer::ImportedMembers;
 ///     foo.bar()
 /// ```
 ///
+/// ## Options
+/// - `flake8-type-checking.annotation-strategy`
+///
 /// ## References
 /// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct RuntimeImportInTypeCheckingBlock {
     qualified_name: String,
+    strategy: Strategy,
 }
 
 impl Violation for RuntimeImportInTypeCheckingBlock {
@@ -53,14 +64,26 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RuntimeImportInTypeCheckingBlock { qualified_name } = self;
-        format!(
-            "Move import `{qualified_name}` out of type-checking block. Import is used for more than type hinting."
-        )
+        let Self {
+            qualified_name,
+            strategy,
+        } = self;
+        match strategy {
+            Strategy::MoveImport => format!(
+                "Move import `{qualified_name}` out of type-checking block. Import is used for more than type hinting."
+            ),
+            Strategy::QuoteUsages => format!(
+                "Quote references to `{qualified_name}`. Import is not available at runtime."
+            ),
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Move out of type-checking block".to_string())
+        let Self { strategy, .. } = self;
+        match strategy {
+            Strategy::MoveImport => Some("Move out of type-checking block".to_string()),
+            Strategy::QuoteUsages => Some("Quote references".to_string()),
+        }
     }
 }
 
@@ -71,7 +94,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all runtime imports by statement.
-    let mut errors_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut moves_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut quotes_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
     let mut ignores_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
@@ -101,6 +125,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
             let import = ImportBinding {
                 import,
                 reference_id,
+                binding,
                 range: binding.range(),
                 parent_range: binding.parent_range(checker.semantic()),
             };
@@ -118,15 +143,32 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     .or_default()
                     .push(import);
             } else {
-                errors_by_statement.entry(node_id).or_default().push(import);
+                // Determine whether the member should be fixed by moving the import out of the
+                // type-checking block, or by quoting its references.
+                if checker
+                    .settings
+                    .flake8_type_checking
+                    .annotation_strategy
+                    .is_quote()
+                    && binding.references().all(|reference_id| {
+                        let reference = checker.semantic().reference(reference_id);
+                        reference.context().is_typing()
+                            || reference.in_runtime_evaluated_annotation()
+                    })
+                {
+                    println!("quote");
+                    quotes_by_statement.entry(node_id).or_default().push(import);
+                } else {
+                    moves_by_statement.entry(node_id).or_default().push(import);
+                }
             }
         }
     }
 
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
-    for (node_id, imports) in errors_by_statement {
-        let fix = fix_imports(checker, node_id, &imports).ok();
+    for (node_id, imports) in moves_by_statement {
+        let fix = move_imports(checker, node_id, &imports).ok();
 
         for ImportBinding {
             import,
@@ -138,6 +180,36 @@ pub(crate) fn runtime_import_in_type_checking_block(
             let mut diagnostic = Diagnostic::new(
                 RuntimeImportInTypeCheckingBlock {
                     qualified_name: import.qualified_name(),
+                    strategy: Strategy::MoveImport,
+                },
+                range,
+            );
+            if let Some(range) = parent_range {
+                diagnostic.set_parent(range.start());
+            }
+            if let Some(fix) = fix.as_ref() {
+                diagnostic.set_fix(fix.clone());
+            }
+            diagnostics.push(diagnostic);
+        }
+    }
+
+    // Generate a diagnostic for every import, but share a fix across all imports within the same
+    // statement (excluding those that are ignored).
+    for (node_id, imports) in quotes_by_statement {
+        let fix = quote_imports(checker, node_id, &imports).ok();
+
+        for ImportBinding {
+            import,
+            range,
+            parent_range,
+            ..
+        } in imports
+        {
+            let mut diagnostic = Diagnostic::new(
+                RuntimeImportInTypeCheckingBlock {
+                    qualified_name: import.qualified_name(),
+                    strategy: Strategy::QuoteUsages,
                 },
                 range,
             );
@@ -163,6 +235,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
         let mut diagnostic = Diagnostic::new(
             RuntimeImportInTypeCheckingBlock {
                 qualified_name: import.qualified_name(),
+                strategy: Strategy::MoveImport,
             },
             range,
         );
@@ -173,26 +246,38 @@ pub(crate) fn runtime_import_in_type_checking_block(
     }
 }
 
-/// A runtime-required import with its surrounding context.
-struct ImportBinding<'a> {
-    /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    import: AnyImport<'a>,
-    /// The first reference to the imported symbol.
-    reference_id: ResolvedReferenceId,
-    /// The trimmed range of the import (e.g., `List` in `from typing import List`).
-    range: TextRange,
-    /// The range of the import's parent statement.
-    parent_range: Option<TextRange>,
-}
-
-impl Ranged for ImportBinding<'_> {
-    fn range(&self) -> TextRange {
-        self.range
-    }
+/// Generate a [`Fix`] to quote runtime usages for imports in a type-checking block.
+fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+    let mut quote_reference_edits = imports
+        .iter()
+        .flat_map(|ImportBinding { binding, .. }| {
+            binding.references.iter().filter_map(|reference_id| {
+                let reference = checker.semantic().reference(*reference_id);
+                if reference.context().is_runtime() {
+                    Some(quote_annotation(
+                        reference.node_id()?,
+                        checker.semantic(),
+                        checker.locator(),
+                        checker.stylist(),
+                    ))
+                } else {
+                    None
+                }
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let quote_reference_edit = quote_reference_edits
+        .pop()
+        .expect("Expected at least one reference");
+    Ok(
+        Fix::unsafe_edits(quote_reference_edit, quote_reference_edits).isolate(Checker::isolation(
+            checker.semantic().parent_statement_id(node_id),
+        )),
+    )
 }
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.
-fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+fn move_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
@@ -235,4 +320,19 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
             Checker::isolation(checker.semantic().parent_statement_id(node_id)),
         ),
     )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Strategy {
+    /// The import should be moved out of the type-checking block.
+    ///
+    /// This is required when at least one reference to the symbol is in a runtime-required context.
+    /// For example, given `from foo import Bar`, `x = Bar()` would be runtime-required.
+    MoveImport,
+    /// All usages of the import should be wrapped in quotes.
+    ///
+    /// This is acceptable when all references to the symbol are in a runtime-evaluated, but not
+    /// runtime-required context. For example, given `from foo import Bar`, `x: Bar` would be
+    /// runtime-evaluated, but not runtime-required.
+    QuoteUsages,
 }

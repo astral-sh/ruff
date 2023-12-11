@@ -699,6 +699,31 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "AnnotationStrategy": {
+      "oneOf": [
+        {
+          "description": "Avoid changing the semantics of runtime-evaluated annotations (e.g., by quoting them, or inserting `from __future__ import annotations`). Imports will be classified as typing-only or runtime-required based exclusively on the existing type annotations.",
+          "type": "string",
+          "enum": [
+            "preserve"
+          ]
+        },
+        {
+          "description": "Quote runtime-evaluated annotations, if doing so would enable the corresponding import to be moved into an `if TYPE_CHECKING:` block.",
+          "type": "string",
+          "enum": [
+            "quote"
+          ]
+        },
+        {
+          "description": "Insert `from __future__ import annotations` at the top of the file, if doing so would enable an import to be moved into an `if TYPE_CHECKING:` block.",
+          "type": "string",
+          "enum": [
+            "future"
+          ]
+        }
+      ]
+    },
     "ApiBan": {
       "type": "object",
       "required": [
@@ -1184,6 +1209,17 @@
     "Flake8TypeCheckingOptions": {
       "type": "object",
       "properties": {
+        "annotation-strategy": {
+          "description": "The strategy to use when analyzing type annotations that, by default, Python would evaluate at runtime.\n\nFor example, in the following, Python requires that `Sequence` be available at runtime, despite the fact that it's only used in a type annotation: ```python from collections.abc import Sequence\n\ndef func(value: Sequence[int]) -> None: ... ```\n\nIn other words, moving `from collections.abc import Sequence` into an `if TYPE_CHECKING:` block above would cause a runtime error.\n\nBy default, Ruff will respect such runtime evaluations (`\"preserve\"`), but supports two alternative strategies for handling them:\n\n- `\"quote\"`: Add quotes around the annotation (e.g., `\"Sequence[int]\"`), to prevent Python from evaluating it at runtime. Adding quotes around `Sequence` above will allow Ruff to move the import into an `if TYPE_CHECKING:` block. - `\"future\"`: Add a `from __future__ import annotations` import at the top of the file, which will cause Python to treat all annotations as strings, rather than evaluating them at runtime.\n\nSetting `annotation-strategy` to `\"quote\"` or `\"future\"` will allow Ruff to move more imports into type-checking blocks, but may cause issues with other tools that expect annotations to be evaluated at runtime.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationStrategy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "exempt-modules": {
           "description": "Exempt certain modules from needing to be moved into type-checking blocks.",
           "type": [

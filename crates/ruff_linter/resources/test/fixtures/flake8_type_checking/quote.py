@@ -38,3 +38,13 @@ def f():
 
     def baz() -> pd.DataFrame | int:
         ...
+
+
+def f():
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from pandas import DataFrame
+
+    def func(value: DataFrame):
+        ...

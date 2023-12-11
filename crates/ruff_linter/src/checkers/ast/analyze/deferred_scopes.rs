@@ -59,6 +59,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         flake8_type_checking::helpers::is_valid_runtime_import(
                             binding,
                             &checker.semantic,
+                            &checker.settings.flake8_type_checking,
                         )
                     })
                     .collect()

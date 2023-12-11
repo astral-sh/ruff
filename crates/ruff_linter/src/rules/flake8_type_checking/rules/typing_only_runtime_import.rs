@@ -3,20 +3,17 @@ use std::borrow::Cow;
 use anyhow::Result;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
-use ruff_python_codegen::Stylist;
-use ruff_python_semantic::{
-    AnyImport, Binding, Imported, NodeId, ResolvedReferenceId, Scope, SemanticModel,
-};
-use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_semantic::{Binding, Imported, NodeId, Scope};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
+use crate::rules::flake8_type_checking::helpers::quote_annotation;
+use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 
 /// ## What it does
@@ -28,6 +25,10 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// import cycles. If an import is _only_ used in typing-only contexts, it can
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
+///
+/// If [`flake8-type-checking.annotation-strategy`] is set to `"quote"`,
+/// annotations will be wrapped in quotes if doing so would enable the
+/// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
 /// If a class _requires_ that type annotations be available at runtime (as is
 /// the case for Pydantic, SQLAlchemy, and other libraries), consider using
@@ -61,6 +62,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// ```
 ///
 /// ## Options
+/// - `flake8-type-checking.annotation-strategy`
 /// - `flake8-type-checking.runtime-evaluated-base-classes`
 /// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
@@ -97,6 +99,10 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
+/// If [`flake8-type-checking.annotation-strategy`] is set to `"quote"`,
+/// annotations will be wrapped in quotes if doing so would enable the
+/// corresponding import to be moved into an `if TYPE_CHECKING:` block.
+///
 /// If a class _requires_ that type annotations be available at runtime (as is
 /// the case for Pydantic, SQLAlchemy, and other libraries), consider using
 /// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
@@ -129,6 +135,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// ```
 ///
 /// ## Options
+/// - `flake8-type-checking.annotation-strategy`
 /// - `flake8-type-checking.runtime-evaluated-base-classes`
 /// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
@@ -165,6 +172,10 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
+/// If [`flake8-type-checking.annotation-strategy`] is set to `"quote"`,
+/// annotations will be wrapped in quotes if doing so would enable the
+/// corresponding import to be moved into an `if TYPE_CHECKING:` block.
+///
 /// If a class _requires_ that type annotations be available at runtime (as is
 /// the case for Pydantic, SQLAlchemy, and other libraries), consider using
 /// the [`flake8-type-checking.runtime-evaluated-base-classes`] and
@@ -197,6 +208,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ```
 ///
 /// ## Options
+/// - `flake8-type-checking.annotation-strategy`
 /// - `flake8-type-checking.runtime-evaluated-base-classes`
 /// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
@@ -267,9 +279,14 @@ pub(crate) fn typing_only_runtime_import(
                     // quote.
                     reference.in_type_checking_block()
                         || reference.in_typing_only_annotation()
-                        || reference.in_runtime_evaluated_annotation()
                         || reference.in_complex_string_type_definition()
                         || reference.in_simple_string_type_definition()
+                        || (checker
+                            .settings
+                            .flake8_type_checking
+                            .annotation_strategy
+                            .is_quote()
+                            && reference.in_runtime_evaluated_annotation())
                 })
         {
             let qualified_name = import.qualified_name();
@@ -385,26 +402,6 @@ pub(crate) fn typing_only_runtime_import(
             }
             diagnostics.push(diagnostic);
         }
-    }
-}
-
-/// A runtime-required import with its surrounding context.
-struct ImportBinding<'a> {
-    /// The qualified name of the import (e.g., `typing.List` for `from typing import List`).
-    import: AnyImport<'a>,
-    /// The binding for the imported symbol.
-    binding: &'a Binding<'a>,
-    /// The first reference to the imported symbol.
-    reference_id: ResolvedReferenceId,
-    /// The trimmed range of the import (e.g., `List` in `from typing import List`).
-    range: TextRange,
-    /// The range of the import's parent statement.
-    parent_range: Option<TextRange>,
-}
-
-impl Ranged for ImportBinding<'_> {
-    fn range(&self) -> TextRange {
-        self.range
     }
 }
 
@@ -526,61 +523,4 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
     .isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
     )))
-}
-
-/// Wrap a type annotation in quotes.
-///
-/// This requires more than just wrapping the reference itself in quotes. For example:
-/// - When quoting `Series` in `Series[pd.Timestamp]`, we want `"Series[pd.Timestamp]"`.
-/// - When quoting `kubernetes` in `kubernetes.SecurityContext`, we want `"kubernetes.SecurityContext"`.
-/// - When quoting `Series` in `Series["pd.Timestamp"]`, we want `"Series[pd.Timestamp]"`.
-/// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`.
-fn quote_annotation(
-    node_id: NodeId,
-    semantic: &SemanticModel,
-    locator: &Locator,
-    stylist: &Stylist,
-) -> Result<Edit> {
-    let expr = semantic.expression(node_id);
-    if let Some(parent_id) = semantic.parent_expression_id(node_id) {
-        match semantic.expression(parent_id) {
-            Expr::Subscript(parent) => {
-                if expr == parent.value.as_ref() {
-                    // If we're quoting the value of a subscript, we need to quote the entire
-                    // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
-                    // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist);
-                }
-            }
-            Expr::Attribute(parent) => {
-                if expr == parent.value.as_ref() {
-                    // If we're quoting the value of an attribute, we need to quote the entire
-                    // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
-                    // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist);
-                }
-            }
-            Expr::BinOp(parent) => {
-                if parent.op.is_bit_or() {
-                    // If we're quoting the left or right side of a binary operation, we need to
-                    // quote the entire expression. For example, when quoting `DataFrame` in
-                    // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    let annotation = locator.slice(expr);
-
-    // If the annotation already contains a quote, avoid attempting to re-quote it.
-    if annotation.contains('\'') || annotation.contains('"') {
-        return Err(anyhow::anyhow!("Annotation already contains a quote"));
-    }
-
-    // If we're quoting a name, we need to quote the entire expression.
-    let quote = stylist.quote();
-    let annotation = format!("{quote}{annotation}{quote}");
-    Ok(Edit::range_replacement(annotation, expr.range()))
 }
