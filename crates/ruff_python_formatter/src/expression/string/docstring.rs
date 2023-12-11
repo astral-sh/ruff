@@ -464,6 +464,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             .f
             .options()
             .clone()
+            .with_line_width(self.f.options().docstring_code_line_width())
             // It's perhaps a little odd to be hard-coding the indent
             // style here, but I believe it is necessary as a result
             // of the whitespace normalization otherwise done in

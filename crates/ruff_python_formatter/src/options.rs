@@ -49,6 +49,12 @@ pub struct PyFormatOptions {
     /// enabled by default (opt-out) in the future.
     docstring_code: DocstringCode,
 
+    /// The preferred line width at which the formatter should wrap lines in
+    /// docstring code examples. This only has an impact when `docstring_code`
+    /// is enabled.
+    #[cfg_attr(feature = "serde", serde(default = "default_line_width"))]
+    docstring_code_line_width: LineWidth,
+
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
 }
@@ -77,6 +83,7 @@ impl Default for PyFormatOptions {
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
             docstring_code: DocstringCode::default(),
+            docstring_code_line_width: default_line_width(),
             preview: PreviewMode::default(),
         }
     }
@@ -117,6 +124,10 @@ impl PyFormatOptions {
 
     pub fn docstring_code(&self) -> DocstringCode {
         self.docstring_code
+    }
+
+    pub fn docstring_code_line_width(&self) -> LineWidth {
+        self.docstring_code_line_width
     }
 
     pub const fn preview(&self) -> PreviewMode {

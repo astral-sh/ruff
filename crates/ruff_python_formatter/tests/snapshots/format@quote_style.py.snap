@@ -59,14 +59,15 @@ def docstring_single():
 ## Outputs
 ### Output 1
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Single
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Single
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -129,14 +130,15 @@ def docstring_single():
 
 ### Output 2
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
@@ -199,14 +201,15 @@ def docstring_single():
 
 ### Output 3
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Preserve
-line-ending             = LineFeed
-magic-trailing-comma    = Respect
-docstring-code          = Disabled
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Preserve
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = 88
+preview                    = Disabled
 ```
 
 ```python
