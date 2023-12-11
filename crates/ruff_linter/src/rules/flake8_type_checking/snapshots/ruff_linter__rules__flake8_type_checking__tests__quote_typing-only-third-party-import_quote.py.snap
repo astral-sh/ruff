@@ -155,4 +155,45 @@ quote.py:37:22: TCH002 [*] Move third-party import `pandas` into a type-checking
 41 44 | 
 42 45 | 
 
+quote.py:45:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+   |
+44 | def f():
+45 |     from pandas import DataFrame
+   |                        ^^^^^^^^^ TCH002
+46 | 
+47 |     def baz() -> DataFrame():
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from pandas import DataFrame
+1  5  | def f():
+2  6  |     from pandas import DataFrame
+3  7  | 
+--------------------------------------------------------------------------------
+42 46 | 
+43 47 | 
+44 48 | def f():
+45    |-    from pandas import DataFrame
+46 49 | 
+47    |-    def baz() -> DataFrame():
+   50 |+    def baz() -> "DataFrame()":
+48 51 |         ...
+49 52 | 
+50 53 | 
+
+quote.py:54:24: TCH002 Move third-party import `pandas.DataFrame` into a type-checking block
+   |
+52 |     from typing import Literal
+53 | 
+54 |     from pandas import DataFrame
+   |                        ^^^^^^^^^ TCH002
+55 | 
+56 |     def baz() -> DataFrame[Literal["int"]]:
+   |
+   = help: Move into type-checking block
+
 

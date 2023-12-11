@@ -13,7 +13,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
-    use crate::rules::flake8_type_checking::settings::AnnotationStrategy;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_messages, settings};
 
@@ -63,7 +62,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    annotation_strategy: AnnotationStrategy::Quote,
+                    quote_annotations: true,
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)

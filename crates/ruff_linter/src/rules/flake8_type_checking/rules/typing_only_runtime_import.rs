@@ -26,7 +26,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`flake8-type-checking.annotation-strategy`] is set to `"quote"`,
+/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
@@ -62,7 +62,7 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.annotation-strategy`
+/// - `flake8-type-checking.quote-annotations`
 /// - `flake8-type-checking.runtime-evaluated-base-classes`
 /// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
@@ -99,7 +99,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`flake8-type-checking.annotation-strategy`] is set to `"quote"`,
+/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
@@ -135,7 +135,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.annotation-strategy`
+/// - `flake8-type-checking.quote-annotations`
 /// - `flake8-type-checking.runtime-evaluated-base-classes`
 /// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
@@ -172,7 +172,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// instead be imported conditionally under an `if TYPE_CHECKING:` block to
 /// minimize runtime overhead.
 ///
-/// If [`flake8-type-checking.annotation-strategy`] is set to `"quote"`,
+/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to be moved into an `if TYPE_CHECKING:` block.
 ///
@@ -208,7 +208,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.annotation-strategy`
+/// - `flake8-type-checking.quote-annotations`
 /// - `flake8-type-checking.runtime-evaluated-base-classes`
 /// - `flake8-type-checking.runtime-evaluated-decorators`
 ///
@@ -281,11 +281,7 @@ pub(crate) fn typing_only_runtime_import(
                         || reference.in_typing_only_annotation()
                         || reference.in_complex_string_type_definition()
                         || reference.in_simple_string_type_definition()
-                        || (checker
-                            .settings
-                            .flake8_type_checking
-                            .annotation_strategy
-                            .is_quote()
+                        || (checker.settings.flake8_type_checking.quote_annotations
                             && reference.in_runtime_evaluated_annotation())
                 })
         {

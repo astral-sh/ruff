@@ -12,7 +12,6 @@ use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
 use ruff_linter::rules::flake8_pytest_style::types;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::rules::flake8_tidy_imports::settings::{ApiBan, Strictness};
-use ruff_linter::rules::flake8_type_checking::settings::AnnotationStrategy;
 use ruff_linter::rules::isort::settings::RelativeImportsOrder;
 use ruff_linter::rules::isort::{ImportSection, ImportType};
 use ruff_linter::rules::pydocstyle::settings::Convention;
@@ -1644,8 +1643,8 @@ pub struct Flake8TypeCheckingOptions {
     )]
     pub runtime_evaluated_decorators: Option<Vec<String>>,
 
-    /// The strategy to use when analyzing type annotations that, by default,
-    /// Python would evaluate at runtime.
+    /// Whether to add quotes around type annotations, if doing so would allow
+    /// the corresponding import to be moved into a type-checking block.
     ///
     /// For example, in the following, Python requires that `Sequence` be
     /// available at runtime, despite the fact that it's only used in a type
@@ -1660,31 +1659,27 @@ pub struct Flake8TypeCheckingOptions {
     /// In other words, moving `from collections.abc import Sequence` into an
     /// `if TYPE_CHECKING:` block above would cause a runtime error.
     ///
-    /// By default, Ruff will respect such runtime evaluations (`"preserve"`),
-    /// but supports two alternative strategies for handling them:
+    /// By default, Ruff will respect such runtime semantics, and avoid moving
+    /// the import.
     ///
-    /// - `"quote"`: Add quotes around the annotation (e.g., `"Sequence[int]"`), to
-    ///   prevent Python from evaluating it at runtime. Adding quotes around
-    ///   `Sequence` above will allow Ruff to move the import into an
-    ///   `if TYPE_CHECKING:` block.
-    /// - `"future"`: Add a `from __future__ import annotations` import at the
-    ///    top of the file, which will cause Python to treat all annotations as
-    ///    strings, rather than evaluating them at runtime.
+    /// However, setting `quote-annotations` to `true` will instruct Ruff
+    /// to add quotes around the annotation (e.g., `"Sequence[int]"`). Adding
+    /// quotes around `Sequence`, above, will enable Ruff to move the import
+    /// into an `if TYPE_CHECKING:` block.
     ///
-    /// Setting `annotation-strategy` to `"quote"` or `"future"` will allow
-    /// Ruff to move more imports into type-checking blocks, but may cause
-    /// issues with other tools that expect annotations to be evaluated at
-    /// runtime.
+    /// Note that this setting has no effect when `from __future__ import annotations`
+    /// is present, as `__future__` annotations are always treated equivalently
+    /// to quoted annotations.
     #[option(
-        default = "[]",
-        value_type = r#""preserve" | "quote" | "future""#,
+        default = "false",
+        value_type = "bool",
         example = r#"
             # Add quotes around type annotations, if doing so would allow
             # an import to be moved into a type-checking block.
-            annotation-strategy = "quote"
+            quote-annotations = true
         "#
     )]
-    pub annotation_strategy: Option<AnnotationStrategy>,
+    pub quote_annotations: Option<bool>,
 }
 
 impl Flake8TypeCheckingOptions {
@@ -1696,7 +1691,7 @@ impl Flake8TypeCheckingOptions {
                 .unwrap_or_else(|| vec!["typing".to_string()]),
             runtime_evaluated_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
             runtime_evaluated_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
-            annotation_strategy: self.annotation_strategy.unwrap_or_default(),
+            quote_annotations: self.quote_annotations.unwrap_or_default(),
         }
     }
 }

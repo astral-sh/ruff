@@ -99,6 +99,3 @@ version_files = [
   "crates/ruff_shrinking/Cargo.toml",
   "scripts/benchmarks/pyproject.toml",
 ]
-
-[tool.ruff.flake8-type-checking]
-annotation-strategy = "quote"

@@ -22,10 +22,9 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// The type-checking block is not executed at runtime, so the import will not
 /// be available at runtime.
 ///
-/// If [`flake8-type-checking.annotation-strategy`] is set to `"quote"`,
+/// If [`flake8-type-checking.quote-annotations`] is set to `true`,
 /// annotations will be wrapped in quotes if doing so would enable the
 /// corresponding import to remain in the type-checking block.
-///
 ///
 /// ## Example
 /// ```python
@@ -49,7 +48,7 @@ use crate::rules::flake8_type_checking::imports::ImportBinding;
 /// ```
 ///
 /// ## Options
-/// - `flake8-type-checking.annotation-strategy`
+/// - `flake8-type-checking.quote-annotations`
 ///
 /// ## References
 /// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
@@ -145,18 +144,13 @@ pub(crate) fn runtime_import_in_type_checking_block(
             } else {
                 // Determine whether the member should be fixed by moving the import out of the
                 // type-checking block, or by quoting its references.
-                if checker
-                    .settings
-                    .flake8_type_checking
-                    .annotation_strategy
-                    .is_quote()
+                if checker.settings.flake8_type_checking.quote_annotations
                     && binding.references().all(|reference_id| {
                         let reference = checker.semantic().reference(reference_id);
                         reference.context().is_typing()
                             || reference.in_runtime_evaluated_annotation()
                     })
                 {
-                    println!("quote");
                     quotes_by_statement.entry(node_id).or_default().push(import);
                 } else {
                     moves_by_statement.entry(node_id).or_default().push(import);

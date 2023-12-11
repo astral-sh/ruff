@@ -1,5 +1,6 @@
-use crate::rules::flake8_type_checking::settings::Settings;
 use anyhow::Result;
+use rustc_hash::FxHashSet;
+
 use ruff_diagnostics::Edit;
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
@@ -8,7 +9,8 @@ use ruff_python_codegen::Stylist;
 use ruff_python_semantic::{Binding, BindingId, BindingKind, NodeId, SemanticModel};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
-use rustc_hash::FxHashSet;
+
+use crate::rules::flake8_type_checking::settings::Settings;
 
 pub(crate) fn is_valid_runtime_import(
     binding: &Binding,
@@ -30,7 +32,7 @@ pub(crate) fn is_valid_runtime_import(
                         || reference.in_typing_only_annotation()
                         || reference.in_complex_string_type_definition()
                         || reference.in_simple_string_type_definition()
-                        || (settings.annotation_strategy.is_quote()
+                        || (settings.quote_annotations
                             && reference.in_runtime_evaluated_annotation()))
                 })
     } else {
@@ -202,6 +204,8 @@ pub(crate) fn is_singledispatch_implementation(
 /// - When quoting `kubernetes` in `kubernetes.SecurityContext`, we want `"kubernetes.SecurityContext"`.
 /// - When quoting `Series` in `Series["pd.Timestamp"]`, we want `"Series[pd.Timestamp]"`.
 /// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`.
+///
+/// In general, when expanding a component of a call chain, we want to quote the entire call chain.
 pub(crate) fn quote_annotation(
     node_id: NodeId,
     semantic: &SemanticModel,
@@ -224,6 +228,14 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
+                    return quote_annotation(parent_id, semantic, locator, stylist);
+                }
+            }
+            Expr::Call(parent) => {
+                if expr == parent.func.as_ref() {
+                    // If we're quoting the function of a call, we need to quote the entire
+                    // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
+                    // should generate `"DataFrame()"`.
                     return quote_annotation(parent_id, semantic, locator, stylist);
                 }
             }

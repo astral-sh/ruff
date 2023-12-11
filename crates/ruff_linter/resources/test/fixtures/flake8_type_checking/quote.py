@@ -40,6 +40,23 @@ def f():
         ...
 
 
+
+def f():
+    from pandas import DataFrame
+
+    def baz() -> DataFrame():
+        ...
+
+
+def f():
+    from typing import Literal
+
+    from pandas import DataFrame
+
+    def baz() -> DataFrame[Literal["int"]]:
+        ...
+
+
 def f():
     from typing import TYPE_CHECKING
 
