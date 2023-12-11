@@ -16,6 +16,8 @@ special_log(1, 2)
 special_log(1, 10)
 special_log(1, math.e)
 special_log(1, special_e)
+math.log(1, 2.0)
+math.log(1, 10.0)
 
 # Ok.
 math.log2(1)
@@ -45,3 +47,6 @@ def log(*args):
 log(1, 2)
 log(1, 10)
 log(1, math.e)
+
+math.log(1, 2.0001)
+math.log(1, 10.0001)
