@@ -690,7 +690,7 @@
       }
     },
     "unsafe-fixes": {
-      "description": "Enable application of unsafe fixes.",
+      "description": "Enable application of unsafe fixes. If excluded, a hint will be displayed when unsafe fixes are available. If set to false, the hint will be hidden.",
       "type": [
         "boolean",
         "null"

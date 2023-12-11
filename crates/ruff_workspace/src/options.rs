@@ -93,8 +93,10 @@ pub struct Options {
     pub fix: Option<bool>,
 
     /// Enable application of unsafe fixes.
+    /// If excluded, a hint will be displayed when unsafe fixes are available.
+    /// If set to false, the hint will be hidden.
     #[option(
-        default = "false",
+        default = r#"null"#,
         value_type = "bool",
         example = "unsafe-fixes = true"
     )]
