@@ -47,7 +47,7 @@
   },
   {
     "docstring_code": "enabled",
-    "docstring_code_line_width": 88,
+    "docstring_code_line_width": "dynamic",
     "indent_style": "space",
     "indent_width": 4
   }
