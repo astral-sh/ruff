@@ -1123,9 +1123,9 @@ dependencies = [
 
 [[package]]
 name = "is-macro"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4467ed1321b310c2625c5aa6c1b1ffc5de4d9e42668cf697a08fb033ee8265e"
+checksum = "bc74b7abae208af9314a406bd7dcc65091230b6e749c09e07a645885fecf34f9"
 dependencies = [
  "Inflector",
  "pmutil 0.6.1",
