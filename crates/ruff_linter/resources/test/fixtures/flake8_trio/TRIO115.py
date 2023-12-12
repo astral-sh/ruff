@@ -26,5 +26,10 @@ def func():
 
 from trio import Event, sleep
 
+
 def func():
     sleep(0)  # TRIO115
+
+
+async def func():
+    await sleep(seconds=0)  # TRIO115

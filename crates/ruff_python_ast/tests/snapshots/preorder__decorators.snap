@@ -4,10 +4,12 @@ expression: trace
 ---
 - ModModule
   - StmtFunctionDef
-    - ExprName
+    - Decorator
+      - ExprName
     - Parameters
     - StmtPass
   - StmtClassDef
-    - ExprName
+    - Decorator
+      - ExprName
     - StmtPass
 

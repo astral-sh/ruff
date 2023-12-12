@@ -27,6 +27,13 @@ For **Conda** users, Ruff is also available as [`ruff`](https://anaconda.org/con
 conda install -c conda-forge ruff
 ```
 
+For **pkgx** users, Ruff is also available as [`ruff`](https://pkgx.dev/pkgs/github.com/charliermarsh/ruff/)
+on the `pkgx` registry:
+
+```shell
+pkgx install ruff
+```
+
 For **Arch Linux** users, Ruff is also available as [`ruff`](https://archlinux.org/packages/extra/x86_64/ruff/)
 on the official repositories:
 
@@ -39,6 +46,12 @@ on the testing repositories:
 
 ```shell
 apk add ruff
+```
+
+For **openSUSE Tumbleweed** users, Ruff is also available in the distribution repository:
+
+```shell
+sudo zypper install python3-ruff
 ```
 
 On **Docker**, it is published as `ghcr.io/astral-sh/ruff`, tagged for each release and `latest` for

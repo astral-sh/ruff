@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pie/mod.rs
-assertion_line: 29
 ---
 PIE804.py:1:1: PIE804 [*] Unnecessary `dict` kwargs
   |
@@ -107,6 +106,8 @@ PIE804.py:11:1: PIE804 [*] Unnecessary `dict` kwargs
 10 | 
 11 | foo(**{})
    | ^^^^^^^^^ PIE804
+12 | 
+13 | foo(**{**data, "foo": "buzz"})
    |
    = help: Remove unnecessary kwargs
 
@@ -117,8 +118,29 @@ PIE804.py:11:1: PIE804 [*] Unnecessary `dict` kwargs
 11    |-foo(**{})
    11 |+foo()
 12 12 | 
-13 13 | 
-14 14 | foo(**{**data, "foo": "buzz"})
+13 13 | foo(**{**data, "foo": "buzz"})
+14 14 | foo(**buzz)
+
+PIE804.py:22:1: PIE804 [*] Unnecessary `dict` kwargs
+   |
+20 | foo(**{f"buzz__{bar}": True})
+21 | abc(**{"for": 3})
+22 | foo(**{},)
+   | ^^^^^^^^^^ PIE804
+23 | 
+24 | # Duplicated key names wont be fixed to avoid syntax error.
+   |
+   = help: Remove unnecessary kwargs
+
+ℹ Safe fix
+19 19 | foo(**{"": True})
+20 20 | foo(**{f"buzz__{bar}": True})
+21 21 | abc(**{"for": 3})
+22    |-foo(**{},)
+   22 |+foo()
+23 23 | 
+24 24 | # Duplicated key names wont be fixed to avoid syntax error.
+25 25 | abc(**{'a': b}, **{'a': c})  # PIE804
 
 PIE804.py:25:1: PIE804 [*] Unnecessary `dict` kwargs
    |
@@ -129,7 +151,7 @@ PIE804.py:25:1: PIE804 [*] Unnecessary `dict` kwargs
    = help: Remove unnecessary kwargs
 
 ℹ Safe fix
-22 22 | abc(**{"for": 3})
+22 22 | foo(**{},)
 23 23 | 
 24 24 | # Duplicated key names wont be fixed to avoid syntax error.
 25    |-abc(**{'a': b}, **{'a': c})  # PIE804

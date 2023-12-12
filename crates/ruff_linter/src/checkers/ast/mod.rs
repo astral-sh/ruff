@@ -44,12 +44,12 @@ use ruff_python_ast::helpers::{
 };
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::str::trailing_quote;
-use ruff_python_ast::visitor::{walk_except_handler, walk_pattern, Visitor};
+use ruff_python_ast::visitor::{walk_except_handler, walk_f_string_element, walk_pattern, Visitor};
 use ruff_python_ast::{helpers, str, visitor, PySourceType};
 use ruff_python_codegen::{Generator, Quote, Stylist};
 use ruff_python_index::Indexer;
 use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
-use ruff_python_semantic::analyze::{typing, visibility};
+use ruff_python_semantic::analyze::{imports, typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
     ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, Snapshot,
@@ -107,6 +107,8 @@ pub(crate) struct Checker<'a> {
     pub(crate) diagnostics: Vec<Diagnostic>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
     pub(crate) flake8_bugbear_seen: Vec<TextRange>,
+    /// The end offset of the last visited statement.
+    last_stmt_end: TextSize,
 }
 
 impl<'a> Checker<'a> {
@@ -142,6 +144,7 @@ impl<'a> Checker<'a> {
             diagnostics: Vec::default(),
             flake8_bugbear_seen: Vec::default(),
             cell_offsets,
+            last_stmt_end: TextSize::default(),
         }
     }
 }
@@ -268,6 +271,18 @@ where
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
+        // For Jupyter Notebooks, we'll reset the `IMPORT_BOUNDARY` flag when
+        // we encounter a cell boundary.
+        if self.source_type.is_ipynb()
+            && self.semantic.at_top_level()
+            && self.semantic.seen_import_boundary()
+            && self.cell_offsets.is_some_and(|cell_offsets| {
+                cell_offsets.has_cell_boundary(TextRange::new(self.last_stmt_end, stmt.start()))
+            })
+        {
+            self.semantic.flags -= SemanticModelFlags::IMPORT_BOUNDARY;
+        }
+
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
             Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
@@ -288,9 +303,12 @@ where
             }
             _ => {
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
-                if !self.semantic.seen_import_boundary()
-                    && !helpers::is_assignment_to_a_dunder(stmt)
-                    && !helpers::in_nested_block(self.semantic.current_statements())
+                if !(self.semantic.seen_import_boundary()
+                    || helpers::is_assignment_to_a_dunder(stmt)
+                    || helpers::in_nested_block(self.semantic.current_statements())
+                    || imports::is_matplotlib_activation(stmt, self.semantic())
+                    || self.settings.preview.is_enabled()
+                        && imports::is_sys_path_modification(stmt, self.semantic()))
                 {
                     self.semantic.flags |= SemanticModelFlags::IMPORT_BOUNDARY;
                 }
@@ -477,6 +495,13 @@ where
                 // are enabled.
                 let runtime_annotation = !self.semantic.future_annotations();
 
+                // The first parameter may be a single dispatch.
+                let mut singledispatch =
+                    flake8_type_checking::helpers::is_singledispatch_implementation(
+                        function_def,
+                        self.semantic(),
+                    );
+
                 self.semantic.push_scope(ScopeKind::Type);
 
                 if let Some(type_params) = type_params {
@@ -490,7 +515,7 @@ where
                     .chain(&parameters.kwonlyargs)
                 {
                     if let Some(expr) = &parameter_with_default.parameter.annotation {
-                        if runtime_annotation {
+                        if runtime_annotation || singledispatch {
                             self.visit_runtime_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
@@ -499,6 +524,7 @@ where
                     if let Some(expr) = &parameter_with_default.default {
                         self.visit_expr(expr);
                     }
+                    singledispatch = false;
                 }
                 if let Some(arg) = &parameters.vararg {
                     if let Some(expr) = &arg.annotation {
@@ -655,23 +681,24 @@ where
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 let runtime_annotation = if self.semantic.future_annotations() {
-                    if self.semantic.current_scope().kind.is_class() {
-                        let baseclasses = &self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_base_classes;
-                        let decorators = &self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_decorators;
-                        flake8_type_checking::helpers::runtime_evaluated(
-                            baseclasses,
-                            decorators,
-                            &self.semantic,
-                        )
-                    } else {
-                        false
-                    }
+                    self.semantic
+                        .current_scope()
+                        .kind
+                        .as_class()
+                        .is_some_and(|class_def| {
+                            flake8_type_checking::helpers::runtime_evaluated_class(
+                                class_def,
+                                &self
+                                    .settings
+                                    .flake8_type_checking
+                                    .runtime_evaluated_base_classes,
+                                &self
+                                    .settings
+                                    .flake8_type_checking
+                                    .runtime_evaluated_decorators,
+                                &self.semantic,
+                            )
+                        })
                 } else {
                     matches!(
                         self.semantic.current_scope().kind,
@@ -779,6 +806,7 @@ where
 
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
+        self.last_stmt_end = stmt.end();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
@@ -790,8 +818,7 @@ where
 
     fn visit_expr(&mut self, expr: &'b Expr) {
         // Step 0: Pre-processing
-        if !self.semantic.in_f_string()
-            && !self.semantic.in_literal()
+        if !self.semantic.in_typing_literal()
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
             && self.semantic.future_annotations()
@@ -799,7 +826,7 @@ where
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
                 self.deferred.string_type_definitions.push((
                     expr.range(),
-                    value,
+                    value.to_str(),
                     self.semantic.snapshot(),
                 ));
             } else {
@@ -1173,7 +1200,7 @@ where
                     ) {
                         // Ex) Literal["Class"]
                         Some(typing::SubscriptKind::Literal) => {
-                            self.semantic.flags |= SemanticModelFlags::LITERAL;
+                            self.semantic.flags |= SemanticModelFlags::TYPING_LITERAL;
 
                             self.visit_expr(slice);
                             self.visit_expr_context(ctx);
@@ -1213,13 +1240,10 @@ where
                 }
             }
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                if self.semantic.in_type_definition()
-                    && !self.semantic.in_literal()
-                    && !self.semantic.in_f_string()
-                {
+                if self.semantic.in_type_definition() && !self.semantic.in_typing_literal() {
                     self.deferred.string_type_definitions.push((
                         expr.range(),
-                        value,
+                        value.to_str(),
                         self.semantic.snapshot(),
                     ));
                 }
@@ -1246,6 +1270,13 @@ where
 
         // Step 4: Analysis
         analyze::expression(expr, self);
+        match expr {
+            Expr::StringLiteral(string_literal) => {
+                analyze::string_like(string_literal.into(), self);
+            }
+            Expr::BytesLiteral(bytes_literal) => analyze::string_like(bytes_literal.into(), self),
+            _ => {}
+        }
 
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
@@ -1299,17 +1330,6 @@ where
         analyze::except_handler(except_handler, self);
 
         self.semantic.flags = flags_snapshot;
-    }
-
-    fn visit_format_spec(&mut self, format_spec: &'b Expr) {
-        match format_spec {
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                for value in values {
-                    self.visit_expr(value);
-                }
-            }
-            _ => unreachable!("Unexpected expression for format_spec"),
-        }
     }
 
     fn visit_parameters(&mut self, parameters: &'b Parameters) {
@@ -1419,6 +1439,16 @@ where
             self.deferred
                 .type_param_definitions
                 .push((bound, self.semantic.snapshot()));
+        }
+    }
+
+    fn visit_f_string_element(&mut self, f_string_element: &'b ast::FStringElement) {
+        // Step 2: Traversal
+        walk_f_string_element(self, f_string_element);
+
+        // Step 4: Analysis
+        if let Some(literal) = f_string_element.as_literal() {
+            analyze::string_like(literal.into(), self);
         }
     }
 }

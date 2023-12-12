@@ -690,7 +690,7 @@
       }
     },
     "unsafe-fixes": {
-      "description": "Enable application of unsafe fixes.",
+      "description": "Enable application of unsafe fixes. If excluded, a hint will be displayed when unsafe fixes are available. If set to false, the hint will be hidden.",
       "type": [
         "boolean",
         "null"
@@ -1281,7 +1281,7 @@
           ]
         },
         "quote-style": {
-          "description": "Whether to prefer single `'` or double `\"` quotes for strings. Defaults to double quotes.\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for multiline strings and docstrings, regardless of the configured quote style.\n\nRuff may also deviate from this option if using the configured quotes would require escaping quote characters within the string. For example, given:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change `a` to use single quotes when using `quote-style = \"single\"`. However, `b` will be unchanged, as converting to single quotes would require the inner `'` to be escaped, which leads to less readable code: `'It\\'s monday morning'`.",
+          "description": "Configures the preferred quote character for strings. Valid options are:\n\n* `double` (default): Use double quotes `\"` * `single`: Use single quotes `'` * `preserve` (preview only): Keeps the existing quote character. We don't recommend using this option except for projects that already use a mixture of single and double quotes and can't migrate to using double or single quotes.\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for multiline strings and docstrings, regardless of the configured quote style.\n\nRuff may also deviate from using the configured quotes if doing so requires escaping quote characters within the string. For example, given:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change `a` to use single quotes when using `quote-style = \"single\"`. However, `b` remains unchanged, as converting to single quotes requires escaping the inner `'`, which leads to less readable code: `'It\\'s monday morning'`. This does not apply when using `preserve`.",
           "anyOf": [
             {
               "$ref": "#/definitions/QuoteStyle"
@@ -1476,6 +1476,20 @@
           "items": {
             "type": "string"
           }
+        },
+        "length-sort": {
+          "description": "Sort imports by their string length, such that shorter imports appear before longer imports. For example, by default, imports will be sorted alphabetically, as in: ```python import collections import os ```\n\nSetting `length-sort = true` will instead sort such that shorter imports appear before longer imports, as in: ```python import os import collections ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "length-sort-straight": {
+          "description": "Sort straight imports by their string length. Similar to `length-sort`, but applies only to straight imports and doesn't affect `from` imports.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "lines-after-imports": {
           "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
@@ -2355,6 +2369,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-positional-args": {
+          "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-public-methods": {
           "description": "Maximum number of public methods allowed for a class (see: `PLR0904`).",
           "type": [
@@ -2418,7 +2441,8 @@
       "type": "string",
       "enum": [
         "single",
-        "double"
+        "double",
+        "preserve"
       ]
     },
     "RelativeImportsOrder": {
@@ -2849,11 +2873,14 @@
         "FURB15",
         "FURB152",
         "FURB16",
+        "FURB163",
         "FURB168",
         "FURB169",
         "FURB17",
         "FURB171",
         "FURB177",
+        "FURB18",
+        "FURB181",
         "G",
         "G0",
         "G00",
@@ -3087,6 +3114,8 @@
         "PLR0133",
         "PLR02",
         "PLR020",
+        "PLR0202",
+        "PLR0203",
         "PLR0206",
         "PLR04",
         "PLR040",
@@ -3100,6 +3129,7 @@
         "PLR0913",
         "PLR0915",
         "PLR0916",
+        "PLR0917",
         "PLR1",
         "PLR17",
         "PLR170",
@@ -3111,6 +3141,9 @@
         "PLR1714",
         "PLR172",
         "PLR1722",
+        "PLR173",
+        "PLR1733",
+        "PLR1736",
         "PLR2",
         "PLR20",
         "PLR200",
@@ -3368,6 +3401,7 @@
         "S2",
         "S20",
         "S201",
+        "S202",
         "S3",
         "S30",
         "S301",

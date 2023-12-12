@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -86,7 +86,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-x86_64-apple-darwin.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-x86_64-apple-darwin.tar.gz
           tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -103,7 +103,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -125,7 +125,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-aarch64-apple-darwin.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-aarch64-apple-darwin.tar.gz
           tar czvf $ARCHIVE_FILE -C target/aarch64-apple-darwin/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -151,7 +151,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
@@ -177,7 +177,7 @@ jobs:
       - name: "Archive binary"
         shell: bash
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.zip
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.zip
           7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -199,7 +199,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -224,7 +224,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -258,7 +258,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -291,7 +291,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -313,7 +313,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -332,10 +332,10 @@ jobs:
           image: alpine:latest
           options: -v ${{ github.workspace }}:/io -w /io
           run: |
-            apk add py3-pip
-            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links /io/dist/ --force-reinstall
-            ruff --help
-            python -m ruff --help
+            apk add python3
+            python -m venv .venv
+            .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
+            .venv/bin/ruff check --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -343,7 +343,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
@@ -369,7 +369,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -388,10 +388,11 @@ jobs:
           distro: alpine_latest
           githubToken: ${{ github.token }}
           install: |
-            apk add py3-pip
+            apk add python3
           run: |
-            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            ruff check --help
+            python -m venv .venv
+            .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
+            .venv/bin/ruff check --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
@@ -399,7 +400,7 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.tar.gz
+          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.tar.gz
           tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"

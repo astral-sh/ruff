@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -36,30 +37,28 @@ impl Violation for SelfAssigningVariable {
 }
 
 /// PLW0127
-pub(crate) fn self_assigning_variable(checker: &mut Checker, target: &Expr, value: &Expr) {
-    fn inner(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic>) {
-        match (left, right) {
-            (
-                Expr::Tuple(ast::ExprTuple { elts: lhs_elts, .. }),
-                Expr::Tuple(ast::ExprTuple { elts: rhs_elts, .. }),
-            ) if lhs_elts.len() == rhs_elts.len() => lhs_elts
-                .iter()
-                .zip(rhs_elts.iter())
-                .for_each(|(lhs, rhs)| inner(lhs, rhs, diagnostics)),
-            (
-                Expr::Name(ast::ExprName { id: lhs_name, .. }),
-                Expr::Name(ast::ExprName { id: rhs_name, .. }),
-            ) if lhs_name == rhs_name => {
-                diagnostics.push(Diagnostic::new(
-                    SelfAssigningVariable {
-                        name: lhs_name.to_string(),
-                    },
-                    left.range(),
-                ));
-            }
-            _ => {}
-        }
+pub(crate) fn self_assignment(checker: &mut Checker, assign: &ast::StmtAssign) {
+    // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
+    // is not a self-assignment).
+    if checker.semantic().current_scope().kind.is_class() {
+        return;
     }
+
+    for (left, right) in assign
+        .targets
+        .iter()
+        .chain(std::iter::once(assign.value.as_ref()))
+        .tuple_combinations()
+    {
+        visit_assignments(left, right, &mut checker.diagnostics);
+    }
+}
+
+/// PLW0127
+pub(crate) fn self_annotated_assignment(checker: &mut Checker, assign: &ast::StmtAnnAssign) {
+    let Some(value) = assign.value.as_ref() else {
+        return;
+    };
 
     // Assignments in class bodies are attributes (e.g., `x = x` assigns `x` to `self.x`, and thus
     // is not a self-assignment).
@@ -67,5 +66,29 @@ pub(crate) fn self_assigning_variable(checker: &mut Checker, target: &Expr, valu
         return;
     }
 
-    inner(target, value, &mut checker.diagnostics);
+    visit_assignments(&assign.target, value, &mut checker.diagnostics);
+}
+
+fn visit_assignments(left: &Expr, right: &Expr, diagnostics: &mut Vec<Diagnostic>) {
+    match (left, right) {
+        (
+            Expr::Tuple(ast::ExprTuple { elts: lhs_elts, .. }),
+            Expr::Tuple(ast::ExprTuple { elts: rhs_elts, .. }),
+        ) if lhs_elts.len() == rhs_elts.len() => lhs_elts
+            .iter()
+            .zip(rhs_elts.iter())
+            .for_each(|(lhs, rhs)| visit_assignments(lhs, rhs, diagnostics)),
+        (
+            Expr::Name(ast::ExprName { id: lhs_name, .. }),
+            Expr::Name(ast::ExprName { id: rhs_name, .. }),
+        ) if lhs_name == rhs_name => {
+            diagnostics.push(Diagnostic::new(
+                SelfAssigningVariable {
+                    name: lhs_name.to_string(),
+                },
+                left.range(),
+            ));
+        }
+        _ => {}
+    }
 }

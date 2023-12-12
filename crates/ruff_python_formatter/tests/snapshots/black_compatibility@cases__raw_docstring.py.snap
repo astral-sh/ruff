@@ -1,0 +1,89 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/raw_docstring.py
+---
+## Input
+
+```python
+class C:
+
+    r"""Raw"""
+
+def f():
+
+    r"""Raw"""
+
+class SingleQuotes:
+
+
+    r'''Raw'''
+
+class UpperCaseR:
+    R"""Raw"""
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,4 +1,5 @@
+ class C:
++
+     r"""Raw"""
+ 
+ 
+@@ -7,8 +8,9 @@
+ 
+ 
+ class SingleQuotes:
+-    r'''Raw'''
+ 
++    r"""Raw"""
++
+ 
+ class UpperCaseR:
+     R"""Raw"""
+```
+
+## Ruff Output
+
+```python
+class C:
+
+    r"""Raw"""
+
+
+def f():
+    r"""Raw"""
+
+
+class SingleQuotes:
+
+    r"""Raw"""
+
+
+class UpperCaseR:
+    R"""Raw"""
+```
+
+## Black Output
+
+```python
+class C:
+    r"""Raw"""
+
+
+def f():
+    r"""Raw"""
+
+
+class SingleQuotes:
+    r'''Raw'''
+
+
+class UpperCaseR:
+    R"""Raw"""
+```
+
+

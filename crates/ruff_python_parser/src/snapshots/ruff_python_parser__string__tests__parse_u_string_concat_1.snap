@@ -9,9 +9,25 @@ expression: parse_ast
             value: StringLiteral(
                 ExprStringLiteral {
                     range: 0..17,
-                    value: "Hello world",
-                    unicode: false,
-                    implicit_concatenated: true,
+                    value: StringLiteralValue {
+                        inner: Concatenated(
+                            ConcatenatedStringLiteral {
+                                strings: [
+                                    StringLiteral {
+                                        range: 0..8,
+                                        value: "Hello ",
+                                        unicode: false,
+                                    },
+                                    StringLiteral {
+                                        range: 9..17,
+                                        value: "world",
+                                        unicode: true,
+                                    },
+                                ],
+                                value: "Hello world",
+                            },
+                        ),
+                    },
                 },
             ),
         },

@@ -150,3 +150,8 @@ class TabbedIndent:
 		Normal indented line
 		  	- autor
 		"""
+
+
+def single_quoted():
+    ' content\     '
+    return

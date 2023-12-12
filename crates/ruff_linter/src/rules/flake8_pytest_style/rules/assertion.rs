@@ -33,7 +33,7 @@ use super::unittest_assert::UnittestAssert;
 /// Checks for assertions that combine multiple independent conditions.
 ///
 /// ## Why is this bad?
-/// Composite assertion statements are harder debug upon failure, as the
+/// Composite assertion statements are harder to debug upon failure, as the
 /// failure message will not indicate which condition failed.
 ///
 /// ## Example

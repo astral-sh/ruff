@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ruff_ecosystem.projects import Project
+    from ruff_ecosystem.projects import CommandOptions, Project
 
 
 def markdown_project_section(
-    title: str, content: str | list[str], options: object, project: Project
+    title: str, content: str | list[str], options: CommandOptions, project: Project
 ) -> list[str]:
     return markdown_details(
         summary=f'<a href="{project.repo.url}">{project.repo.fullname}</a> ({title})',
@@ -28,8 +28,10 @@ def markdown_plus_minus(added: int, removed: int) -> str:
     return f"+{added} -{removed}"
 
 
-def markdown_details(summary: str, content: str | list[str], preface: str):
-    lines = []
+def markdown_details(
+    summary: str, content: str | list[str], preface: str | None
+) -> list[str]:
+    lines: list[str] = []
     lines.append(f"<details><summary>{summary}</summary>")
     if preface:
         lines.append("<p>")

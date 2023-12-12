@@ -2,10 +2,8 @@ use ruff_formatter::write;
 use ruff_python_ast::StmtAnnAssign;
 
 use crate::comments::{SourceComment, SuppressionKind};
-
-use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
+use crate::statement::stmt_assign::FormatStatementsLastExpression;
 use crate::statement::trailing_semicolon;
 
 #[derive(Default)]
@@ -33,7 +31,7 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
                     space(),
                     token("="),
                     space(),
-                    maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
+                    FormatStatementsLastExpression::new(value, item)
                 ]
             )?;
         }
