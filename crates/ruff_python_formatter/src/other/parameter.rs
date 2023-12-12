@@ -2,6 +2,7 @@ use ruff_formatter::write;
 use ruff_python_ast::Parameter;
 
 use crate::prelude::*;
+use crate::statement::stmt_ann_assign::FormatAnnotation;
 
 #[derive(Default)]
 pub struct FormatParameter;
@@ -17,7 +18,7 @@ impl FormatNodeRule<Parameter> for FormatParameter {
         name.format().fmt(f)?;
 
         if let Some(annotation) = annotation {
-            write!(f, [token(":"), space(), annotation.format()])?;
+            write!(f, [token(":"), space(), FormatAnnotation::new(annotation)])?;
         }
 
         Ok(())

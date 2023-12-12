@@ -1062,7 +1062,7 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  def argument_with_long_default(
-@@ -75,8 +71,7 @@
+@@ -75,22 +71,21 @@
      b=ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
      + [dddddddddddddddddddd, eeeeeeeeeeeeeeeeeeee, ffffffffffffffffffffffff],
      h=[],
@@ -1072,9 +1072,15 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  def argument_with_long_type_annotation(
-@@ -85,12 +80,10 @@
-     | yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
-     | zzzzzzzzzzzzzzzzzzz = [0, 1, 2, 3],
+     a,
+-    b: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+-    | yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+-    | zzzzzzzzzzzzzzzzzzz = [0, 1, 2, 3],
++    b: (
++        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
++        | yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
++        | zzzzzzzzzzzzzzzzzzz
++    ) = [0, 1, 2, 3],
      h=[],
 -):
 -    ...
@@ -1087,7 +1093,7 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  # Type parameter empty line spacing
-@@ -99,8 +92,7 @@
+@@ -99,8 +94,7 @@
      A,
      # another
      B,
@@ -1097,7 +1103,7 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  # Type parameter comments
-@@ -159,8 +151,7 @@
+@@ -159,8 +153,7 @@
  
  
  # Comment
@@ -1107,7 +1113,7 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  # Comment that could be mistaken for a trailing comment of the function declaration when
-@@ -192,8 +183,7 @@
+@@ -192,8 +185,7 @@
  # Regression test for https://github.com/astral-sh/ruff/issues/5176#issuecomment-1598171989
  def foo(
      b=3 + 2,  # comment
@@ -1117,7 +1123,7 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  # Comments on the slash or the star, both of which don't have a node
-@@ -454,8 +444,7 @@
+@@ -454,8 +446,7 @@
  def f(
      # first
      # second
@@ -1127,7 +1133,7 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  def f(  # first
-@@ -475,8 +464,7 @@
+@@ -475,8 +466,7 @@
      # first
      b,
      # second
@@ -1137,7 +1143,7 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  def f(  # first
-@@ -484,8 +472,7 @@
+@@ -484,8 +474,7 @@
      # second
      b,
      # third
@@ -1147,7 +1153,7 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  def f(  # first
-@@ -494,8 +481,7 @@
+@@ -494,8 +483,7 @@
      # third
      b,
      # fourth
@@ -1157,7 +1163,7 @@ def function_with_one_argument_and_a_keyword_separator(
  
  
  def f(  # first
-@@ -522,17 +508,14 @@
+@@ -522,17 +510,14 @@
      a,
      # third
      /,  # second

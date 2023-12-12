@@ -1,10 +1,15 @@
+use crate::builders::parenthesize_if_expands;
 use ruff_formatter::write;
-use ruff_python_ast::StmtAnnAssign;
+use ruff_python_ast::{Expr, StmtAnnAssign};
 
 use crate::comments::{SourceComment, SuppressionKind};
-use crate::expression::has_parentheses;
+use crate::expression::parentheses::Parentheses;
+use crate::expression::{has_own_parentheses, has_parentheses};
 use crate::prelude::*;
-use crate::preview::is_prefer_splitting_right_hand_side_of_assignments_enabled;
+use crate::preview::{
+    is_parenthesize_long_type_hints_enabled,
+    is_prefer_splitting_right_hand_side_of_assignments_enabled,
+};
 use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
 };
@@ -27,7 +32,9 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
 
         if let Some(value) = value {
             if is_prefer_splitting_right_hand_side_of_assignments_enabled(f.context())
-                && has_parentheses(annotation, f.context()).is_some()
+                && (has_parentheses(annotation, f.context()).is_some()
+                    || (is_parenthesize_long_type_hints_enabled(f.context()))
+                        && should_parenthesize_annotation(annotation, f.context()))
             {
                 FormatStatementsLastExpression::RightToLeft {
                     before_operator: AnyBeforeOperator::Expression(annotation),
@@ -49,7 +56,7 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
                 )?;
             }
         } else {
-            annotation.format().fmt(f)?;
+            FormatAnnotation::new(annotation).fmt(f)?;
         }
 
         if f.options().source_type().is_ipynb()
@@ -70,4 +77,46 @@ impl FormatNodeRule<StmtAnnAssign> for FormatStmtAnnAssign {
     ) -> bool {
         SuppressionKind::has_skip_comment(trailing_comments, context.source())
     }
+}
+
+pub(crate) struct FormatAnnotation<'a> {
+    annotation: &'a Expr,
+}
+
+impl<'a> FormatAnnotation<'a> {
+    pub(crate) fn new(annotation: &'a Expr) -> Self {
+        Self { annotation }
+    }
+}
+
+impl Format<PyFormatContext<'_>> for FormatAnnotation<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
+        if is_parenthesize_long_type_hints_enabled(f.context()) {
+            let comments = f.context().comments();
+            if comments.has_leading(self.annotation) || comments.has_trailing(self.annotation) {
+                self.annotation
+                    .format()
+                    .with_options(Parentheses::Always)
+                    .fmt(f)
+            } else if should_parenthesize_annotation(self.annotation, f.context()) {
+                parenthesize_if_expands(&self.annotation.format().with_options(Parentheses::Never))
+                    .fmt(f)
+            } else {
+                self.annotation
+                    .format()
+                    .with_options(Parentheses::Never)
+                    .fmt(f)
+            }
+        } else {
+            self.annotation.format().fmt(f)
+        }
+    }
+}
+
+/// Returns `true` if an annotation should be parenthesized if it splits over multiple lines.
+pub(crate) fn should_parenthesize_annotation(
+    annotation: &Expr,
+    context: &PyFormatContext<'_>,
+) -> bool {
+    !matches!(annotation, Expr::Name(_)) && has_own_parentheses(annotation, context).is_none()
 }

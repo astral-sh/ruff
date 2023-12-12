@@ -24,3 +24,9 @@ pub(crate) const fn is_prefer_splitting_right_hand_side_of_assignments_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// FIXME ADD proper URl once I have internet again.
+/// Returns `true` if the [`parenthesize_long_type_hints`](TOOD) preview style is enabled.
+pub(crate) const fn is_parenthesize_long_type_hints_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
