@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::comments::{
     leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
 };
-use crate::context::{NodeLevel, TopLevelStatementPosition, WithNodeLevel};
+use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::expression::string::StringLayout;
 use crate::prelude::*;
 use crate::statement::stmt_expr::FormatStmtExpr;
@@ -71,7 +71,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let source = f.context().source();
         let source_type = f.options().source_type();
 
-        let f = &mut WithNodeLevel::new(node_level, f);
+        let f = WithNodeLevel::new(node_level, f);
+        let f = &mut WithIndentLevel::new(f.context().indent_level().increment(), f);
 
         // Format the first statement in the body, which often has special formatting rules.
         let first = match self.kind {

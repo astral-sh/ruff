@@ -363,7 +363,7 @@ preview                    = {preview:?}"#,
             line_ending = self.0.line_ending(),
             magic_trailing_comma = self.0.magic_trailing_comma(),
             docstring_code = self.0.docstring_code(),
-            docstring_code_line_width = self.0.docstring_code_line_width().value(),
+            docstring_code_line_width = self.0.docstring_code_line_width(),
             preview = self.0.preview()
         )
     }

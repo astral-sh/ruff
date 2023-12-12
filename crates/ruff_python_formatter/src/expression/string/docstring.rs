@@ -7,13 +7,13 @@ use std::{borrow::Cow, collections::VecDeque};
 use {once_cell::sync::Lazy, regex::Regex};
 
 use {
-    ruff_formatter::{write, IndentStyle, Printed},
+    ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
     ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
     ruff_source_file::Locator,
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
-use crate::{prelude::*, FormatModuleError};
+use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
 use super::{NormalizedString, QuoteChar};
 
@@ -460,11 +460,22 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             .map(|line| line.code)
             .collect::<Vec<&str>>()
             .join("\n");
+        let line_width = match self.f.options().docstring_code_line_width() {
+            DocstringCodeLineWidth::Fixed(width) => width,
+            DocstringCodeLineWidth::Dynamic => {
+                let global_line_width = self.f.options().line_width().value();
+                let indent_width = self.f.options().indent_width();
+                let indent_level = self.f.context().indent_level();
+                let current_indent = indent_level.to_ascii_spaces(indent_width);
+                let width = std::cmp::max(1, global_line_width.saturating_sub(current_indent));
+                LineWidth::try_from(width).expect("width is capped at a minimum of 1")
+            }
+        };
         let options = self
             .f
             .options()
             .clone()
-            .with_line_width(self.f.options().docstring_code_line_width())
+            .with_line_width(line_width)
             // It's perhaps a little odd to be hard-coding the indent
             // style here, but I believe it is necessary as a result
             // of the whitespace normalization otherwise done in

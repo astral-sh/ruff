@@ -52,8 +52,7 @@ pub struct PyFormatOptions {
     /// The preferred line width at which the formatter should wrap lines in
     /// docstring code examples. This only has an impact when `docstring_code`
     /// is enabled.
-    #[cfg_attr(feature = "serde", serde(default = "default_line_width"))]
-    docstring_code_line_width: LineWidth,
+    docstring_code_line_width: DocstringCodeLineWidth,
 
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
@@ -83,7 +82,7 @@ impl Default for PyFormatOptions {
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
             docstring_code: DocstringCode::default(),
-            docstring_code_line_width: default_line_width(),
+            docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
         }
     }
@@ -126,7 +125,7 @@ impl PyFormatOptions {
         self.docstring_code
     }
 
-    pub fn docstring_code_line_width(&self) -> LineWidth {
+    pub fn docstring_code_line_width(&self) -> DocstringCodeLineWidth {
         self.docstring_code_line_width
     }
 
@@ -300,5 +299,52 @@ pub enum DocstringCode {
 impl DocstringCode {
     pub const fn is_enabled(self) -> bool {
         matches!(self, DocstringCode::Enabled)
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum DocstringCodeLineWidth {
+    Fixed(LineWidth),
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "deserialize_docstring_code_line_width_dynamic")
+    )]
+    Dynamic,
+}
+
+impl Default for DocstringCodeLineWidth {
+    fn default() -> DocstringCodeLineWidth {
+        DocstringCodeLineWidth::Fixed(default_line_width())
+    }
+}
+
+impl std::fmt::Debug for DocstringCodeLineWidth {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            DocstringCodeLineWidth::Fixed(v) => v.value().fmt(f),
+            DocstringCodeLineWidth::Dynamic => "dynamic".fmt(f),
+        }
+    }
+}
+
+/// Responsible for deserializing the `DocstringCodeLineWidth::Dynamic`
+/// variant.
+fn deserialize_docstring_code_line_width_dynamic<'de, D>(d: D) -> Result<(), D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::{de::Error, Deserialize};
+
+    let value = String::deserialize(d)?;
+    match &*value {
+        "dynamic" => Ok(()),
+        s => Err(D::Error::invalid_value(
+            serde::de::Unexpected::Str(s),
+            &"dynamic",
+        )),
     }
 }
