@@ -128,7 +128,7 @@ PIE804.py:22:1: PIE804 [*] Unnecessary `dict` kwargs
 22 | foo(**{},)
    | ^^^^^^^^^^ PIE804
 23 | 
-24 | # Duplicated key names wont be fixed to avoid syntax error.
+24 | # Duplicated key names won't be fixed, to avoid syntax errors.
    |
    = help: Remove unnecessary kwargs
 
@@ -139,12 +139,12 @@ PIE804.py:22:1: PIE804 [*] Unnecessary `dict` kwargs
 22    |-foo(**{},)
    22 |+foo()
 23 23 | 
-24 24 | # Duplicated key names wont be fixed to avoid syntax error.
+24 24 | # Duplicated key names won't be fixed, to avoid syntax errors.
 25 25 | abc(**{'a': b}, **{'a': c})  # PIE804
 
 PIE804.py:25:1: PIE804 [*] Unnecessary `dict` kwargs
    |
-24 | # Duplicated key names wont be fixed to avoid syntax error.
+24 | # Duplicated key names won't be fixed, to avoid syntax errors.
 25 | abc(**{'a': b}, **{'a': c})  # PIE804
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PIE804
    |
@@ -153,7 +153,7 @@ PIE804.py:25:1: PIE804 [*] Unnecessary `dict` kwargs
 ℹ Safe fix
 22 22 | foo(**{},)
 23 23 | 
-24 24 | # Duplicated key names wont be fixed to avoid syntax error.
+24 24 | # Duplicated key names won't be fixed, to avoid syntax errors.
 25    |-abc(**{'a': b}, **{'a': c})  # PIE804
    25 |+abc(a=b, **{'a': c})  # PIE804
 

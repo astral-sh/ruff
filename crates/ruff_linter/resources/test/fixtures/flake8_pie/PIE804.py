@@ -21,5 +21,5 @@ foo(**{f"buzz__{bar}": True})
 abc(**{"for": 3})
 foo(**{},)
 
-# Duplicated key names wont be fixed to avoid syntax error.
+# Duplicated key names won't be fixed, to avoid syntax errors.
 abc(**{'a': b}, **{'a': c})  # PIE804

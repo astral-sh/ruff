@@ -1,13 +1,13 @@
-use std::collections::HashSet;
+use std::hash::BuildHasherDefault;
 
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_python_ast::{self as ast, Expr};
-
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::Ranged;
-
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
@@ -69,16 +69,19 @@ impl AlwaysFixableViolation for UnnecessaryDictKwargs {
 
 /// PIE804
 pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCall) {
-    let mut all_kwargs = HashSet::new();
+    let mut seen = FxHashSet::with_capacity_and_hasher(
+        call.arguments.keywords.len(),
+        BuildHasherDefault::default(),
+    );
 
-    for kw in &call.arguments.keywords {
+    for keyword in &call.arguments.keywords {
         // keyword is a spread operator (indicated by None)
-        if let Some(name) = &kw.arg {
-            all_kwargs.insert(name.as_str());
+        if let Some(name) = &keyword.arg {
+            seen.insert(name.as_str());
             continue;
         }
 
-        let Expr::Dict(ast::ExprDict { keys, values, .. }) = &kw.value else {
+        let Expr::Dict(ast::ExprDict { keys, values, .. }) = &keyword.value else {
             continue;
         };
 
@@ -88,7 +91,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
 
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 format!("**{}", checker.locator().slice(values[0].range())),
-                kw.range(),
+                keyword.range(),
             )));
 
             checker.diagnostics.push(diagnostic);
@@ -100,7 +103,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
         let kwargs = keys
             .iter()
             .filter_map(|key| key.as_ref().and_then(as_kwarg))
-            .filter(|name| all_kwargs.insert(name))
+            .filter(|name| seen.insert(name))
             .collect::<Vec<_>>();
         if kwargs.len() != keys.len() {
             continue;
@@ -111,7 +114,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
         if values.is_empty() {
             diagnostic.try_set_fix(|| {
                 remove_argument(
-                    kw,
+                    keyword,
                     &call.arguments,
                     Parentheses::Preserve,
                     checker.locator().contents(),
@@ -127,7 +130,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCal
                         format!("{}={}", kwarg, checker.locator().slice(value.range()))
                     })
                     .join(", "),
-                kw.range(),
+                keyword.range(),
             )));
         }
 
