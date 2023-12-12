@@ -25,7 +25,7 @@ quote-style                = Double
 line-ending                = CarriageReturnLineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Enabled
-docstring-code-line-width  = 88
+docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 ```
 

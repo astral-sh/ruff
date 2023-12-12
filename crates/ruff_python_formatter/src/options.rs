@@ -302,24 +302,19 @@ impl DocstringCode {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, CacheKey)]
+#[derive(Copy, Clone, Default, Eq, PartialEq, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum DocstringCodeLineWidth {
     Fixed(LineWidth),
+    #[default]
     #[cfg_attr(
         feature = "serde",
         serde(deserialize_with = "deserialize_docstring_code_line_width_dynamic")
     )]
     Dynamic,
-}
-
-impl Default for DocstringCodeLineWidth {
-    fn default() -> DocstringCodeLineWidth {
-        DocstringCodeLineWidth::Fixed(default_line_width())
-    }
 }
 
 impl std::fmt::Debug for DocstringCodeLineWidth {
