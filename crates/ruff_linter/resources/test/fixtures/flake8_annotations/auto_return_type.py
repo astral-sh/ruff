@@ -147,3 +147,38 @@ def func(x: int):
     while x > 0:
         break
         return 1
+
+
+import abc
+from abc import abstractmethod
+
+
+class Foo(abc.ABC):
+    @abstractmethod
+    def method(self):
+        pass
+
+    @abc.abstractmethod
+    def method(self):
+        """Docstring."""
+
+    @abc.abstractmethod
+    def method(self):
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def method():
+        pass
+
+    @classmethod
+    @abstractmethod
+    def method(cls):
+        pass
+
+    @abstractmethod
+    def method(self):
+        if self.x > 0:
+            return 1
+        else:
+            return 1.5

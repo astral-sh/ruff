@@ -19,21 +19,32 @@ if x > 0:
 else:
     import e
 
-__some__magic = 1
+import sys
+sys.path.insert(0, "some/path")
 
 import f
 
+import matplotlib
+
+matplotlib.use("Agg")
+
+import g
+
+__some__magic = 1
+
+import h
+
 
 def foo() -> None:
-    import e
+    import i
 
 
 if __name__ == "__main__":
-    import g
+    import j
 
-import h; import i
+import k; import l
 
 
 if __name__ == "__main__":
-    import j; \
-import k
+    import m; \
+import n

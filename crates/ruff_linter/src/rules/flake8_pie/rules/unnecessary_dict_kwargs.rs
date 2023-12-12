@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
-use ruff_python_ast::{self as ast, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{remove_argument, Parentheses};
 
 /// ## What it does
 /// Checks for unnecessary `dict` kwargs.
@@ -52,8 +53,8 @@ impl AlwaysFixableViolation for UnnecessaryDictKwargs {
 }
 
 /// PIE804
-pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
-    for kw in kwargs {
+pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, call: &ast::ExprCall) {
+    for kw in &call.arguments.keywords {
         // keyword is a spread operator (indicated by None)
         if kw.arg.is_some() {
             continue;
@@ -65,7 +66,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
 
         // Ex) `foo(**{**bar})`
         if matches!(keys.as_slice(), [None]) {
-            let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
+            let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, call.range());
 
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 format!("**{}", checker.locator().slice(values[0].range())),
@@ -86,10 +87,18 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs
             continue;
         }
 
-        let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
+        let mut diagnostic = Diagnostic::new(UnnecessaryDictKwargs, call.range());
 
         if values.is_empty() {
-            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(kw.start(), kw.end())));
+            diagnostic.try_set_fix(|| {
+                remove_argument(
+                    kw,
+                    &call.arguments,
+                    Parentheses::Preserve,
+                    checker.locator().contents(),
+                )
+                .map(Fix::safe_edit)
+            });
         } else {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 kwargs

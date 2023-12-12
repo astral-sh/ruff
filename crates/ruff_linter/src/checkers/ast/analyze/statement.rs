@@ -250,6 +250,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TooManyArguments) {
                 pylint::rules::too_many_arguments(checker, function_def);
             }
+            if checker.enabled(Rule::TooManyPositional) {
+                pylint::rules::too_many_positional(checker, function_def);
+            }
             if checker.enabled(Rule::TooManyReturnStatements) {
                 if let Some(diagnostic) = pylint::rules::too_many_return_statements(
                     stmt,
@@ -1568,7 +1571,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::named_expr_without_context(checker, value);
             }
             if checker.enabled(Rule::AsyncioDanglingTask) {
-                ruff::rules::asyncio_dangling_task(checker, value);
+                if let Some(diagnostic) =
+                    ruff::rules::asyncio_dangling_task(value, checker.semantic())
+                {
+                    checker.diagnostics.push(diagnostic);
+                }
             }
             if checker.enabled(Rule::RepeatedAppend) {
                 refurb::rules::repeated_append(checker, stmt);

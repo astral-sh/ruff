@@ -11,7 +11,7 @@ use std::str::FromStr;
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
-    serde(default)
+    serde(default, deny_unknown_fields)
 )]
 pub struct PyFormatOptions {
     /// Whether we're in a `.py` file or `.pyi` file, which have different rules.
@@ -49,6 +49,12 @@ pub struct PyFormatOptions {
     /// enabled by default (opt-out) in the future.
     docstring_code: DocstringCode,
 
+    /// The preferred line width at which the formatter should wrap lines in
+    /// docstring code examples. This only has an impact when `docstring_code`
+    /// is enabled.
+    #[cfg_attr(feature = "serde", serde(default = "default_line_width"))]
+    docstring_code_line_width: LineWidth,
+
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
 }
@@ -77,6 +83,7 @@ impl Default for PyFormatOptions {
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
             docstring_code: DocstringCode::default(),
+            docstring_code_line_width: default_line_width(),
             preview: PreviewMode::default(),
         }
     }
@@ -117,6 +124,10 @@ impl PyFormatOptions {
 
     pub fn docstring_code(&self) -> DocstringCode {
         self.docstring_code
+    }
+
+    pub fn docstring_code_line_width(&self) -> LineWidth {
+        self.docstring_code_line_width
     }
 
     pub const fn preview(&self) -> PreviewMode {
@@ -207,35 +218,7 @@ pub enum QuoteStyle {
     Single,
     #[default]
     Double,
-}
-
-impl QuoteStyle {
-    pub const fn as_char(self) -> char {
-        match self {
-            QuoteStyle::Single => '\'',
-            QuoteStyle::Double => '"',
-        }
-    }
-
-    #[must_use]
-    pub const fn invert(self) -> QuoteStyle {
-        match self {
-            QuoteStyle::Single => QuoteStyle::Double,
-            QuoteStyle::Double => QuoteStyle::Single,
-        }
-    }
-}
-
-impl TryFrom<char> for QuoteStyle {
-    type Error = ();
-
-    fn try_from(value: char) -> std::result::Result<Self, Self::Error> {
-        match value {
-            '\'' => Ok(QuoteStyle::Single),
-            '"' => Ok(QuoteStyle::Double),
-            _ => Err(()),
-        }
-    }
+    Preserve,
 }
 
 impl FromStr for QuoteStyle {
@@ -245,6 +228,7 @@ impl FromStr for QuoteStyle {
         match s {
             "\"" | "double" | "Double" => Ok(Self::Double),
             "'" | "single" | "Single" => Ok(Self::Single),
+            "preserve" | "Preserve" => Ok(Self::Preserve),
             // TODO: replace this error with a diagnostic
             _ => Err("Value not supported for QuoteStyle"),
         }

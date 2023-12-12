@@ -14,7 +14,7 @@ expression: "parse_suite(r#\"f\"\"\"#, \"<test>\").unwrap()"
                             FString(
                                 FString {
                                     range: 0..3,
-                                    values: [],
+                                    elements: [],
                                 },
                             ),
                         ),

@@ -78,7 +78,7 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
         return Some(node.into());
     }
 
-    let mut fstring_elems = Vec::with_capacity(joinees.len() * 2);
+    let mut f_string_elements = Vec::with_capacity(joinees.len() * 2);
     let mut first = true;
 
     for expr in joinees {
@@ -88,13 +88,13 @@ fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
             return None;
         }
         if !std::mem::take(&mut first) {
-            fstring_elems.push(helpers::to_constant_string(joiner));
+            f_string_elements.push(helpers::to_f_string_literal_element(joiner));
         }
-        fstring_elems.push(helpers::to_f_string_element(expr)?);
+        f_string_elements.push(helpers::to_f_string_element(expr)?);
     }
 
     let node = ast::FString {
-        values: fstring_elems,
+        elements: f_string_elements,
         range: TextRange::default(),
     };
     Some(node.into())
@@ -127,7 +127,7 @@ pub(crate) fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner:
     };
 
     // Try to build the fstring (internally checks whether e.g. the elements are
-    // convertible to f-string parts).
+    // convertible to f-string elements).
     let Some(new_expr) = build_fstring(joiner, joinees) else {
         return;
     };

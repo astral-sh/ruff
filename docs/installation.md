@@ -48,6 +48,12 @@ on the testing repositories:
 apk add ruff
 ```
 
+For **openSUSE Tumbleweed** users, Ruff is also available in the distribution repository:
+
+```shell
+sudo zypper install python3-ruff
+```
+
 On **Docker**, it is published as `ghcr.io/astral-sh/ruff`, tagged for each release and `latest` for
 the latest release.
 

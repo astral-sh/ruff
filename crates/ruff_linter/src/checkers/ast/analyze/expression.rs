@@ -356,6 +356,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::FString,
                 // flynt
                 Rule::StaticJoinToFString,
+                // refurb
+                Rule::HashlibDigestHex,
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
@@ -543,7 +545,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bugbear::rules::no_explicit_stacklevel(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDictKwargs) {
-                flake8_pie::rules::unnecessary_dict_kwargs(checker, expr, keywords);
+                flake8_pie::rules::unnecessary_dict_kwargs(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryRangeStart) {
                 flake8_pie::rules::unnecessary_range_start(checker, call);
@@ -580,6 +582,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::HashlibInsecureHashFunction) {
                 flake8_bandit::rules::hashlib_insecure_hash_functions(checker, call);
+            }
+            if checker.enabled(Rule::HashlibDigestHex) {
+                refurb::rules::hashlib_digest_hex(checker, call);
             }
             if checker.enabled(Rule::RequestWithoutTimeout) {
                 flake8_bandit::rules::request_without_timeout(checker, call);
@@ -1270,30 +1275,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }
-        Expr::BytesLiteral(_) => {
-            if checker.source_type.is_stub() && checker.enabled(Rule::StringOrBytesTooLong) {
-                flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
-            }
-        }
-        Expr::StringLiteral(string) => {
-            if checker.enabled(Rule::HardcodedBindAllInterfaces) {
-                if let Some(diagnostic) =
-                    flake8_bandit::rules::hardcoded_bind_all_interfaces(string)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            if checker.enabled(Rule::HardcodedTempFile) {
-                flake8_bandit::rules::hardcoded_tmp_directory(checker, string);
-            }
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             if checker.enabled(Rule::UnicodeKindPrefix) {
-                for string_part in string.value.parts() {
+                for string_part in value.parts() {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
-                }
-            }
-            if checker.source_type.is_stub() {
-                if checker.enabled(Rule::StringOrBytesTooLong) {
-                    flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
                 }
             }
         }

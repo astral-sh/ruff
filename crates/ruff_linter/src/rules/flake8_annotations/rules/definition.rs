@@ -537,6 +537,19 @@ fn check_dynamically_typed<F>(
     }
 }
 
+fn is_empty_body(body: &[Stmt]) -> bool {
+    body.iter().all(|stmt| match stmt {
+        Stmt::Pass(_) => true,
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+            matches!(
+                value.as_ref(),
+                Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
+            )
+        }
+        _ => false,
+    })
+}
+
 /// Generate flake8-annotation checks for a given `Definition`.
 pub(crate) fn definition(
     checker: &Checker,
@@ -725,16 +738,22 @@ pub(crate) fn definition(
     ) {
         if is_method && visibility::is_classmethod(decorator_list, checker.semantic()) {
             if checker.enabled(Rule::MissingReturnTypeClassMethod) {
-                let return_type = auto_return_type(function)
-                    .and_then(|return_type| {
-                        return_type.into_expression(
-                            checker.importer(),
-                            function.parameters.start(),
-                            checker.semantic(),
-                            checker.settings.target_version,
-                        )
-                    })
-                    .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits));
+                let return_type = if visibility::is_abstract(decorator_list, checker.semantic())
+                    && is_empty_body(body)
+                {
+                    None
+                } else {
+                    auto_return_type(function)
+                        .and_then(|return_type| {
+                            return_type.into_expression(
+                                checker.importer(),
+                                function.parameters.start(),
+                                checker.semantic(),
+                                checker.settings.target_version,
+                            )
+                        })
+                        .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
+                };
                 let mut diagnostic = Diagnostic::new(
                     MissingReturnTypeClassMethod {
                         name: name.to_string(),
@@ -752,16 +771,22 @@ pub(crate) fn definition(
             }
         } else if is_method && visibility::is_staticmethod(decorator_list, checker.semantic()) {
             if checker.enabled(Rule::MissingReturnTypeStaticMethod) {
-                let return_type = auto_return_type(function)
-                    .and_then(|return_type| {
-                        return_type.into_expression(
-                            checker.importer(),
-                            function.parameters.start(),
-                            checker.semantic(),
-                            checker.settings.target_version,
-                        )
-                    })
-                    .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits));
+                let return_type = if visibility::is_abstract(decorator_list, checker.semantic())
+                    && is_empty_body(body)
+                {
+                    None
+                } else {
+                    auto_return_type(function)
+                        .and_then(|return_type| {
+                            return_type.into_expression(
+                                checker.importer(),
+                                function.parameters.start(),
+                                checker.semantic(),
+                                checker.settings.target_version,
+                            )
+                        })
+                        .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
+                };
                 let mut diagnostic = Diagnostic::new(
                     MissingReturnTypeStaticMethod {
                         name: name.to_string(),
@@ -818,18 +843,25 @@ pub(crate) fn definition(
             match visibility {
                 visibility::Visibility::Public => {
                     if checker.enabled(Rule::MissingReturnTypeUndocumentedPublicFunction) {
-                        let return_type = auto_return_type(function)
-                            .and_then(|return_type| {
-                                return_type.into_expression(
-                                    checker.importer(),
-                                    function.parameters.start(),
-                                    checker.semantic(),
-                                    checker.settings.target_version,
-                                )
-                            })
-                            .map(|(return_type, edits)| {
-                                (checker.generator().expr(&return_type), edits)
-                            });
+                        let return_type =
+                            if visibility::is_abstract(decorator_list, checker.semantic())
+                                && is_empty_body(body)
+                            {
+                                None
+                            } else {
+                                auto_return_type(function)
+                                    .and_then(|return_type| {
+                                        return_type.into_expression(
+                                            checker.importer(),
+                                            function.parameters.start(),
+                                            checker.semantic(),
+                                            checker.settings.target_version,
+                                        )
+                                    })
+                                    .map(|(return_type, edits)| {
+                                        (checker.generator().expr(&return_type), edits)
+                                    })
+                            };
                         let mut diagnostic = Diagnostic::new(
                             MissingReturnTypeUndocumentedPublicFunction {
                                 name: name.to_string(),
@@ -853,18 +885,25 @@ pub(crate) fn definition(
                 }
                 visibility::Visibility::Private => {
                     if checker.enabled(Rule::MissingReturnTypePrivateFunction) {
-                        let return_type = auto_return_type(function)
-                            .and_then(|return_type| {
-                                return_type.into_expression(
-                                    checker.importer(),
-                                    function.parameters.start(),
-                                    checker.semantic(),
-                                    checker.settings.target_version,
-                                )
-                            })
-                            .map(|(return_type, edits)| {
-                                (checker.generator().expr(&return_type), edits)
-                            });
+                        let return_type =
+                            if visibility::is_abstract(decorator_list, checker.semantic())
+                                && is_empty_body(body)
+                            {
+                                None
+                            } else {
+                                auto_return_type(function)
+                                    .and_then(|return_type| {
+                                        return_type.into_expression(
+                                            checker.importer(),
+                                            function.parameters.start(),
+                                            checker.semantic(),
+                                            checker.settings.target_version,
+                                        )
+                                    })
+                                    .map(|(return_type, edits)| {
+                                        (checker.generator().expr(&return_type), edits)
+                                    })
+                            };
                         let mut diagnostic = Diagnostic::new(
                             MissingReturnTypePrivateFunction {
                                 name: name.to_string(),
