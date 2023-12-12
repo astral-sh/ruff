@@ -10,8 +10,9 @@ pub(super) fn logical_line(content: &str) -> Option<usize> {
     // Find the first logical line.
     let mut logical_line = None;
     for (i, line) in content.universal_newlines().enumerate() {
-        if line.trim().is_empty() {
-            // Empty line. If this is the line _after_ the first logical line, stop.
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.chars().all(|c| matches!(c, '-' | '~' | '=' | '#')) {
+            // Empty line, or underline. If this is the line _after_ the first logical line, stop.
             if logical_line.is_some() {
                 break;
             }

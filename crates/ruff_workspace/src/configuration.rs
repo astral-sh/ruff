@@ -158,12 +158,21 @@ impl Configuration {
         let format = self.format;
         let format_defaults = FormatterSettings::default();
 
+        let quote_style = format.quote_style.unwrap_or(format_defaults.quote_style);
+        let format_preview = match format.preview.unwrap_or(global_preview) {
+            PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+            PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+        };
+
+        if quote_style == QuoteStyle::Preserve && !format_preview.is_enabled() {
+            return Err(anyhow!(
+                "'quote-style = preserve' is a preview only feature. Run with '--preview' to enable it."
+            ));
+        }
+
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
-            preview: match format.preview.unwrap_or(global_preview) {
-                PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
-                PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
-            },
+            preview: format_preview,
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {
@@ -176,7 +185,7 @@ impl Configuration {
                 .map_or(format_defaults.indent_width, |tab_size| {
                     ruff_formatter::IndentWidth::from(NonZeroU8::from(tab_size))
                 }),
-            quote_style: format.quote_style.unwrap_or(format_defaults.quote_style),
+            quote_style,
             magic_trailing_comma: format
                 .magic_trailing_comma
                 .unwrap_or(format_defaults.magic_trailing_comma),

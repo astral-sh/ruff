@@ -25,11 +25,11 @@ def markdown_format_result(result: Result) -> str:
     """
     Render a `ruff format` ecosystem check result as markdown.
     """
-    lines = []
+    lines: list[str] = []
     total_lines_removed = total_lines_added = 0
     total_files_modified = 0
     error_count = len(result.errored)
-    patch_sets = []
+    patch_sets: list[PatchSet] = []
 
     for project, comparison in result.completed:
         total_lines_added += comparison.diff.lines_added
@@ -97,7 +97,7 @@ def format_patchset(patch_set: PatchSet, repo: ClonedRepository) -> str:
     """
     Convert a patchset to markdown, adding permalinks to the start of each hunk.
     """
-    lines = []
+    lines: list[str] = []
     for file_patch in patch_set:
         for hunk in file_patch:
             # Note:  When used for `format` checks, the line number is not exact because

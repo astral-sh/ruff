@@ -213,13 +213,28 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
                                         diagnostic.range(),
                                     )));
                                     context.push_diagnostic(diagnostic);
+                                } else if iter
+                                    .peek()
+                                    .is_some_and(|token| token.kind() == TokenKind::Rsqb)
+                                {
+                                    // Allow `foo[1 :]`, but not `foo[1  :]`.
+                                    if let (Whitespace::Many | Whitespace::Tab, offset) = whitespace
+                                    {
+                                        let mut diagnostic = Diagnostic::new(
+                                            WhitespaceBeforePunctuation { symbol },
+                                            TextRange::at(token.start() - offset, offset),
+                                        );
+                                        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(
+                                            diagnostic.range(),
+                                        )));
+                                        context.push_diagnostic(diagnostic);
+                                    }
                                 } else {
+                                    // Allow, e.g., `foo[1:2]` or `foo[1 : 2]` or `foo[1 :: 2]`.
                                     let token = iter
                                         .peek()
                                         .filter(|next| matches!(next.kind(), TokenKind::Colon))
                                         .unwrap_or(&token);
-
-                                    // Allow, e.g., `foo[1:2]` or `foo[1 : 2]` or `foo[1 :: 2]`.
                                     if line.trailing_whitespace(token) != whitespace {
                                         let mut diagnostic = Diagnostic::new(
                                             WhitespaceBeforePunctuation { symbol },

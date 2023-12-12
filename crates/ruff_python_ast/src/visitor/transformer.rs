@@ -1,8 +1,8 @@
 use crate::{
-    self as ast, Alias, Arguments, BoolOp, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, ExprContext, Keyword, MatchCase, Operator, Parameter, Parameters, Pattern,
-    PatternArguments, PatternKeyword, Stmt, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp,
-    WithItem,
+    self as ast, Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator,
+    ElifElseClause, ExceptHandler, Expr, ExprContext, FString, FStringElement, Keyword, MatchCase,
+    Operator, Parameter, Parameters, Pattern, PatternArguments, PatternKeyword, Stmt,
+    StringLiteral, TypeParam, TypeParamTypeVar, TypeParams, UnaryOp, WithItem,
 };
 
 /// A trait for transforming ASTs. Visits all nodes in the AST recursively in evaluation-order.
@@ -39,9 +39,6 @@ pub trait Transformer {
     }
     fn visit_except_handler(&self, except_handler: &mut ExceptHandler) {
         walk_except_handler(self, except_handler);
-    }
-    fn visit_format_spec(&self, format_spec: &mut Expr) {
-        walk_format_spec(self, format_spec);
     }
     fn visit_arguments(&self, arguments: &mut Arguments) {
         walk_arguments(self, arguments);
@@ -84,6 +81,18 @@ pub trait Transformer {
     }
     fn visit_elif_else_clause(&self, elif_else_clause: &mut ElifElseClause) {
         walk_elif_else_clause(self, elif_else_clause);
+    }
+    fn visit_f_string(&self, f_string: &mut FString) {
+        walk_f_string(self, f_string);
+    }
+    fn visit_f_string_element(&self, f_string_element: &mut FStringElement) {
+        walk_f_string_element(self, f_string_element);
+    }
+    fn visit_string_literal(&self, string_literal: &mut StringLiteral) {
+        walk_string_literal(self, string_literal);
+    }
+    fn visit_bytes_literal(&self, bytes_literal: &mut BytesLiteral) {
+        walk_bytes_literal(self, bytes_literal);
     }
 }
 
@@ -454,22 +463,29 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             visitor.visit_expr(func);
             visitor.visit_arguments(arguments);
         }
-        Expr::FormattedValue(ast::ExprFormattedValue {
-            value, format_spec, ..
-        }) => {
-            visitor.visit_expr(value);
-            if let Some(expr) = format_spec {
-                visitor.visit_format_spec(expr);
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            for f_string_part in value.parts_mut() {
+                match f_string_part {
+                    ast::FStringPart::Literal(string_literal) => {
+                        visitor.visit_string_literal(string_literal);
+                    }
+                    ast::FStringPart::FString(f_string) => {
+                        visitor.visit_f_string(f_string);
+                    }
+                }
             }
         }
-        Expr::FString(ast::ExprFString { values, .. }) => {
-            for expr in values {
-                visitor.visit_expr(expr);
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            for string_literal in value.parts_mut() {
+                visitor.visit_string_literal(string_literal);
             }
         }
-        Expr::StringLiteral(_)
-        | Expr::BytesLiteral(_)
-        | Expr::NumberLiteral(_)
+        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+            for bytes_literal in value.parts_mut() {
+                visitor.visit_bytes_literal(bytes_literal);
+            }
+        }
+        Expr::NumberLiteral(_)
         | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_) => {}
@@ -558,10 +574,6 @@ pub fn walk_except_handler<V: Transformer + ?Sized>(
             visitor.visit_body(body);
         }
     }
-}
-
-pub fn walk_format_spec<V: Transformer + ?Sized>(visitor: &V, format_spec: &mut Expr) {
-    visitor.visit_expr(format_spec);
 }
 
 pub fn walk_arguments<V: Transformer + ?Sized>(visitor: &V, arguments: &mut Arguments) {
@@ -713,20 +725,51 @@ pub fn walk_pattern_keyword<V: Transformer + ?Sized>(
     visitor.visit_pattern(&mut pattern_keyword.pattern);
 }
 
-#[allow(unused_variables)]
-pub fn walk_expr_context<V: Transformer + ?Sized>(visitor: &V, expr_context: &mut ExprContext) {}
+pub fn walk_f_string<V: Transformer + ?Sized>(visitor: &V, f_string: &mut FString) {
+    for element in &mut f_string.elements {
+        visitor.visit_f_string_element(element);
+    }
+}
 
-#[allow(unused_variables)]
-pub fn walk_bool_op<V: Transformer + ?Sized>(visitor: &V, bool_op: &mut BoolOp) {}
+pub fn walk_f_string_element<V: Transformer + ?Sized>(
+    visitor: &V,
+    f_string_element: &mut FStringElement,
+) {
+    if let ast::FStringElement::Expression(ast::FStringExpressionElement {
+        expression,
+        format_spec,
+        ..
+    }) = f_string_element
+    {
+        visitor.visit_expr(expression);
+        if let Some(format_spec) = format_spec {
+            for spec_element in &mut format_spec.elements {
+                visitor.visit_f_string_element(spec_element);
+            }
+        }
+    }
+}
 
-#[allow(unused_variables)]
-pub fn walk_operator<V: Transformer + ?Sized>(visitor: &V, operator: &mut Operator) {}
+pub fn walk_expr_context<V: Transformer + ?Sized>(_visitor: &V, _expr_context: &mut ExprContext) {}
 
-#[allow(unused_variables)]
-pub fn walk_unary_op<V: Transformer + ?Sized>(visitor: &V, unary_op: &mut UnaryOp) {}
+pub fn walk_bool_op<V: Transformer + ?Sized>(_visitor: &V, _bool_op: &mut BoolOp) {}
 
-#[allow(unused_variables)]
-pub fn walk_cmp_op<V: Transformer + ?Sized>(visitor: &V, cmp_op: &mut CmpOp) {}
+pub fn walk_operator<V: Transformer + ?Sized>(_visitor: &V, _operator: &mut Operator) {}
 
-#[allow(unused_variables)]
-pub fn walk_alias<V: Transformer + ?Sized>(visitor: &V, alias: &mut Alias) {}
+pub fn walk_unary_op<V: Transformer + ?Sized>(_visitor: &V, _unary_op: &mut UnaryOp) {}
+
+pub fn walk_cmp_op<V: Transformer + ?Sized>(_visitor: &V, _cmp_op: &mut CmpOp) {}
+
+pub fn walk_alias<V: Transformer + ?Sized>(_visitor: &V, _alias: &mut Alias) {}
+
+pub fn walk_string_literal<V: Transformer + ?Sized>(
+    _visitor: &V,
+    _string_literal: &mut StringLiteral,
+) {
+}
+
+pub fn walk_bytes_literal<V: Transformer + ?Sized>(
+    _visitor: &V,
+    _bytes_literal: &mut BytesLiteral,
+) {
+}

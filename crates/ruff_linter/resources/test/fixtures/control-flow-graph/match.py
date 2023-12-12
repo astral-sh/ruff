@@ -129,3 +129,11 @@ def func():
             print("Grass is green")
         case Color.BLUE:
             print("I'm feeling the blues :(")
+
+
+def func(point):
+    match point:
+        case (0, 0):
+            print("Origin")
+        case foo:
+            raise ValueError("oops")

@@ -1,4 +1,5 @@
 pub mod function_type;
+pub mod imports;
 pub mod logging;
 pub mod type_inference;
 pub mod typing;

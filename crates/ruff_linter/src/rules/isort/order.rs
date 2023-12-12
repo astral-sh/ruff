@@ -1,3 +1,5 @@
+use crate::rules::isort::sorting::ImportStyle;
+use crate::rules::isort::{ImportSection, ImportType};
 use itertools::Itertools;
 
 use super::settings::Settings;
@@ -7,6 +9,7 @@ use super::types::{AliasData, CommentSet, ImportBlock, ImportFromStatement};
 
 pub(crate) fn order_imports<'a>(
     block: ImportBlock<'a>,
+    section: &ImportSection,
     settings: &Settings,
 ) -> Vec<EitherImport<'a>> {
     let straight_imports = block.import.into_iter();
@@ -51,26 +54,67 @@ pub(crate) fn order_imports<'a>(
                 },
             );
 
-    let ordered_imports = if settings.force_sort_within_sections {
+    let ordered_imports = if matches!(section, ImportSection::Known(ImportType::Future)) {
+        from_imports
+            .sorted_by_cached_key(|(import_from, _, _, aliases)| {
+                ModuleKey::from_module(
+                    import_from.module,
+                    None,
+                    import_from.level,
+                    aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
+                    settings,
+                )
+            })
+            .map(ImportFrom)
+            .chain(
+                straight_imports
+                    .sorted_by_cached_key(|(alias, _)| {
+                        ModuleKey::from_module(
+                            Some(alias.name),
+                            alias.asname,
+                            None,
+                            None,
+                            ImportStyle::Straight,
+                            settings,
+                        )
+                    })
+                    .map(Import),
+            )
+            .collect()
+    } else if settings.force_sort_within_sections {
         straight_imports
             .map(Import)
             .chain(from_imports.map(ImportFrom))
             .sorted_by_cached_key(|import| match import {
-                Import((alias, _)) => {
-                    ModuleKey::from_module(Some(alias.name), alias.asname, None, None, settings)
-                }
+                Import((alias, _)) => ModuleKey::from_module(
+                    Some(alias.name),
+                    alias.asname,
+                    None,
+                    None,
+                    ImportStyle::Straight,
+                    settings,
+                ),
                 ImportFrom((import_from, _, _, aliases)) => ModuleKey::from_module(
                     import_from.module,
                     None,
                     import_from.level,
                     aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
                     settings,
                 ),
             })
             .collect()
     } else {
         let ordered_straight_imports = straight_imports.sorted_by_cached_key(|(alias, _)| {
-            ModuleKey::from_module(Some(alias.name), alias.asname, None, None, settings)
+            ModuleKey::from_module(
+                Some(alias.name),
+                alias.asname,
+                None,
+                None,
+                ImportStyle::Straight,
+                settings,
+            )
         });
         let ordered_from_imports =
             from_imports.sorted_by_cached_key(|(import_from, _, _, aliases)| {
@@ -79,6 +123,7 @@ pub(crate) fn order_imports<'a>(
                     None,
                     import_from.level,
                     aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
                     settings,
                 )
             });

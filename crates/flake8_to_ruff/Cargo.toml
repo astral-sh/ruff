@@ -1,6 +1,6 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.1.6"
+version = "0.1.7"
 description = """
 Convert Flake8 configuration files to Ruff configuration files.
 """
@@ -19,7 +19,7 @@ ruff_workspace = { path = "../ruff_workspace" }
 anyhow = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }
-configparser = { version = "3.0.2" }
+configparser = { version = "3.0.3" }
 itertools = { workspace = true }
 log = { workspace = true }
 once_cell = { workspace = true }

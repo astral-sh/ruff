@@ -294,6 +294,7 @@ pub fn python_files_in_path(
                         let (root, settings) =
                             resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
                         resolver.add(root, settings);
+                        break;
                     }
                 }
             }
@@ -494,6 +495,7 @@ pub fn python_file_at_path(
                 let (root, settings) =
                     resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
                 resolver.add(root, settings);
+                break;
             }
         }
     }

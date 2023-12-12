@@ -5,11 +5,14 @@ expression: trace
 - ModModule
   - StmtFunctionDef
     - Parameters
-      - Parameter
-      - Parameter
-      - ExprNumberLiteral
-      - Parameter
-      - ExprNumberLiteral
+      - ParameterWithDefault
+        - Parameter
+      - ParameterWithDefault
+        - Parameter
+        - ExprNumberLiteral
+      - ParameterWithDefault
+        - Parameter
+        - ExprNumberLiteral
       - Parameter
     - StmtPass
 

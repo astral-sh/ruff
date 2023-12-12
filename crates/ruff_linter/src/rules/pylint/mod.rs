@@ -94,6 +94,7 @@ mod tests {
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
+    #[test_case(Rule::TooManyPositional, Path::new("too_many_positional.py"))]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
     #[test_case(
         Rule::TooManyReturnStatements,
@@ -153,6 +154,16 @@ mod tests {
     #[test_case(
         Rule::RepeatedKeywordArgument,
         Path::new("repeated_keyword_argument.py")
+    )]
+    #[test_case(
+        Rule::UnnecessaryListIndexLookup,
+        Path::new("unnecessary_list_index_lookup.py")
+    )]
+    #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(
+        Rule::UnnecessaryDictIndexLookup,
+        Path::new("unnecessary_dict_index_lookup.py")
     )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -240,6 +251,22 @@ mod tests {
     }
 
     #[test]
+    fn max_positional_args() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_positional_params.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_positional_args: 4,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::TooManyPositional)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn max_branches() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_branches_params.py"),
@@ -314,6 +341,17 @@ mod tests {
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
             },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn unspecified_encoding_python39_or_lower() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/unspecified_encoding.py"),
+            &LinterSettings::for_rule(Rule::UnspecifiedEncoding)
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
         Ok(())

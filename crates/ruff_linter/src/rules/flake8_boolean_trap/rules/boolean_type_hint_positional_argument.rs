@@ -4,6 +4,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -109,14 +110,8 @@ pub(crate) fn boolean_type_hint_positional_argument(
     decorator_list: &[Decorator],
     parameters: &Parameters,
 ) {
+    // Allow Boolean type hints in explicitly-allowed functions.
     if is_allowed_func_def(name) {
-        return;
-    }
-
-    if decorator_list.iter().any(|decorator| {
-        collect_call_path(&decorator.expression)
-            .is_some_and(|call_path| call_path.as_slice() == [name, "setter"])
-    }) {
         return;
     }
 
@@ -138,9 +133,26 @@ pub(crate) fn boolean_type_hint_positional_argument(
                 continue;
             }
         }
+
+        // Allow Boolean type hints in setters.
+        if decorator_list.iter().any(|decorator| {
+            collect_call_path(&decorator.expression)
+                .is_some_and(|call_path| call_path.as_slice() == [name, "setter"])
+        }) {
+            return;
+        }
+
+        // Allow Boolean defaults in `@override` methods, since they're required to adhere to
+        // the parent signature.
+        if visibility::is_override(decorator_list, checker.semantic()) {
+            return;
+        }
+
+        // If `bool` isn't actually a reference to the `bool` built-in, return.
         if !checker.semantic().is_builtin("bool") {
             return;
         }
+
         checker.diagnostics.push(Diagnostic::new(
             BooleanTypeHintPositionalArgument,
             parameter.name.range(),

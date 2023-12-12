@@ -23,6 +23,9 @@ bar, (foo, baz) = bar, (foo, 1)
 (foo, (bar, baz)) = (foo, (bar, 1))
 foo: int = foo
 bar: int = bar
+foo = foo = bar
+(foo, bar) = (foo, bar) = baz
+(foo, bar) = baz = (foo, bar) = 1
 
 # Non-errors.
 foo = bar

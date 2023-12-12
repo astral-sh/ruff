@@ -122,7 +122,7 @@ impl fmt::Display for RemovalKind {
 
 /// Return `true` if a string contains duplicate characters, taking into account
 /// escapes.
-fn has_duplicates(s: &str) -> bool {
+fn has_duplicates(s: &ast::StringLiteralValue) -> bool {
     let mut escaped = false;
     let mut seen = FxHashSet::default();
     for ch in s.chars() {
