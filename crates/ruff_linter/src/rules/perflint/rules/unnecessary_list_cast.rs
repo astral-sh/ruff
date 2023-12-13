@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Stmt;
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
@@ -110,30 +110,13 @@ pub(crate) fn unnecessary_list_cast(checker: &mut Checker, iter: &Expr, body: &[
             if body.iter().any(|stmt| match_append(stmt, id)) {
                 return;
             }
-            let scope = checker.semantic().current_scope();
-            if let Some(binding_id) = scope.get(id) {
-                let binding = checker.semantic().binding(binding_id);
-                if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
-                    if let Some(parent_id) = binding.source {
-                        let parent = checker.semantic().statement(parent_id);
-                        if let Stmt::Assign(ast::StmtAssign { value, .. })
-                        | Stmt::AnnAssign(ast::StmtAnnAssign {
-                            value: Some(value), ..
-                        })
-                        | Stmt::AugAssign(ast::StmtAugAssign { value, .. }) = parent
-                        {
-                            if matches!(
-                                value.as_ref(),
-                                Expr::Tuple(_) | Expr::List(_) | Expr::Set(_)
-                            ) {
-                                let mut diagnostic =
-                                    Diagnostic::new(UnnecessaryListCast, *list_range);
-                                diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
-                                checker.diagnostics.push(diagnostic);
-                            }
-                        }
-                    }
-                }
+            let Some(value) = find_assigned_value(id, checker.semantic()) else {
+                return;
+            };
+            if matches!(value, Expr::Tuple(_) | Expr::List(_) | Expr::Set(_)) {
+                let mut diagnostic = Diagnostic::new(UnnecessaryListCast, *list_range);
+                diagnostic.set_fix(remove_cast(*list_range, *iterable_range));
+                checker.diagnostics.push(diagnostic);
             }
         }
         _ => {}
