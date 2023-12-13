@@ -292,8 +292,7 @@ impl Printer {
                 AzureEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
             SerializationFormat::Sarif => {
-                SarifEmitter::default()
-                    .emit(writer, &diagnostics.messages, &context)?;
+                SarifEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
         }
 
