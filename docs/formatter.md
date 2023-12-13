@@ -392,3 +392,15 @@ flag.
 Black promotes some of its preview styling to stable at the end of each year. Ruff will similarly
 implement formatting changes under the [`preview`](https://docs.astral.sh/ruff/settings/#preview)
 flag, promoting them to stable through minor releases, in accordance with our [versioning policy](https://github.com/astral-sh/ruff/discussions/6998#discussioncomment-7016766).
+
+## Sorting imports
+
+Currently, the Ruff formatter does not sort imports. In order to both sort imports and format,
+call the Ruff linter and then the formatter:
+
+```shell
+ruff check --select I --fix .
+ruff format .
+```
+
+A unified command for both linting and formatting is currently [being developed](https://github.com/astral-sh/ruff/issues/8232).
