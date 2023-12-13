@@ -1360,6 +1360,7 @@ impl<'a> Generator<'a> {
                 *conversion,
                 format_spec.as_deref(),
             ),
+            ast::FStringElement::Invalid(ast::FStringInvalidElement { value, .. }) => self.p(value),
         }
     }
 

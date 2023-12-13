@@ -90,6 +90,7 @@ pub enum AnyNode {
     ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler),
     FStringExpressionElement(ast::FStringExpressionElement),
     FStringLiteralElement(ast::FStringLiteralElement),
+    FStringInvalidElement(ast::FStringInvalidElement),
     PatternMatchValue(ast::PatternMatchValue),
     PatternMatchSingleton(ast::PatternMatchSingleton),
     PatternMatchSequence(ast::PatternMatchSequence),
@@ -171,6 +172,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -286,6 +288,7 @@ impl AnyNode {
             | AnyNode::ExceptHandlerExceptHandler(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::PatternMatchValue(_)
             | AnyNode::PatternMatchSingleton(_)
             | AnyNode::PatternMatchSequence(_)
@@ -367,6 +370,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -474,6 +478,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -564,6 +569,7 @@ impl AnyNode {
             | AnyNode::ExprCall(_)
             | AnyNode::FStringExpressionElement(_)
             | AnyNode::FStringLiteralElement(_)
+            | AnyNode::FStringInvalidElement(_)
             | AnyNode::ExprFString(_)
             | AnyNode::ExprStringLiteral(_)
             | AnyNode::ExprBytesLiteral(_)
@@ -680,6 +686,7 @@ impl AnyNode {
             Self::ExprCall(node) => AnyNodeRef::ExprCall(node),
             Self::FStringExpressionElement(node) => AnyNodeRef::FStringExpressionElement(node),
             Self::FStringLiteralElement(node) => AnyNodeRef::FStringLiteralElement(node),
+            Self::FStringInvalidElement(node) => AnyNodeRef::FStringInvalidElement(node),
             Self::ExprFString(node) => AnyNodeRef::ExprFString(node),
             Self::ExprStringLiteral(node) => AnyNodeRef::ExprStringLiteral(node),
             Self::ExprBytesLiteral(node) => AnyNodeRef::ExprBytesLiteral(node),
@@ -4628,6 +4635,7 @@ impl From<FStringElement> for AnyNode {
         match element {
             FStringElement::Literal(node) => AnyNode::FStringLiteralElement(node),
             FStringElement::Expression(node) => AnyNode::FStringExpressionElement(node),
+            FStringElement::Invalid(node) => AnyNode::FStringInvalidElement(node),
         }
     }
 }
@@ -5246,6 +5254,7 @@ impl Ranged for AnyNode {
             AnyNode::ExprCall(node) => node.range(),
             AnyNode::FStringExpressionElement(node) => node.range(),
             AnyNode::FStringLiteralElement(node) => node.range(),
+            AnyNode::FStringInvalidElement(node) => node.range(),
             AnyNode::ExprFString(node) => node.range(),
             AnyNode::ExprStringLiteral(node) => node.range(),
             AnyNode::ExprBytesLiteral(node) => node.range(),
@@ -5344,6 +5353,7 @@ pub enum AnyNodeRef<'a> {
     ExprCall(&'a ast::ExprCall),
     FStringExpressionElement(&'a ast::FStringExpressionElement),
     FStringLiteralElement(&'a ast::FStringLiteralElement),
+    FStringInvalidElement(&'a ast::FStringInvalidElement),
     ExprFString(&'a ast::ExprFString),
     ExprStringLiteral(&'a ast::ExprStringLiteral),
     ExprBytesLiteral(&'a ast::ExprBytesLiteral),
@@ -5441,6 +5451,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprCall(node) => NonNull::from(*node).cast(),
             AnyNodeRef::FStringExpressionElement(node) => NonNull::from(*node).cast(),
             AnyNodeRef::FStringLiteralElement(node) => NonNull::from(*node).cast(),
+            AnyNodeRef::FStringInvalidElement(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprFString(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprStringLiteral(node) => NonNull::from(*node).cast(),
             AnyNodeRef::ExprBytesLiteral(node) => NonNull::from(*node).cast(),
@@ -5544,6 +5555,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::ExprCall(_) => NodeKind::ExprCall,
             AnyNodeRef::FStringExpressionElement(_) => NodeKind::FStringExpressionElement,
             AnyNodeRef::FStringLiteralElement(_) => NodeKind::FStringLiteralElement,
+            AnyNodeRef::FStringInvalidElement(_) => NodeKind::FStringInvalidElement,
             AnyNodeRef::ExprFString(_) => NodeKind::ExprFString,
             AnyNodeRef::ExprStringLiteral(_) => NodeKind::ExprStringLiteral,
             AnyNodeRef::ExprBytesLiteral(_) => NodeKind::ExprBytesLiteral,
@@ -5642,6 +5654,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5757,6 +5770,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::PatternMatchValue(_)
             | AnyNodeRef::PatternMatchSingleton(_)
             | AnyNodeRef::PatternMatchSequence(_)
@@ -5837,6 +5851,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -5944,6 +5959,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -6034,6 +6050,7 @@ impl<'a> AnyNodeRef<'a> {
             | AnyNodeRef::ExprCall(_)
             | AnyNodeRef::FStringExpressionElement(_)
             | AnyNodeRef::FStringLiteralElement(_)
+            | AnyNodeRef::FStringInvalidElement(_)
             | AnyNodeRef::ExprFString(_)
             | AnyNodeRef::ExprStringLiteral(_)
             | AnyNodeRef::ExprBytesLiteral(_)
@@ -6204,7 +6221,7 @@ impl<'a> AnyNodeRef<'a> {
             AnyNodeRef::StringLiteral(node) => node.visit_preorder(visitor),
             AnyNodeRef::BytesLiteral(node) => node.visit_preorder(visitor),
             AnyNodeRef::ElifElseClause(node) => node.visit_preorder(visitor),
-            AnyNodeRef::ExprInvalid(_) => {}
+            AnyNodeRef::ExprInvalid(_) | AnyNodeRef::FStringInvalidElement(_) => {}
         }
     }
 
@@ -6852,6 +6869,7 @@ impl<'a> From<&'a FStringElement> for AnyNodeRef<'a> {
         match element {
             FStringElement::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
             FStringElement::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
+            FStringElement::Invalid(node) => AnyNodeRef::FStringInvalidElement(node),
         }
     }
 }
@@ -6987,6 +7005,7 @@ impl Ranged for AnyNodeRef<'_> {
             AnyNodeRef::ExprCall(node) => node.range(),
             AnyNodeRef::FStringExpressionElement(node) => node.range(),
             AnyNodeRef::FStringLiteralElement(node) => node.range(),
+            AnyNodeRef::FStringInvalidElement(node) => node.range(),
             AnyNodeRef::ExprFString(node) => node.range(),
             AnyNodeRef::ExprStringLiteral(node) => node.range(),
             AnyNodeRef::ExprBytesLiteral(node) => node.range(),
@@ -7087,6 +7106,7 @@ pub enum NodeKind {
     ExprCall,
     FStringExpressionElement,
     FStringLiteralElement,
+    FStringInvalidElement,
     ExprFString,
     ExprStringLiteral,
     ExprBytesLiteral,

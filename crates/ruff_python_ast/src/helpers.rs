@@ -310,7 +310,7 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
 
 pub fn any_over_f_string_element(element: &FStringElement, func: &dyn Fn(&Expr) -> bool) -> bool {
     match element {
-        FStringElement::Literal(_) => false,
+        FStringElement::Literal(_) | FStringElement::Invalid(_) => false,
         FStringElement::Expression(ast::FStringExpressionElement {
             expression,
             format_spec,
@@ -1339,6 +1339,7 @@ impl Truthiness {
                             value, ..
                         }) => !value.is_empty(),
                         ast::FStringElement::Expression(_) => true,
+                        ast::FStringElement::Invalid(_) => false,
                     })
                 {
                     Self::Truthy

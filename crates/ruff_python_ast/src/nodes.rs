@@ -987,6 +987,18 @@ impl Deref for FStringLiteralElement {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct FStringInvalidElement {
+    pub value: String,
+    pub range: TextRange,
+}
+
+impl Ranged for FStringInvalidElement {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// Transforms a value prior to formatting it.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, is_macro::Is)]
 #[repr(i8)]
@@ -1207,6 +1219,7 @@ impl From<FString> for Expr {
 pub enum FStringElement {
     Literal(FStringLiteralElement),
     Expression(FStringExpressionElement),
+    Invalid(FStringInvalidElement),
 }
 
 impl Ranged for FStringElement {
@@ -1214,6 +1227,7 @@ impl Ranged for FStringElement {
         match self {
             FStringElement::Literal(node) => node.range(),
             FStringElement::Expression(node) => node.range(),
+            FStringElement::Invalid(node) => node.range(),
         }
     }
 }
