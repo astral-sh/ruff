@@ -58,6 +58,7 @@ use ruff_python_semantic::{
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
 use ruff_source_file::Locator;
 
+use crate::checkers::ast::annotation::AnnotationContext;
 use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::Importer;
@@ -68,6 +69,7 @@ use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
 mod analyze;
+mod annotation;
 mod deferred;
 
 pub(crate) struct Checker<'a> {
@@ -515,8 +517,10 @@ where
                     .chain(&parameters.kwonlyargs)
                 {
                     if let Some(expr) = &parameter_with_default.parameter.annotation {
-                        if runtime_annotation || singledispatch {
-                            self.visit_runtime_annotation(expr);
+                        if singledispatch {
+                            self.visit_runtime_required_annotation(expr);
+                        } else if runtime_annotation {
+                            self.visit_runtime_evaluated_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -529,7 +533,7 @@ where
                 if let Some(arg) = &parameters.vararg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
-                            self.visit_runtime_annotation(expr);
+                            self.visit_runtime_evaluated_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -538,7 +542,7 @@ where
                 if let Some(arg) = &parameters.kwarg {
                     if let Some(expr) = &arg.annotation {
                         if runtime_annotation {
-                            self.visit_runtime_annotation(expr);
+                            self.visit_runtime_evaluated_annotation(expr);
                         } else {
                             self.visit_annotation(expr);
                         };
@@ -546,7 +550,7 @@ where
                 }
                 for expr in returns {
                     if runtime_annotation {
-                        self.visit_runtime_annotation(expr);
+                        self.visit_runtime_evaluated_annotation(expr);
                     } else {
                         self.visit_annotation(expr);
                     };
@@ -677,40 +681,16 @@ where
                 value,
                 ..
             }) => {
-                // If we're in a class or module scope, then the annotation needs to be
-                // available at runtime.
-                // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = if self.semantic.future_annotations() {
-                    self.semantic
-                        .current_scope()
-                        .kind
-                        .as_class()
-                        .is_some_and(|class_def| {
-                            flake8_type_checking::helpers::runtime_evaluated_class(
-                                class_def,
-                                &self
-                                    .settings
-                                    .flake8_type_checking
-                                    .runtime_evaluated_base_classes,
-                                &self
-                                    .settings
-                                    .flake8_type_checking
-                                    .runtime_evaluated_decorators,
-                                &self.semantic,
-                            )
-                        })
-                } else {
-                    matches!(
-                        self.semantic.current_scope().kind,
-                        ScopeKind::Class(_) | ScopeKind::Module
-                    )
-                };
-
-                if runtime_annotation {
-                    self.visit_runtime_annotation(annotation);
-                } else {
-                    self.visit_annotation(annotation);
+                match AnnotationContext::from_model(&self.semantic, self.settings) {
+                    AnnotationContext::RuntimeRequired => {
+                        self.visit_runtime_required_annotation(annotation);
+                    }
+                    AnnotationContext::RuntimeEvaluated => {
+                        self.visit_runtime_evaluated_annotation(annotation);
+                    }
+                    AnnotationContext::TypingOnly => self.visit_annotation(annotation),
                 }
+
                 if let Some(expr) = value {
                     if self.semantic.match_typing_expr(annotation, "TypeAlias") {
                         self.visit_type_definition(expr);
@@ -1527,10 +1507,18 @@ impl<'a> Checker<'a> {
         self.semantic.flags = snapshot;
     }
 
-    /// Visit an [`Expr`], and treat it as a runtime-required type annotation.
-    fn visit_runtime_annotation(&mut self, expr: &'a Expr) {
+    /// Visit an [`Expr`], and treat it as a runtime-evaluated type annotation.
+    fn visit_runtime_evaluated_annotation(&mut self, expr: &'a Expr) {
         let snapshot = self.semantic.flags;
-        self.semantic.flags |= SemanticModelFlags::RUNTIME_ANNOTATION;
+        self.semantic.flags |= SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION;
+        self.visit_type_definition(expr);
+        self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as a runtime-required type annotation.
+    fn visit_runtime_required_annotation(&mut self, expr: &'a Expr) {
+        let snapshot = self.semantic.flags;
+        self.semantic.flags |= SemanticModelFlags::RUNTIME_REQUIRED_ANNOTATION;
         self.visit_type_definition(expr);
         self.semantic.flags = snapshot;
     }
