@@ -3,6 +3,7 @@ use std::io::Write;
 #[cfg(not(target_arch = "wasm32"))]
 use url::Url;
 
+#[allow(unused_imports)]
 use anyhow::{anyhow, Result};
 use serde::{Serialize, Serializer};
 use serde_json::json;
@@ -136,6 +137,7 @@ impl SarifResult {
         })
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     #[cfg(target_arch = "wasm32")]
     fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
