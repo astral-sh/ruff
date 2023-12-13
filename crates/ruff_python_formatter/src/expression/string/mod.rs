@@ -86,13 +86,13 @@ impl<'a> AnyString<'a> {
     fn parts(&self) -> Vec<AnyStringPart<'a>> {
         match self {
             Self::String(ExprStringLiteral { value, .. }) => {
-                value.parts().map(AnyStringPart::String).collect()
+                value.iter().map(AnyStringPart::String).collect()
             }
             Self::Bytes(ExprBytesLiteral { value, .. }) => {
-                value.parts().map(AnyStringPart::Bytes).collect()
+                value.iter().map(AnyStringPart::Bytes).collect()
             }
             Self::FString(ExprFString { value, .. }) => value
-                .parts()
+                .iter()
                 .map(|f_string_part| match f_string_part {
                     ast::FStringPart::Literal(string_literal) => {
                         AnyStringPart::String(string_literal)

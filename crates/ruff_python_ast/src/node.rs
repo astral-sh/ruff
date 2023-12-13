@@ -2742,7 +2742,7 @@ impl AstNode for ast::ExprFString {
     {
         let ast::ExprFString { value, range: _ } = self;
 
-        for f_string_part in value.parts() {
+        for f_string_part in value {
             match f_string_part {
                 ast::FStringPart::Literal(string_literal) => {
                     visitor.visit_string_literal(string_literal);
@@ -2788,7 +2788,7 @@ impl AstNode for ast::ExprStringLiteral {
     {
         let ast::ExprStringLiteral { value, range: _ } = self;
 
-        for string_literal in value.parts() {
+        for string_literal in value {
             visitor.visit_string_literal(string_literal);
         }
     }
@@ -2827,7 +2827,7 @@ impl AstNode for ast::ExprBytesLiteral {
     {
         let ast::ExprBytesLiteral { value, range: _ } = self;
 
-        for bytes_literal in value.parts() {
+        for bytes_literal in value {
             visitor.visit_bytes_literal(bytes_literal);
         }
     }
