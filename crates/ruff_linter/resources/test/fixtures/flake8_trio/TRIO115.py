@@ -29,8 +29,8 @@ async def func():
     trio.sleep(e)  # TRIO115
 
     m_x, m_y = 0
-    trio.sleep(m_y)  # TRIO115
-    trio.sleep(m_x)  # TRIO115
+    trio.sleep(m_y)  # OK
+    trio.sleep(m_x)  # OK
 
     m_a = m_b = 0
     trio.sleep(m_a)  # TRIO115
@@ -43,6 +43,8 @@ async def func():
 
 
 def func():
+    import trio
+
     trio.run(trio.sleep(0))  # TRIO115
 
 
@@ -55,3 +57,10 @@ def func():
 
 async def func():
     await sleep(seconds=0)  # TRIO115
+
+
+def func():
+    import trio
+
+    if (walrus := 0) == 0:
+        trio.sleep(walrus)  # TRIO115
