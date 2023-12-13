@@ -481,7 +481,7 @@ Options:
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
-          Output serialization format for violations [env: RUFF_OUTPUT_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure]
+          Output serialization format for violations [env: RUFF_OUTPUT_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure, sarif]
   -o, --output-file <OUTPUT_FILE>
           Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>

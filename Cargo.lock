@@ -2259,6 +2259,7 @@ dependencies = [
  "typed-arena",
  "unicode-width",
  "unicode_names2",
+ "url",
  "wsl",
 ]
 

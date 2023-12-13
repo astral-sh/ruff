@@ -3663,7 +3663,8 @@
         "github",
         "gitlab",
         "pylint",
-        "azure"
+        "azure",
+        "sarif"
       ]
     },
     "Strictness": {
