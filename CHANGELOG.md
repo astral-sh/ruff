@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.1.8
+
+This release includes opt-in support for formatting Python snippets within
+docstrings via the `docstring-code-format` setting.
+[Check out the blog post](https://astral.sh/blog/v0.1.8) for more details!
+
+### Preview features
+
+- Add `"preserve"` quote-style to mimic Black's skip-string-normalization ([#8822](https://github.com/astral-sh/ruff/pull/8822))
+- Implement `prefer_splitting_right_hand_side_of_assignments` preview style ([#8943](https://github.com/astral-sh/ruff/pull/8943))
+- \[`pycodestyle`\] Add fix for `unexpected-spaces-around-keyword-parameter-equals` ([#9072](https://github.com/astral-sh/ruff/pull/9072))
+- \[`pycodestyle`\] Add fix for comment-related whitespace rules ([#9075](https://github.com/astral-sh/ruff/pull/9075))
+- \[`pycodestyle`\] Allow `sys.path` modifications between imports ([#9047](https://github.com/astral-sh/ruff/pull/9047))
+- \[`refurb`\] Implement `hashlib-digest-hex` (`FURB181`) ([#9077](https://github.com/astral-sh/ruff/pull/9077))
+
+### Rule changes
+
+- Allow `flake8-type-checking` rules to automatically quote runtime-evaluated references ([#6001](https://github.com/astral-sh/ruff/pull/6001))
+- Allow transparent cell magics in Jupyter Notebooks ([#8911](https://github.com/astral-sh/ruff/pull/8911))
+- \[`flake8-annotations`\] Avoid `ANN2xx` fixes for abstract methods with empty bodies ([#9034](https://github.com/astral-sh/ruff/pull/9034))
+- \[`flake8-self`\] Ignore underscore references in type annotations ([#9036](https://github.com/astral-sh/ruff/pull/9036))
+- \[`pep8-naming`\] Allow class names when `apps.get_model` is a non-string ([#9065](https://github.com/astral-sh/ruff/pull/9065))
+- \[`pycodestyle`\] Allow `matplotlib.use` calls to intersperse imports ([#9094](https://github.com/astral-sh/ruff/pull/9094))
+- \[`pyflakes`\] Support fixing unused assignments in tuples by renaming variables (`F841`) ([#9107](https://github.com/astral-sh/ruff/pull/9107))
+- \[`pylint`\] Add fix for `subprocess-run-without-check` (`PLW1510`) ([#6708](https://github.com/astral-sh/ruff/pull/6708))
+
+### Formatter
+
+- Add `docstring-code-format` knob to enable docstring snippet formatting ([#8854](https://github.com/astral-sh/ruff/pull/8854))
+- Use double quotes for all docstrings, including single-quoted docstrings ([#9020](https://github.com/astral-sh/ruff/pull/9020))
+- Implement "dynamic" line width mode for docstring code formatting ([#9098](https://github.com/astral-sh/ruff/pull/9098))
+- Support reformatting Markdown code blocks ([#9030](https://github.com/astral-sh/ruff/pull/9030))
+- add support for formatting reStructuredText code snippets ([#9003](https://github.com/astral-sh/ruff/pull/9003))
+- Avoid trailing comma for single-argument with positional separator ([#9076](https://github.com/astral-sh/ruff/pull/9076))
+- Fix handling of trailing target comment ([#9051](https://github.com/astral-sh/ruff/pull/9051))
+
+### CLI
+
+- Hide unsafe fix suggestions when explicitly disabled ([#9095](https://github.com/astral-sh/ruff/pull/9095))
+- Add SARIF support to `--output-format` ([#9078](https://github.com/astral-sh/ruff/pull/9078))
+
+### Bug fixes
+
+- Apply unnecessary index rule prior to enumerate rewrite ([#9012](https://github.com/astral-sh/ruff/pull/9012))
+- \[`flake8-err-msg`\] Allow `EM` fixes even if `msg` variable is defined ([#9059](https://github.com/astral-sh/ruff/pull/9059))
+- \[`flake8-pie`\] Prevent keyword arguments duplication ([#8450](https://github.com/astral-sh/ruff/pull/8450))
+- \[`flake8-pie`\] Respect trailing comma in `unnecessary-dict-kwargs` (`PIE804`) ([#9015](https://github.com/astral-sh/ruff/pull/9015))
+- \[`flake8-raise`\] Avoid removing parentheses on ctypes.WinError ([#9027](https://github.com/astral-sh/ruff/pull/9027))
+- \[`isort`\] Avoid invalid combination of `force-sort-within-types` and `lines-between-types` ([#9041](https://github.com/astral-sh/ruff/pull/9041))
+- \[`isort`\] Ensure that from-style imports are always ordered first in `__future__` ([#9039](https://github.com/astral-sh/ruff/pull/9039))
+- \[`pycodestyle`\] Allow tab indentation before keyword ([#9099](https://github.com/astral-sh/ruff/pull/9099))
+- \[`pylint`\] Ignore `@overrides` and `@overloads` for `too-many-positional` ([#9000](https://github.com/astral-sh/ruff/pull/9000))
+- \[`pyupgrade`\] Enable `printf-string-formatting` fix with comments on right-hand side ([#9037](https://github.com/astral-sh/ruff/pull/9037))
+- \[`refurb`\] Make `math-constant` (`FURB152`) rule more targeted ([#9054](https://github.com/astral-sh/ruff/pull/9054))
+- \[`refurb`\] Support floating-point base in `redundant-log-base` (`FURB163`) ([#9100](https://github.com/astral-sh/ruff/pull/9100))
+- \[`ruff`\] Detect `unused-asyncio-dangling-task` (`RUF006`) on unused assignments ([#9060](https://github.com/astral-sh/ruff/pull/9060))
+
 ## 0.1.7
 
 ### Preview features
