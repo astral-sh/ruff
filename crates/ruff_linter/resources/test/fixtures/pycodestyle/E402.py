@@ -24,21 +24,27 @@ sys.path.insert(0, "some/path")
 
 import f
 
-__some__magic = 1
+import matplotlib
+
+matplotlib.use("Agg")
 
 import g
 
+__some__magic = 1
+
+import h
+
 
 def foo() -> None:
-    import h
-
-
-if __name__ == "__main__":
     import i
 
-import j; import k
+
+if __name__ == "__main__":
+    import j
+
+import k; import l
 
 
 if __name__ == "__main__":
-    import l; \
-import m
+    import m; \
+import n

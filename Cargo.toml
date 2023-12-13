@@ -17,12 +17,12 @@ bitflags = { version = "2.4.1" }
 chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
 clap = { version = "4.4.7", features = ["derive"] }
 colored = { version = "2.0.0" }
-filetime = { version = "0.2.20" }
+filetime = { version = "0.2.23" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 ignore = { version = "0.4.20" }
 insta = { version = "1.34.0", feature = ["filters", "glob"] }
-is-macro = { version = "0.3.0" }
+is-macro = { version = "0.3.1" }
 itertools = { version = "0.11.0" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
@@ -34,7 +34,7 @@ quote = { version = "1.0.23" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "1.1.0" }
 schemars = { version = "0.8.16" }
-serde = { version = "1.0.190", features = ["derive"] }
+serde = { version = "1.0.193", features = ["derive"] }
 serde_json = { version = "1.0.108" }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.3.0", features = ["inline"] }
@@ -42,7 +42,7 @@ smallvec = { version = "1.11.2" }
 static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
 strum_macros = { version = "0.25.3" }
-syn = { version = "2.0.39" }
+syn = { version = "2.0.40" }
 test-case = { version = "3.2.1" }
 thiserror = { version = "1.0.50" }
 toml = { version = "0.7.8" }

@@ -1,0 +1,26 @@
+[
+  {
+    "docstring_code": "enabled",
+    "docstring_code_line_width": "dynamic",
+    "indent_style": "space",
+    "indent_width": 4
+  },
+  {
+    "docstring_code": "enabled",
+    "docstring_code_line_width": "dynamic",
+    "indent_style": "space",
+    "indent_width": 2
+  },
+  {
+    "docstring_code": "enabled",
+    "docstring_code_line_width": "dynamic",
+    "indent_style": "tab",
+    "indent_width": 4
+  },
+  {
+    "docstring_code": "enabled",
+    "docstring_code_line_width": "dynamic",
+    "indent_style": "tab",
+    "indent_width": 8
+  }
+]

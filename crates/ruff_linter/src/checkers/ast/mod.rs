@@ -306,6 +306,7 @@ where
                 if !(self.semantic.seen_import_boundary()
                     || helpers::is_assignment_to_a_dunder(stmt)
                     || helpers::in_nested_block(self.semantic.current_statements())
+                    || imports::is_matplotlib_activation(stmt, self.semantic())
                     || self.settings.preview.is_enabled()
                         && imports::is_sys_path_modification(stmt, self.semantic()))
                 {

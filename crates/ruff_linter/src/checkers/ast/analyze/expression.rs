@@ -356,6 +356,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::FString,
                 // flynt
                 Rule::StaticJoinToFString,
+                // refurb
+                Rule::HashlibDigestHex,
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
@@ -580,6 +582,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::HashlibInsecureHashFunction) {
                 flake8_bandit::rules::hashlib_insecure_hash_functions(checker, call);
+            }
+            if checker.enabled(Rule::HashlibDigestHex) {
+                refurb::rules::hashlib_digest_hex(checker, call);
             }
             if checker.enabled(Rule::RequestWithoutTimeout) {
                 flake8_bandit::rules::request_without_timeout(checker, call);
