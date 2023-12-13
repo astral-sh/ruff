@@ -1051,6 +1051,14 @@ impl FStringValue {
         matches!(self.inner, FStringValueInner::Concatenated(_))
     }
 
+    /// Returns a slice of all the [`FStringPart`]s contained in this value.
+    pub fn as_slice(&self) -> &[FStringPart] {
+        match &self.inner {
+            FStringValueInner::Single(part) => std::slice::from_ref(part),
+            FStringValueInner::Concatenated(parts) => parts,
+        }
+    }
+
     /// Returns an iterator over all the [`FStringPart`]s contained in this value.
     pub fn parts(&self) -> impl Iterator<Item = &FStringPart> {
         match &self.inner {
@@ -1239,6 +1247,14 @@ impl StringLiteralValue {
     /// string literal is a unicode string.
     pub fn is_unicode(&self) -> bool {
         self.parts().next().map_or(false, |part| part.unicode)
+    }
+
+    /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
+    pub fn as_slice(&self) -> &[StringLiteral] {
+        match &self.inner {
+            StringLiteralValueInner::Single(value) => std::slice::from_ref(value),
+            StringLiteralValueInner::Concatenated(value) => value.strings.as_slice(),
+        }
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value.
@@ -1455,6 +1471,14 @@ impl BytesLiteralValue {
     /// Returns `true` if the bytes literal is implicitly concatenated.
     pub const fn is_implicit_concatenated(&self) -> bool {
         matches!(self.inner, BytesLiteralValueInner::Concatenated(_))
+    }
+
+    /// Returns a slice of all the [`BytesLiteral`] parts contained in this value.
+    pub fn as_slice(&self) -> &[BytesLiteral] {
+        match &self.inner {
+            BytesLiteralValueInner::Single(value) => std::slice::from_ref(value),
+            BytesLiteralValueInner::Concatenated(value) => value.as_slice(),
+        }
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
