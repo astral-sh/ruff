@@ -337,21 +337,25 @@ impl<'a> Printer<'a> {
             }
 
             FormatElement::Tag(StartFitsExpanded(tag::FitsExpanded { condition, .. })) => {
-                let condition_met = match condition {
-                    Some(condition) => {
-                        let group_mode = match condition.group_id {
-                            Some(group_id) => self.state.group_modes.get_print_mode(group_id)?,
-                            None => args.mode(),
-                        };
+                if args.mode().is_flat() {
+                    let condition_met = match condition {
+                        Some(condition) => {
+                            let group_mode = match condition.group_id {
+                                Some(group_id) => {
+                                    self.state.group_modes.get_print_mode(group_id)?
+                                }
+                                None => args.mode(),
+                            };
 
-                        condition.mode == group_mode
+                            condition.mode == group_mode
+                        }
+                        None => true,
+                    };
+
+                    if condition_met {
+                        // We measured the inner groups all in expanded. It now is necessary to measure if the inner groups fit as well.
+                        self.state.measured_group_fits = false;
                     }
-                    None => true,
-                };
-
-                if condition_met {
-                    // We measured the inner groups all in expanded. It now is necessary to measure if the inner groups fit as well.
-                    self.state.measured_group_fits = false;
                 }
 
                 stack.push(TagKind::FitsExpanded, args);
