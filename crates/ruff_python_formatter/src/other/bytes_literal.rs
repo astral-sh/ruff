@@ -1,12 +1,24 @@
 use ruff_python_ast::BytesLiteral;
+use ruff_text_size::Ranged;
 
 use crate::prelude::*;
+use crate::string::{Quoting, StringPart};
 
 #[derive(Default)]
 pub struct FormatBytesLiteral;
 
 impl FormatNodeRule<BytesLiteral> for FormatBytesLiteral {
-    fn fmt_fields(&self, _item: &BytesLiteral, _f: &mut PyFormatter) -> FormatResult<()> {
-        unreachable!("Handled inside of `FormatExprBytesLiteral`");
+    fn fmt_fields(&self, item: &BytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
+        let locator = f.context().locator();
+        let parent_docstring_quote_style = f.context().docstring();
+
+        StringPart::from_source(item.range(), &locator)
+            .normalize(
+                Quoting::CanChange,
+                &locator,
+                f.options().quote_style(),
+                parent_docstring_quote_style,
+            )
+            .fmt(f)
     }
 }

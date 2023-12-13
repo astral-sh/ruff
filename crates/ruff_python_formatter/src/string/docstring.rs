@@ -102,7 +102,7 @@ use super::{NormalizedString, QuoteChar};
 ///         line c
 ///    """
 /// ```
-pub(super) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> FormatResult<()> {
+pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> FormatResult<()> {
     let docstring = &normalized.text;
 
     // Black doesn't change the indentation of docstrings that contain an escaped newline

@@ -4,31 +4,38 @@ use ruff_python_ast::ExprStringLiteral;
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::SourceComment;
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
-use crate::expression::string::{
-    AnyString, FormatString, StringLayout, StringPrefix, StringQuotes,
+use crate::expression::parentheses::{
+    in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
+use crate::string::StringContext;
+use crate::string::{AnyString, FormatStringContinuation, StringPrefix, StringQuotes};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
-    layout: StringLayout,
+    context: StringContext,
 }
 
 impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExprStringLiteral {
-    type Options = StringLayout;
+    type Options = StringContext;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.layout = options;
+        self.context = options;
         self
     }
 }
 
 impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
     fn fmt_fields(&self, item: &ExprStringLiteral, f: &mut PyFormatter) -> FormatResult<()> {
-        FormatString::new(&AnyString::String(item))
-            .with_layout(self.layout)
-            .fmt(f)
+        let ExprStringLiteral { value, .. } = item;
+
+        match value.as_slice() {
+            [string_literal] => string_literal.format().with_options(self.context).fmt(f),
+            _ => in_parentheses_only_group(
+                &FormatStringContinuation::new(&AnyString::String(item)).with_context(self.context),
+            )
+            .fmt(f),
+        }
     }
 
     fn fmt_dangling_comments(
