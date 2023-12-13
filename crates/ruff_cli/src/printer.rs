@@ -7,7 +7,6 @@ use anyhow::Result;
 use bitflags::bitflags;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
-use ruff_workspace::resolver::PyprojectConfig;
 use serde::Serialize;
 
 use ruff_linter::fs::relativize_path;
@@ -211,7 +210,6 @@ impl Printer {
         &self,
         diagnostics: &Diagnostics,
         writer: &mut dyn Write,
-        config: &PyprojectConfig,
     ) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
@@ -295,7 +293,6 @@ impl Printer {
             }
             SerializationFormat::Sarif => {
                 SarifEmitter::default()
-                    .with_applied_rules(config.settings.linter.rules)
                     .emit(writer, &diagnostics.messages, &context)?;
             }
         }

@@ -424,7 +424,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         if cli.statistics {
             printer.write_statistics(&diagnostics, &mut summary_writer)?;
         } else {
-            printer.write_once(&diagnostics, &mut summary_writer, &pyproject_config)?;
+            printer.write_once(&diagnostics, &mut summary_writer)?;
         }
 
         if !cli.exit_zero {

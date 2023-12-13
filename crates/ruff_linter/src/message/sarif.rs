@@ -1,4 +1,6 @@
 use std::io::Write;
+
+#[cfg(not(target_arch = "wasm32"))]
 use url::Url;
 
 use serde::{Serialize, Serializer};
@@ -6,27 +8,25 @@ use serde_json::json;
 
 use ruff_source_file::OneIndexed;
 
+use crate::codes::Rule;
 use crate::fs::normalize_path;
 use crate::message::{Emitter, EmitterContext, Message};
-use crate::registry::{AsRule, Linter, Rule, RuleNamespace};
-use crate::settings::rule_table::RuleTable;
+use crate::registry::{AsRule, Linter, RuleNamespace};
 use crate::VERSION;
 
-#[derive(Default)]
+use strum::IntoEnumIterator;
+
 pub struct SarifEmitter<'a> {
     applied_rules: Vec<SarifRule<'a>>,
 }
 
-impl SarifEmitter<'_> {
-    #[must_use]
-    pub fn with_applied_rules(mut self, rule_table: RuleTable) -> Self {
+impl Default for SarifEmitter<'static> {
+    fn default() -> SarifEmitter<'static> {
         let mut applied_rules = Vec::new();
-
-        for rule in rule_table.iter_enabled() {
+        for rule in Rule::iter() {
             applied_rules.push(SarifRule::from_rule(rule));
         }
-        self.applied_rules = applied_rules;
-        self
+        SarifEmitter { applied_rules }
     }
 }
 
@@ -199,7 +199,11 @@ mod tests {
     fn test_results() {
         let content = get_output();
         let sarif = serde_json::from_str::<serde_json::Value>(content.as_str()).unwrap();
+        let rules = sarif["runs"][0]["tool"]["driver"]["rules"]
+            .as_array()
+            .unwrap();
         let results = sarif["runs"][0]["results"].as_array().unwrap();
         assert_eq!(results.len(), 3);
+        assert!(rules.len() > 3);
     }
 }
