@@ -589,7 +589,7 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => match value.as_ref() {
                 Expr::Tuple(ast::ExprTuple { elts, .. })
                 | Expr::List(ast::ExprList { elts, .. }) => {
-                    if let Some(target) = targets.iter().next() {
+                    if let Some(target) = targets.iter().find(|target| defines(symbol, target)) {
                         return match target {
                             Expr::Tuple(ast::ExprTuple {
                                 elts: target_elts, ..
@@ -616,6 +616,17 @@ pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) ->
         }
     }
     None
+}
+
+/// Returns `true` if the [`Expr`] defines the symbol.
+fn defines(symbol: &str, expr: &Expr) -> bool {
+    match expr {
+        Expr::Name(ast::ExprName { id, .. }) => id == symbol,
+        Expr::Tuple(ast::ExprTuple { elts, .. })
+        | Expr::List(ast::ExprList { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. }) => elts.iter().any(|elt| defines(symbol, elt)),
+        _ => false,
+    }
 }
 
 fn get_value_by_id<'a>(

@@ -225,6 +225,45 @@ TRIO115.py:37:5: TRIO115 [*] Use `trio.lowlevel.checkpoint()` instead of `trio.s
 39 39 |     m_c = (m_d, m_e) = (0, 0)
 40 40 |     trio.sleep(m_c)  # OK
 
+TRIO115.py:41:5: TRIO115 [*] Use `trio.lowlevel.checkpoint()` instead of `trio.sleep(0)`
+   |
+39 |     m_c = (m_d, m_e) = (0, 0)
+40 |     trio.sleep(m_c)  # OK
+41 |     trio.sleep(m_d)  # TRIO115
+   |     ^^^^^^^^^^^^^^^ TRIO115
+42 |     trio.sleep(m_e)  # TRIO115
+   |
+   = help: Replace with `trio.lowlevel.checkpoint()`
+
+ℹ Safe fix
+38 38 | 
+39 39 |     m_c = (m_d, m_e) = (0, 0)
+40 40 |     trio.sleep(m_c)  # OK
+41    |-    trio.sleep(m_d)  # TRIO115
+   41 |+    trio.lowlevel.checkpoint()  # TRIO115
+42 42 |     trio.sleep(m_e)  # TRIO115
+43 43 | 
+44 44 | 
+
+TRIO115.py:42:5: TRIO115 [*] Use `trio.lowlevel.checkpoint()` instead of `trio.sleep(0)`
+   |
+40 |     trio.sleep(m_c)  # OK
+41 |     trio.sleep(m_d)  # TRIO115
+42 |     trio.sleep(m_e)  # TRIO115
+   |     ^^^^^^^^^^^^^^^ TRIO115
+   |
+   = help: Replace with `trio.lowlevel.checkpoint()`
+
+ℹ Safe fix
+39 39 |     m_c = (m_d, m_e) = (0, 0)
+40 40 |     trio.sleep(m_c)  # OK
+41 41 |     trio.sleep(m_d)  # TRIO115
+42    |-    trio.sleep(m_e)  # TRIO115
+   42 |+    trio.lowlevel.checkpoint()  # TRIO115
+43 43 | 
+44 44 | 
+45 45 | def func():
+
 TRIO115.py:53:5: TRIO115 [*] Use `trio.lowlevel.checkpoint()` instead of `trio.sleep(0)`
    |
 52 | def func():
