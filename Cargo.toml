@@ -96,6 +96,14 @@ rest_pat_in_fully_bound_structs = "warn"
 lto = "thin"
 codegen-units = 16
 
+# Some crates don't change as much but benefit more from
+# more expensive optimization passes, so we selectively
+# decrease codegen-units in some cases.
+[profile.release.package.ruff_python_parser]
+codegen-units = 1
+[profile.release.package.ruff_python_ast]
+codegen-units = 1
+
 [profile.dev.package.insta]
 opt-level = 3
 
