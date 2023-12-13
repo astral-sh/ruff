@@ -5,7 +5,7 @@ use ruff_macros::CacheKey;
 use crate::registry::{Rule, RuleSet, RuleSetIterator};
 
 /// A table to keep track of which rules are enabled and whether they should be fixed.
-#[derive(Debug, CacheKey, Default, Copy, Clone)]
+#[derive(Debug, CacheKey, Default)]
 pub struct RuleTable {
     /// Maps rule codes to a boolean indicating if the rule should be fixed.
     enabled: RuleSet,
@@ -66,7 +66,7 @@ impl FromIterator<Rule> for RuleTable {
     fn from_iter<T: IntoIterator<Item = Rule>>(iter: T) -> Self {
         let rules = RuleSet::from_iter(iter);
         Self {
-            enabled: rules,
+            enabled: rules.clone(),
             should_fix: rules,
         }
     }

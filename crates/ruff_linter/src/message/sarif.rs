@@ -3,6 +3,7 @@ use std::io::Write;
 #[cfg(not(target_arch = "wasm32"))]
 use url::Url;
 
+use anyhow::{anyhow, Result};
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
@@ -16,31 +17,19 @@ use crate::VERSION;
 
 use strum::IntoEnumIterator;
 
-pub struct SarifEmitter<'a> {
-    applied_rules: Vec<SarifRule<'a>>,
-}
+pub struct SarifEmitter;
 
-impl Default for SarifEmitter<'static> {
-    fn default() -> SarifEmitter<'static> {
-        let mut applied_rules = Vec::new();
-        for rule in Rule::iter() {
-            applied_rules.push(SarifRule::from_rule(rule));
-        }
-        SarifEmitter { applied_rules }
-    }
-}
-
-impl Emitter for SarifEmitter<'_> {
+impl Emitter for SarifEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
         messages: &[Message],
         _context: &EmitterContext,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let results = messages
             .iter()
             .map(SarifResult::from_message)
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>>>()?;
 
         let output = json!({
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -50,7 +39,7 @@ impl Emitter for SarifEmitter<'_> {
                     "driver": {
                         "name": "ruff",
                         "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": self.applied_rules,
+                        "rules": Rule::iter().map(SarifRule::from).collect::<Vec<_>>(),
                         "version": VERSION.to_string(),
                     }
                 },
@@ -72,8 +61,8 @@ struct SarifRule<'a> {
     url: Option<String>,
 }
 
-impl<'a> SarifRule<'a> {
-    fn from_rule(rule: Rule) -> Self {
+impl From<Rule> for SarifRule<'_> {
+    fn from(rule: Rule) -> Self {
         let code = rule.noqa_code().to_string();
         let (linter, _) = Linter::parse_code(&code).unwrap();
         Self {
@@ -124,30 +113,33 @@ struct SarifResult {
 
 impl SarifResult {
     #[cfg(not(target_arch = "wasm32"))]
-    fn from_message(message: &Message) -> Self {
+    fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
-        let abs_filepath = normalize_path(message.filename());
-        Self {
+        let path = normalize_path(message.filename());
+        Ok(Self {
             rule: message.kind.rule(),
             level: "error".to_string(),
             message: message.kind.name.clone(),
-            uri: Url::from_file_path(abs_filepath).unwrap().to_string(),
+            uri: Url::from_file_path(&path)
+                .map_err(|()| anyhow!("Failed to convert path to URL: {}", path.display()))?
+                .to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
-        }
+        })
     }
+
     #[cfg(target_arch = "wasm32")]
-    fn from_message(message: &Message) -> Self {
+    fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
         let abs_filepath = normalize_path(message.filename());
-        Self {
+        Ok(Self {
             rule: message.kind.rule(),
             level: "error".to_string(),
             message: message.kind.name.clone(),
             uri: abs_filepath.display().to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
-        }
+        })
     }
 }
 

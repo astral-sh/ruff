@@ -8,7 +8,7 @@ const RULESET_SIZE: usize = 12;
 /// A set of [`Rule`]s.
 ///
 /// Uses a bitset where a bit of one signals that the Rule with that [u16] is in this set.
-#[derive(Clone, Default, CacheKey, PartialEq, Eq, Copy)]
+#[derive(Clone, Default, CacheKey, PartialEq, Eq)]
 pub struct RuleSet([u64; RULESET_SIZE]);
 
 impl RuleSet {
@@ -257,7 +257,7 @@ impl RuleSet {
     /// ```
     pub fn iter(&self) -> RuleSetIterator {
         RuleSetIterator {
-            set: *self,
+            set: self.clone(),
             index: 0,
         }
     }
