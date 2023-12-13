@@ -1,10 +1,6 @@
 use std::io::Write;
 
-#[cfg(not(target_arch = "wasm32"))]
-use url::Url;
-
-#[allow(unused_imports)]
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
@@ -127,8 +123,8 @@ impl SarifResult {
             rule: message.kind.rule(),
             level: "error".to_string(),
             message: message.kind.name.clone(),
-            uri: Url::from_file_path(&path)
-                .map_err(|()| anyhow!("Failed to convert path to URL: {}", path.display()))?
+            uri: url::Url::from_file_path(&path)
+                .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))?
                 .to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
@@ -137,17 +133,17 @@ impl SarifResult {
         })
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     #[cfg(target_arch = "wasm32")]
+    #[allow(clippy::unnecessary_wraps)]
     fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
-        let abs_filepath = normalize_path(message.filename());
+        let path = normalize_path(message.filename());
         Ok(Self {
             rule: message.kind.rule(),
             level: "error".to_string(),
             message: message.kind.name.clone(),
-            uri: abs_filepath.display().to_string(),
+            uri: path.display().to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
             end_line: end_location.row,
