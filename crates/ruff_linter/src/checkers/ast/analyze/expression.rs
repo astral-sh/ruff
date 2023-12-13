@@ -1277,7 +1277,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
         }
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             if checker.enabled(Rule::UnicodeKindPrefix) {
-                for string_part in value.parts() {
+                for string_part in value {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
                 }
             }

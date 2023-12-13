@@ -583,10 +583,10 @@ impl<'a> From<ast::LiteralExpressionRef<'a>> for ComparableLiteral<'a> {
                 value, ..
             }) => Self::Bool(value),
             ast::LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-                Self::Str(value.parts().map(Into::into).collect())
+                Self::Str(value.iter().map(Into::into).collect())
             }
             ast::LiteralExpressionRef::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-                Self::Bytes(value.parts().map(Into::into).collect())
+                Self::Bytes(value.iter().map(Into::into).collect())
             }
             ast::LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
                 Self::Number(value.into())
@@ -1012,17 +1012,17 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
             }),
             ast::Expr::FString(ast::ExprFString { value, range: _ }) => {
                 Self::FString(ExprFString {
-                    parts: value.parts().map(Into::into).collect(),
+                    parts: value.iter().map(Into::into).collect(),
                 })
             }
             ast::Expr::StringLiteral(ast::ExprStringLiteral { value, range: _ }) => {
                 Self::StringLiteral(ExprStringLiteral {
-                    parts: value.parts().map(Into::into).collect(),
+                    parts: value.iter().map(Into::into).collect(),
                 })
             }
             ast::Expr::BytesLiteral(ast::ExprBytesLiteral { value, range: _ }) => {
                 Self::BytesLiteral(ExprBytesLiteral {
-                    parts: value.parts().map(Into::into).collect(),
+                    parts: value.iter().map(Into::into).collect(),
                 })
             }
             ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value, range: _ }) => {

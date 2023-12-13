@@ -57,7 +57,7 @@ impl Violation for HardcodedSQLExpression {
 /// becomes `foobar {x}baz`.
 fn concatenated_f_string(expr: &ast::ExprFString, locator: &Locator) -> String {
     expr.value
-        .parts()
+        .iter()
         .filter_map(|part| {
             raw_contents(locator.slice(part)).map(|s| s.escape_default().to_string())
         })

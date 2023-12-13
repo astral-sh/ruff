@@ -4,8 +4,8 @@ use std::cell::OnceCell;
 use std::fmt;
 use std::fmt::Debug;
 use std::ops::Deref;
+use std::slice::{Iter, IterMut};
 
-use itertools::Either::{Left, Right};
 use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -1051,21 +1051,31 @@ impl FStringValue {
         matches!(self.inner, FStringValueInner::Concatenated(_))
     }
 
-    /// Returns an iterator over all the [`FStringPart`]s contained in this value.
-    pub fn parts(&self) -> impl Iterator<Item = &FStringPart> {
+    /// Returns a slice of all the [`FStringPart`]s contained in this value.
+    pub fn as_slice(&self) -> &[FStringPart] {
         match &self.inner {
-            FStringValueInner::Single(part) => Left(std::iter::once(part)),
-            FStringValueInner::Concatenated(parts) => Right(parts.iter()),
+            FStringValueInner::Single(part) => std::slice::from_ref(part),
+            FStringValueInner::Concatenated(parts) => parts,
         }
+    }
+
+    /// Returns a mutable slice of all the [`FStringPart`]s contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [FStringPart] {
+        match &mut self.inner {
+            FStringValueInner::Single(part) => std::slice::from_mut(part),
+            FStringValueInner::Concatenated(parts) => parts,
+        }
+    }
+
+    /// Returns an iterator over all the [`FStringPart`]s contained in this value.
+    pub fn iter(&self) -> Iter<FStringPart> {
+        self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`FStringPart`]s contained in this value
     /// that allows modification.
-    pub(crate) fn parts_mut(&mut self) -> impl Iterator<Item = &mut FStringPart> {
-        match &mut self.inner {
-            FStringValueInner::Single(part) => Left(std::iter::once(part)),
-            FStringValueInner::Concatenated(parts) => Right(parts.iter_mut()),
-        }
+    pub(crate) fn iter_mut(&mut self) -> IterMut<FStringPart> {
+        self.as_mut_slice().iter_mut()
     }
 
     /// Returns an iterator over the [`StringLiteral`] parts contained in this value.
@@ -1078,7 +1088,7 @@ impl FStringValue {
     ///
     /// Here, the string literal parts returned would be `"foo"` and `"baz"`.
     pub fn literals(&self) -> impl Iterator<Item = &StringLiteral> {
-        self.parts().filter_map(|part| part.as_literal())
+        self.iter().filter_map(|part| part.as_literal())
     }
 
     /// Returns an iterator over the [`FString`] parts contained in this value.
@@ -1091,7 +1101,7 @@ impl FStringValue {
     ///
     /// Here, the f-string parts returned would be `f"bar {x}"` and `f"qux"`.
     pub fn f_strings(&self) -> impl Iterator<Item = &FString> {
-        self.parts().filter_map(|part| part.as_f_string())
+        self.iter().filter_map(|part| part.as_f_string())
     }
 
     /// Returns an iterator over all the [`FStringElement`] contained in this value.
@@ -1107,6 +1117,15 @@ impl FStringValue {
     /// expression (`x`) and string literal (`"qux"`).
     pub fn elements(&self) -> impl Iterator<Item = &FStringElement> {
         self.f_strings().flat_map(|fstring| fstring.elements.iter())
+    }
+}
+
+impl<'a> IntoIterator for &'a FStringValue {
+    type Item = &'a FStringPart;
+    type IntoIter = Iter<'a, FStringPart>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -1238,24 +1257,34 @@ impl StringLiteralValue {
     /// For an implicitly concatenated string, it returns `true` only if the first
     /// string literal is a unicode string.
     pub fn is_unicode(&self) -> bool {
-        self.parts().next().map_or(false, |part| part.unicode)
+        self.iter().next().map_or(false, |part| part.unicode)
+    }
+
+    /// Returns a slice of all the [`StringLiteral`] parts contained in this value.
+    pub fn as_slice(&self) -> &[StringLiteral] {
+        match &self.inner {
+            StringLiteralValueInner::Single(value) => std::slice::from_ref(value),
+            StringLiteralValueInner::Concatenated(value) => value.strings.as_slice(),
+        }
+    }
+
+    /// Returns a mutable slice of all the [`StringLiteral`] parts contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [StringLiteral] {
+        match &mut self.inner {
+            StringLiteralValueInner::Single(value) => std::slice::from_mut(value),
+            StringLiteralValueInner::Concatenated(value) => value.strings.as_mut_slice(),
+        }
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value.
-    pub fn parts(&self) -> impl Iterator<Item = &StringLiteral> {
-        match &self.inner {
-            StringLiteralValueInner::Single(value) => Left(std::iter::once(value)),
-            StringLiteralValueInner::Concatenated(value) => Right(value.strings.iter()),
-        }
+    pub fn iter(&self) -> Iter<StringLiteral> {
+        self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`StringLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn parts_mut(&mut self) -> impl Iterator<Item = &mut StringLiteral> {
-        match &mut self.inner {
-            StringLiteralValueInner::Single(value) => Left(std::iter::once(value)),
-            StringLiteralValueInner::Concatenated(value) => Right(value.strings.iter_mut()),
-        }
+    pub(crate) fn iter_mut(&mut self) -> IterMut<StringLiteral> {
+        self.as_mut_slice().iter_mut()
     }
 
     /// Returns `true` if the string literal value is empty.
@@ -1266,12 +1295,12 @@ impl StringLiteralValue {
     /// Returns the total length of the string literal value, in bytes, not
     /// [`char`]s or graphemes.
     pub fn len(&self) -> usize {
-        self.parts().fold(0, |acc, part| acc + part.value.len())
+        self.iter().fold(0, |acc, part| acc + part.value.len())
     }
 
     /// Returns an iterator over the [`char`]s of each string literal part.
     pub fn chars(&self) -> impl Iterator<Item = char> + '_ {
-        self.parts().flat_map(|part| part.value.chars())
+        self.iter().flat_map(|part| part.value.chars())
     }
 
     /// Returns the concatenated string value as a [`str`].
@@ -1283,6 +1312,15 @@ impl StringLiteralValue {
             StringLiteralValueInner::Single(value) => value.as_str(),
             StringLiteralValueInner::Concatenated(value) => value.to_str(),
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a StringLiteralValue {
+    type Item = &'a StringLiteral;
+    type IntoIter = Iter<'a, StringLiteral>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -1457,37 +1495,55 @@ impl BytesLiteralValue {
         matches!(self.inner, BytesLiteralValueInner::Concatenated(_))
     }
 
-    /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
-    pub fn parts(&self) -> impl Iterator<Item = &BytesLiteral> {
+    /// Returns a slice of all the [`BytesLiteral`] parts contained in this value.
+    pub fn as_slice(&self) -> &[BytesLiteral] {
         match &self.inner {
-            BytesLiteralValueInner::Single(value) => Left(std::iter::once(value)),
-            BytesLiteralValueInner::Concatenated(values) => Right(values.iter()),
+            BytesLiteralValueInner::Single(value) => std::slice::from_ref(value),
+            BytesLiteralValueInner::Concatenated(value) => value.as_slice(),
         }
+    }
+
+    /// Returns a mutable slice of all the [`BytesLiteral`] parts contained in this value.
+    fn as_mut_slice(&mut self) -> &mut [BytesLiteral] {
+        match &mut self.inner {
+            BytesLiteralValueInner::Single(value) => std::slice::from_mut(value),
+            BytesLiteralValueInner::Concatenated(value) => value.as_mut_slice(),
+        }
+    }
+
+    /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value.
+    pub fn iter(&self) -> Iter<BytesLiteral> {
+        self.as_slice().iter()
     }
 
     /// Returns an iterator over all the [`BytesLiteral`] parts contained in this value
     /// that allows modification.
-    pub(crate) fn parts_mut(&mut self) -> impl Iterator<Item = &mut BytesLiteral> {
-        match &mut self.inner {
-            BytesLiteralValueInner::Single(value) => Left(std::iter::once(value)),
-            BytesLiteralValueInner::Concatenated(values) => Right(values.iter_mut()),
-        }
+    pub(crate) fn iter_mut(&mut self) -> IterMut<BytesLiteral> {
+        self.as_mut_slice().iter_mut()
     }
 
     /// Returns `true` if the concatenated bytes has a length of zero.
     pub fn is_empty(&self) -> bool {
-        self.parts().all(|part| part.is_empty())
+        self.iter().all(|part| part.is_empty())
     }
 
     /// Returns the length of the concatenated bytes.
     pub fn len(&self) -> usize {
-        self.parts().map(|part| part.len()).sum()
+        self.iter().map(|part| part.len()).sum()
     }
 
     /// Returns an iterator over the bytes of the concatenated bytes.
     fn bytes(&self) -> impl Iterator<Item = u8> + '_ {
-        self.parts()
-            .flat_map(|part| part.as_slice().iter().copied())
+        self.iter().flat_map(|part| part.as_slice().iter().copied())
+    }
+}
+
+impl<'a> IntoIterator for &'a BytesLiteralValue {
+    type Item = &'a BytesLiteral;
+    type IntoIter = Iter<'a, BytesLiteral>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 

@@ -70,7 +70,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
             ));
         }
         Expr::FString(ast::ExprFString { value, .. }) => {
-            let kind = if value.parts().all(|f_string_part| match f_string_part {
+            let kind = if value.iter().all(|f_string_part| match f_string_part {
                 ast::FStringPart::Literal(literal) => literal.is_empty(),
                 ast::FStringPart::FString(f_string) => {
                     f_string.elements.iter().all(|element| match element {
@@ -82,7 +82,7 @@ pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
                 }
             }) {
                 Kind::Empty
-            } else if value.parts().any(|f_string_part| match f_string_part {
+            } else if value.iter().any(|f_string_part| match f_string_part {
                 ast::FStringPart::Literal(literal) => !literal.is_empty(),
                 ast::FStringPart::FString(f_string) => {
                     f_string.elements.iter().any(|element| match element {

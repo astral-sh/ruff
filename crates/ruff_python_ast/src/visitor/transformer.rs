@@ -464,7 +464,7 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             visitor.visit_arguments(arguments);
         }
         Expr::FString(ast::ExprFString { value, .. }) => {
-            for f_string_part in value.parts_mut() {
+            for f_string_part in value.iter_mut() {
                 match f_string_part {
                     ast::FStringPart::Literal(string_literal) => {
                         visitor.visit_string_literal(string_literal);
@@ -476,12 +476,12 @@ pub fn walk_expr<V: Transformer + ?Sized>(visitor: &V, expr: &mut Expr) {
             }
         }
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-            for string_literal in value.parts_mut() {
+            for string_literal in value.iter_mut() {
                 visitor.visit_string_literal(string_literal);
             }
         }
         Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
-            for bytes_literal in value.parts_mut() {
+            for bytes_literal in value.iter_mut() {
                 visitor.visit_bytes_literal(bytes_literal);
             }
         }
