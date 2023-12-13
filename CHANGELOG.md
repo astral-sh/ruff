@@ -4,7 +4,7 @@
 
 This release includes opt-in support for formatting Python snippets within
 docstrings via the `docstring-code-format` setting.
-[Check out the blog post](https://astral.sh/blog/v0.1.8) for more details!
+[Check out the blog post](https://astral.sh/blog/ruff-v0.1.8) for more details!
 
 ### Preview features
 
