@@ -1,6 +1,5 @@
 use memchr::memchr2;
 
-use ruff_formatter::{FormatResult, FormatRuleWithOptions};
 use ruff_python_ast::{AnyNodeRef, ExprFString};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -10,32 +9,20 @@ use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::string::{AnyString, FormatStringContinuation, Quoting, StringContext};
+use crate::string::{AnyString, FormatStringContinuation, Quoting, StringOptions};
 
 #[derive(Default)]
-pub struct FormatExprFString {
-    context: StringContext,
-}
-
-impl FormatRuleWithOptions<ExprFString, PyFormatContext<'_>> for FormatExprFString {
-    type Options = StringContext;
-
-    fn with_options(mut self, options: Self::Options) -> Self {
-        self.context = options;
-        self
-    }
-}
+pub struct FormatExprFString;
 
 impl FormatNodeRule<ExprFString> for FormatExprFString {
     fn fmt_fields(&self, item: &ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
-        let context = self
-            .context
-            .with_quoting(f_string_quoting(item, &f.context().locator()));
+        let options =
+            StringOptions::default().with_quoting(f_string_quoting(item, &f.context().locator()));
 
         match item.value.as_slice() {
-            [f_string_part] => f_string_part.format().with_options(context).fmt(f),
+            [f_string_part] => f_string_part.format().with_options(options).fmt(f),
             _ => in_parentheses_only_group(
-                &FormatStringContinuation::new(&AnyString::FString(item)).with_context(context),
+                &FormatStringContinuation::new(&AnyString::FString(item)).with_options(options),
             )
             .fmt(f),
         }

@@ -10,14 +10,13 @@ pub struct FormatBytesLiteral;
 impl FormatNodeRule<BytesLiteral> for FormatBytesLiteral {
     fn fmt_fields(&self, item: &BytesLiteral, f: &mut PyFormatter) -> FormatResult<()> {
         let locator = f.context().locator();
-        let parent_docstring_quote_style = f.context().docstring();
 
         StringPart::from_source(item.range(), &locator)
             .normalize(
                 Quoting::CanChange,
                 &locator,
                 f.options().quote_style(),
-                parent_docstring_quote_style,
+                f.context().docstring(),
             )
             .fmt(f)
     }

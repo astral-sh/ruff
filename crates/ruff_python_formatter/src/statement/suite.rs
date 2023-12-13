@@ -11,7 +11,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::prelude::*;
 use crate::statement::stmt_expr::FormatStmtExpr;
-use crate::string::StringContext;
+use crate::string::StringOptions;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
     write_suppressed_statements_starting_with_trailing_comment,
@@ -609,7 +609,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                     leading_comments(node_comments.leading),
                     string_literal
                         .format()
-                        .with_options(StringContext::docstring()),
+                        .with_options(StringOptions::docstring()),
                 ]
             )?;
 

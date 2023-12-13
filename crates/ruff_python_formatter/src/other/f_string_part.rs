@@ -1,19 +1,20 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions};
 use ruff_python_ast::FStringPart;
 
+use crate::other::f_string::FormatFString;
 use crate::prelude::*;
-use crate::string::StringContext;
+use crate::string::StringOptions;
 
 #[derive(Default)]
 pub struct FormatFStringPart {
-    context: StringContext,
+    options: StringOptions,
 }
 
 impl FormatRuleWithOptions<FStringPart, PyFormatContext<'_>> for FormatFStringPart {
-    type Options = StringContext;
+    type Options = StringOptions;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.context = options;
+        self.options = options;
         self
     }
 }
@@ -22,9 +23,11 @@ impl FormatRule<FStringPart, PyFormatContext<'_>> for FormatFStringPart {
     fn fmt(&self, item: &FStringPart, f: &mut PyFormatter) -> FormatResult<()> {
         match item {
             FStringPart::Literal(string_literal) => {
-                string_literal.format().with_options(self.context).fmt(f)
+                string_literal.format().with_options(self.options).fmt(f)
             }
-            FStringPart::FString(f_string) => f_string.format().with_options(self.context).fmt(f),
+            FStringPart::FString(f_string) => {
+                FormatFString::new(f_string, self.options.quoting()).fmt(f)
+            }
         }
     }
 }

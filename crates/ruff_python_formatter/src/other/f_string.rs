@@ -1,35 +1,30 @@
-use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::FString;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
-use crate::string::{StringContext, StringPart};
+use crate::string::{Quoting, StringPart};
 
-#[derive(Default)]
-pub struct FormatFString {
-    context: StringContext,
+pub(crate) struct FormatFString<'a> {
+    value: &'a FString,
+    quoting: Quoting,
 }
 
-impl FormatRuleWithOptions<FString, PyFormatContext<'_>> for FormatFString {
-    type Options = StringContext;
-
-    fn with_options(mut self, options: Self::Options) -> Self {
-        self.context = options;
-        self
+impl<'a> FormatFString<'a> {
+    pub(crate) fn new(value: &'a FString, quoting: Quoting) -> Self {
+        Self { value, quoting }
     }
 }
 
-impl FormatNodeRule<FString> for FormatFString {
-    fn fmt_fields(&self, item: &FString, f: &mut PyFormatter) -> FormatResult<()> {
+impl Format<PyFormatContext<'_>> for FormatFString<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let locator = f.context().locator();
-        let parent_docstring_quote_style = f.context().docstring();
 
-        let result = StringPart::from_source(item.range(), &locator)
+        let result = StringPart::from_source(self.value.range(), &locator)
             .normalize(
-                self.context.quoting(),
+                self.quoting,
                 &locator,
                 f.options().quote_style(),
-                parent_docstring_quote_style,
+                f.context().docstring(),
             )
             .fmt(f);
 
@@ -39,7 +34,7 @@ impl FormatNodeRule<FString> for FormatFString {
         // after the f-string is formatted, so only for all the non-formatted
         // comments.
         let comments = f.context().comments();
-        item.elements.iter().for_each(|value| {
+        self.value.elements.iter().for_each(|value| {
             comments.mark_verbatim_node_comments_formatted(value.into());
         });
 

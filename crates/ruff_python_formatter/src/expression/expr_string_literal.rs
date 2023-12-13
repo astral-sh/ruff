@@ -1,6 +1,5 @@
 use ruff_formatter::FormatRuleWithOptions;
-use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::ExprStringLiteral;
+use ruff_python_ast::{AnyNodeRef, ExprStringLiteral};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::SourceComment;
@@ -8,19 +7,20 @@ use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
 use crate::prelude::*;
-use crate::string::StringContext;
-use crate::string::{AnyString, FormatStringContinuation, StringPrefix, StringQuotes};
+use crate::string::{
+    AnyString, FormatStringContinuation, StringOptions, StringPrefix, StringQuotes,
+};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
-    context: StringContext,
+    options: StringOptions,
 }
 
 impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExprStringLiteral {
-    type Options = StringContext;
+    type Options = StringOptions;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.context = options;
+        self.options = options;
         self
     }
 }
@@ -30,9 +30,9 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
         let ExprStringLiteral { value, .. } = item;
 
         match value.as_slice() {
-            [string_literal] => string_literal.format().with_options(self.context).fmt(f),
+            [string_literal] => string_literal.format().with_options(self.options).fmt(f),
             _ => in_parentheses_only_group(
-                &FormatStringContinuation::new(&AnyString::String(item)).with_context(self.context),
+                &FormatStringContinuation::new(&AnyString::String(item)).with_options(self.options),
             )
             .fmt(f),
         }

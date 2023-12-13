@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
+use crate::other::f_string::FormatFString;
 use crate::prelude::*;
 use crate::QuoteStyle;
 
@@ -125,30 +126,30 @@ impl Ranged for AnyStringPart<'_> {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
-pub enum Quoting {
+pub(crate) enum Quoting {
     #[default]
     CanChange,
     Preserve,
 }
 
 #[derive(Default, Copy, Clone, Debug)]
-pub enum StringLayout {
+pub(crate) enum StringLayout {
     #[default]
     Default,
     DocString,
 }
 
-/// A context for formatting any kind of string. This can be either a string,
+/// Resolved options for formatting any kind of string. This can be either a string,
 /// bytes or f-string.
 #[derive(Copy, Clone, Debug, Default)]
-pub struct StringContext {
+pub struct StringOptions {
     quoting: Quoting,
     layout: StringLayout,
 }
 
-impl StringContext {
+impl StringOptions {
     /// Creates a new context with the docstring layout.
-    pub fn docstring() -> Self {
+    pub(crate) fn docstring() -> Self {
         Self {
             layout: StringLayout::DocString,
             ..Self::default()
@@ -156,77 +157,62 @@ impl StringContext {
     }
 
     /// Returns a new context with the given [`Quoting`] style.
-    pub const fn with_quoting(mut self, quoting: Quoting) -> Self {
+    pub(crate) const fn with_quoting(mut self, quoting: Quoting) -> Self {
         self.quoting = quoting;
         self
     }
 
-    /// Returns a new context with the given [`StringLayout`].
-    pub const fn with_layout(mut self, layout: StringLayout) -> Self {
-        self.layout = layout;
-        self
-    }
-
     /// Returns the [`Quoting`] style to use for the string.
-    pub const fn quoting(self) -> Quoting {
+    pub(crate) const fn quoting(self) -> Quoting {
         self.quoting
     }
 
-    /// Returns the [`StringLayout`] to use for the string.
-    pub const fn layout(self) -> StringLayout {
-        self.layout
-    }
-
     /// Returns `true` if the string is a docstring.
-    pub const fn is_docstring(self) -> bool {
+    pub(crate) const fn is_docstring(self) -> bool {
         matches!(self.layout, StringLayout::DocString)
     }
 }
 
 struct FormatStringPart<'a> {
-    string_part: &'a AnyStringPart<'a>,
-    context: StringContext,
+    part: &'a AnyStringPart<'a>,
+    options: StringOptions,
 }
 
 impl<'a> FormatStringPart<'a> {
-    pub(crate) fn new(string: &'a AnyStringPart<'a>) -> Self {
-        Self {
-            string_part: string,
-            context: StringContext::default(),
-        }
-    }
-
-    pub(crate) fn with_context(mut self, context: StringContext) -> Self {
-        self.context = context;
-        self
+    fn new(part: &'a AnyStringPart<'a>, options: StringOptions) -> Self {
+        Self { part, options }
     }
 }
 
 impl Format<PyFormatContext<'_>> for FormatStringPart<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        match self.string_part {
-            AnyStringPart::String(part) => part.format().with_options(self.context).fmt(f),
-            AnyStringPart::Bytes(part) => part.format().fmt(f),
-            AnyStringPart::FString(part) => part.format().with_options(self.context).fmt(f),
+        match self.part {
+            AnyStringPart::String(string_literal) => {
+                string_literal.format().with_options(self.options).fmt(f)
+            }
+            AnyStringPart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
+            AnyStringPart::FString(f_string) => {
+                FormatFString::new(f_string, self.options.quoting()).fmt(f)
+            }
         }
     }
 }
 
 pub(crate) struct FormatStringContinuation<'a> {
     string: &'a AnyString<'a>,
-    context: StringContext,
+    options: StringOptions,
 }
 
 impl<'a> FormatStringContinuation<'a> {
     pub(crate) fn new(string: &'a AnyString<'a>) -> Self {
         Self {
             string,
-            context: StringContext::default(),
+            options: StringOptions::default(),
         }
     }
 
-    pub(crate) fn with_context(mut self, context: StringContext) -> Self {
-        self.context = context;
+    pub(crate) fn with_options(mut self, options: StringOptions) -> Self {
+        self.options = options;
         self
     }
 }
@@ -241,7 +227,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
             joiner.entry(&format_args![
                 line_suffix_boundary(),
                 leading_comments(comments.leading(&part)),
-                FormatStringPart::new(&part).with_context(self.context),
+                FormatStringPart::new(&part, self.options),
                 trailing_comments(comments.trailing(&part))
             ]);
         }
@@ -459,11 +445,11 @@ impl StringPrefix {
         TextSize::new(self.bits().count_ones())
     }
 
-    pub(crate) const fn is_raw_string(self) -> bool {
+    pub(super) const fn is_raw_string(self) -> bool {
         self.contains(StringPrefix::RAW) || self.contains(StringPrefix::RAW_UPPER)
     }
 
-    pub(crate) const fn is_fstring(self) -> bool {
+    pub(super) const fn is_fstring(self) -> bool {
         self.contains(StringPrefix::F_STRING)
     }
 }

@@ -33,9 +33,9 @@ node_lines = (
 nodes = []
 for node_line in node_lines:
     node = node_line.split("(")[1].split(")")[0].split("::")[-1].split("<")[0]
-    # These nodes aren't used in the formatter as the formatting of them is handled
-    # in one of the other nodes containing them.
-    if node in ("FStringLiteralElement", "FStringExpressionElement"):
+    # `FString` has a custom implementation while the formatting for `FStringLiteralElement`
+    # and `FStringExpressionElement` are handled by the `FString` implementation.
+    if node in ("FString", "FStringLiteralElement", "FStringExpressionElement"):
         continue
     nodes.append(node)
 print(nodes)
