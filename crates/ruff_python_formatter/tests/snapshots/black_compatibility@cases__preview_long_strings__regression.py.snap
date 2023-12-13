@@ -832,7 +832,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
  
  some_commented_string = (  # This comment stays at the top.
      "This string is long but not so long that it needs hahahah toooooo be so greatttt"
-@@ -279,38 +280,27 @@
+@@ -279,36 +280,25 @@
  )
  
  lpar_and_rpar_have_comments = func_call(  # LPAR Comment
@@ -852,33 +852,31 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 -    f" {'' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
 -)
 +cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
-+
-+cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
  
 -cmd_fstring = (
 -    "sudo -E deluge-console info --detailed --sort-reverse=time_added"
 -    f" {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
 -)
-+cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {{'' if ID is None else ID}} | perl -nE 'print if /^{field}:/'"
++cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {'{{}}' if ID is None else ID} | perl -nE 'print if /^{field}:/'"
  
 -cmd_fstring = (
 -    "sudo -E deluge-console info --detailed --sort-reverse=time_added {'' if ID is"
 -    f" None else ID}} | perl -nE 'print if /^{field}:/'"
 -)
-+fstring = f"This string really doesn't need to be an {{{{fstring}}}}, but this one most certainly, absolutely {does}."
++cmd_fstring = f"sudo -E deluge-console info --detailed --sort-reverse=time_added {{'' if ID is None else ID}} | perl -nE 'print if /^{field}:/'"
  
++fstring = f"This string really doesn't need to be an {{{{fstring}}}}, but this one most certainly, absolutely {does}."
++
  fstring = (
 -    "This string really doesn't need to be an {{fstring}}, but this one most"
 -    f" certainly, absolutely {does}."
 +    f"We have to remember to escape {braces}." " Like {these}." f" But not {this}."
  )
- 
+-
 -fstring = f"We have to remember to escape {braces}. Like {{these}}. But not {this}."
  
--
+ 
  class A:
-     class B:
-         def foo():
 @@ -364,10 +354,7 @@
          def foo():
              if not hasattr(module, name):
@@ -933,7 +931,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
          )
  
  
-@@ -432,14 +415,12 @@
+@@ -432,9 +415,7 @@
          assert xxxxxxx_xxxx in [
              x.xxxxx.xxxxxx.xxxxx.xxxxxx,
              x.xxxxx.xxxxxx.xxxxx.xxxx,
@@ -943,15 +941,7 @@ s = f'Lorem Ipsum is simply dummy text of the printing and typesetting industry:
 +        ], "xxxxxxxxxxx xxxxxxx xxxx (xxxxxx xxxx) %x xxx xxxxx" % xxxxxxx_xxxx
  
  
--value.__dict__[key] = (
--    "test"  # set some Thrift field to non-None in the struct aa bb cc dd ee
--)
-+value.__dict__[
-+    key
-+] = "test"  # set some Thrift field to non-None in the struct aa bb cc dd ee
- 
- RE_ONE_BACKSLASH = {
-     "asdf_hjkl_jkl": re.compile(
+ value.__dict__[key] = (
 @@ -449,8 +430,7 @@
  
  RE_TWO_BACKSLASHES = {
@@ -1627,9 +1617,9 @@ class xxxxxxxxxxxxxxxxxxxxx(xxxx.xxxxxxxxxxxxx):
         ], "xxxxxxxxxxx xxxxxxx xxxx (xxxxxx xxxx) %x xxx xxxxx" % xxxxxxx_xxxx
 
 
-value.__dict__[
-    key
-] = "test"  # set some Thrift field to non-None in the struct aa bb cc dd ee
+value.__dict__[key] = (
+    "test"  # set some Thrift field to non-None in the struct aa bb cc dd ee
+)
 
 RE_ONE_BACKSLASH = {
     "asdf_hjkl_jkl": re.compile(

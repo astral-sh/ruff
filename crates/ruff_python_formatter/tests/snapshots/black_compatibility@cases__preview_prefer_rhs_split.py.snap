@@ -118,57 +118,7 @@ a = (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,29 +1,31 @@
--first_item, second_item = (
--    some_looooooooong_module.some_looooooooooooooong_function_name(
--        first_argument, second_argument, third_argument
--    )
-+(
-+    first_item,
-+    second_item,
-+) = some_looooooooong_module.some_looooooooooooooong_function_name(
-+    first_argument, second_argument, third_argument
- )
- 
--some_dict["with_a_long_key"] = (
--    some_looooooooong_module.some_looooooooooooooong_function_name(
--        first_argument, second_argument, third_argument
--    )
-+some_dict[
-+    "with_a_long_key"
-+] = some_looooooooong_module.some_looooooooooooooong_function_name(
-+    first_argument, second_argument, third_argument
- )
- 
- # Make sure it works when the RHS only has one pair of (optional) parens.
--first_item, second_item = (
--    some_looooooooong_module.SomeClass.some_looooooooooooooong_variable_name
--)
-+(
-+    first_item,
-+    second_item,
-+) = some_looooooooong_module.SomeClass.some_looooooooooooooong_variable_name
- 
--some_dict["with_a_long_key"] = (
--    some_looooooooong_module.SomeClass.some_looooooooooooooong_variable_name
--)
-+some_dict[
-+    "with_a_long_key"
-+] = some_looooooooong_module.SomeClass.some_looooooooooooooong_variable_name
- 
- # Make sure chaining assignments work.
--first_item, second_item, third_item, forth_item = m["everything"] = (
--    some_looooooooong_module.some_looooooooooooooong_function_name(
--        first_argument, second_argument, third_argument
--    )
-+first_item, second_item, third_item, forth_item = m[
-+    "everything"
-+] = some_looooooooong_module.some_looooooooooooooong_function_name(
-+    first_argument, second_argument, third_argument
- )
- 
- # Make sure when the RHS's first split at the non-optional paren fits,
-@@ -60,9 +62,7 @@
+@@ -60,9 +60,7 @@
      some_arg
  ).intersection(pk_cols)
  
@@ -179,76 +129,37 @@ a = (
  
  some_kind_of_table[
      some_key  # type: ignore  # noqa: E501
-@@ -85,15 +85,29 @@
- )
- 
- # Multiple targets
--a = b = (
--    ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
--)
-+a = (
-+    b
-+) = ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
- 
--a = b = c = d = e = f = g = (
-+a = (
-+    b
-+) = (
-+    c
-+) = (
-+    d
-+) = (
-+    e
-+) = (
-+    f
-+) = (
-+    g
-+) = (
-     hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
--) = i = j = (
--    kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
--)
-+) = (
-+    i
-+) = (
-+    j
-+) = kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
- 
- a = (
-     bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ```
 
 ## Ruff Output
 
 ```python
-(
-    first_item,
-    second_item,
-) = some_looooooooong_module.some_looooooooooooooong_function_name(
-    first_argument, second_argument, third_argument
+first_item, second_item = (
+    some_looooooooong_module.some_looooooooooooooong_function_name(
+        first_argument, second_argument, third_argument
+    )
 )
 
-some_dict[
-    "with_a_long_key"
-] = some_looooooooong_module.some_looooooooooooooong_function_name(
-    first_argument, second_argument, third_argument
+some_dict["with_a_long_key"] = (
+    some_looooooooong_module.some_looooooooooooooong_function_name(
+        first_argument, second_argument, third_argument
+    )
 )
 
 # Make sure it works when the RHS only has one pair of (optional) parens.
-(
-    first_item,
-    second_item,
-) = some_looooooooong_module.SomeClass.some_looooooooooooooong_variable_name
+first_item, second_item = (
+    some_looooooooong_module.SomeClass.some_looooooooooooooong_variable_name
+)
 
-some_dict[
-    "with_a_long_key"
-] = some_looooooooong_module.SomeClass.some_looooooooooooooong_variable_name
+some_dict["with_a_long_key"] = (
+    some_looooooooong_module.SomeClass.some_looooooooooooooong_variable_name
+)
 
 # Make sure chaining assignments work.
-first_item, second_item, third_item, forth_item = m[
-    "everything"
-] = some_looooooooong_module.some_looooooooooooooong_function_name(
-    first_argument, second_argument, third_argument
+first_item, second_item, third_item, forth_item = m["everything"] = (
+    some_looooooooong_module.some_looooooooooooooong_function_name(
+        first_argument, second_argument, third_argument
+    )
 )
 
 # Make sure when the RHS's first split at the non-optional paren fits,
@@ -308,29 +219,15 @@ some_kind_of_instance.some_kind_of_map[a_key] = (
 )
 
 # Multiple targets
-a = (
-    b
-) = ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+a = b = (
+    ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+)
 
-a = (
-    b
-) = (
-    c
-) = (
-    d
-) = (
-    e
-) = (
-    f
-) = (
-    g
-) = (
+a = b = c = d = e = f = g = (
     hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
-) = (
-    i
-) = (
-    j
-) = kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+) = i = j = (
+    kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk
+)
 
 a = (
     bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
