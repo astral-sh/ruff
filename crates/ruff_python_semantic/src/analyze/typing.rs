@@ -582,40 +582,62 @@ pub fn resolve_assignment<'a>(
 pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
     let binding_id = semantic.lookup_symbol(symbol)?;
     let binding = semantic.binding(binding_id);
-    if binding.kind.is_assignment() || binding.kind.is_named_expr_assignment() {
-        let parent_id = binding.source?;
-        let parent = semantic.statement(parent_id);
-        match parent {
-            Stmt::Assign(ast::StmtAssign { value, targets, .. }) => match value.as_ref() {
-                Expr::Tuple(ast::ExprTuple { elts, .. })
-                | Expr::List(ast::ExprList { elts, .. }) => {
+    match binding.kind {
+        // Ex) `x := 1`
+        BindingKind::NamedExprAssignment => {
+            let parent_id = binding.source?;
+            let parent = semantic
+                .expressions(parent_id)
+                .find_map(|expr| expr.as_named_expr_expr());
+            if let Some(ast::ExprNamedExpr { target, value, .. }) = parent {
+                return match_value(symbol, target.as_ref(), value.as_ref());
+            }
+        }
+        // Ex) `x = 1`
+        BindingKind::Assignment => {
+            let parent_id = binding.source?;
+            let parent = semantic.statement(parent_id);
+            match parent {
+                Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
                     if let Some(target) = targets.iter().find(|target| defines(symbol, target)) {
-                        return match target {
-                            Expr::Tuple(ast::ExprTuple {
-                                elts: target_elts, ..
-                            })
-                            | Expr::List(ast::ExprList {
-                                elts: target_elts, ..
-                            })
-                            | Expr::Set(ast::ExprSet {
-                                elts: target_elts, ..
-                            }) => get_value_by_id(symbol, target_elts, elts),
-                            _ => Some(value.as_ref()),
-                        };
+                        return match_value(symbol, target, value.as_ref());
                     }
                 }
-                _ => return Some(value.as_ref()),
-            },
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                value: Some(value), ..
-            }) => {
-                return Some(value.as_ref());
+                Stmt::AnnAssign(ast::StmtAnnAssign {
+                    value: Some(value),
+                    target,
+                    ..
+                }) => {
+                    return match_value(symbol, target, value.as_ref());
+                }
+                _ => {}
             }
-            Stmt::AugAssign(_) => return None,
-            _ => return None,
         }
+        _ => {}
     }
     None
+}
+
+/// Given a target and value, find the value that's assigned to the given symbol.
+fn match_value<'a>(symbol: &str, target: &Expr, value: &'a Expr) -> Option<&'a Expr> {
+    match target {
+        Expr::Name(ast::ExprName { id, .. }) if id.as_str() == symbol => Some(value),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            match value {
+                Expr::Tuple(ast::ExprTuple {
+                    elts: value_elts, ..
+                })
+                | Expr::List(ast::ExprList {
+                    elts: value_elts, ..
+                })
+                | Expr::Set(ast::ExprSet {
+                    elts: value_elts, ..
+                }) => get_value_by_id(symbol, elts, value_elts),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
 }
 
 /// Returns `true` if the [`Expr`] defines the symbol.
@@ -629,11 +651,7 @@ fn defines(symbol: &str, expr: &Expr) -> bool {
     }
 }
 
-fn get_value_by_id<'a>(
-    target_id: &str,
-    targets: &'a [Expr],
-    values: &'a [Expr],
-) -> Option<&'a Expr> {
+fn get_value_by_id<'a>(target_id: &str, targets: &[Expr], values: &'a [Expr]) -> Option<&'a Expr> {
     for (target, value) in targets.iter().zip(values.iter()) {
         match target {
             Expr::Tuple(ast::ExprTuple {

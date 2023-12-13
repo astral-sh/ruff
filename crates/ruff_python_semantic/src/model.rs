@@ -993,14 +993,6 @@ impl<'a> SemanticModel<'a> {
         &self.nodes[node_id]
     }
 
-    /// Return the [`Expr`] corresponding to the given [`NodeId`].
-    #[inline]
-    pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr> {
-        self.nodes
-            .ancestor_ids(node_id)
-            .find_map(|id| self.nodes[id].as_expression())
-    }
-
     /// Given a [`Expr`], return its parent, if any.
     #[inline]
     pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
@@ -1042,6 +1034,22 @@ impl<'a> SemanticModel<'a> {
             .ancestor_ids(node_id)
             .filter(|id| self.nodes[*id].is_statement())
             .nth(1)
+    }
+
+    /// Return the [`Expr`] corresponding to the given [`NodeId`].
+    #[inline]
+    pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+        self.nodes
+            .ancestor_ids(node_id)
+            .find_map(|id| self.nodes[id].as_expression())
+    }
+
+    /// Returns an [`Iterator`] over the expressions, starting from the given [`NodeId`].
+    /// through to any parents.
+    pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr> + '_ {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter_map(move |id| self.nodes[id].as_expression())
     }
 
     /// Set the [`Globals`] for the current [`Scope`].

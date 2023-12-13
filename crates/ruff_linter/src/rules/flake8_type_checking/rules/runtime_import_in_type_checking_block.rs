@@ -86,6 +86,16 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
     }
 }
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+enum Action {
+    /// The import should be moved out of the type-checking block.
+    Move,
+    /// All usages of the import should be wrapped in quotes.
+    Quote,
+    /// The import should be ignored.
+    Ignore,
+}
+
 /// TCH004
 pub(crate) fn runtime_import_in_type_checking_block(
     checker: &Checker,
@@ -93,9 +103,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     // Collect all runtime imports by statement.
-    let mut moves_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
-    let mut quotes_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
-    let mut ignores_by_statement: FxHashMap<NodeId, Vec<ImportBinding>> = FxHashMap::default();
+    let mut actions: FxHashMap<(NodeId, Action), Vec<ImportBinding>> = FxHashMap::default();
 
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
@@ -137,8 +145,8 @@ pub(crate) fn runtime_import_in_type_checking_block(
                     )
                 })
             {
-                ignores_by_statement
-                    .entry(node_id)
+                actions
+                    .entry((node_id, Action::Ignore))
                     .or_default()
                     .push(import);
             } else {
@@ -151,92 +159,104 @@ pub(crate) fn runtime_import_in_type_checking_block(
                             || reference.in_runtime_evaluated_annotation()
                     })
                 {
-                    quotes_by_statement.entry(node_id).or_default().push(import);
+                    actions
+                        .entry((node_id, Action::Quote))
+                        .or_default()
+                        .push(import);
                 } else {
-                    moves_by_statement.entry(node_id).or_default().push(import);
+                    actions
+                        .entry((node_id, Action::Move))
+                        .or_default()
+                        .push(import);
                 }
             }
         }
     }
 
-    // Generate a diagnostic for every import, but share a fix across all imports within the same
-    // statement (excluding those that are ignored).
-    for (node_id, imports) in moves_by_statement {
-        let fix = move_imports(checker, node_id, &imports).ok();
+    for ((node_id, action), imports) in actions {
+        match action {
+            // Generate a diagnostic for every import, but share a fix across all imports within the same
+            // statement (excluding those that are ignored).
+            Action::Move => {
+                let fix = move_imports(checker, node_id, &imports).ok();
 
-        for ImportBinding {
-            import,
-            range,
-            parent_range,
-            ..
-        } in imports
-        {
-            let mut diagnostic = Diagnostic::new(
-                RuntimeImportInTypeCheckingBlock {
-                    qualified_name: import.qualified_name(),
-                    strategy: Strategy::MoveImport,
-                },
-                range,
-            );
-            if let Some(range) = parent_range {
-                diagnostic.set_parent(range.start());
+                for ImportBinding {
+                    import,
+                    range,
+                    parent_range,
+                    ..
+                } in imports
+                {
+                    let mut diagnostic = Diagnostic::new(
+                        RuntimeImportInTypeCheckingBlock {
+                            qualified_name: import.qualified_name(),
+                            strategy: Strategy::MoveImport,
+                        },
+                        range,
+                    );
+                    if let Some(range) = parent_range {
+                        diagnostic.set_parent(range.start());
+                    }
+                    if let Some(fix) = fix.as_ref() {
+                        diagnostic.set_fix(fix.clone());
+                    }
+                    diagnostics.push(diagnostic);
+                }
             }
-            if let Some(fix) = fix.as_ref() {
-                diagnostic.set_fix(fix.clone());
+
+            // Generate a diagnostic for every import, but share a fix across all imports within the same
+            // statement (excluding those that are ignored).
+            Action::Quote => {
+                let fix = quote_imports(checker, node_id, &imports).ok();
+
+                for ImportBinding {
+                    import,
+                    range,
+                    parent_range,
+                    ..
+                } in imports
+                {
+                    let mut diagnostic = Diagnostic::new(
+                        RuntimeImportInTypeCheckingBlock {
+                            qualified_name: import.qualified_name(),
+                            strategy: Strategy::QuoteUsages,
+                        },
+                        range,
+                    );
+                    if let Some(range) = parent_range {
+                        diagnostic.set_parent(range.start());
+                    }
+                    if let Some(fix) = fix.as_ref() {
+                        diagnostic.set_fix(fix.clone());
+                    }
+                    diagnostics.push(diagnostic);
+                }
             }
-            diagnostics.push(diagnostic);
+
+            // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
+            // suppression comments aren't marked as unused.
+            Action::Ignore => {
+                for ImportBinding {
+                    import,
+                    range,
+                    parent_range,
+                    ..
+                } in imports
+                {
+                    let mut diagnostic = Diagnostic::new(
+                        RuntimeImportInTypeCheckingBlock {
+                            qualified_name: import.qualified_name(),
+                            strategy: Strategy::MoveImport,
+                        },
+                        range,
+                    );
+                    if let Some(range) = parent_range {
+                        diagnostic.set_parent(range.start());
+                    }
+                    diagnostics.push(diagnostic);
+                }
+            }
         }
-    }
-
-    // Generate a diagnostic for every import, but share a fix across all imports within the same
-    // statement (excluding those that are ignored).
-    for (node_id, imports) in quotes_by_statement {
-        let fix = quote_imports(checker, node_id, &imports).ok();
-
-        for ImportBinding {
-            import,
-            range,
-            parent_range,
-            ..
-        } in imports
-        {
-            let mut diagnostic = Diagnostic::new(
-                RuntimeImportInTypeCheckingBlock {
-                    qualified_name: import.qualified_name(),
-                    strategy: Strategy::QuoteUsages,
-                },
-                range,
-            );
-            if let Some(range) = parent_range {
-                diagnostic.set_parent(range.start());
-            }
-            if let Some(fix) = fix.as_ref() {
-                diagnostic.set_fix(fix.clone());
-            }
-            diagnostics.push(diagnostic);
-        }
-    }
-
-    // Separately, generate a diagnostic for every _ignored_ import, to ensure that the
-    // suppression comments aren't marked as unused.
-    for ImportBinding {
-        import,
-        range,
-        parent_range,
-        ..
-    } in ignores_by_statement.into_values().flatten()
-    {
-        let mut diagnostic = Diagnostic::new(
-            RuntimeImportInTypeCheckingBlock {
-                qualified_name: import.qualified_name(),
-                strategy: Strategy::MoveImport,
-            },
-            range,
-        );
-        if let Some(range) = parent_range {
-            diagnostic.set_parent(range.start());
-        }
-        diagnostics.push(diagnostic);
     }
 }
 
