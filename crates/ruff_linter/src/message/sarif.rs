@@ -89,6 +89,9 @@ impl Serialize for SarifRule<'_> {
             "fullDescription": {
                 "text": self.explanation,
             },
+            "help": {
+                "text": self.summary,
+            },
             "helpUri": self.url,
             "properties": {
                 "id": self.code,
@@ -109,12 +112,15 @@ struct SarifResult {
     uri: String,
     start_line: OneIndexed,
     start_column: OneIndexed,
+    end_line: OneIndexed,
+    end_column: OneIndexed,
 }
 
 impl SarifResult {
     #[cfg(not(target_arch = "wasm32"))]
     fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
+        let end_location = message.compute_end_location();
         let path = normalize_path(message.filename());
         Ok(Self {
             rule: message.kind.rule(),
@@ -125,12 +131,15 @@ impl SarifResult {
                 .to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
+            end_line: end_location.row,
+            end_column: end_location.column,
         })
     }
 
     #[cfg(target_arch = "wasm32")]
     fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
+        let end_location = message.compute_end_location();
         let abs_filepath = normalize_path(message.filename());
         Ok(Self {
             rule: message.kind.rule(),
@@ -139,6 +148,8 @@ impl SarifResult {
             uri: abs_filepath.display().to_string(),
             start_line: start_location.row,
             start_column: start_location.column,
+            end_line: end_location.row,
+            end_column: end_location.column,
         })
     }
 }
@@ -161,6 +172,8 @@ impl Serialize for SarifResult {
                     "region": {
                         "startLine": self.start_line,
                         "startColumn": self.start_column,
+                        "endLine": self.end_line,
+                        "endColumn": self.end_column,
                     }
                 }
             }],
