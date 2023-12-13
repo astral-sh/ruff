@@ -1005,6 +1005,23 @@ impl<'a> SemanticModel<'a> {
             .nth(1)
     }
 
+    /// Return the [`Expr`] corresponding to the given [`NodeId`].
+    #[inline]
+    pub fn expression(&self, node_id: NodeId) -> &'a Expr {
+        self.nodes
+            .ancestor_ids(node_id)
+            .find_map(|id| self.nodes[id].as_expression())
+            .expect("No expression found")
+    }
+
+    /// Returns an [`Iterator`] over the expressions, starting from the given [`NodeId`].
+    /// through to any parents.
+    pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr> + '_ {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter_map(move |id| self.nodes[id].as_expression())
+    }
+
     /// Set the [`Globals`] for the current [`Scope`].
     pub fn set_globals(&mut self, globals: Globals<'a>) {
         // If any global bindings don't already exist in the global scope, add them.
