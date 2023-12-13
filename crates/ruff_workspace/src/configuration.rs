@@ -34,7 +34,9 @@ use ruff_linter::settings::{
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
 };
-use ruff_python_formatter::{MagicTrailingComma, QuoteStyle};
+use ruff_python_formatter::{
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
+};
 
 use crate::options::{
     Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
@@ -189,6 +191,12 @@ impl Configuration {
             magic_trailing_comma: format
                 .magic_trailing_comma
                 .unwrap_or(format_defaults.magic_trailing_comma),
+            docstring_code_format: format
+                .docstring_code_format
+                .unwrap_or(format_defaults.docstring_code_format),
+            docstring_code_line_width: format
+                .docstring_code_line_width
+                .unwrap_or(format_defaults.docstring_code_line_width),
         };
 
         let lint = self.lint;
@@ -1020,6 +1028,8 @@ pub struct FormatConfiguration {
     pub quote_style: Option<QuoteStyle>,
     pub magic_trailing_comma: Option<MagicTrailingComma>,
     pub line_ending: Option<LineEnding>,
+    pub docstring_code_format: Option<DocstringCode>,
+    pub docstring_code_line_width: Option<DocstringCodeLineWidth>,
 }
 
 impl FormatConfiguration {
@@ -1046,6 +1056,14 @@ impl FormatConfiguration {
                 }
             }),
             line_ending: options.line_ending,
+            docstring_code_format: options.docstring_code_format.map(|yes| {
+                if yes {
+                    DocstringCode::Enabled
+                } else {
+                    DocstringCode::Disabled
+                }
+            }),
+            docstring_code_line_width: options.docstring_code_line_length,
         })
     }
 
@@ -1059,6 +1077,10 @@ impl FormatConfiguration {
             quote_style: self.quote_style.or(other.quote_style),
             magic_trailing_comma: self.magic_trailing_comma.or(other.magic_trailing_comma),
             line_ending: self.line_ending.or(other.line_ending),
+            docstring_code_format: self.docstring_code_format.or(other.docstring_code_format),
+            docstring_code_line_width: self
+                .docstring_code_line_width
+                .or(other.docstring_code_line_width),
         }
     }
 }

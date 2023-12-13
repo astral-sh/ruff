@@ -71,6 +71,20 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
     # Like Black, automatically detect the appropriate line ending.
     line-ending = "auto"
+
+    # Enable auto-formatting of code examples in docstrings. Markdown,
+    # reStructuredText code/literal blocks and doctests are all supported.
+    #
+    # This is currently disabled by default, but it is planned for this
+    # to be opt-out in the future.
+    docstring-code-format = false
+
+    # Set the line length limit used when formatting code snippets in
+    # docstrings.
+    #
+    # This only has an effect when the `docstring-code-format` setting is
+    # enabled.
+    docstring-code-line-length = "dynamic"
     ```
 
 === "ruff.toml"
@@ -134,6 +148,20 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
     # Like Black, automatically detect the appropriate line ending.
     line-ending = "auto"
+
+    # Enable auto-formatting of code examples in docstrings. Markdown,
+    # reStructuredText code/literal blocks and doctests are all supported.
+    #
+    # This is currently disabled by default, but it is planned for this
+    # to be opt-out in the future.
+    docstring-code-format = false
+
+    # Set the line length limit used when formatting code snippets in
+    # docstrings.
+    #
+    # This only has an effect when the `docstring-code-format` setting is
+    # enabled.
+    docstring-code-line-length = "dynamic"
     ```
 
 As an example, the following would configure Ruff to:

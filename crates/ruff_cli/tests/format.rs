@@ -140,6 +140,99 @@ if condition:
 }
 
 #[test]
+fn docstring_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[format]
+docstring-code-format = true
+docstring-code-line-length = 20
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+def f(x):
+    '''
+    Something about `f`. And an example:
+
+    .. code-block:: python
+
+        foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+
+    Another example:
+
+    ```py
+    foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+    ```
+
+    And another:
+
+    >>> foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+    '''
+    pass
+"#), @r###"
+success: true
+exit_code: 0
+----- stdout -----
+def f(x):
+    """
+    Something about `f`. And an example:
+
+    .. code-block:: python
+
+        (
+            foo,
+            bar,
+            quux,
+        ) = this_is_a_long_line(
+            lion,
+            hippo,
+            lemur,
+            bear,
+        )
+
+    Another example:
+
+    ```py
+    (
+        foo,
+        bar,
+        quux,
+    ) = this_is_a_long_line(
+        lion,
+        hippo,
+        lemur,
+        bear,
+    )
+    ```
+
+    And another:
+
+    >>> (
+    ...     foo,
+    ...     bar,
+    ...     quux,
+    ... ) = this_is_a_long_line(
+    ...     lion,
+    ...     hippo,
+    ...     lemur,
+    ...     bear,
+    ... )
+    """
+    pass
+
+----- stderr -----
+"###);
+    Ok(())
+}
+
+#[test]
 fn mixed_line_endings() -> Result<()> {
     let tempdir = TempDir::new()?;
 

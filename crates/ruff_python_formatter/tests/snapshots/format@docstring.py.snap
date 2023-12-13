@@ -173,7 +173,7 @@ quote-style                = Double
 line-ending                = LineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Disabled
-docstring-code-line-width  = 88
+docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 ```
 
@@ -347,7 +347,7 @@ quote-style                = Double
 line-ending                = LineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Disabled
-docstring-code-line-width  = 88
+docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 ```
 
@@ -521,7 +521,7 @@ quote-style                = Double
 line-ending                = LineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Disabled
-docstring-code-line-width  = 88
+docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 ```
 
@@ -695,7 +695,7 @@ quote-style                = Double
 line-ending                = LineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Disabled
-docstring-code-line-width  = 88
+docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 ```
 
@@ -869,7 +869,7 @@ quote-style                = Single
 line-ending                = LineFeed
 magic-trailing-comma       = Respect
 docstring-code             = Disabled
-docstring-code-line-width  = 88
+docstring-code-line-width  = "dynamic"
 preview                    = Disabled
 ```
 
