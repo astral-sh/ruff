@@ -58,6 +58,7 @@ use ruff_python_semantic::{
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
 use ruff_source_file::Locator;
 
+use crate::checkers::ast::annotation::AnnotationContext;
 use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::Importer;
@@ -68,6 +69,7 @@ use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa};
 
 mod analyze;
+mod annotation;
 mod deferred;
 
 pub(crate) struct Checker<'a> {
@@ -679,62 +681,14 @@ where
                 value,
                 ..
             }) => {
-                enum AnnotationKind {
-                    RuntimeRequired,
-                    RuntimeEvaluated,
-                    TypingOnly,
-                }
-
-                fn annotation_kind(
-                    semantic: &SemanticModel,
-                    settings: &LinterSettings,
-                ) -> AnnotationKind {
-                    // If the annotation is in a class, and that class is marked as
-                    // runtime-evaluated, treat the annotation as runtime-required.
-                    // TODO(charlie): We could also include function calls here.
-                    if semantic
-                        .current_scope()
-                        .kind
-                        .as_class()
-                        .is_some_and(|class_def| {
-                            flake8_type_checking::helpers::runtime_required_class(
-                                class_def,
-                                &settings.flake8_type_checking.runtime_evaluated_base_classes,
-                                &settings.flake8_type_checking.runtime_evaluated_decorators,
-                                semantic,
-                            )
-                        })
-                    {
-                        return AnnotationKind::RuntimeRequired;
-                    }
-
-                    // If `__future__` annotations are enabled, then annotations are never evaluated
-                    // at runtime, so we can treat them as typing-only.
-                    if semantic.future_annotations() {
-                        return AnnotationKind::TypingOnly;
-                    }
-
-                    // Otherwise, if we're in a class or module scope, then the annotation needs to
-                    // be available at runtime.
-                    // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                    if matches!(
-                        semantic.current_scope().kind,
-                        ScopeKind::Class(_) | ScopeKind::Module
-                    ) {
-                        return AnnotationKind::RuntimeEvaluated;
-                    }
-
-                    AnnotationKind::TypingOnly
-                }
-
-                match annotation_kind(&self.semantic, self.settings) {
-                    AnnotationKind::RuntimeRequired => {
+                match AnnotationContext::from_model(&self.semantic, self.settings) {
+                    AnnotationContext::RuntimeRequired => {
                         self.visit_runtime_required_annotation(annotation);
                     }
-                    AnnotationKind::RuntimeEvaluated => {
+                    AnnotationContext::RuntimeEvaluated => {
                         self.visit_runtime_evaluated_annotation(annotation);
                     }
-                    AnnotationKind::TypingOnly => self.visit_annotation(annotation),
+                    AnnotationContext::TypingOnly => self.visit_annotation(annotation),
                 }
 
                 if let Some(expr) = value {

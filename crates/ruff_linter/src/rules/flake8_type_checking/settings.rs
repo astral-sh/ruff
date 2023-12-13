@@ -6,8 +6,8 @@ use ruff_macros::CacheKey;
 pub struct Settings {
     pub strict: bool,
     pub exempt_modules: Vec<String>,
-    pub runtime_evaluated_base_classes: Vec<String>,
-    pub runtime_evaluated_decorators: Vec<String>,
+    pub runtime_required_base_classes: Vec<String>,
+    pub runtime_required_decorators: Vec<String>,
     pub quote_annotations: bool,
 }
 
@@ -16,8 +16,8 @@ impl Default for Settings {
         Self {
             strict: false,
             exempt_modules: vec!["typing".to_string(), "typing_extensions".to_string()],
-            runtime_evaluated_base_classes: vec![],
-            runtime_evaluated_decorators: vec![],
+            runtime_required_base_classes: vec![],
+            runtime_required_decorators: vec![],
             quote_annotations: false,
         }
     }

@@ -1649,23 +1649,36 @@ pub struct Flake8TypeCheckingOptions {
     /// For example, in the following, Python requires that `Sequence` be
     /// available at runtime, despite the fact that it's only used in a type
     /// annotation:
+    ///
     /// ```python
     /// from collections.abc import Sequence
+    ///
     ///
     /// def func(value: Sequence[int]) -> None:
     ///     ...
     /// ```
     ///
     /// In other words, moving `from collections.abc import Sequence` into an
-    /// `if TYPE_CHECKING:` block above would cause a runtime error.
+    /// `if TYPE_CHECKING:` block above would cause a runtime error, as the
+    /// type would no longer be available at runtime.
     ///
-    /// By default, Ruff will respect such runtime semantics, and avoid moving
-    /// the import.
+    /// By default, Ruff will respect such runtime semantics and avoid moving
+    /// the import to prevent such runtime errors.
     ///
-    /// However, setting `quote-annotations` to `true` will instruct Ruff
-    /// to add quotes around the annotation (e.g., `"Sequence[int]"`). Adding
-    /// quotes around `Sequence`, above, will enable Ruff to move the import
-    /// into an `if TYPE_CHECKING:` block.
+    /// Setting `quote-annotations` to `true` will instruct Ruff to add quotes
+    /// around the annotation (e.g., `"Sequence[int]"`), which in turn enables
+    /// Ruff to move the import into an `if TYPE_CHECKING:` block, like so:
+    ///
+    /// ```python
+    /// from typing import TYPE_CHECKING
+    ///
+    /// if TYPE_CHECKING:
+    ///     from collections.abc import Sequence
+    ///
+    ///
+    /// def func(value: "Sequence[int]") -> None:
+    ///     ...
+    /// ```
     ///
     /// Note that this setting has no effect when `from __future__ import annotations`
     /// is present, as `__future__` annotations are always treated equivalently
@@ -1689,8 +1702,8 @@ impl Flake8TypeCheckingOptions {
             exempt_modules: self
                 .exempt_modules
                 .unwrap_or_else(|| vec!["typing".to_string()]),
-            runtime_evaluated_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
-            runtime_evaluated_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
+            runtime_required_base_classes: self.runtime_evaluated_base_classes.unwrap_or_default(),
+            runtime_required_decorators: self.runtime_evaluated_decorators.unwrap_or_default(),
             quote_annotations: self.quote_annotations.unwrap_or_default(),
         }
     }

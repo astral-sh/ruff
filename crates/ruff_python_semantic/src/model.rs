@@ -995,11 +995,10 @@ impl<'a> SemanticModel<'a> {
 
     /// Return the [`Expr`] corresponding to the given [`NodeId`].
     #[inline]
-    pub fn expression(&self, node_id: NodeId) -> &'a Expr {
+    pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr> {
         self.nodes
             .ancestor_ids(node_id)
             .find_map(|id| self.nodes[id].as_expression())
-            .expect("No expression found")
     }
 
     /// Given a [`Expr`], return its parent, if any.

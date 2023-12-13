@@ -72,7 +72,7 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
                 "Move import `{qualified_name}` out of type-checking block. Import is used for more than type hinting."
             ),
             Strategy::QuoteUsages => format!(
-                "Quote references to `{qualified_name}`. Import is not available at runtime."
+                "Quote references to `{qualified_name}`. Import is in a type-checking block."
             ),
         }
     }
@@ -249,7 +249,7 @@ fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) 
                 let reference = checker.semantic().reference(*reference_id);
                 if reference.context().is_runtime() {
                     Some(quote_annotation(
-                        reference.node_id()?,
+                        reference.expression_id()?,
                         checker.semantic(),
                         checker.locator(),
                         checker.stylist(),

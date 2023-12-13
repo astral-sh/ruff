@@ -26,7 +26,7 @@ pub struct ResolvedReference {
 
 impl ResolvedReference {
     /// The expression that the reference occurs in.
-    pub const fn node_id(&self) -> Option<NodeId> {
+    pub const fn expression_id(&self) -> Option<NodeId> {
         self.node_id
     }
 

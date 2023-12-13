@@ -6,12 +6,25 @@ use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::Stylist;
-use ruff_python_semantic::{Binding, BindingId, BindingKind, NodeId, SemanticModel};
+use ruff_python_semantic::{
+    Binding, BindingId, BindingKind, NodeId, ResolvedReference, SemanticModel,
+};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::rules::flake8_type_checking::settings::Settings;
 
+/// Returns `true` if the [`ResolvedReference`] is in a typing-only context _or_ a runtime-evaluated
+/// context (with quoting enabled).
+pub(crate) fn is_typing_reference(reference: &ResolvedReference, settings: &Settings) -> bool {
+    reference.in_type_checking_block()
+        || reference.in_typing_only_annotation()
+        || reference.in_complex_string_type_definition()
+        || reference.in_simple_string_type_definition()
+        || (settings.quote_annotations && reference.in_runtime_evaluated_annotation())
+}
+
+/// Returns `true` if the [`Binding`] represents a runtime-required import.
 pub(crate) fn is_valid_runtime_import(
     binding: &Binding,
     semantic: &SemanticModel,
@@ -25,16 +38,7 @@ pub(crate) fn is_valid_runtime_import(
             && binding
                 .references()
                 .map(|reference_id| semantic.reference(reference_id))
-                .any(|reference| {
-                    // Are we in a typing-only context _or_ a runtime-evaluated context? We're
-                    // willing to quote runtime-evaluated, but not runtime-required annotations.
-                    !(reference.in_type_checking_block()
-                        || reference.in_typing_only_annotation()
-                        || reference.in_complex_string_type_definition()
-                        || reference.in_simple_string_type_definition()
-                        || (settings.quote_annotations
-                            && reference.in_runtime_evaluated_annotation()))
-                })
+                .any(|reference| !is_typing_reference(reference, settings))
     } else {
         false
     }
@@ -212,10 +216,10 @@ pub(crate) fn quote_annotation(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let expr = semantic.expression(node_id);
+    let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
         match semantic.expression(parent_id) {
-            Expr::Subscript(parent) => {
+            Some(Expr::Subscript(parent)) => {
                 if expr == parent.value.as_ref() {
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
@@ -223,7 +227,7 @@ pub(crate) fn quote_annotation(
                     return quote_annotation(parent_id, semantic, locator, stylist);
                 }
             }
-            Expr::Attribute(parent) => {
+            Some(Expr::Attribute(parent)) => {
                 if expr == parent.value.as_ref() {
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
@@ -231,7 +235,7 @@ pub(crate) fn quote_annotation(
                     return quote_annotation(parent_id, semantic, locator, stylist);
                 }
             }
-            Expr::Call(parent) => {
+            Some(Expr::Call(parent)) => {
                 if expr == parent.func.as_ref() {
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
@@ -239,7 +243,7 @@ pub(crate) fn quote_annotation(
                     return quote_annotation(parent_id, semantic, locator, stylist);
                 }
             }
-            Expr::BinOp(parent) => {
+            Some(Expr::BinOp(parent)) => {
                 if parent.op.is_bit_or() {
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
@@ -253,7 +257,12 @@ pub(crate) fn quote_annotation(
 
     let annotation = locator.slice(expr);
 
-    // If the annotation already contains a quote, avoid attempting to re-quote it.
+    // If the annotation already contains a quote, avoid attempting to re-quote it. For example:
+    // ```python
+    // from typing import Literal
+    //
+    // Set[Literal["Foo"]]
+    // ```
     if annotation.contains('\'') || annotation.contains('"') {
         return Err(anyhow::anyhow!("Annotation already contains a quote"));
     }

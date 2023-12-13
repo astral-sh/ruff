@@ -130,7 +130,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_evaluated_base_classes: vec![
+                    runtime_required_base_classes: vec![
                         "pydantic.BaseModel".to_string(),
                         "sqlalchemy.orm.DeclarativeBase".to_string(),
                     ],
@@ -161,7 +161,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_evaluated_decorators: vec![
+                    runtime_required_decorators: vec![
                         "attrs.define".to_string(),
                         "attrs.frozen".to_string(),
                     ],
@@ -186,7 +186,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 flake8_type_checking: super::settings::Settings {
-                    runtime_evaluated_base_classes: vec!["module.direct.MyBaseClass".to_string()],
+                    runtime_required_base_classes: vec!["module.direct.MyBaseClass".to_string()],
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rule(rule_code)

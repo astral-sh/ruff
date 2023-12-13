@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
-use crate::rules::flake8_type_checking::helpers::quote_annotation;
+use crate::rules::flake8_type_checking::helpers::{is_typing_reference, quote_annotation};
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 
@@ -274,15 +274,7 @@ pub(crate) fn typing_only_runtime_import(
                 .references()
                 .map(|reference_id| checker.semantic().reference(reference_id))
                 .all(|reference| {
-                    // All references should be in a typing context _or_ a runtime-evaluated
-                    // annotation (as opposed to a runtime-required annotation), which we can
-                    // quote.
-                    reference.in_type_checking_block()
-                        || reference.in_typing_only_annotation()
-                        || reference.in_complex_string_type_definition()
-                        || reference.in_simple_string_type_definition()
-                        || (checker.settings.flake8_type_checking.quote_annotations
-                            && reference.in_runtime_evaluated_annotation())
+                    is_typing_reference(reference, &checker.settings.flake8_type_checking)
                 })
         {
             let qualified_name = import.qualified_name();
@@ -497,7 +489,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                 let reference = checker.semantic().reference(*reference_id);
                 if reference.context().is_runtime() {
                     Some(quote_annotation(
-                        reference.node_id()?,
+                        reference.expression_id()?,
                         checker.semantic(),
                         checker.locator(),
                         checker.stylist(),
