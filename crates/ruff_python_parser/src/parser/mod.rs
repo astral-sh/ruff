@@ -1,15 +1,17 @@
 use std::fmt::Display;
 
 use ast::{
-    BoolOp, CmpOp, ConversionFlag, ExceptHandler, ExprContext, IpyEscapeKind, Number, Operator,
-    Pattern, Singleton, UnaryOp,
+    BoolOp, CmpOp, ConversionFlag, ExceptHandler, ExprContext, FStringElement, IpyEscapeKind,
+    Number, Operator, Pattern, Singleton, UnaryOp,
 };
 use bitflags::bitflags;
 
 use crate::{
     helpers::{self, token_kind_to_cmp_op},
     lexer::{LexResult, LexicalErrorType, Spanned},
-    string::{concatenate_strings, parse_fstring_middle, parse_string_literal, StringType},
+    string::{
+        concatenated_strings, parse_fstring_literal_element, parse_string_literal, StringType,
+    },
     token_set::TokenSet,
     FStringErrorType, Mode, ParseError, ParseErrorType, Tok, TokenKind,
 };
@@ -2856,6 +2858,13 @@ where
             Tok::Lsqb => return self.parse_bracketsized_expr(range),
             Tok::Lbrace => return self.parse_bracesized_expr(range),
             Tok::Yield => return self.parse_yield_expr(range),
+            // `Invalid` tokens are created when there's a lexical error, so
+            // we only create an `Expr::Invalid` it here to avoid creating
+            // unexpected token errors
+            Tok::Invalid => Expr::Invalid(ast::ExprInvalid {
+                value: self.src_text(range).into(),
+                range,
+            }),
             // Handle unexpected token
             _ => {
                 // Try to parse an expression after seeing an unexpected token
@@ -3254,6 +3263,7 @@ where
     }
 
     fn parse_string_expr(&mut self, mut tok: Tok, mut str_range: TextRange) -> ExprWithRange {
+        let mut final_range = str_range;
         let mut strings = vec![];
         while let Tok::String {
             value,
@@ -3261,16 +3271,15 @@ where
             triple_quoted,
         } = tok
         {
-            match parse_string_literal(&value, kind, triple_quoted, str_range.start()) {
+            match parse_string_literal(&value, kind, triple_quoted, str_range) {
                 Ok(string) => {
                     strings.push(string);
                 }
                 Err(error) => {
-                    strings.push(StringType::Invalid(ast::ExprStringLiteral {
+                    strings.push(StringType::Invalid(ast::StringLiteral {
                         value,
                         range: str_range,
                         unicode: kind.is_unicode(),
-                        implicit_concatenated: false,
                     }));
                     self.add_error(ParseErrorType::Lexical(error.error), error.location);
                 }
@@ -3280,25 +3289,53 @@ where
                 break;
             }
 
-            let (next_tok, range) = self.next_token();
-            str_range = str_range.cover(range);
-            tok = next_tok;
+            (tok, str_range) = self.next_token();
+            final_range = final_range.cover(str_range);
         }
 
         // This handles the case where the string is implicit concatenated with
         // a fstring, e.g., `"hello " f"{x}"`.
         if self.at(TokenKind::FStringStart) {
-            let (_, fstring_range) = self.next_token();
-            let (Expr::FString(fstring), fstring_range) = self.parse_fstring_expr(fstring_range)
-            else {
-                unreachable!()
-            };
-            str_range = str_range.cover(fstring_range);
-            strings.push(StringType::FString(fstring));
+            let mut fstring_range = self.current_range();
+            self.handle_implict_concatenated_strings(&mut fstring_range, &mut strings);
+            final_range = final_range.cover(fstring_range);
         }
 
-        match concatenate_strings(strings, str_range) {
-            Ok(string) => (string, str_range),
+        if strings.len() == 1 {
+            return match strings.pop().unwrap() {
+                StringType::Str(string) => {
+                    let range = string.range;
+                    (
+                        Expr::StringLiteral(ast::ExprStringLiteral {
+                            value: ast::StringLiteralValue::single(string),
+                            range,
+                        }),
+                        range,
+                    )
+                }
+                StringType::Bytes(bytes) => {
+                    let range = bytes.range;
+                    (
+                        Expr::BytesLiteral(ast::ExprBytesLiteral {
+                            value: ast::BytesLiteralValue::single(bytes),
+                            range,
+                        }),
+                        range,
+                    )
+                }
+                StringType::Invalid(invalid) => (
+                    Expr::Invalid(ast::ExprInvalid {
+                        value: invalid.value,
+                        range: invalid.range,
+                    }),
+                    invalid.range,
+                ),
+                _ => unreachable!(),
+            };
+        }
+
+        match concatenated_strings(strings, final_range) {
+            Ok(string) => (string, final_range),
             Err(error) => {
                 self.add_error(ParseErrorType::Lexical(error.error), error.location);
                 (
@@ -3312,57 +3349,69 @@ where
         }
     }
 
-    fn parse_fstring_expr(&mut self, fstring_range: TextRange) -> ExprWithRange {
-        let (Expr::FString(fstring), mut fstring_range) = self.parse_fstring(fstring_range) else {
-            unreachable!()
-        };
-
-        let mut strings = vec![StringType::FString(fstring)];
-        // Handles implict concatenated f-strings, e.g. `f"{x}" f"hello"`, and
-        // implict concatenated f-strings with strings, e.g. `f"{x}" "xyz" f"{x}"`.
-        let fstring_set = TokenSet::new(&[TokenKind::FStringStart, TokenKind::String]);
-        while self.at_ts(fstring_set) {
+    const FSTRING_SET: TokenSet = TokenSet::new(&[TokenKind::FStringStart, TokenKind::String]);
+    /// Handles implict concatenated f-strings, e.g. `f"{x}" f"hello"`, and
+    /// implict concatenated f-strings with strings, e.g. `f"{x}" "xyz" f"{x}"`.
+    fn handle_implict_concatenated_strings(
+        &mut self,
+        fstring_range: &mut TextRange,
+        strings: &mut Vec<StringType>,
+    ) {
+        while self.at_ts(Self::FSTRING_SET) {
             if self.at(TokenKind::FStringStart) {
                 let (_, range) = self.next_token();
-                let (Expr::FString(fstring), range) = self.parse_fstring(range) else {
-                    unreachable!()
-                };
-                fstring_range = fstring_range.cover(range);
+                let fstring = self.parse_fstring(range);
+                *fstring_range = fstring_range.cover(fstring.range);
                 strings.push(StringType::FString(fstring));
             } else {
-                while self.at(TokenKind::String) {
-                    let (
-                        Tok::String {
-                            value,
-                            kind,
-                            triple_quoted,
-                        },
-                        str_range,
-                    ) = self.next_token()
-                    else {
-                        unreachable!()
-                    };
+                let (
+                    Tok::String {
+                        value,
+                        kind,
+                        triple_quoted,
+                    },
+                    str_range,
+                ) = self.next_token()
+                else {
+                    unreachable!()
+                };
 
-                    match parse_string_literal(&value, kind, triple_quoted, str_range.start()) {
-                        Ok(string) => {
-                            fstring_range = fstring_range.cover(str_range);
-                            strings.push(string);
-                        }
-                        Err(error) => {
-                            strings.push(StringType::Invalid(ast::ExprStringLiteral {
-                                value,
-                                range: str_range,
-                                unicode: kind.is_unicode(),
-                                implicit_concatenated: false,
-                            }));
-                            self.add_error(ParseErrorType::Lexical(error.error), error.location);
-                        }
+                match parse_string_literal(&value, kind, triple_quoted, str_range) {
+                    Ok(string) => {
+                        *fstring_range = fstring_range.cover(str_range);
+                        strings.push(string);
+                    }
+                    Err(error) => {
+                        strings.push(StringType::Invalid(ast::StringLiteral {
+                            value,
+                            range: str_range,
+                            unicode: kind.is_unicode(),
+                        }));
+                        self.add_error(ParseErrorType::Lexical(error.error), error.location);
                     }
                 }
             }
         }
+    }
 
-        match concatenate_strings(strings, fstring_range) {
+    fn parse_fstring_expr(&mut self, mut fstring_range: TextRange) -> ExprWithRange {
+        let fstring = self.parse_fstring(fstring_range);
+
+        if !self.at_ts(Self::FSTRING_SET) {
+            let range = fstring.range;
+            return (
+                Expr::FString(ast::ExprFString {
+                    value: ast::FStringValue::single(fstring),
+                    range,
+                }),
+                range,
+            );
+        }
+
+        let mut strings = vec![StringType::FString(fstring)];
+        self.handle_implict_concatenated_strings(&mut fstring_range, &mut strings);
+
+        match concatenated_strings(strings, fstring_range) {
             Ok(string) => (string, fstring_range),
             Err(error) => {
                 self.add_error(ParseErrorType::Lexical(error.error), error.location);
@@ -3377,65 +3426,86 @@ where
         }
     }
 
-    fn parse_fstring(&mut self, mut fstring_range: TextRange) -> ExprWithRange {
-        let mut values = vec![];
+    fn parse_fstring(&mut self, mut fstring_range: TextRange) -> ast::FString {
+        let (elements, _) = self.parse_fstring_elements();
 
-        const FSTRING_END_SET: TokenSet =
-            TokenSet::new(&[TokenKind::FStringEnd, TokenKind::Rbrace]).union(NEWLINE_EOF_SET);
-        while !self.at_ts(FSTRING_END_SET) {
-            let range = self.current_range();
+        fstring_range = fstring_range.cover(self.current_range());
+        self.eat(TokenKind::FStringEnd);
 
-            let (expr, expr_range) = if self.at(TokenKind::Lbrace) {
-                self.parse_formatted_value()
-            } else if self.at(TokenKind::FStringMiddle) {
-                let (Tok::FStringMiddle { value, is_raw }, range) = self.next_token() else {
-                    unreachable!()
-                };
-                parse_fstring_middle(&value, is_raw, range.start())
-                    .map(|expr| (expr, range))
-                    .unwrap_or_else(|err| {
-                        self.add_error(ParseErrorType::Lexical(err.error), err.location);
-                        (
-                            Expr::Invalid(ast::ExprInvalid {
-                                value: self.src_text(err.location).into(),
-                                range: err.location,
-                            }),
-                            err.location,
-                        )
-                    })
-            } else if self.at_expr() {
-                self.parse_expr()
-            } else {
-                self.next_token();
-                (
-                    Expr::Invalid(ast::ExprInvalid {
-                        value: self.src_text(range).into(),
-                        range,
-                    }),
-                    range,
-                )
-            };
-            fstring_range = fstring_range.cover(expr_range);
-            values.push(expr);
+        ast::FString {
+            elements,
+            range: fstring_range,
         }
-
-        if self.at(TokenKind::FStringEnd) {
-            fstring_range = fstring_range.cover(self.current_range());
-            self.eat(TokenKind::FStringEnd);
-        }
-
-        (
-            Expr::FString(ast::ExprFString {
-                values,
-                range: fstring_range,
-                implicit_concatenated: false,
-            }),
-            fstring_range,
-        )
     }
 
-    fn parse_formatted_value(&mut self) -> ExprWithRange {
-        let mut range = self.current_range();
+    const FSTRING_END_SET: TokenSet =
+        TokenSet::new(&[TokenKind::FStringEnd, TokenKind::Rbrace]).union(NEWLINE_EOF_SET);
+    fn parse_fstring_elements(&mut self) -> (Vec<FStringElement>, TextRange) {
+        let mut elements = vec![];
+        let mut final_range: Option<TextRange> = None;
+        while !self.at_ts(Self::FSTRING_END_SET) {
+            let element = match self.current_kind() {
+                TokenKind::Lbrace => {
+                    let fstring_expr = self.parse_fstring_expr_element();
+                    let range = final_range.get_or_insert_with(|| fstring_expr.range);
+                    *range = range.cover(fstring_expr.range);
+                    FStringElement::Expression(fstring_expr)
+                }
+                TokenKind::FStringMiddle => {
+                    let (Tok::FStringMiddle { value, is_raw }, range) = self.next_token() else {
+                        unreachable!()
+                    };
+                    let (fstring_literal, fstring_range) =
+                        match parse_fstring_literal_element(&value, is_raw, range) {
+                            Ok(fstring) => {
+                                let range = fstring.range();
+                                (fstring, range)
+                            }
+                            Err(lex_error) => {
+                                self.add_error(
+                                    ParseErrorType::Lexical(lex_error.error),
+                                    lex_error.location,
+                                );
+                                (
+                                    ast::FStringElement::Invalid(ast::FStringInvalidElement {
+                                        value: self.src_text(lex_error.location).into(),
+                                        range: lex_error.location,
+                                    }),
+                                    lex_error.location,
+                                )
+                            }
+                        };
+                    let range = final_range.get_or_insert_with(|| fstring_range);
+                    *range = range.cover(fstring_range);
+                    fstring_literal
+                }
+                // `Invalid` tokens are created when there's a lexical error, so
+                // we ignore it here to avoid creating unexpected token errors
+                TokenKind::Invalid => {
+                    self.next_token();
+                    continue;
+                }
+                // Handle an unexpected token
+                _ => {
+                    let (tok, range) = self.next_token();
+                    self.add_error(
+                        ParseErrorType::OtherError(format!(
+                            "f-string: unexpected token `{:?}`",
+                            tok
+                        )),
+                        range,
+                    );
+                    continue;
+                }
+            };
+            elements.push(element);
+        }
+
+        (elements, final_range.unwrap_or_default())
+    }
+
+    fn parse_fstring_expr_element(&mut self) -> ast::FStringExpressionElement {
+        let range = self.current_range();
 
         let has_open_brace = self.eat(TokenKind::Lbrace);
         let (value, value_range) = self.parse_exprs_and_recover(
@@ -3492,16 +3562,13 @@ where
         };
 
         let format_spec = if self.eat(TokenKind::Colon) {
-            let range = self.current_range();
-            let (Expr::FString(mut node), _) = self.parse_fstring_expr(range) else {
-                unreachable!()
-            };
-            // Special case for when the f-string has no values. We set the range
-            // to an empty `TextRange`.
-            if node.values.is_empty() {
-                node.range = TextRange::empty(range.start());
+            let (elements, mut range) = self.parse_fstring_elements();
+            // Special case for when the f-string format spec is empty. We set the range
+            // to an emtpy `TextRange`.
+            if range.is_empty() {
+                range = TextRange::empty(self.current_range().start());
             }
-            Some(Box::new(Expr::FString(node)))
+            Some(Box::new(ast::FStringFormatSpec { elements, range }))
         } else {
             None
         };
@@ -3516,17 +3583,13 @@ where
             );
         }
 
-        range = range.cover(close_brace_range);
-        (
-            Expr::FormattedValue(ast::ExprFormattedValue {
-                value: Box::new(value),
-                debug_text,
-                conversion,
-                format_spec,
-                range,
-            }),
-            range,
-        )
+        ast::FStringExpressionElement {
+            expression: Box::new(value),
+            debug_text,
+            conversion,
+            format_spec,
+            range: range.cover(close_brace_range),
+        }
     }
 
     fn parse_bracketsized_expr(&mut self, open_bracket_range: TextRange) -> ExprWithRange {

@@ -151,9 +151,15 @@ ParsedFile {
                                                     StringLiteral(
                                                         ExprStringLiteral {
                                                             range: 95..109,
-                                                            value: "Hello World!",
-                                                            unicode: false,
-                                                            implicit_concatenated: false,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 95..109,
+                                                                        value: "Hello World!",
+                                                                        unicode: false,
+                                                                    },
+                                                                ),
+                                                            },
                                                         },
                                                     ),
                                                 ],
@@ -184,9 +190,15 @@ ParsedFile {
                                                     StringLiteral(
                                                         ExprStringLiteral {
                                                             range: 128..142,
-                                                            value: "Olá, Mundo!",
-                                                            unicode: false,
-                                                            implicit_concatenated: false,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 128..142,
+                                                                        value: "Olá, Mundo!",
+                                                                        unicode: false,
+                                                                    },
+                                                                ),
+                                                            },
                                                         },
                                                     ),
                                                 ],

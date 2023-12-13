@@ -61,7 +61,6 @@ pub(crate) fn set_expr_range(expr: &mut Expr, range: TextRange) {
         Expr::Subscript(node) => node.range = range,
         Expr::YieldFrom(node) => node.range = range,
         Expr::NoneLiteral(node) => node.range = range,
-        Expr::FormattedValue(node) => node.range = range,
         Expr::StringLiteral(node) => node.range = range,
         Expr::BytesLiteral(node) => node.range = range,
         Expr::NumberLiteral(node) => node.range = range,

@@ -75,9 +75,15 @@ ParsedFile {
                                     StringLiteral(
                                         ExprStringLiteral {
                                             range: 17..24,
-                                            value: "hello",
-                                            unicode: false,
-                                            implicit_concatenated: false,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 17..24,
+                                                        value: "hello",
+                                                        unicode: false,
+                                                    },
+                                                ),
+                                            },
                                         },
                                     ),
                                 ],
@@ -134,9 +140,15 @@ ParsedFile {
                                         StringLiteral(
                                             ExprStringLiteral {
                                                 range: 38..43,
-                                                value: "foo",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 38..43,
+                                                            value: "foo",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     ),
@@ -146,9 +158,15 @@ ParsedFile {
                                     StringLiteral(
                                         ExprStringLiteral {
                                             range: 45..50,
-                                            value: "bar",
-                                            unicode: false,
-                                            implicit_concatenated: false,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 45..50,
+                                                        value: "bar",
+                                                        unicode: false,
+                                                    },
+                                                ),
+                                            },
                                         },
                                     ),
                                     Dict(
@@ -159,9 +177,15 @@ ParsedFile {
                                                     StringLiteral(
                                                         ExprStringLiteral {
                                                             range: 55..63,
-                                                            value: "nested",
-                                                            unicode: false,
-                                                            implicit_concatenated: false,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 55..63,
+                                                                        value: "nested",
+                                                                        unicode: false,
+                                                                    },
+                                                                ),
+                                                            },
                                                         },
                                                     ),
                                                 ),
@@ -170,9 +194,15 @@ ParsedFile {
                                                 StringLiteral(
                                                     ExprStringLiteral {
                                                         range: 65..71,
-                                                        value: "dict",
-                                                        unicode: false,
-                                                        implicit_concatenated: false,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 65..71,
+                                                                    value: "dict",
+                                                                    unicode: false,
+                                                                },
+                                                            ),
+                                                        },
                                                     },
                                                 ),
                                             ],
@@ -499,9 +529,15 @@ ParsedFile {
                                                     StringLiteral(
                                                         ExprStringLiteral {
                                                             range: 168..176,
-                                                            value: "nested",
-                                                            unicode: false,
-                                                            implicit_concatenated: false,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 168..176,
+                                                                        value: "nested",
+                                                                        unicode: false,
+                                                                    },
+                                                                ),
+                                                            },
                                                         },
                                                     ),
                                                 ),
@@ -510,9 +546,15 @@ ParsedFile {
                                                 StringLiteral(
                                                     ExprStringLiteral {
                                                         range: 178..184,
-                                                        value: "dict",
-                                                        unicode: false,
-                                                        implicit_concatenated: false,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 178..184,
+                                                                    value: "dict",
+                                                                    unicode: false,
+                                                                },
+                                                            ),
+                                                        },
                                                     },
                                                 ),
                                             ],
@@ -697,9 +739,15 @@ ParsedFile {
                                         StringLiteral(
                                             ExprStringLiteral {
                                                 range: 279..282,
-                                                value: "A",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 279..282,
+                                                            value: "A",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     ),
@@ -707,9 +755,15 @@ ParsedFile {
                                         StringLiteral(
                                             ExprStringLiteral {
                                                 range: 304..307,
-                                                value: "B",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 304..307,
+                                                            value: "B",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     ),

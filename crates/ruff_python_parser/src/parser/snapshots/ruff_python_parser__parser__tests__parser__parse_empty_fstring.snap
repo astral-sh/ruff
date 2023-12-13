@@ -13,8 +13,16 @@ ParsedFile {
                         value: FString(
                             ExprFString {
                                 range: 1..4,
-                                values: [],
-                                implicit_concatenated: false,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 1..4,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
                             },
                         ),
                     },
@@ -25,8 +33,16 @@ ParsedFile {
                         value: FString(
                             ExprFString {
                                 range: 5..8,
-                                values: [],
-                                implicit_concatenated: false,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 5..8,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
                             },
                         ),
                     },
@@ -37,8 +53,16 @@ ParsedFile {
                         value: FString(
                             ExprFString {
                                 range: 9..12,
-                                values: [],
-                                implicit_concatenated: false,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 9..12,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
                             },
                         ),
                     },
@@ -49,8 +73,16 @@ ParsedFile {
                         value: FString(
                             ExprFString {
                                 range: 13..20,
-                                values: [],
-                                implicit_concatenated: false,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 13..20,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
                             },
                         ),
                     },
@@ -61,8 +93,16 @@ ParsedFile {
                         value: FString(
                             ExprFString {
                                 range: 21..28,
-                                values: [],
-                                implicit_concatenated: false,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 21..28,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
                             },
                         ),
                     },

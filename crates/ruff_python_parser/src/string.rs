@@ -6,11 +6,12 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::lexer::{LexicalError, LexicalErrorType};
 use crate::token::StringKind;
 
+#[derive(Debug)]
 pub(crate) enum StringType {
-    Str(ast::ExprStringLiteral),
-    Bytes(ast::ExprBytesLiteral),
-    FString(ast::ExprFString),
-    Invalid(ast::ExprStringLiteral),
+    Str(ast::StringLiteral),
+    Bytes(ast::BytesLiteral),
+    FString(ast::FString),
+    Invalid(ast::StringLiteral),
 }
 
 impl Ranged for StringType {
@@ -63,6 +64,11 @@ impl<'a> StringParser<'a> {
     #[inline]
     fn get_pos(&self) -> TextSize {
         self.location
+    }
+
+    #[inline]
+    fn range(&self, start_location: TextSize) -> TextRange {
+        TextRange::new(start_location, self.location)
     }
 
     /// Returns the next byte in the string, if there is one.

@@ -84,9 +84,15 @@ ParsedFile {
                                 value: StringLiteral(
                                     ExprStringLiteral {
                                         range: 27..30,
-                                        value: "x",
-                                        unicode: false,
-                                        implicit_concatenated: false,
+                                        value: StringLiteralValue {
+                                            inner: Single(
+                                                StringLiteral {
+                                                    range: 27..30,
+                                                    value: "x",
+                                                    unicode: false,
+                                                },
+                                            ),
+                                        },
                                     },
                                 ),
                                 generators: [

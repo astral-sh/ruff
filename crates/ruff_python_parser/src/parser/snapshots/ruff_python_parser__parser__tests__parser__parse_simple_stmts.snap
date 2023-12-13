@@ -351,9 +351,15 @@ ParsedFile {
                             StringLiteral(
                                 ExprStringLiteral {
                                     range: 169..176,
-                                    value: "error",
-                                    unicode: false,
-                                    implicit_concatenated: false,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 169..176,
+                                                value: "error",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                         ),

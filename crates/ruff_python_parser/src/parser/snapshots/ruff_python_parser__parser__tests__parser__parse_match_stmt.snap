@@ -192,9 +192,15 @@ ParsedFile {
                                         value: StringLiteral(
                                             ExprStringLiteral {
                                                 range: 209..211,
-                                                value: "",
-                                                unicode: false,
-                                                implicit_concatenated: false,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 209..211,
+                                                            value: "",
+                                                            unicode: false,
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     },
@@ -221,8 +227,14 @@ ParsedFile {
                                         value: BytesLiteral(
                                             ExprBytesLiteral {
                                                 range: 234..237,
-                                                value: [],
-                                                implicit_concatenated: false,
+                                                value: BytesLiteralValue {
+                                                    inner: Single(
+                                                        BytesLiteral {
+                                                            range: 234..237,
+                                                            value: [],
+                                                        },
+                                                    ),
+                                                },
                                             },
                                         ),
                                     },
@@ -581,9 +593,15 @@ ParsedFile {
                                                     value: StringLiteral(
                                                         ExprStringLiteral {
                                                             range: 525..527,
-                                                            value: "",
-                                                            unicode: false,
-                                                            implicit_concatenated: false,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 525..527,
+                                                                        value: "",
+                                                                        unicode: false,
+                                                                    },
+                                                                ),
+                                                            },
                                                         },
                                                     ),
                                                 },
@@ -2176,9 +2194,15 @@ ParsedFile {
                                             StringLiteral(
                                                 ExprStringLiteral {
                                                     range: 1569..1571,
-                                                    value: "",
-                                                    unicode: false,
-                                                    implicit_concatenated: false,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 1569..1571,
+                                                                value: "",
+                                                                unicode: false,
+                                                            },
+                                                        ),
+                                                    },
                                                 },
                                             ),
                                             NoneLiteral(
