@@ -190,7 +190,7 @@ mod tests {
     use crate::message::SarifEmitter;
 
     fn get_output() -> String {
-        let mut emitter = SarifEmitter{};
+        let mut emitter = SarifEmitter {};
         capture_emitter_output(&mut emitter, &create_messages())
     }
 
