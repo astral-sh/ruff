@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
@@ -506,7 +507,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         add_import_edit
             .into_edits()
             .into_iter()
-            .chain(quote_reference_edits),
+            .chain(quote_reference_edits.into_iter().dedup()),
     )
     .isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),

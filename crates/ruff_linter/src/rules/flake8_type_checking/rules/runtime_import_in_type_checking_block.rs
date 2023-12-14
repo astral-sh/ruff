@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
+use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Fix, FixAvailability, Violation};
@@ -262,7 +263,7 @@ pub(crate) fn runtime_import_in_type_checking_block(
 
 /// Generate a [`Fix`] to quote runtime usages for imports in a type-checking block.
 fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
-    let mut quote_reference_edits = imports
+    let quote_reference_edits = imports
         .iter()
         .flat_map(|ImportBinding { binding, .. }| {
             binding.references.iter().filter_map(|reference_id| {
@@ -280,14 +281,12 @@ fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) 
             })
         })
         .collect::<Result<Vec<_>>>()?;
-    let quote_reference_edit = quote_reference_edits
-        .pop()
-        .expect("Expected at least one reference");
-    Ok(
-        Fix::unsafe_edits(quote_reference_edit, quote_reference_edits).isolate(Checker::isolation(
-            checker.semantic().parent_statement_id(node_id),
-        )),
-    )
+
+    let mut rest = quote_reference_edits.into_iter().dedup();
+    let head = rest.next().expect("Expected at least one reference");
+    Ok(Fix::unsafe_edits(head, rest).isolate(Checker::isolation(
+        checker.semantic().parent_statement_id(node_id),
+    )))
 }
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.
