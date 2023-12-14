@@ -432,70 +432,10 @@ pub(crate) fn concatenated_strings(
     .into())
 }
 
-// TODO: consolidate these with ParseError
-/// An error that occurred during parsing of an f-string.
-#[derive(Debug, PartialEq)]
-struct FStringError {
-    /// The type of error that occurred.
-    pub(crate) error: FStringErrorType,
-    /// The location of the error.
-    pub(crate) location: TextRange,
-}
-
-impl From<FStringError> for LexicalError {
-    fn from(err: FStringError) -> Self {
-        LexicalError {
-            error: LexicalErrorType::FStringError(err.error),
-            location: err.location,
-        }
-    }
-}
-
-/// Represents the different types of errors that can occur during parsing of an f-string.
-#[derive(Debug, PartialEq)]
-pub enum FStringErrorType {
-    /// Expected a right brace after an opened left brace.
-    UnclosedLbrace,
-    /// An invalid conversion flag was encountered.
-    InvalidConversionFlag,
-    /// A single right brace was encountered.
-    SingleRbrace,
-    /// Unterminated string.
-    UnterminatedString,
-    /// Unterminated triple-quoted string.
-    UnterminatedTripleQuotedString,
-    // TODO(dhruvmanila): The parser can't catch all cases of this error, but
-    // wherever it can, we'll display the correct error message.
-    /// A lambda expression without parentheses was encountered.
-    LambdaWithoutParentheses,
-}
-
-impl std::fmt::Display for FStringErrorType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use FStringErrorType::{
-            InvalidConversionFlag, LambdaWithoutParentheses, SingleRbrace, UnclosedLbrace,
-            UnterminatedString, UnterminatedTripleQuotedString,
-        };
-        match self {
-            UnclosedLbrace => write!(f, "expecting '}}'"),
-            InvalidConversionFlag => write!(f, "invalid conversion character"),
-            SingleRbrace => write!(f, "single '}}' is not allowed"),
-            UnterminatedString => write!(f, "unterminated string"),
-            UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
-            LambdaWithoutParentheses => {
-                write!(f, "lambda expressions are not allowed without parentheses")
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::lexer::LexicalErrorType;
     use crate::parser::parse_suite;
-    use crate::{ParseErrorType, Suite};
-
-    use super::*;
+    use crate::{FStringErrorType, ParseErrorType, Suite};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
@@ -580,7 +520,7 @@ mod tests {
     fn parse_fstring_error(source: &str) -> FStringErrorType {
         parse_suite(source, "<test>")
             .map_err(|e| match e.error {
-                ParseErrorType::Lexical(LexicalErrorType::FStringError(e)) => e,
+                ParseErrorType::FStringError(e) => e,
                 e => unreachable!("Expected FStringError: {:?}", e),
             })
             .expect_err("Expected error")

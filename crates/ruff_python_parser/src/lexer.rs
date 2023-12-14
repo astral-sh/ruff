@@ -37,12 +37,12 @@ use unicode_ident::{is_xid_continue, is_xid_start};
 use ruff_python_ast::{Int, IpyEscapeKind};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
+use crate::error::FStringErrorType;
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
 use crate::lexer::fstring::{FStringContext, FStringContextFlags, FStrings};
 use crate::lexer::indentation::{Indentation, Indentations};
 use crate::{
     soft_keywords::SoftKeywordTransformer,
-    string::FStringErrorType,
     token::{StringKind, Tok},
     Mode,
 };

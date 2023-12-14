@@ -115,7 +115,6 @@ pub use parser::{
 };
 use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-pub use string::FStringErrorType;
 pub use token::{StringKind, Tok, TokenKind};
 
 use crate::lexer::LexResult;
@@ -133,7 +132,7 @@ mod string;
 mod token;
 mod token_set;
 pub mod typing;
-pub use error::{ParseError, ParseErrorType};
+pub use error::{FStringErrorType, ParseError, ParseErrorType};
 
 /// Collect tokens up to and including the first error.
 pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {

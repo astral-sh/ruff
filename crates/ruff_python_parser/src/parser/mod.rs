@@ -7,13 +7,14 @@ use ast::{
 use bitflags::bitflags;
 
 use crate::{
+    error::FStringErrorType,
     helpers::{self, token_kind_to_cmp_op},
-    lexer::{LexResult, LexicalErrorType, Spanned},
+    lexer::{LexResult, Spanned},
     string::{
         concatenated_strings, parse_fstring_literal_element, parse_string_literal, StringType,
     },
     token_set::TokenSet,
-    FStringErrorType, Mode, ParseError, ParseErrorType, Tok, TokenKind,
+    Mode, ParseError, ParseErrorType, Tok, TokenKind,
 };
 use itertools::PeekNth;
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -3544,9 +3545,7 @@ where
             && matches!(value, Expr::Lambda(_))
         {
             self.add_error(
-                ParseErrorType::Lexical(LexicalErrorType::FStringError(
-                    FStringErrorType::LambdaWithoutParentheses,
-                )),
+                ParseErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
                 value_range,
             )
         }
@@ -3571,9 +3570,7 @@ where
                 "a" => ConversionFlag::Ascii,
                 _ => {
                     self.add_error(
-                        ParseErrorType::Lexical(LexicalErrorType::FStringError(
-                            FStringErrorType::InvalidConversionFlag,
-                        )),
+                        ParseErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
                         range,
                     );
                     ConversionFlag::None
@@ -3598,9 +3595,7 @@ where
         let close_brace_range = self.current_range();
         if has_open_brace && !self.eat(TokenKind::Rbrace) {
             self.add_error(
-                ParseErrorType::Lexical(LexicalErrorType::FStringError(
-                    FStringErrorType::UnclosedLbrace,
-                )),
+                ParseErrorType::FStringError(FStringErrorType::UnclosedLbrace),
                 close_brace_range,
             );
         }
