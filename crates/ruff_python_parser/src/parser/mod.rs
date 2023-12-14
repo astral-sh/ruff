@@ -390,7 +390,29 @@ where
         self.at_ts(COMPOUND_STMT_SET)
     }
 
-    fn src_text(&self, range: TextRange) -> &'src str {
+    fn src_text(&self, mut range: TextRange) -> &'src str {
+        // This check is to prevent the parser from panicking when using the
+        // `parse_expression_starts_at` function with an offset bigger than zero.
+        //
+        // The parser assumes that the token's range values are smaller than
+        // the source length. But, with an offset bigger than zero, it can
+        // happen that the token's range values are bigger than the source
+        // length, causing the parser to panic when calling this function
+        // with such ranges.
+        //
+        // Therefore, we fix this by creating a new range starting at 0 up to
+        // the source length - 1.
+        //
+        // TODO: Create the proper range here.
+        let src_len = self.source.len();
+        if range.start().to_usize() > src_len || range.end().to_usize() > src_len {
+            range = TextRange::new(
+                0.into(),
+                (self.source.len() - 1)
+                    .try_into()
+                    .expect("source length is bigger than u32 max"),
+            );
+        }
         &self.source[range]
     }
 
