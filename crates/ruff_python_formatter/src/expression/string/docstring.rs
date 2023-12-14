@@ -316,7 +316,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                     }
                 }
                 CodeExampleAddAction::Format { mut kind } => {
-                    let Some(formatted_lines) = self.format(kind.code())? else {
+                    let Some(formatted_lines) = self.format(&mut kind)? else {
                         // Since we've failed to emit these lines, we need to
                         // put them back in the queue but have them jump to the
                         // front of the queue to get processed before any other
@@ -432,8 +432,12 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         Ok(())
     }
 
-    /// Given a sequence of lines from a code snippet, format them and return
+    /// Given a code example, format them and return
     /// the formatted code as a sequence of owned docstring lines.
+    ///
+    /// This may mutate the code example in place if extracting the lines of
+    /// code requires adjusting which part of each line is used for the actual
+    /// code bit.
     ///
     /// This routine generally only returns an error when the recursive call
     /// to the formatter itself returns a `FormatError`. In all other cases
@@ -448,10 +452,25 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
     /// but at time of writing, it wasn't clear to me how to best do that.
     fn format(
         &mut self,
-        code: &[CodeExampleLine<'_>],
+        kind: &mut CodeExampleKind<'_>,
     ) -> FormatResult<Option<Vec<OutputDocstringLine<'static>>>> {
         use ruff_python_parser::AsMode;
 
+        let line_width = match self.f.options().docstring_code_line_width() {
+            DocstringCodeLineWidth::Fixed(width) => width,
+            DocstringCodeLineWidth::Dynamic => {
+                let global_line_width = self.f.options().line_width().value();
+                let indent_width = self.f.options().indent_width();
+                let indent_level = self.f.context().indent_level();
+                let current_indent = indent_level
+                    .to_ascii_spaces(indent_width)
+                    .saturating_add(kind.extra_indent_ascii_spaces());
+                let width = std::cmp::max(1, global_line_width.saturating_sub(current_indent));
+                LineWidth::try_from(width).expect("width is capped at a minimum of 1")
+            }
+        };
+
+        let code = kind.code();
         let (Some(unformatted_first), Some(unformatted_last)) = (code.first(), code.last()) else {
             return Ok(None);
         };
@@ -460,17 +479,6 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             .map(|line| line.code)
             .collect::<Vec<&str>>()
             .join("\n");
-        let line_width = match self.f.options().docstring_code_line_width() {
-            DocstringCodeLineWidth::Fixed(width) => width,
-            DocstringCodeLineWidth::Dynamic => {
-                let global_line_width = self.f.options().line_width().value();
-                let indent_width = self.f.options().indent_width();
-                let indent_level = self.f.context().indent_level();
-                let current_indent = indent_level.to_ascii_spaces(indent_width);
-                let width = std::cmp::max(1, global_line_width.saturating_sub(current_indent));
-                LineWidth::try_from(width).expect("width is capped at a minimum of 1")
-            }
-        };
         let options = self
             .f
             .options()
@@ -776,6 +784,17 @@ impl<'src> CodeExampleKind<'src> {
             CodeExampleKind::Doctest(doctest) => doctest.lines,
             CodeExampleKind::Rst(litblock) => litblock.lines,
             CodeExampleKind::Markdown(fenced) => fenced.lines,
+        }
+    }
+
+    /// This returns any extra indent that will be added after formatting this
+    /// code example.
+    ///
+    /// The extra indent is expressed in units of ASCII space characters.
+    fn extra_indent_ascii_spaces(&self) -> u16 {
+        match *self {
+            CodeExampleKind::Doctest(_) => 4,
+            _ => 0,
         }
     }
 }
