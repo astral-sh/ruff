@@ -1,0 +1,92 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\n*a\n*(a + 1)\n*x.attr\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..21,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 1..3,
+                        value: Starred(
+                            ExprStarred {
+                                range: 1..3,
+                                value: Name(
+                                    ExprName {
+                                        range: 2..3,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 4..12,
+                        value: Starred(
+                            ExprStarred {
+                                range: 4..12,
+                                value: BinOp(
+                                    ExprBinOp {
+                                        range: 6..11,
+                                        left: Name(
+                                            ExprName {
+                                                range: 6..7,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 10..11,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 13..20,
+                        value: Starred(
+                            ExprStarred {
+                                range: 13..20,
+                                value: Attribute(
+                                    ExprAttribute {
+                                        range: 14..20,
+                                        value: Name(
+                                            ExprName {
+                                                range: 14..15,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        attr: Identifier {
+                                            id: "attr",
+                                            range: 16..20,
+                                        },
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

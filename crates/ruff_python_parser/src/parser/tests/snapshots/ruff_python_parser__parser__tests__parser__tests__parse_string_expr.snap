@@ -1,0 +1,255 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(r#\"\n'Hello World'\n\"😎\"\n'Foo' 'Bar'\n(\n    'A'\n    'B'\n    'C'\n)\n'''Olá, Mundo!'''\n\"\"\"ABCDE\"\"\"\n(\n    '''aB'''\n    '''cD'''\n)\nb'hello world'\nb'bytes' b'concatenated'\n\"#)"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..163,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 1..14,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 1..14,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 1..14,
+                                            value: "Hello World",
+                                            unicode: false,
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 15..21,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 15..21,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 15..21,
+                                            value: "😎",
+                                            unicode: false,
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 22..33,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 22..33,
+                                value: StringLiteralValue {
+                                    inner: Concatenated(
+                                        ConcatenatedStringLiteral {
+                                            strings: [
+                                                StringLiteral {
+                                                    range: 22..27,
+                                                    value: "Foo",
+                                                    unicode: false,
+                                                },
+                                                StringLiteral {
+                                                    range: 28..33,
+                                                    value: "Bar",
+                                                    unicode: false,
+                                                },
+                                            ],
+                                            value: "FooBar",
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 34..61,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 40..59,
+                                value: StringLiteralValue {
+                                    inner: Concatenated(
+                                        ConcatenatedStringLiteral {
+                                            strings: [
+                                                StringLiteral {
+                                                    range: 40..43,
+                                                    value: "A",
+                                                    unicode: false,
+                                                },
+                                                StringLiteral {
+                                                    range: 48..51,
+                                                    value: "B",
+                                                    unicode: false,
+                                                },
+                                                StringLiteral {
+                                                    range: 56..59,
+                                                    value: "C",
+                                                    unicode: false,
+                                                },
+                                            ],
+                                            value: "ABC",
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 62..80,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 62..80,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 62..80,
+                                            value: "Olá, Mundo!",
+                                            unicode: false,
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 81..92,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 81..92,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 81..92,
+                                            value: "ABCDE",
+                                            unicode: false,
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 93..122,
+                        value: StringLiteral(
+                            ExprStringLiteral {
+                                range: 99..120,
+                                value: StringLiteralValue {
+                                    inner: Concatenated(
+                                        ConcatenatedStringLiteral {
+                                            strings: [
+                                                StringLiteral {
+                                                    range: 99..107,
+                                                    value: "aB",
+                                                    unicode: false,
+                                                },
+                                                StringLiteral {
+                                                    range: 112..120,
+                                                    value: "cD",
+                                                    unicode: false,
+                                                },
+                                            ],
+                                            value: "aBcD",
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 123..137,
+                        value: BytesLiteral(
+                            ExprBytesLiteral {
+                                range: 123..137,
+                                value: BytesLiteralValue {
+                                    inner: Single(
+                                        BytesLiteral {
+                                            range: 123..137,
+                                            value: [
+                                                104,
+                                                101,
+                                                108,
+                                                108,
+                                                111,
+                                                32,
+                                                119,
+                                                111,
+                                                114,
+                                                108,
+                                                100,
+                                            ],
+                                        },
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 138..162,
+                        value: BytesLiteral(
+                            ExprBytesLiteral {
+                                range: 138..162,
+                                value: BytesLiteralValue {
+                                    inner: Concatenated(
+                                        [
+                                            BytesLiteral {
+                                                range: 138..146,
+                                                value: [
+                                                    98,
+                                                    121,
+                                                    116,
+                                                    101,
+                                                    115,
+                                                ],
+                                            },
+                                            BytesLiteral {
+                                                range: 147..162,
+                                                value: [
+                                                    99,
+                                                    111,
+                                                    110,
+                                                    99,
+                                                    97,
+                                                    116,
+                                                    101,
+                                                    110,
+                                                    97,
+                                                    116,
+                                                    101,
+                                                    100,
+                                                ],
+                                            },
+                                        ],
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

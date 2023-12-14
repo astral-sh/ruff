@@ -1,0 +1,114 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(r#\"\nf\"\"\nF\"\"\nf''\nf\"\"\"\"\"\"\nf''''''\n\"#)"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..29,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 1..4,
+                        value: FString(
+                            ExprFString {
+                                range: 1..4,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 1..4,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 5..8,
+                        value: FString(
+                            ExprFString {
+                                range: 5..8,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 5..8,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 9..12,
+                        value: FString(
+                            ExprFString {
+                                range: 9..12,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 9..12,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 13..20,
+                        value: FString(
+                            ExprFString {
+                                range: 13..20,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 13..20,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 21..28,
+                        value: FString(
+                            ExprFString {
+                                range: 21..28,
+                                value: FStringValue {
+                                    inner: Single(
+                                        FString(
+                                            FString {
+                                                range: 21..28,
+                                                elements: [],
+                                            },
+                                        ),
+                                    ),
+                                },
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

@@ -1,0 +1,135 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\nx: int\n(y): 1 + 2\nvar: tuple[int] | int = 1,\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..46,
+            body: [
+                AnnAssign(
+                    StmtAnnAssign {
+                        range: 1..7,
+                        target: Name(
+                            ExprName {
+                                range: 1..2,
+                                id: "x",
+                                ctx: Store,
+                            },
+                        ),
+                        annotation: Name(
+                            ExprName {
+                                range: 4..7,
+                                id: "int",
+                                ctx: Load,
+                            },
+                        ),
+                        value: None,
+                        simple: true,
+                    },
+                ),
+                AnnAssign(
+                    StmtAnnAssign {
+                        range: 8..18,
+                        target: Name(
+                            ExprName {
+                                range: 9..10,
+                                id: "y",
+                                ctx: Store,
+                            },
+                        ),
+                        annotation: BinOp(
+                            ExprBinOp {
+                                range: 13..18,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 13..14,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                op: Add,
+                                right: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 17..18,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                        value: None,
+                        simple: false,
+                    },
+                ),
+                AnnAssign(
+                    StmtAnnAssign {
+                        range: 19..45,
+                        target: Name(
+                            ExprName {
+                                range: 19..22,
+                                id: "var",
+                                ctx: Store,
+                            },
+                        ),
+                        annotation: BinOp(
+                            ExprBinOp {
+                                range: 24..40,
+                                left: Subscript(
+                                    ExprSubscript {
+                                        range: 24..34,
+                                        value: Name(
+                                            ExprName {
+                                                range: 24..29,
+                                                id: "tuple",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        slice: Name(
+                                            ExprName {
+                                                range: 30..33,
+                                                id: "int",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                                op: BitOr,
+                                right: Name(
+                                    ExprName {
+                                        range: 37..40,
+                                        id: "int",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        value: Some(
+                            Tuple(
+                                ExprTuple {
+                                    range: 43..45,
+                                    elts: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 43..44,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                        simple: true,
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

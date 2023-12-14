@@ -1,0 +1,245 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\nclass T:\n    ...\nclass Test():\n        def __init__(self):\n            pass\nclass T(a=1, *A, **k):\n    ...\nclass T:\n    def f():\n        a, b = l\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..147,
+            body: [
+                ClassDef(
+                    StmtClassDef {
+                        range: 1..17,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "T",
+                            range: 7..8,
+                        },
+                        type_params: None,
+                        arguments: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 14..17,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 14..17,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                ClassDef(
+                    StmtClassDef {
+                        range: 18..76,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "Test",
+                            range: 24..28,
+                        },
+                        type_params: None,
+                        arguments: Some(
+                            Arguments {
+                                range: 28..30,
+                                args: [],
+                                keywords: [],
+                            },
+                        ),
+                        body: [
+                            FunctionDef(
+                                StmtFunctionDef {
+                                    range: 40..76,
+                                    is_async: false,
+                                    decorator_list: [],
+                                    name: Identifier {
+                                        id: "__init__",
+                                        range: 44..52,
+                                    },
+                                    type_params: None,
+                                    parameters: Parameters {
+                                        range: 52..58,
+                                        posonlyargs: [],
+                                        args: [
+                                            ParameterWithDefault {
+                                                range: 53..57,
+                                                parameter: Parameter {
+                                                    range: 53..57,
+                                                    name: Identifier {
+                                                        id: "self",
+                                                        range: 53..57,
+                                                    },
+                                                    annotation: None,
+                                                },
+                                                default: None,
+                                            },
+                                        ],
+                                        vararg: None,
+                                        kwonlyargs: [],
+                                        kwarg: None,
+                                    },
+                                    returns: None,
+                                    body: [
+                                        Pass(
+                                            StmtPass {
+                                                range: 72..76,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                ClassDef(
+                    StmtClassDef {
+                        range: 77..107,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "T",
+                            range: 83..84,
+                        },
+                        type_params: None,
+                        arguments: Some(
+                            Arguments {
+                                range: 84..98,
+                                args: [
+                                    Starred(
+                                        ExprStarred {
+                                            range: 90..92,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 91..92,
+                                                    id: "A",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 85..88,
+                                        arg: Some(
+                                            Identifier {
+                                                id: "a",
+                                                range: 85..86,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 87..88,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 94..97,
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                range: 96..97,
+                                                id: "k",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 104..107,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 104..107,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                ClassDef(
+                    StmtClassDef {
+                        range: 108..146,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "T",
+                            range: 114..115,
+                        },
+                        type_params: None,
+                        arguments: None,
+                        body: [
+                            FunctionDef(
+                                StmtFunctionDef {
+                                    range: 121..146,
+                                    is_async: false,
+                                    decorator_list: [],
+                                    name: Identifier {
+                                        id: "f",
+                                        range: 125..126,
+                                    },
+                                    type_params: None,
+                                    parameters: Parameters {
+                                        range: 126..128,
+                                        posonlyargs: [],
+                                        args: [],
+                                        vararg: None,
+                                        kwonlyargs: [],
+                                        kwarg: None,
+                                    },
+                                    returns: None,
+                                    body: [
+                                        Assign(
+                                            StmtAssign {
+                                                range: 138..146,
+                                                targets: [
+                                                    Tuple(
+                                                        ExprTuple {
+                                                            range: 138..142,
+                                                            elts: [
+                                                                Name(
+                                                                    ExprName {
+                                                                        range: 138..139,
+                                                                        id: "a",
+                                                                        ctx: Store,
+                                                                    },
+                                                                ),
+                                                                Name(
+                                                                    ExprName {
+                                                                        range: 141..142,
+                                                                        id: "b",
+                                                                        ctx: Store,
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                ],
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 145..146,
+                                                        id: "l",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

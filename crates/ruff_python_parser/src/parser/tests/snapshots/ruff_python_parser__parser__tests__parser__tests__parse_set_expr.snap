@@ -1,0 +1,189 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\n{1, 2, 3}\n{1 + 2, (a, b), {1,2,3}, {a:b, **d}}\n{a}\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..52,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 1..10,
+                        value: Set(
+                            ExprSet {
+                                range: 1..10,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 2..3,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 5..6,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 8..9,
+                                            value: Int(
+                                                3,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 11..47,
+                        value: Set(
+                            ExprSet {
+                                range: 11..47,
+                                elts: [
+                                    BinOp(
+                                        ExprBinOp {
+                                            range: 12..17,
+                                            left: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 12..13,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 16..17,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 19..25,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 20..21,
+                                                        id: "a",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 23..24,
+                                                        id: "b",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Set(
+                                        ExprSet {
+                                            range: 27..34,
+                                            elts: [
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 28..29,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 30..31,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                                NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 32..33,
+                                                        value: Int(
+                                                            3,
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    Dict(
+                                        ExprDict {
+                                            range: 36..46,
+                                            keys: [
+                                                Some(
+                                                    Name(
+                                                        ExprName {
+                                                            range: 37..38,
+                                                            id: "a",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ),
+                                                None,
+                                            ],
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 39..40,
+                                                        id: "b",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 44..45,
+                                                        id: "d",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 48..51,
+                        value: Set(
+                            ExprSet {
+                                range: 48..51,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 49..50,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

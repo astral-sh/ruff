@@ -1,0 +1,328 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\nif True:\n    1\n    ...\nif x < 1:\n    ...\nelse:\n    pass\n\nif a:\n    pass\nelif b:\n    ...\n\nif a and b:\n    ...\nelif True:\n    ...\nelif c:\n    ...\nelif d:\n    ...\nelse:\n    f()\nif a:=b: ...\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..188,
+            body: [
+                If(
+                    StmtIf {
+                        range: 1..23,
+                        test: BooleanLiteral(
+                            ExprBooleanLiteral {
+                                range: 4..8,
+                                value: true,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 14..15,
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 14..15,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                            Expr(
+                                StmtExpr {
+                                    range: 20..23,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 20..23,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        elif_else_clauses: [],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        range: 24..56,
+                        test: Compare(
+                            ExprCompare {
+                                range: 27..32,
+                                left: Name(
+                                    ExprName {
+                                        range: 27..28,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ops: [
+                                    Lt,
+                                ],
+                                comparators: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 31..32,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 38..41,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 38..41,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        elif_else_clauses: [
+                            ElifElseClause {
+                                range: 42..56,
+                                test: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 52..56,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        range: 58..88,
+                        test: Name(
+                            ExprName {
+                                range: 61..62,
+                                id: "a",
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 68..72,
+                                },
+                            ),
+                        ],
+                        elif_else_clauses: [
+                            ElifElseClause {
+                                range: 73..88,
+                                test: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 78..79,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 85..88,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 85..88,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        range: 90..174,
+                        test: BoolOp(
+                            ExprBoolOp {
+                                range: 93..100,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            range: 93..94,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 99..100,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 106..109,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 106..109,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        elif_else_clauses: [
+                            ElifElseClause {
+                                range: 110..128,
+                                test: Some(
+                                    BooleanLiteral(
+                                        ExprBooleanLiteral {
+                                            range: 115..119,
+                                            value: true,
+                                        },
+                                    ),
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 125..128,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 125..128,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                            ElifElseClause {
+                                range: 129..144,
+                                test: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 134..135,
+                                            id: "c",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 141..144,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 141..144,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                            ElifElseClause {
+                                range: 145..160,
+                                test: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 150..151,
+                                            id: "d",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 157..160,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 157..160,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                            ElifElseClause {
+                                range: 161..174,
+                                test: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 171..174,
+                                            value: Call(
+                                                ExprCall {
+                                                    range: 171..174,
+                                                    func: Name(
+                                                        ExprName {
+                                                            range: 171..172,
+                                                            id: "f",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 172..174,
+                                                        args: [],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ],
+                    },
+                ),
+                If(
+                    StmtIf {
+                        range: 175..187,
+                        test: NamedExpr(
+                            ExprNamedExpr {
+                                range: 178..182,
+                                target: Name(
+                                    ExprName {
+                                        range: 178..179,
+                                        id: "a",
+                                        ctx: Store,
+                                    },
+                                ),
+                                value: Name(
+                                    ExprName {
+                                        range: 181..182,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 184..187,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 184..187,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        elif_else_clauses: [],
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

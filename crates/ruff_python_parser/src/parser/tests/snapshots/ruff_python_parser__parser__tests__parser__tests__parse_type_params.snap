@@ -1,0 +1,145 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\ndef max[T](args: Iterable[T]) -> T:\n    ...\nclass list[T]:\n    ...\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..68,
+            body: [
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 1..44,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "max",
+                            range: 5..8,
+                        },
+                        type_params: Some(
+                            TypeParams {
+                                range: 8..11,
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            range: 9..10,
+                                            name: Identifier {
+                                                id: "T",
+                                                range: 9..10,
+                                            },
+                                            bound: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        parameters: Parameters {
+                            range: 11..30,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 12..29,
+                                    parameter: Parameter {
+                                        range: 12..29,
+                                        name: Identifier {
+                                            id: "args",
+                                            range: 12..16,
+                                        },
+                                        annotation: Some(
+                                            Subscript(
+                                                ExprSubscript {
+                                                    range: 18..29,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 18..26,
+                                                            id: "Iterable",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    slice: Name(
+                                                        ExprName {
+                                                            range: 27..28,
+                                                            id: "T",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: Some(
+                            Name(
+                                ExprName {
+                                    range: 34..35,
+                                    id: "T",
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 41..44,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 41..44,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                ClassDef(
+                    StmtClassDef {
+                        range: 45..67,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "list",
+                            range: 51..55,
+                        },
+                        type_params: Some(
+                            TypeParams {
+                                range: 55..58,
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            range: 56..57,
+                                            name: Identifier {
+                                                id: "T",
+                                                range: 56..57,
+                                            },
+                                            bound: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        arguments: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 64..67,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 64..67,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

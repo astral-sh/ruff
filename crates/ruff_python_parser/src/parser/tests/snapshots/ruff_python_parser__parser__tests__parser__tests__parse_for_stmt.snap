@@ -1,0 +1,516 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\nfor i in x:\n    ...\nfor x.attr in f():\n    pass\nfor 1 + 2 in x.attr:\n    ...\nfor i in x <= y:\n    pass\nfor i in a and b:\n    pass\nfor a,b,c, in iter:\n    ...\nfor (a, b) in iter:\n    ...\nfor i in *x.attr:\n    ...\nfor -i in [1, 2]:\n    ...\nfor *l in a, b, c,:\n   ...\nelse:\n    pass\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..281,
+            body: [
+                For(
+                    StmtFor {
+                        range: 1..20,
+                        is_async: false,
+                        target: Name(
+                            ExprName {
+                                range: 5..6,
+                                id: "i",
+                                ctx: Store,
+                            },
+                        ),
+                        iter: Name(
+                            ExprName {
+                                range: 10..11,
+                                id: "x",
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 17..20,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 17..20,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                    },
+                ),
+                For(
+                    StmtFor {
+                        range: 21..48,
+                        is_async: false,
+                        target: Attribute(
+                            ExprAttribute {
+                                range: 25..31,
+                                value: Name(
+                                    ExprName {
+                                        range: 25..26,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: "attr",
+                                    range: 27..31,
+                                },
+                                ctx: Store,
+                            },
+                        ),
+                        iter: Call(
+                            ExprCall {
+                                range: 35..38,
+                                func: Name(
+                                    ExprName {
+                                        range: 35..36,
+                                        id: "f",
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 36..38,
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 44..48,
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                    },
+                ),
+                For(
+                    StmtFor {
+                        range: 49..77,
+                        is_async: false,
+                        target: BinOp(
+                            ExprBinOp {
+                                range: 53..58,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 53..54,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                op: Add,
+                                right: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 57..58,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                        iter: Attribute(
+                            ExprAttribute {
+                                range: 62..68,
+                                value: Name(
+                                    ExprName {
+                                        range: 62..63,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: "attr",
+                                    range: 64..68,
+                                },
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 74..77,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 74..77,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                    },
+                ),
+                For(
+                    StmtFor {
+                        range: 78..103,
+                        is_async: false,
+                        target: Name(
+                            ExprName {
+                                range: 82..83,
+                                id: "i",
+                                ctx: Store,
+                            },
+                        ),
+                        iter: Compare(
+                            ExprCompare {
+                                range: 87..93,
+                                left: Name(
+                                    ExprName {
+                                        range: 87..88,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ops: [
+                                    LtE,
+                                ],
+                                comparators: [
+                                    Name(
+                                        ExprName {
+                                            range: 92..93,
+                                            id: "y",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 99..103,
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                    },
+                ),
+                For(
+                    StmtFor {
+                        range: 104..130,
+                        is_async: false,
+                        target: Name(
+                            ExprName {
+                                range: 108..109,
+                                id: "i",
+                                ctx: Store,
+                            },
+                        ),
+                        iter: BoolOp(
+                            ExprBoolOp {
+                                range: 113..120,
+                                op: And,
+                                values: [
+                                    Name(
+                                        ExprName {
+                                            range: 113..114,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 119..120,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 126..130,
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                    },
+                ),
+                For(
+                    StmtFor {
+                        range: 131..158,
+                        is_async: false,
+                        target: Tuple(
+                            ExprTuple {
+                                range: 135..141,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 135..136,
+                                            id: "a",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 137..138,
+                                            id: "b",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 139..140,
+                                            id: "c",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                            },
+                        ),
+                        iter: Name(
+                            ExprName {
+                                range: 145..149,
+                                id: "iter",
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 155..158,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 155..158,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                    },
+                ),
+                For(
+                    StmtFor {
+                        range: 159..186,
+                        is_async: false,
+                        target: Tuple(
+                            ExprTuple {
+                                range: 163..169,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 164..165,
+                                            id: "a",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 167..168,
+                                            id: "b",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                            },
+                        ),
+                        iter: Name(
+                            ExprName {
+                                range: 173..177,
+                                id: "iter",
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 183..186,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 183..186,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                    },
+                ),
+                For(
+                    StmtFor {
+                        range: 187..212,
+                        is_async: false,
+                        target: Name(
+                            ExprName {
+                                range: 191..192,
+                                id: "i",
+                                ctx: Store,
+                            },
+                        ),
+                        iter: Starred(
+                            ExprStarred {
+                                range: 196..203,
+                                value: Attribute(
+                                    ExprAttribute {
+                                        range: 197..203,
+                                        value: Name(
+                                            ExprName {
+                                                range: 197..198,
+                                                id: "x",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        attr: Identifier {
+                                            id: "attr",
+                                            range: 199..203,
+                                        },
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 209..212,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 209..212,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                    },
+                ),
+                For(
+                    StmtFor {
+                        range: 213..238,
+                        is_async: false,
+                        target: UnaryOp(
+                            ExprUnaryOp {
+                                range: 217..219,
+                                op: USub,
+                                operand: Name(
+                                    ExprName {
+                                        range: 218..219,
+                                        id: "i",
+                                        ctx: Store,
+                                    },
+                                ),
+                            },
+                        ),
+                        iter: List(
+                            ExprList {
+                                range: 223..229,
+                                elts: [
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 224..225,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 227..228,
+                                            value: Int(
+                                                2,
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 235..238,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 235..238,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        orelse: [],
+                    },
+                ),
+                For(
+                    StmtFor {
+                        range: 239..280,
+                        is_async: false,
+                        target: Starred(
+                            ExprStarred {
+                                range: 243..245,
+                                value: Name(
+                                    ExprName {
+                                        range: 244..245,
+                                        id: "l",
+                                        ctx: Store,
+                                    },
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                        iter: Tuple(
+                            ExprTuple {
+                                range: 249..257,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 249..250,
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 252..253,
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 255..256,
+                                            id: "c",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                ctx: Load,
+                            },
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 262..265,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 262..265,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                        orelse: [
+                            Pass(
+                                StmtPass {
+                                    range: 276..280,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

@@ -1,0 +1,132 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\n(l)\n(l)()\n(l)()()()\n(a\nand\nb\nor\nc)\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..36,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 1..4,
+                        value: Name(
+                            ExprName {
+                                range: 2..3,
+                                id: "l",
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 5..10,
+                        value: Call(
+                            ExprCall {
+                                range: 5..10,
+                                func: Name(
+                                    ExprName {
+                                        range: 6..7,
+                                        id: "l",
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 8..10,
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 11..20,
+                        value: Call(
+                            ExprCall {
+                                range: 11..20,
+                                func: Call(
+                                    ExprCall {
+                                        range: 11..18,
+                                        func: Call(
+                                            ExprCall {
+                                                range: 11..16,
+                                                func: Name(
+                                                    ExprName {
+                                                        range: 12..13,
+                                                        id: "l",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                arguments: Arguments {
+                                                    range: 14..16,
+                                                    args: [],
+                                                    keywords: [],
+                                                },
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 16..18,
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 18..20,
+                                    args: [],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 21..35,
+                        value: BoolOp(
+                            ExprBoolOp {
+                                range: 22..34,
+                                op: Or,
+                                values: [
+                                    BoolOp(
+                                        ExprBoolOp {
+                                            range: 22..29,
+                                            op: And,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 22..23,
+                                                        id: "a",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 28..29,
+                                                        id: "b",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 33..34,
+                                            id: "c",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

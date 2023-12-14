@@ -1,0 +1,589 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\n(i for i in list)\n(a async for i in iter)\n(b for c in d if x in w if y and yy if z)\n(a for b in c if d and e for f in j if k > h)\n(a for b in c if d and e async for f in j if k > h)\nf(x for i in l)\nf(a, x for i in l)\nf(a, x for i, j in l)\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..240,
+            body: [
+                Expr(
+                    StmtExpr {
+                        range: 1..18,
+                        value: GeneratorExp(
+                            ExprGeneratorExp {
+                                range: 1..18,
+                                elt: Name(
+                                    ExprName {
+                                        range: 2..3,
+                                        id: "i",
+                                        ctx: Load,
+                                    },
+                                ),
+                                generators: [
+                                    Comprehension {
+                                        range: 4..17,
+                                        target: Name(
+                                            ExprName {
+                                                range: 8..9,
+                                                id: "i",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 13..17,
+                                                id: "list",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [],
+                                        is_async: false,
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 19..42,
+                        value: GeneratorExp(
+                            ExprGeneratorExp {
+                                range: 19..42,
+                                elt: Name(
+                                    ExprName {
+                                        range: 20..21,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                generators: [
+                                    Comprehension {
+                                        range: 22..41,
+                                        target: Name(
+                                            ExprName {
+                                                range: 32..33,
+                                                id: "i",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 37..41,
+                                                id: "iter",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [],
+                                        is_async: true,
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 43..84,
+                        value: GeneratorExp(
+                            ExprGeneratorExp {
+                                range: 43..84,
+                                elt: Name(
+                                    ExprName {
+                                        range: 44..45,
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                ),
+                                generators: [
+                                    Comprehension {
+                                        range: 46..83,
+                                        target: Name(
+                                            ExprName {
+                                                range: 50..51,
+                                                id: "c",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 55..56,
+                                                id: "d",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [
+                                            Compare(
+                                                ExprCompare {
+                                                    range: 60..66,
+                                                    left: Name(
+                                                        ExprName {
+                                                            range: 60..61,
+                                                            id: "x",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ops: [
+                                                        In,
+                                                    ],
+                                                    comparators: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 65..66,
+                                                                id: "w",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                            BoolOp(
+                                                ExprBoolOp {
+                                                    range: 70..78,
+                                                    op: And,
+                                                    values: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 70..71,
+                                                                id: "y",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Name(
+                                                            ExprName {
+                                                                range: 76..78,
+                                                                id: "yy",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 82..83,
+                                                    id: "z",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        is_async: false,
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 85..130,
+                        value: GeneratorExp(
+                            ExprGeneratorExp {
+                                range: 85..130,
+                                elt: Name(
+                                    ExprName {
+                                        range: 86..87,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                generators: [
+                                    Comprehension {
+                                        range: 88..109,
+                                        target: Name(
+                                            ExprName {
+                                                range: 92..93,
+                                                id: "b",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 97..98,
+                                                id: "c",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [
+                                            BoolOp(
+                                                ExprBoolOp {
+                                                    range: 102..109,
+                                                    op: And,
+                                                    values: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 102..103,
+                                                                id: "d",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Name(
+                                                            ExprName {
+                                                                range: 108..109,
+                                                                id: "e",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        ],
+                                        is_async: false,
+                                    },
+                                    Comprehension {
+                                        range: 110..129,
+                                        target: Name(
+                                            ExprName {
+                                                range: 114..115,
+                                                id: "f",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 119..120,
+                                                id: "j",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [
+                                            Compare(
+                                                ExprCompare {
+                                                    range: 124..129,
+                                                    left: Name(
+                                                        ExprName {
+                                                            range: 124..125,
+                                                            id: "k",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ops: [
+                                                        Gt,
+                                                    ],
+                                                    comparators: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 128..129,
+                                                                id: "h",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        ],
+                                        is_async: false,
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 131..182,
+                        value: GeneratorExp(
+                            ExprGeneratorExp {
+                                range: 131..182,
+                                elt: Name(
+                                    ExprName {
+                                        range: 132..133,
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                ),
+                                generators: [
+                                    Comprehension {
+                                        range: 134..155,
+                                        target: Name(
+                                            ExprName {
+                                                range: 138..139,
+                                                id: "b",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 143..144,
+                                                id: "c",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [
+                                            BoolOp(
+                                                ExprBoolOp {
+                                                    range: 148..155,
+                                                    op: And,
+                                                    values: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 148..149,
+                                                                id: "d",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        Name(
+                                                            ExprName {
+                                                                range: 154..155,
+                                                                id: "e",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        ],
+                                        is_async: false,
+                                    },
+                                    Comprehension {
+                                        range: 156..181,
+                                        target: Name(
+                                            ExprName {
+                                                range: 166..167,
+                                                id: "f",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        iter: Name(
+                                            ExprName {
+                                                range: 171..172,
+                                                id: "j",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ifs: [
+                                            Compare(
+                                                ExprCompare {
+                                                    range: 176..181,
+                                                    left: Name(
+                                                        ExprName {
+                                                            range: 176..177,
+                                                            id: "k",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ops: [
+                                                        Gt,
+                                                    ],
+                                                    comparators: [
+                                                        Name(
+                                                            ExprName {
+                                                                range: 180..181,
+                                                                id: "h",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                        ],
+                                        is_async: true,
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 183..198,
+                        value: Call(
+                            ExprCall {
+                                range: 183..198,
+                                func: Name(
+                                    ExprName {
+                                        range: 183..184,
+                                        id: "f",
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 184..198,
+                                    args: [
+                                        GeneratorExp(
+                                            ExprGeneratorExp {
+                                                range: 185..197,
+                                                elt: Name(
+                                                    ExprName {
+                                                        range: 185..186,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                generators: [
+                                                    Comprehension {
+                                                        range: 187..197,
+                                                        target: Name(
+                                                            ExprName {
+                                                                range: 191..192,
+                                                                id: "i",
+                                                                ctx: Store,
+                                                            },
+                                                        ),
+                                                        iter: Name(
+                                                            ExprName {
+                                                                range: 196..197,
+                                                                id: "l",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        ifs: [],
+                                                        is_async: false,
+                                                    },
+                                                ],
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 199..217,
+                        value: Call(
+                            ExprCall {
+                                range: 199..217,
+                                func: Name(
+                                    ExprName {
+                                        range: 199..200,
+                                        id: "f",
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 200..217,
+                                    args: [
+                                        Name(
+                                            ExprName {
+                                                range: 201..202,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        GeneratorExp(
+                                            ExprGeneratorExp {
+                                                range: 204..216,
+                                                elt: Name(
+                                                    ExprName {
+                                                        range: 204..205,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                generators: [
+                                                    Comprehension {
+                                                        range: 206..216,
+                                                        target: Name(
+                                                            ExprName {
+                                                                range: 210..211,
+                                                                id: "i",
+                                                                ctx: Store,
+                                                            },
+                                                        ),
+                                                        iter: Name(
+                                                            ExprName {
+                                                                range: 215..216,
+                                                                id: "l",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        ifs: [],
+                                                        is_async: false,
+                                                    },
+                                                ],
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+                Expr(
+                    StmtExpr {
+                        range: 218..239,
+                        value: Call(
+                            ExprCall {
+                                range: 218..239,
+                                func: Name(
+                                    ExprName {
+                                        range: 218..219,
+                                        id: "f",
+                                        ctx: Load,
+                                    },
+                                ),
+                                arguments: Arguments {
+                                    range: 219..239,
+                                    args: [
+                                        Name(
+                                            ExprName {
+                                                range: 220..221,
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        GeneratorExp(
+                                            ExprGeneratorExp {
+                                                range: 223..238,
+                                                elt: Name(
+                                                    ExprName {
+                                                        range: 223..224,
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                generators: [
+                                                    Comprehension {
+                                                        range: 225..238,
+                                                        target: Tuple(
+                                                            ExprTuple {
+                                                                range: 229..233,
+                                                                elts: [
+                                                                    Name(
+                                                                        ExprName {
+                                                                            range: 229..230,
+                                                                            id: "i",
+                                                                            ctx: Store,
+                                                                        },
+                                                                    ),
+                                                                    Name(
+                                                                        ExprName {
+                                                                            range: 232..233,
+                                                                            id: "j",
+                                                                            ctx: Store,
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                ctx: Store,
+                                                            },
+                                                        ),
+                                                        iter: Name(
+                                                            ExprName {
+                                                                range: 237..238,
+                                                                id: "l",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        ifs: [],
+                                                        is_async: false,
+                                                    },
+                                                ],
+                                            },
+                                        ),
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

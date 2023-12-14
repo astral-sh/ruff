@@ -1,0 +1,262 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\nx = 1\n[] = *l\n() = *t\na, b = ab\n*a = 1 + 2\na = b = c\nfoo.bar = False\nbaz[0] = 42\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..82,
+            body: [
+                Assign(
+                    StmtAssign {
+                        range: 1..6,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    range: 1..2,
+                                    id: "x",
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 5..6,
+                                value: Int(
+                                    1,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        range: 7..14,
+                        targets: [
+                            List(
+                                ExprList {
+                                    range: 7..9,
+                                    elts: [],
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: Starred(
+                            ExprStarred {
+                                range: 12..14,
+                                value: Name(
+                                    ExprName {
+                                        range: 13..14,
+                                        id: "l",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        range: 15..22,
+                        targets: [
+                            Tuple(
+                                ExprTuple {
+                                    range: 15..17,
+                                    elts: [],
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: Starred(
+                            ExprStarred {
+                                range: 20..22,
+                                value: Name(
+                                    ExprName {
+                                        range: 21..22,
+                                        id: "t",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        range: 23..32,
+                        targets: [
+                            Tuple(
+                                ExprTuple {
+                                    range: 23..27,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 23..24,
+                                                id: "a",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 26..27,
+                                                id: "b",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: Name(
+                            ExprName {
+                                range: 30..32,
+                                id: "ab",
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        range: 33..43,
+                        targets: [
+                            Starred(
+                                ExprStarred {
+                                    range: 33..35,
+                                    value: Name(
+                                        ExprName {
+                                            range: 34..35,
+                                            id: "a",
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: BinOp(
+                            ExprBinOp {
+                                range: 38..43,
+                                left: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 38..39,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                op: Add,
+                                right: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 42..43,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        range: 44..53,
+                        targets: [
+                            Name(
+                                ExprName {
+                                    range: 44..45,
+                                    id: "a",
+                                    ctx: Store,
+                                },
+                            ),
+                            Name(
+                                ExprName {
+                                    range: 48..49,
+                                    id: "b",
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: Name(
+                            ExprName {
+                                range: 52..53,
+                                id: "c",
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        range: 54..69,
+                        targets: [
+                            Attribute(
+                                ExprAttribute {
+                                    range: 54..61,
+                                    value: Name(
+                                        ExprName {
+                                            range: 54..57,
+                                            id: "foo",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    attr: Identifier {
+                                        id: "bar",
+                                        range: 58..61,
+                                    },
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: BooleanLiteral(
+                            ExprBooleanLiteral {
+                                range: 64..69,
+                                value: false,
+                            },
+                        ),
+                    },
+                ),
+                Assign(
+                    StmtAssign {
+                        range: 70..81,
+                        targets: [
+                            Subscript(
+                                ExprSubscript {
+                                    range: 70..76,
+                                    value: Name(
+                                        ExprName {
+                                            range: 70..73,
+                                            id: "baz",
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    slice: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 74..75,
+                                            value: Int(
+                                                0,
+                                            ),
+                                        },
+                                    ),
+                                    ctx: Store,
+                                },
+                            ),
+                        ],
+                        value: NumberLiteral(
+                            ExprNumberLiteral {
+                                range: 79..81,
+                                value: Int(
+                                    42,
+                                ),
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

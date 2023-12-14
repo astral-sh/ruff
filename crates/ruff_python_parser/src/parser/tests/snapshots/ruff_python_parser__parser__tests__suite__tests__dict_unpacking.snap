@@ -1,0 +1,81 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/suite.rs
+expression: parse_ast
+---
+Dict(
+    ExprDict {
+        range: 0..25,
+        keys: [
+            Some(
+                StringLiteral(
+                    ExprStringLiteral {
+                        range: 1..4,
+                        value: StringLiteralValue {
+                            inner: Single(
+                                StringLiteral {
+                                    range: 1..4,
+                                    value: "a",
+                                    unicode: false,
+                                },
+                            ),
+                        },
+                    },
+                ),
+            ),
+            None,
+            Some(
+                StringLiteral(
+                    ExprStringLiteral {
+                        range: 16..19,
+                        value: StringLiteralValue {
+                            inner: Single(
+                                StringLiteral {
+                                    range: 16..19,
+                                    value: "d",
+                                    unicode: false,
+                                },
+                            ),
+                        },
+                    },
+                ),
+            ),
+        ],
+        values: [
+            StringLiteral(
+                ExprStringLiteral {
+                    range: 6..9,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 6..9,
+                                value: "b",
+                                unicode: false,
+                            },
+                        ),
+                    },
+                },
+            ),
+            Name(
+                ExprName {
+                    range: 13..14,
+                    id: "c",
+                    ctx: Load,
+                },
+            ),
+            StringLiteral(
+                ExprStringLiteral {
+                    range: 21..24,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 21..24,
+                                value: "e",
+                                unicode: false,
+                            },
+                        ),
+                    },
+                },
+            ),
+        ],
+    },
+)

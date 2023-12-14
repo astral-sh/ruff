@@ -1,0 +1,387 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\ntype Point = tuple[float, float]\ntype Point[T] = tuple[T, T]\ntype IntFunc[**P] = Callable[P, int]  # ParamSpec\ntype LabeledTuple[*Ts] = tuple[str, *Ts]  # TypeVarTuple\ntype HashableSequence[T: Hashable] = Sequence[T]  # TypeVar with bound\ntype IntOrStrSequence[T: (int, str)] = Sequence[T]  # TypeVar with constraints\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..319,
+            body: [
+                TypeAlias(
+                    StmtTypeAlias {
+                        range: 1..33,
+                        name: Name(
+                            ExprName {
+                                range: 6..11,
+                                id: "Point",
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: None,
+                        value: Subscript(
+                            ExprSubscript {
+                                range: 14..33,
+                                value: Name(
+                                    ExprName {
+                                        range: 14..19,
+                                        id: "tuple",
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Tuple(
+                                    ExprTuple {
+                                        range: 20..32,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    range: 20..25,
+                                                    id: "float",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 27..32,
+                                                    id: "float",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                TypeAlias(
+                    StmtTypeAlias {
+                        range: 34..61,
+                        name: Name(
+                            ExprName {
+                                range: 39..44,
+                                id: "Point",
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 44..47,
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            range: 45..46,
+                                            name: Identifier {
+                                                id: "T",
+                                                range: 45..46,
+                                            },
+                                            bound: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        value: Subscript(
+                            ExprSubscript {
+                                range: 50..61,
+                                value: Name(
+                                    ExprName {
+                                        range: 50..55,
+                                        id: "tuple",
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Tuple(
+                                    ExprTuple {
+                                        range: 56..60,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    range: 56..57,
+                                                    id: "T",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 59..60,
+                                                    id: "T",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                TypeAlias(
+                    StmtTypeAlias {
+                        range: 62..98,
+                        name: Name(
+                            ExprName {
+                                range: 67..74,
+                                id: "IntFunc",
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 74..79,
+                                type_params: [
+                                    ParamSpec(
+                                        TypeParamParamSpec {
+                                            range: 75..78,
+                                            name: Identifier {
+                                                id: "P",
+                                                range: 77..78,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        value: Subscript(
+                            ExprSubscript {
+                                range: 82..98,
+                                value: Name(
+                                    ExprName {
+                                        range: 82..90,
+                                        id: "Callable",
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Tuple(
+                                    ExprTuple {
+                                        range: 91..97,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    range: 91..92,
+                                                    id: "P",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Name(
+                                                ExprName {
+                                                    range: 94..97,
+                                                    id: "int",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                TypeAlias(
+                    StmtTypeAlias {
+                        range: 112..152,
+                        name: Name(
+                            ExprName {
+                                range: 117..129,
+                                id: "LabeledTuple",
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 129..134,
+                                type_params: [
+                                    TypeVarTuple(
+                                        TypeParamTypeVarTuple {
+                                            range: 130..133,
+                                            name: Identifier {
+                                                id: "Ts",
+                                                range: 131..133,
+                                            },
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        value: Subscript(
+                            ExprSubscript {
+                                range: 137..152,
+                                value: Name(
+                                    ExprName {
+                                        range: 137..142,
+                                        id: "tuple",
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Tuple(
+                                    ExprTuple {
+                                        range: 143..151,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    range: 143..146,
+                                                    id: "str",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 148..151,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 149..151,
+                                                            id: "Ts",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                TypeAlias(
+                    StmtTypeAlias {
+                        range: 169..217,
+                        name: Name(
+                            ExprName {
+                                range: 174..190,
+                                id: "HashableSequence",
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 190..203,
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            range: 191..202,
+                                            name: Identifier {
+                                                id: "T",
+                                                range: 191..192,
+                                            },
+                                            bound: Some(
+                                                Name(
+                                                    ExprName {
+                                                        range: 194..202,
+                                                        id: "Hashable",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        value: Subscript(
+                            ExprSubscript {
+                                range: 206..217,
+                                value: Name(
+                                    ExprName {
+                                        range: 206..214,
+                                        id: "Sequence",
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Name(
+                                    ExprName {
+                                        range: 215..216,
+                                        id: "T",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+                TypeAlias(
+                    StmtTypeAlias {
+                        range: 240..290,
+                        name: Name(
+                            ExprName {
+                                range: 245..261,
+                                id: "IntOrStrSequence",
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: Some(
+                            TypeParams {
+                                range: 261..276,
+                                type_params: [
+                                    TypeVar(
+                                        TypeParamTypeVar {
+                                            range: 262..275,
+                                            name: Identifier {
+                                                id: "T",
+                                                range: 262..263,
+                                            },
+                                            bound: Some(
+                                                Tuple(
+                                                    ExprTuple {
+                                                        range: 265..275,
+                                                        elts: [
+                                                            Name(
+                                                                ExprName {
+                                                                    range: 266..269,
+                                                                    id: "int",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            Name(
+                                                                ExprName {
+                                                                    range: 271..274,
+                                                                    id: "str",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        ],
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        value: Subscript(
+                            ExprSubscript {
+                                range: 279..290,
+                                value: Name(
+                                    ExprName {
+                                        range: 279..287,
+                                        id: "Sequence",
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Name(
+                                    ExprName {
+                                        range: 288..289,
+                                        id: "T",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}

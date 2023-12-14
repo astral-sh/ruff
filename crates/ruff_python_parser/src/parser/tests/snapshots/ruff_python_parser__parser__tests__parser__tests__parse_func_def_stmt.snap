@@ -1,0 +1,1082 @@
+---
+source: crates/ruff_python_parser/src/parser/tests/parser.rs
+expression: "parse(\"\ndef f():\n    ...\ndef x() -> int:\n    f()\n    pass\n    ...\ndef mul(x, y) -> 'str':\n    x * y\ndef f1(*a): ...\ndef f2(*a, z, x=0): ...\ndef f3(**kwargs): f()\ndef f4(*args, **kwargs): f() + 1\ndef f5(*args, a, b=1, **kwargs): f() + 1\ndef f6(a, /): ...\ndef f7(a, /, b): ...\ndef f8(a=1, /,): ...\ndef f9(a, b, /, *, c): ...\ndef f10(kw=1, *, a): ...\ndef f11(x: int, y: 'str', z: 1 + 2): pass\ndef f12(self, a=1, b=2, c=3): ...\n\")"
+---
+ParsedFile {
+    ast: Module(
+        ModModule {
+            range: 0..417,
+            body: [
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 1..17,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f",
+                            range: 5..6,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 6..8,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 14..17,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 14..17,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 18..58,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "x",
+                            range: 22..23,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 23..25,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: Some(
+                            Name(
+                                ExprName {
+                                    range: 29..32,
+                                    id: "int",
+                                    ctx: Load,
+                                },
+                            ),
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 38..41,
+                                    value: Call(
+                                        ExprCall {
+                                            range: 38..41,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 38..39,
+                                                    id: "f",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 39..41,
+                                                args: [],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                },
+                            ),
+                            Pass(
+                                StmtPass {
+                                    range: 46..50,
+                                },
+                            ),
+                            Expr(
+                                StmtExpr {
+                                    range: 55..58,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 55..58,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 59..92,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "mul",
+                            range: 63..66,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 66..72,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 67..68,
+                                    parameter: Parameter {
+                                        range: 67..68,
+                                        name: Identifier {
+                                            id: "x",
+                                            range: 67..68,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                                ParameterWithDefault {
+                                    range: 70..71,
+                                    parameter: Parameter {
+                                        range: 70..71,
+                                        name: Identifier {
+                                            id: "y",
+                                            range: 70..71,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: Some(
+                            StringLiteral(
+                                ExprStringLiteral {
+                                    range: 76..81,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 76..81,
+                                                value: "str",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
+                                },
+                            ),
+                        ),
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 87..92,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 87..92,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 87..88,
+                                                    id: "x",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            op: Mult,
+                                            right: Name(
+                                                ExprName {
+                                                    range: 91..92,
+                                                    id: "y",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 93..108,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f1",
+                            range: 97..99,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 99..103,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: Some(
+                                Parameter {
+                                    range: 101..102,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 101..102,
+                                    },
+                                    annotation: None,
+                                },
+                            ),
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 105..108,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 105..108,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 109..132,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f2",
+                            range: 113..115,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 115..127,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: Some(
+                                Parameter {
+                                    range: 117..118,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 117..118,
+                                    },
+                                    annotation: None,
+                                },
+                            ),
+                            kwonlyargs: [
+                                ParameterWithDefault {
+                                    range: 120..121,
+                                    parameter: Parameter {
+                                        range: 120..121,
+                                        name: Identifier {
+                                            id: "z",
+                                            range: 120..121,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                                ParameterWithDefault {
+                                    range: 123..126,
+                                    parameter: Parameter {
+                                        range: 123..124,
+                                        name: Identifier {
+                                            id: "x",
+                                            range: 123..124,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 125..126,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 129..132,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 129..132,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 133..154,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f3",
+                            range: 137..139,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 139..149,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: Some(
+                                Parameter {
+                                    range: 142..148,
+                                    name: Identifier {
+                                        id: "kwargs",
+                                        range: 142..148,
+                                    },
+                                    annotation: None,
+                                },
+                            ),
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 151..154,
+                                    value: Call(
+                                        ExprCall {
+                                            range: 151..154,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 151..152,
+                                                    id: "f",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 152..154,
+                                                args: [],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 155..187,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f4",
+                            range: 159..161,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 161..178,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: Some(
+                                Parameter {
+                                    range: 163..167,
+                                    name: Identifier {
+                                        id: "args",
+                                        range: 163..167,
+                                    },
+                                    annotation: None,
+                                },
+                            ),
+                            kwonlyargs: [],
+                            kwarg: Some(
+                                Parameter {
+                                    range: 171..177,
+                                    name: Identifier {
+                                        id: "kwargs",
+                                        range: 171..177,
+                                    },
+                                    annotation: None,
+                                },
+                            ),
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 180..187,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 180..187,
+                                            left: Call(
+                                                ExprCall {
+                                                    range: 180..183,
+                                                    func: Name(
+                                                        ExprName {
+                                                            range: 180..181,
+                                                            id: "f",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 181..183,
+                                                        args: [],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 186..187,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 188..228,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f5",
+                            range: 192..194,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 194..219,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: Some(
+                                Parameter {
+                                    range: 196..200,
+                                    name: Identifier {
+                                        id: "args",
+                                        range: 196..200,
+                                    },
+                                    annotation: None,
+                                },
+                            ),
+                            kwonlyargs: [
+                                ParameterWithDefault {
+                                    range: 202..203,
+                                    parameter: Parameter {
+                                        range: 202..203,
+                                        name: Identifier {
+                                            id: "a",
+                                            range: 202..203,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                                ParameterWithDefault {
+                                    range: 205..208,
+                                    parameter: Parameter {
+                                        range: 205..206,
+                                        name: Identifier {
+                                            id: "b",
+                                            range: 205..206,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 207..208,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ],
+                            kwarg: Some(
+                                Parameter {
+                                    range: 212..218,
+                                    name: Identifier {
+                                        id: "kwargs",
+                                        range: 212..218,
+                                    },
+                                    annotation: None,
+                                },
+                            ),
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 221..228,
+                                    value: BinOp(
+                                        ExprBinOp {
+                                            range: 221..228,
+                                            left: Call(
+                                                ExprCall {
+                                                    range: 221..224,
+                                                    func: Name(
+                                                        ExprName {
+                                                            range: 221..222,
+                                                            id: "f",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 222..224,
+                                                        args: [],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 227..228,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 229..246,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f6",
+                            range: 233..235,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 235..241,
+                            posonlyargs: [
+                                ParameterWithDefault {
+                                    range: 236..237,
+                                    parameter: Parameter {
+                                        range: 236..237,
+                                        name: Identifier {
+                                            id: "a",
+                                            range: 236..237,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 243..246,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 243..246,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 247..267,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f7",
+                            range: 251..253,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 253..262,
+                            posonlyargs: [
+                                ParameterWithDefault {
+                                    range: 254..255,
+                                    parameter: Parameter {
+                                        range: 254..255,
+                                        name: Identifier {
+                                            id: "a",
+                                            range: 254..255,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 260..261,
+                                    parameter: Parameter {
+                                        range: 260..261,
+                                        name: Identifier {
+                                            id: "b",
+                                            range: 260..261,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 264..267,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 264..267,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 268..288,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f8",
+                            range: 272..274,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 274..283,
+                            posonlyargs: [
+                                ParameterWithDefault {
+                                    range: 275..278,
+                                    parameter: Parameter {
+                                        range: 275..276,
+                                        name: Identifier {
+                                            id: "a",
+                                            range: 275..276,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 277..278,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 285..288,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 285..288,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 289..315,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f9",
+                            range: 293..295,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 295..310,
+                            posonlyargs: [
+                                ParameterWithDefault {
+                                    range: 296..297,
+                                    parameter: Parameter {
+                                        range: 296..297,
+                                        name: Identifier {
+                                            id: "a",
+                                            range: 296..297,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                                ParameterWithDefault {
+                                    range: 299..300,
+                                    parameter: Parameter {
+                                        range: 299..300,
+                                        name: Identifier {
+                                            id: "b",
+                                            range: 299..300,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [
+                                ParameterWithDefault {
+                                    range: 308..309,
+                                    parameter: Parameter {
+                                        range: 308..309,
+                                        name: Identifier {
+                                            id: "c",
+                                            range: 308..309,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 312..315,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 312..315,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 316..340,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f10",
+                            range: 320..323,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 323..335,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 324..328,
+                                    parameter: Parameter {
+                                        range: 324..326,
+                                        name: Identifier {
+                                            id: "kw",
+                                            range: 324..326,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 327..328,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [
+                                ParameterWithDefault {
+                                    range: 333..334,
+                                    parameter: Parameter {
+                                        range: 333..334,
+                                        name: Identifier {
+                                            id: "a",
+                                            range: 333..334,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 337..340,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 337..340,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 341..382,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f11",
+                            range: 345..348,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 348..376,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 349..355,
+                                    parameter: Parameter {
+                                        range: 349..355,
+                                        name: Identifier {
+                                            id: "x",
+                                            range: 349..350,
+                                        },
+                                        annotation: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 352..355,
+                                                    id: "int",
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                    default: None,
+                                },
+                                ParameterWithDefault {
+                                    range: 357..365,
+                                    parameter: Parameter {
+                                        range: 357..365,
+                                        name: Identifier {
+                                            id: "y",
+                                            range: 357..358,
+                                        },
+                                        annotation: Some(
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 360..365,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 360..365,
+                                                                value: "str",
+                                                                unicode: false,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                    default: None,
+                                },
+                                ParameterWithDefault {
+                                    range: 367..375,
+                                    parameter: Parameter {
+                                        range: 367..375,
+                                        name: Identifier {
+                                            id: "z",
+                                            range: 367..368,
+                                        },
+                                        annotation: Some(
+                                            BinOp(
+                                                ExprBinOp {
+                                                    range: 370..375,
+                                                    left: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 370..371,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    op: Add,
+                                                    right: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 374..375,
+                                                            value: Int(
+                                                                2,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 378..382,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 383..416,
+                        is_async: false,
+                        decorator_list: [],
+                        name: Identifier {
+                            id: "f12",
+                            range: 387..390,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 390..411,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 391..395,
+                                    parameter: Parameter {
+                                        range: 391..395,
+                                        name: Identifier {
+                                            id: "self",
+                                            range: 391..395,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                                ParameterWithDefault {
+                                    range: 397..400,
+                                    parameter: Parameter {
+                                        range: 397..398,
+                                        name: Identifier {
+                                            id: "a",
+                                            range: 397..398,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 399..400,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                                ParameterWithDefault {
+                                    range: 402..405,
+                                    parameter: Parameter {
+                                        range: 402..403,
+                                        name: Identifier {
+                                            id: "b",
+                                            range: 402..403,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 404..405,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                                ParameterWithDefault {
+                                    range: 407..410,
+                                    parameter: Parameter {
+                                        range: 407..408,
+                                        name: Identifier {
+                                            id: "c",
+                                            range: 407..408,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 409..410,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 413..416,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 413..416,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ],
+        },
+    ),
+    parse_errors: [],
+}
