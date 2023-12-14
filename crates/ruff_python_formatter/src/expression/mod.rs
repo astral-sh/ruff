@@ -533,15 +533,15 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
 
-    if visitor.max_precedence == OperatorPrecedence::None {
+    if !visitor.any_parenthesized_expressions {
+        // Only use the more complex IR when there is any expression that we can possibly split by
+        false
+    } else if visitor.max_precedence == OperatorPrecedence::None {
         true
     } else if visitor.max_precedence_count > 1 {
         false
     } else if visitor.max_precedence == OperatorPrecedence::Attribute {
         true
-    } else if !visitor.any_parenthesized_expressions {
-        // Only use the more complex IR when there is any expression that we can possibly split by
-        false
     } else {
         fn is_parenthesized(expr: &Expr, context: &PyFormatContext) -> bool {
             // Don't break subscripts except in parenthesized context. It looks weird.
@@ -716,6 +716,9 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
+            // Non terminal nodes that don't have a termination token.
+            Expr::NamedExpr(_) | Expr::GeneratorExp(_) | Expr::Tuple(_) => {}
+
             // Expressions with sub expressions but a preceding token
             // Mark this expression as first expression and not the sub expression.
             // Visit the sub-expressions because the sub expressions may be the end of the entire expression.
@@ -738,11 +741,8 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 self.first.set_if_none(First::Token);
             }
 
-            // Terminal nodes or nodes that wrap a sub-expression (where the sub expression can never be the end).
-            Expr::Tuple(_)
-            | Expr::NamedExpr(_)
-            | Expr::GeneratorExp(_)
-            | Expr::FString(_)
+            // Terminal nodes or nodes that wrap a sub-expression (where the sub expression can never be at the end).
+            Expr::FString(_)
             | Expr::StringLiteral(_)
             | Expr::BytesLiteral(_)
             | Expr::NumberLiteral(_)
