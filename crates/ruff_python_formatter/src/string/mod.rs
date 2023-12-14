@@ -11,13 +11,24 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::{leading_comments, trailing_comments};
+use crate::expression::expr_f_string::f_string_quoting;
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
 use crate::other::f_string::FormatFString;
+use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
 use crate::prelude::*;
 use crate::QuoteStyle;
 
 pub(crate) mod docstring;
 
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) enum Quoting {
+    #[default]
+    CanChange,
+    Preserve,
+}
+
+/// Represents any kind of string expression. This could be either a string,
+/// bytes or f-string.
 #[derive(Clone, Debug)]
 pub(crate) enum AnyString<'a> {
     String(&'a ExprStringLiteral),
@@ -47,21 +58,38 @@ impl<'a> AnyString<'a> {
         }
     }
 
-    fn parts(&self) -> Vec<AnyStringPart<'a>> {
+    /// Returns the quoting to be used for this string.
+    fn quoting(&self, locator: &Locator<'_>) -> Quoting {
         match self {
-            Self::String(ExprStringLiteral { value, .. }) => {
-                value.iter().map(AnyStringPart::String).collect()
-            }
+            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
+            Self::FString(f_string) => f_string_quoting(f_string, locator),
+        }
+    }
+
+    /// Returns a vector of all the [`AnyStringPart`] of this string.
+    fn parts(&self, quoting: Quoting) -> Vec<AnyStringPart<'a>> {
+        match self {
+            Self::String(ExprStringLiteral { value, .. }) => value
+                .iter()
+                .map(|part| AnyStringPart::String {
+                    part,
+                    layout: StringLiteralKind::String,
+                })
+                .collect(),
             Self::Bytes(ExprBytesLiteral { value, .. }) => {
                 value.iter().map(AnyStringPart::Bytes).collect()
             }
             Self::FString(ExprFString { value, .. }) => value
                 .iter()
                 .map(|f_string_part| match f_string_part {
-                    ast::FStringPart::Literal(string_literal) => {
-                        AnyStringPart::String(string_literal)
-                    }
-                    ast::FStringPart::FString(f_string) => AnyStringPart::FString(f_string),
+                    ast::FStringPart::Literal(string_literal) => AnyStringPart::String {
+                        part: string_literal,
+                        layout: StringLiteralKind::InImplicitlyConcatenatedFString(quoting),
+                    },
+                    ast::FStringPart::FString(f_string) => AnyStringPart::FString {
+                        part: f_string,
+                        quoting,
+                    },
                 })
                 .collect(),
         }
@@ -98,19 +126,29 @@ impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
     }
 }
 
+/// Represents any kind of string which is part of an implicitly concatenated
+/// string. This could be either a string, bytes or f-string.
+///
+/// This is constructed from the [`AnyString::parts`] method on [`AnyString`].
 #[derive(Clone, Debug)]
 enum AnyStringPart<'a> {
-    String(&'a ast::StringLiteral),
+    String {
+        part: &'a ast::StringLiteral,
+        layout: StringLiteralKind,
+    },
     Bytes(&'a ast::BytesLiteral),
-    FString(&'a ast::FString),
+    FString {
+        part: &'a ast::FString,
+        quoting: Quoting,
+    },
 }
 
 impl<'a> From<&AnyStringPart<'a>> for AnyNodeRef<'a> {
     fn from(value: &AnyStringPart<'a>) -> Self {
         match value {
-            AnyStringPart::String(part) => AnyNodeRef::StringLiteral(part),
+            AnyStringPart::String { part, .. } => AnyNodeRef::StringLiteral(part),
             AnyStringPart::Bytes(part) => AnyNodeRef::BytesLiteral(part),
-            AnyStringPart::FString(part) => AnyNodeRef::FString(part),
+            AnyStringPart::FString { part, .. } => AnyNodeRef::FString(part),
         }
     }
 }
@@ -118,116 +156,49 @@ impl<'a> From<&AnyStringPart<'a>> for AnyNodeRef<'a> {
 impl Ranged for AnyStringPart<'_> {
     fn range(&self) -> TextRange {
         match self {
-            Self::String(part) => part.range(),
+            Self::String { part, .. } => part.range(),
             Self::Bytes(part) => part.range(),
-            Self::FString(part) => part.range(),
+            Self::FString { part, .. } => part.range(),
         }
     }
 }
 
-#[derive(Copy, Clone, Debug, Default)]
-pub(crate) enum Quoting {
-    #[default]
-    CanChange,
-    Preserve,
-}
-
-#[derive(Default, Copy, Clone, Debug)]
-pub(crate) enum StringLayout {
-    #[default]
-    Default,
-    DocString,
-}
-
-/// Resolved options for formatting any kind of string. This can be either a string,
-/// bytes or f-string.
-#[derive(Copy, Clone, Debug, Default)]
-pub struct StringOptions {
-    quoting: Quoting,
-    layout: StringLayout,
-}
-
-impl StringOptions {
-    /// Creates a new context with the docstring layout.
-    pub(crate) fn docstring() -> Self {
-        Self {
-            layout: StringLayout::DocString,
-            ..Self::default()
-        }
-    }
-
-    /// Returns a new context with the given [`Quoting`] style.
-    pub(crate) const fn with_quoting(mut self, quoting: Quoting) -> Self {
-        self.quoting = quoting;
-        self
-    }
-
-    /// Returns the [`Quoting`] style to use for the string.
-    pub(crate) const fn quoting(self) -> Quoting {
-        self.quoting
-    }
-
-    /// Returns `true` if the string is a docstring.
-    pub(crate) const fn is_docstring(self) -> bool {
-        matches!(self.layout, StringLayout::DocString)
-    }
-}
-
-struct FormatStringPart<'a> {
-    part: &'a AnyStringPart<'a>,
-    options: StringOptions,
-}
-
-impl<'a> FormatStringPart<'a> {
-    fn new(part: &'a AnyStringPart<'a>, options: StringOptions) -> Self {
-        Self { part, options }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for FormatStringPart<'_> {
+impl Format<PyFormatContext<'_>> for AnyStringPart<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        match self.part {
-            AnyStringPart::String(string_literal) => {
-                string_literal.format().with_options(self.options).fmt(f)
+        match self {
+            AnyStringPart::String { part, layout } => {
+                FormatStringLiteral::new(part, *layout).fmt(f)
             }
             AnyStringPart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
-            AnyStringPart::FString(f_string) => {
-                FormatFString::new(f_string, self.options.quoting()).fmt(f)
-            }
+            AnyStringPart::FString { part, quoting } => FormatFString::new(part, *quoting).fmt(f),
         }
     }
 }
 
+/// Formats any implicitly concatenated string. This could be any valid combination
+/// of string, bytes or f-string literals.
 pub(crate) struct FormatStringContinuation<'a> {
     string: &'a AnyString<'a>,
-    options: StringOptions,
 }
 
 impl<'a> FormatStringContinuation<'a> {
     pub(crate) fn new(string: &'a AnyString<'a>) -> Self {
-        Self {
-            string,
-            options: StringOptions::default(),
-        }
-    }
-
-    pub(crate) fn with_options(mut self, options: StringOptions) -> Self {
-        self.options = options;
-        self
+        Self { string }
     }
 }
 
 impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
+        let quoting = self.string.quoting(&f.context().locator());
 
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
-        for part in self.string.parts() {
+        for part in self.string.parts(quoting) {
             joiner.entry(&format_args![
                 line_suffix_boundary(),
                 leading_comments(comments.leading(&part)),
-                FormatStringPart::new(&part, self.options),
+                part,
                 trailing_comments(comments.trailing(&part))
             ]);
         }

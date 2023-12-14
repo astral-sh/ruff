@@ -8,23 +8,27 @@ use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
+use crate::other::f_string_part::FormatFStringPart;
 use crate::prelude::*;
-use crate::string::{AnyString, FormatStringContinuation, Quoting, StringOptions};
+use crate::string::{AnyString, FormatStringContinuation, Quoting};
 
 #[derive(Default)]
 pub struct FormatExprFString;
 
 impl FormatNodeRule<ExprFString> for FormatExprFString {
     fn fmt_fields(&self, item: &ExprFString, f: &mut PyFormatter) -> FormatResult<()> {
-        let options =
-            StringOptions::default().with_quoting(f_string_quoting(item, &f.context().locator()));
+        let ExprFString { value, .. } = item;
 
-        match item.value.as_slice() {
-            [f_string_part] => f_string_part.format().with_options(options).fmt(f),
-            _ => in_parentheses_only_group(
-                &FormatStringContinuation::new(&AnyString::FString(item)).with_options(options),
+        match value.as_slice() {
+            [f_string_part] => FormatFStringPart::new(
+                f_string_part,
+                f_string_quoting(item, &f.context().locator()),
             )
             .fmt(f),
+            _ => {
+                in_parentheses_only_group(&FormatStringContinuation::new(&AnyString::FString(item)))
+                    .fmt(f)
+            }
         }
     }
 
@@ -54,7 +58,7 @@ impl NeedsParentheses for ExprFString {
     }
 }
 
-fn f_string_quoting(f_string: &ExprFString, locator: &Locator) -> Quoting {
+pub(crate) fn f_string_quoting(f_string: &ExprFString, locator: &Locator) -> Quoting {
     let unprefixed = locator
         .slice(f_string.range())
         .trim_start_matches(|c| c != '"' && c != '\'');

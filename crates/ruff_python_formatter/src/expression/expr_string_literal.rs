@@ -6,21 +6,40 @@ use crate::comments::SourceComment;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
+use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
 use crate::prelude::*;
-use crate::string::{
-    AnyString, FormatStringContinuation, StringOptions, StringPrefix, StringQuotes,
-};
+use crate::string::{AnyString, FormatStringContinuation, StringPrefix, StringQuotes};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
-    options: StringOptions,
+    kind: ExprStringLiteralKind,
+}
+
+#[derive(Default, Copy, Clone, Debug)]
+pub enum ExprStringLiteralKind {
+    #[default]
+    String,
+    Docstring,
+}
+
+impl ExprStringLiteralKind {
+    const fn string_literal_kind(self) -> StringLiteralKind {
+        match self {
+            ExprStringLiteralKind::String => StringLiteralKind::String,
+            ExprStringLiteralKind::Docstring => StringLiteralKind::Docstring,
+        }
+    }
+
+    const fn is_docstring(self) -> bool {
+        matches!(self, ExprStringLiteralKind::Docstring)
+    }
 }
 
 impl FormatRuleWithOptions<ExprStringLiteral, PyFormatContext<'_>> for FormatExprStringLiteral {
-    type Options = StringOptions;
+    type Options = ExprStringLiteralKind;
 
     fn with_options(mut self, options: Self::Options) -> Self {
-        self.options = options;
+        self.kind = options;
         self
     }
 }
@@ -30,10 +49,16 @@ impl FormatNodeRule<ExprStringLiteral> for FormatExprStringLiteral {
         let ExprStringLiteral { value, .. } = item;
 
         match value.as_slice() {
-            [string_literal] => string_literal.format().with_options(self.options).fmt(f),
-            _ => in_parentheses_only_group(
-                &FormatStringContinuation::new(&AnyString::String(item)).with_options(self.options),
-            )
+            [string_literal] => {
+                FormatStringLiteral::new(string_literal, self.kind.string_literal_kind()).fmt(f)
+            }
+            _ => {
+                // This is just a sanity check because [`DocstringStmt::try_from_statement`]
+                // ensures that the docstring is a *single* string literal.
+                assert!(!self.kind.is_docstring());
+
+                in_parentheses_only_group(&FormatStringContinuation::new(&AnyString::String(item)))
+            }
             .fmt(f),
         }
     }

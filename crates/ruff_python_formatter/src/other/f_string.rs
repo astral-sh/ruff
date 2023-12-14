@@ -4,8 +4,14 @@ use ruff_text_size::Ranged;
 use crate::prelude::*;
 use crate::string::{Quoting, StringPart};
 
+/// Formats an f-string which is part of a larger f-string expression.
+///
+/// For example, this would be used to format the f-string part in `"foo" f"bar {x}"`
+/// or the standalone f-string in `f"foo {x} bar"`.
 pub(crate) struct FormatFString<'a> {
     value: &'a FString,
+    /// The quoting of an f-string. This is determined by the parent node
+    /// (f-string expression) and is required to format an f-string correctly.
     quoting: Quoting,
 }
 
