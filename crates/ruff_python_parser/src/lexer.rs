@@ -702,23 +702,8 @@ impl<'source> Lexer<'source> {
                     }
                 }
                 Some('\r' | '\n') if !triple_quoted => {
-                    if let Some(fstring) = self.fstrings.current() {
-                        // When we are in an f-string, check whether does the initial quote
-                        // matches with f-strings quotes and if it is, then this must be a
-                        // missing '}' token so raise the proper error.
-                        if fstring.quote_char() == quote && !fstring.is_triple_quoted() {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::FStringError(
-                                    FStringErrorType::UnclosedLbrace,
-                                ),
-                                location: self.token_range(),
-                            });
-                        }
-                    }
                     return Err(LexicalError {
-                        error: LexicalErrorType::OtherError(
-                            "EOL while scanning string literal".to_owned(),
-                        ),
+                        error: LexicalErrorType::UnclosedStringError,
                         location: self.token_range(),
                     });
                 }
@@ -734,21 +719,6 @@ impl<'source> Lexer<'source> {
 
                 Some(_) => {}
                 None => {
-                    if let Some(fstring) = self.fstrings.current() {
-                        // When we are in an f-string, check whether does the initial quote
-                        // matches with f-strings quotes and if it is, then this must be a
-                        // missing '}' token so raise the proper error.
-                        if fstring.quote_char() == quote
-                            && fstring.is_triple_quoted() == triple_quoted
-                        {
-                            return Err(LexicalError {
-                                error: LexicalErrorType::FStringError(
-                                    FStringErrorType::UnclosedLbrace,
-                                ),
-                                location: self.token_range(),
-                            });
-                        }
-                    }
                     return Err(LexicalError {
                         error: if triple_quoted {
                             LexicalErrorType::Eof
@@ -973,10 +943,6 @@ impl<'source> Lexer<'source> {
         if self.nesting > 0 {
             // Reset the nesting to avoid going into infinite loop.
             self.nesting = 0;
-            return Err(LexicalError {
-                error: LexicalErrorType::Eof,
-                location: self.token_range(),
-            });
         }
 
         // Next, insert a trailing newline, if required.
@@ -1318,6 +1284,8 @@ pub enum LexicalErrorType {
     // to use the `UnicodeError` variant instead.
     #[doc(hidden)]
     StringError,
+    /// A string literal without the closing quote.
+    UnclosedStringError,
     // TODO: Should take a start/end position to report.
     /// Decoding of a unicode escape sequence in a string literal failed.
     UnicodeError,
@@ -1396,6 +1364,9 @@ impl std::fmt::Display for LexicalErrorType {
             LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
             LexicalErrorType::AssignmentError => write!(f, "invalid assignment target"),
             LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
+            LexicalErrorType::UnclosedStringError => {
+                write!(f, "missing closing quote in string literal")
+            }
         }
     }
 }
@@ -2183,9 +2154,7 @@ f"{(lambda x:{x})}"
 
     #[test]
     fn test_fstring_error() {
-        use FStringErrorType::{
-            SingleRbrace, UnclosedLbrace, UnterminatedString, UnterminatedTripleQuotedString,
-        };
+        use FStringErrorType::{SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString};
 
         assert_eq!(lex_fstring_error("f'}'"), SingleRbrace);
         assert_eq!(lex_fstring_error("f'{{}'"), SingleRbrace);
@@ -2195,18 +2164,6 @@ f"{(lambda x:{x})}"
         assert_eq!(lex_fstring_error("f'{a:b}}'"), SingleRbrace);
         assert_eq!(lex_fstring_error("f'{3:}}>10}'"), SingleRbrace);
         assert_eq!(lex_fstring_error(r"f'\{foo}\}'"), SingleRbrace);
-
-        assert_eq!(lex_fstring_error("f'{'"), UnclosedLbrace);
-        assert_eq!(lex_fstring_error("f'{foo!r'"), UnclosedLbrace);
-        assert_eq!(lex_fstring_error("f'{foo='"), UnclosedLbrace);
-        assert_eq!(
-            lex_fstring_error(
-                r#"f"{"
-"#
-            ),
-            UnclosedLbrace
-        );
-        assert_eq!(lex_fstring_error(r#"f"""{""""#), UnclosedLbrace);
 
         assert_eq!(lex_fstring_error(r#"f""#), UnterminatedString);
         assert_eq!(lex_fstring_error(r"f'"), UnterminatedString);
