@@ -152,7 +152,7 @@ impl<'a> StringParser<'a> {
 
         let Some('{') = self.next_char() else {
             return Err(LexicalError::new(
-                LexicalErrorType::StringError,
+                LexicalErrorType::MissingUnicodeLbrace,
                 self.range(start_pos),
             ));
         };
@@ -160,7 +160,7 @@ impl<'a> StringParser<'a> {
         let start_pos = self.get_pos();
         let Some(close_idx) = self.rest.find('}') else {
             return Err(LexicalError::new(
-                LexicalErrorType::StringError,
+                LexicalErrorType::MissingUnicodeRbrace,
                 self.range(self.get_pos()),
             ));
         };
@@ -174,6 +174,7 @@ impl<'a> StringParser<'a> {
 
     fn parse_escaped_char(&mut self, string: &mut String) -> Result<(), LexicalError> {
         let Some(first_char) = self.next_char() else {
+            // TODO: check when this error case happens
             return Err(LexicalError {
                 error: LexicalErrorType::StringError,
                 location: self.range(self.get_pos()),

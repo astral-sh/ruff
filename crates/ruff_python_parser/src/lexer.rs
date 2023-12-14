@@ -720,11 +720,7 @@ impl<'source> Lexer<'source> {
                 Some(_) => {}
                 None => {
                     return Err(LexicalError {
-                        error: if triple_quoted {
-                            LexicalErrorType::Eof
-                        } else {
-                            LexicalErrorType::StringError
-                        },
+                        error: LexicalErrorType::UnclosedStringError,
                         location: self.token_range(),
                     });
                 }
@@ -1286,9 +1282,12 @@ pub enum LexicalErrorType {
     StringError,
     /// A string literal without the closing quote.
     UnclosedStringError,
-    // TODO: Should take a start/end position to report.
     /// Decoding of a unicode escape sequence in a string literal failed.
     UnicodeError,
+    /// Missing the `{` for unicode escape sequence.
+    MissingUnicodeLbrace,
+    /// Missing the `}` for unicode escape sequence.
+    MissingUnicodeRbrace,
     /// The nesting of brackets/braces/parentheses is not balanced.
     NestingError,
     /// The indentation is not consistent.
@@ -1366,6 +1365,12 @@ impl std::fmt::Display for LexicalErrorType {
             LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
             LexicalErrorType::UnclosedStringError => {
                 write!(f, "missing closing quote in string literal")
+            }
+            LexicalErrorType::MissingUnicodeLbrace => {
+                write!(f, "Missing `{{` in Unicode escape sequence")
+            }
+            LexicalErrorType::MissingUnicodeRbrace => {
+                write!(f, "Missing `}}` in Unicode escape sequence")
             }
         }
     }
