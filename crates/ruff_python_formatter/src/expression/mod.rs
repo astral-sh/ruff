@@ -552,17 +552,13 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
         // Only use the layout if the first expression starts with parentheses
         // or the last expression ends with parentheses of some sort, and
         // those parentheses are non-empty.
-        if visitor
+        visitor
             .last
             .is_some_and(|last| is_parenthesized(last, context))
-        {
-            true
-        } else {
-            visitor
+            || visitor
                 .first
                 .expression()
                 .is_some_and(|first| is_parenthesized(first, context))
-        }
     }
 }
 
@@ -689,16 +685,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 // Don't walk the slice, because the slice is always parenthesized.
                 return;
             }
-            Expr::UnaryOp(ast::ExprUnaryOp {
-                range: _,
-                op,
-                operand: _,
-            }) => {
-                if op.is_invert() {
-                    self.update_max_precedence(OperatorPrecedence::BitwiseInversion);
-                }
-                self.first.set_if_none(First::Token);
-            }
 
             // `[a, b].test.test[300].dot`
             Expr::Attribute(ast::ExprAttribute {
@@ -727,10 +713,23 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             }
             Expr::FString(ast::ExprFString { value, .. }) if value.is_implicit_concatenated() => {
                 self.update_max_precedence(OperatorPrecedence::String);
+                return;
             }
 
             // Expressions with sub expressions but a preceding token
             // Mark this expression as first expression and not the sub expression.
+            // Visit the sub-expressions because the sub expressions may be the end of the entire expression.
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                range: _,
+                op,
+                operand: _,
+            }) => {
+                if op.is_invert() {
+                    self.update_max_precedence(OperatorPrecedence::BitwiseInversion);
+                }
+                self.first.set_if_none(First::Token);
+            }
+
             Expr::Lambda(_)
             | Expr::Await(_)
             | Expr::Yield(_)
@@ -739,6 +738,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 self.first.set_if_none(First::Token);
             }
 
+            // Terminal nodes or nodes that wrap a sub-expression (where the sub expression can never be the end).
             Expr::Tuple(_)
             | Expr::NamedExpr(_)
             | Expr::GeneratorExp(_)
@@ -751,7 +751,9 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::EllipsisLiteral(_)
             | Expr::Name(_)
             | Expr::Slice(_)
-            | Expr::IpyEscapeCommand(_) => {}
+            | Expr::IpyEscapeCommand(_) => {
+                return;
+            }
         };
 
         walk_expr(self, expr);
