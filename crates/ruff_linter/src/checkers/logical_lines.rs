@@ -16,7 +16,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{
 use crate::settings::LinterSettings;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of 8.
-fn expand_indent(line: &str) -> usize {
+pub(crate) fn expand_indent(line: &str) -> usize {
     let line = line.trim_end_matches(['\n', '\r']);
 
     let mut indent = 0;
@@ -43,6 +43,8 @@ pub(crate) fn check_logical_lines(
     let mut non_comment_prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
+
+    blank_lines_checker.check_content(tokens, 4, locator, stylist, &mut context);
 
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
@@ -102,16 +104,6 @@ pub(crate) fn check_logical_lines(
                 context.push(kind, range);
             }
         }
-
-        blank_lines_checker.check_line(
-            &line,
-            prev_indent_level,
-            indent_level,
-            indent_size,
-            locator,
-            stylist,
-            &mut context,
-        );
 
         if !line.is_comment_only() {
             non_comment_prev_line = Some(line);
