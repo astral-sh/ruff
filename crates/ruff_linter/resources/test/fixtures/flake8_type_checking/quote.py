@@ -65,3 +65,10 @@ def f():
 
     def func(value: DataFrame):
         ...
+
+
+def f():
+    from pandas import DataFrame, Series
+
+    def baz() -> DataFrame | Series:
+        ...

@@ -18,5 +18,7 @@ quote.py:64:28: TCH004 [*] Quote references to `pandas.DataFrame`. Import is in 
 66    |-    def func(value: DataFrame):
    66 |+    def func(value: "DataFrame"):
 67 67 |         ...
+68 68 | 
+69 69 | 
 
 

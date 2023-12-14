@@ -196,4 +196,60 @@ quote.py:54:24: TCH002 Move third-party import `pandas.DataFrame` into a type-ch
    |
    = help: Move into type-checking block
 
+quote.py:71:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
+   |
+70 | def f():
+71 |     from pandas import DataFrame, Series
+   |                        ^^^^^^^^^ TCH002
+72 | 
+73 |     def baz() -> DataFrame | Series:
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from pandas import DataFrame, Series
+1  5  | def f():
+2  6  |     from pandas import DataFrame
+3  7  | 
+--------------------------------------------------------------------------------
+68 72 | 
+69 73 | 
+70 74 | def f():
+71    |-    from pandas import DataFrame, Series
+72 75 | 
+73    |-    def baz() -> DataFrame | Series:
+   76 |+    def baz() -> "DataFrame | Series":
+74 77 |         ...
+
+quote.py:71:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
+   |
+70 | def f():
+71 |     from pandas import DataFrame, Series
+   |                                   ^^^^^^ TCH002
+72 | 
+73 |     def baz() -> DataFrame | Series:
+   |
+   = help: Move into type-checking block
+
+ℹ Unsafe fix
+   1  |+from typing import TYPE_CHECKING
+   2  |+
+   3  |+if TYPE_CHECKING:
+   4  |+    from pandas import DataFrame, Series
+1  5  | def f():
+2  6  |     from pandas import DataFrame
+3  7  | 
+--------------------------------------------------------------------------------
+68 72 | 
+69 73 | 
+70 74 | def f():
+71    |-    from pandas import DataFrame, Series
+72 75 | 
+73    |-    def baz() -> DataFrame | Series:
+   76 |+    def baz() -> "DataFrame | Series":
+74 77 |         ...
+
 
