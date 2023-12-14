@@ -6,9 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::SourceComment;
-use crate::expression::parentheses::{
-    in_parentheses_only_soft_line_break_or_space, optional_parentheses, parenthesized,
-};
+use crate::expression::parentheses::parenthesized;
 use crate::other::commas;
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
@@ -77,7 +75,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                                     joiner.entry_with_line_separator(
                                         item,
                                         &item.format(),
-                                        in_parentheses_only_soft_line_break_or_space(),
+                                        soft_line_break_or_space(),
                                     );
                                 }
                                 joiner.finish()
@@ -87,7 +85,7 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                             // This is similar to `maybe_parenthesize_expression`, but we're not
                             // dealing with an expression here, it's a `WithItem`.
                             if comments.has_leading(item) || comments.has_trailing(item) {
-                                optional_parentheses(&item.format()).fmt(f)?;
+                                parenthesized("(", &item.format(), ")").fmt(f)?;
                             } else {
                                 item.format().fmt(f)?;
                             }

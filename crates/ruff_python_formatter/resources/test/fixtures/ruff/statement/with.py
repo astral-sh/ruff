@@ -303,3 +303,7 @@ if True:
 if True:
     with anyio.CancelScope(shield=True) if get_running_loop() else contextlib.nullcontext():
         pass
+
+
+with Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Document(aaaaa, bbbbbbbbbb, ddddddddddddd):
+    pass
