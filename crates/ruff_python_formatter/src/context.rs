@@ -1,5 +1,5 @@
 use crate::comments::Comments;
-use crate::expression::string::QuoteChar;
+use crate::string::QuoteChar;
 use crate::PyFormatOptions;
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_source_file::Locator;

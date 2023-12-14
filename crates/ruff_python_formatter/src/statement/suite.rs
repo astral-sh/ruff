@@ -9,7 +9,7 @@ use crate::comments::{
     leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
 };
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
-use crate::expression::string::StringLayout;
+use crate::expression::expr_string_literal::ExprStringLiteralKind;
 use crate::prelude::*;
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
@@ -609,7 +609,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                     leading_comments(node_comments.leading),
                     string_literal
                         .format()
-                        .with_options(StringLayout::DocString),
+                        .with_options(ExprStringLiteralKind::Docstring),
                 ]
             )?;
 
