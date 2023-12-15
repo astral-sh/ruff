@@ -578,3 +578,8 @@ match n % 3, n % 5:
         print("Buzz")
     case _:
         print(n)
+
+# Unparenthesized tuples
+match x:
+    case Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Doc(aaaaa, bbbbbbbbbb, ddddddddddddd):
+        pass
