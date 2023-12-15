@@ -397,27 +397,13 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_django::rules::nullable_model_string_field(checker, body);
             }
             if checker.enabled(Rule::DjangoExcludeWithModelForm) {
-                if let Some(diagnostic) = flake8_django::rules::exclude_with_model_form(
-                    checker,
-                    arguments.as_deref(),
-                    body,
-                ) {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_django::rules::exclude_with_model_form(checker, class_def);
             }
             if checker.enabled(Rule::DjangoAllWithModelForm) {
-                if let Some(diagnostic) =
-                    flake8_django::rules::all_with_model_form(checker, arguments.as_deref(), body)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
+                flake8_django::rules::all_with_model_form(checker, class_def);
             }
             if checker.enabled(Rule::DjangoUnorderedBodyContentInModel) {
-                flake8_django::rules::unordered_body_content_in_model(
-                    checker,
-                    arguments.as_deref(),
-                    body,
-                );
+                flake8_django::rules::unordered_body_content_in_model(checker, class_def);
             }
             if !checker.source_type.is_stub() {
                 if checker.enabled(Rule::DjangoModelWithoutDunderStr) {
