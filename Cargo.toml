@@ -88,7 +88,20 @@ rc_mutex = "warn"
 rest_pat_in_fully_bound_structs = "warn"
 
 [profile.release]
-lto = "fat"
+# Note that we set these explicitly, and these values
+# were chosen based on a trade-off between compile times
+# and runtime performance[1].
+#
+# [1]: https://github.com/astral-sh/ruff/pull/9031
+lto = "thin"
+codegen-units = 16
+
+# Some crates don't change as much but benefit more from
+# more expensive optimization passes, so we selectively
+# decrease codegen-units in some cases.
+[profile.release.package.ruff_python_parser]
+codegen-units = 1
+[profile.release.package.ruff_python_ast]
 codegen-units = 1
 
 [profile.dev.package.insta]
@@ -102,8 +115,8 @@ opt-level = 3
 [profile.dev.package.ruff_python_parser]
 opt-level = 1
 
-# Use the `--profile release-debug` flag to show symbols in release mode.
-# e.g. `cargo build --profile release-debug`
-[profile.release-debug]
+# Use the `--profile profiling` flag to show symbols in release mode.
+# e.g. `cargo build --profile profiling`
+[profile.profiling]
 inherits = "release"
 debug = 1

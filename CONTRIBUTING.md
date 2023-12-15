@@ -556,10 +556,10 @@ examples.
 
 #### Linux
 
-Install `perf` and build `ruff_benchmark` with the `release-debug` profile and then run it with perf
+Install `perf` and build `ruff_benchmark` with the `profiling` profile and then run it with perf
 
 ```shell
-cargo bench -p ruff_benchmark --no-run --profile=release-debug && perf record --call-graph dwarf -F 9999 cargo bench -p ruff_benchmark --profile=release-debug -- --profile-time=1
+cargo bench -p ruff_benchmark --no-run --profile=profiling && perf record --call-graph dwarf -F 9999 cargo bench -p ruff_benchmark --profile=profiling -- --profile-time=1
 ```
 
 You can also use the `ruff_dev` launcher to run `ruff check` multiple times on a repository to
@@ -567,8 +567,8 @@ gather enough samples for a good flamegraph (change the 999, the sample rate, an
 of checks, to your liking)
 
 ```shell
-cargo build --bin ruff_dev --profile=release-debug
-perf record -g -F 999 target/release-debug/ruff_dev repeat --repeat 30 --exit-zero --no-cache path/to/cpython > /dev/null
+cargo build --bin ruff_dev --profile=profiling
+perf record -g -F 999 target/profiling/ruff_dev repeat --repeat 30 --exit-zero --no-cache path/to/cpython > /dev/null
 ```
 
 Then convert the recorded profile
@@ -598,7 +598,7 @@ cargo install cargo-instruments
 Then run the profiler with
 
 ```shell
-cargo instruments -t time --bench linter --profile release-debug -p ruff_benchmark -- --profile-time=1
+cargo instruments -t time --bench linter --profile profiling -p ruff_benchmark -- --profile-time=1
 ```
 
 - `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc`
