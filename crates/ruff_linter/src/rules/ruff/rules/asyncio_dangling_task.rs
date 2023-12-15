@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 
 /// ## What it does
 /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls
-/// that do not store a reference to the returned result.
+/// that do not eventually await the returned task.
 ///
 /// ## Why is this bad?
 /// Per the `asyncio` documentation, the event loop only retains a weak
@@ -59,7 +59,7 @@ impl Violation for AsyncioDanglingTask {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AsyncioDanglingTask { method } = self;
-        format!("Store a reference to the return value of `asyncio.{method}`")
+        format!("Cannot prove result of `asyncio.{method}` is awaited in all program traces.")
     }
 }
 
