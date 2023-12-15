@@ -439,7 +439,8 @@ fn is_wildcard(pattern: &MatchCase) -> bool {
             | Pattern::MatchSequence(_)
             | Pattern::MatchMapping(_)
             | Pattern::MatchClass(_)
-            | Pattern::MatchStar(_) => false,
+            | Pattern::MatchStar(_)
+            | Pattern::Invalid(_) => false,
             Pattern::MatchAs(PatternMatchAs { pattern, .. }) => pattern.is_none(),
             Pattern::MatchOr(PatternMatchOr { patterns, .. }) => {
                 patterns.iter().all(is_wildcard_pattern)
@@ -648,6 +649,8 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Name(_)
                         | Expr::List(_)
                         | Expr::IpyEscapeCommand(_)
+                        // NOTE: Is this the correct place to handle this node?
+                        | Expr::Invalid(_)
                         | Expr::Tuple(_)
                         | Expr::Slice(_) => self.unconditional_next_block(after),
                         // TODO: handle these expressions.
