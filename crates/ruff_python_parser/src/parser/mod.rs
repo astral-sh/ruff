@@ -2354,7 +2354,7 @@ where
     }
 
     fn parse_alias(&mut self) -> ast::Alias {
-        let (kind, range) = self.current_token();
+        let (kind, mut range) = self.current_token();
         if kind == TokenKind::Star {
             self.eat(TokenKind::Star);
             return ast::Alias {
@@ -2367,18 +2367,19 @@ where
             };
         }
 
-        let mut name = self.parse_dotted_name();
+        let name = self.parse_dotted_name();
+        range = range.cover(name.range);
 
         let asname = if self.eat(TokenKind::As) {
             let id = self.parse_identifier();
-            name.range = name.range.cover(id.range);
+            range = range.cover(id.range);
             Some(id)
         } else {
             None
         };
 
         ast::Alias {
-            range: name.range,
+            range,
             name,
             asname,
         }

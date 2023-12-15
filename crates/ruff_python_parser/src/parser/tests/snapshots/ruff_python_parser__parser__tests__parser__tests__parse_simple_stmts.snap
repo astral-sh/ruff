@@ -755,7 +755,7 @@ ParsedFile {
                                 range: 411..421,
                                 name: Identifier {
                                     id: "a.b.c",
-                                    range: 411..421,
+                                    range: 411..416,
                                 },
                                 asname: Some(
                                     Identifier {
@@ -806,7 +806,7 @@ ParsedFile {
                                 range: 444..456,
                                 name: Identifier {
                                     id: "foo.bar",
-                                    range: 444..456,
+                                    range: 444..451,
                                 },
                                 asname: Some(
                                     Identifier {
@@ -819,7 +819,7 @@ ParsedFile {
                                 range: 458..473,
                                 name: Identifier {
                                     id: "a.b.c.d",
-                                    range: 458..473,
+                                    range: 458..465,
                                 },
                                 asname: Some(
                                     Identifier {
@@ -888,7 +888,7 @@ ParsedFile {
                                 range: 537..545,
                                 name: Identifier {
                                     id: "baz",
-                                    range: 537..545,
+                                    range: 537..540,
                                 },
                                 asname: Some(
                                     Identifier {
@@ -901,7 +901,7 @@ ParsedFile {
                                 range: 547..559,
                                 name: Identifier {
                                     id: "FooBar",
-                                    range: 547..559,
+                                    range: 547..553,
                                 },
                                 asname: Some(
                                     Identifier {
@@ -1024,7 +1024,7 @@ ParsedFile {
                                 range: 705..711,
                                 name: Identifier {
                                     id: "b",
-                                    range: 705..711,
+                                    range: 705..706,
                                 },
                                 asname: Some(
                                     Identifier {
