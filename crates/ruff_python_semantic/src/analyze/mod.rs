@@ -1,3 +1,4 @@
+pub mod class;
 pub mod function_type;
 pub mod imports;
 pub mod logging;

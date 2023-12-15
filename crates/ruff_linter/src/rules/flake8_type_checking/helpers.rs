@@ -1,13 +1,12 @@
 use anyhow::Result;
-use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::helpers::{map_callable, map_subscript};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
-    Binding, BindingId, BindingKind, NodeId, ResolvedReference, SemanticModel,
+    analyze, Binding, BindingKind, NodeId, ResolvedReference, SemanticModel,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -59,57 +58,17 @@ pub(crate) fn runtime_required_class(
     false
 }
 
+/// Return `true` if a class is a subclass of a runtime-required base class.
 fn runtime_required_base_class(
     class_def: &ast::StmtClassDef,
     base_classes: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    fn inner(
-        class_def: &ast::StmtClassDef,
-        base_classes: &[String],
-        semantic: &SemanticModel,
-        seen: &mut FxHashSet<BindingId>,
-    ) -> bool {
-        class_def.bases().iter().any(|expr| {
-            // If the base class is itself runtime-required, then this is too.
-            // Ex) `class Foo(BaseModel): ...`
-            if semantic
-                .resolve_call_path(map_subscript(expr))
-                .is_some_and(|call_path| {
-                    base_classes
-                        .iter()
-                        .any(|base_class| from_qualified_name(base_class) == call_path)
-                })
-            {
-                return true;
-            }
-
-            // If the base class extends a runtime-required class, then this does too.
-            // Ex) `class Bar(BaseModel): ...; class Foo(Bar): ...`
-            if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
-                if seen.insert(id) {
-                    let binding = semantic.binding(id);
-                    if let Some(base_class) = binding
-                        .kind
-                        .as_class_definition()
-                        .map(|id| &semantic.scopes[*id])
-                        .and_then(|scope| scope.kind.as_class())
-                    {
-                        if inner(base_class, base_classes, semantic, seen) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            false
-        })
-    }
-
-    if base_classes.is_empty() {
-        return false;
-    }
-
-    inner(class_def, base_classes, semantic, &mut FxHashSet::default())
+    analyze::class::any_over_body(class_def, semantic, &|call_path| {
+        base_classes
+            .iter()
+            .any(|base_class| from_qualified_name(base_class) == call_path)
+    })
 }
 
 fn runtime_required_decorators(
