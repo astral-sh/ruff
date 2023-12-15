@@ -254,14 +254,26 @@ pub(crate) fn indent(checker: &mut Checker, docstring: &Docstring) {
                     Edit::range_deletion(TextRange::at(line.start(), line_indent.text_len()))
                 } else {
                     // Convert the character count to an offset within the source.
+                    // Example, where `[]` is a 2 byte non-breaking space:
+                    // ```
+                    // def f():
+                    //     """ Docstring header
+                    // ^^^^ Real indentation is 4 chars
+                    //       docstring body, over-indented
+                    // ^^^^^^ Over-indentation is 6 - 4 = 2 chars due to this line
+                    //    [] []  docstring body 2, further indented
+                    // ^^^^^ We take these 4 chars/5 bytes to match the docstring ...
+                    //      ^^^ ... and these 2 chars/3 bytes to remove the `over_indented_size` ...
+                    //         ^^ ... but preserve this real indent
+                    // ```
                     let offset = checker
                         .locator()
-                        .after(line.start() + indent.text_len())
+                        .after(line.start())
                         .chars()
-                        .take(over_indented_size)
+                        .take(docstring.indentation.chars().count() + over_indented_size)
                         .map(TextLen::text_len)
                         .sum::<TextSize>();
-                    let range = TextRange::at(line.start(), indent.text_len() + offset);
+                    let range = TextRange::at(line.start(), offset);
                     Edit::range_replacement(indent, range)
                 };
                 diagnostic.set_fix(Fix::safe_edit(edit));
