@@ -13,7 +13,7 @@
 //! [`Mode`]: crate::mode
 
 use itertools::Itertools;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::lexer::{lex, lex_starts_at, LexicalError, Spanned};
 use crate::ParseError;
