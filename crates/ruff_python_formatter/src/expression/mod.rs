@@ -528,6 +528,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
+#[allow(clippy::if_same_then_else)]
 fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
@@ -535,11 +536,54 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
     if !visitor.any_parenthesized_expressions {
         // Only use the more complex IR when there is any expression that we can possibly split by
         false
-    } else if visitor.max_precedence == OperatorPrecedence::None {
-        true
     } else if visitor.max_precedence_count > 1 {
         false
-    } else if visitor.max_precedence == OperatorPrecedence::Attribute {
+    } else if visitor.max_precedence == OperatorPrecedence::None && expr.is_lambda_expr() {
+        // Micha: This seems to exclusively apply for lambda expressions where the body ends in a subscript.
+        // Subscripts are excluded by default because breaking them looks odd, but it seems to be fine for lambda expression.
+        //
+        // ```python
+        // mapper = lambda x: dict_with_default[
+        //  np.nan if isinstance(x, float) and np.isnan(x) else x
+        // ]
+        // ```
+        //
+        // to prevent that it gets formatted as:
+        //
+        // ```python
+        // mapper = (
+        //      lambda x: dict_with_default[
+        //          np.nan if isinstance(x, float) and np.isnan(x) else x
+        //      ]
+        // )
+        // ```
+        // I think we should remove this check in the future and instead parenthesize the body of the lambda expression:
+        //
+        // ```python
+        // mapper = lambda x: (
+        //      dict_with_default[
+        //          np.nan if isinstance(x, float) and np.isnan(x) else x
+        //     ]
+        // )
+        // ```
+        true
+    } else if visitor.max_precedence == OperatorPrecedence::Attribute
+        && (expr.is_lambda_expr() || expr.is_named_expr_expr())
+    {
+        // A single method call inside a named expression (`:=`) or as the body of a lambda function:
+        // ```python
+        // kwargs["open_with"] = lambda path, _: fsspec.open(
+        //      path, "wb", **(storage_options or {})
+        // ).open()
+        //
+        // if ret := subprocess.run(
+        //      ["git", "rev-parse", "--short", "HEAD"],
+        //      cwd=package_dir,
+        //      capture_output=True,
+        //      encoding="ascii",
+        //      errors="surrogateescape",
+        // ).stdout:
+        // ```
         true
     } else {
         fn is_parenthesized(expr: &Expr, context: &PyFormatContext) -> bool {
