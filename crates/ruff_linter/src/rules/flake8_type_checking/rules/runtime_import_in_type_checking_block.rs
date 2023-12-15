@@ -274,6 +274,7 @@ fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) 
                         checker.semantic(),
                         checker.locator(),
                         checker.stylist(),
+                        checker.generator(),
                     ))
                 } else {
                     None
@@ -282,7 +283,7 @@ fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) 
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let mut rest = quote_reference_edits.into_iter().dedup();
+    let mut rest = quote_reference_edits.into_iter().unique();
     let head = rest.next().expect("Expected at least one reference");
     Ok(Fix::unsafe_edits(head, rest).isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
