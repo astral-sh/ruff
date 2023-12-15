@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF006.py:6:5: RUF006 Store a reference to the return value of `asyncio.create_task`
+RUF006.py:6:5: RUF006 Cannot prove result of `asyncio.create_task` is awaited in all program traces.
   |
 4 | # Error
 5 | def f():
@@ -9,7 +9,7 @@ RUF006.py:6:5: RUF006 Store a reference to the return value of `asyncio.create_t
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
   |
 
-RUF006.py:11:5: RUF006 Store a reference to the return value of `asyncio.ensure_future`
+RUF006.py:11:5: RUF006 Cannot prove result of `asyncio.ensure_future` is awaited in all program traces.
    |
  9 | # Error
 10 | def f():
@@ -17,7 +17,7 @@ RUF006.py:11:5: RUF006 Store a reference to the return value of `asyncio.ensure_
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
    |
 
-RUF006.py:68:12: RUF006 Store a reference to the return value of `asyncio.create_task`
+RUF006.py:68:12: RUF006 Cannot prove result of `asyncio.create_task` is awaited in all program traces.
    |
 66 | # Error
 67 | def f():
@@ -25,7 +25,7 @@ RUF006.py:68:12: RUF006 Store a reference to the return value of `asyncio.create
    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
    |
 
-RUF006.py:74:26: RUF006 Store a reference to the return value of `asyncio.create_task`
+RUF006.py:74:26: RUF006 Cannot prove result of `asyncio.create_task` is awaited in all program traces.
    |
 72 | def f():
 73 |     loop = asyncio.get_running_loop()
@@ -33,7 +33,7 @@ RUF006.py:74:26: RUF006 Store a reference to the return value of `asyncio.create
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
    |
 
-RUF006.py:97:5: RUF006 Store a reference to the return value of `asyncio.create_task`
+RUF006.py:97:5: RUF006 Cannot prove result of `asyncio.create_task` is awaited in all program traces.
    |
 95 | def f():
 96 |     loop = asyncio.get_running_loop()
