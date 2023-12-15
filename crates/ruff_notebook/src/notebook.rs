@@ -421,18 +421,18 @@ mod tests {
         ));
     }
 
-    #[test_case(Path::new("markdown.json"), false; "markdown")]
-    #[test_case(Path::new("only_magic.json"), true; "only_magic")]
-    #[test_case(Path::new("code_and_magic.json"), true; "code_and_magic")]
-    #[test_case(Path::new("only_code.json"), true; "only_code")]
-    #[test_case(Path::new("cell_magic.json"), false; "cell_magic")]
-    #[test_case(Path::new("valid_cell_magic.json"), true; "valid_cell_magic")]
-    #[test_case(Path::new("automagic.json"), false; "automagic")]
-    #[test_case(Path::new("automagics.json"), false; "automagics")]
-    #[test_case(Path::new("automagic_before_code.json"), false; "automagic_before_code")]
-    #[test_case(Path::new("automagic_after_code.json"), true; "automagic_after_code")]
-    #[test_case(Path::new("unicode_magic_gh9145.json"), true; "unicode_magic_gh9145")]
-    fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
+    #[test_case("markdown", false)]
+    #[test_case("only_magic", true)]
+    #[test_case("code_and_magic", true)]
+    #[test_case("only_code", true)]
+    #[test_case("cell_magic", false)]
+    #[test_case("valid_cell_magic", true)]
+    #[test_case("automagic", false)]
+    #[test_case("automagics", false)]
+    #[test_case("automagic_before_code", false)]
+    #[test_case("automagic_after_code", true)]
+    #[test_case("unicode_magic_gh9145", true)]
+    fn test_is_valid_code_cell(cell: &str, expected: bool) -> Result<()> {
         /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
         fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
             let path = notebook_path("cell").join(path);
@@ -440,7 +440,10 @@ mod tests {
             Ok(serde_json::from_str(&source_code)?)
         }
 
-        assert_eq!(read_jupyter_cell(path)?.is_valid_code_cell(), expected);
+        assert_eq!(
+            read_jupyter_cell(format!("{cell}.json"))?.is_valid_code_cell(),
+            expected
+        );
         Ok(())
     }
 
