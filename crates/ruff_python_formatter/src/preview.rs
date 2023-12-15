@@ -24,3 +24,12 @@ pub(crate) const fn is_prefer_splitting_right_hand_side_of_assignments_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`no_blank_line_before_class_docstring`] preview style is enabled.
+///
+/// [`no_blank_line_before_class_docstring`]: https://github.com/astral-sh/ruff/issues/8888
+pub(crate) const fn is_no_blank_line_before_class_docstring_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}
