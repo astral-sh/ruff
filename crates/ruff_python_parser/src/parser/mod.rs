@@ -3869,7 +3869,7 @@ where
                     range
                 },
             )
-            // Doens't really matter what range we get here, since the range will
+            // Doesn't really matter what range we get here, since the range will
             // be modified later in `parse_bracketsized_expr`.
             .unwrap_or_default();
 
@@ -3898,7 +3898,7 @@ where
                     range
                 },
             )
-            // Doens't really matter what range we get here, since the range will
+            // Doesn't really matter what range we get here, since the range will
             // be modified later in `parse_bracesized_expr`.
             .unwrap_or_default();
 
@@ -3933,7 +3933,7 @@ where
                     range
                 },
             )
-            // Doens't really matter what range we get here, since the range will
+            // Doesn't really matter what range we get here, since the range will
             // be modified later in `parse_bracesized_expr`.
             .unwrap_or_default();
 
