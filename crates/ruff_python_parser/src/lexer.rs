@@ -805,7 +805,7 @@ impl<'source> Lexer<'source> {
         } else {
             // Reached the end of the file. Emit a trailing newline token if not at the beginning of a logical line,
             // empty the dedent stack, and finally, return the EndOfFile token.
-            self.consume_end()
+            Ok(self.consume_end())
         }
     }
 
@@ -933,7 +933,7 @@ impl<'source> Lexer<'source> {
         Ok(token)
     }
 
-    fn consume_end(&mut self) -> Result<Spanned, LexicalError> {
+    fn consume_end(&mut self) -> Spanned {
         // We reached end of file.
         // First of all, we need all nestings to be finished.
         if self.nesting > 0 {
@@ -944,13 +944,13 @@ impl<'source> Lexer<'source> {
         // Next, insert a trailing newline, if required.
         if !self.state.is_new_logical_line() {
             self.state = State::AfterNewline;
-            Ok((Tok::Newline, TextRange::empty(self.offset())))
+            (Tok::Newline, TextRange::empty(self.offset()))
         }
         // Next, flush the indentation stack to zero.
         else if self.indentations.dedent().is_some() {
-            Ok((Tok::Dedent, TextRange::empty(self.offset())))
+            (Tok::Dedent, TextRange::empty(self.offset()))
         } else {
-            Ok((Tok::EndOfFile, TextRange::empty(self.offset())))
+            (Tok::EndOfFile, TextRange::empty(self.offset()))
         }
     }
 

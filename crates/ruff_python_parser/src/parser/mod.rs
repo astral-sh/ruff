@@ -20,9 +20,9 @@ use itertools::PeekNth;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
-mod parser;
+mod functions;
 mod tests;
-pub use parser::*;
+pub use functions::*;
 
 #[derive(Debug)]
 pub struct ParsedFile {
@@ -296,14 +296,8 @@ where
     }
 
     fn lookahead(&mut self, offset: usize) -> (TokenKind, TextRange) {
-        self.lexer
-            .peek_nth(offset)
-            .map(|result| match result {
-                Ok((tok, range)) => (tok.into(), *range),
-                // Return a `Invalid` token when encountering an error
-                Err(err) => (TokenKind::Invalid, err.location),
-            })
-            .unwrap_or((
+        self.lexer.peek_nth(offset).map_or(
+            (
                 TokenKind::EndOfFile,
                 TextRange::empty(
                     self.source
@@ -311,7 +305,13 @@ where
                         .try_into()
                         .expect("source length is  bigger than u32 max"),
                 ),
-            ))
+            ),
+            |result| match result {
+                Ok((tok, range)) => (tok.into(), *range),
+                // Return a `Invalid` token when encountering an error
+                Err(err) => (TokenKind::Invalid, err.location),
+            },
+        )
     }
 
     #[inline]
@@ -478,15 +478,15 @@ where
                 break;
             }
 
-            if !self.at(delim) {
+            if self.at(delim) {
+                final_range = Some(self.current_range());
+                self.eat(delim);
+            } else {
                 if self.at_expr() {
                     self.expect(delim);
                 } else {
                     break;
                 }
-            } else {
-                final_range = Some(self.current_range());
-                self.eat(delim);
             }
         }
 
@@ -1017,7 +1017,7 @@ where
                 patterns.push(pattern);
             }
 
-            lhs = Pattern::MatchOr(ast::PatternMatchOr { patterns, range });
+            lhs = Pattern::MatchOr(ast::PatternMatchOr { range, patterns });
         }
 
         if self.eat(TokenKind::As) {
@@ -1237,10 +1237,10 @@ where
 
         (
             Pattern::MatchMapping(ast::PatternMatchMapping {
+                range,
                 keys,
                 patterns,
                 rest,
-                range,
             }),
             range,
         )
@@ -1627,12 +1627,12 @@ where
 
         (
             Stmt::ClassDef(ast::StmtClassDef {
+                range,
                 decorator_list,
                 name,
                 type_params,
                 arguments,
                 body,
-                range,
             }),
             range,
         )
@@ -1668,8 +1668,7 @@ where
                 // Should we make `target` an `Expr::Invalid` here?
                 self.add_error(
                     ParseErrorType::OtherError(format!(
-                        "expression `{:?}` not allowed in `with` statement",
-                        target
+                        "expression `{target:?}` not allowed in `with` statement"
                     )),
                     target_range,
                 );
@@ -1684,9 +1683,9 @@ where
 
         self.clear_ctx(ParserCtxFlags::WITH_ITEM);
         ast::WithItem {
+            range,
             context_expr,
             optional_vars,
-            range,
         }
     }
 
@@ -1928,7 +1927,7 @@ where
         };
 
         if !helpers::is_valid_aug_assignment_target(&target.value) {
-            self.add_error(ParseErrorType::AugAssignmentError, target.range)
+            self.add_error(ParseErrorType::AugAssignmentError, target.range);
         }
 
         helpers::set_expr_ctx(&mut target.value, ExprContext::Store);
@@ -1981,9 +1980,9 @@ where
 
             if !self.eat(TokenKind::Semi) {
                 if self.at_simple_stmt() {
-                    stmts.iter().for_each(|stmt| {
-                        self.add_error(ParseErrorType::SimpleStmtsInSameLine, stmt.range())
-                    });
+                    for stmt in &stmts {
+                        self.add_error(ParseErrorType::SimpleStmtsInSameLine, stmt.range());
+                    }
                 } else {
                     break;
                 }
@@ -2060,7 +2059,7 @@ where
         };
 
         (
-            Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand { value, kind, range }),
+            Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand { range, kind, value }),
             range,
         )
     }
@@ -2162,7 +2161,7 @@ where
         );
         let range = global_range.cover(range.unwrap_or(global_range));
 
-        (Stmt::Global(ast::StmtGlobal { names, range }), range)
+        (Stmt::Global(ast::StmtGlobal { range, names }), range)
     }
 
     fn parse_nonlocal_stmt(&mut self, nonlocal_range: TextRange) -> StmtWithRange {
@@ -2182,10 +2181,9 @@ where
                     range
                 },
             )
-            .map(|range| nonlocal_range.cover(range))
-            .unwrap_or(nonlocal_range);
+            .map_or(nonlocal_range, |range| nonlocal_range.cover(range));
 
-        (Stmt::Nonlocal(ast::StmtNonlocal { names, range }), range)
+        (Stmt::Nonlocal(ast::StmtNonlocal { range, names }), range)
     }
 
     fn parse_return_stmt(&mut self, mut range: TextRange) -> StmtWithRange {
@@ -2199,7 +2197,7 @@ where
             Some(Box::new(value))
         };
 
-        (Stmt::Return(ast::StmtReturn { value, range }), range)
+        (Stmt::Return(ast::StmtReturn { range, value }), range)
     }
 
     fn parse_raise_stmt(&mut self, mut range: TextRange) -> StmtWithRange {
@@ -2248,7 +2246,7 @@ where
             None
         };
 
-        (Stmt::Raise(ast::StmtRaise { exc, cause, range }), range)
+        (Stmt::Raise(ast::StmtRaise { range, exc, cause }), range)
     }
 
     fn parse_type_stmt(&mut self, range: TextRange) -> StmtWithRange {
@@ -2263,7 +2261,7 @@ where
             })
         } else {
             self.add_error(
-                ParseErrorType::OtherError(format!("expecting identifier, got {}", tok)),
+                ParseErrorType::OtherError(format!("expecting identifier, got {tok}")),
                 tok_range,
             );
             Expr::Invalid(ast::ExprInvalid {
@@ -2304,7 +2302,7 @@ where
             },
         );
 
-        ast::TypeParams { type_params, range }
+        ast::TypeParams { range, type_params }
     }
 
     fn parse_type_param(&mut self) -> ast::TypeParam {
@@ -2402,19 +2400,18 @@ where
                     range
                 },
             )
-            .map(|range| import_range.cover(range))
-            .unwrap_or(import_range);
+            .map_or(import_range, |range| import_range.cover(range));
 
-        (Stmt::Import(ast::StmtImport { names, range }), range)
+        (Stmt::Import(ast::StmtImport { range, names }), range)
     }
 
     fn parse_import_from_stmt(&mut self, from_range: TextRange) -> StmtWithRange {
+        const DOT_ELLIPSIS_SET: TokenSet = TokenSet::new(&[TokenKind::Dot, TokenKind::Ellipsis]);
         self.eat(TokenKind::From);
 
         let mut module = None;
         let mut level = if self.eat(TokenKind::Ellipsis) { 3 } else { 0 };
 
-        const DOT_ELLIPSIS_SET: TokenSet = TokenSet::new(&[TokenKind::Dot, TokenKind::Ellipsis]);
         while self.at_ts(DOT_ELLIPSIS_SET) {
             if self.eat(TokenKind::Dot) {
                 level += 1;
@@ -2463,8 +2460,7 @@ where
                     range
                 },
             )
-            .map(|range| from_range.cover(range))
-            .unwrap_or(from_range)
+            .map_or(from_range, |range| from_range.cover(range))
         };
 
         (
@@ -2729,9 +2725,9 @@ where
     ///
     /// See <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
     fn current_op(&mut self) -> (u8, TokenKind, Associativity) {
-        let kind = self.current_kind();
         const NOT_AN_OP: (u8, TokenKind, Associativity) =
             (0, TokenKind::Invalid, Associativity::Left);
+        let kind = self.current_kind();
 
         match kind {
             TokenKind::Or => (4, kind, Associativity::Left),
@@ -2873,7 +2869,7 @@ where
                 range,
             }),
             Tok::IpyEscapeCommand { value, kind } if self.mode == Mode::Ipython => {
-                Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { value, kind, range })
+                Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand { range, kind, value })
             }
             tok @ Tok::String { .. } => return self.parse_string_expr(tok, range),
             Tok::FStringStart => return self.parse_fstring_expr(range),
@@ -2911,7 +2907,7 @@ where
                     );
                 } else {
                     self.add_error(
-                        ParseErrorType::OtherError(format!("unexpected token `{}`", tok)),
+                        ParseErrorType::OtherError(format!("unexpected token `{tok}`")),
                         range,
                     );
                 }
@@ -3033,9 +3029,9 @@ where
         self.clear_ctx(ParserCtxFlags::ARGUMENTS);
 
         let arguments = ast::Arguments {
+            range,
             args,
             keywords,
-            range,
         };
 
         if let Err(error) = helpers::validate_arguments(&arguments, self.source_path) {
@@ -3160,10 +3156,10 @@ where
 
             (
                 Expr::Slice(ast::ExprSlice {
+                    range,
                     lower,
                     upper,
                     step,
-                    range,
                 }),
                 range,
             )
@@ -3353,7 +3349,7 @@ where
                     }),
                     invalid.range,
                 ),
-                _ => unreachable!(),
+                StringType::FString(_) => unreachable!(),
             };
         }
 
@@ -3470,7 +3466,7 @@ where
             let element = match self.current_kind() {
                 TokenKind::Lbrace => {
                     let fstring_expr = self.parse_fstring_expr_element();
-                    let range = final_range.get_or_insert_with(|| fstring_expr.range);
+                    let range = final_range.get_or_insert(fstring_expr.range);
                     *range = range.cover(fstring_expr.range);
                     FStringElement::Expression(fstring_expr)
                 }
@@ -3498,7 +3494,7 @@ where
                                 )
                             }
                         };
-                    let range = final_range.get_or_insert_with(|| fstring_range);
+                    let range = final_range.get_or_insert(fstring_range);
                     *range = range.cover(fstring_range);
                     fstring_literal
                 }
@@ -3512,10 +3508,7 @@ where
                 _ => {
                     let (tok, range) = self.next_token();
                     self.add_error(
-                        ParseErrorType::OtherError(format!(
-                            "f-string: unexpected token `{:?}`",
-                            tok
-                        )),
+                        ParseErrorType::OtherError(format!("f-string: unexpected token `{tok:?}`")),
                         range,
                     );
                     continue;
@@ -3547,7 +3540,7 @@ where
             self.add_error(
                 ParseErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
                 value_range,
-            )
+            );
         }
         let debug_text = if self.eat(TokenKind::Equal) {
             let leading_range = range
@@ -3587,7 +3580,7 @@ where
             if range.is_empty() {
                 range = TextRange::empty(self.current_range().start());
             }
-            Some(Box::new(ast::FStringFormatSpec { elements, range }))
+            Some(Box::new(ast::FStringFormatSpec { range, elements }))
         } else {
             None
         };
@@ -3831,15 +3824,15 @@ where
             elts.push(expr);
             final_range = final_range.cover(expr_range);
 
-            if !self.at(TokenKind::Comma) {
+            if self.at(TokenKind::Comma) {
+                final_range = final_range.cover(self.current_range());
+                self.eat(TokenKind::Comma);
+            } else {
                 if self.at_expr() {
                     self.expect(TokenKind::Comma);
                 } else {
                     break;
                 }
-            } else {
-                final_range = final_range.cover(self.current_range());
-                self.eat(TokenKind::Comma);
             }
         }
 
@@ -3902,7 +3895,7 @@ where
             // be modified later in `parse_bracesized_expr`.
             .unwrap_or_default();
 
-        (Expr::Set(ast::ExprSet { elts, range }), range)
+        (Expr::Set(ast::ExprSet { range, elts }), range)
     }
 
     fn parse_dict_expr(&mut self, key: Option<Expr>, value: Expr) -> ExprWithRange {
@@ -3939,9 +3932,9 @@ where
 
         (
             Expr::Dict(ast::ExprDict {
+                range,
                 keys,
                 values,
-                range,
             }),
             range,
         )
@@ -3991,11 +3984,11 @@ where
         }
 
         ast::Comprehension {
+            range,
             target,
             iter,
             ifs,
             is_async,
-            range,
         }
     }
 
@@ -4281,9 +4274,9 @@ where
         };
 
         ast::Parameter {
+            range,
             name,
             annotation,
-            range,
         }
     }
 
@@ -4300,9 +4293,9 @@ where
         };
 
         ast::ParameterWithDefault {
+            range,
             parameter,
             default,
-            range,
         }
     }
 
@@ -4394,16 +4387,15 @@ where
 
                 range
             })
-            .map(|range| first_param_range.cover(range))
-            .unwrap_or(first_param_range);
+            .map_or(first_param_range, |range| first_param_range.cover(range));
 
         let parameters = ast::Parameters {
-            kwarg,
-            vararg,
-            args,
-            posonlyargs,
-            kwonlyargs,
             range,
+            posonlyargs,
+            args,
+            vararg,
+            kwonlyargs,
+            kwarg,
         };
 
         if let Err(error) = helpers::validate_parameters(&parameters, self.source_path) {
