@@ -72,3 +72,18 @@ def f():
 
     def baz() -> DataFrame | Series:
         ...
+
+
+def f():
+    from pandas import DataFrame, Series
+
+    def baz() -> (
+        DataFrame |
+        Series
+    ):
+        ...
+
+    class C:
+        x: DataFrame[
+            int
+        ] = 1

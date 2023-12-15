@@ -5,7 +5,7 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_codegen::Stylist;
+use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
     Binding, BindingId, BindingKind, NodeId, ResolvedReference, SemanticModel,
 };
@@ -215,6 +215,7 @@ pub(crate) fn quote_annotation(
     semantic: &SemanticModel,
     locator: &Locator,
     stylist: &Stylist,
+    generator: Generator,
 ) -> Result<Edit> {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
@@ -224,7 +225,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of a subscript, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame[int]`, we
                     // should generate `"DataFrame[int]"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist);
+                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
                 }
             }
             Some(Expr::Attribute(parent)) => {
@@ -232,7 +233,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the value of an attribute, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `pd.DataFrame`, we
                     // should generate `"pd.DataFrame"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist);
+                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
                 }
             }
             Some(Expr::Call(parent)) => {
@@ -240,7 +241,7 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the function of a call, we need to quote the entire
                     // expression. For example, when quoting `DataFrame` in `DataFrame()`, we
                     // should generate `"DataFrame()"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist);
+                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
                 }
             }
             Some(Expr::BinOp(parent)) => {
@@ -248,14 +249,12 @@ pub(crate) fn quote_annotation(
                     // If we're quoting the left or right side of a binary operation, we need to
                     // quote the entire expression. For example, when quoting `DataFrame` in
                     // `DataFrame | Series`, we should generate `"DataFrame | Series"`.
-                    return quote_annotation(parent_id, semantic, locator, stylist);
+                    return quote_annotation(parent_id, semantic, locator, stylist, generator);
                 }
             }
             _ => {}
         }
     }
-
-    let annotation = locator.slice(expr);
 
     // If the annotation already contains a quote, avoid attempting to re-quote it. For example:
     // ```python
@@ -263,12 +262,17 @@ pub(crate) fn quote_annotation(
     //
     // Set[Literal["Foo"]]
     // ```
-    if annotation.contains('\'') || annotation.contains('"') {
+    let text = locator.slice(expr);
+    if text.contains('\'') || text.contains('"') {
         return Err(anyhow::anyhow!("Annotation already contains a quote"));
     }
 
-    // If we're quoting a name, we need to quote the entire expression.
+    // Quote the entire expression.
     let quote = stylist.quote();
-    let annotation = format!("{quote}{annotation}{quote}");
-    Ok(Edit::range_replacement(annotation, expr.range()))
+    let annotation = generator.expr(expr);
+
+    Ok(Edit::range_replacement(
+        format!("{quote}{annotation}{quote}"),
+        expr.range(),
+    ))
 }

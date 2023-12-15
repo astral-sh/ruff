@@ -494,6 +494,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                         checker.semantic(),
                         checker.locator(),
                         checker.stylist(),
+                        checker.generator(),
                     ))
                 } else {
                     None
@@ -507,7 +508,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         add_import_edit
             .into_edits()
             .into_iter()
-            .chain(quote_reference_edits.into_iter().dedup()),
+            .chain(quote_reference_edits.into_iter().unique()),
     )
     .isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
