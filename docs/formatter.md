@@ -403,4 +403,4 @@ ruff check --select I --fix .
 ruff format .
 ```
 
-A unified command for both linting and formatting is currently [being developed](https://github.com/astral-sh/ruff/issues/8232).
+A unified command for both linting and formatting is [planned](https://github.com/astral-sh/ruff/issues/8232).
