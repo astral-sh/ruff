@@ -280,7 +280,7 @@ where
                 Err(lex_error) => {
                     self.add_error(ParseErrorType::Lexical(lex_error.error), lex_error.location);
 
-                    // Return a `Invalid` token when encoutering an error
+                    // Return a `Invalid` token when encountering an error
                     (Tok::Invalid, lex_error.location)
                 }
             })
@@ -300,7 +300,7 @@ where
             .peek_nth(offset)
             .map(|result| match result {
                 Ok((tok, range)) => (tok.into(), *range),
-                // Return a `Invalid` token when encoutering an error
+                // Return a `Invalid` token when encountering an error
                 Err(err) => (TokenKind::Invalid, err.location),
             })
             .unwrap_or((
@@ -428,13 +428,13 @@ where
     fn parse_delimited(
         &mut self,
         allow_trailing_delim: bool,
-        openning: TokenKind,
+        opening: TokenKind,
         delim: TokenKind,
         closing: TokenKind,
         mut func: impl FnMut(&mut Parser<'src, 'src_path, I>),
     ) -> TextRange {
         let start_range = self.current_range();
-        assert!(self.eat(openning));
+        assert!(self.eat(opening));
 
         self.parse_separated(
             allow_trailing_delim,
@@ -454,8 +454,8 @@ where
     }
 
     /// Parses a sequence of elements separated by a delimiter. This function stops
-    /// parsing upon encoutering any of the tokens in `ending_set`, if it doesn't
-    /// encouter the tokens in `ending_set` it stops parsing when seeing the `EOF`
+    /// parsing upon encountering any of the tokens in `ending_set`, if it doesn't
+    /// encounter the tokens in `ending_set` it stops parsing when seeing the `EOF`
     /// or `Newline` token.
     ///
     /// Returns the last [`TextRange`] of the parsed elements. If none elements are
@@ -779,7 +779,7 @@ where
                     TokenKind::Int | TokenKind::Float | TokenKind::Complex
                 ) =>
             {
-                // Since the `Minus` token was consumend `parse_lhs` will not
+                // Since the `Minus` token was consumed `parse_lhs` will not
                 // be able to parse an `UnaryOp`, therefore we create the node
                 // manually.
                 let (expr, expr_range) = self.parse_lhs();
@@ -3320,7 +3320,7 @@ where
         // a fstring, e.g., `"hello " f"{x}"`.
         if self.at(TokenKind::FStringStart) {
             let mut fstring_range = self.current_range();
-            self.handle_implict_concatenated_strings(&mut fstring_range, &mut strings);
+            self.handle_implicit_concatenated_strings(&mut fstring_range, &mut strings);
             final_range = final_range.cover(fstring_range);
         }
 
@@ -3373,9 +3373,9 @@ where
     }
 
     const FSTRING_SET: TokenSet = TokenSet::new(&[TokenKind::FStringStart, TokenKind::String]);
-    /// Handles implict concatenated f-strings, e.g. `f"{x}" f"hello"`, and
-    /// implict concatenated f-strings with strings, e.g. `f"{x}" "xyz" f"{x}"`.
-    fn handle_implict_concatenated_strings(
+    /// Handles implicit concatenated f-strings, e.g. `f"{x}" f"hello"`, and
+    /// implicit concatenated f-strings with strings, e.g. `f"{x}" "xyz" f"{x}"`.
+    fn handle_implicit_concatenated_strings(
         &mut self,
         fstring_range: &mut TextRange,
         strings: &mut Vec<StringType>,
@@ -3432,7 +3432,7 @@ where
         }
 
         let mut strings = vec![StringType::FString(fstring)];
-        self.handle_implict_concatenated_strings(&mut fstring_range, &mut strings);
+        self.handle_implicit_concatenated_strings(&mut fstring_range, &mut strings);
 
         match concatenated_strings(strings, fstring_range) {
             Ok(string) => (string, fstring_range),
@@ -3583,7 +3583,7 @@ where
         let format_spec = if self.eat(TokenKind::Colon) {
             let (elements, mut range) = self.parse_fstring_elements();
             // Special case for when the f-string format spec is empty. We set the range
-            // to an emtpy `TextRange`.
+            // to an empty `TextRange`.
             if range.is_empty() {
                 range = TextRange::empty(self.current_range().start());
             }
@@ -4360,7 +4360,7 @@ where
                     std::mem::swap(&mut args, &mut posonlyargs);
                 } else if parser.at(TokenKind::Name) {
                     let param = parser.parse_parameter_with_default();
-                    // Don't allow non-default paramaters after default parameters e.g. `a=1, b`,
+                    // Don't allow non-default parameters after default parameters e.g. `a=1, b`,
                     // can't place `b` after `a=1`. Non-default parameters are only allowed after
                     // default parameters if we have a `*` before them, e.g. `a=1, *, b`.
                     if param.default.is_none() && has_seen_default_param {
