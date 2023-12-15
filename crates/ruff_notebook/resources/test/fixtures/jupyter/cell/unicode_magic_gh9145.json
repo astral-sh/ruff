@@ -1,0 +1,19 @@
+{
+  "execution_count": null,
+  "cell_type": "code",
+  "id": "1",
+  "metadata": {},
+  "outputs": [],
+  "source": [
+    "def sample_func(xx):\n",
+    "    \"\"\"\n",
+    "    转置 (transpose)\n",
+    "    \"\"\"\n",
+    "    return xx.T",
+    "# https://github.com/astral-sh/ruff-vscode/issues/362",
+    "DEFAULT_SYSTEM_PROMPT = (",
+    "    \"Ты — Сайга, русскоязычный автоматический ассистент. \"",
+    "    \"Ты разговариваешь с людьми и помогаешь им.\"",
+    ")"
+  ]
+}
