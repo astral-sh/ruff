@@ -1,0 +1,14 @@
+{
+  "execution_count": null,
+  "cell_type": "code",
+  "id": "1",
+  "metadata": {},
+  "outputs": [],
+  "source": [
+    "def sample_func(xx):\n",
+    "    \"\"\"\n",
+    "    转置 (transpose)\n",
+    "    \"\"\"\n",
+    "    return xx.T"
+  ]
+}

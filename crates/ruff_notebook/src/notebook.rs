@@ -431,6 +431,7 @@ mod tests {
     #[test_case(Path::new("automagics.json"), false; "automagics")]
     #[test_case(Path::new("automagic_before_code.json"), false; "automagic_before_code")]
     #[test_case(Path::new("automagic_after_code.json"), true; "automagic_after_code")]
+    #[test_case(Path::new("unicode_magic_gh9145.json"), true; "unicode_magic_gh9145")]
     fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
         /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
         fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
