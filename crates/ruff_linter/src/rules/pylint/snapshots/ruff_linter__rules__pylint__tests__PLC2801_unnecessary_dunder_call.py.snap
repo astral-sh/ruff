@@ -1,0 +1,301 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+unnecessary_dunder_call.py:1:7: PLC2801 [*] Unnecessary dunder call `3.0.__add__(4.0)`
+  |
+1 | print((3.0).__add__(4.0))  # PLC2801
+  |       ^^^^^^^^^^^^^^^^^^ PLC2801
+2 | print((3.0).__sub__(4.0))  # PLC2801
+3 | print((3.0).__mul__(4.0))  # PLC2801
+  |
+  = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+1   |-print((3.0).__add__(4.0))  # PLC2801
+  1 |+print(3.0 + 4.0)  # PLC2801
+2 2 | print((3.0).__sub__(4.0))  # PLC2801
+3 3 | print((3.0).__mul__(4.0))  # PLC2801
+4 4 | print((3.0).__truediv__(4.0))  # PLC2801
+
+unnecessary_dunder_call.py:2:7: PLC2801 [*] Unnecessary dunder call `3.0.__sub__(4.0)`
+  |
+1 | print((3.0).__add__(4.0))  # PLC2801
+2 | print((3.0).__sub__(4.0))  # PLC2801
+  |       ^^^^^^^^^^^^^^^^^^ PLC2801
+3 | print((3.0).__mul__(4.0))  # PLC2801
+4 | print((3.0).__truediv__(4.0))  # PLC2801
+  |
+  = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+1 1 | print((3.0).__add__(4.0))  # PLC2801
+2   |-print((3.0).__sub__(4.0))  # PLC2801
+  2 |+print(3.0 - 4.0)  # PLC2801
+3 3 | print((3.0).__mul__(4.0))  # PLC2801
+4 4 | print((3.0).__truediv__(4.0))  # PLC2801
+5 5 | print((3.0).__floordiv__(4.0))  # PLC2801
+
+unnecessary_dunder_call.py:3:7: PLC2801 [*] Unnecessary dunder call `3.0.__mul__(4.0)`
+  |
+1 | print((3.0).__add__(4.0))  # PLC2801
+2 | print((3.0).__sub__(4.0))  # PLC2801
+3 | print((3.0).__mul__(4.0))  # PLC2801
+  |       ^^^^^^^^^^^^^^^^^^ PLC2801
+4 | print((3.0).__truediv__(4.0))  # PLC2801
+5 | print((3.0).__floordiv__(4.0))  # PLC2801
+  |
+  = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+1 1 | print((3.0).__add__(4.0))  # PLC2801
+2 2 | print((3.0).__sub__(4.0))  # PLC2801
+3   |-print((3.0).__mul__(4.0))  # PLC2801
+  3 |+print(3.0 * 4.0)  # PLC2801
+4 4 | print((3.0).__truediv__(4.0))  # PLC2801
+5 5 | print((3.0).__floordiv__(4.0))  # PLC2801
+6 6 | print((3.0).__mod__(4.0))  # PLC2801
+
+unnecessary_dunder_call.py:4:7: PLC2801 [*] Unnecessary dunder call `3.0.__truediv__(4.0)`
+  |
+2 | print((3.0).__sub__(4.0))  # PLC2801
+3 | print((3.0).__mul__(4.0))  # PLC2801
+4 | print((3.0).__truediv__(4.0))  # PLC2801
+  |       ^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+5 | print((3.0).__floordiv__(4.0))  # PLC2801
+6 | print((3.0).__mod__(4.0))  # PLC2801
+  |
+  = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+1 1 | print((3.0).__add__(4.0))  # PLC2801
+2 2 | print((3.0).__sub__(4.0))  # PLC2801
+3 3 | print((3.0).__mul__(4.0))  # PLC2801
+4   |-print((3.0).__truediv__(4.0))  # PLC2801
+  4 |+print(3.0 / 4.0)  # PLC2801
+5 5 | print((3.0).__floordiv__(4.0))  # PLC2801
+6 6 | print((3.0).__mod__(4.0))  # PLC2801
+7 7 | print((3.0).__eq__(4.0))  # PLC2801
+
+unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call `3.0.__floordiv__(4.0)`
+  |
+3 | print((3.0).__mul__(4.0))  # PLC2801
+4 | print((3.0).__truediv__(4.0))  # PLC2801
+5 | print((3.0).__floordiv__(4.0))  # PLC2801
+  |       ^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+6 | print((3.0).__mod__(4.0))  # PLC2801
+7 | print((3.0).__eq__(4.0))  # PLC2801
+  |
+  = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+2 2 | print((3.0).__sub__(4.0))  # PLC2801
+3 3 | print((3.0).__mul__(4.0))  # PLC2801
+4 4 | print((3.0).__truediv__(4.0))  # PLC2801
+5   |-print((3.0).__floordiv__(4.0))  # PLC2801
+  5 |+print(3.0 // 4.0)  # PLC2801
+6 6 | print((3.0).__mod__(4.0))  # PLC2801
+7 7 | print((3.0).__eq__(4.0))  # PLC2801
+8 8 | print((3.0).__ne__(4.0))  # PLC2801
+
+unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call `3.0.__mod__(4.0)`
+  |
+4 | print((3.0).__truediv__(4.0))  # PLC2801
+5 | print((3.0).__floordiv__(4.0))  # PLC2801
+6 | print((3.0).__mod__(4.0))  # PLC2801
+  |       ^^^^^^^^^^^^^^^^^^ PLC2801
+7 | print((3.0).__eq__(4.0))  # PLC2801
+8 | print((3.0).__ne__(4.0))  # PLC2801
+  |
+  = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+3 3 | print((3.0).__mul__(4.0))  # PLC2801
+4 4 | print((3.0).__truediv__(4.0))  # PLC2801
+5 5 | print((3.0).__floordiv__(4.0))  # PLC2801
+6   |-print((3.0).__mod__(4.0))  # PLC2801
+  6 |+print(3.0 % 4.0)  # PLC2801
+7 7 | print((3.0).__eq__(4.0))  # PLC2801
+8 8 | print((3.0).__ne__(4.0))  # PLC2801
+9 9 | print((3.0).__lt__(4.0))  # PLC2801
+
+unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call `3.0.__eq__(4.0)`
+  |
+5 | print((3.0).__floordiv__(4.0))  # PLC2801
+6 | print((3.0).__mod__(4.0))  # PLC2801
+7 | print((3.0).__eq__(4.0))  # PLC2801
+  |       ^^^^^^^^^^^^^^^^^ PLC2801
+8 | print((3.0).__ne__(4.0))  # PLC2801
+9 | print((3.0).__lt__(4.0))  # PLC2801
+  |
+  = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+4 4 | print((3.0).__truediv__(4.0))  # PLC2801
+5 5 | print((3.0).__floordiv__(4.0))  # PLC2801
+6 6 | print((3.0).__mod__(4.0))  # PLC2801
+7   |-print((3.0).__eq__(4.0))  # PLC2801
+  7 |+print(3.0 == 4.0)  # PLC2801
+8 8 | print((3.0).__ne__(4.0))  # PLC2801
+9 9 | print((3.0).__lt__(4.0))  # PLC2801
+10 10 | print((3.0).__le__(4.0))  # PLC2801
+
+unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call `3.0.__ne__(4.0)`
+   |
+ 6 | print((3.0).__mod__(4.0))  # PLC2801
+ 7 | print((3.0).__eq__(4.0))  # PLC2801
+ 8 | print((3.0).__ne__(4.0))  # PLC2801
+   |       ^^^^^^^^^^^^^^^^^ PLC2801
+ 9 | print((3.0).__lt__(4.0))  # PLC2801
+10 | print((3.0).__le__(4.0))  # PLC2801
+   |
+   = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+5 5 | print((3.0).__floordiv__(4.0))  # PLC2801
+6 6 | print((3.0).__mod__(4.0))  # PLC2801
+7 7 | print((3.0).__eq__(4.0))  # PLC2801
+8   |-print((3.0).__ne__(4.0))  # PLC2801
+  8 |+print(3.0 != 4.0)  # PLC2801
+9 9 | print((3.0).__lt__(4.0))  # PLC2801
+10 10 | print((3.0).__le__(4.0))  # PLC2801
+11 11 | print((3.0).__gt__(4.0))  # PLC2801
+
+unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call `3.0.__lt__(4.0)`
+   |
+ 7 | print((3.0).__eq__(4.0))  # PLC2801
+ 8 | print((3.0).__ne__(4.0))  # PLC2801
+ 9 | print((3.0).__lt__(4.0))  # PLC2801
+   |       ^^^^^^^^^^^^^^^^^ PLC2801
+10 | print((3.0).__le__(4.0))  # PLC2801
+11 | print((3.0).__gt__(4.0))  # PLC2801
+   |
+   = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+6  6  | print((3.0).__mod__(4.0))  # PLC2801
+7  7  | print((3.0).__eq__(4.0))  # PLC2801
+8  8  | print((3.0).__ne__(4.0))  # PLC2801
+9     |-print((3.0).__lt__(4.0))  # PLC2801
+   9  |+print(3.0 < 4.0)  # PLC2801
+10 10 | print((3.0).__le__(4.0))  # PLC2801
+11 11 | print((3.0).__gt__(4.0))  # PLC2801
+12 12 | print((3.0).__ge__(4.0))  # PLC2801
+
+unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call `3.0.__le__(4.0)`
+   |
+ 8 | print((3.0).__ne__(4.0))  # PLC2801
+ 9 | print((3.0).__lt__(4.0))  # PLC2801
+10 | print((3.0).__le__(4.0))  # PLC2801
+   |       ^^^^^^^^^^^^^^^^^ PLC2801
+11 | print((3.0).__gt__(4.0))  # PLC2801
+12 | print((3.0).__ge__(4.0))  # PLC2801
+   |
+   = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+7  7  | print((3.0).__eq__(4.0))  # PLC2801
+8  8  | print((3.0).__ne__(4.0))  # PLC2801
+9  9  | print((3.0).__lt__(4.0))  # PLC2801
+10    |-print((3.0).__le__(4.0))  # PLC2801
+   10 |+print(3.0 <= 4.0)  # PLC2801
+11 11 | print((3.0).__gt__(4.0))  # PLC2801
+12 12 | print((3.0).__ge__(4.0))  # PLC2801
+13 13 | print((3.0).__str__())  # PLC2801
+
+unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call `3.0.__gt__(4.0)`
+   |
+ 9 | print((3.0).__lt__(4.0))  # PLC2801
+10 | print((3.0).__le__(4.0))  # PLC2801
+11 | print((3.0).__gt__(4.0))  # PLC2801
+   |       ^^^^^^^^^^^^^^^^^ PLC2801
+12 | print((3.0).__ge__(4.0))  # PLC2801
+13 | print((3.0).__str__())  # PLC2801
+   |
+   = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+8  8  | print((3.0).__ne__(4.0))  # PLC2801
+9  9  | print((3.0).__lt__(4.0))  # PLC2801
+10 10 | print((3.0).__le__(4.0))  # PLC2801
+11    |-print((3.0).__gt__(4.0))  # PLC2801
+   11 |+print(3.0 > 4.0)  # PLC2801
+12 12 | print((3.0).__ge__(4.0))  # PLC2801
+13 13 | print((3.0).__str__())  # PLC2801
+14 14 | print((3.0).__repr__())  # PLC2801
+
+unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call `3.0.__ge__(4.0)`
+   |
+10 | print((3.0).__le__(4.0))  # PLC2801
+11 | print((3.0).__gt__(4.0))  # PLC2801
+12 | print((3.0).__ge__(4.0))  # PLC2801
+   |       ^^^^^^^^^^^^^^^^^ PLC2801
+13 | print((3.0).__str__())  # PLC2801
+14 | print((3.0).__repr__())  # PLC2801
+   |
+   = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+9  9  | print((3.0).__lt__(4.0))  # PLC2801
+10 10 | print((3.0).__le__(4.0))  # PLC2801
+11 11 | print((3.0).__gt__(4.0))  # PLC2801
+12    |-print((3.0).__ge__(4.0))  # PLC2801
+   12 |+print(3.0 >= 4.0)  # PLC2801
+13 13 | print((3.0).__str__())  # PLC2801
+14 14 | print((3.0).__repr__())  # PLC2801
+15 15 | print([1, 2, 3].__len__())  # PLC2801
+
+unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call `3.0.__str__()`
+   |
+11 | print((3.0).__gt__(4.0))  # PLC2801
+12 | print((3.0).__ge__(4.0))  # PLC2801
+13 | print((3.0).__str__())  # PLC2801
+   |       ^^^^^^^^^^^^^^^ PLC2801
+14 | print((3.0).__repr__())  # PLC2801
+15 | print([1, 2, 3].__len__())  # PLC2801
+   |
+   = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+10 10 | print((3.0).__le__(4.0))  # PLC2801
+11 11 | print((3.0).__gt__(4.0))  # PLC2801
+12 12 | print((3.0).__ge__(4.0))  # PLC2801
+13    |-print((3.0).__str__())  # PLC2801
+   13 |+print(str(3.0))  # PLC2801
+14 14 | print((3.0).__repr__())  # PLC2801
+15 15 | print([1, 2, 3].__len__())  # PLC2801
+
+unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call `3.0.__repr__()`
+   |
+12 | print((3.0).__ge__(4.0))  # PLC2801
+13 | print((3.0).__str__())  # PLC2801
+14 | print((3.0).__repr__())  # PLC2801
+   |       ^^^^^^^^^^^^^^^^ PLC2801
+15 | print([1, 2, 3].__len__())  # PLC2801
+   |
+   = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+11 11 | print((3.0).__gt__(4.0))  # PLC2801
+12 12 | print((3.0).__ge__(4.0))  # PLC2801
+13 13 | print((3.0).__str__())  # PLC2801
+14    |-print((3.0).__repr__())  # PLC2801
+   14 |+print(repr(3.0))  # PLC2801
+15 15 | print([1, 2, 3].__len__())  # PLC2801
+
+unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call `[1, 2, 3].__len__()`
+   |
+13 | print((3.0).__str__())  # PLC2801
+14 | print((3.0).__repr__())  # PLC2801
+15 | print([1, 2, 3].__len__())  # PLC2801
+   |       ^^^^^^^^^^^^^^^^^^^ PLC2801
+   |
+   = help: Remove unnecessary dunder call
+
+ℹ Safe fix
+12 12 | print((3.0).__ge__(4.0))  # PLC2801
+13 13 | print((3.0).__str__())  # PLC2801
+14 14 | print((3.0).__repr__())  # PLC2801
+15    |-print([1, 2, 3].__len__())  # PLC2801
+   15 |+print(len([1, 2, 3]))  # PLC2801
+
+
