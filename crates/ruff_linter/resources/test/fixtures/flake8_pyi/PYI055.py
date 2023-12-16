@@ -56,3 +56,9 @@ def convert_union(union: UnionType) -> _T | None:
         Union[type[_T] | type[Converter[_T]]] | Converter[_T] | Callable[[str], _T], ...  # PYI055
     ] = union.__args__
     ...
+
+def convert_union(union: UnionType) -> _T | None:
+    converters: tuple[
+        Union[type[_T] | type[Converter[_T]] | str] | Converter[_T] | Callable[[str], _T], ...  # PYI055
+    ] = union.__args__
+    ...
