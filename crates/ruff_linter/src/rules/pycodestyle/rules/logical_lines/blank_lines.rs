@@ -361,7 +361,7 @@ struct LinePreprocessor<'a> {
 impl<'a> LinePreprocessor<'a> {
     fn new(tokens: &'a [LexResult], locator: &'a Locator) -> LinePreprocessor<'a> {
         LinePreprocessor {
-            tokens: tokens.into_iter().flatten(),
+            tokens: tokens.iter().flatten(),
             locator,
             previous_blank_lines: 0,
             current_blank_lines: 0,
@@ -379,7 +379,6 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut first_token: Option<Tok> = None;
         let mut first_token_range = TextRange::new(0.into(), 0.into());
         let mut last_token: Option<Tok> = None;
-        let mut last_token_range = TextRange::new(0.into(), 0.into());
         let mut parens = 0u32;
 
         let logical_line: LogicalLineInfo;
@@ -387,7 +386,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         while let Some((token, range)) = self.tokens.next() {
             if first_token.is_none() && !matches!(token, Tok::Indent | Tok::Dedent | Tok::Newline) {
                 first_token = Some(token.clone());
-                first_token_range = range.clone();
+                first_token_range = *range;
             }
 
             if !matches!(
@@ -425,7 +424,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     parens = parens.saturating_sub(1);
                 }
                 Tok::Newline | Tok::NonLogicalNewline if parens == 0 => {
-                    last_token_range = range.clone();
+                    let last_token_range = *range;
 
                     if !matches!(first_token, Some(Tok::String { .. })) {
                         is_docstring = false;
@@ -447,37 +446,37 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         self.current_blank_characters +=
                             range.end() - first_token_range.start() + TextSize::new(1);
                         return self.next();
-                    } else {
-                        if self.previous_blank_lines < self.current_blank_lines {
-                            self.previous_blank_lines = self.current_blank_lines;
-                        }
-
-                        logical_line = LogicalLineInfo {
-                            first_token: first_token.clone().unwrap(),
-                            first_token_range,
-                            last_token: last_token.unwrap(),
-                            last_token_range,
-                            is_comment_only: line_is_comment_only,
-                            is_docstring,
-                            indent_level,
-                            blank_lines: self.current_blank_lines,
-                            preceding_blank_lines: self.previous_blank_lines,
-                            preceding_blank_characters: self.current_blank_characters,
-                        };
-
-                        if !line_is_comment_only {
-                            self.previous_blank_lines = 0;
-                        }
-                        self.current_blank_lines = 0;
-                        self.current_blank_characters = 0.into();
-                        return Some(logical_line);
                     }
+
+                    if self.previous_blank_lines < self.current_blank_lines {
+                        self.previous_blank_lines = self.current_blank_lines;
+                    }
+
+                    logical_line = LogicalLineInfo {
+                        first_token: first_token.clone().unwrap(),
+                        first_token_range,
+                        last_token: last_token.unwrap(),
+                        last_token_range,
+                        is_comment_only: line_is_comment_only,
+                        is_docstring,
+                        indent_level,
+                        blank_lines: self.current_blank_lines,
+                        preceding_blank_lines: self.previous_blank_lines,
+                        preceding_blank_characters: self.current_blank_characters,
+                    };
+
+                    if !line_is_comment_only {
+                        self.previous_blank_lines = 0;
+                    }
+                    self.current_blank_lines = 0;
+                    self.current_blank_characters = 0.into();
+                    return Some(logical_line);
                 }
                 _ => {}
             }
         }
 
-        return None;
+        None
     }
 }
 
@@ -496,10 +495,8 @@ impl BlankLinesChecker {
 
         for logical_line in line_preprocessor {
             self.check_line(&logical_line, prev_indent_level, locator, stylist, context);
-            prev_indent_level = Some(logical_line.indent_level.clone());
+            prev_indent_level = Some(logical_line.indent_level);
         }
-
-        return;
     }
 
     fn check_line(
