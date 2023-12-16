@@ -2705,7 +2705,7 @@ pub struct PylintOptions {
 
     /// Maximum number of local variables allowed for a function or method body (see:
     /// `PLR0914`).
-    #[option(default = r"11", value_type = "int", example = r"max-locals = 11")]
+    #[option(default = r"15", value_type = "int", example = r"max-locals = 15")]
     pub max_locals: Option<usize>,
 
     /// Maximum number of statements allowed for a function or method body (see:

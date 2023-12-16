@@ -1,6 +1,6 @@
 def func():
     # Ok
-    # 11 is max default
+    # 15 is max default
     first = 1
     second = 2
     third = 3
@@ -12,6 +12,10 @@ def func():
     ninth = 9
     tenth = 10
     eleventh = 11
+    twelveth = 12
+    thirteenth = 13
+    fourteenth = 14
+    fifteenth = 15
 
 def func():
     # PLR0914
@@ -28,3 +32,6 @@ def func():
     eleventh = 11
     twelfth = 12
     thirteenth = 13
+    fourteenth = 14
+    fifteenth = 15
+    sixteenth = 16
