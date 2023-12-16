@@ -347,6 +347,8 @@ struct LogicalLineInfo {
     preceding_blank_characters: TextSize,
 }
 
+/// Iterator that processes tokens until a full logical line (or comment line) is "built".
+/// It then returns characteristics of that logical line (see `LogicalLineInfo`).
 struct LinePreprocessor<'a> {
     tokens: Flatten<Iter<'a, Result<(Tok, TextRange), LexicalError>>>,
     locator: &'a Locator<'a>,
@@ -380,8 +382,6 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut first_token_range = TextRange::new(0.into(), 0.into());
         let mut last_token: Option<Tok> = None;
         let mut parens = 0u32;
-
-        let logical_line: LogicalLineInfo;
 
         while let Some((token, range)) = self.tokens.next() {
             if first_token.is_none() && !matches!(token, Tok::Indent | Tok::Dedent | Tok::Newline) {
@@ -452,7 +452,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         self.previous_blank_lines = self.current_blank_lines;
                     }
 
-                    logical_line = LogicalLineInfo {
+                    let logical_line = LogicalLineInfo {
                         first_token: first_token.clone().unwrap(),
                         first_token_range,
                         last_token: last_token.unwrap(),
