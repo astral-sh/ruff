@@ -142,8 +142,8 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    // skip `__init__` calls
-    if attr == "__init__" {
+    // skip common/irreplaceable dunder methods
+    if ["__init__", "__new__", "__init_subclass__", "__subclasses__"].contains(&attr.as_str()) {
         return;
     }
 
