@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+too_many_locals.py:30:5: PLR0914 Too many local variables: (13/11)
+   |
+28 |     eleventh = 11
+29 |     twelfth = 12
+30 |     thirteenth = 13
+   |     ^ PLR0914
+   |
+
+
