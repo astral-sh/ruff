@@ -142,6 +142,11 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
+    // skip `__init__` calls
+    if attr == "__init__" {
+        return;
+    }
+
     let mut fixed: Option<String> = None;
 
     match arguments.args.len() {

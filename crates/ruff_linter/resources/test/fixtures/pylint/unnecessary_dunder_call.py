@@ -13,3 +13,8 @@ print((3.0).__ge__(4.0))  # PLC2801
 print((3.0).__str__())  # PLC2801
 print((3.0).__repr__())  # PLC2801
 print([1, 2, 3].__len__())  # PLC2801
+
+
+class Thing:
+    def __init__(self) -> None:
+        super().__init__()  # Ok

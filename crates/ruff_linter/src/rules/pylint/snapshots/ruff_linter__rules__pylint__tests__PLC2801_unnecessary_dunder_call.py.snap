@@ -263,6 +263,7 @@ unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call `3.0.__str_
    13 |+print(str(3.0))  # PLC2801
 14 14 | print((3.0).__repr__())  # PLC2801
 15 15 | print([1, 2, 3].__len__())  # PLC2801
+16 16 | 
 
 unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call `3.0.__repr__()`
    |
@@ -281,6 +282,8 @@ unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call `3.0.__repr
 14    |-print((3.0).__repr__())  # PLC2801
    14 |+print(repr(3.0))  # PLC2801
 15 15 | print([1, 2, 3].__len__())  # PLC2801
+16 16 | 
+17 17 | 
 
 unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call `[1, 2, 3].__len__()`
    |
@@ -297,5 +300,8 @@ unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call `[1, 2, 3].
 14 14 | print((3.0).__repr__())  # PLC2801
 15    |-print([1, 2, 3].__len__())  # PLC2801
    15 |+print(len([1, 2, 3]))  # PLC2801
+16 16 | 
+17 17 | 
+18 18 | class Thing:
 
 
