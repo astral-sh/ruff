@@ -390,18 +390,31 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 first_token_range = range.clone();
             }
 
-            if !matches!(token, Tok::Comment(_)) {
+            if !matches!(
+                token,
+                Tok::Comment(_) | Tok::Indent | Tok::Dedent | Tok::Newline | Tok::NonLogicalNewline
+            ) {
                 line_is_comment_only = false;
             }
 
             // Allow a comment to follow a docstring.
-            if !matches!(token, Tok::String { .. } | Tok::Comment(_)) {
+            if !matches!(
+                token,
+                Tok::String { .. }
+                    | Tok::Comment(_)
+                    | Tok::Indent
+                    | Tok::Dedent
+                    | Tok::Newline
+                    | Tok::NonLogicalNewline
+            ) {
                 is_docstring = false;
             }
 
-            if !matches!(token, Tok::Newline | Tok::NonLogicalNewline) {
+            if !matches!(
+                token,
+                Tok::Indent | Tok::Dedent | Tok::Newline | Tok::NonLogicalNewline
+            ) {
                 last_token = Some(token.clone());
-                last_token_range = range.clone();
             }
 
             match token {
@@ -412,6 +425,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     parens = parens.saturating_sub(1);
                 }
                 Tok::Newline | Tok::NonLogicalNewline if parens == 0 => {
+                    last_token_range = range.clone();
+
                     if !matches!(first_token, Some(Tok::String { .. })) {
                         is_docstring = false;
                     }
@@ -429,7 +444,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     // Empty line
                     if matches!(first_token, Some(Tok::NonLogicalNewline)) {
                         self.current_blank_lines += 1;
-                        self.current_blank_characters += range.end() - first_token_range.start();
+                        self.current_blank_characters +=
+                            range.end() - first_token_range.start() + TextSize::new(1);
                         return self.next();
                     } else {
                         if self.previous_blank_lines < self.current_blank_lines {
@@ -449,7 +465,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                             preceding_blank_characters: self.current_blank_characters,
                         };
 
-                        if line_is_comment_only {
+                        if !line_is_comment_only {
                             self.previous_blank_lines = 0;
                         }
                         self.current_blank_lines = 0;
