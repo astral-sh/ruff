@@ -80,6 +80,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     }
 
     let mut type_exprs = Vec::new();
+    let mut other_exprs = Vec::new();
 
     let mut collect_type_exprs = |expr: &'a Expr, _| {
         let Some(subscript) = expr.as_subscript_expr() else {
@@ -91,6 +92,8 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
             .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "type"]))
         {
             type_exprs.push(&subscript.slice);
+        } else {
+            other_exprs.push(expr);
         }
     };
 
@@ -144,24 +147,32 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                         range: TextRange::default(),
                     }))
             } else {
-                checker
-                    .generator()
-                    .expr(&Expr::Subscript(ast::ExprSubscript {
-                        value: Box::new(Expr::Name(ast::ExprName {
-                            id: "type".into(),
-                            ctx: ExprContext::Load,
-                            range: TextRange::default(),
-                        })),
-                        slice: Box::new(concatenate_bin_ors(
-                            type_exprs
-                                .clone()
-                                .into_iter()
-                                .map(std::convert::AsRef::as_ref)
-                                .collect(),
-                        )),
+                let types = &Expr::Subscript(ast::ExprSubscript {
+                    value: Box::new(Expr::Name(ast::ExprName {
+                        id: "type".into(),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
-                    }))
+                    })),
+                    slice: Box::new(concatenate_bin_ors(
+                        type_exprs
+                            .clone()
+                            .into_iter()
+                            .map(std::convert::AsRef::as_ref)
+                            .collect(),
+                    )),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                });
+
+                if other_exprs.is_empty() {
+                    checker.generator().expr(types)
+                } else {
+                    let mut exprs = Vec::new();
+                    exprs.push(types);
+                    exprs.extend(other_exprs);
+
+                    checker.generator().expr(&concatenate_bin_ors(exprs))
+                }
             };
 
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
