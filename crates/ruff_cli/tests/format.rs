@@ -255,7 +255,7 @@ fn mixed_line_endings() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    2 files left unchanged
+    2 files already formatted
     "###);
     Ok(())
 }
@@ -876,7 +876,7 @@ fn test_diff() {
 
 
         ----- stderr -----
-        2 files would be reformatted, 1 file left unchanged
+        2 files would be reformatted, 1 file already formatted
         "###);
     });
 }
