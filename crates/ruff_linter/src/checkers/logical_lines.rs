@@ -44,7 +44,7 @@ pub(crate) fn check_logical_lines(
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
-    blank_lines_checker.check_content(tokens, 4, locator, stylist, &mut context);
+    blank_lines_checker.check_content(tokens, locator, stylist, &mut context);
 
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
