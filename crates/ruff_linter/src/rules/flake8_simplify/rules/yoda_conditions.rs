@@ -1,3 +1,5 @@
+use std::cmp;
+
 use anyhow::Result;
 use libcst_native::CompOp;
 
@@ -78,18 +80,51 @@ impl Violation for YodaConditions {
     }
 }
 
-/// Return `true` if an [`Expr`] is a constant or a constant-like name.
-fn is_constant_like(expr: &Expr) -> bool {
+/// Comparisons left hand side must not be more [`ConstantLikelihood`] than their right hand side
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum ConstantLikelihood {
+    Unlikely = 0,
+    Probably = 1,   // CAMEL_CASED vars
+    Definitely = 2, // literals, empty dicts and tuples...
+}
+
+fn how_likely_constant_str(s: &str) -> ConstantLikelihood {
+    if str::is_cased_uppercase(s) {
+        ConstantLikelihood::Probably
+    } else {
+        ConstantLikelihood::Unlikely
+    }
+}
+
+/// Return [`Expr`] [`ConstantLikelihood`] level depending on simple heuristics.
+fn how_likely_constant(expr: &Expr) -> ConstantLikelihood {
+    if expr.is_literal_expr() {
+        return ConstantLikelihood::Definitely;
+    }
     match expr {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => str::is_cased_uppercase(attr),
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant_like),
-        Expr::Name(ast::ExprName { id, .. }) => str::is_cased_uppercase(id),
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => how_likely_constant_str(attr),
+        Expr::Name(ast::ExprName { id, .. }) => how_likely_constant_str(id),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => elts
+            .iter()
+            .map(how_likely_constant)
+            .min()
+            .unwrap_or(ConstantLikelihood::Definitely),
+        Expr::Dict(ast::ExprDict { values: vs, .. }) => {
+            if vs.is_empty() {
+                ConstantLikelihood::Definitely
+            } else {
+                ConstantLikelihood::Probably
+            }
+        }
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+            cmp::min(how_likely_constant(left), how_likely_constant(right))
+        }
         Expr::UnaryOp(ast::ExprUnaryOp {
             op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
             operand,
             range: _,
-        }) => operand.is_literal_expr(),
-        _ => expr.is_literal_expr(),
+        }) => how_likely_constant(operand),
+        _ => ConstantLikelihood::Unlikely,
     }
 }
 
@@ -180,7 +215,7 @@ pub(crate) fn yoda_conditions(
         return;
     }
 
-    if !is_constant_like(left) || is_constant_like(right) {
+    if how_likely_constant(left) <= how_likely_constant(right) {
         return;
     }
 
