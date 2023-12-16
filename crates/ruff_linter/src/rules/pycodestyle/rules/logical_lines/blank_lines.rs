@@ -31,7 +31,6 @@ pub(crate) struct BlankLinesChecker {
     /// to the second line instead of the first.
     last_non_comment_line_end: TextSize,
     previous_unindented_token: Option<Tok>,
-    prev_indent_level: Option<usize>,
 }
 
 /// Number of blank lines around top level classes and functions.
@@ -487,7 +486,7 @@ impl BlankLinesChecker {
         return;
     }
 
-    pub(crate) fn check_line(
+    fn check_line(
         &mut self,
         line: &LogicalLineInfo,
         prev_indent_level: Option<usize>,

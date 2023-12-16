@@ -414,12 +414,6 @@ struct LogicalLinesBuilder {
     tokens: Vec<LogicalLineToken>,
     lines: Vec<Line>,
     current_line: CurrentLine,
-    /// Number of previous consecutive blank lines.
-    previous_blank_lines: u32,
-    /// Number of consecutive blank lines.
-    current_blank_lines: u32,
-    /// Number of blank characters in the blank lines (\n vs \r\n for example).
-    current_blank_characters: u32,
 }
 
 impl LogicalLinesBuilder {
@@ -481,26 +475,12 @@ impl LogicalLinesBuilder {
             let is_empty = self.tokens[self.current_line.tokens_start as usize..end as usize]
                 .iter()
                 .all(|token| token.kind.is_newline());
-            if is_empty {
-                self.current_blank_lines += 1;
-                self.current_blank_characters += end - self.current_line.tokens_start;
-            } else {
-                if self.previous_blank_lines < self.current_blank_lines {
-                    self.previous_blank_lines = self.current_blank_lines;
-                }
+            if !is_empty {
                 self.lines.push(Line {
                     flags: self.current_line.flags,
-                    blank_lines: self.current_blank_lines,
-                    preceding_blank_lines: self.previous_blank_lines,
-                    preceding_blank_characters: self.current_blank_characters,
                     tokens_start: self.current_line.tokens_start,
                     tokens_end: end,
                 });
-                if self.current_line.flags != TokenFlags::COMMENT {
-                    self.previous_blank_lines = 0;
-                }
-                self.current_blank_lines = 0;
-                self.current_blank_characters = 0;
             }
 
             self.current_line = CurrentLine {
@@ -524,9 +504,6 @@ impl LogicalLinesBuilder {
 #[derive(Debug, Clone)]
 struct Line {
     flags: TokenFlags,
-    blank_lines: u32,
-    preceding_blank_lines: u32,
-    preceding_blank_characters: u32,
     tokens_start: u32,
     tokens_end: u32,
 }
