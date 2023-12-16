@@ -356,6 +356,18 @@ def f():
 # end
 
 
+# no error
+if (
+    cond1
+
+
+
+    and cond2
+):
+    pass
+# end
+
+
 # E301
 class Class(object):
 
