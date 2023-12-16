@@ -134,7 +134,7 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     };
 
-    let Ok(summary) = CFormatSummary::try_from(value.as_str()) else {
+    let Ok(summary) = CFormatSummary::try_from(value.to_str()) else {
         return;
     };
 

@@ -12,9 +12,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::{
-    leading_comments, trailing_comments, LeadingDanglingTrailingComments, SourceComment,
-};
+use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_generator_exp::is_generator_parenthesized;
 use crate::expression::expr_tuple::is_tuple_parenthesized;
@@ -23,6 +21,7 @@ use crate::expression::parentheses::{
     OptionalParentheses, Parentheses, Parenthesize,
 };
 use crate::prelude::*;
+use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -37,7 +36,6 @@ pub(crate) mod expr_dict;
 pub(crate) mod expr_dict_comp;
 pub(crate) mod expr_ellipsis_literal;
 pub(crate) mod expr_f_string;
-pub(crate) mod expr_formatted_value;
 pub(crate) mod expr_generator_exp;
 pub(crate) mod expr_if_exp;
 pub(crate) mod expr_ipy_escape_command;
@@ -60,7 +58,6 @@ pub(crate) mod expr_yield;
 pub(crate) mod expr_yield_from;
 mod operator;
 pub(crate) mod parentheses;
-pub(crate) mod string;
 
 #[derive(Copy, Clone, PartialEq, Eq, Default)]
 pub struct FormatExpr {
@@ -98,7 +95,6 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::YieldFrom(expr) => expr.format().fmt(f),
             Expr::Compare(expr) => expr.format().fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
-            Expr::FormattedValue(expr) => expr.format().fmt(f),
             Expr::FString(expr) => expr.format().fmt(f),
             Expr::StringLiteral(expr) => expr.format().fmt(f),
             Expr::BytesLiteral(expr) => expr.format().fmt(f),
@@ -126,10 +122,12 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Parentheses::Never => false,
         };
         if parenthesize {
-            let comment = f.context().comments().clone();
-            let node_comments = comment.leading_dangling_trailing(expression);
+            let comments = f.context().comments().clone();
+            let node_comments = comments.leading_dangling_trailing(expression);
             if !node_comments.has_leading() && !node_comments.has_trailing() {
-                parenthesized("(", &format_expr, ")").fmt(f)
+                parenthesized("(", &format_expr, ")")
+                    .with_indent(!is_expression_huggable(expression, f.context()))
+                    .fmt(f)
             } else {
                 format_with_parentheses_comments(expression, &node_comments, f)
             }
@@ -285,7 +283,6 @@ fn format_with_parentheses_comments(
         Expr::YieldFrom(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
-        Expr::FormattedValue(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::StringLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::BytesLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
@@ -403,9 +400,11 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
                         .fmt(f)
                 }
+
                 Parenthesize::IfRequired => {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
+
                 Parenthesize::Optional | Parenthesize::IfBreaks => {
                     if can_omit_optional_parentheses(expression, f.context()) {
                         optional_parentheses(&expression.format().with_options(Parentheses::Never))
@@ -427,113 +426,25 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizeExpression<'_> {
                 Parenthesize::Optional | Parenthesize::IfRequired => {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }
+
                 Parenthesize::IfBreaks => {
-                    // Is the expression the last token in the parent statement.
-                    // Excludes `await` and `yield` for which Black doesn't seem to apply the layout?
-                    let last_expression = parent.is_stmt_assign()
-                        || parent.is_stmt_ann_assign()
-                        || parent.is_stmt_aug_assign()
-                        || parent.is_stmt_return();
-
-                    // Format the statements and value's trailing end of line comments:
-                    // * after the expression if the expression needs no parentheses (necessary or the `expand_parent` makes the group never fit).
-                    // * inside the parentheses if the expression exceeds the line-width.
-                    //
-                    // ```python
-                    // a = long # with_comment
-                    // b = (
-                    //     short # with_comment
-                    // )
-                    //
-                    // # formatted
-                    // a = (
-                    //     long # with comment
-                    // )
-                    // b = short # with comment
-                    // ```
-                    // This matches Black's formatting with the exception that ruff applies this style also for
-                    // attribute chains and non-fluent call expressions. See https://github.com/psf/black/issues/4001#issuecomment-1786681792
-                    //
-                    // This logic isn't implemented in [`place_comment`] by associating trailing statement comments to the expression because
-                    // doing so breaks the suite empty lines formatting that relies on trailing comments to be stored on the statement.
-                    let (inline_comments, expression_trailing_comments) = if last_expression
-                        && !(
-                            // Ignore non-fluent attribute chains for black compatibility.
-                            // See https://github.com/psf/black/issues/4001#issuecomment-1786681792
-                            expression.is_attribute_expr()
-                                || expression.is_call_expr()
-                                || expression.is_yield_from_expr()
-                                || expression.is_yield_expr()
-                                || expression.is_await_expr()
-                        ) {
-                        let parent_trailing_comments = comments.trailing(*parent);
-                        let after_end_of_line = parent_trailing_comments
-                            .partition_point(|comment| comment.line_position().is_end_of_line());
-                        let (stmt_inline_comments, _) =
-                            parent_trailing_comments.split_at(after_end_of_line);
-
-                        let after_end_of_line = node_comments
-                            .trailing
-                            .partition_point(|comment| comment.line_position().is_end_of_line());
-
-                        let (expression_inline_comments, expression_trailing_comments) =
-                            node_comments.trailing.split_at(after_end_of_line);
-
-                        (
-                            OptionalParenthesesInlinedComments {
-                                expression: expression_inline_comments,
-                                statement: stmt_inline_comments,
-                            },
-                            expression_trailing_comments,
-                        )
+                    if node_comments.has_trailing() {
+                        expression.format().with_options(Parentheses::Always).fmt(f)
                     } else {
-                        (
-                            OptionalParenthesesInlinedComments::default(),
-                            node_comments.trailing,
-                        )
-                    };
-
-                    if expression_trailing_comments.is_empty() {
                         // The group id is necessary because the nested expressions may reference it.
                         let group_id = f.group_id("optional_parentheses");
                         let f = &mut WithNodeLevel::new(NodeLevel::Expression(Some(group_id)), f);
 
-                        best_fit_parenthesize(&format_with(|f| {
-                            inline_comments.mark_formatted();
-
-                            expression
-                                .format()
-                                .with_options(Parentheses::Never)
-                                .fmt(f)?;
-
-                            if !inline_comments.is_empty() {
-                                // If the expressions exceeds the line width, format the comments in the parentheses
-                                if_group_breaks(&inline_comments)
-                                    .with_group_id(Some(group_id))
-                                    .fmt(f)?;
-                            }
-
-                            Ok(())
-                        }))
-                        .with_group_id(Some(group_id))
-                        .fmt(f)?;
-
-                        if !inline_comments.is_empty() {
-                            // If the line fits into the line width, format the comments after the parenthesized expression
-                            if_group_fits_on_line(&inline_comments)
-                                .with_group_id(Some(group_id))
-                                .fmt(f)?;
-                        }
-
-                        Ok(())
-                    } else {
-                        expression.format().with_options(Parentheses::Always).fmt(f)
+                        best_fit_parenthesize(&expression.format().with_options(Parentheses::Never))
+                            .with_group_id(Some(group_id))
+                            .fmt(f)
                     }
                 }
             },
             OptionalParentheses::Never => match parenthesize {
                 Parenthesize::IfBreaksOrIfRequired => {
                     parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                        .with_indent(!is_expression_huggable(expression, f.context()))
                         .fmt(f)
                 }
 
@@ -573,7 +484,6 @@ impl NeedsParentheses for Expr {
             Expr::YieldFrom(expr) => expr.needs_parentheses(parent, context),
             Expr::Compare(expr) => expr.needs_parentheses(parent, context),
             Expr::Call(expr) => expr.needs_parentheses(parent, context),
-            Expr::FormattedValue(expr) => expr.needs_parentheses(parent, context),
             Expr::FString(expr) => expr.needs_parentheses(parent, context),
             Expr::StringLiteral(expr) => expr.needs_parentheses(parent, context),
             Expr::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
@@ -618,19 +528,63 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
+#[allow(clippy::if_same_then_else)]
 fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
 
-    if visitor.max_precedence == OperatorPrecedence::None {
-        true
-    } else if visitor.max_precedence_count > 1 {
-        false
-    } else if visitor.max_precedence == OperatorPrecedence::Attribute {
-        true
-    } else if !visitor.any_parenthesized_expressions {
+    if !visitor.any_parenthesized_expressions {
         // Only use the more complex IR when there is any expression that we can possibly split by
         false
+    } else if visitor.max_precedence_count > 1 {
+        false
+    } else if visitor.max_precedence == OperatorPrecedence::None && expr.is_lambda_expr() {
+        // Micha: This seems to exclusively apply for lambda expressions where the body ends in a subscript.
+        // Subscripts are excluded by default because breaking them looks odd, but it seems to be fine for lambda expression.
+        //
+        // ```python
+        // mapper = lambda x: dict_with_default[
+        //  np.nan if isinstance(x, float) and np.isnan(x) else x
+        // ]
+        // ```
+        //
+        // to prevent that it gets formatted as:
+        //
+        // ```python
+        // mapper = (
+        //      lambda x: dict_with_default[
+        //          np.nan if isinstance(x, float) and np.isnan(x) else x
+        //      ]
+        // )
+        // ```
+        // I think we should remove this check in the future and instead parenthesize the body of the lambda expression:
+        //
+        // ```python
+        // mapper = lambda x: (
+        //      dict_with_default[
+        //          np.nan if isinstance(x, float) and np.isnan(x) else x
+        //     ]
+        // )
+        // ```
+        true
+    } else if visitor.max_precedence == OperatorPrecedence::Attribute
+        && (expr.is_lambda_expr() || expr.is_named_expr_expr())
+    {
+        // A single method call inside a named expression (`:=`) or as the body of a lambda function:
+        // ```python
+        // kwargs["open_with"] = lambda path, _: fsspec.open(
+        //      path, "wb", **(storage_options or {})
+        // ).open()
+        //
+        // if ret := subprocess.run(
+        //      ["git", "rev-parse", "--short", "HEAD"],
+        //      cwd=package_dir,
+        //      capture_output=True,
+        //      encoding="ascii",
+        //      errors="surrogateescape",
+        // ).stdout:
+        // ```
+        true
     } else {
         fn is_parenthesized(expr: &Expr, context: &PyFormatContext) -> bool {
             // Don't break subscripts except in parenthesized context. It looks weird.
@@ -641,17 +595,13 @@ fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool
         // Only use the layout if the first expression starts with parentheses
         // or the last expression ends with parentheses of some sort, and
         // those parentheses are non-empty.
-        if visitor
+        visitor
             .last
             .is_some_and(|last| is_parenthesized(last, context))
-        {
-            true
-        } else {
-            visitor
+            || visitor
                 .first
                 .expression()
                 .is_some_and(|first| is_parenthesized(first, context))
-        }
     }
 }
 
@@ -778,16 +728,6 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 // Don't walk the slice, because the slice is always parenthesized.
                 return;
             }
-            Expr::UnaryOp(ast::ExprUnaryOp {
-                range: _,
-                op,
-                operand: _,
-            }) => {
-                if op.is_invert() {
-                    self.update_max_precedence(OperatorPrecedence::BitwiseInversion);
-                }
-                self.first.set_if_none(First::Token);
-            }
 
             // `[a, b].test.test[300].dot`
             Expr::Attribute(ast::ExprAttribute {
@@ -804,23 +744,38 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
-            Expr::StringLiteral(ast::ExprStringLiteral {
-                implicit_concatenated: true,
-                ..
-            })
-            | Expr::BytesLiteral(ast::ExprBytesLiteral {
-                implicit_concatenated: true,
-                ..
-            })
-            | Expr::FString(ast::ExprFString {
-                implicit_concatenated: true,
-                ..
-            }) => {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                if value.is_implicit_concatenated() =>
+            {
                 self.update_max_precedence(OperatorPrecedence::String);
             }
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. })
+                if value.is_implicit_concatenated() =>
+            {
+                self.update_max_precedence(OperatorPrecedence::String);
+            }
+            Expr::FString(ast::ExprFString { value, .. }) if value.is_implicit_concatenated() => {
+                self.update_max_precedence(OperatorPrecedence::String);
+                return;
+            }
+
+            // Non terminal nodes that don't have a termination token.
+            Expr::NamedExpr(_) | Expr::GeneratorExp(_) | Expr::Tuple(_) => {}
 
             // Expressions with sub expressions but a preceding token
             // Mark this expression as first expression and not the sub expression.
+            // Visit the sub-expressions because the sub expressions may be the end of the entire expression.
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                range: _,
+                op,
+                operand: _,
+            }) => {
+                if op.is_invert() {
+                    self.update_max_precedence(OperatorPrecedence::BitwiseInversion);
+                }
+                self.first.set_if_none(First::Token);
+            }
+
             Expr::Lambda(_)
             | Expr::Await(_)
             | Expr::Yield(_)
@@ -829,11 +784,8 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 self.first.set_if_none(First::Token);
             }
 
-            Expr::Tuple(_)
-            | Expr::NamedExpr(_)
-            | Expr::GeneratorExp(_)
-            | Expr::FormattedValue(_)
-            | Expr::FString(_)
+            // Terminal nodes or nodes that wrap a sub-expression (where the sub expression can never be at the end).
+            Expr::FString(_)
             | Expr::StringLiteral(_)
             | Expr::BytesLiteral(_)
             | Expr::NumberLiteral(_)
@@ -842,7 +794,9 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::EllipsisLiteral(_)
             | Expr::Name(_)
             | Expr::Slice(_)
-            | Expr::IpyEscapeCommand(_) => {}
+            | Expr::IpyEscapeCommand(_) => {
+                return;
+            }
         };
 
         walk_expr(self, expr);
@@ -1043,7 +997,7 @@ impl OwnParentheses {
 /// Differs from [`has_own_parentheses`] in that it returns [`OwnParentheses::NonEmpty`] for
 /// parenthesized expressions, like `(1)` or `([1])`, regardless of whether those expression have
 /// their _own_ parentheses.
-fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<OwnParentheses> {
+pub(crate) fn has_parentheses(expr: &Expr, context: &PyFormatContext) -> Option<OwnParentheses> {
     let own_parentheses = has_own_parentheses(expr, context);
 
     // If the node has its own non-empty parentheses, we don't need to check for surrounding
@@ -1120,6 +1074,85 @@ pub(crate) fn has_own_parentheses(
     }
 }
 
+/// Returns `true` if the expression can hug directly to enclosing parentheses, as in Black's
+/// `hug_parens_with_braces_and_square_brackets` preview style behavior.
+///
+/// For example, in preview style, given:
+/// ```python
+/// ([1, 2, 3,])
+/// ```
+///
+/// We want to format it as:
+/// ```python
+/// ([
+///     1,
+///     2,
+///     3,
+/// ])
+/// ```
+///
+/// As opposed to:
+/// ```python
+/// (
+///     [
+///         1,
+///         2,
+///         3,
+///     ]
+/// )
+/// ```
+pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> bool {
+    if !is_hug_parens_with_braces_and_square_brackets_enabled(context) {
+        return false;
+    }
+
+    match expr {
+        Expr::Tuple(_)
+        | Expr::List(_)
+        | Expr::Set(_)
+        | Expr::Dict(_)
+        | Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_) => true,
+
+        Expr::Starred(ast::ExprStarred { value, .. }) => matches!(
+            value.as_ref(),
+            Expr::Tuple(_)
+                | Expr::List(_)
+                | Expr::Set(_)
+                | Expr::Dict(_)
+                | Expr::ListComp(_)
+                | Expr::SetComp(_)
+                | Expr::DictComp(_)
+        ),
+
+        Expr::BoolOp(_)
+        | Expr::NamedExpr(_)
+        | Expr::BinOp(_)
+        | Expr::UnaryOp(_)
+        | Expr::Lambda(_)
+        | Expr::IfExp(_)
+        | Expr::GeneratorExp(_)
+        | Expr::Await(_)
+        | Expr::Yield(_)
+        | Expr::YieldFrom(_)
+        | Expr::Compare(_)
+        | Expr::Call(_)
+        | Expr::FString(_)
+        | Expr::Attribute(_)
+        | Expr::Subscript(_)
+        | Expr::Name(_)
+        | Expr::Slice(_)
+        | Expr::IpyEscapeCommand(_)
+        | Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_) => false,
+    }
+}
+
 /// The precedence of [python operators](https://docs.python.org/3/reference/expressions.html#operator-precedence) from
 /// highest to lowest priority.
 ///
@@ -1145,7 +1178,7 @@ enum OperatorPrecedence {
     Conditional,
 }
 
-impl From<ast::Operator> for OperatorPrecedence {
+impl From<Operator> for OperatorPrecedence {
     fn from(value: Operator) -> Self {
         match value {
             Operator::Add | Operator::Sub => OperatorPrecedence::Additive,
@@ -1160,43 +1193,5 @@ impl From<ast::Operator> for OperatorPrecedence {
             Operator::BitXor => OperatorPrecedence::BitwiseXor,
             Operator::BitAnd => OperatorPrecedence::BitwiseAnd,
         }
-    }
-}
-
-#[derive(Debug, Default)]
-struct OptionalParenthesesInlinedComments<'a> {
-    expression: &'a [SourceComment],
-    statement: &'a [SourceComment],
-}
-
-impl<'a> OptionalParenthesesInlinedComments<'a> {
-    fn is_empty(&self) -> bool {
-        self.expression.is_empty() && self.statement.is_empty()
-    }
-
-    fn iter_comments(&self) -> impl Iterator<Item = &'a SourceComment> {
-        self.expression.iter().chain(self.statement)
-    }
-
-    fn mark_formatted(&self) {
-        for comment in self.iter_comments() {
-            comment.mark_formatted();
-        }
-    }
-}
-
-impl Format<PyFormatContext<'_>> for OptionalParenthesesInlinedComments<'_> {
-    fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        for comment in self.iter_comments() {
-            comment.mark_unformatted();
-        }
-
-        write!(
-            f,
-            [
-                trailing_comments(self.expression),
-                trailing_comments(self.statement)
-            ]
-        )
     }
 }

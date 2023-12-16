@@ -71,7 +71,12 @@ class CheckOptions(CommandOptions):
     max_lines_per_rule: int | None = 50
 
     def to_ruff_args(self) -> list[str]:
-        args = ["check", "--no-cache", "--exit-zero"]
+        args = [
+            "check",
+            "--no-cache",
+            "--exit-zero",
+            f"--{'' if self.preview else 'no-'}preview",
+        ]
         if self.select:
             args.extend(["--select", self.select])
         if self.ignore:
@@ -80,8 +85,6 @@ class CheckOptions(CommandOptions):
             args.extend(["--exclude", self.exclude])
         if self.show_fixes:
             args.extend(["--show-fixes", "--ecosystem-ci"])
-        if self.preview:
-            args.append("--preview")
         return args
 
 
@@ -95,15 +98,13 @@ class FormatOptions(CommandOptions):
     exclude: str = ""
 
     def to_ruff_args(self) -> list[str]:
-        args = ["format"]
+        args = ["format", f"--{'' if self.preview else 'no-'}preview"]
         if self.exclude:
             args.extend(["--exclude", self.exclude])
-        if self.preview:
-            args.append("--preview")
         return args
 
     def to_black_args(self) -> list[str]:
-        args = []
+        args: list[str] = []
         if self.exclude:
             args.extend(["--exclude", self.exclude])
         if self.preview:

@@ -28,6 +28,8 @@ mod tests {
     #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171.py"))]
     #[test_case(Rule::IsinstanceTypeNone, Path::new("FURB168.py"))]
     #[test_case(Rule::TypeNoneComparison, Path::new("FURB169.py"))]
+    #[test_case(Rule::RedundantLogBase, Path::new("FURB163.py"))]
+    #[test_case(Rule::HashlibDigestHex, Path::new("FURB181.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -68,6 +68,10 @@ with True:
 with True:
     ... # comment
 
+with True:
+    ...
+    # comment
+
 match x:
     case 1:
         ...

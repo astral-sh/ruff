@@ -21,3 +21,7 @@ _PrivateAliasS2: TypeAlias = Annotated[str, "also okay"]
 
 # check that this edge case doesn't crash
 _: TypeAlias = str | int
+
+# PEP 695
+type _FooT = str | int
+type Foo = str | int

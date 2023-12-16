@@ -29,6 +29,10 @@ baz: bytes = b"50 character byte stringgggggggggggggggggggggggggg"  # OK
 
 qux: bytes = b"51 character byte stringggggggggggggggggggggggggggg\xff"  # Error: PYI053
 
+ffoo: str = f"50 character stringggggggggggggggggggggggggggggggg"  # OK
+
+fbar: str = f"51 character stringgggggggggggggggggggggggggggggggg"  # Error: PYI053
+
 class Demo:
     """Docstrings are excluded from this rule. Some padding."""  # OK
 

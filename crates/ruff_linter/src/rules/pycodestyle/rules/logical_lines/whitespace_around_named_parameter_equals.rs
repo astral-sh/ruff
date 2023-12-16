@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -34,10 +34,14 @@ use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineTo
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;
 
-impl Violation for UnexpectedSpacesAroundKeywordParameterEquals {
+impl AlwaysFixableViolation for UnexpectedSpacesAroundKeywordParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unexpected spaces around keyword / parameter equals")
+    }
+
+    fn fix_title(&self) -> String {
+        format!("Remove whitespace")
     }
 }
 
@@ -165,22 +169,31 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                         }
                     }
                 } else {
+                    // If there's space between the preceding token and the equals sign, report it.
                     if token.start() != prev_end {
-                        context.push(
+                        let mut diagnostic = Diagnostic::new(
                             UnexpectedSpacesAroundKeywordParameterEquals,
                             TextRange::new(prev_end, token.start()),
                         );
+                        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(prev_end, token.start())));
+                        context.push_diagnostic(diagnostic);
                     }
 
+                    // If there's space between the equals sign and the following token, report it.
                     while let Some(next) = iter.peek() {
                         if next.kind() == TokenKind::NonLogicalNewline {
                             iter.next();
                         } else {
                             if next.start() != token.end() {
-                                context.push(
+                                let mut diagnostic = Diagnostic::new(
                                     UnexpectedSpacesAroundKeywordParameterEquals,
                                     TextRange::new(token.end(), next.start()),
                                 );
+                                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                                    token.end(),
+                                    next.start(),
+                                )));
+                                context.push_diagnostic(diagnostic);
                             }
                             break;
                         }

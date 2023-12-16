@@ -59,7 +59,6 @@ pub(crate) fn assignment_target(target: &Expr) -> Result<(), LexicalError> {
         YieldFrom(ref e) => Err(err(e.range.start())),
         Compare(ref e) => Err(err(e.range.start())),
         Call(ref e) => Err(err(e.range.start())),
-        FormattedValue(ref e) => Err(err(e.range.start())),
         // FString is recursive, but all its forms are invalid as an
         // assignment target, so we can reject it without exploring it.
         FString(ref e) => Err(err(e.range.start())),

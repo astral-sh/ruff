@@ -13,14 +13,15 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments, Comments, SourceComment};
 use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_soft_line_break,
-    in_parentheses_only_soft_line_break_or_space, is_expression_parenthesized,
-    write_in_parentheses_only_group_end_tag, write_in_parentheses_only_group_start_tag,
-    Parentheses,
+    in_parentheses_only_group, in_parentheses_only_if_group_breaks,
+    in_parentheses_only_soft_line_break, in_parentheses_only_soft_line_break_or_space,
+    is_expression_parenthesized, write_in_parentheses_only_group_end_tag,
+    write_in_parentheses_only_group_start_tag, Parentheses,
 };
-use crate::expression::string::{AnyString, FormatString, StringLayout};
 use crate::expression::OperatorPrecedence;
 use crate::prelude::*;
+use crate::preview::is_fix_power_op_line_length_enabled;
+use crate::string::{AnyString, FormatStringContinuation};
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum BinaryLike<'a> {
@@ -394,9 +395,10 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                             [
                                 operand.leading_binary_comments().map(leading_comments),
                                 leading_comments(comments.leading(&string_constant)),
-                                FormatString::new(&string_constant).with_layout(
-                                    StringLayout::ImplicitConcatenatedStringInBinaryLike,
-                                ),
+                                // Call `FormatStringContinuation` directly to avoid formatting
+                                // the implicitly concatenated string with the enclosing group
+                                // because the group is added by the binary like formatting.
+                                FormatStringContinuation::new(&string_constant),
                                 trailing_comments(comments.trailing(&string_constant)),
                                 operand.trailing_binary_comments().map(trailing_comments),
                                 line_suffix_boundary(),
@@ -412,9 +414,10 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                             f,
                             [
                                 leading_comments(comments.leading(&string_constant)),
-                                FormatString::new(&string_constant).with_layout(
-                                    StringLayout::ImplicitConcatenatedStringInBinaryLike
-                                ),
+                                // Call `FormatStringContinuation` directly to avoid formatting
+                                // the implicitly concatenated string with the enclosing group
+                                // because the group is added by the binary like formatting.
+                                FormatStringContinuation::new(&string_constant),
                                 trailing_comments(comments.trailing(&string_constant)),
                             ]
                         )?;
@@ -718,7 +721,11 @@ impl Format<PyFormatContext<'_>> for FlatBinaryExpressionSlice<'_> {
                     )
                 {
                     hard_line_break().fmt(f)?;
-                } else if !is_pow {
+                } else if is_pow {
+                    if is_fix_power_op_line_length_enabled(f.context()) {
+                        in_parentheses_only_if_group_breaks(&space()).fmt(f)?;
+                    }
+                } else {
                     space().fmt(f)?;
                 }
 
@@ -1105,9 +1112,8 @@ impl OperatorIndex {
     fn new(index: usize) -> Self {
         assert_eq!(index % 2, 1, "Operator indices must be odd positions");
 
-        // SAFETY A value with a module 0 is guaranteed to never equal 0
-        #[allow(unsafe_code)]
-        Self(unsafe { NonZeroUsize::new_unchecked(index) })
+        // OK because a value with a modulo 1 is guaranteed to never equal 0
+        Self(NonZeroUsize::new(index).expect("valid index"))
     }
 
     const fn value(self) -> usize {

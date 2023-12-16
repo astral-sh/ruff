@@ -22,6 +22,9 @@ use crate::checkers::ast::Checker;
 /// one underscore (e.g., `_str_`), but ignores known dunder methods (like
 /// `__init__`), as well as methods that are marked with `@override`.
 ///
+/// Additional dunder methods names can be allowed via the
+/// [`pylint.allow-dunder-method-names`] setting.
+///
 /// ## Example
 /// ```python
 /// class Foo:
@@ -35,6 +38,9 @@ use crate::checkers::ast::Checker;
 ///     def __init__(self):
 ///         ...
 /// ```
+///
+/// ## Options
+/// - `pylint.allow-dunder-method-names`
 #[violation]
 pub struct BadDunderMethodName {
     name: String,
@@ -54,7 +60,14 @@ pub(crate) fn bad_dunder_method_name(checker: &mut Checker, class_body: &[Stmt])
         .iter()
         .filter_map(ruff_python_ast::Stmt::as_function_def_stmt)
         .filter(|method| {
-            if is_known_dunder_method(&method.name) || matches!(method.name.as_str(), "_") {
+            if is_known_dunder_method(&method.name)
+                || checker
+                    .settings
+                    .pylint
+                    .allow_dunder_method_names
+                    .contains(method.name.as_str())
+                || matches!(method.name.as_str(), "_")
+            {
                 return false;
             }
             method.name.starts_with('_') && method.name.ends_with('_')

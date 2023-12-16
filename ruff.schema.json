@@ -690,7 +690,7 @@
       }
     },
     "unsafe-fixes": {
-      "description": "Enable application of unsafe fixes.",
+      "description": "Enable application of unsafe fixes. If excluded, a hint will be displayed when unsafe fixes are available. If set to false, the hint will be hidden.",
       "type": [
         "boolean",
         "null"
@@ -744,6 +744,16 @@
           "enum": [
             "pep257"
           ]
+        }
+      ]
+    },
+    "DocstringCodeLineWidth": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/LineWidth"
+        },
+        {
+          "type": "null"
         }
       ]
     },
@@ -1194,6 +1204,13 @@
             "type": "string"
           }
         },
+        "quote-annotations": {
+          "description": "Whether to add quotes around type annotations, if doing so would allow the corresponding import to be moved into a type-checking block.\n\nFor example, in the following, Python requires that `Sequence` be available at runtime, despite the fact that it's only used in a type annotation:\n\n```python from collections.abc import Sequence\n\ndef func(value: Sequence[int]) -> None: ... ```\n\nIn other words, moving `from collections.abc import Sequence` into an `if TYPE_CHECKING:` block above would cause a runtime error, as the type would no longer be available at runtime.\n\nBy default, Ruff will respect such runtime semantics and avoid moving the import to prevent such runtime errors.\n\nSetting `quote-annotations` to `true` will instruct Ruff to add quotes around the annotation (e.g., `\"Sequence[int]\"`), which in turn enables Ruff to move the import into an `if TYPE_CHECKING:` block, like so:\n\n```python from typing import TYPE_CHECKING\n\nif TYPE_CHECKING: from collections.abc import Sequence\n\ndef func(value: \"Sequence[int]\") -> None: ... ```\n\nNote that this setting has no effect when `from __future__ import annotations` is present, as `__future__` annotations are always treated equivalently to quoted annotations.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "runtime-evaluated-base-classes": {
           "description": "Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's `sqlalchemy.orm.DeclarativeBase`, but can also support user-defined classes that inherit from those base classes. For example, if you define a common `DeclarativeBase` subclass that's used throughout your project (e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to this list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt models from being moved into type-checking blocks.",
           "type": [
@@ -1241,6 +1258,24 @@
       "description": "Experimental: Configures how `ruff format` formats your code.\n\nPlease provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).",
       "type": "object",
       "properties": {
+        "docstring-code-format": {
+          "description": "Whether to format code snippets in docstrings.\n\nWhen this is enabled, Python code examples within docstrings are automatically reformatted.\n\nFor example, when this is enabled, the following code:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(  x  )\n\nMarkdown is also supported:\n\n```py f(  x  ) ```\n\nAs are reStructuredText literal blocks::\n\nf(  x  )\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(  x  ) \"\"\" pass ```\n\n... will be reformatted (assuming the rest of the options are set to their defaults) as:\n\n```python def f(x): \"\"\" Something about `f`. And an example in doctest format:\n\n>>> f(x)\n\nMarkdown is also supported:\n\n```py f(x) ```\n\nAs are reStructuredText literal blocks::\n\nf(x)\n\nAnd reStructuredText code blocks:\n\n.. code-block:: python\n\nf(x) \"\"\" pass ```\n\nIf a code snippt in a docstring contains invalid Python code or if the formatter would otherwise write invalid Python code, then the code example is ignored by the formatter and kept as-is.\n\nCurrently, doctest, Markdown, reStructuredText literal blocks, and reStructuredText code blocks are all supported and automatically recognized. In the case of unlabeled fenced code blocks in Markdown and reStructuredText literal blocks, the contents are assumed to be Python and reformatted. As with any other format, if the contents aren't valid Python, then the block is left untouched automatically.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "docstring-code-line-length": {
+          "description": "Set the line length used when formatting code snippets in docstrings.\n\nThis only has an effect when the `docstring-code-format` setting is enabled.\n\nThe default value for this setting is `\"dynamic\"`, which has the effect of ensuring that any reformatted code examples in docstrings adhere to the global line length configuration that is used for the surrounding Python code. The point of this setting is that it takes the indentation of the docstring into account when reformatting code examples.\n\nAlternatively, this can be set to a fixed integer, which will result in the same line length limit being applied to all reformatted code examples in docstrings. When set to a fixed integer, the indent of the docstring is not taken into account. That is, this may result in lines in the reformatted code example that exceed the globally configured line length limit.\n\nFor example, when this is set to `20` and `docstring-code-format` is enabled, then this code:\n\n```python def f(x): ''' Something about `f`. And an example:\n\n.. code-block:: python\n\nfoo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear) ''' pass ```\n\n... will be reformatted (assuming the rest of the options are set to their defaults) as:\n\n```python def f(x): \"\"\" Something about `f`. And an example:\n\n.. code-block:: python\n\n( foo, bar, quux, ) = this_is_a_long_line( lion, hippo, lemur, bear, ) \"\"\" pass ```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/DocstringCodeLineWidth"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "exclude": {
           "description": "A list of file patterns to exclude from formatting in addition to the files excluded globally (see [`exclude`](#exclude), and [`extend-exclude`](#extend-exclude)).\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
@@ -1281,7 +1316,7 @@
           ]
         },
         "quote-style": {
-          "description": "Whether to prefer single `'` or double `\"` quotes for strings. Defaults to double quotes.\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for multiline strings and docstrings, regardless of the configured quote style.\n\nRuff may also deviate from this option if using the configured quotes would require escaping quote characters within the string. For example, given:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change `a` to use single quotes when using `quote-style = \"single\"`. However, `b` will be unchanged, as converting to single quotes would require the inner `'` to be escaped, which leads to less readable code: `'It\\'s monday morning'`.",
+          "description": "Configures the preferred quote character for strings. Valid options are:\n\n* `double` (default): Use double quotes `\"` * `single`: Use single quotes `'` * `preserve` (preview only): Keeps the existing quote character. We don't recommend using this option except for projects that already use a mixture of single and double quotes and can't migrate to using double or single quotes.\n\nIn compliance with [PEP 8](https://peps.python.org/pep-0008/) and [PEP 257](https://peps.python.org/pep-0257/), Ruff prefers double quotes for multiline strings and docstrings, regardless of the configured quote style.\n\nRuff may also deviate from using the configured quotes if doing so requires escaping quote characters within the string. For example, given:\n\n```python a = \"a string without any quotes\" b = \"It's monday morning\" ```\n\nRuff will change `a` to use single quotes when using `quote-style = \"single\"`. However, `b` remains unchanged, as converting to single quotes requires escaping the inner `'`, which leads to less readable code: `'It\\'s monday morning'`. This does not apply when using `preserve`.",
           "anyOf": [
             {
               "$ref": "#/definitions/QuoteStyle"
@@ -1440,6 +1475,13 @@
             "type": "string"
           }
         },
+        "from-first": {
+          "description": "Whether to place `import from` imports before straight imports when sorting.\n\nFor example, by default, imports will be sorted such that straight imports appear before `import from` imports, as in: ```python import os import sys from typing import List ```\n\nSetting `from-first = true` will instead sort such that `import from` imports appear before straight imports, as in: ```python from typing import List import os import sys ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
@@ -1469,6 +1511,20 @@
           "items": {
             "type": "string"
           }
+        },
+        "length-sort": {
+          "description": "Sort imports by their string length, such that shorter imports appear before longer imports. For example, by default, imports will be sorted alphabetically, as in: ```python import collections import os ```\n\nSetting `length-sort = true` will instead sort such that shorter imports appear before longer imports, as in: ```python import os import collections ```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "length-sort-straight": {
+          "description": "Sort straight imports by their string length. Similar to `length-sort`, but applies only to straight imports and doesn't affect `from` imports.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "lines-after-imports": {
           "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.\n\nWhen using the formatter, only the values `-1`, `1`, and `2` are compatible because it enforces at least one empty and at most two empty lines after imports.",
@@ -1622,6 +1678,12 @@
       "type": "integer",
       "format": "uint16",
       "maximum": 320.0,
+      "minimum": 1.0
+    },
+    "LineWidth": {
+      "description": "The maximum visual width to which the formatter should try to limit a line.",
+      "type": "integer",
+      "format": "uint16",
       "minimum": 1.0
     },
     "LintOptions": {
@@ -2300,6 +2362,17 @@
     "PylintOptions": {
       "type": "object",
       "properties": {
+        "allow-dunder-method-names": {
+          "description": "Dunder methods name to allow, in addition to the default set from the Python standard library (see: `PLW3201`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "allow-magic-value-types": {
           "description": "Constant types to ignore when used as \"magic values\" (see: `PLR2004`).",
           "type": [
@@ -2330,6 +2403,15 @@
         },
         "max-branches": {
           "description": "Maximum number of branches allowed for a function or method body (see: `PLR0912`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "max-positional-args": {
+          "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
           "type": [
             "integer",
             "null"
@@ -2400,7 +2482,8 @@
       "type": "string",
       "enum": [
         "single",
-        "double"
+        "double",
+        "preserve"
       ]
     },
     "RelativeImportsOrder": {
@@ -2839,11 +2922,14 @@
         "FURB15",
         "FURB152",
         "FURB16",
+        "FURB163",
         "FURB168",
         "FURB169",
         "FURB17",
         "FURB171",
         "FURB177",
+        "FURB18",
+        "FURB181",
         "G",
         "G0",
         "G00",
@@ -3077,6 +3163,8 @@
         "PLR0133",
         "PLR02",
         "PLR020",
+        "PLR0202",
+        "PLR0203",
         "PLR0206",
         "PLR04",
         "PLR040",
@@ -3090,6 +3178,7 @@
         "PLR0913",
         "PLR0915",
         "PLR0916",
+        "PLR0917",
         "PLR1",
         "PLR17",
         "PLR170",
@@ -3101,6 +3190,9 @@
         "PLR1714",
         "PLR172",
         "PLR1722",
+        "PLR173",
+        "PLR1733",
+        "PLR1736",
         "PLR2",
         "PLR20",
         "PLR200",
@@ -3358,6 +3450,7 @@
         "S2",
         "S20",
         "S201",
+        "S202",
         "S3",
         "S30",
         "S301",
@@ -3404,6 +3497,7 @@
         "S608",
         "S609",
         "S61",
+        "S611",
         "S612",
         "S7",
         "S70",
@@ -3611,7 +3705,8 @@
         "github",
         "gitlab",
         "pylint",
-        "azure"
+        "azure",
+        "sarif"
       ]
     },
     "Strictness": {

@@ -1,0 +1,90 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/ignore_pyi.pyi
+---
+## Input
+
+```python
+def f():  # type: ignore
+    ...
+
+class x:  # some comment
+    ...
+
+class y:
+    ...  # comment
+
+# whitespace doesn't matter (note the next line has a trailing space and tab)
+class z:        
+    ...
+
+def g():
+    # hi
+    ...
+
+def h():
+    ...
+    # bye
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -3,7 +3,6 @@
+ 
+ class x:  # some comment
+     ...
+-
+ class y: ...  # comment
+ 
+ # whitespace doesn't matter (note the next line has a trailing space and tab)
+```
+
+## Ruff Output
+
+```python
+def f():  # type: ignore
+    ...
+
+class x:  # some comment
+    ...
+class y: ...  # comment
+
+# whitespace doesn't matter (note the next line has a trailing space and tab)
+class z: ...
+
+def g():
+    # hi
+    ...
+
+def h():
+    ...
+    # bye
+```
+
+## Black Output
+
+```python
+def f():  # type: ignore
+    ...
+
+class x:  # some comment
+    ...
+
+class y: ...  # comment
+
+# whitespace doesn't matter (note the next line has a trailing space and tab)
+class z: ...
+
+def g():
+    # hi
+    ...
+
+def h():
+    ...
+    # bye
+```
+
+

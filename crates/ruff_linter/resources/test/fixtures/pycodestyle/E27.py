@@ -60,3 +60,6 @@ def f():
 if (a and
     b):
     pass
+#: Okay
+def f():
+	return 1

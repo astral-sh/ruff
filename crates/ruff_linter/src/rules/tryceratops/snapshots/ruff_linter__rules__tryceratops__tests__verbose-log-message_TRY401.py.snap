@@ -177,4 +177,20 @@ TRY401.py:117:40: TRY401 Redundant exception object included in `logging.excepti
     |                                        ^^ TRY401
     |
 
+TRY401.py:139:49: TRY401 Redundant exception object included in `logging.exception` call
+    |
+137 |             finish()
+138 |         except Exception as ex:
+139 |             logger.exception(f"Found an error: {ex}")  # TRY401
+    |                                                 ^^ TRY401
+    |
+
+TRY401.py:150:49: TRY401 Redundant exception object included in `logging.exception` call
+    |
+148 |             finish()
+149 |         except Exception:
+150 |             logger.exception(f"Found an error: {ex}")  # TRY401
+    |                                                 ^^ TRY401
+    |
+
 

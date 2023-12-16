@@ -36,12 +36,12 @@ console_log = { version = "1.0.0" }
 log = { workspace = true }
 
 serde = { workspace = true }
-serde-wasm-bindgen = { version = "0.6.1" }
+serde-wasm-bindgen = { version = "0.6.3" }
 wasm-bindgen = { version = "0.2.84" }
-js-sys = { version = "0.3.61" }
+js-sys = { version = "0.3.66" }
 
 [dev-dependencies]
-wasm-bindgen-test = { version = "0.3.34" }
+wasm-bindgen-test = { version = "0.3.38" }
 
 [lints]
 workspace = true

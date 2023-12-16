@@ -211,6 +211,8 @@ E20.py:137:20: E203 [*] Whitespace before ':'
 136 | #: E203:1:20
 137 | ham[{lower + offset : upper + offset} : upper + offset]
     |                    ^ E203
+138 | 
+139 | #: Okay
     |
     = help: Remove whitespace before ':'
 
@@ -220,5 +222,23 @@ E20.py:137:20: E203 [*] Whitespace before ':'
 136 136 | #: E203:1:20
 137     |-ham[{lower + offset : upper + offset} : upper + offset]
     137 |+ham[{lower + offset: upper + offset} : upper + offset]
+138 138 | 
+139 139 | #: Okay
+140 140 | ham[upper:]
+
+E20.py:149:10: E203 [*] Whitespace before ':'
+    |
+148 | #: E203:1:10
+149 | ham[upper  :]
+    |          ^^ E203
+    |
+    = help: Remove whitespace before ':'
+
+ℹ Safe fix
+146 146 | ham[upper : ]
+147 147 | 
+148 148 | #: E203:1:10
+149     |-ham[upper  :]
+    149 |+ham[upper:]
 
 

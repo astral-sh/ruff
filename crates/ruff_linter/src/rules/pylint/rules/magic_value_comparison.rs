@@ -83,7 +83,7 @@ fn is_magic_value(literal_expr: LiteralExpressionRef, allowed_types: &[ConstantT
         | LiteralExpressionRef::EllipsisLiteral(_) => false,
         // Special-case some common string and integer types.
         LiteralExpressionRef::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
-            !matches!(value.as_str(), "" | "__main__")
+            !matches!(value.to_str(), "" | "__main__")
         }
         LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
             ast::Number::Int(value) => !matches!(*value, Int::ZERO | Int::ONE),

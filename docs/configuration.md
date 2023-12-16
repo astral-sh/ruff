@@ -71,6 +71,20 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
     # Like Black, automatically detect the appropriate line ending.
     line-ending = "auto"
+
+    # Enable auto-formatting of code examples in docstrings. Markdown,
+    # reStructuredText code/literal blocks and doctests are all supported.
+    #
+    # This is currently disabled by default, but it is planned for this
+    # to be opt-out in the future.
+    docstring-code-format = false
+
+    # Set the line length limit used when formatting code snippets in
+    # docstrings.
+    #
+    # This only has an effect when the `docstring-code-format` setting is
+    # enabled.
+    docstring-code-line-length = "dynamic"
     ```
 
 === "ruff.toml"
@@ -134,6 +148,20 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
     # Like Black, automatically detect the appropriate line ending.
     line-ending = "auto"
+
+    # Enable auto-formatting of code examples in docstrings. Markdown,
+    # reStructuredText code/literal blocks and doctests are all supported.
+    #
+    # This is currently disabled by default, but it is planned for this
+    # to be opt-out in the future.
+    docstring-code-format = false
+
+    # Set the line length limit used when formatting code snippets in
+    # docstrings.
+    #
+    # This only has an effect when the `docstring-code-format` setting is
+    # enabled.
+    docstring-code-line-length = "dynamic"
     ```
 
 As an example, the following would configure Ruff to:
@@ -299,6 +327,45 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria.
 For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
+### Default inclusions
+
+By default, Ruff will discover files matching `*.py`, `*.ipy`, or `pyproject.toml`.
+
+To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    extend-include = ["*.ipynb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    extend-include = ["*.ipynb"]
+    ```
+
+You can also change the default selection using the [`include`](settings.md#include) setting.
+
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
+    ```
+
+!!! warning
+    Paths provided to `include` _must_ match files. For example, `include = ["src"]` will fail since it
+    matches a directory.
+
 ## Jupyter Notebook discovery
 
 Ruff has built-in support for [Jupyter Notebooks](https://jupyter.org/).
@@ -422,7 +489,7 @@ Run Ruff on the given files or directories (default)
 Usage: ruff check [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to check
+  [FILES]...  List of files or directories to check [default: .]
 
 Options:
       --fix
@@ -442,7 +509,7 @@ Options:
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
-          Output serialization format for violations [env: RUFF_OUTPUT_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure]
+          Output serialization format for violations [env: RUFF_OUTPUT_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure, sarif]
   -o, --output-file <OUTPUT_FILE>
           Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>
@@ -518,7 +585,7 @@ Run the Ruff formatter on the given files or directories
 Usage: ruff format [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to format
+  [FILES]...  List of files or directories to format [default: .]
 
 Options:
       --check

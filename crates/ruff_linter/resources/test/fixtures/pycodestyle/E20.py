@@ -135,3 +135,15 @@ ham[lower + offset: :upper + offset]
 
 #: E203:1:20
 ham[{lower + offset : upper + offset} : upper + offset]
+
+#: Okay
+ham[upper:]
+
+#: Okay
+ham[upper :]
+
+#: E202:1:12
+ham[upper : ]
+
+#: E203:1:10
+ham[upper  :]

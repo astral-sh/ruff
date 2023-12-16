@@ -78,9 +78,7 @@ pub(crate) fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: 
 
         // `ctypes.WinError()` is a function, not a class. It's part of the standard library, so
         // we might as well get it right.
-        if exception_type
-            .as_ref()
-            .is_some_and(ExceptionType::is_builtin)
+        if exception_type.is_none()
             && checker
                 .semantic()
                 .resolve_call_path(func)

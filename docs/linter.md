@@ -18,6 +18,10 @@ ruff check . --watch  # Lint all files in the current directory, and re-lint on 
 
 For the full list of supported options, run `ruff check --help`.
 
+!!! note
+    As of Ruff v0.1.7 the `ruff check` command uses the current working directory (`.`) as the default path to check.
+    See [the file discovery documentation](configuration.md#python-file-discovery) for details.
+
 ## Rule selection
 
 The set of enabled rules is controlled via the [`select`](settings.md#select),
@@ -198,6 +202,9 @@ ruff check . --unsafe-fixes
 # Apply unsafe fixes
 ruff check . --fix --unsafe-fixes
 ```
+
+By default, Ruff will display a hint when unsafe fixes are available but not enabled. The suggestion can be silenced
+by setting the [`unsafe-fixes`](settings.md#unsafe-fixes) setting to `false` or using the `--no-unsafe-fixes` flag.
 
 The safety of fixes can be adjusted per rule using the [`extend-safe-fixes`](settings.md#extend-safe-fixes) and [`extend-unsafe-fixes`](settings.md#extend-unsafe-fixes) settings.
 

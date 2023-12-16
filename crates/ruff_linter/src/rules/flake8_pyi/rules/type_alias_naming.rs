@@ -46,12 +46,16 @@ impl Violation for SnakeCaseTypeAlias {
 ///
 /// ## Example
 /// ```python
-/// MyTypeT = int
+/// from typing import TypeAlias
+///
+/// _MyTypeT: TypeAlias = int
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// MyType = int
+/// from typing import TypeAlias
+///
+/// _MyType: TypeAlias = int
 /// ```
 #[violation]
 pub struct TSuffixedTypeAlias {
