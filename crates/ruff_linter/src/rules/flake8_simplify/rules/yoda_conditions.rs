@@ -83,11 +83,15 @@ impl Violation for YodaConditions {
 /// Comparisons left hand side must not be more [`ConstantLikelihood`] than their right hand side
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum ConstantLikelihood {
+    /// The expression is unlikely to be a constant (e.g., `foo` or `foo(bar)`).
     Unlikely = 0,
-    Probably = 1,   // CAMEL_CASED vars
-    Definitely = 2, // literals, empty dicts and tuples...
-}
 
+    /// The expression is likely to be a constant (e.g., `FOO`).
+    Probably = 1,
+
+    /// The expression is a constant for certain (e.g., `42` or `"foo"`).
+    Definitely = 2,
+}
 fn how_likely_constant_str(s: &str) -> ConstantLikelihood {
     if str::is_cased_uppercase(s) {
         ConstantLikelihood::Probably
