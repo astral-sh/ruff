@@ -993,7 +993,7 @@ impl<'a> SemanticModel<'a> {
         &self.nodes[node_id]
     }
 
-    /// Given a [`Expr`], return its parent, if any.
+    /// Given a [`NodeId`], return its parent, if any.
     #[inline]
     pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
         self.nodes
