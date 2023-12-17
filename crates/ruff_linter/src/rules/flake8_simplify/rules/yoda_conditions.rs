@@ -92,43 +92,51 @@ enum ConstantLikelihood {
     /// The expression is a constant for certain (e.g., `42` or `"foo"`).
     Definitely = 2,
 }
-fn how_likely_constant_str(s: &str) -> ConstantLikelihood {
-    if str::is_cased_uppercase(s) {
-        ConstantLikelihood::Probably
-    } else {
-        ConstantLikelihood::Unlikely
-    }
-}
 
-/// Return [`Expr`] [`ConstantLikelihood`] level depending on simple heuristics.
-fn how_likely_constant(expr: &Expr) -> ConstantLikelihood {
-    if expr.is_literal_expr() {
-        return ConstantLikelihood::Definitely;
-    }
-    match expr {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => how_likely_constant_str(attr),
-        Expr::Name(ast::ExprName { id, .. }) => how_likely_constant_str(id),
-        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => elts
-            .iter()
-            .map(how_likely_constant)
-            .min()
-            .unwrap_or(ConstantLikelihood::Definitely),
-        Expr::Dict(ast::ExprDict { values: vs, .. }) => {
-            if vs.is_empty() {
-                ConstantLikelihood::Definitely
-            } else {
-                ConstantLikelihood::Probably
+impl ConstantLikelihood {
+    fn from_expression(expr: &Expr, is_preview_enabled: bool) -> Self {
+        match expr {
+            _ if expr.is_literal_expr() => ConstantLikelihood::Definitely,
+            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                ConstantLikelihood::from_identifier(attr)
             }
+            Expr::Name(ast::ExprName { id, .. }) => ConstantLikelihood::from_identifier(id),
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+                .iter()
+                .map(|x| ConstantLikelihood::from_expression(x, is_preview_enabled))
+                .min()
+                .unwrap_or(ConstantLikelihood::Definitely),
+            Expr::List(ast::ExprList { elts, .. }) if is_preview_enabled => elts
+                .iter()
+                .map(|x| ConstantLikelihood::from_expression(x, is_preview_enabled))
+                .min()
+                .unwrap_or(ConstantLikelihood::Definitely),
+            Expr::Dict(ast::ExprDict { values: vs, .. }) if is_preview_enabled => {
+                if vs.is_empty() {
+                    ConstantLikelihood::Definitely
+                } else {
+                    ConstantLikelihood::Probably
+                }
+            }
+            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => cmp::min(
+                ConstantLikelihood::from_expression(left, is_preview_enabled),
+                ConstantLikelihood::from_expression(right, is_preview_enabled),
+            ),
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
+                operand,
+                range: _,
+            }) => ConstantLikelihood::from_expression(operand, is_preview_enabled),
+            _ => ConstantLikelihood::Unlikely,
         }
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            cmp::min(how_likely_constant(left), how_likely_constant(right))
+    }
+
+    fn from_identifier(identifier: &str) -> Self {
+        if str::is_cased_uppercase(identifier) {
+            ConstantLikelihood::Probably
+        } else {
+            ConstantLikelihood::Unlikely
         }
-        Expr::UnaryOp(ast::ExprUnaryOp {
-            op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
-            operand,
-            range: _,
-        }) => how_likely_constant(operand),
-        _ => ConstantLikelihood::Unlikely,
     }
 }
 
@@ -219,7 +227,9 @@ pub(crate) fn yoda_conditions(
         return;
     }
 
-    if how_likely_constant(left) <= how_likely_constant(right) {
+    if ConstantLikelihood::from_expression(left, checker.settings.preview.is_enabled())
+        <= ConstantLikelihood::from_expression(right, checker.settings.preview.is_enabled())
+    {
         return;
     }
 
