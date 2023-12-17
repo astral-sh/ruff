@@ -1,9 +1,8 @@
-use std::ops::Add;
-
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
@@ -342,29 +341,24 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::TooManyLocals) {
                 // PLR0914
-                let mut num_locals = 0;
-                let mut last_seen_range = TextRange::default();
-                for (_name, binding_id) in scope.bindings() {
-                    let binding = checker.semantic.binding(binding_id);
-                    if matches!(binding.kind, BindingKind::Assignment) {
-                        num_locals += 1;
-
-                        // use the beginning of the last seen assignment as the range
-                        last_seen_range = TextRange::new(
-                            binding.range().start(),
-                            binding.range().start().add(TextSize::from(1)),
-                        );
-                    }
-                }
+                let num_locals = scope
+                    .binding_ids()
+                    .filter(|&id| {
+                        let binding = checker.semantic.binding(id);
+                        matches!(binding.kind, BindingKind::Assignment)
+                    })
+                    .count();
 
                 if num_locals > checker.settings.pylint.max_locals {
-                    diagnostics.push(Diagnostic::new(
-                        pylint::rules::TooManyLocals {
-                            current_amount: num_locals,
-                            max_amount: checker.settings.pylint.max_locals,
-                        },
-                        last_seen_range,
-                    ));
+                    if let ScopeKind::Function(func) = scope.kind {
+                        diagnostics.push(Diagnostic::new(
+                            pylint::rules::TooManyLocals {
+                                current_amount: num_locals,
+                                max_amount: checker.settings.pylint.max_locals,
+                            },
+                            func.identifier(),
+                        ));
+                    };
                 }
             }
         }

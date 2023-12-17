@@ -1,5 +1,4 @@
-def func():
-    # Ok
+def func() -> None:  # Ok
     # 15 is max default
     first = 1
     second = 2
@@ -17,8 +16,7 @@ def func():
     fourteenth = 14
     fifteenth = 15
 
-def func():
-    # PLR0914
+def func() -> None:  # PLR0914
     first = 1
     second = 2
     third = 3
