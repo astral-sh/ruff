@@ -17,6 +17,7 @@ use crate::importer::ImportRequest;
 /// ## Example
 /// ```python
 /// import functools
+///
 /// nums = [1, 2, 3]
 /// sum = functools.reduce(lambda x, y: x + y, nums)
 /// ```
@@ -25,6 +26,7 @@ use crate::importer::ImportRequest;
 /// ```python
 /// import functools
 /// import operator
+///
 /// nums = [1, 2, 3]
 /// sum = functools.reduce(operator.add, nums)
 /// ```
