@@ -1,17 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-too_many_locals.py:18:5: PLR0914 Too many local variables: (15/11)
-   |
-16 |     thirteenth = 13
-17 |     fourteenth = 14
-18 |     fifteenth = 15
-   |     ^ PLR0914
-19 | 
-20 | def func():
-   |
-
-too_many_locals.py:36:5: PLR0914 Too many local variables: (16/11)
+too_many_locals.py:36:5: PLR0914 Too many local variables: (16/15)
    |
 34 |     thirteenth = 13
 35 |     fourteenth = 14

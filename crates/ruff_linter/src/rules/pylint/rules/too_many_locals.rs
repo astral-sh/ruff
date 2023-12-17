@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// ## What it does
 /// Checks for functions/methods that include too many local variables.
 ///
-/// By default, this rule allows up to eleven arguments, as configured by the
+/// By default, this rule allows up to fifteen arguments, as configured by the
 /// [`pylint.max-locals`] option.
 ///
 /// ## Why is this bad?

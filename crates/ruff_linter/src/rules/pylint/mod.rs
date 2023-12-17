@@ -352,7 +352,7 @@ mod tests {
             Path::new("pylint/too_many_locals.py"),
             &LinterSettings {
                 pylint: pylint::settings::Settings {
-                    max_locals: 11,
+                    max_locals: 15,
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyLocals])

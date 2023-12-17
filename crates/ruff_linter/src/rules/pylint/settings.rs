@@ -60,7 +60,7 @@ impl Default for Settings {
             max_branches: 12,
             max_statements: 50,
             max_public_methods: 20,
-            max_locals: 11,
+            max_locals: 15,
         }
     }
 }
