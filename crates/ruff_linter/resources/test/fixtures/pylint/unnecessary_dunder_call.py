@@ -1,3 +1,6 @@
+from typing import Any
+
+
 print((3.0).__add__(4.0))  # PLC2801
 print((3.0).__sub__(4.0))  # PLC2801
 print((3.0).__mul__(4.0))  # PLC2801
@@ -13,8 +16,12 @@ print((3.0).__ge__(4.0))  # PLC2801
 print((3.0).__str__())  # PLC2801
 print((3.0).__repr__())  # PLC2801
 print([1, 2, 3].__len__())  # PLC2801
+print((1).__neg__())  # PLC2801
 
 
 class Thing:
-    def __init__(self) -> None:
+    def __init__(self, stuff: Any) -> None:
         super().__init__()  # Ok
+        super().__class__(stuff=(1, 2, 3))  # Ok
+
+blah = lambda: {"a": 1}.__delitem__("a")  # Ok
