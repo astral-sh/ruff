@@ -87,3 +87,6 @@ def f():
         x: DataFrame[
             int
         ] = 1
+
+    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
+        ...
