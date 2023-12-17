@@ -952,6 +952,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
         #[allow(deprecated)]
         (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
+        (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),
         #[allow(deprecated)]
         (Refurb, "131") => (RuleGroup::Nursery, rules::refurb::rules::DeleteFullSlice),
         #[allow(deprecated)]
