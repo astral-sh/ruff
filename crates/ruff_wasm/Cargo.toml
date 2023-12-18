@@ -41,7 +41,7 @@ wasm-bindgen = { version = "0.2.84" }
 js-sys = { version = "0.3.66" }
 
 [dev-dependencies]
-wasm-bindgen-test = { version = "0.3.38" }
+wasm-bindgen-test = { version = "0.3.39" }
 
 [lints]
 workspace = true
