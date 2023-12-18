@@ -2,17 +2,21 @@ use anyhow::{bail, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
+use crate::importer::{ImportRequest, Importer};
 
 /// ## What it does
-/// Checks for lambda expressions and function definitions that can be replaced with a function
-/// from `operator` module.
+/// Checks for lambda expressions and function definitions that can be replaced
+/// with a function from the `operator` module.
 ///
 /// ## Why is this bad?
-/// Using functions from `operator` module is more concise and readable.
+/// The `operator` module provides functions that implement the same functionality
+/// as the corresponding operators. For example, `operator.add` is equivalent to
+/// `lambda x, y: x + y`. Using the functions from the `operator` module is more
+/// concise and communicates the intent of the code more clearly.
 ///
 /// ## Example
 /// ```python
@@ -54,7 +58,7 @@ impl Violation for ReimplementedOperator {
 }
 
 /// FURB118
-pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &LambdaLike) {
+pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLike) {
     let Some(params) = target.parameters() else {
         return;
     };
@@ -69,29 +73,30 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &LambdaLike)
         },
         target.range(),
     );
-    diagnostic.try_set_fix(|| target.try_fix(checker, operator));
+    diagnostic.try_set_fix(|| target.try_fix(operator, checker.importer(), checker.semantic()));
     checker.diagnostics.push(diagnostic);
 }
 
 /// Candidate for lambda expression or function definition consisting of a return statement.
-pub(crate) enum LambdaLike<'a> {
+#[derive(Debug)]
+pub(crate) enum FunctionLike<'a> {
     Lambda(&'a ast::ExprLambda),
     Function(&'a ast::StmtFunctionDef),
 }
 
-impl<'a> From<&'a ast::ExprLambda> for LambdaLike<'a> {
+impl<'a> From<&'a ast::ExprLambda> for FunctionLike<'a> {
     fn from(lambda: &'a ast::ExprLambda) -> Self {
         Self::Lambda(lambda)
     }
 }
 
-impl<'a> From<&'a ast::StmtFunctionDef> for LambdaLike<'a> {
+impl<'a> From<&'a ast::StmtFunctionDef> for FunctionLike<'a> {
     fn from(function: &'a ast::StmtFunctionDef) -> Self {
         Self::Function(function)
     }
 }
 
-impl Ranged for LambdaLike<'_> {
+impl Ranged for FunctionLike<'_> {
     fn range(&self) -> TextRange {
         match self {
             Self::Lambda(expr) => expr.range(),
@@ -100,7 +105,8 @@ impl Ranged for LambdaLike<'_> {
     }
 }
 
-impl LambdaLike<'_> {
+impl FunctionLike<'_> {
+    /// Return the [`ast::Parameters`] of the function-like node.
     fn parameters(&self) -> Option<&ast::Parameters> {
         match self {
             Self::Lambda(expr) => expr.parameters.as_deref(),
@@ -108,6 +114,10 @@ impl LambdaLike<'_> {
         }
     }
 
+    /// Return the body of the function-like node.
+    ///
+    /// If the node is a function definition that consists of more than a single return statement,
+    /// returns `None`.
     fn body(&self) -> Option<&Expr> {
         match self {
             Self::Lambda(expr) => Some(&expr.body),
@@ -118,13 +128,28 @@ impl LambdaLike<'_> {
         }
     }
 
-    fn try_fix(&self, checker: &Checker, operator: &'static str) -> Result<Fix> {
+    /// Return the display kind of the function-like node.
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::Lambda(_) => "lambda",
+            Self::Function(_) => "function",
+        }
+    }
+
+    /// Attempt to fix the function-like node by replacing it with a call to the corresponding
+    /// function from `operator` module.
+    fn try_fix(
+        &self,
+        operator: &'static str,
+        importer: &Importer,
+        semantic: &SemanticModel,
+    ) -> Result<Fix> {
         match self {
             Self::Lambda(_) => {
-                let (edit, binding) = checker.importer().get_or_import_symbol(
+                let (edit, binding) = importer.get_or_import_symbol(
                     &ImportRequest::import("operator", operator),
                     self.start(),
-                    checker.semantic(),
+                    semantic,
                 )?;
                 Ok(Fix::safe_edits(
                     Edit::range_replacement(binding, self.range()),
@@ -134,15 +159,9 @@ impl LambdaLike<'_> {
             Self::Function(_) => bail!("No fix available"),
         }
     }
-
-    fn kind(&self) -> &'static str {
-        match self {
-            Self::Lambda(_) => "lambda",
-            Self::Function(_) => "function",
-        }
-    }
 }
 
+/// Return the name of the `operator` implemented by the given expression.
 fn get_operator(expr: &Expr, params: &ast::Parameters) -> Option<&'static str> {
     match expr {
         Expr::UnaryOp(expr) => unary_op(expr, params),
@@ -152,11 +171,12 @@ fn get_operator(expr: &Expr, params: &ast::Parameters) -> Option<&'static str> {
     }
 }
 
+/// Return the name of the `operator` implemented by the given unary expression.
 fn unary_op(expr: &ast::ExprUnaryOp, params: &ast::Parameters) -> Option<&'static str> {
     let [arg] = params.args.as_slice() else {
         return None;
     };
-    if !is_same(arg, &expr.operand) {
+    if !is_same_expression(arg, &expr.operand) {
         return None;
     }
     Some(match expr.op {
@@ -167,11 +187,12 @@ fn unary_op(expr: &ast::ExprUnaryOp, params: &ast::Parameters) -> Option<&'stati
     })
 }
 
+/// Return the name of the `operator` implemented by the given binary expression.
 fn bin_op(expr: &ast::ExprBinOp, params: &ast::Parameters) -> Option<&'static str> {
     let [arg1, arg2] = params.args.as_slice() else {
         return None;
     };
-    if !is_same(arg1, &expr.left) || !is_same(arg2, &expr.right) {
+    if !is_same_expression(arg1, &expr.left) || !is_same_expression(arg2, &expr.right) {
         return None;
     }
     Some(match expr.op {
@@ -191,6 +212,7 @@ fn bin_op(expr: &ast::ExprBinOp, params: &ast::Parameters) -> Option<&'static st
     })
 }
 
+/// Return the name of the `operator` implemented by the given comparison expression.
 fn cmp_op(expr: &ast::ExprCompare, params: &ast::Parameters) -> Option<&'static str> {
     let [arg1, arg2] = params.args.as_slice() else {
         return None;
@@ -201,7 +223,7 @@ fn cmp_op(expr: &ast::ExprCompare, params: &ast::Parameters) -> Option<&'static 
     let [right] = expr.comparators.as_slice() else {
         return None;
     };
-    if !is_same(arg1, &expr.left) || !is_same(arg2, right) {
+    if !is_same_expression(arg1, &expr.left) || !is_same_expression(arg2, right) {
         return None;
     }
     match op {
@@ -218,7 +240,10 @@ fn cmp_op(expr: &ast::ExprCompare, params: &ast::Parameters) -> Option<&'static 
     }
 }
 
-fn is_same(arg: &ast::ParameterWithDefault, expr: &Expr) -> bool {
+/// Returns `true` if the given argument is the "same" as the given expression. For example, if
+/// the argument has a default, it is not considered the same as any expression; if both match the
+/// same name, they are considered the same.
+fn is_same_expression(arg: &ast::ParameterWithDefault, expr: &Expr) -> bool {
     if arg.default.is_some() {
         false
     } else if let Expr::Name(name) = expr {
