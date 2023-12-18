@@ -368,6 +368,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     .diagnostics
                     .extend(ruff::rules::unreachable::in_function(name, body));
             }
+            if checker.enabled(Rule::ReimplementedOperator) {
+                refurb::rules::reimplemented_operator(checker, &function_def.into());
+            }
         }
         Stmt::Return(_) => {
             if checker.enabled(Rule::ReturnOutsideFunction) {
