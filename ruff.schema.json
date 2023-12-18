@@ -2410,6 +2410,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-locals": {
+          "description": "Maximum number of local variables allowed for a function or method body (see: `PLR0914`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-positional-args": {
           "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
           "type": [
@@ -3169,6 +3178,7 @@
         "PLR0911",
         "PLR0912",
         "PLR0913",
+        "PLR0914",
         "PLR0915",
         "PLR0916",
         "PLR0917",

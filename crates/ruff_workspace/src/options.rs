@@ -2703,6 +2703,11 @@ pub struct PylintOptions {
     #[option(default = r"3", value_type = "int", example = r"max-pos-args = 3")]
     pub max_positional_args: Option<usize>,
 
+    /// Maximum number of local variables allowed for a function or method body (see:
+    /// `PLR0914`).
+    #[option(default = r"15", value_type = "int", example = r"max-locals = 15")]
+    pub max_locals: Option<usize>,
+
     /// Maximum number of statements allowed for a function or method body (see:
     /// `PLR0915`).
     #[option(default = r"50", value_type = "int", example = r"max-statements = 50")]
@@ -2742,6 +2747,7 @@ impl PylintOptions {
             max_public_methods: self
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),
+            max_locals: self.max_locals.unwrap_or(defaults.max_locals),
         }
     }
 }

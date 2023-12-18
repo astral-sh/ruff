@@ -15,6 +15,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
+        Rule::TooManyLocals,
         Rule::TypingOnlyFirstPartyImport,
         Rule::TypingOnlyStandardLibraryImport,
         Rule::TypingOnlyThirdPartyImport,
@@ -335,6 +336,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         if scope.kind.is_function() {
             if checker.enabled(Rule::NoSelfUse) {
                 pylint::rules::no_self_use(checker, scope_id, scope, &mut diagnostics);
+            }
+
+            if checker.enabled(Rule::TooManyLocals) {
+                pylint::rules::too_many_locals(checker, scope, &mut diagnostics);
             }
         }
     }
