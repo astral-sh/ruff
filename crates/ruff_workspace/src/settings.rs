@@ -89,6 +89,7 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("build"),
     FilePattern::Builtin("dist"),
     FilePattern::Builtin("node_modules"),
+    FilePattern::Builtin("site-packages"),
     FilePattern::Builtin("venv"),
 ];
 
