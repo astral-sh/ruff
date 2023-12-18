@@ -235,3 +235,17 @@ pub(crate) fn quote_annotation(
         expr.range(),
     ))
 }
+
+/// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
+pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
+    let mut filtered: Vec<Edit> = Vec::with_capacity(edits.len());
+    for edit in edits {
+        if filtered
+            .iter()
+            .all(|filtered_edit| !filtered_edit.range().contains_range(edit.range()))
+        {
+            filtered.push(edit);
+        }
+    }
+    filtered
+}
