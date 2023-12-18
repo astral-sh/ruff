@@ -2454,6 +2454,7 @@ dependencies = [
  "insta",
  "itertools 0.11.0",
  "ruff_python_ast",
+ "ruff_python_index",
  "ruff_python_parser",
  "ruff_source_file",
  "ruff_text_size",
