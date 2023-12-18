@@ -330,7 +330,7 @@ class TabbedIndent:
         """check for correct tabbed formatting
                                     ^^^^^^^^^^
         Normal indented line
-                - autor
+            - autor
         """
 
 
@@ -506,7 +506,7 @@ class TabbedIndent:
     """check for correct tabbed formatting
                                 ^^^^^^^^^^
     Normal indented line
-            - autor
+        - autor
     """
 
 
@@ -680,9 +680,9 @@ def f():
 class TabbedIndent:
 	def tabbed_indent(self):
 		"""check for correct tabbed formatting
-		                            ^^^^^^^^^^
+					    ^^^^^^^^^^
 		Normal indented line
-		        - autor
+			- autor
 		"""
 
 
@@ -856,9 +856,9 @@ def f():
 class TabbedIndent:
 	def tabbed_indent(self):
 		"""check for correct tabbed formatting
-		                            ^^^^^^^^^^
+									^^^^^^^^^^
 		Normal indented line
-		        - autor
+			- autor
 		"""
 
 
@@ -1034,7 +1034,7 @@ class TabbedIndent:
         """check for correct tabbed formatting
                                     ^^^^^^^^^^
         Normal indented line
-                - autor
+            - autor
         """
 
 

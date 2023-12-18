@@ -15,6 +15,8 @@ use {
     ruff_text_size::{Ranged, TextLen, TextRange, TextSize},
 };
 
+use ruff_formatter::IndentWidth;
+
 use crate::{prelude::*, DocstringCodeLineWidth, FormatModuleError};
 
 use super::{NormalizedString, QuoteChar};
@@ -180,7 +182,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
         .clone()
         // We don't want to count whitespace-only lines as miss-indented
         .filter(|line| !line.trim().is_empty())
-        .map(indentation_length)
+        .map(|line| indentation_length(line, f.options().indent_width()))
         .min()
         .unwrap_or_default();
 
@@ -270,6 +272,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                 line,
                 offset: self.offset,
                 next: lines.peek().copied(),
+                indent_width: self.f.options().indent_width(),
             };
             // We know that the normalized string has \n line endings.
             self.offset += line.line.text_len() + "\n".text_len();
@@ -392,7 +395,10 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             .take_while(|c| c.is_whitespace())
             .any(|c| c != ' ');
 
-        if tab_or_non_ascii_space {
+        let indent_style = self.f.options().indent_style();
+        let indent_width = self.f.options().indent_width();
+
+        if tab_or_non_ascii_space || indent_style == IndentStyle::Tab {
             // We strip the indentation that is shared with the docstring
             // statement, unless a line was indented less than the docstring
             // statement, in which case we strip only this much indentation to
@@ -400,8 +406,16 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
             // overindented, in which case we strip the additional whitespace
             // (see example in [`format_docstring`] doc comment). We then
             // prepend the in-docstring indentation to the string.
-            let indent_len = indentation_length(trim_end) - self.stripped_indentation_length;
-            let in_docstring_indent = " ".repeat(usize::from(indent_len)) + trim_end.trim_start();
+            let indent_len =
+                indentation_length(trim_end, indent_width) - self.stripped_indentation_length;
+            let in_docstring_indent = if indent_style == IndentStyle::Tab {
+                // When using tabs, replace indent_width spaces with tabs. This
+                // may caused mixed indentation, but that should be uncommon.
+                "\t".repeat(usize::from(indent_len) / indent_width.value() as usize)
+                    + &" ".repeat(usize::from(indent_len) % indent_width.value() as usize)
+            } else {
+                " ".repeat(usize::from(indent_len))
+            } + trim_end.trim_start();
             text(&in_docstring_indent).fmt(self.f)?;
         } else {
             // Take the string with the trailing whitespace removed, then also
@@ -559,6 +573,9 @@ struct InputDocstringLine<'src> {
     ///
     /// This is `None` if and only if this is the last line in the docstring.
     next: Option<&'src str>,
+
+    /// The indentation width to use when expanding tabs in this line.
+    indent_width: IndentWidth,
 }
 
 impl<'src> InputDocstringLine<'src> {
@@ -972,7 +989,7 @@ impl<'src> CodeExampleRst<'src> {
         }
         Some(CodeExampleRst {
             lines: vec![],
-            opening_indent: indentation_length(opening_indent),
+            opening_indent: indentation_length(opening_indent, original.indent_width),
             min_indent: None,
             is_directive: false,
         })
@@ -1010,7 +1027,7 @@ impl<'src> CodeExampleRst<'src> {
         }
         Some(CodeExampleRst {
             lines: vec![],
-            opening_indent: indentation_length(original.line),
+            opening_indent: indentation_length(original.line, original.indent_width),
             min_indent: None,
             is_directive: true,
         })
@@ -1030,7 +1047,7 @@ impl<'src> CodeExampleRst<'src> {
             line.code = if line.original.line.trim().is_empty() {
                 ""
             } else {
-                indentation_trim(min_indent, line.original.line)
+                indentation_trim(min_indent, line.original.line, line.original.indent_width)
             };
         }
         &self.lines
@@ -1067,7 +1084,9 @@ impl<'src> CodeExampleRst<'src> {
             // an empty line followed by an unindented non-empty line.
             if let Some(next) = original.next {
                 let (next_indent, next_rest) = indent_with_suffix(next);
-                if !next_rest.is_empty() && indentation_length(next_indent) <= self.opening_indent {
+                if !next_rest.is_empty()
+                    && indentation_length(next_indent, original.indent_width) <= self.opening_indent
+                {
                     self.push_format_action(queue);
                     return None;
                 }
@@ -1079,7 +1098,7 @@ impl<'src> CodeExampleRst<'src> {
             queue.push_back(CodeExampleAddAction::Kept);
             return Some(self);
         }
-        let indent_len = indentation_length(indent);
+        let indent_len = indentation_length(indent, original.indent_width);
         if indent_len <= self.opening_indent {
             // If we find an unindented non-empty line at the same (or less)
             // indentation of the opening line at this point, then we know it
@@ -1141,7 +1160,7 @@ impl<'src> CodeExampleRst<'src> {
             queue.push_back(CodeExampleAddAction::Print { original });
             return Some(self);
         }
-        let min_indent = indentation_length(indent);
+        let min_indent = indentation_length(indent, original.indent_width);
         // At this point, we found a non-empty line. The only thing we require
         // is that its indentation is strictly greater than the indentation of
         // the line containing the `::`. Otherwise, we treat this as an invalid
@@ -1289,7 +1308,7 @@ impl<'src> CodeExampleMarkdown<'src> {
         };
         Some(CodeExampleMarkdown {
             lines: vec![],
-            opening_fence_indent: indentation_length(opening_fence_indent),
+            opening_fence_indent: indentation_length(opening_fence_indent, original.indent_width),
             fence_kind,
             fence_len,
         })
@@ -1322,7 +1341,7 @@ impl<'src> CodeExampleMarkdown<'src> {
         // its indent normalized. And, at the time of writing, a subsequent
         // formatting run undoes this indentation, thus violating idempotency.
         if !original.line.trim_whitespace().is_empty()
-            && indentation_length(original.line) < self.opening_fence_indent
+            && indentation_length(original.line, original.indent_width) < self.opening_fence_indent
         {
             queue.push_back(self.into_reset_action());
             queue.push_back(CodeExampleAddAction::Print { original });
@@ -1368,7 +1387,11 @@ impl<'src> CodeExampleMarkdown<'src> {
         // Unlike reStructuredText blocks, for Markdown fenced code blocks, the
         // indentation that we want to strip from each line is known when the
         // block is opened. So we can strip it as we collect lines.
-        let code = indentation_trim(self.opening_fence_indent, original.line);
+        let code = indentation_trim(
+            self.opening_fence_indent,
+            original.line,
+            original.indent_width,
+        );
         self.lines.push(CodeExampleLine { original, code });
     }
 
@@ -1538,12 +1561,13 @@ fn needs_chaperone_space(normalized: &NormalizedString, trim_end: &str) -> bool 
 /// to the next multiple of 8. This is effectively a port of
 /// [`str.expandtabs`](https://docs.python.org/3/library/stdtypes.html#str.expandtabs),
 /// which black [calls with the default tab width of 8](https://github.com/psf/black/blob/c36e468794f9256d5e922c399240d49782ba04f1/src/black/strings.py#L61).
-fn indentation_length(line: &str) -> TextSize {
+/// Our version uses the configured indent width for tabs instead.
+fn indentation_length(line: &str, indent_width: IndentWidth) -> TextSize {
     let mut indentation = 0u32;
     for char in line.chars() {
         if char == '\t' {
             // Pad to the next multiple of tab_width
-            indentation += 8 - (indentation.rem_euclid(8));
+            indentation += indent_width.value() - (indentation.rem_euclid(indent_width.value()));
         } else if char.is_whitespace() {
             indentation += u32::from(char.text_len());
         } else {
@@ -1560,7 +1584,7 @@ fn indentation_length(line: &str) -> TextSize {
 /// `indentation_length`. This is useful when one needs to trim some minimum
 /// level of indentation from a code snippet collected from a docstring before
 /// attempting to reformat it.
-fn indentation_trim(indent_len: TextSize, line: &str) -> &str {
+fn indentation_trim(indent_len: TextSize, line: &str, indent_width: IndentWidth) -> &str {
     let mut seen_indent_len = 0u32;
     let mut trimmed = line;
     for char in line.chars() {
@@ -1569,7 +1593,8 @@ fn indentation_trim(indent_len: TextSize, line: &str) -> &str {
         }
         if char == '\t' {
             // Pad to the next multiple of tab_width
-            seen_indent_len += 8 - (seen_indent_len.rem_euclid(8));
+            seen_indent_len +=
+                indent_width.value() - (seen_indent_len.rem_euclid(indent_width.value()));
             trimmed = &trimmed[1..];
         } else if char.is_whitespace() {
             seen_indent_len += u32::from(char.text_len());
@@ -1608,15 +1633,17 @@ fn is_rst_option(line: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use ruff_formatter::IndentWidth;
     use ruff_text_size::TextSize;
 
     use super::indentation_length;
 
     #[test]
     fn test_indentation_like_black() {
-        assert_eq!(indentation_length("\t \t  \t"), TextSize::new(24));
-        assert_eq!(indentation_length("\t        \t"), TextSize::new(24));
-        assert_eq!(indentation_length("\t\t\t"), TextSize::new(24));
-        assert_eq!(indentation_length("    "), TextSize::new(4));
+        let w: IndentWidth = 8.try_into().unwrap();
+        assert_eq!(indentation_length("\t \t  \t", w), TextSize::new(24));
+        assert_eq!(indentation_length("\t        \t", w), TextSize::new(24));
+        assert_eq!(indentation_length("\t\t\t", w), TextSize::new(24));
+        assert_eq!(indentation_length("    ", w), TextSize::new(4));
     }
 }

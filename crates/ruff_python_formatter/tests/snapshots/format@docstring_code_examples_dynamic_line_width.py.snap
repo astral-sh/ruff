@@ -878,21 +878,21 @@ def simple():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	    def abcdefghijklmnopqrstuvwxyz(
-	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	    ):
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 	```
 
 	Done.
@@ -908,111 +908,111 @@ def repeated():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	    def abcdefghijklmnopqrstuvwxyz(
-	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	    ):
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 
-	    def abcdefghijklmnopqrstuvwxyz(
-	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	    ):
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 
 
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	    def abcdefghijklmnopqrstuvwxyz(
-	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	    ):
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 
-	    def abcdefghijklmnopqrstuvwxyz(
-	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	    ):
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 	```
 
 	Done.
@@ -1028,23 +1028,23 @@ def barely_exceeds_limit():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	    def abcdefghijklmnopqrstuvwxyz(
-	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	    ):
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is 89 columns, which is one
-	            # more than the limit. Therefore, it should get wrapped for
-	            # indent_width >= 4.
-	            print(
-	                abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a5678
-	            )
-	            return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is 89 columns, which is one
+				# more than the limit. Therefore, it should get wrapped for
+				# indent_width >= 4.
+				print(
+					abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a5678
+				)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 	```
 
 	Done.
@@ -1056,28 +1056,28 @@ def barely_exceeds_limit():
 # the dynamic line width setting is applied correctly.
 def unindented():
 	"""
-	    First line.
+		First line.
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	    def abcdefghijklmnopqrstuvwxyz(
-	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	    ):
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is just one character shy of
-	            # tripping the default line width of 88. So it should not be
-	            # wrapped.
-	            print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
-	            return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a567)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 	```
 
-	    Done.
+		Done.
 	"""
 	pass
 
@@ -1086,30 +1086,30 @@ def unindented():
 # globally configured line width *after* its indentation has been corrected.
 def unindented_barely_exceeds_limit():
 	"""
-	    First line.
+		First line.
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	    Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	    def abcdefghijklmnopqrstuvwxyz(
-	        self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	    ):
-	        def abcdefghijklmnopqrstuvwxyz(
-	            abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
-	        ):
-	            # For 4 space indents, this is 89 columns, which is one
-	            # more than the limit. Therefore, it should get wrapped for
-	            # indent_width >= 4.
-	            print(
-	                abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a5678
-	            )
-	            return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self, abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4
+			):
+				# For 4 space indents, this is 89 columns, which is one
+				# more than the limit. Therefore, it should get wrapped for
+				# indent_width >= 4.
+				print(
+					abc, ddef, ghi, jkl, mno, pqr, stu, vwx, yz, a1, a2, a3, a4, a5678
+				)
+				return 5
 
-	        self.x = doit(5)
+			self.x = doit(5)
 	```
 
-	    Done.
+		Done.
 	"""
 	pass
 
@@ -1208,61 +1208,61 @@ def simple():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	        def abcdefghijklmnopqrstuvwxyz(
-	                self,
-	                abc,
-	                ddef,
-	                ghi,
-	                jkl,
-	                mno,
-	                pqr,
-	                stu,
-	                vwx,
-	                yz,
-	                a1,
-	                a2,
-	                a3,
-	                a4,
-	        ):
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self,
+			abc,
+			ddef,
+			ghi,
+			jkl,
+			mno,
+			pqr,
+			stu,
+			vwx,
+			yz,
+			a1,
+			a2,
+			a3,
+			a4,
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 	```
 
 	Done.
@@ -1278,379 +1278,379 @@ def repeated():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	        def abcdefghijklmnopqrstuvwxyz(
-	                self,
-	                abc,
-	                ddef,
-	                ghi,
-	                jkl,
-	                mno,
-	                pqr,
-	                stu,
-	                vwx,
-	                yz,
-	                a1,
-	                a2,
-	                a3,
-	                a4,
-	        ):
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self,
+			abc,
+			ddef,
+			ghi,
+			jkl,
+			mno,
+			pqr,
+			stu,
+			vwx,
+			yz,
+			a1,
+			a2,
+			a3,
+			a4,
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 
-	        def abcdefghijklmnopqrstuvwxyz(
-	                self,
-	                abc,
-	                ddef,
-	                ghi,
-	                jkl,
-	                mno,
-	                pqr,
-	                stu,
-	                vwx,
-	                yz,
-	                a1,
-	                a2,
-	                a3,
-	                a4,
-	        ):
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self,
+			abc,
+			ddef,
+			ghi,
+			jkl,
+			mno,
+			pqr,
+			stu,
+			vwx,
+			yz,
+			a1,
+			a2,
+			a3,
+			a4,
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 
 
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	        def abcdefghijklmnopqrstuvwxyz(
-	                self,
-	                abc,
-	                ddef,
-	                ghi,
-	                jkl,
-	                mno,
-	                pqr,
-	                stu,
-	                vwx,
-	                yz,
-	                a1,
-	                a2,
-	                a3,
-	                a4,
-	        ):
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self,
+			abc,
+			ddef,
+			ghi,
+			jkl,
+			mno,
+			pqr,
+			stu,
+			vwx,
+			yz,
+			a1,
+			a2,
+			a3,
+			a4,
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 
-	        def abcdefghijklmnopqrstuvwxyz(
-	                self,
-	                abc,
-	                ddef,
-	                ghi,
-	                jkl,
-	                mno,
-	                pqr,
-	                stu,
-	                vwx,
-	                yz,
-	                a1,
-	                a2,
-	                a3,
-	                a4,
-	        ):
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self,
+			abc,
+			ddef,
+			ghi,
+			jkl,
+			mno,
+			pqr,
+			stu,
+			vwx,
+			yz,
+			a1,
+			a2,
+			a3,
+			a4,
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 	```
 
 	Done.
@@ -1666,61 +1666,61 @@ def barely_exceeds_limit():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	        def abcdefghijklmnopqrstuvwxyz(
-	                self,
-	                abc,
-	                ddef,
-	                ghi,
-	                jkl,
-	                mno,
-	                pqr,
-	                stu,
-	                vwx,
-	                yz,
-	                a1,
-	                a2,
-	                a3,
-	                a4,
-	        ):
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is 89 columns, which is one
-	                        # more than the limit. Therefore, it should get wrapped for
-	                        # indent_width >= 4.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a5678,
-	                        )
-	                        return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self,
+			abc,
+			ddef,
+			ghi,
+			jkl,
+			mno,
+			pqr,
+			stu,
+			vwx,
+			yz,
+			a1,
+			a2,
+			a3,
+			a4,
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is 89 columns, which is one
+				# more than the limit. Therefore, it should get wrapped for
+				# indent_width >= 4.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a5678,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 	```
 
 	Done.
@@ -1736,61 +1736,61 @@ def unindented():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	        def abcdefghijklmnopqrstuvwxyz(
-	                self,
-	                abc,
-	                ddef,
-	                ghi,
-	                jkl,
-	                mno,
-	                pqr,
-	                stu,
-	                vwx,
-	                yz,
-	                a1,
-	                a2,
-	                a3,
-	                a4,
-	        ):
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is just one character shy of
-	                        # tripping the default line width of 88. So it should not be
-	                        # wrapped.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a567,
-	                        )
-	                        return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self,
+			abc,
+			ddef,
+			ghi,
+			jkl,
+			mno,
+			pqr,
+			stu,
+			vwx,
+			yz,
+			a1,
+			a2,
+			a3,
+			a4,
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is just one character shy of
+				# tripping the default line width of 88. So it should not be
+				# wrapped.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a567,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 	```
 
 	    Done.
@@ -1806,61 +1806,61 @@ def unindented_barely_exceeds_limit():
 
 	```py
 	class Abcdefghijklmopqrstuvwxyz(
-	        Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
+		Abc, Def, Ghi, Jkl, Mno, Pqr, Stu, Vwx, Yz, A1, A2, A3, A4, A5
 	):
-	        def abcdefghijklmnopqrstuvwxyz(
-	                self,
-	                abc,
-	                ddef,
-	                ghi,
-	                jkl,
-	                mno,
-	                pqr,
-	                stu,
-	                vwx,
-	                yz,
-	                a1,
-	                a2,
-	                a3,
-	                a4,
-	        ):
-	                def abcdefghijklmnopqrstuvwxyz(
-	                        abc,
-	                        ddef,
-	                        ghi,
-	                        jkl,
-	                        mno,
-	                        pqr,
-	                        stu,
-	                        vwx,
-	                        yz,
-	                        a1,
-	                        a2,
-	                        a3,
-	                        a4,
-	                ):
-	                        # For 4 space indents, this is 89 columns, which is one
-	                        # more than the limit. Therefore, it should get wrapped for
-	                        # indent_width >= 4.
-	                        print(
-	                                abc,
-	                                ddef,
-	                                ghi,
-	                                jkl,
-	                                mno,
-	                                pqr,
-	                                stu,
-	                                vwx,
-	                                yz,
-	                                a1,
-	                                a2,
-	                                a3,
-	                                a4,
-	                                a5678,
-	                        )
-	                        return 5
+		def abcdefghijklmnopqrstuvwxyz(
+			self,
+			abc,
+			ddef,
+			ghi,
+			jkl,
+			mno,
+			pqr,
+			stu,
+			vwx,
+			yz,
+			a1,
+			a2,
+			a3,
+			a4,
+		):
+			def abcdefghijklmnopqrstuvwxyz(
+				abc,
+				ddef,
+				ghi,
+				jkl,
+				mno,
+				pqr,
+				stu,
+				vwx,
+				yz,
+				a1,
+				a2,
+				a3,
+				a4,
+			):
+				# For 4 space indents, this is 89 columns, which is one
+				# more than the limit. Therefore, it should get wrapped for
+				# indent_width >= 4.
+				print(
+					abc,
+					ddef,
+					ghi,
+					jkl,
+					mno,
+					pqr,
+					stu,
+					vwx,
+					yz,
+					a1,
+					a2,
+					a3,
+					a4,
+					a5678,
+				)
+				return 5
 
-	                self.x = doit(5)
+			self.x = doit(5)
 	```
 
 	    Done.

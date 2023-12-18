@@ -1872,7 +1872,7 @@ def rst_literal_first_line_indent_uses_tabs_4spaces():
     """
     Do cool stuff::
 
-        cool_stuff( 1 )
+    cool_stuff( 1 )
 
     Done.
     """
@@ -1884,8 +1884,8 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
     """
     Do cool stuff::
 
-        cool_stuff( 1 )
-        cool_stuff( 2 )
+    cool_stuff( 1 )
+    cool_stuff( 2 )
 
     Done.
     """
@@ -1901,11 +1901,11 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 # As with the above example, reST seems to behave the same way here.
 def rst_literal_first_line_indent_uses_tabs_8spaces():
     """
-    Do cool stuff::
+       Do cool stuff::
 
-     cool_stuff( 1 )
+    cool_stuff( 1 )
 
-    Done.
+       Done.
     """
     pass
 
@@ -1913,12 +1913,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
     """
-    Do cool stuff::
+       Do cool stuff::
 
-     cool_stuff( 1 )
-     cool_stuff( 2 )
+    cool_stuff( 1 )
+    cool_stuff( 2 )
 
-    Done.
+       Done.
     """
     pass
 
@@ -1930,7 +1930,7 @@ def rst_literal_first_line_tab_second_line_spaces():
     """
     Do cool stuff::
 
-        cool_stuff( 1 )
+    cool_stuff( 1 )
         cool_stuff( 2 )
 
     Done.
@@ -1960,7 +1960,7 @@ def rst_literal_odd_indentation():
     """
     Do cool stuff::
 
-        cool_stuff( 1 )
+    cool_stuff( 1 )
      cool_stuff( 2 )
 
     Done.
@@ -2082,11 +2082,11 @@ def rst_literal_skipped_first_line_not_indented_then_indented():
 # and doesn't treat it as a literal block.
 def rst_literal_skipped_first_line_not_indented_tab():
     """
-    Do cool stuff::
+        Do cool stuff::
 
     cool_stuff( 1 )
 
-    Done.
+        Done.
     """
     pass
 
@@ -2094,12 +2094,12 @@ def rst_literal_skipped_first_line_not_indented_tab():
 # Like the previous test, but adds a second line.
 def rst_literal_skipped_first_line_not_indented_tab_multiple():
     """
-    Do cool stuff::
+        Do cool stuff::
 
     cool_stuff( 1 )
     cool_stuff( 2 )
 
-    Done.
+        Done.
     """
     pass
 
@@ -2427,7 +2427,7 @@ def markdown_first_line_indent_uses_tabs_4spaces():
     Do cool stuff.
 
     ```py
-        cool_stuff( 1 )
+    cool_stuff( 1 )
     ```
 
     Done.
@@ -2440,8 +2440,8 @@ def markdown_first_line_indent_uses_tabs_4spaces_multiple():
     Do cool stuff.
 
     ```py
-        cool_stuff( 1 )
-        cool_stuff( 2 )
+    cool_stuff( 1 )
+    cool_stuff( 2 )
     ```
 
     Done.
@@ -2451,27 +2451,27 @@ def markdown_first_line_indent_uses_tabs_4spaces_multiple():
 
 def markdown_first_line_indent_uses_tabs_8spaces():
     """
-    Do cool stuff.
+       Do cool stuff.
 
-     ```py
-     cool_stuff( 1 )
-     ```
+    ```py
+    cool_stuff( 1 )
+    ```
 
-    Done.
+       Done.
     """
     pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces_multiple():
     """
-    Do cool stuff.
+       Do cool stuff.
 
-     ```py
-     cool_stuff( 1 )
-     cool_stuff( 2 )
-     ```
+    ```py
+    cool_stuff( 1 )
+    cool_stuff( 2 )
+    ```
 
-    Done.
+       Done.
     """
     pass
 
@@ -2480,10 +2480,10 @@ def markdown_first_line_tab_second_line_spaces():
     """
     Do cool stuff.
 
-        ```py
-        cool_stuff( 1 )
+    ```py
+    cool_stuff( 1 )
         cool_stuff( 2 )
-        ```
+    ```
 
     Done.
     """
@@ -2494,10 +2494,10 @@ def markdown_odd_indentation():
     """
     Do cool stuff.
 
-        ```py
-        cool_stuff( 1 )
+    ```py
+    cool_stuff( 1 )
         cool_stuff( 2 )
-        ```
+    ```
 
     Done.
     """
@@ -3242,11 +3242,11 @@ def rst_literal_subsequent_line_not_indented():
 # under-specified.)
 def rst_literal_first_line_indent_uses_tabs_4spaces():
   """
-  Do cool stuff::
+    Do cool stuff::
 
-      cool_stuff( 1 )
+  cool_stuff( 1 )
 
-  Done.
+    Done.
   """
   pass
 
@@ -3254,12 +3254,12 @@ def rst_literal_first_line_indent_uses_tabs_4spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
   """
-  Do cool stuff::
+    Do cool stuff::
 
-      cool_stuff( 1 )
-      cool_stuff( 2 )
+  cool_stuff( 1 )
+  cool_stuff( 2 )
 
-  Done.
+    Done.
   """
   pass
 
@@ -3273,11 +3273,11 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 # As with the above example, reST seems to behave the same way here.
 def rst_literal_first_line_indent_uses_tabs_8spaces():
   """
-  Do cool stuff::
+       Do cool stuff::
 
-   cool_stuff( 1 )
+  cool_stuff( 1 )
 
-  Done.
+       Done.
   """
   pass
 
@@ -3285,12 +3285,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
   """
-  Do cool stuff::
+       Do cool stuff::
 
-   cool_stuff( 1 )
-   cool_stuff( 2 )
+  cool_stuff( 1 )
+  cool_stuff( 2 )
 
-  Done.
+       Done.
   """
   pass
 
@@ -3300,12 +3300,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
 # block and format it.
 def rst_literal_first_line_tab_second_line_spaces():
   """
-  Do cool stuff::
+    Do cool stuff::
 
-      cool_stuff( 1 )
-      cool_stuff( 2 )
+  cool_stuff( 1 )
+        cool_stuff( 2 )
 
-  Done.
+    Done.
   """
   pass
 
@@ -3330,12 +3330,12 @@ def rst_literal_first_line_tab_second_line_spaces():
 # the real world. ---AG
 def rst_literal_odd_indentation():
   """
-  Do cool stuff::
+    Do cool stuff::
 
-      cool_stuff( 1 )
-   cool_stuff( 2 )
+  cool_stuff( 1 )
+     cool_stuff( 2 )
 
-  Done.
+    Done.
   """
   pass
 
@@ -3454,11 +3454,11 @@ def rst_literal_skipped_first_line_not_indented_then_indented():
 # and doesn't treat it as a literal block.
 def rst_literal_skipped_first_line_not_indented_tab():
   """
-  Do cool stuff::
+        Do cool stuff::
 
   cool_stuff( 1 )
 
-  Done.
+        Done.
   """
   pass
 
@@ -3466,12 +3466,12 @@ def rst_literal_skipped_first_line_not_indented_tab():
 # Like the previous test, but adds a second line.
 def rst_literal_skipped_first_line_not_indented_tab_multiple():
   """
-  Do cool stuff::
+        Do cool stuff::
 
   cool_stuff( 1 )
   cool_stuff( 2 )
 
-  Done.
+        Done.
   """
   pass
 
@@ -3796,82 +3796,82 @@ def markdown_with_blank_lines():
 
 def markdown_first_line_indent_uses_tabs_4spaces():
   """
-  Do cool stuff.
+    Do cool stuff.
 
-  ```py
-      cool_stuff( 1 )
-  ```
+    ```py
+  cool_stuff( 1 )
+    ```
 
-  Done.
+    Done.
   """
   pass
 
 
 def markdown_first_line_indent_uses_tabs_4spaces_multiple():
   """
-  Do cool stuff.
+    Do cool stuff.
 
-  ```py
-      cool_stuff( 1 )
-      cool_stuff( 2 )
-  ```
+    ```py
+  cool_stuff( 1 )
+  cool_stuff( 2 )
+    ```
 
-  Done.
+    Done.
   """
   pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces():
   """
-  Do cool stuff.
+       Do cool stuff.
 
-   ```py
-   cool_stuff( 1 )
-   ```
+  ```py
+  cool_stuff( 1 )
+  ```
 
-  Done.
+       Done.
   """
   pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces_multiple():
   """
-  Do cool stuff.
+       Do cool stuff.
 
-   ```py
-   cool_stuff( 1 )
-   cool_stuff( 2 )
-   ```
+  ```py
+  cool_stuff( 1 )
+  cool_stuff( 2 )
+  ```
 
-  Done.
+       Done.
   """
   pass
 
 
 def markdown_first_line_tab_second_line_spaces():
   """
-  Do cool stuff.
+    Do cool stuff.
 
-      ```py
-      cool_stuff( 1 )
-      cool_stuff( 2 )
-      ```
+  ```py
+  cool_stuff( 1 )
+        cool_stuff( 2 )
+  ```
 
-  Done.
+    Done.
   """
   pass
 
 
 def markdown_odd_indentation():
   """
-  Do cool stuff.
+    Do cool stuff.
 
-      ```py
-      cool_stuff( 1 )
-      cool_stuff( 2 )
-      ```
+  ```py
+  cool_stuff( 1 )
+        cool_stuff( 2 )
+  ```
 
-  Done.
+    Done.
   """
   pass
 
@@ -4498,7 +4498,7 @@ def rst_literal_simple_continued():
 	Do cool stuff::
 
 	    def cool_stuff( x ):
-	        print( f"hi {x}" );
+		print( f"hi {x}" );
 
 	Done.
 	"""
@@ -4531,10 +4531,10 @@ def rst_literal_with_blank_lines():
 	Do cool stuff::
 
 	    def cool_stuff( x ):
-	        print( f"hi {x}" );
+		print( f"hi {x}" );
 
 	    def other_stuff( y ):
-	        print(    y     )
+		print(    y     )
 
 	Done.
 	"""
@@ -5379,9 +5379,9 @@ def markdown_skipped_unindented_completely():
 	"""
 	    Do cool stuff.
 
-	        ```py
+		```py
 	cool_stuff( 1 )
-	        ```
+		```
 
 	    Done.
 	"""
@@ -5705,8 +5705,8 @@ def doctest_varying_start_column():
 
 	>>> assert    ("Easy!")
 	  >>> import                      math
-	      >>> math.floor(  1.9  )
-	      1
+		  >>> math.floor(  1.9  )
+		  1
 	"""
 	pass
 
@@ -5858,7 +5858,7 @@ def rst_literal_simple():
 	"""
 	Do cool stuff::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -5869,8 +5869,8 @@ def rst_literal_simple_continued():
 	"""
 	Do cool stuff::
 
-	    def cool_stuff( x ):
-	        print( f"hi {x}" );
+		def cool_stuff( x ):
+			print( f"hi {x}" );
 
 	Done.
 	"""
@@ -5883,7 +5883,7 @@ def rst_literal_second_to_last():
 	"""
 	Do cool stuff::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 	"""
 	pass
 
@@ -5894,7 +5894,7 @@ def rst_literal_actually_last():
 	"""
 	Do cool stuff::
 
-	    cool_stuff( 1 )"""
+		cool_stuff( 1 )"""
 	pass
 
 
@@ -5902,11 +5902,11 @@ def rst_literal_with_blank_lines():
 	"""
 	Do cool stuff::
 
-	    def cool_stuff( x ):
-	        print( f"hi {x}" );
+		def cool_stuff( x ):
+			print( f"hi {x}" );
 
-	    def other_stuff( y ):
-	        print(    y     )
+		def other_stuff( y ):
+			print(    y     )
 
 	Done.
 	"""
@@ -5920,7 +5920,7 @@ def rst_literal_extra_blanks():
 
 
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 
 
@@ -5937,7 +5937,7 @@ def rst_literal_extra_blanks_at_end():
 	Do cool stuff::
 
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 
 
@@ -5951,10 +5951,10 @@ def rst_literal_extra_blanks_in_snippet():
 	"""
 	Do cool stuff::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 
-	    cool_stuff( 2 )
+		cool_stuff( 2 )
 
 	Done.
 	"""
@@ -5968,7 +5968,7 @@ def rst_literal_subsequent_line_not_indented():
 	Do cool stuff::
 
 	 if True:
-	    cool_stuff( '''
+		cool_stuff( '''
 	 hiya''' )
 
 	Done.
@@ -5988,7 +5988,7 @@ def rst_literal_first_line_indent_uses_tabs_4spaces():
 	"""
 	Do cool stuff::
 
-	    cool_stuff( 1 )
+	cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6000,8 +6000,8 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 	"""
 	Do cool stuff::
 
-	    cool_stuff( 1 )
-	    cool_stuff( 2 )
+	cool_stuff( 1 )
+	cool_stuff( 2 )
 
 	Done.
 	"""
@@ -6017,11 +6017,11 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 # As with the above example, reST seems to behave the same way here.
 def rst_literal_first_line_indent_uses_tabs_8spaces():
 	"""
-	Do cool stuff::
+	   Do cool stuff::
 
-	 cool_stuff( 1 )
+	cool_stuff( 1 )
 
-	Done.
+	   Done.
 	"""
 	pass
 
@@ -6029,12 +6029,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
 	"""
-	Do cool stuff::
+	   Do cool stuff::
 
-	 cool_stuff( 1 )
-	 cool_stuff( 2 )
+	cool_stuff( 1 )
+	cool_stuff( 2 )
 
-	Done.
+	   Done.
 	"""
 	pass
 
@@ -6046,8 +6046,8 @@ def rst_literal_first_line_tab_second_line_spaces():
 	"""
 	Do cool stuff::
 
-	    cool_stuff( 1 )
-	    cool_stuff( 2 )
+	cool_stuff( 1 )
+		cool_stuff( 2 )
 
 	Done.
 	"""
@@ -6076,7 +6076,7 @@ def rst_literal_odd_indentation():
 	"""
 	Do cool stuff::
 
-	    cool_stuff( 1 )
+	cool_stuff( 1 )
 	 cool_stuff( 2 )
 
 	Done.
@@ -6092,7 +6092,7 @@ def rst_literal_lone_colon():
 
 	::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6103,7 +6103,7 @@ def rst_directive_simple():
 	"""
 	.. code-block:: python
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6114,7 +6114,7 @@ def rst_directive_case_insensitive():
 	"""
 	.. cOdE-bLoCk:: python
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6125,7 +6125,7 @@ def rst_directive_sourcecode():
 	"""
 	.. sourcecode:: python
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6135,14 +6135,14 @@ def rst_directive_sourcecode():
 def rst_directive_options():
 	"""
 	.. code-block:: python
-	    :linenos:
-	    :emphasize-lines: 2,3
-	    :name: blah blah
+		:linenos:
+		:emphasize-lines: 2,3
+		:name: blah blah
 
-	    cool_stuff( 1 )
-	    cool_stuff( 2 )
-	    cool_stuff( 3 )
-	    cool_stuff( 4 )
+		cool_stuff( 1 )
+		cool_stuff( 2 )
+		cool_stuff( 3 )
+		cool_stuff( 4 )
 
 	Done.
 	"""
@@ -6156,7 +6156,7 @@ def rst_directive_doctest():
 	"""
 	.. code-block:: pycon
 
-	    >>> cool_stuff( 1 )
+		>>> cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6198,11 +6198,11 @@ def rst_literal_skipped_first_line_not_indented_then_indented():
 # and doesn't treat it as a literal block.
 def rst_literal_skipped_first_line_not_indented_tab():
 	"""
-	Do cool stuff::
+		Do cool stuff::
 
 	cool_stuff( 1 )
 
-	Done.
+		Done.
 	"""
 	pass
 
@@ -6210,12 +6210,12 @@ def rst_literal_skipped_first_line_not_indented_tab():
 # Like the previous test, but adds a second line.
 def rst_literal_skipped_first_line_not_indented_tab_multiple():
 	"""
-	Do cool stuff::
+		Do cool stuff::
 
 	cool_stuff( 1 )
 	cool_stuff( 2 )
 
-	Done.
+		Done.
 	"""
 	pass
 
@@ -6230,7 +6230,7 @@ def rst_literal_skipped_subsequent_line_not_indented():
 	Do cool stuff::
 
 	 if True:
-	    cool_stuff( '''
+		cool_stuff( '''
 	hiya''' )
 
 	Done.
@@ -6248,7 +6248,7 @@ def rst_literal_skipped_not_directive():
 	"""
 	.. code-block::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6267,7 +6267,7 @@ def rst_literal_skipped_possible_false_negative():
 	This is a test.
 	.. This is a test::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6282,7 +6282,7 @@ def rst_literal_skipped_doctest():
 	"""
 	Do cool stuff::
 
-	    >>> cool_stuff( 1 )
+		>>> cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6293,9 +6293,9 @@ def rst_literal_skipped_markdown():
 	"""
 	Do cool stuff::
 
-	    ```py
-	    cool_stuff( 1 )
-	    ```
+		```py
+		cool_stuff( 1 )
+		```
 
 	Done.
 	"""
@@ -6317,7 +6317,7 @@ def rst_directive_skipped_wrong_language():
 	"""
 	.. code-block:: rust
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6330,7 +6330,7 @@ def rst_directive_skipped_doctest():
 	"""
 	.. code-block:: python
 
-	    >>> cool_stuff( 1 )
+		>>> cool_stuff( 1 )
 
 	Done.
 	"""
@@ -6366,7 +6366,7 @@ def markdown_simple_continued():
 
 	```python
 	def cool_stuff( x ):
-	    print( f"hi {x}" );
+		print( f"hi {x}" );
 	```
 
 	Done.
@@ -6527,10 +6527,10 @@ def markdown_with_blank_lines():
 
 	```py
 	def cool_stuff( x ):
-	    print( f"hi {x}" );
+		print( f"hi {x}" );
 
 	def other_stuff( y ):
-	    print(    y     )
+		print(    y     )
 	```
 
 	Done.
@@ -6543,7 +6543,7 @@ def markdown_first_line_indent_uses_tabs_4spaces():
 	Do cool stuff.
 
 	```py
-	    cool_stuff( 1 )
+	cool_stuff( 1 )
 	```
 
 	Done.
@@ -6556,8 +6556,8 @@ def markdown_first_line_indent_uses_tabs_4spaces_multiple():
 	Do cool stuff.
 
 	```py
-	    cool_stuff( 1 )
-	    cool_stuff( 2 )
+	cool_stuff( 1 )
+	cool_stuff( 2 )
 	```
 
 	Done.
@@ -6567,27 +6567,27 @@ def markdown_first_line_indent_uses_tabs_4spaces_multiple():
 
 def markdown_first_line_indent_uses_tabs_8spaces():
 	"""
-	Do cool stuff.
+	   Do cool stuff.
 
-	 ```py
-	 cool_stuff( 1 )
-	 ```
+	```py
+	cool_stuff( 1 )
+	```
 
-	Done.
+	   Done.
 	"""
 	pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces_multiple():
 	"""
-	Do cool stuff.
+	   Do cool stuff.
 
-	 ```py
-	 cool_stuff( 1 )
-	 cool_stuff( 2 )
-	 ```
+	```py
+	cool_stuff( 1 )
+	cool_stuff( 2 )
+	```
 
-	Done.
+	   Done.
 	"""
 	pass
 
@@ -6596,10 +6596,10 @@ def markdown_first_line_tab_second_line_spaces():
 	"""
 	Do cool stuff.
 
-	    ```py
-	    cool_stuff( 1 )
-	    cool_stuff( 2 )
-	    ```
+	```py
+	cool_stuff( 1 )
+		cool_stuff( 2 )
+	```
 
 	Done.
 	"""
@@ -6610,10 +6610,10 @@ def markdown_odd_indentation():
 	"""
 	Do cool stuff.
 
-	    ```py
-	    cool_stuff( 1 )
-	    cool_stuff( 2 )
-	    ```
+	```py
+	cool_stuff( 1 )
+		cool_stuff( 2 )
+	```
 
 	Done.
 	"""
@@ -6665,12 +6665,12 @@ def markdown_weird_closing():
 	  ```python
 	  cool_stuff( 1 )
 
-	       ```
-	    # The above fences look like it shouldn't close the block, but we
-	    # allow it to. The fences below re-open a block (until the end of
-	    # the docstring), but it's invalid Python and thus doesn't get
-	    # reformatted.
-	      a = 10
+		   ```
+		# The above fences look like it shouldn't close the block, but we
+		# allow it to. The fences below re-open a block (until the end of
+		# the docstring), but it's invalid Python and thus doesn't get
+		# reformatted.
+		  a = 10
 	  ```
 
 	  Now the code block is closed
@@ -6681,10 +6681,10 @@ def markdown_weird_closing():
 def markdown_over_indented():
 	"""
 	A docstring
-	    over intended
-	    ```python
-	    print( 5 )
-	    ```
+		over intended
+		```python
+		print( 5 )
+		```
 	"""
 	pass
 
@@ -6749,13 +6749,13 @@ def markdown_skipped_accidental_closure():
 # plausibly, to do normalization *after* code snippets have been formatted.
 def markdown_skipped_unindented_completely():
 	"""
-	    Do cool stuff.
+		Do cool stuff.
 
-	        ```py
+			```py
 	cool_stuff( 1 )
-	        ```
+			```
 
-	    Done.
+		Done.
 	"""
 	pass
 
@@ -6768,9 +6768,9 @@ def markdown_skipped_unindented_somewhat():
 	"""
 	Do cool stuff.
 
-	    ```py
+		```py
 	cool_stuff( 1 )
-	    ```
+		```
 
 	Done.
 	"""
@@ -6789,10 +6789,10 @@ def markdown_skipped_unindented_with_inconsistent_indentation():
 	"""
 	Do cool stuff.
 
-	    ```py
+		```py
 	cool_stuff( 1 )
-	    cool_stuff( 2 )
-	    ```
+		cool_stuff( 2 )
+		```
 
 	Done.
 	"""
@@ -6819,7 +6819,7 @@ def markdown_skipped_rst_literal():
 	```py
 	And do this::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	```
 
@@ -6835,7 +6835,7 @@ def markdown_skipped_rst_directive():
 	```py
 	.. code-block:: python
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	```
 
@@ -7365,7 +7365,7 @@ def rst_literal_first_line_indent_uses_tabs_4spaces():
     """
     Do cool stuff::
 
-        cool_stuff(1)
+    cool_stuff( 1 )
 
     Done.
     """
@@ -7377,8 +7377,8 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
     """
     Do cool stuff::
 
-        cool_stuff(1)
-        cool_stuff(2)
+    cool_stuff( 1 )
+    cool_stuff( 2 )
 
     Done.
     """
@@ -7394,11 +7394,11 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 # As with the above example, reST seems to behave the same way here.
 def rst_literal_first_line_indent_uses_tabs_8spaces():
     """
-    Do cool stuff::
+       Do cool stuff::
 
-     cool_stuff(1)
+    cool_stuff( 1 )
 
-    Done.
+       Done.
     """
     pass
 
@@ -7406,12 +7406,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
     """
-    Do cool stuff::
+       Do cool stuff::
 
-     cool_stuff(1)
-     cool_stuff(2)
+    cool_stuff( 1 )
+    cool_stuff( 2 )
 
-    Done.
+       Done.
     """
     pass
 
@@ -7423,8 +7423,8 @@ def rst_literal_first_line_tab_second_line_spaces():
     """
     Do cool stuff::
 
-        cool_stuff(1)
-        cool_stuff(2)
+    cool_stuff( 1 )
+        cool_stuff( 2 )
 
     Done.
     """
@@ -7453,8 +7453,8 @@ def rst_literal_odd_indentation():
     """
     Do cool stuff::
 
-     cool_stuff(1)
-     cool_stuff(2)
+    cool_stuff( 1 )
+     cool_stuff( 2 )
 
     Done.
     """
@@ -7575,11 +7575,11 @@ def rst_literal_skipped_first_line_not_indented_then_indented():
 # and doesn't treat it as a literal block.
 def rst_literal_skipped_first_line_not_indented_tab():
     """
-    Do cool stuff::
+        Do cool stuff::
 
     cool_stuff( 1 )
 
-    Done.
+        Done.
     """
     pass
 
@@ -7587,12 +7587,12 @@ def rst_literal_skipped_first_line_not_indented_tab():
 # Like the previous test, but adds a second line.
 def rst_literal_skipped_first_line_not_indented_tab_multiple():
     """
-    Do cool stuff::
+        Do cool stuff::
 
     cool_stuff( 1 )
     cool_stuff( 2 )
 
-    Done.
+        Done.
     """
     pass
 
@@ -7942,27 +7942,27 @@ def markdown_first_line_indent_uses_tabs_4spaces_multiple():
 
 def markdown_first_line_indent_uses_tabs_8spaces():
     """
-    Do cool stuff.
+       Do cool stuff.
 
-     ```py
-     cool_stuff(1)
-     ```
+    ```py
+    cool_stuff(1)
+    ```
 
-    Done.
+       Done.
     """
     pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces_multiple():
     """
-    Do cool stuff.
+       Do cool stuff.
 
-     ```py
-     cool_stuff(1)
-     cool_stuff(2)
-     ```
+    ```py
+    cool_stuff(1)
+    cool_stuff(2)
+    ```
 
-    Done.
+       Done.
     """
     pass
 
@@ -7971,10 +7971,10 @@ def markdown_first_line_tab_second_line_spaces():
     """
     Do cool stuff.
 
-        ```py
-        cool_stuff(1)
-        cool_stuff(2)
-        ```
+    ```py
+    cool_stuff( 1 )
+        cool_stuff( 2 )
+    ```
 
     Done.
     """
@@ -7985,10 +7985,10 @@ def markdown_odd_indentation():
     """
     Do cool stuff.
 
-        ```py
-        cool_stuff(1)
-        cool_stuff(2)
-        ```
+    ```py
+    cool_stuff( 1 )
+        cool_stuff( 2 )
+    ```
 
     Done.
     """
@@ -8768,11 +8768,11 @@ def rst_literal_subsequent_line_not_indented():
 # under-specified.)
 def rst_literal_first_line_indent_uses_tabs_4spaces():
   """
-  Do cool stuff::
+    Do cool stuff::
 
-      cool_stuff(1)
+  cool_stuff( 1 )
 
-  Done.
+    Done.
   """
   pass
 
@@ -8780,12 +8780,12 @@ def rst_literal_first_line_indent_uses_tabs_4spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
   """
-  Do cool stuff::
+    Do cool stuff::
 
-      cool_stuff(1)
-      cool_stuff(2)
+  cool_stuff( 1 )
+  cool_stuff( 2 )
 
-  Done.
+    Done.
   """
   pass
 
@@ -8799,11 +8799,11 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 # As with the above example, reST seems to behave the same way here.
 def rst_literal_first_line_indent_uses_tabs_8spaces():
   """
-  Do cool stuff::
+       Do cool stuff::
 
-   cool_stuff(1)
+  cool_stuff( 1 )
 
-  Done.
+       Done.
   """
   pass
 
@@ -8811,12 +8811,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
   """
-  Do cool stuff::
+       Do cool stuff::
 
-   cool_stuff(1)
-   cool_stuff(2)
+  cool_stuff( 1 )
+  cool_stuff( 2 )
 
-  Done.
+       Done.
   """
   pass
 
@@ -8826,12 +8826,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
 # block and format it.
 def rst_literal_first_line_tab_second_line_spaces():
   """
-  Do cool stuff::
+    Do cool stuff::
 
-      cool_stuff(1)
-      cool_stuff(2)
+  cool_stuff( 1 )
+        cool_stuff( 2 )
 
-  Done.
+    Done.
   """
   pass
 
@@ -8856,12 +8856,12 @@ def rst_literal_first_line_tab_second_line_spaces():
 # the real world. ---AG
 def rst_literal_odd_indentation():
   """
-  Do cool stuff::
+    Do cool stuff::
 
-   cool_stuff(1)
-   cool_stuff(2)
+  cool_stuff( 1 )
+     cool_stuff( 2 )
 
-  Done.
+    Done.
   """
   pass
 
@@ -8980,11 +8980,11 @@ def rst_literal_skipped_first_line_not_indented_then_indented():
 # and doesn't treat it as a literal block.
 def rst_literal_skipped_first_line_not_indented_tab():
   """
-  Do cool stuff::
+        Do cool stuff::
 
   cool_stuff( 1 )
 
-  Done.
+        Done.
   """
   pass
 
@@ -8992,12 +8992,12 @@ def rst_literal_skipped_first_line_not_indented_tab():
 # Like the previous test, but adds a second line.
 def rst_literal_skipped_first_line_not_indented_tab_multiple():
   """
-  Do cool stuff::
+        Do cool stuff::
 
   cool_stuff( 1 )
   cool_stuff( 2 )
 
-  Done.
+        Done.
   """
   pass
 
@@ -9320,82 +9320,82 @@ def markdown_with_blank_lines():
 
 def markdown_first_line_indent_uses_tabs_4spaces():
   """
-  Do cool stuff.
+    Do cool stuff.
 
-  ```py
-  cool_stuff(1)
-  ```
+    ```py
+  cool_stuff( 1 )
+    ```
 
-  Done.
+    Done.
   """
   pass
 
 
 def markdown_first_line_indent_uses_tabs_4spaces_multiple():
   """
-  Do cool stuff.
+    Do cool stuff.
 
-  ```py
-  cool_stuff(1)
-  cool_stuff(2)
-  ```
+    ```py
+  cool_stuff( 1 )
+  cool_stuff( 2 )
+    ```
 
-  Done.
+    Done.
   """
   pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces():
   """
-  Do cool stuff.
+       Do cool stuff.
 
-   ```py
-   cool_stuff(1)
-   ```
+  ```py
+  cool_stuff(1)
+  ```
 
-  Done.
+       Done.
   """
   pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces_multiple():
   """
-  Do cool stuff.
+       Do cool stuff.
 
-   ```py
-   cool_stuff(1)
-   cool_stuff(2)
-   ```
+  ```py
+  cool_stuff(1)
+  cool_stuff(2)
+  ```
 
-  Done.
+       Done.
   """
   pass
 
 
 def markdown_first_line_tab_second_line_spaces():
   """
-  Do cool stuff.
+    Do cool stuff.
 
-      ```py
-      cool_stuff(1)
-      cool_stuff(2)
-      ```
+  ```py
+  cool_stuff( 1 )
+        cool_stuff( 2 )
+  ```
 
-  Done.
+    Done.
   """
   pass
 
 
 def markdown_odd_indentation():
   """
-  Do cool stuff.
+    Do cool stuff.
 
-      ```py
-      cool_stuff(1)
-      cool_stuff(2)
-      ```
+  ```py
+  cool_stuff( 1 )
+        cool_stuff( 2 )
+  ```
 
-  Done.
+    Done.
   """
   pass
 
@@ -10063,7 +10063,7 @@ def rst_literal_simple_continued():
 	Do cool stuff::
 
 	    def cool_stuff(x):
-	            print(f"hi {x}")
+		    print(f"hi {x}")
 
 	Done.
 	"""
@@ -10096,11 +10096,11 @@ def rst_literal_with_blank_lines():
 	Do cool stuff::
 
 	    def cool_stuff(x):
-	            print(f"hi {x}")
+		    print(f"hi {x}")
 
 
 	    def other_stuff(y):
-	            print(y)
+		    print(y)
 
 	Done.
 	"""
@@ -10162,10 +10162,10 @@ def rst_literal_subsequent_line_not_indented():
 	Do cool stuff::
 
 	 if True:
-	         cool_stuff(
-	                 '''
+		 cool_stuff(
+			 '''
 	 hiya'''
-	         )
+		 )
 
 	Done.
 	"""
@@ -10562,7 +10562,7 @@ def markdown_simple_continued():
 
 	```python
 	def cool_stuff(x):
-	        print(f"hi {x}")
+		print(f"hi {x}")
 	```
 
 	Done.
@@ -10641,7 +10641,7 @@ def markdown_nested_fences():
 
 	``````
 	do_something(
-	        '''
+		'''
 	```
 	did i trick you?
 	```
@@ -10720,11 +10720,11 @@ def markdown_with_blank_lines():
 
 	```py
 	def cool_stuff(x):
-	        print(f"hi {x}")
+		print(f"hi {x}")
 
 
 	def other_stuff(y):
-	        print(y)
+		print(y)
 	```
 
 	Done.
@@ -10939,9 +10939,9 @@ def markdown_skipped_unindented_completely():
 	"""
 	    Do cool stuff.
 
-	        ```py
+		```py
 	cool_stuff( 1 )
-	        ```
+		```
 
 	    Done.
 	"""
@@ -11041,11 +11041,11 @@ def markdown_skipped_rst_directive():
  	Do cool stuff::
  
  	 if True:
--	         cool_stuff(
--	                 '''
+-		 cool_stuff(
+-			 '''
 -	 hiya'''
--	         )
-+	         cool_stuff('''
+-		 )
++		 cool_stuff('''
 +	 hiya''')
  
  	Done.
@@ -11055,7 +11055,7 @@ def markdown_skipped_rst_directive():
  
  	``````
 -	do_something(
--	        '''
+-		'''
 +	do_something('''
  	```
  	did i trick you?
@@ -11299,8 +11299,8 @@ def doctest_varying_start_column():
 
 	>>> assert "Easy!"
 	  >>> import math
-	      >>> math.floor(1.9)
-	      1
+		  >>> math.floor(1.9)
+		  1
 	"""
 	pass
 
@@ -11456,7 +11456,7 @@ def rst_literal_simple():
 	"""
 	Do cool stuff::
 
-	    cool_stuff(1)
+		cool_stuff(1)
 
 	Done.
 	"""
@@ -11467,8 +11467,8 @@ def rst_literal_simple_continued():
 	"""
 	Do cool stuff::
 
-	    def cool_stuff(x):
-	        print(f"hi {x}")
+		def cool_stuff(x):
+			print(f"hi {x}")
 
 	Done.
 	"""
@@ -11481,7 +11481,7 @@ def rst_literal_second_to_last():
 	"""
 	Do cool stuff::
 
-	    cool_stuff(1)
+		cool_stuff(1)
 	"""
 	pass
 
@@ -11492,7 +11492,7 @@ def rst_literal_actually_last():
 	"""
 	Do cool stuff::
 
-	    cool_stuff(1)"""
+		cool_stuff(1)"""
 	pass
 
 
@@ -11500,12 +11500,12 @@ def rst_literal_with_blank_lines():
 	"""
 	Do cool stuff::
 
-	    def cool_stuff(x):
-	        print(f"hi {x}")
+		def cool_stuff(x):
+			print(f"hi {x}")
 
 
-	    def other_stuff(y):
-	        print(y)
+		def other_stuff(y):
+			print(y)
 
 	Done.
 	"""
@@ -11519,7 +11519,7 @@ def rst_literal_extra_blanks():
 
 
 
-	    cool_stuff(1)
+		cool_stuff(1)
 
 
 
@@ -11536,7 +11536,7 @@ def rst_literal_extra_blanks_at_end():
 	Do cool stuff::
 
 
-	    cool_stuff(1)
+		cool_stuff(1)
 
 
 
@@ -11550,10 +11550,10 @@ def rst_literal_extra_blanks_in_snippet():
 	"""
 	Do cool stuff::
 
-	    cool_stuff(1)
+		cool_stuff(1)
 
 
-	    cool_stuff(2)
+		cool_stuff(2)
 
 	Done.
 	"""
@@ -11567,10 +11567,10 @@ def rst_literal_subsequent_line_not_indented():
 	Do cool stuff::
 
 	 if True:
-	     cool_stuff(
-	         '''
+		 cool_stuff(
+			 '''
 	 hiya'''
-	     )
+		 )
 
 	Done.
 	"""
@@ -11589,7 +11589,7 @@ def rst_literal_first_line_indent_uses_tabs_4spaces():
 	"""
 	Do cool stuff::
 
-	    cool_stuff(1)
+	cool_stuff( 1 )
 
 	Done.
 	"""
@@ -11601,8 +11601,8 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 	"""
 	Do cool stuff::
 
-	    cool_stuff(1)
-	    cool_stuff(2)
+	cool_stuff( 1 )
+	cool_stuff( 2 )
 
 	Done.
 	"""
@@ -11618,11 +11618,11 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 # As with the above example, reST seems to behave the same way here.
 def rst_literal_first_line_indent_uses_tabs_8spaces():
 	"""
-	Do cool stuff::
+	   Do cool stuff::
 
-	 cool_stuff(1)
+	cool_stuff( 1 )
 
-	Done.
+	   Done.
 	"""
 	pass
 
@@ -11630,12 +11630,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
 	"""
-	Do cool stuff::
+	   Do cool stuff::
 
-	 cool_stuff(1)
-	 cool_stuff(2)
+	cool_stuff( 1 )
+	cool_stuff( 2 )
 
-	Done.
+	   Done.
 	"""
 	pass
 
@@ -11647,8 +11647,8 @@ def rst_literal_first_line_tab_second_line_spaces():
 	"""
 	Do cool stuff::
 
-	    cool_stuff(1)
-	    cool_stuff(2)
+	cool_stuff( 1 )
+		cool_stuff( 2 )
 
 	Done.
 	"""
@@ -11677,8 +11677,8 @@ def rst_literal_odd_indentation():
 	"""
 	Do cool stuff::
 
-	 cool_stuff(1)
-	 cool_stuff(2)
+	cool_stuff( 1 )
+	 cool_stuff( 2 )
 
 	Done.
 	"""
@@ -11693,7 +11693,7 @@ def rst_literal_lone_colon():
 
 	::
 
-	    cool_stuff(1)
+		cool_stuff(1)
 
 	Done.
 	"""
@@ -11704,7 +11704,7 @@ def rst_directive_simple():
 	"""
 	.. code-block:: python
 
-	    cool_stuff(1)
+		cool_stuff(1)
 
 	Done.
 	"""
@@ -11715,7 +11715,7 @@ def rst_directive_case_insensitive():
 	"""
 	.. cOdE-bLoCk:: python
 
-	    cool_stuff(1)
+		cool_stuff(1)
 
 	Done.
 	"""
@@ -11726,7 +11726,7 @@ def rst_directive_sourcecode():
 	"""
 	.. sourcecode:: python
 
-	    cool_stuff(1)
+		cool_stuff(1)
 
 	Done.
 	"""
@@ -11736,14 +11736,14 @@ def rst_directive_sourcecode():
 def rst_directive_options():
 	"""
 	.. code-block:: python
-	    :linenos:
-	    :emphasize-lines: 2,3
-	    :name: blah blah
+		:linenos:
+		:emphasize-lines: 2,3
+		:name: blah blah
 
-	    cool_stuff(1)
-	    cool_stuff(2)
-	    cool_stuff(3)
-	    cool_stuff(4)
+		cool_stuff(1)
+		cool_stuff(2)
+		cool_stuff(3)
+		cool_stuff(4)
 
 	Done.
 	"""
@@ -11757,7 +11757,7 @@ def rst_directive_doctest():
 	"""
 	.. code-block:: pycon
 
-	    >>> cool_stuff(1)
+		>>> cool_stuff(1)
 
 	Done.
 	"""
@@ -11799,11 +11799,11 @@ def rst_literal_skipped_first_line_not_indented_then_indented():
 # and doesn't treat it as a literal block.
 def rst_literal_skipped_first_line_not_indented_tab():
 	"""
-	Do cool stuff::
+		Do cool stuff::
 
 	cool_stuff( 1 )
 
-	Done.
+		Done.
 	"""
 	pass
 
@@ -11811,12 +11811,12 @@ def rst_literal_skipped_first_line_not_indented_tab():
 # Like the previous test, but adds a second line.
 def rst_literal_skipped_first_line_not_indented_tab_multiple():
 	"""
-	Do cool stuff::
+		Do cool stuff::
 
 	cool_stuff( 1 )
 	cool_stuff( 2 )
 
-	Done.
+		Done.
 	"""
 	pass
 
@@ -11831,7 +11831,7 @@ def rst_literal_skipped_subsequent_line_not_indented():
 	Do cool stuff::
 
 	 if True:
-	    cool_stuff( '''
+		cool_stuff( '''
 	hiya''' )
 
 	Done.
@@ -11849,7 +11849,7 @@ def rst_literal_skipped_not_directive():
 	"""
 	.. code-block::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -11868,7 +11868,7 @@ def rst_literal_skipped_possible_false_negative():
 	This is a test.
 	.. This is a test::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -11883,7 +11883,7 @@ def rst_literal_skipped_doctest():
 	"""
 	Do cool stuff::
 
-	    >>> cool_stuff( 1 )
+		>>> cool_stuff( 1 )
 
 	Done.
 	"""
@@ -11894,9 +11894,9 @@ def rst_literal_skipped_markdown():
 	"""
 	Do cool stuff::
 
-	    ```py
-	    cool_stuff( 1 )
-	    ```
+		```py
+		cool_stuff( 1 )
+		```
 
 	Done.
 	"""
@@ -11918,7 +11918,7 @@ def rst_directive_skipped_wrong_language():
 	"""
 	.. code-block:: rust
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	Done.
 	"""
@@ -11931,7 +11931,7 @@ def rst_directive_skipped_doctest():
 	"""
 	.. code-block:: python
 
-	    >>> cool_stuff( 1 )
+		>>> cool_stuff( 1 )
 
 	Done.
 	"""
@@ -11967,7 +11967,7 @@ def markdown_simple_continued():
 
 	```python
 	def cool_stuff(x):
-	    print(f"hi {x}")
+		print(f"hi {x}")
 	```
 
 	Done.
@@ -12046,7 +12046,7 @@ def markdown_nested_fences():
 
 	``````
 	do_something(
-	    '''
+		'''
 	```
 	did i trick you?
 	```
@@ -12125,11 +12125,11 @@ def markdown_with_blank_lines():
 
 	```py
 	def cool_stuff(x):
-	    print(f"hi {x}")
+		print(f"hi {x}")
 
 
 	def other_stuff(y):
-	    print(y)
+		print(y)
 	```
 
 	Done.
@@ -12166,27 +12166,27 @@ def markdown_first_line_indent_uses_tabs_4spaces_multiple():
 
 def markdown_first_line_indent_uses_tabs_8spaces():
 	"""
-	Do cool stuff.
+	   Do cool stuff.
 
-	 ```py
-	 cool_stuff(1)
-	 ```
+	```py
+	cool_stuff(1)
+	```
 
-	Done.
+	   Done.
 	"""
 	pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces_multiple():
 	"""
-	Do cool stuff.
+	   Do cool stuff.
 
-	 ```py
-	 cool_stuff(1)
-	 cool_stuff(2)
-	 ```
+	```py
+	cool_stuff(1)
+	cool_stuff(2)
+	```
 
-	Done.
+	   Done.
 	"""
 	pass
 
@@ -12195,10 +12195,10 @@ def markdown_first_line_tab_second_line_spaces():
 	"""
 	Do cool stuff.
 
-	    ```py
-	    cool_stuff(1)
-	    cool_stuff(2)
-	    ```
+	```py
+	cool_stuff( 1 )
+		cool_stuff( 2 )
+	```
 
 	Done.
 	"""
@@ -12209,10 +12209,10 @@ def markdown_odd_indentation():
 	"""
 	Do cool stuff.
 
-	    ```py
-	    cool_stuff(1)
-	    cool_stuff(2)
-	    ```
+	```py
+	cool_stuff( 1 )
+		cool_stuff( 2 )
+	```
 
 	Done.
 	"""
@@ -12258,12 +12258,12 @@ def markdown_weird_closing():
 
 	  ```python
 	  cool_stuff(1)
-	       ```
-	    # The above fences look like it shouldn't close the block, but we
-	    # allow it to. The fences below re-open a block (until the end of
-	    # the docstring), but it's invalid Python and thus doesn't get
-	    # reformatted.
-	      a = 10
+		   ```
+		# The above fences look like it shouldn't close the block, but we
+		# allow it to. The fences below re-open a block (until the end of
+		# the docstring), but it's invalid Python and thus doesn't get
+		# reformatted.
+		  a = 10
 	  ```
 
 	  Now the code block is closed
@@ -12274,10 +12274,10 @@ def markdown_weird_closing():
 def markdown_over_indented():
 	"""
 	A docstring
-	    over intended
-	    ```python
-	    print(5)
-	    ```
+		over intended
+		```python
+		print(5)
+		```
 	"""
 	pass
 
@@ -12342,13 +12342,13 @@ def markdown_skipped_accidental_closure():
 # plausibly, to do normalization *after* code snippets have been formatted.
 def markdown_skipped_unindented_completely():
 	"""
-	    Do cool stuff.
+		Do cool stuff.
 
-	        ```py
+			```py
 	cool_stuff( 1 )
-	        ```
+			```
 
-	    Done.
+		Done.
 	"""
 	pass
 
@@ -12361,9 +12361,9 @@ def markdown_skipped_unindented_somewhat():
 	"""
 	Do cool stuff.
 
-	    ```py
+		```py
 	cool_stuff( 1 )
-	    ```
+		```
 
 	Done.
 	"""
@@ -12382,10 +12382,10 @@ def markdown_skipped_unindented_with_inconsistent_indentation():
 	"""
 	Do cool stuff.
 
-	    ```py
+		```py
 	cool_stuff( 1 )
-	    cool_stuff( 2 )
-	    ```
+		cool_stuff( 2 )
+		```
 
 	Done.
 	"""
@@ -12412,7 +12412,7 @@ def markdown_skipped_rst_literal():
 	```py
 	And do this::
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	```
 
@@ -12428,7 +12428,7 @@ def markdown_skipped_rst_directive():
 	```py
 	.. code-block:: python
 
-	    cool_stuff( 1 )
+		cool_stuff( 1 )
 
 	```
 
@@ -12446,11 +12446,11 @@ def markdown_skipped_rst_directive():
  	Do cool stuff::
  
  	 if True:
--	     cool_stuff(
--	         '''
+-		 cool_stuff(
+-			 '''
 -	 hiya'''
--	     )
-+	     cool_stuff('''
+-		 )
++		 cool_stuff('''
 +	 hiya''')
  
  	Done.
@@ -12460,7 +12460,7 @@ def markdown_skipped_rst_directive():
  
  	``````
 -	do_something(
--	    '''
+-		'''
 +	do_something('''
  	```
  	did i trick you?
@@ -13003,7 +13003,7 @@ def rst_literal_first_line_indent_uses_tabs_4spaces():
     """
     Do cool stuff::
 
-        cool_stuff(1)
+    cool_stuff( 1 )
 
     Done.
     """
@@ -13015,8 +13015,8 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
     """
     Do cool stuff::
 
-        cool_stuff(1)
-        cool_stuff(2)
+    cool_stuff( 1 )
+    cool_stuff( 2 )
 
     Done.
     """
@@ -13032,11 +13032,11 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 # As with the above example, reST seems to behave the same way here.
 def rst_literal_first_line_indent_uses_tabs_8spaces():
     """
-    Do cool stuff::
+       Do cool stuff::
 
-     cool_stuff(1)
+    cool_stuff( 1 )
 
-    Done.
+       Done.
     """
     pass
 
@@ -13044,12 +13044,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
     """
-    Do cool stuff::
+       Do cool stuff::
 
-     cool_stuff(1)
-     cool_stuff(2)
+    cool_stuff( 1 )
+    cool_stuff( 2 )
 
-    Done.
+       Done.
     """
     pass
 
@@ -13061,8 +13061,8 @@ def rst_literal_first_line_tab_second_line_spaces():
     """
     Do cool stuff::
 
-        cool_stuff(1)
-        cool_stuff(2)
+    cool_stuff( 1 )
+        cool_stuff( 2 )
 
     Done.
     """
@@ -13091,8 +13091,8 @@ def rst_literal_odd_indentation():
     """
     Do cool stuff::
 
-     cool_stuff(1)
-     cool_stuff(2)
+    cool_stuff( 1 )
+     cool_stuff( 2 )
 
     Done.
     """
@@ -13213,11 +13213,11 @@ def rst_literal_skipped_first_line_not_indented_then_indented():
 # and doesn't treat it as a literal block.
 def rst_literal_skipped_first_line_not_indented_tab():
     """
-    Do cool stuff::
+        Do cool stuff::
 
     cool_stuff( 1 )
 
-    Done.
+        Done.
     """
     pass
 
@@ -13225,12 +13225,12 @@ def rst_literal_skipped_first_line_not_indented_tab():
 # Like the previous test, but adds a second line.
 def rst_literal_skipped_first_line_not_indented_tab_multiple():
     """
-    Do cool stuff::
+        Do cool stuff::
 
     cool_stuff( 1 )
     cool_stuff( 2 )
 
-    Done.
+        Done.
     """
     pass
 
@@ -13580,27 +13580,27 @@ def markdown_first_line_indent_uses_tabs_4spaces_multiple():
 
 def markdown_first_line_indent_uses_tabs_8spaces():
     """
-    Do cool stuff.
+       Do cool stuff.
 
-     ```py
-     cool_stuff(1)
-     ```
+    ```py
+    cool_stuff(1)
+    ```
 
-    Done.
+       Done.
     """
     pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces_multiple():
     """
-    Do cool stuff.
+       Do cool stuff.
 
-     ```py
-     cool_stuff(1)
-     cool_stuff(2)
-     ```
+    ```py
+    cool_stuff(1)
+    cool_stuff(2)
+    ```
 
-    Done.
+       Done.
     """
     pass
 
@@ -13609,10 +13609,10 @@ def markdown_first_line_tab_second_line_spaces():
     """
     Do cool stuff.
 
-        ```py
-        cool_stuff(1)
-        cool_stuff(2)
-        ```
+    ```py
+    cool_stuff( 1 )
+        cool_stuff( 2 )
+    ```
 
     Done.
     """
@@ -13623,10 +13623,10 @@ def markdown_odd_indentation():
     """
     Do cool stuff.
 
-        ```py
-        cool_stuff(1)
-        cool_stuff(2)
-        ```
+    ```py
+    cool_stuff( 1 )
+        cool_stuff( 2 )
+    ```
 
     Done.
     """
@@ -14408,7 +14408,7 @@ def rst_literal_first_line_indent_uses_tabs_4spaces():
     """
     Do cool stuff::
 
-        cool_stuff(1)
+    cool_stuff( 1 )
 
     Done.
     """
@@ -14420,8 +14420,8 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
     """
     Do cool stuff::
 
-        cool_stuff(1)
-        cool_stuff(2)
+    cool_stuff( 1 )
+    cool_stuff( 2 )
 
     Done.
     """
@@ -14437,11 +14437,11 @@ def rst_literal_first_line_indent_uses_tabs_4spaces_multiple():
 # As with the above example, reST seems to behave the same way here.
 def rst_literal_first_line_indent_uses_tabs_8spaces():
     """
-    Do cool stuff::
+       Do cool stuff::
 
-     cool_stuff(1)
+    cool_stuff( 1 )
 
-    Done.
+       Done.
     """
     pass
 
@@ -14449,12 +14449,12 @@ def rst_literal_first_line_indent_uses_tabs_8spaces():
 # Like the test above, but with multiple lines.
 def rst_literal_first_line_indent_uses_tabs_8spaces_multiple():
     """
-    Do cool stuff::
+       Do cool stuff::
 
-     cool_stuff(1)
-     cool_stuff(2)
+    cool_stuff( 1 )
+    cool_stuff( 2 )
 
-    Done.
+       Done.
     """
     pass
 
@@ -14466,8 +14466,8 @@ def rst_literal_first_line_tab_second_line_spaces():
     """
     Do cool stuff::
 
-        cool_stuff(1)
-        cool_stuff(2)
+    cool_stuff( 1 )
+        cool_stuff( 2 )
 
     Done.
     """
@@ -14496,8 +14496,8 @@ def rst_literal_odd_indentation():
     """
     Do cool stuff::
 
-     cool_stuff(1)
-     cool_stuff(2)
+    cool_stuff( 1 )
+     cool_stuff( 2 )
 
     Done.
     """
@@ -14618,11 +14618,11 @@ def rst_literal_skipped_first_line_not_indented_then_indented():
 # and doesn't treat it as a literal block.
 def rst_literal_skipped_first_line_not_indented_tab():
     """
-    Do cool stuff::
+        Do cool stuff::
 
     cool_stuff( 1 )
 
-    Done.
+        Done.
     """
     pass
 
@@ -14630,12 +14630,12 @@ def rst_literal_skipped_first_line_not_indented_tab():
 # Like the previous test, but adds a second line.
 def rst_literal_skipped_first_line_not_indented_tab_multiple():
     """
-    Do cool stuff::
+        Do cool stuff::
 
     cool_stuff( 1 )
     cool_stuff( 2 )
 
-    Done.
+        Done.
     """
     pass
 
@@ -14985,27 +14985,27 @@ def markdown_first_line_indent_uses_tabs_4spaces_multiple():
 
 def markdown_first_line_indent_uses_tabs_8spaces():
     """
-    Do cool stuff.
+       Do cool stuff.
 
-     ```py
-     cool_stuff(1)
-     ```
+    ```py
+    cool_stuff(1)
+    ```
 
-    Done.
+       Done.
     """
     pass
 
 
 def markdown_first_line_indent_uses_tabs_8spaces_multiple():
     """
-    Do cool stuff.
+       Do cool stuff.
 
-     ```py
-     cool_stuff(1)
-     cool_stuff(2)
-     ```
+    ```py
+    cool_stuff(1)
+    cool_stuff(2)
+    ```
 
-    Done.
+       Done.
     """
     pass
 
@@ -15014,10 +15014,10 @@ def markdown_first_line_tab_second_line_spaces():
     """
     Do cool stuff.
 
-        ```py
-        cool_stuff(1)
-        cool_stuff(2)
-        ```
+    ```py
+    cool_stuff( 1 )
+        cool_stuff( 2 )
+    ```
 
     Done.
     """
@@ -15028,10 +15028,10 @@ def markdown_odd_indentation():
     """
     Do cool stuff.
 
-        ```py
-        cool_stuff(1)
-        cool_stuff(2)
-        ```
+    ```py
+    cool_stuff( 1 )
+        cool_stuff( 2 )
+    ```
 
     Done.
     """
