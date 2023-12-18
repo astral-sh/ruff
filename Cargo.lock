@@ -3282,9 +3282,9 @@ checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
 name = "unicode_names2"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d5506ae2c3c1ccbdf468e52fc5ef536c2ccd981f01273a4cb81aa61021f3a5f"
+checksum = "ac64ef2f016dc69dfa8283394a70b057066eb054d5fcb6b9eb17bd2ec5097211"
 dependencies = [
  "phf",
  "unicode_names2_generator",
@@ -3292,9 +3292,9 @@ dependencies = [
 
 [[package]]
 name = "unicode_names2_generator"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6dfc680313e95bc6637fa278cd7a22390c3c2cd7b8b2bd28755bc6c0fc811e7"
+checksum = "013f6a731e80f3930de580e55ba41dfa846de4e0fdee4a701f97989cb1597d6a"
 dependencies = [
  "getopts",
  "log",
