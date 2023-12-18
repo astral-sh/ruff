@@ -26,24 +26,29 @@ op_gt = lambda x, y: x > y
 op_gte = lambda x, y: x >= y
 op_is = lambda x, y: x is y
 op_isnot = lambda x, y: x is not y
-op_in = lambda x, y: x in y
+op_in = lambda x, y: y in x
+
 
 def op_not2(x):
     return not x
 
+
 def op_add2(x, y):
     return x + y
+
 
 class Adder:
     def add(x, y):
         return x + y
 
-# Ok.
+# OK.
 op_add3 = lambda x, y = 1: x + y
 op_neg2 = lambda x, y: y - x
 op_notin = lambda x, y: y not in x
 op_and = lambda x, y: y and x
 op_or = lambda x, y: y or x
+op_in = lambda x, y: x in y
+
 
 def op_neg3(x, y):
     return y - x

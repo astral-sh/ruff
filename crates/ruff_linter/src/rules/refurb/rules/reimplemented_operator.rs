@@ -223,21 +223,86 @@ fn cmp_op(expr: &ast::ExprCompare, params: &ast::Parameters) -> Option<&'static 
     let [right] = expr.comparators.as_slice() else {
         return None;
     };
-    if !is_same_expression(arg1, &expr.left) || !is_same_expression(arg2, right) {
-        return None;
-    }
+
     match op {
-        ast::CmpOp::Eq => Some("eq"),
-        ast::CmpOp::NotEq => Some("ne"),
-        ast::CmpOp::Lt => Some("lt"),
-        ast::CmpOp::LtE => Some("le"),
-        ast::CmpOp::Gt => Some("gt"),
-        ast::CmpOp::GtE => Some("ge"),
-        ast::CmpOp::Is => Some("is_"),
-        ast::CmpOp::IsNot => Some("is_not"),
-        ast::CmpOp::In => Some("contains"),
+        ast::CmpOp::Eq => {
+            if match_arguments(arg1, arg2, &expr.left, right) {
+                Some("eq")
+            } else {
+                None
+            }
+        }
+        ast::CmpOp::NotEq => {
+            if match_arguments(arg1, arg2, &expr.left, right) {
+                Some("ne")
+            } else {
+                None
+            }
+        }
+        ast::CmpOp::Lt => {
+            if match_arguments(arg1, arg2, &expr.left, right) {
+                Some("lt")
+            } else {
+                None
+            }
+        }
+        ast::CmpOp::LtE => {
+            if match_arguments(arg1, arg2, &expr.left, right) {
+                Some("le")
+            } else {
+                None
+            }
+        }
+        ast::CmpOp::Gt => {
+            if match_arguments(arg1, arg2, &expr.left, right) {
+                Some("gt")
+            } else {
+                None
+            }
+        }
+        ast::CmpOp::GtE => {
+            if match_arguments(arg1, arg2, &expr.left, right) {
+                Some("ge")
+            } else {
+                None
+            }
+        }
+        ast::CmpOp::Is => {
+            if match_arguments(arg1, arg2, &expr.left, right) {
+                Some("is_")
+            } else {
+                None
+            }
+        }
+        ast::CmpOp::IsNot => {
+            if match_arguments(arg1, arg2, &expr.left, right) {
+                Some("is_not")
+            } else {
+                None
+            }
+        }
+        ast::CmpOp::In => {
+            // Note: `operator.contains` reverses the order of arguments. That is:
+            // `operator.contains` is equivalent to `lambda x, y: y in x`, rather than
+            // `lambda x, y: x in y`.
+            if match_arguments(arg1, arg2, right, &expr.left) {
+                Some("contains")
+            } else {
+                None
+            }
+        }
         ast::CmpOp::NotIn => None,
     }
+}
+
+/// Returns `true` if the given arguments match the expected operands.
+fn match_arguments(
+    arg1: &ast::ParameterWithDefault,
+    arg2: &ast::ParameterWithDefault,
+    operand1: &Expr,
+    operand2: &Expr,
+) -> bool {
+    is_same_expression(arg1, operand1) && is_same_expression(arg2, operand2)
 }
 
 /// Returns `true` if the given argument is the "same" as the given expression. For example, if
