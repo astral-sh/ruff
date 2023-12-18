@@ -1,5 +1,4 @@
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
 use ruff_text_size::Ranged;
@@ -340,26 +339,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
             }
 
             if checker.enabled(Rule::TooManyLocals) {
-                // PLR0914
-                let num_locals = scope
-                    .binding_ids()
-                    .filter(|&id| {
-                        let binding = checker.semantic.binding(id);
-                        matches!(binding.kind, BindingKind::Assignment)
-                    })
-                    .count();
-
-                if num_locals > checker.settings.pylint.max_locals {
-                    if let ScopeKind::Function(func) = scope.kind {
-                        diagnostics.push(Diagnostic::new(
-                            pylint::rules::TooManyLocals {
-                                current_amount: num_locals,
-                                max_amount: checker.settings.pylint.max_locals,
-                            },
-                            func.identifier(),
-                        ));
-                    };
-                }
+                pylint::rules::too_many_locals(checker, scope, &mut diagnostics);
             }
         }
     }

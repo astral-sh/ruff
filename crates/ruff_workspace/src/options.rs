@@ -2747,7 +2747,7 @@ impl PylintOptions {
             max_public_methods: self
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),
-            max_locals: defaults.max_locals,
+            max_locals: self.max_locals.unwrap_or(defaults.max_locals),
         }
     }
 }

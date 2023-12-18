@@ -1,10 +1,14 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::identifier::Identifier;
+use ruff_python_semantic::{Scope, ScopeKind};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for functions/methods that include too many local variables.
+/// Checks for functions that include too many local variables.
 ///
-/// By default, this rule allows up to fifteen arguments, as configured by the
+/// By default, this rule allows up to fifteen locals, as configured by the
 /// [`pylint.max-locals`] option.
 ///
 /// ## Why is this bad?
@@ -17,8 +21,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// - `pylint.max-locals`
 #[violation]
 pub struct TooManyLocals {
-    pub(crate) current_amount: usize,
-    pub(crate) max_amount: usize,
+    current_amount: usize,
+    max_amount: usize,
 }
 
 impl Violation for TooManyLocals {
@@ -29,5 +33,27 @@ impl Violation for TooManyLocals {
             max_amount,
         } = self;
         format!("Too many local variables: ({current_amount}/{max_amount})")
+    }
+}
+
+/// PLR0914
+pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope, diagnostics: &mut Vec<Diagnostic>) {
+    let num_locals = scope
+        .binding_ids()
+        .filter(|id| {
+            let binding = checker.semantic().binding(*id);
+            binding.kind.is_assignment()
+        })
+        .count();
+    if num_locals > checker.settings.pylint.max_locals {
+        if let ScopeKind::Function(func) = scope.kind {
+            diagnostics.push(Diagnostic::new(
+                TooManyLocals {
+                    current_amount: num_locals,
+                    max_amount: checker.settings.pylint.max_locals,
+                },
+                func.identifier(),
+            ));
+        };
     }
 }
