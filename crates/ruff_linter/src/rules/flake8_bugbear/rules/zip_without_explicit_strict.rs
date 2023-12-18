@@ -30,7 +30,9 @@ use crate::fix::edits::add_argument;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe if `**kwargs` are also passed to `zip`
+/// This rule's fix is marked as unsafe for `zip` calls that contain
+/// `**kwargs`, as adding a `check` keyword argument to such a call may lead
+/// to a duplicate keyword argument error.
 ///
 /// ## References
 /// - [Python documentation: `zip`](https://docs.python.org/3/library/functions.html#zip)
