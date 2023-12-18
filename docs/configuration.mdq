@@ -1,4 +1,4 @@
-# Configuring Ruff
+<{Bndrs21}># Configuring Ruff
 
 Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file.
 
