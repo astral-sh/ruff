@@ -515,7 +515,7 @@ impl<'a> FormatResults<'a> {
         if changed > 0 && unchanged > 0 {
             writeln!(
                 f,
-                "{} file{} {}, {} file{} already formatted",
+                "{} file{} {}, {} file{} {}",
                 changed,
                 if changed == 1 { "" } else { "s" },
                 match self.mode {
@@ -524,6 +524,10 @@ impl<'a> FormatResults<'a> {
                 },
                 unchanged,
                 if unchanged == 1 { "" } else { "s" },
+                match self.mode {
+                    FormatMode::Write => "left unchanged",
+                    FormatMode::Check | FormatMode::Diff => "already formatted",
+                },
             )
         } else if changed > 0 {
             writeln!(
@@ -539,9 +543,13 @@ impl<'a> FormatResults<'a> {
         } else if unchanged > 0 {
             writeln!(
                 f,
-                "{} file{} already formatted",
+                "{} file{} {}",
                 unchanged,
                 if unchanged == 1 { "" } else { "s" },
+                match self.mode {
+                    FormatMode::Write => "left unchanged",
+                    FormatMode::Check | FormatMode::Diff => "already formatted",
+                },
             )
         } else {
             Ok(())
