@@ -747,7 +747,11 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     let missing: Vec<(usize, &str)> = keywords
         .enumerate()
         .filter_map(|(index, keyword)| {
-            if summary.keywords.contains(&keyword.to_string()) {
+            if summary
+                .keywords
+                .iter()
+                .any(|summary_keyword| summary_keyword == keyword.as_str())
+            {
                 None
             } else {
                 Some((index, keyword.as_str()))
