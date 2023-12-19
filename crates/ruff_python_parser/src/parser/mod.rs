@@ -56,6 +56,7 @@ bitflags! {
         const FOR_TARGET = 1 << 18;
         const AWAIT_EXPR = 1 << 19;
         const WITH_ITEM = 1 << 20;
+        const DECORATOR = 1 << 21;
     }
 }
 
@@ -510,7 +511,8 @@ where
                         | ParserCtxFlags::SUBSCRIPT_EXPR
                         | ParserCtxFlags::PARENTHESIZED_EXPR
                         | ParserCtxFlags::WHILE_STMT
-                        | ParserCtxFlags::MATCH_STMT,
+                        | ParserCtxFlags::MATCH_STMT
+                        | ParserCtxFlags::DECORATOR,
                 ) =>
             {
                 true
@@ -1480,6 +1482,7 @@ where
     }
 
     fn parse_decorators(&mut self) -> StmtWithRange {
+        self.set_ctx(ParserCtxFlags::DECORATOR);
         let range = self.current_range();
         let mut decorators = vec![];
 
@@ -1494,6 +1497,7 @@ where
             });
             self.eat(TokenKind::Newline);
         }
+        self.clear_ctx(ParserCtxFlags::DECORATOR);
 
         let (kind, kind_range) = self.current_token();
         match kind {

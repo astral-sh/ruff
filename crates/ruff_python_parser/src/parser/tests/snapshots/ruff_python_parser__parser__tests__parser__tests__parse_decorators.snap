@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
-expression: "parse(\"\n@a\ndef f(): ...\n\n@a.b.c\ndef f(): ...\n\n@a\n@a.b.c\ndef f(): ...\n\n@a\n@1 | 2\n@a.b.c\nclass T: ...\n    \")"
+expression: "parse(\"\n@a\ndef f(): ...\n\n@a.b.c\ndef f(): ...\n\n@a\n@a.b.c\ndef f(): ...\n\n@a\n@1 | 2\n@a.b.c\nclass T: ...\n\n@named_expr := abc\ndef f():\n    ...\n\")"
 ---
 ParsedFile {
     ast: Module(
         ModModule {
-            range: 0..97,
+            range: 0..130,
             body: [
                 FunctionDef(
                     StmtFunctionDef {
@@ -272,6 +272,62 @@ ParsedFile {
                                     value: EllipsisLiteral(
                                         ExprEllipsisLiteral {
                                             range: 89..92,
+                                        },
+                                    ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                FunctionDef(
+                    StmtFunctionDef {
+                        range: 94..129,
+                        is_async: false,
+                        decorator_list: [
+                            Decorator {
+                                range: 94..112,
+                                expression: NamedExpr(
+                                    ExprNamedExpr {
+                                        range: 95..112,
+                                        target: Name(
+                                            ExprName {
+                                                range: 95..105,
+                                                id: "named_expr",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                range: 109..112,
+                                                id: "abc",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            },
+                        ],
+                        name: Identifier {
+                            id: "f",
+                            range: 117..118,
+                        },
+                        type_params: None,
+                        parameters: Parameters {
+                            range: 118..120,
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                        returns: None,
+                        body: [
+                            Expr(
+                                StmtExpr {
+                                    range: 126..129,
+                                    value: EllipsisLiteral(
+                                        ExprEllipsisLiteral {
+                                            range: 126..129,
                                         },
                                     ),
                                 },

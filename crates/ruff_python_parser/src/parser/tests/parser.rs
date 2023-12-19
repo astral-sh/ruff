@@ -611,7 +611,11 @@ def f(): ...
 @1 | 2
 @a.b.c
 class T: ...
-    "
+
+@named_expr := abc
+def f():
+    ...
+"
         ));
     }
 
