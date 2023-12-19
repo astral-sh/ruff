@@ -7,28 +7,32 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for the presence of unused private `TypeVar` declarations.
+/// Checks for the presence of unused private `TypeVar`, `ParamSpec` or
+/// `TypeVarTuple` declarations.
 ///
 /// ## Why is this bad?
-/// A private `TypeVar` that is defined but not used is likely a mistake, and
+/// A private `TypeVar` that is defined but not used is likely a mistake. It
 /// should either be used, made public, or removed to avoid confusion.
 ///
 /// ## Example
 /// ```python
 /// import typing
+/// import typing_extensions
 ///
 /// _T = typing.TypeVar("_T")
+/// _Ts = typing_extensions.TypeVarTuple("_Ts")
 /// ```
 #[violation]
 pub struct UnusedPrivateTypeVar {
-    name: String,
+    typevarlike_name: String,
+    typevarlike_kind: String,
 }
 
 impl Violation for UnusedPrivateTypeVar {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedPrivateTypeVar { name } = self;
-        format!("Private TypeVar `{name}` is never used")
+        let UnusedPrivateTypeVar{typevarlike_name, typevarlike_kind} = self;
+        format!("Private {typevarlike_kind} `{typevarlike_name}` is never used")
     }
 }
 
@@ -185,13 +189,23 @@ pub(crate) fn unused_private_type_var(
         let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
             continue;
         };
-        if !checker.semantic().match_typing_expr(func, "TypeVar") {
-            continue;
-        }
+
+        let semantic = checker.semantic();
+
+        let typevarlike_kind = {
+            if semantic.match_typing_expr(func, "TypeVar") {"TypeVar"} else {
+                if semantic.match_typing_expr(func, "ParamSpec") {"ParamSpec"} else {
+                    if semantic.match_typing_expr(func, "TypeVarTuple") {"TypeVarTuple"} else {
+                        continue;
+                    }
+                }
+            }
+        };
 
         diagnostics.push(Diagnostic::new(
             UnusedPrivateTypeVar {
-                name: id.to_string(),
+                typevarlike_name: id.to_string(),
+                typevarlike_kind: typevarlike_kind.to_string()
             },
             binding.range(),
         ));
