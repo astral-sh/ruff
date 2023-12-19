@@ -11,6 +11,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::expression::expr_string_literal::ExprStringLiteralKind;
 use crate::prelude::*;
+use crate::preview::is_no_blank_line_before_class_docstring_enabled;
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
@@ -108,13 +109,23 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     if !comments.has_leading(first)
                         && lines_before(first.start(), source) > 1
                         && !source_type.is_stub()
+                        && !is_no_blank_line_before_class_docstring_enabled(f.context())
                     {
                         // Allow up to one empty line before a class docstring, e.g., this is
                         // stable formatting:
+                        //
                         // ```python
                         // class Test:
                         //
                         //     """Docstring"""
+                        // ```
+                        //
+                        // But, in preview mode, we don't want to allow any empty lines before a
+                        // class docstring, e.g., this is preview formatting:
+                        //
+                        // ```python
+                        // class Test:
+                        //   """Docstring"""
                         // ```
                         empty_line().fmt(f)?;
                     }

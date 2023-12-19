@@ -27,30 +27,21 @@ class UpperCaseR:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,4 +1,5 @@
- class C:
-+
-     r"""Raw"""
- 
- 
-@@ -7,8 +8,9 @@
+@@ -7,7 +7,7 @@
  
  
  class SingleQuotes:
 -    r'''Raw'''
- 
 +    r"""Raw"""
-+
+ 
  
  class UpperCaseR:
-     R"""Raw"""
 ```
 
 ## Ruff Output
 
 ```python
 class C:
-
     r"""Raw"""
 
 
@@ -59,7 +50,6 @@ def f():
 
 
 class SingleQuotes:
-
     r"""Raw"""
 
 

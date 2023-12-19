@@ -198,7 +198,6 @@ def reference_docstring_newlines():
 
 
 class RemoveNewlineBeforeClassDocstring:
-
     """Black's `Preview.no_blank_line_before_class_docstring`"""
 
 
