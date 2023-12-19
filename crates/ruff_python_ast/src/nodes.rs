@@ -3257,7 +3257,7 @@ impl PartialEq<str> for Identifier {
 impl PartialEq<String> for Identifier {
     #[inline]
     fn eq(&self, other: &String) -> bool {
-        &self.id == other
+        self.id == other
     }
 }
 
