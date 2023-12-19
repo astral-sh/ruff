@@ -31,7 +31,10 @@ pub struct UnusedPrivateTypeVar {
 impl Violation for UnusedPrivateTypeVar {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedPrivateTypeVar{typevarlike_name, typevarlike_kind} = self;
+        let UnusedPrivateTypeVar {
+            typevarlike_name,
+            typevarlike_kind,
+        } = self;
         format!("Private {typevarlike_kind} `{typevarlike_name}` is never used")
     }
 }
@@ -192,20 +195,19 @@ pub(crate) fn unused_private_type_var(
 
         let semantic = checker.semantic();
 
-        let typevarlike_kind = {
-            if semantic.match_typing_expr(func, "TypeVar") {"TypeVar"} else {
-                if semantic.match_typing_expr(func, "ParamSpec") {"ParamSpec"} else {
-                    if semantic.match_typing_expr(func, "TypeVarTuple") {"TypeVarTuple"} else {
-                        continue;
-                    }
-                }
+        let typevarlike_kind = match func {
+            f if semantic.match_typing_expr(f, "TypeVar") => "TypeVar",
+            f if semantic.match_typing_expr(f, "ParamSpec") => "ParamSpec",
+            f if semantic.match_typing_expr(f, "TypeVarTuple") => "TypeVarTuple",
+            _ => {
+                continue;
             }
         };
 
         diagnostics.push(Diagnostic::new(
             UnusedPrivateTypeVar {
                 typevarlike_name: id.to_string(),
-                typevarlike_kind: typevarlike_kind.to_string()
+                typevarlike_kind: typevarlike_kind.to_string(),
             },
             binding.range(),
         ));
