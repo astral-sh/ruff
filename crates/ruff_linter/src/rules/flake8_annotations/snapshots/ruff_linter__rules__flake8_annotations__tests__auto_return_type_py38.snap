@@ -550,4 +550,96 @@ auto_return_type.py:180:9: ANN201 [*] Missing return type annotation for public 
 182 182 |             return 1
 183 183 |         else:
 
+auto_return_type.py:187:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+187 | def func(x: int):
+    |     ^^^^ ANN201
+188 |     try:
+189 |         pass
+    |
+    = help: Add return type annotation: `Optional[int]`
+
+ℹ Unsafe fix
+151 151 | 
+152 152 | import abc
+153 153 | from abc import abstractmethod
+    154 |+from typing import Optional
+154 155 | 
+155 156 | 
+156 157 | class Foo(abc.ABC):
+--------------------------------------------------------------------------------
+184 185 |             return 1.5
+185 186 | 
+186 187 | 
+187     |-def func(x: int):
+    188 |+def func(x: int) -> Optional[int]:
+188 189 |     try:
+189 190 |         pass
+190 191 |     except:
+
+auto_return_type.py:194:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+194 | def func(x: int):
+    |     ^^^^ ANN201
+195 |     try:
+196 |         pass
+    |
+    = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+191 191 |         return 2
+192 192 | 
+193 193 | 
+194     |-def func(x: int):
+    194 |+def func(x: int) -> int:
+195 195 |     try:
+196 196 |         pass
+197 197 |     except:
+
+auto_return_type.py:203:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+203 | def func(x: int):
+    |     ^^^^ ANN201
+204 |     if not x:
+205 |         raise ValueError
+    |
+    = help: Add return type annotation: `NoReturn`
+
+ℹ Unsafe fix
+151 151 | 
+152 152 | import abc
+153 153 | from abc import abstractmethod
+    154 |+from typing import NoReturn
+154 155 | 
+155 156 | 
+156 157 | class Foo(abc.ABC):
+--------------------------------------------------------------------------------
+200 201 |         return 3
+201 202 | 
+202 203 | 
+203     |-def func(x: int):
+    204 |+def func(x: int) -> NoReturn:
+204 205 |     if not x:
+205 206 |         raise ValueError
+206 207 |     else:
+
+auto_return_type.py:210:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+210 | def func(x: int):
+    |     ^^^^ ANN201
+211 |     if not x:
+212 |         raise ValueError
+    |
+    = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+207 207 |         raise TypeError
+208 208 | 
+209 209 | 
+210     |-def func(x: int):
+    210 |+def func(x: int) -> int:
+211 211 |     if not x:
+212 212 |         raise ValueError
+213 213 |     else:
+
 

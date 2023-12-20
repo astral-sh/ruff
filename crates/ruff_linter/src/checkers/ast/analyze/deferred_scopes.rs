@@ -5,13 +5,17 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint};
+use crate::rules::{
+    flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint, ruff,
+};
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
 pub(crate) fn deferred_scopes(checker: &mut Checker) {
     if !checker.any_enabled(&[
+        Rule::AsyncioDanglingTask,
         Rule::GlobalVariableNotAssigned,
         Rule::ImportShadowedByLoopVar,
+        Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
         Rule::RedefinedWhileUnused,
         Rule::RuntimeImportInTypeCheckingBlock,
@@ -32,7 +36,6 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UnusedPrivateTypedDict,
         Rule::UnusedStaticMethodArgument,
         Rule::UnusedVariable,
-        Rule::NoSelfUse,
     ]) {
         return;
     }
@@ -268,6 +271,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         }
         if checker.enabled(Rule::UnusedPrivateTypedDict) {
             flake8_pyi::rules::unused_private_typed_dict(checker, scope, &mut diagnostics);
+        }
+
+        if checker.enabled(Rule::AsyncioDanglingTask) {
+            ruff::rules::asyncio_dangling_binding(scope, &checker.semantic, &mut diagnostics);
         }
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {

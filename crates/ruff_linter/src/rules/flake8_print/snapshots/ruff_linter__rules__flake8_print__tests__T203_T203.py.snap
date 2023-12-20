@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_print/mod.rs
 ---
-T203.py:3:1: T203 `pprint` found
+T203.py:3:1: T203 [*] `pprint` found
   |
 1 | from pprint import pprint
 2 | 
@@ -10,8 +10,17 @@ T203.py:3:1: T203 `pprint` found
 4 | 
 5 | import pprint
   |
+  = help: Remove `pprint`
 
-T203.py:7:1: T203 `pprint` found
+ℹ Unsafe fix
+1 1 | from pprint import pprint
+2 2 | 
+3   |-pprint("Hello, world!")  # T203
+4 3 | 
+5 4 | import pprint
+6 5 | 
+
+T203.py:7:1: T203 [*] `pprint` found
   |
 5 | import pprint
 6 | 
@@ -20,5 +29,14 @@ T203.py:7:1: T203 `pprint` found
 8 | 
 9 | pprint.pformat("Hello, world!")
   |
+  = help: Remove `pprint`
+
+ℹ Unsafe fix
+4 4 | 
+5 5 | import pprint
+6 6 | 
+7   |-pprint.pprint("Hello, world!")  # T203
+8 7 | 
+9 8 | pprint.pformat("Hello, world!")
 
 

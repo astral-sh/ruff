@@ -182,3 +182,33 @@ class Foo(abc.ABC):
             return 1
         else:
             return 1.5
+
+
+def func(x: int):
+    try:
+        pass
+    except:
+        return 2
+
+
+def func(x: int):
+    try:
+        pass
+    except:
+        return 2
+    else:
+        return 3
+
+
+def func(x: int):
+    if not x:
+        raise ValueError
+    else:
+        raise TypeError
+
+
+def func(x: int):
+    if not x:
+        raise ValueError
+    else:
+        return 1
