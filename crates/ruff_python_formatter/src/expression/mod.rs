@@ -529,7 +529,7 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
 #[allow(clippy::if_same_then_else)]
-fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
+pub(crate) fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
 
@@ -1192,6 +1192,78 @@ impl From<Operator> for OperatorPrecedence {
             Operator::BitOr => OperatorPrecedence::BitwiseOr,
             Operator::BitXor => OperatorPrecedence::BitwiseXor,
             Operator::BitAnd => OperatorPrecedence::BitwiseAnd,
+        }
+    }
+}
+
+/// Returns `true` if `expr` is an expression that can be split into multiple lines.
+///
+/// Returns `false` for expressions that are guaranteed to never split.
+pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -> bool {
+    match expr {
+        // Single token expressions. They never have any split points.
+        Expr::NamedExpr(_)
+        | Expr::Name(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
+        | Expr::Slice(_)
+        | Expr::IpyEscapeCommand(_) => false,
+
+        // Expressions that insert split points when parenthesized.
+        Expr::Compare(_)
+        | Expr::BinOp(_)
+        | Expr::BoolOp(_)
+        | Expr::IfExp(_)
+        | Expr::GeneratorExp(_)
+        | Expr::Subscript(_)
+        | Expr::Await(_)
+        | Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_)
+        | Expr::YieldFrom(_) => true,
+
+        // Sequence types can split if they contain at least one element.
+        Expr::Tuple(tuple) => !tuple.elts.is_empty(),
+        Expr::Dict(dict) => !dict.values.is_empty(),
+        Expr::Set(set) => !set.elts.is_empty(),
+        Expr::List(list) => !list.elts.is_empty(),
+
+        Expr::UnaryOp(unary) => is_splittable_expression(unary.operand.as_ref(), context),
+        Expr::Yield(ast::ExprYield { value, .. }) => value.is_some(),
+
+        Expr::Call(ast::ExprCall {
+            arguments, func, ..
+        }) => {
+            !arguments.is_empty()
+                || is_expression_parenthesized(
+                    func.as_ref().into(),
+                    context.comments().ranges(),
+                    context.source(),
+                )
+        }
+
+        // String like literals can expand if they are implicit concatenated.
+        Expr::FString(fstring) => fstring.value.is_implicit_concatenated(),
+        Expr::StringLiteral(string) => string.value.is_implicit_concatenated(),
+        Expr::BytesLiteral(bytes) => bytes.value.is_implicit_concatenated(),
+
+        // Expressions that have no split points per se, but they contain nested sub expressions that might expand.
+        Expr::Lambda(ast::ExprLambda {
+            body: expression, ..
+        })
+        | Expr::Starred(ast::ExprStarred {
+            value: expression, ..
+        })
+        | Expr::Attribute(ast::ExprAttribute {
+            value: expression, ..
+        }) => {
+            is_expression_parenthesized(
+                expression.into(),
+                context.comments().ranges(),
+                context.source(),
+            ) || is_splittable_expression(expression.as_ref(), context)
         }
     }
 }
