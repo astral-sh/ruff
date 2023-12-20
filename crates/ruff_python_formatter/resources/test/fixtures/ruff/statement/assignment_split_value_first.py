@@ -153,6 +153,23 @@ this_is_a_ridiculously_long_name_and_nobody_in_their_right_mind_would_use = (
     function().b().c([1, 2, 3], arg1, [1, 2, 3], arg2, [1, 2, 3], arg3)
 )
 
+#######
+# Subscripts and non-fluent attribute chains
+a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[
+    xxxxx
+].bbvbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb[
+    yyyyyyyyyy[aaaa]
+] = ccccccccccccccccccccccccccccccccccc["aaaaaaa"]
+
+a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[
+    xxxxx
+].bbvbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb = ccccccccccccccccccccccccccccccccccc[
+    "aaaaaaa"
+]
+
+label_thresholds[label_id] = label_quantiles[label_id][
+    min(int(tolerance * num_thresholds), num_thresholds - 1)
+]
 
 #######
 # Test comment inlining
