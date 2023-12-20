@@ -45,11 +45,24 @@ use crate::settings::LinterSettings;
 /// )
 /// ```
 ///
+/// ## Error suppression
+/// Hint: when suppressing `E501` errors within multi-line strings (like
+/// docstrings), the `noqa` directive should come at the end of the string
+/// (after the closing triple quote), and will apply to the entire string, like
+/// so:
+///
+/// ```python
+/// """Lorem ipsum dolor sit amet.
+///
+/// Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
+/// """  # noqa: E501
+/// ```
+///
 /// ## Options
 /// - `line-length`
-/// - `pycodestyle.max-line-length`
 /// - `task-tags`
 /// - `pycodestyle.ignore-overlong-task-comments`
+/// - `pycodestyle.max-line-length`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
