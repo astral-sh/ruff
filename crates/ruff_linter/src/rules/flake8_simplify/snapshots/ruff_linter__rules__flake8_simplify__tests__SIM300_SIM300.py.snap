@@ -309,7 +309,7 @@ SIM300.py:16:5: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > (B)` 
    16 |+B or A[0][0] > (B)
 17 17 | 
 18 18 | # Errors in preview
-19 19 | ['upper'] == UPPER_LIST 
+19 19 | ['upper'] == UPPER_LIST
 
 SIM300.py:23:1: SIM300 [*] Yoda conditions are discouraged, use `['upper'] == UPPER_LIST` instead
    |
@@ -321,7 +321,7 @@ SIM300.py:23:1: SIM300 [*] Yoda conditions are discouraged, use `['upper'] == UP
    = help: Replace Yoda condition with `['upper'] == UPPER_LIST`
 
 ℹ Safe fix
-20 20 | {} == DummyHandler.CONFIG 
+20 20 | {} == DummyHandler.CONFIG
 21 21 | 
 22 22 | # Errors in stable
 23    |-UPPER_LIST == ['upper']

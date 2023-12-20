@@ -309,14 +309,14 @@ SIM300.py:16:5: SIM300 [*] Yoda conditions are discouraged, use `A[0][0] > (B)` 
    16 |+B or A[0][0] > (B)
 17 17 | 
 18 18 | # Errors in preview
-19 19 | ['upper'] == UPPER_LIST 
+19 19 | ['upper'] == UPPER_LIST
 
 SIM300.py:19:1: SIM300 [*] Yoda conditions are discouraged, use `UPPER_LIST == ['upper']` instead
    |
 18 | # Errors in preview
-19 | ['upper'] == UPPER_LIST 
+19 | ['upper'] == UPPER_LIST
    | ^^^^^^^^^^^^^^^^^^^^^^^ SIM300
-20 | {} == DummyHandler.CONFIG 
+20 | {} == DummyHandler.CONFIG
    |
    = help: Replace Yoda condition with `UPPER_LIST == ['upper']`
 
@@ -324,17 +324,17 @@ SIM300.py:19:1: SIM300 [*] Yoda conditions are discouraged, use `UPPER_LIST == [
 16 16 | B or(B)<A[0][0]
 17 17 | 
 18 18 | # Errors in preview
-19    |-['upper'] == UPPER_LIST 
-   19 |+UPPER_LIST == ['upper'] 
-20 20 | {} == DummyHandler.CONFIG 
+19    |-['upper'] == UPPER_LIST
+   19 |+UPPER_LIST == ['upper']
+20 20 | {} == DummyHandler.CONFIG
 21 21 | 
 22 22 | # Errors in stable
 
 SIM300.py:20:1: SIM300 [*] Yoda conditions are discouraged, use `DummyHandler.CONFIG == {}` instead
    |
 18 | # Errors in preview
-19 | ['upper'] == UPPER_LIST 
-20 | {} == DummyHandler.CONFIG 
+19 | ['upper'] == UPPER_LIST
+20 | {} == DummyHandler.CONFIG
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300
 21 | 
 22 | # Errors in stable
@@ -344,9 +344,9 @@ SIM300.py:20:1: SIM300 [*] Yoda conditions are discouraged, use `DummyHandler.CO
 ℹ Safe fix
 17 17 | 
 18 18 | # Errors in preview
-19 19 | ['upper'] == UPPER_LIST 
-20    |-{} == DummyHandler.CONFIG 
-   20 |+DummyHandler.CONFIG == {} 
+19 19 | ['upper'] == UPPER_LIST
+20    |-{} == DummyHandler.CONFIG
+   20 |+DummyHandler.CONFIG == {}
 21 21 | 
 22 22 | # Errors in stable
 23 23 | UPPER_LIST == ['upper']

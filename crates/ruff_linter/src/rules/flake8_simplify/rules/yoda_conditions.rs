@@ -110,7 +110,7 @@ impl ConstantLikelihood {
                 .unwrap_or(ConstantLikelihood::Definitely),
             Expr::List(ast::ExprList { elts, .. }) if preview.is_enabled() => elts
                 .iter()
-                .map(|xexpr| ConstantLikelihood::from_expression(expr, preview))
+                .map(|expr| ConstantLikelihood::from_expression(expr, preview))
                 .min()
                 .unwrap_or(ConstantLikelihood::Definitely),
             Expr::Dict(ast::ExprDict { values: vs, .. }) if preview.is_enabled() => {
