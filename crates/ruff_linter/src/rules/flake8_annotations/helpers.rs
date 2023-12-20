@@ -62,7 +62,7 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
 
     // If every control flow path raises an exception, return `NoReturn`.
     if terminal == Some(Terminal::Raise) {
-        return Some(AutoPythonType::NoReturn);
+        return Some(AutoPythonType::Never);
     }
 
     // Determine the return type of the first `return` statement.
@@ -102,7 +102,7 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
 
 #[derive(Debug)]
 pub(crate) enum AutoPythonType {
-    NoReturn,
+    Never,
     Atom(PythonType),
     Union(FxHashSet<PythonType>),
 }
@@ -120,10 +120,17 @@ impl AutoPythonType {
         target_version: PythonVersion,
     ) -> Option<(Expr, Vec<Edit>)> {
         match self {
-            AutoPythonType::NoReturn => {
+            AutoPythonType::Never => {
                 let (no_return_edit, binding) = importer
                     .get_or_import_symbol(
-                        &ImportRequest::import_from("typing", "NoReturn"),
+                        &ImportRequest::import_from(
+                            "typing",
+                            if target_version >= PythonVersion::Py311 {
+                                "Never"
+                            } else {
+                                "NoReturn"
+                            },
+                        ),
                         at,
                         semantic,
                     )
