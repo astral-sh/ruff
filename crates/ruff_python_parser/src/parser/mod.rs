@@ -3802,7 +3802,9 @@ where
 
         // Update the range of `Expr::Tuple` or `Expr::Generator` to
         // include the parenthesis.
-        if matches!(expr, Expr::Tuple(_) | Expr::GeneratorExp(_)) {
+        if matches!(expr, Expr::Tuple(_) | Expr::GeneratorExp(_))
+            && !self.last_ctx.contains(ParserCtxFlags::PARENTHESIZED_EXPR)
+        {
             helpers::set_expr_range(&mut expr, range);
         }
 
