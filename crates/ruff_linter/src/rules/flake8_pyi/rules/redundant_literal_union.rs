@@ -66,7 +66,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr
 
     // Adds a member to `literal_exprs` for each value in a `Literal`, and any builtin types
     // to `builtin_types_in_union`.
-    let mut func = |expr: &'a Expr, _| {
+    let mut func = |expr: &'a Expr, _parent: &'a Expr| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if checker.semantic().match_typing_expr(value, "Literal") {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
@@ -84,7 +84,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr
         builtin_types_in_union.insert(builtin_type);
     };
 
-    traverse_union(&mut func, checker.semantic(), union, None);
+    traverse_union(&mut func, checker.semantic(), union);
 
     for typing_literal_expr in typing_literal_exprs {
         let Some(literal_type) = match_literal_type(typing_literal_expr) else {

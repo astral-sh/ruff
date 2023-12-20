@@ -83,7 +83,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     let mut type_exprs = Vec::new();
     let mut other_exprs = Vec::new();
 
-    let mut collect_type_exprs = |expr: &'a Expr, _| {
+    let mut collect_type_exprs = |expr: &'a Expr, _parent: &'a Expr| {
         let subscript = expr.as_subscript_expr();
 
         if subscript.is_none() {
@@ -102,7 +102,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
         }
     };
 
-    traverse_union(&mut collect_type_exprs, checker.semantic(), union, None);
+    traverse_union(&mut collect_type_exprs, checker.semantic(), union);
 
     if type_exprs.len() > 1 {
         let type_members: Vec<String> = type_exprs
