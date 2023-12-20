@@ -473,15 +473,18 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
     )?;
 
     // Step 2) Add the import to a `TYPE_CHECKING` block.
-    let add_import_edit = checker.importer().typing_import_edit(
-        &ImportedMembers {
-            statement,
-            names: member_names.iter().map(AsRef::as_ref).collect(),
-        },
-        at,
-        checker.semantic(),
-        checker.source_type,
-    )?;
+    let (type_checking_edit, add_import_edit) = checker
+        .importer()
+        .typing_import_edit(
+            &ImportedMembers {
+                statement,
+                names: member_names.iter().map(AsRef::as_ref).collect(),
+            },
+            at,
+            checker.semantic(),
+            checker.source_type,
+        )?
+        .into_edits();
 
     // Step 3) Quote any runtime usages of the referenced symbol.
     let quote_reference_edits = filter_contained(
@@ -507,10 +510,10 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
     );
 
     Ok(Fix::unsafe_edits(
-        remove_import_edit,
+        type_checking_edit,
         add_import_edit
-            .into_edits()
             .into_iter()
+            .chain(std::iter::once(remove_import_edit))
             .chain(quote_reference_edits),
     )
     .isolate(Checker::isolation(
