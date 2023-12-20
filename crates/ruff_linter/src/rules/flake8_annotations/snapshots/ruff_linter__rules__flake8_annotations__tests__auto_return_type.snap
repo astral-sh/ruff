@@ -540,13 +540,13 @@ auto_return_type.py:203:5: ANN201 [*] Missing return type annotation for public 
 204 |     if not x:
 205 |         raise ValueError
     |
-    = help: Add return type annotation: `NoReturn`
+    = help: Add return type annotation: `Never`
 
 ℹ Unsafe fix
 151 151 | 
 152 152 | import abc
 153 153 | from abc import abstractmethod
-    154 |+from typing import NoReturn
+    154 |+from typing import Never
 154 155 | 
 155 156 | 
 156 157 | class Foo(abc.ABC):
@@ -555,7 +555,7 @@ auto_return_type.py:203:5: ANN201 [*] Missing return type annotation for public 
 201 202 | 
 202 203 | 
 203     |-def func(x: int):
-    204 |+def func(x: int) -> NoReturn:
+    204 |+def func(x: int) -> Never:
 204 205 |     if not x:
 205 206 |         raise ValueError
 206 207 |     else:
