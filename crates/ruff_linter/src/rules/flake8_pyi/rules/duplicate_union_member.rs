@@ -1,14 +1,15 @@
-use ruff_python_ast::{self as ast, Expr};
-use rustc_hash::FxHashSet;
 use std::collections::HashSet;
 
-use crate::checkers::ast::Checker;
+use rustc_hash::FxHashSet;
 
-use crate::rules::flake8_pyi::helpers::traverse_union;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for duplicate union members.

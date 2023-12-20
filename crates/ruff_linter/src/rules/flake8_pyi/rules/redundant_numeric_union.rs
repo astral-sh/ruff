@@ -1,11 +1,10 @@
-use ruff_python_ast::{Expr, Parameters};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{Expr, Parameters};
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_pyi::helpers::traverse_union;
 
 /// ## What it does
 /// Checks for union annotations that contain redundant numeric types (e.g.,
