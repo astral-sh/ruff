@@ -116,21 +116,21 @@ fn get_undecorated_methods(
             {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
                     if id == method_name && checker.semantic().is_builtin(method_name) {
-                        if arguments.args.len() != 1 {
-                            continue;
-                        }
-
                         if targets.len() != 1 {
                             continue;
                         }
 
+                        let [arg] = arguments.args.as_slice() else {
+                            continue;
+                        };
+
                         let target_name = match targets.first() {
-                            Some(Expr::Name(ast::ExprName { id, .. })) => id.to_string(),
+                            Some(Expr::Name(ast::ExprName { id, .. })) => id,
                             _ => continue,
                         };
 
-                        if let Expr::Name(ast::ExprName { id, .. }) = &arguments.args[0] {
-                            if target_name == *id {
+                        if let Expr::Name(ast::ExprName { id, .. }) = &arg {
+                            if target_name == id {
                                 explicit_decorator_calls.insert(id.to_string(), stmt.range());
                             }
                         };
