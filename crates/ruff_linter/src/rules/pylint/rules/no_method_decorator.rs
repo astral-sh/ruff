@@ -124,9 +124,11 @@ fn get_undecorated_methods(
                             continue;
                         };
 
-                        let target_name = match targets.first() {
-                            Some(Expr::Name(ast::ExprName { id, .. })) => id,
-                            _ => continue,
+                        let Some(Expr::Name(ast::ExprName {
+                            id: target_name, ..
+                        })) = targets.first()
+                        else {
+                            continue;
                         };
 
                         if let Expr::Name(ast::ExprName { id, .. }) = &arg {
