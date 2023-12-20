@@ -39,11 +39,13 @@ pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
     pub allow_dunder_method_names: FxHashSet<String>,
     pub max_args: usize,
+    pub max_positional_args: usize,
     pub max_returns: usize,
     pub max_bool_expr: usize,
     pub max_branches: usize,
     pub max_statements: usize,
     pub max_public_methods: usize,
+    pub max_locals: usize,
 }
 
 impl Default for Settings {
@@ -52,11 +54,13 @@ impl Default for Settings {
             allow_magic_value_types: vec![ConstantType::Str, ConstantType::Bytes],
             allow_dunder_method_names: FxHashSet::default(),
             max_args: 5,
+            max_positional_args: 5,
             max_returns: 6,
             max_bool_expr: 5,
             max_branches: 12,
             max_statements: 50,
             max_public_methods: 20,
+            max_locals: 15,
         }
     }
 }

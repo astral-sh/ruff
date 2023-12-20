@@ -411,4 +411,22 @@ D.py:707:1: D208 [*] Docstring is over-indented
 709 709 | 
 710 710 | 
 
+D.py:723:1: D208 [*] Docstring is over-indented
+    |
+721 |     """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
+722 | 
+723 |        Returns:
+    |  D208
+724 |     """
+    |
+    = help: Remove over-indentation
+
+ℹ Safe fix
+720 720 | def inconsistent_indent_byte_size():
+721 721 |     """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
+722 722 | 
+723     |-       Returns:
+    723 |+    Returns:
+724 724 |     """
+
 

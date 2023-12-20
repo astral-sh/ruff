@@ -247,6 +247,14 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                     Some(Fix::unsafe_edit(edit).isolate(isolation))
                 };
             }
+        } else {
+            let name = binding.name(checker.locator());
+            let renamed = format!("_{name}");
+            if checker.settings.dummy_variable_rgx.is_match(&renamed) {
+                let edit = Edit::range_replacement(renamed, binding.range());
+
+                return Some(Fix::unsafe_edit(edit).isolate(isolation));
+            }
         }
     }
 

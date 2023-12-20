@@ -635,7 +635,6 @@ impl<'stmt> BasicBlocksBuilder<'stmt> {
                         | Expr::Set(_)
                         | Expr::Compare(_)
                         | Expr::Call(_)
-                        | Expr::FormattedValue(_)
                         | Expr::FString(_)
                         | Expr::StringLiteral(_)
                         | Expr::BytesLiteral(_)

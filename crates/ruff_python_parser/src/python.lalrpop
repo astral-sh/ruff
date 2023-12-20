@@ -11,7 +11,7 @@ use crate::{
     lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
     context::set_context,
-    string::{StringType, concatenated_strings, parse_fstring_middle, parse_string_literal},
+    string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
     token::{self, StringKind},
     invalid,
 };
@@ -156,33 +156,33 @@ ExpressionStatement: ast::Stmt = {
     },
 };
 
-AssignSuffix: ast::ParenthesizedExpr = {
+AssignSuffix: crate::parser::ParenthesizedExpr = {
     "=" <e:TestListOrYieldExpr> => e,
     "=" <e:IpyEscapeCommandExpr> => e
 };
 
-TestListOrYieldExpr: ast::ParenthesizedExpr = {
+TestListOrYieldExpr: crate::parser::ParenthesizedExpr = {
     TestList,
     YieldExpr
 }
 
 #[inline]
-TestOrStarExprList: ast::ParenthesizedExpr = {
+TestOrStarExprList: crate::parser::ParenthesizedExpr = {
     // as far as I can tell, these were the same
     TestList
 };
 
-TestOrStarExpr: ast::ParenthesizedExpr = {
+TestOrStarExpr: crate::parser::ParenthesizedExpr = {
     Test<"all">,
     StarExpr,
 };
 
-NamedOrStarExpr: ast::ParenthesizedExpr = {
+NamedOrStarExpr: crate::parser::ParenthesizedExpr = {
     NamedExpression,
     StarExpr,
 };
 
-TestOrStarNamedExpr: ast::ParenthesizedExpr = {
+TestOrStarNamedExpr: crate::parser::ParenthesizedExpr = {
     NamedExpressionTest,
     StarExpr,
 };
@@ -345,7 +345,7 @@ IpyEscapeCommandStatement: ast::Stmt = {
     }
 }
 
-IpyEscapeCommandExpr: ast::ParenthesizedExpr = {
+IpyEscapeCommandExpr: crate::parser::ParenthesizedExpr = {
     <location:@L> <c:ipy_escape_command> <end_location:@R> =>? {
         if mode == Mode::Ipython {
             // This should never occur as the lexer won't allow it.
@@ -630,13 +630,13 @@ StarPattern: ast::Pattern = {
     }.into(),
 }
 
-NumberAtom: ast::ParenthesizedExpr = {
+NumberAtom: crate::parser::ParenthesizedExpr = {
     <location:@L> <value:Number> <end_location:@R> => ast::Expr::NumberLiteral(
         ast::ExprNumberLiteral { value, range: (location..end_location).into() }
     ).into(),
 }
 
-NumberExpr: ast::ParenthesizedExpr = {
+NumberExpr: crate::parser::ParenthesizedExpr = {
     NumberAtom,
     <location:@L> "-" <operand:NumberAtom> <end_location:@R> => ast::Expr::UnaryOp(
         ast::ExprUnaryOp {
@@ -647,7 +647,7 @@ NumberExpr: ast::ParenthesizedExpr = {
     ).into(),
 }
 
-AddOpExpr: ast::ParenthesizedExpr = {
+AddOpExpr: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:NumberExpr> <op:AddOp> <right:NumberAtom> <end_location:@R> => ast::ExprBinOp {
         left: Box::new(left.into()),
         op,
@@ -1316,7 +1316,7 @@ Decorator: ast::Decorator = {
     },
 };
 
-YieldExpr: ast::ParenthesizedExpr = {
+YieldExpr: crate::parser::ParenthesizedExpr = {
     <location:@L> "yield" <value:TestList?> <end_location:@R> => ast::ExprYield {
         value: value.map(ast::Expr::from).map(Box::new),
         range: (location..end_location).into(),
@@ -1327,7 +1327,7 @@ YieldExpr: ast::ParenthesizedExpr = {
     }.into(),
 };
 
-Test<Goal>: ast::ParenthesizedExpr = {
+Test<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <body:OrTest<"all">> "if" <test:OrTest<"all">> "else" <orelse:Test<"all">> <end_location:@R> => ast::ExprIfExp {
         test: Box::new(test.into()),
         body: Box::new(body.into()),
@@ -1338,12 +1338,12 @@ Test<Goal>: ast::ParenthesizedExpr = {
     LambdaDef,
 };
 
-NamedExpressionTest: ast::ParenthesizedExpr = {
+NamedExpressionTest: crate::parser::ParenthesizedExpr = {
     NamedExpression,
     Test<"all">,
 }
 
-NamedExpressionName: ast::ParenthesizedExpr = {
+NamedExpressionName: crate::parser::ParenthesizedExpr = {
     <location:@L> <id:Identifier> <end_location:@R> => ast::ExprName {
         id: id.into(),
         ctx: ast::ExprContext::Store,
@@ -1351,7 +1351,7 @@ NamedExpressionName: ast::ParenthesizedExpr = {
     }.into(),
 }
 
-NamedExpression: ast::ParenthesizedExpr = {
+NamedExpression: crate::parser::ParenthesizedExpr = {
     <location:@L> <target:NamedExpressionName> ":=" <value:Test<"all">> <end_location:@R> => {
         ast::ExprNamedExpr {
             target: Box::new(target.into()),
@@ -1361,7 +1361,7 @@ NamedExpression: ast::ParenthesizedExpr = {
     },
 };
 
-LambdaDef: ast::ParenthesizedExpr = {
+LambdaDef: crate::parser::ParenthesizedExpr = {
     <location:@L> "lambda" <location_args:@L> <parameters:ParameterList<UntypedParameter, StarUntypedParameter, StarUntypedParameter>?> <end_location_args:@R> ":" <fstring_middle:fstring_middle?> <body:Test<"all">> <end_location:@R> =>? {
         if fstring_middle.is_some() {
             return Err(LexicalError {
@@ -1379,7 +1379,7 @@ LambdaDef: ast::ParenthesizedExpr = {
     }
 }
 
-OrTest<Goal>: ast::ParenthesizedExpr = {
+OrTest<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <values:(<AndTest<"all">> "or")+> <last: AndTest<"all">> <end_location:@R> => {
         let values = values.into_iter().chain(std::iter::once(last)).map(ast::Expr::from).collect();
         ast::ExprBoolOp { op: ast::BoolOp::Or, values, range: (location..end_location).into() }.into()
@@ -1387,7 +1387,7 @@ OrTest<Goal>: ast::ParenthesizedExpr = {
     AndTest<Goal>,
 };
 
-AndTest<Goal>: ast::ParenthesizedExpr = {
+AndTest<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <values:(<NotTest<"all">> "and")+> <last:NotTest<"all">> <end_location:@R> => {
         let values = values.into_iter().chain(std::iter::once(last)).map(ast::Expr::from).collect();
         ast::ExprBoolOp { op: ast::BoolOp::And, values, range: (location..end_location).into() }.into()
@@ -1395,7 +1395,7 @@ AndTest<Goal>: ast::ParenthesizedExpr = {
     NotTest<Goal>,
 };
 
-NotTest<Goal>: ast::ParenthesizedExpr = {
+NotTest<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> "not" <operand:NotTest<"all">> <end_location:@R> => ast::ExprUnaryOp {
         operand: Box::new(operand.into()),
         op: ast::UnaryOp::Not,
@@ -1404,7 +1404,7 @@ NotTest<Goal>: ast::ParenthesizedExpr = {
     Comparison<Goal>,
 };
 
-Comparison<Goal>: ast::ParenthesizedExpr = {
+Comparison<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:Expression<"all">> <comparisons:(CompOp Expression<"all">)+> <end_location:@R> => {
         let (ops, comparators) = comparisons.into_iter().map(|(op, comparator)| (op, ast::Expr::from(comparator))).unzip();
         ast::ExprCompare { left: Box::new(left.into()), ops, comparators, range: (location..end_location).into() }.into()
@@ -1425,7 +1425,7 @@ CompOp: ast::CmpOp = {
     "is" "not" => ast::CmpOp::IsNot,
 };
 
-Expression<Goal>: ast::ParenthesizedExpr = {
+Expression<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:Expression<"all">> "|" <right:XorExpression<"all">> <end_location:@R> => ast::ExprBinOp {
         left: Box::new(left.into()),
         op: ast::Operator::BitOr,
@@ -1435,7 +1435,7 @@ Expression<Goal>: ast::ParenthesizedExpr = {
     XorExpression<Goal>,
 };
 
-XorExpression<Goal>: ast::ParenthesizedExpr = {
+XorExpression<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:XorExpression<"all">> "^" <right:AndExpression<"all">> <end_location:@R> => ast::ExprBinOp {
         left: Box::new(left.into()),
         op: ast::Operator::BitXor,
@@ -1445,7 +1445,7 @@ XorExpression<Goal>: ast::ParenthesizedExpr = {
     AndExpression<Goal>,
 };
 
-AndExpression<Goal>: ast::ParenthesizedExpr = {
+AndExpression<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:AndExpression<"all">> "&" <right:ShiftExpression<"all">> <end_location:@R> => ast::ExprBinOp {
         left: Box::new(left.into()),
         op: ast::Operator::BitAnd,
@@ -1455,7 +1455,7 @@ AndExpression<Goal>: ast::ParenthesizedExpr = {
     ShiftExpression<Goal>,
 };
 
-ShiftExpression<Goal>: ast::ParenthesizedExpr = {
+ShiftExpression<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:ShiftExpression<"all">> <op:ShiftOp> <right:ArithmeticExpression<"all">> <end_location:@R> => ast::ExprBinOp {
         left: Box::new(left.into()),
         op,
@@ -1470,7 +1470,7 @@ ShiftOp: ast::Operator = {
     ">>" => ast::Operator::RShift,
 };
 
-ArithmeticExpression<Goal>: ast::ParenthesizedExpr = {
+ArithmeticExpression<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:ArithmeticExpression<"all">> <op:AddOp> <right:Term<"all">> <end_location:@R> => ast::ExprBinOp {
         left: Box::new(left.into()),
         op,
@@ -1485,7 +1485,7 @@ AddOp: ast::Operator = {
     "-" => ast::Operator::Sub,
 };
 
-Term<Goal>: ast::ParenthesizedExpr = {
+Term<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:Term<"all">> <op:MulOp> <right:Factor<"all">> <end_location:@R> => ast::ExprBinOp {
         left: Box::new(left.into()),
         op,
@@ -1503,7 +1503,7 @@ MulOp: ast::Operator = {
     "@" => ast::Operator::MatMult,
 };
 
-Factor<Goal>: ast::ParenthesizedExpr = {
+Factor<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <op:UnaryOp> <operand:Factor<"all">> <end_location:@R> => ast::ExprUnaryOp {
         operand: Box::new(operand.into()),
         op,
@@ -1518,7 +1518,7 @@ UnaryOp: ast::UnaryOp = {
     "~" => ast::UnaryOp::Invert,
 };
 
-Power<Goal>: ast::ParenthesizedExpr = {
+Power<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> <left:AtomExpr<"all">> "**" <right:Factor<"all">> <end_location:@R> => ast::ExprBinOp {
         left: Box::new(left.into()),
         op: ast::Operator::Pow,
@@ -1528,14 +1528,14 @@ Power<Goal>: ast::ParenthesizedExpr = {
     AtomExpr<Goal>,
 };
 
-AtomExpr<Goal>: ast::ParenthesizedExpr = {
+AtomExpr<Goal>: crate::parser::ParenthesizedExpr = {
     <location:@L> "await" <value:AtomExpr2<"all">> <end_location:@R> => {
         ast::ExprAwait { value: Box::new(value.into()), range: (location..end_location).into() }.into()
     },
     AtomExpr2<Goal>,
 }
 
-AtomExpr2<Goal>: ast::ParenthesizedExpr = {
+AtomExpr2<Goal>: crate::parser::ParenthesizedExpr = {
     Atom<Goal>,
     <location:@L> <func:AtomExpr2<"all">> <arguments:Arguments> <end_location:@R> => ast::ExprCall {
         func: Box::new(func.into()),
@@ -1556,7 +1556,7 @@ AtomExpr2<Goal>: ast::ParenthesizedExpr = {
     }.into(),
 };
 
-SubscriptList: ast::ParenthesizedExpr = {
+SubscriptList: crate::parser::ParenthesizedExpr = {
     Subscript,
     <location:@L> <s1:Subscript> "," <end_location:@R> => {
         ast::ExprTuple {
@@ -1575,7 +1575,7 @@ SubscriptList: ast::ParenthesizedExpr = {
     }
 };
 
-Subscript: ast::ParenthesizedExpr = {
+Subscript: crate::parser::ParenthesizedExpr = {
     TestOrStarNamedExpr,
     <location:@L> <lower:Test<"all">?> ":" <upper:Test<"all">?> <step:SliceOp?> <end_location:@R> => {
         let lower = lower.map(ast::Expr::from).map(Box::new);
@@ -1587,7 +1587,7 @@ Subscript: ast::ParenthesizedExpr = {
     }
 };
 
-SliceOp: Option<ast::ParenthesizedExpr> = {
+SliceOp: Option<crate::parser::ParenthesizedExpr> = {
     <location:@L> ":" <e:Test<"all">?> => e,
 }
 
@@ -1611,23 +1611,23 @@ StringLiteral: StringType = {
 };
 
 FStringExpr: StringType = {
-    <location:@L> FStringStart <values:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
+    <location:@L> FStringStart <elements:FStringMiddlePattern*> FStringEnd <end_location:@R> => {
         StringType::FString(ast::FString {
-            values,
+            elements,
             range: (location..end_location).into()
         })
     }
 };
 
-FStringMiddlePattern: ast::Expr = {
+FStringMiddlePattern: ast::FStringElement = {
     FStringReplacementField,
     <location:@L> <fstring_middle:fstring_middle> <end_location:@R> =>? {
         let (source, is_raw) = fstring_middle;
-        Ok(parse_fstring_middle(&source, is_raw, (location..end_location).into())?)
+        Ok(parse_fstring_literal_element(&source, is_raw, (location..end_location).into())?)
     }
 };
 
-FStringReplacementField: ast::Expr = {
+FStringReplacementField: ast::FStringElement = {
     <location:@L> "{" <value:TestListOrYieldExpr> <debug:"="?> <conversion:FStringConversion?> <format_spec:FStringFormatSpecSuffix?> "}" <end_location:@R> =>? {
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
             return Err(LexicalError {
@@ -1651,30 +1651,27 @@ FStringReplacementField: ast::Expr = {
             }
         });
         Ok(
-            ast::ExprFormattedValue {
-                value: Box::new(value.into()),
+            ast::FStringElement::Expression(ast::FStringExpressionElement {
+                expression: Box::new(value.into()),
                 debug_text,
                 conversion: conversion.map_or(ast::ConversionFlag::None, |(_, conversion_flag)| {
                     conversion_flag
                 }),
                 format_spec: format_spec.map(Box::new),
                 range: (location..end_location).into(),
-            }
-            .into()
+            })
         )
     }
 };
 
-FStringFormatSpecSuffix: ast::Expr = {
+FStringFormatSpecSuffix: ast::FStringFormatSpec = {
     ":" <format_spec:FStringFormatSpec> => format_spec
 };
 
-FStringFormatSpec: ast::Expr = {
-    <location:@L> <values:FStringMiddlePattern*> <end_location:@R> => {
-        ast::FString {
-            values,
-            range: (location..end_location).into()
-        }.into()
+FStringFormatSpec: ast::FStringFormatSpec = {
+    <location:@L> <elements:FStringMiddlePattern*> <end_location:@R> => ast::FStringFormatSpec {
+        elements,
+        range: (location..end_location).into(),
     },
 };
 
@@ -1693,7 +1690,7 @@ FStringConversion: (TextSize, ast::ConversionFlag) = {
     }
 };
 
-Atom<Goal>: ast::ParenthesizedExpr = {
+Atom<Goal>: crate::parser::ParenthesizedExpr = {
     <expr:String> => expr.into(),
     <location:@L> <value:Number> <end_location:@R> => ast::ExprNumberLiteral {
         value,
@@ -1713,7 +1710,7 @@ Atom<Goal>: ast::ParenthesizedExpr = {
     },
     <location:@L> "(" <elts:OneOrMore<Test<"all">>> <trailing_comma:","?> ")" <end_location:@R> if Goal != "no-withitems" => {
         if elts.len() == 1 && trailing_comma.is_none() {
-            ast::ParenthesizedExpr {
+            crate::parser::ParenthesizedExpr {
                 expr: elts.into_iter().next().unwrap().into(),
                 range: (location..end_location).into(),
             }
@@ -1730,7 +1727,7 @@ Atom<Goal>: ast::ParenthesizedExpr = {
                     location: mid.start(),
                 })?;
             }
-            Ok(ast::ParenthesizedExpr {
+            Ok(crate::parser::ParenthesizedExpr {
                 expr: mid.into(),
                 range: (location..end_location).into(),
             })
@@ -1744,7 +1741,7 @@ Atom<Goal>: ast::ParenthesizedExpr = {
         ctx: ast::ExprContext::Load,
         range: (location..end_location).into(),
     }.into(),
-    <location:@L> "(" <e:YieldExpr> ")" <end_location:@R> => ast::ParenthesizedExpr {
+    <location:@L> "(" <e:YieldExpr> ")" <end_location:@R> => crate::parser::ParenthesizedExpr {
         expr: e.into(),
         range: (location..end_location).into(),
     },
@@ -1793,37 +1790,37 @@ Atom<Goal>: ast::ParenthesizedExpr = {
     <location:@L> "..." <end_location:@R> => ast::ExprEllipsisLiteral { range: (location..end_location).into() }.into(),
 };
 
-ListLiteralValues: Vec<ast::ParenthesizedExpr> = {
+ListLiteralValues: Vec<crate::parser::ParenthesizedExpr> = {
     <e:OneOrMore<TestOrStarNamedExpr>> ","? => e,
 };
 
-DictLiteralValues: Vec<(Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr)> = {
+DictLiteralValues: Vec<(Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr)> = {
     <elements:OneOrMore<DictElement>> ","? => elements,
 };
 
-DictEntry: (ast::ParenthesizedExpr, ast::ParenthesizedExpr) = {
+DictEntry: (crate::parser::ParenthesizedExpr, crate::parser::ParenthesizedExpr) = {
     <e1: Test<"all">> ":" <e2: Test<"all">> => (e1, e2),
 };
 
-DictElement: (Option<Box<ast::ParenthesizedExpr>>, ast::ParenthesizedExpr) = {
+DictElement: (Option<Box<crate::parser::ParenthesizedExpr>>, crate::parser::ParenthesizedExpr) = {
     <e:DictEntry> => (Some(Box::new(e.0)), e.1),
     "**" <e:Expression<"all">> => (None, e),
 };
 
-SetLiteralValues: Vec<ast::ParenthesizedExpr> = {
+SetLiteralValues: Vec<crate::parser::ParenthesizedExpr> = {
     <e1:OneOrMore<TestOrStarNamedExpr>> ","? => e1
 };
 
-ExpressionOrStarExpression: ast::ParenthesizedExpr = {
+ExpressionOrStarExpression: crate::parser::ParenthesizedExpr = {
     Expression<"all">,
     StarExpr
 };
 
-ExpressionList: ast::ParenthesizedExpr = {
+ExpressionList: crate::parser::ParenthesizedExpr = {
     GenericList<ExpressionOrStarExpression>
 };
 
-ExpressionList2: Vec<ast::ParenthesizedExpr> = {
+ExpressionList2: Vec<crate::parser::ParenthesizedExpr> = {
     <elements:OneOrMore<ExpressionOrStarExpression>> ","? => elements,
 };
 
@@ -1832,14 +1829,14 @@ ExpressionList2: Vec<ast::ParenthesizedExpr> = {
 // - a single expression
 // - a single expression followed by a trailing comma
 #[inline]
-TestList: ast::ParenthesizedExpr = {
+TestList: crate::parser::ParenthesizedExpr = {
     GenericList<TestOrStarExpr>
 };
 
-GenericList<Element>: ast::ParenthesizedExpr = {
+GenericList<Element>: crate::parser::ParenthesizedExpr = {
     <location:@L> <elts:OneOrMore<Element>> <trailing_comma:","?> <end_location:@R> => {
         if elts.len() == 1 && trailing_comma.is_none() {
-            ast::ParenthesizedExpr {
+            crate::parser::ParenthesizedExpr {
               expr: elts.into_iter().next().unwrap().into(),
               range: (location..end_location).into(),
             }
@@ -1851,7 +1848,7 @@ GenericList<Element>: ast::ParenthesizedExpr = {
 }
 
 // Test
-StarExpr: ast::ParenthesizedExpr = {
+StarExpr: crate::parser::ParenthesizedExpr = {
     <location:@L> "*" <value:Expression<"all">> <end_location:@R> => ast::ExprStarred {
         value: Box::new(value.into()),
         ctx: ast::ExprContext::Load,
@@ -1876,8 +1873,8 @@ SingleForComprehension: ast::Comprehension = {
     }
 };
 
-ExpressionNoCond: ast::ParenthesizedExpr = OrTest<"all">;
-ComprehensionIf: ast::ParenthesizedExpr = "if" <c:ExpressionNoCond> => c;
+ExpressionNoCond: crate::parser::ParenthesizedExpr = OrTest<"all">;
+ComprehensionIf: crate::parser::ParenthesizedExpr = "if" <c:ExpressionNoCond> => c;
 
 Arguments: ast::Arguments = {
     <location:@L> "(" <e: Comma<FunctionArgument>> ")" <end_location:@R> =>? {

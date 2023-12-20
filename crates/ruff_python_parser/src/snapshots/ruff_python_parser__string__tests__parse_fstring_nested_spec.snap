@@ -14,11 +14,11 @@ expression: parse_ast
                             FString(
                                 FString {
                                     range: 0..15,
-                                    values: [
-                                        FormattedValue(
-                                            ExprFormattedValue {
+                                    elements: [
+                                        Expression(
+                                            FStringExpressionElement {
                                                 range: 2..14,
-                                                value: Name(
+                                                expression: Name(
                                                     ExprName {
                                                         range: 3..6,
                                                         id: "foo",
@@ -28,37 +28,26 @@ expression: parse_ast
                                                 debug_text: None,
                                                 conversion: None,
                                                 format_spec: Some(
-                                                    FString(
-                                                        ExprFString {
-                                                            range: 7..13,
-                                                            value: FStringValue {
-                                                                inner: Single(
-                                                                    FString(
-                                                                        FString {
-                                                                            range: 7..13,
-                                                                            values: [
-                                                                                FormattedValue(
-                                                                                    ExprFormattedValue {
-                                                                                        range: 7..13,
-                                                                                        value: Name(
-                                                                                            ExprName {
-                                                                                                range: 8..12,
-                                                                                                id: "spec",
-                                                                                                ctx: Load,
-                                                                                            },
-                                                                                        ),
-                                                                                        debug_text: None,
-                                                                                        conversion: None,
-                                                                                        format_spec: None,
-                                                                                    },
-                                                                                ),
-                                                                            ],
+                                                    FStringFormatSpec {
+                                                        range: 7..13,
+                                                        elements: [
+                                                            Expression(
+                                                                FStringExpressionElement {
+                                                                    range: 7..13,
+                                                                    expression: Name(
+                                                                        ExprName {
+                                                                            range: 8..12,
+                                                                            id: "spec",
+                                                                            ctx: Load,
                                                                         },
                                                                     ),
-                                                                ),
-                                                            },
-                                                        },
-                                                    ),
+                                                                    debug_text: None,
+                                                                    conversion: None,
+                                                                    format_spec: None,
+                                                                },
+                                                            ),
+                                                        ],
+                                                    },
                                                 ),
                                             },
                                         ),

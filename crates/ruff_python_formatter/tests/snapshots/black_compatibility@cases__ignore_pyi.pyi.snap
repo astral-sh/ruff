@@ -22,10 +22,9 @@ def g():
     # hi
     ...
 
-# FIXME(#8905): Uncomment, leads to unstable formatting
-# def h():
-#     ...
-#     # bye
+def h():
+    ...
+    # bye
 ```
 
 ## Black Differences
@@ -41,17 +40,6 @@ def g():
  class y: ...  # comment
  
  # whitespace doesn't matter (note the next line has a trailing space and tab)
-@@ -13,6 +12,7 @@
-     # hi
-     ...
- 
--def h():
--    ...
--    # bye
-+# FIXME(#8905): Uncomment, leads to unstable formatting
-+# def h():
-+#     ...
-+#     # bye
 ```
 
 ## Ruff Output
@@ -71,10 +59,9 @@ def g():
     # hi
     ...
 
-# FIXME(#8905): Uncomment, leads to unstable formatting
-# def h():
-#     ...
-#     # bye
+def h():
+    ...
+    # bye
 ```
 
 ## Black Output

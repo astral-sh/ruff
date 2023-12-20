@@ -21,20 +21,25 @@ If left unspecified, Ruff's default configuration is equivalent to:
         ".git",
         ".git-rewrite",
         ".hg",
+        ".ipynb_checkpoints",
         ".mypy_cache",
         ".nox",
         ".pants.d",
+        ".pyenv",
+        ".pytest_cache",
         ".pytype",
         ".ruff_cache",
         ".svn",
         ".tox",
         ".venv",
+        ".vscode",
         "__pypackages__",
         "_build",
         "buck-out",
         "build",
         "dist",
         "node_modules",
+        "site-packages",
         "venv",
     ]
 
@@ -71,6 +76,20 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
     # Like Black, automatically detect the appropriate line ending.
     line-ending = "auto"
+
+    # Enable auto-formatting of code examples in docstrings. Markdown,
+    # reStructuredText code/literal blocks and doctests are all supported.
+    #
+    # This is currently disabled by default, but it is planned for this
+    # to be opt-out in the future.
+    docstring-code-format = false
+
+    # Set the line length limit used when formatting code snippets in
+    # docstrings.
+    #
+    # This only has an effect when the `docstring-code-format` setting is
+    # enabled.
+    docstring-code-line-length = "dynamic"
     ```
 
 === "ruff.toml"
@@ -84,20 +103,25 @@ If left unspecified, Ruff's default configuration is equivalent to:
         ".git",
         ".git-rewrite",
         ".hg",
+        ".ipynb_checkpoints",
         ".mypy_cache",
         ".nox",
         ".pants.d",
+        ".pyenv",
+        ".pytest_cache",
         ".pytype",
         ".ruff_cache",
         ".svn",
         ".tox",
         ".venv",
+        ".vscode",
         "__pypackages__",
         "_build",
         "buck-out",
         "build",
         "dist",
         "node_modules",
+        "site-packages",
         "venv",
     ]
 
@@ -134,6 +158,20 @@ If left unspecified, Ruff's default configuration is equivalent to:
 
     # Like Black, automatically detect the appropriate line ending.
     line-ending = "auto"
+
+    # Enable auto-formatting of code examples in docstrings. Markdown,
+    # reStructuredText code/literal blocks and doctests are all supported.
+    #
+    # This is currently disabled by default, but it is planned for this
+    # to be opt-out in the future.
+    docstring-code-format = false
+
+    # Set the line length limit used when formatting code snippets in
+    # docstrings.
+    #
+    # This only has an effect when the `docstring-code-format` setting is
+    # enabled.
+    docstring-code-line-length = "dynamic"
     ```
 
 As an example, the following would configure Ruff to:
@@ -301,21 +339,20 @@ For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Default inclusions
 
-By default, Ruff will discover files matching `*.py`, `*.ipy`, or `pyproject.toml`. 
+By default, Ruff will discover files matching `*.py`, `*.ipy`, or `pyproject.toml`.
 
 To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
 
 === "pyproject.toml"
 
     ```toml
-    [tool.ruff.lint]
+    [tool.ruff]
     extend-include = ["*.ipynb"]
     ```
 
 === "ruff.toml"
 
     ```toml
-    [lint]
     extend-include = ["*.ipynb"]
     ```
 
@@ -325,20 +362,19 @@ You can also change the default selection using the [`include`](settings.md#incl
 === "pyproject.toml"
 
     ```toml
-    [tool.ruff.lint]
+    [tool.ruff]
     include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
     ```
 
 === "ruff.toml"
 
     ```toml
-    [lint]
     include = ["pyproject.toml", "src/**/*.py", "scripts/**/*.py"]
     ```
 
 !!! warning
     Paths provided to `include` _must_ match files. For example, `include = ["src"]` will fail since it
-matches a directory.
+    matches a directory.
 
 ## Jupyter Notebook discovery
 
@@ -483,7 +519,7 @@ Options:
       --ignore-noqa
           Ignore any `# noqa` comments
       --output-format <OUTPUT_FORMAT>
-          Output serialization format for violations [env: RUFF_OUTPUT_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure]
+          Output serialization format for violations [env: RUFF_OUTPUT_FORMAT=] [possible values: text, json, json-lines, junit, grouped, github, gitlab, pylint, azure, sarif]
   -o, --output-file <OUTPUT_FILE>
           Specify file to write the linter output to (default: stdout)
       --target-version <TARGET_VERSION>

@@ -13,7 +13,7 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, TextEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, PylintEmitter, SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
 use ruff_linter::registry::{AsRule, Rule};
@@ -125,15 +125,7 @@ impl Printer {
                 if let Some(fixables) = fixables {
                     let fix_prefix = format!("[{}]", "*".cyan());
 
-                    if self.unsafe_fixes.is_enabled() {
-                        if fixables.applicable > 0 {
-                            writeln!(
-                                writer,
-                                "{fix_prefix} {} fixable with the --fix option.",
-                                fixables.applicable
-                            )?;
-                        }
-                    } else {
+                    if self.unsafe_fixes.is_hint() {
                         if fixables.applicable > 0 && fixables.unapplicable_unsafe > 0 {
                             let es = if fixables.unapplicable_unsafe == 1 {
                                 ""
@@ -161,6 +153,14 @@ impl Printer {
                             writeln!(writer,
                                 "No fixes available ({} hidden fix{es} can be enabled with the `--unsafe-fixes` option).",
                                 fixables.unapplicable_unsafe
+                            )?;
+                        }
+                    } else {
+                        if fixables.applicable > 0 {
+                            writeln!(
+                                writer,
+                                "{fix_prefix} {} fixable with the --fix option.",
+                                fixables.applicable
                             )?;
                         }
                     }
@@ -290,6 +290,9 @@ impl Printer {
             }
             SerializationFormat::Azure => {
                 AzureEmitter.emit(writer, &diagnostics.messages, &context)?;
+            }
+            SerializationFormat::Sarif => {
+                SarifEmitter.emit(writer, &diagnostics.messages, &context)?;
             }
         }
 

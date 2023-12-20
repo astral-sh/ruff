@@ -90,7 +90,7 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
 fn contains_message(expr: &Expr) -> bool {
     match expr {
         Expr::FString(ast::ExprFString { value, .. }) => {
-            for f_string_part in value.parts() {
+            for f_string_part in value {
                 match f_string_part {
                     ast::FStringPart::Literal(literal) => {
                         if literal.chars().any(char::is_whitespace) {
@@ -98,8 +98,12 @@ fn contains_message(expr: &Expr) -> bool {
                         }
                     }
                     ast::FStringPart::FString(f_string) => {
-                        for value in &f_string.values {
-                            if contains_message(value) {
+                        for literal in f_string
+                            .elements
+                            .iter()
+                            .filter_map(|element| element.as_literal())
+                        {
+                            if literal.chars().any(char::is_whitespace) {
                                 return true;
                             }
                         }

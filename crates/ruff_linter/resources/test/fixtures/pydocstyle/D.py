@@ -713,5 +713,12 @@ def retain_extra_whitespace_not_overindented():
 
     This is not overindented
         This is overindented, but since one line is not overindented this should not raise
-            And so is this, but it we should preserve the extra space on this line relative 
+            And so is this, but it we should preserve the extra space on this line relative
+    """
+
+
+def inconsistent_indent_byte_size():
+    """There's a non-breaking space (2-bytes) after 3 spaces (https://github.com/astral-sh/ruff/issues/9080).
+
+       Returns:
     """

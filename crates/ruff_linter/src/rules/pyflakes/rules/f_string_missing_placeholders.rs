@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast as ast;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -47,11 +47,12 @@ impl AlwaysFixableViolation for FStringMissingPlaceholders {
 
 /// F541
 pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::ExprFString) {
-    if expr
-        .value
-        .f_strings()
-        .any(|f_string| f_string.values.iter().any(Expr::is_formatted_value_expr))
-    {
+    if expr.value.f_strings().any(|f_string| {
+        f_string
+            .elements
+            .iter()
+            .any(ast::FStringElement::is_expression)
+    }) {
         return;
     }
 

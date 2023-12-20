@@ -5,35 +5,41 @@ use bitflags::bitflags;
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
-    self as ast, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExpressionRef,
+    self as ast, Expr, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExpressionRef,
 };
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::{leading_comments, trailing_comments};
-use crate::expression::parentheses::{
-    in_parentheses_only_group, in_parentheses_only_soft_line_break_or_space,
-};
-use crate::expression::Expr;
+use crate::expression::expr_f_string::f_string_quoting;
+use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
+use crate::other::f_string::FormatFString;
+use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
 use crate::prelude::*;
 use crate::QuoteStyle;
 
-mod docstring;
+pub(crate) mod docstring;
 
-#[derive(Copy, Clone, Debug)]
-enum Quoting {
+#[derive(Copy, Clone, Debug, Default)]
+pub(crate) enum Quoting {
+    #[default]
     CanChange,
     Preserve,
 }
 
+/// Represents any kind of string expression. This could be either a string,
+/// bytes or f-string.
 #[derive(Clone, Debug)]
-pub(super) enum AnyString<'a> {
+pub(crate) enum AnyString<'a> {
     String(&'a ExprStringLiteral),
     Bytes(&'a ExprBytesLiteral),
     FString(&'a ExprFString),
 }
 
 impl<'a> AnyString<'a> {
+    /// Creates a new [`AnyString`] from the given [`Expr`].
+    ///
+    /// Returns `None` if the expression is not either a string, bytes or f-string.
     pub(crate) fn from_expression(expression: &'a Expr) -> Option<AnyString<'a>> {
         match expression {
             Expr::StringLiteral(string) => Some(AnyString::String(string)),
@@ -43,36 +49,8 @@ impl<'a> AnyString<'a> {
         }
     }
 
-    fn quoting(&self, locator: &Locator) -> Quoting {
-        match self {
-            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
-            Self::FString(f_string) => {
-                let unprefixed = locator
-                    .slice(f_string.range)
-                    .trim_start_matches(|c| c != '"' && c != '\'');
-                let triple_quoted =
-                    unprefixed.starts_with(r#"""""#) || unprefixed.starts_with(r"'''");
-                if f_string.value.elements().any(|value| match value {
-                    Expr::FormattedValue(ast::ExprFormattedValue { range, .. }) => {
-                        let string_content = locator.slice(*range);
-                        if triple_quoted {
-                            string_content.contains(r#"""""#) || string_content.contains("'''")
-                        } else {
-                            string_content.contains(['"', '\''])
-                        }
-                    }
-                    _ => false,
-                }) {
-                    Quoting::Preserve
-                } else {
-                    Quoting::CanChange
-                }
-            }
-        }
-    }
-
     /// Returns `true` if the string is implicitly concatenated.
-    pub(super) fn is_implicit_concatenated(&self) -> bool {
+    pub(crate) fn is_implicit_concatenated(&self) -> bool {
         match self {
             Self::String(ExprStringLiteral { value, .. }) => value.is_implicit_concatenated(),
             Self::Bytes(ExprBytesLiteral { value, .. }) => value.is_implicit_concatenated(),
@@ -80,21 +58,38 @@ impl<'a> AnyString<'a> {
         }
     }
 
-    fn parts(&self) -> Vec<AnyStringPart<'a>> {
+    /// Returns the quoting to be used for this string.
+    fn quoting(&self, locator: &Locator<'_>) -> Quoting {
         match self {
-            Self::String(ExprStringLiteral { value, .. }) => {
-                value.parts().map(AnyStringPart::String).collect()
-            }
+            Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
+            Self::FString(f_string) => f_string_quoting(f_string, locator),
+        }
+    }
+
+    /// Returns a vector of all the [`AnyStringPart`] of this string.
+    fn parts(&self, quoting: Quoting) -> Vec<AnyStringPart<'a>> {
+        match self {
+            Self::String(ExprStringLiteral { value, .. }) => value
+                .iter()
+                .map(|part| AnyStringPart::String {
+                    part,
+                    layout: StringLiteralKind::String,
+                })
+                .collect(),
             Self::Bytes(ExprBytesLiteral { value, .. }) => {
-                value.parts().map(AnyStringPart::Bytes).collect()
+                value.iter().map(AnyStringPart::Bytes).collect()
             }
             Self::FString(ExprFString { value, .. }) => value
-                .parts()
+                .iter()
                 .map(|f_string_part| match f_string_part {
-                    ast::FStringPart::Literal(string_literal) => {
-                        AnyStringPart::String(string_literal)
-                    }
-                    ast::FStringPart::FString(f_string) => AnyStringPart::FString(f_string),
+                    ast::FStringPart::Literal(string_literal) => AnyStringPart::String {
+                        part: string_literal,
+                        layout: StringLiteralKind::InImplicitlyConcatenatedFString(quoting),
+                    },
+                    ast::FStringPart::FString(f_string) => AnyStringPart::FString {
+                        part: f_string,
+                        quoting,
+                    },
                 })
                 .collect(),
         }
@@ -131,19 +126,29 @@ impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
     }
 }
 
+/// Represents any kind of string which is part of an implicitly concatenated
+/// string. This could be either a string, bytes or f-string.
+///
+/// This is constructed from the [`AnyString::parts`] method on [`AnyString`].
 #[derive(Clone, Debug)]
 enum AnyStringPart<'a> {
-    String(&'a ast::StringLiteral),
+    String {
+        part: &'a ast::StringLiteral,
+        layout: StringLiteralKind,
+    },
     Bytes(&'a ast::BytesLiteral),
-    FString(&'a ast::FString),
+    FString {
+        part: &'a ast::FString,
+        quoting: Quoting,
+    },
 }
 
 impl<'a> From<&AnyStringPart<'a>> for AnyNodeRef<'a> {
     fn from(value: &AnyStringPart<'a>) -> Self {
         match value {
-            AnyStringPart::String(part) => AnyNodeRef::StringLiteral(part),
+            AnyStringPart::String { part, .. } => AnyNodeRef::StringLiteral(part),
             AnyStringPart::Bytes(part) => AnyNodeRef::BytesLiteral(part),
-            AnyStringPart::FString(part) => AnyNodeRef::FString(part),
+            AnyStringPart::FString { part, .. } => AnyNodeRef::FString(part),
         }
     }
 }
@@ -151,98 +156,33 @@ impl<'a> From<&AnyStringPart<'a>> for AnyNodeRef<'a> {
 impl Ranged for AnyStringPart<'_> {
     fn range(&self) -> TextRange {
         match self {
-            Self::String(part) => part.range(),
+            Self::String { part, .. } => part.range(),
             Self::Bytes(part) => part.range(),
-            Self::FString(part) => part.range(),
+            Self::FString { part, .. } => part.range(),
         }
     }
 }
 
-pub(super) struct FormatString<'a> {
-    string: &'a AnyString<'a>,
-    layout: StringLayout,
-}
-
-#[derive(Default, Copy, Clone, Debug)]
-pub enum StringLayout {
-    #[default]
-    Default,
-    DocString,
-    /// An implicit concatenated string in a binary like (e.g. `a + b` or `a < b`) expression.
-    ///
-    /// Formats the implicit concatenated string parts without the enclosing group because the group
-    /// is added by the binary like formatting.
-    ImplicitConcatenatedStringInBinaryLike,
-}
-
-impl<'a> FormatString<'a> {
-    pub(super) fn new(string: &'a AnyString<'a>) -> Self {
-        Self {
-            string,
-            layout: StringLayout::Default,
-        }
-    }
-
-    pub(super) fn with_layout(mut self, layout: StringLayout) -> Self {
-        self.layout = layout;
-        self
-    }
-}
-
-impl<'a> Format<PyFormatContext<'_>> for FormatString<'a> {
+impl Format<PyFormatContext<'_>> for AnyStringPart<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let parent_docstring_quote_style = f.context().docstring();
-        let locator = f.context().locator();
-        let result = match self.layout {
-            StringLayout::Default => {
-                if self.string.is_implicit_concatenated() {
-                    in_parentheses_only_group(&FormatStringContinuation::new(self.string)).fmt(f)
-                } else {
-                    StringPart::from_source(self.string.range(), &locator)
-                        .normalize(
-                            self.string.quoting(&locator),
-                            &locator,
-                            f.options().quote_style(),
-                            parent_docstring_quote_style,
-                        )
-                        .fmt(f)
-                }
+        match self {
+            AnyStringPart::String { part, layout } => {
+                FormatStringLiteral::new(part, *layout).fmt(f)
             }
-            StringLayout::DocString => {
-                let string_part = StringPart::from_source(self.string.range(), &locator);
-                let normalized = string_part.normalize(
-                    Quoting::CanChange,
-                    &locator,
-                    f.options().quote_style(),
-                    parent_docstring_quote_style,
-                );
-                docstring::format(&normalized, f)
-            }
-            StringLayout::ImplicitConcatenatedStringInBinaryLike => {
-                FormatStringContinuation::new(self.string).fmt(f)
-            }
-        };
-        // TODO(dhruvmanila): With PEP 701, comments can be inside f-strings.
-        // This is to mark all of those comments as formatted but we need to
-        // figure out how to handle them. Note that this needs to be done only
-        // after the f-string is formatted, so only for all the non-formatted
-        // comments.
-        if let AnyString::FString(fstring) = self.string {
-            let comments = f.context().comments();
-            fstring.value.elements().for_each(|value| {
-                comments.mark_verbatim_node_comments_formatted(value.into());
-            });
+            AnyStringPart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
+            AnyStringPart::FString { part, quoting } => FormatFString::new(part, *quoting).fmt(f),
         }
-        result
     }
 }
 
-struct FormatStringContinuation<'a> {
+/// Formats any implicitly concatenated string. This could be any valid combination
+/// of string, bytes or f-string literals.
+pub(crate) struct FormatStringContinuation<'a> {
     string: &'a AnyString<'a>,
 }
 
 impl<'a> FormatStringContinuation<'a> {
-    fn new(string: &'a AnyString<'a>) -> Self {
+    pub(crate) fn new(string: &'a AnyString<'a>) -> Self {
         Self { string }
     }
 }
@@ -250,24 +190,15 @@ impl<'a> FormatStringContinuation<'a> {
 impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let comments = f.context().comments().clone();
-        let locator = f.context().locator();
-        let in_docstring = f.context().docstring();
-        let quote_style = f.options().quote_style();
+        let quoting = self.string.quoting(&f.context().locator());
 
         let mut joiner = f.join_with(in_parentheses_only_soft_line_break_or_space());
 
-        for part in self.string.parts() {
-            let normalized = StringPart::from_source(part.range(), &locator).normalize(
-                self.string.quoting(&locator),
-                &locator,
-                quote_style,
-                in_docstring,
-            );
-
+        for part in self.string.parts(quoting) {
             joiner.entry(&format_args![
                 line_suffix_boundary(),
                 leading_comments(comments.leading(&part)),
-                normalized,
+                part,
                 trailing_comments(comments.trailing(&part))
             ]);
         }
@@ -277,7 +208,7 @@ impl Format<PyFormatContext<'_>> for FormatStringContinuation<'_> {
 }
 
 #[derive(Debug)]
-struct StringPart {
+pub(crate) struct StringPart {
     /// The prefix.
     prefix: StringPrefix,
 
@@ -289,7 +220,7 @@ struct StringPart {
 }
 
 impl StringPart {
-    fn from_source(range: TextRange, locator: &Locator) -> Self {
+    pub(crate) fn from_source(range: TextRange, locator: &Locator) -> Self {
         let string_content = locator.slice(range);
 
         let prefix = StringPrefix::parse(string_content);
@@ -316,16 +247,14 @@ impl StringPart {
     /// snippet within the docstring. The quote style should correspond to the
     /// style of quotes used by said docstring. Normalization will ensure the
     /// quoting styles don't conflict.
-    fn normalize<'a>(
+    pub(crate) fn normalize<'a>(
         self,
         quoting: Quoting,
         locator: &'a Locator,
         configured_style: QuoteStyle,
-        parent_docstring_quote_style: Option<QuoteStyle>,
+        parent_docstring_quote_char: Option<QuoteChar>,
     ) -> NormalizedString<'a> {
-        // Per PEP 8 and PEP 257, always prefer double quotes for docstrings
-        // and triple-quoted strings. (We assume docstrings are always
-        // triple-quoted.)
+        // Per PEP 8, always prefer double quotes for triple-quoted strings.
         let preferred_style = if self.quotes.triple {
             // ... unless we're formatting a code snippet inside a docstring,
             // then we specifically want to invert our quote style to avoid
@@ -372,8 +301,8 @@ impl StringPart {
             // Overall this is a bit of a corner case and just inverting the
             // style from what the parent ultimately decided upon works, even
             // if it doesn't have perfect alignment with PEP8.
-            if let Some(style) = parent_docstring_quote_style {
-                style.invert()
+            if let Some(quote) = parent_docstring_quote_char {
+                QuoteStyle::from(quote.invert())
             } else {
                 QuoteStyle::Double
             }
@@ -386,10 +315,14 @@ impl StringPart {
         let quotes = match quoting {
             Quoting::Preserve => self.quotes,
             Quoting::CanChange => {
-                if self.prefix.is_raw_string() {
-                    choose_quotes_raw(raw_content, self.quotes, preferred_style)
+                if let Some(preferred_quote) = QuoteChar::from_style(preferred_style) {
+                    if self.prefix.is_raw_string() {
+                        choose_quotes_raw(raw_content, self.quotes, preferred_quote)
+                    } else {
+                        choose_quotes(raw_content, self.quotes, preferred_quote)
+                    }
                 } else {
-                    choose_quotes(raw_content, self.quotes, preferred_style)
+                    self.quotes
                 }
             }
         };
@@ -406,7 +339,7 @@ impl StringPart {
 }
 
 #[derive(Debug)]
-struct NormalizedString<'a> {
+pub(crate) struct NormalizedString<'a> {
     prefix: StringPrefix,
 
     /// The quotes of the normalized string (preferred quotes)
@@ -442,7 +375,7 @@ impl Format<PyFormatContext<'_>> for NormalizedString<'_> {
 
 bitflags! {
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    pub(super) struct StringPrefix: u8 {
+    pub(crate) struct StringPrefix: u8 {
         const UNICODE   = 0b0000_0001;
         /// `r"test"`
         const RAW       = 0b0000_0010;
@@ -454,7 +387,7 @@ bitflags! {
 }
 
 impl StringPrefix {
-    pub(super) fn parse(input: &str) -> StringPrefix {
+    pub(crate) fn parse(input: &str) -> StringPrefix {
         let chars = input.chars();
         let mut prefix = StringPrefix::empty();
 
@@ -479,7 +412,7 @@ impl StringPrefix {
         prefix
     }
 
-    pub(super) const fn text_len(self) -> TextSize {
+    pub(crate) const fn text_len(self) -> TextSize {
         TextSize::new(self.bits().count_ones())
     }
 
@@ -524,9 +457,9 @@ impl Format<PyFormatContext<'_>> for StringPrefix {
 fn choose_quotes_raw(
     input: &str,
     quotes: StringQuotes,
-    preferred_style: QuoteStyle,
+    preferred_quote: QuoteChar,
 ) -> StringQuotes {
-    let preferred_quote_char = preferred_style.as_char();
+    let preferred_quote_char = preferred_quote.as_char();
     let mut chars = input.chars().peekable();
     let contains_unescaped_configured_quotes = loop {
         match chars.next() {
@@ -564,10 +497,10 @@ fn choose_quotes_raw(
 
     StringQuotes {
         triple: quotes.triple,
-        style: if contains_unescaped_configured_quotes {
-            quotes.style
+        quote_char: if contains_unescaped_configured_quotes {
+            quotes.quote_char
         } else {
-            preferred_style
+            preferred_quote
         },
     }
 }
@@ -580,14 +513,14 @@ fn choose_quotes_raw(
 /// For triple quoted strings, the preferred quote style is always used, unless the string contains
 /// a triplet of the quote character (e.g., if double quotes are preferred, double quotes will be
 /// used unless the string contains `"""`).
-fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle) -> StringQuotes {
-    let style = if quotes.triple {
+fn choose_quotes(input: &str, quotes: StringQuotes, preferred_quote: QuoteChar) -> StringQuotes {
+    let quote = if quotes.triple {
         // True if the string contains a triple quote sequence of the configured quote style.
         let mut uses_triple_quotes = false;
         let mut chars = input.chars().peekable();
 
         while let Some(c) = chars.next() {
-            let preferred_quote_char = preferred_style.as_char();
+            let preferred_quote_char = preferred_quote.as_char();
             match c {
                 '\\' => {
                     if matches!(chars.peek(), Some('"' | '\\')) {
@@ -635,9 +568,9 @@ fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle)
         if uses_triple_quotes {
             // String contains a triple quote sequence of the configured quote style.
             // Keep the existing quote style.
-            quotes.style
+            quotes.quote_char
         } else {
-            preferred_style
+            preferred_quote
         }
     } else {
         let mut single_quotes = 0u32;
@@ -657,19 +590,19 @@ fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle)
             }
         }
 
-        match preferred_style {
-            QuoteStyle::Single => {
+        match preferred_quote {
+            QuoteChar::Single => {
                 if single_quotes > double_quotes {
-                    QuoteStyle::Double
+                    QuoteChar::Double
                 } else {
-                    QuoteStyle::Single
+                    QuoteChar::Single
                 }
             }
-            QuoteStyle::Double => {
+            QuoteChar::Double => {
                 if double_quotes > single_quotes {
-                    QuoteStyle::Single
+                    QuoteChar::Single
                 } else {
-                    QuoteStyle::Double
+                    QuoteChar::Double
                 }
             }
         }
@@ -677,29 +610,32 @@ fn choose_quotes(input: &str, quotes: StringQuotes, preferred_style: QuoteStyle)
 
     StringQuotes {
         triple: quotes.triple,
-        style,
+        quote_char: quote,
     }
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(super) struct StringQuotes {
+pub(crate) struct StringQuotes {
     triple: bool,
-    style: QuoteStyle,
+    quote_char: QuoteChar,
 }
 
 impl StringQuotes {
-    pub(super) fn parse(input: &str) -> Option<StringQuotes> {
+    pub(crate) fn parse(input: &str) -> Option<StringQuotes> {
         let mut chars = input.chars();
 
         let quote_char = chars.next()?;
-        let style = QuoteStyle::try_from(quote_char).ok()?;
+        let quote = QuoteChar::try_from(quote_char).ok()?;
 
         let triple = chars.next() == Some(quote_char) && chars.next() == Some(quote_char);
 
-        Some(Self { triple, style })
+        Some(Self {
+            triple,
+            quote_char: quote,
+        })
     }
 
-    pub(super) const fn is_triple(self) -> bool {
+    pub(crate) const fn is_triple(self) -> bool {
         self.triple
     }
 
@@ -714,14 +650,71 @@ impl StringQuotes {
 
 impl Format<PyFormatContext<'_>> for StringQuotes {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let quotes = match (self.style, self.triple) {
-            (QuoteStyle::Single, false) => "'",
-            (QuoteStyle::Single, true) => "'''",
-            (QuoteStyle::Double, false) => "\"",
-            (QuoteStyle::Double, true) => "\"\"\"",
+        let quotes = match (self.quote_char, self.triple) {
+            (QuoteChar::Single, false) => "'",
+            (QuoteChar::Single, true) => "'''",
+            (QuoteChar::Double, false) => "\"",
+            (QuoteChar::Double, true) => "\"\"\"",
         };
 
         token(quotes).fmt(f)
+    }
+}
+
+/// The quotation character used to quote a string, byte, or fstring literal.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum QuoteChar {
+    /// A single quote: `'`
+    Single,
+
+    /// A double quote: '"'
+    Double,
+}
+
+impl QuoteChar {
+    pub const fn as_char(self) -> char {
+        match self {
+            QuoteChar::Single => '\'',
+            QuoteChar::Double => '"',
+        }
+    }
+
+    #[must_use]
+    pub const fn invert(self) -> QuoteChar {
+        match self {
+            QuoteChar::Single => QuoteChar::Double,
+            QuoteChar::Double => QuoteChar::Single,
+        }
+    }
+
+    #[must_use]
+    pub const fn from_style(style: QuoteStyle) -> Option<QuoteChar> {
+        match style {
+            QuoteStyle::Single => Some(QuoteChar::Single),
+            QuoteStyle::Double => Some(QuoteChar::Double),
+            QuoteStyle::Preserve => None,
+        }
+    }
+}
+
+impl From<QuoteChar> for QuoteStyle {
+    fn from(value: QuoteChar) -> Self {
+        match value {
+            QuoteChar::Single => QuoteStyle::Single,
+            QuoteChar::Double => QuoteStyle::Double,
+        }
+    }
+}
+
+impl TryFrom<char> for QuoteChar {
+    type Error = ();
+
+    fn try_from(value: char) -> Result<Self, Self::Error> {
+        match value {
+            '\'' => Ok(QuoteChar::Single),
+            '"' => Ok(QuoteChar::Double),
+            _ => Err(()),
+        }
     }
 }
 
@@ -737,9 +730,9 @@ fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> 
     // If `last_index` is `0` at the end, then the input is already normalized and can be returned as is.
     let mut last_index = 0;
 
-    let style = quotes.style;
-    let preferred_quote = style.as_char();
-    let opposite_quote = style.invert().as_char();
+    let quote = quotes.quote_char;
+    let preferred_quote = quote.as_char();
+    let opposite_quote = quote.invert().as_char();
 
     let mut chars = input.char_indices().peekable();
 

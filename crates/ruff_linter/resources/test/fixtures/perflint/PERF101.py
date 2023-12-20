@@ -63,3 +63,8 @@ for i in list(foo_tuple):  # Ok
 
 for i in list(foo_set):  # Ok
     foo_set.append(i + 1)
+
+x, y, nested_tuple = (1, 2, (3, 4, 5))
+
+for i in list(nested_tuple):  # PERF101
+    pass

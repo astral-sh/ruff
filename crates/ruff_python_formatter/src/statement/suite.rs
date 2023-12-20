@@ -8,9 +8,10 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::comments::{
     leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
 };
-use crate::context::{NodeLevel, TopLevelStatementPosition, WithNodeLevel};
-use crate::expression::string::StringLayout;
+use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
+use crate::expression::expr_string_literal::ExprStringLiteralKind;
 use crate::prelude::*;
+use crate::preview::is_no_blank_line_before_class_docstring_enabled;
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
@@ -71,7 +72,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let source = f.context().source();
         let source_type = f.options().source_type();
 
-        let f = &mut WithNodeLevel::new(node_level, f);
+        let f = WithNodeLevel::new(node_level, f);
+        let f = &mut WithIndentLevel::new(f.context().indent_level().increment(), f);
 
         // Format the first statement in the body, which often has special formatting rules.
         let first = match self.kind {
@@ -107,13 +109,23 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     if !comments.has_leading(first)
                         && lines_before(first.start(), source) > 1
                         && !source_type.is_stub()
+                        && !is_no_blank_line_before_class_docstring_enabled(f.context())
                     {
                         // Allow up to one empty line before a class docstring, e.g., this is
                         // stable formatting:
+                        //
                         // ```python
                         // class Test:
                         //
                         //     """Docstring"""
+                        // ```
+                        //
+                        // But, in preview mode, we don't want to allow any empty lines before a
+                        // class docstring, e.g., this is preview formatting:
+                        //
+                        // ```python
+                        // class Test:
+                        //   """Docstring"""
                         // ```
                         empty_line().fmt(f)?;
                     }
@@ -511,7 +523,9 @@ pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> b
             let [node] = body else {
                 return false;
             };
-            value.is_ellipsis_literal_expr() && !comments.has_leading(node)
+            value.is_ellipsis_literal_expr()
+                && !comments.has_leading(node)
+                && !comments.has_trailing_own_line(node)
         }
         _ => false,
     }
@@ -606,7 +620,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                     leading_comments(node_comments.leading),
                     string_literal
                         .format()
-                        .with_options(StringLayout::DocString),
+                        .with_options(ExprStringLiteralKind::Docstring),
                 ]
             )?;
 

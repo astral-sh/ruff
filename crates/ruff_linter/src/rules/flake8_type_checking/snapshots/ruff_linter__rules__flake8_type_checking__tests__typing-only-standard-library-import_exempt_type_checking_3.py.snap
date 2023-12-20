@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+exempt_type_checking_3.py:5:20: TCH003 [*] Move standard library import `typing.Final` into a type-checking block
+  |
+3 | from __future__ import annotations
+4 | 
+5 | from typing import Final, Mapping
+  |                    ^^^^^ TCH003
+6 | 
+7 | Const: Final[dict] = {}
+  |
+  = help: Move into type-checking block
+
+ℹ Unsafe fix
+2  2  | 
+3  3  | from __future__ import annotations
+4  4  | 
+5     |-from typing import Final, Mapping
+   5  |+from typing import Mapping
+   6  |+from typing import TYPE_CHECKING
+   7  |+
+   8  |+if TYPE_CHECKING:
+   9  |+    from typing import Final
+6  10 | 
+7  11 | Const: Final[dict] = {}
+
+

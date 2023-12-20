@@ -15,8 +15,9 @@ use crate::rules::{
     flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
-    flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_use_pathlib, flynt, numpy,
-    pandas_vet, pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff,
+    flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_type_checking, flake8_use_pathlib,
+    flynt, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
+    refurb, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -356,6 +357,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::FString,
                 // flynt
                 Rule::StaticJoinToFString,
+                // refurb
+                Rule::HashlibDigestHex,
             ]) {
                 if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
                     let attr = attr.as_str();
@@ -543,7 +546,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_bugbear::rules::no_explicit_stacklevel(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDictKwargs) {
-                flake8_pie::rules::unnecessary_dict_kwargs(checker, expr, keywords);
+                flake8_pie::rules::unnecessary_dict_kwargs(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryRangeStart) {
                 flake8_pie::rules::unnecessary_range_start(checker, call);
@@ -580,6 +583,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::HashlibInsecureHashFunction) {
                 flake8_bandit::rules::hashlib_insecure_hash_functions(checker, call);
+            }
+            if checker.enabled(Rule::HashlibDigestHex) {
+                refurb::rules::hashlib_digest_hex(checker, call);
             }
             if checker.enabled(Rule::RequestWithoutTimeout) {
                 flake8_bandit::rules::request_without_timeout(checker, call);
@@ -1165,6 +1171,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 if checker.enabled(Rule::UnnecessaryTypeUnion) {
                     flake8_pyi::rules::unnecessary_type_union(checker, expr);
                 }
+                if checker.enabled(Rule::RuntimeStringUnion) {
+                    flake8_type_checking::rules::runtime_string_union(checker, expr);
+                }
             }
         }
         Expr::UnaryOp(
@@ -1270,30 +1279,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::math_constant(checker, number_literal);
             }
         }
-        Expr::BytesLiteral(_) => {
-            if checker.source_type.is_stub() && checker.enabled(Rule::StringOrBytesTooLong) {
-                flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
-            }
-        }
-        Expr::StringLiteral(string) => {
-            if checker.enabled(Rule::HardcodedBindAllInterfaces) {
-                if let Some(diagnostic) =
-                    flake8_bandit::rules::hardcoded_bind_all_interfaces(string)
-                {
-                    checker.diagnostics.push(diagnostic);
-                }
-            }
-            if checker.enabled(Rule::HardcodedTempFile) {
-                flake8_bandit::rules::hardcoded_tmp_directory(checker, string);
-            }
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             if checker.enabled(Rule::UnicodeKindPrefix) {
-                for string_part in string.value.parts() {
+                for string_part in value {
                     pyupgrade::rules::unicode_kind_prefix(checker, string_part);
-                }
-            }
-            if checker.source_type.is_stub() {
-                if checker.enabled(Rule::StringOrBytesTooLong) {
-                    flake8_pyi::rules::string_or_bytes_too_long(checker, expr);
                 }
             }
         }

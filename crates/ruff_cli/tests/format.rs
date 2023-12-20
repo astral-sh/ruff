@@ -140,6 +140,99 @@ if condition:
 }
 
 #[test]
+fn docstring_options() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+[format]
+docstring-code-format = true
+docstring-code-line-length = 20
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(["format", "--config"])
+        .arg(&ruff_toml)
+        .arg("-")
+        .pass_stdin(r#"
+def f(x):
+    '''
+    Something about `f`. And an example:
+
+    .. code-block:: python
+
+        foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+
+    Another example:
+
+    ```py
+    foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+    ```
+
+    And another:
+
+    >>> foo, bar, quux = this_is_a_long_line(lion, hippo, lemur, bear)
+    '''
+    pass
+"#), @r###"
+success: true
+exit_code: 0
+----- stdout -----
+def f(x):
+    """
+    Something about `f`. And an example:
+
+    .. code-block:: python
+
+        (
+            foo,
+            bar,
+            quux,
+        ) = this_is_a_long_line(
+            lion,
+            hippo,
+            lemur,
+            bear,
+        )
+
+    Another example:
+
+    ```py
+    (
+        foo,
+        bar,
+        quux,
+    ) = this_is_a_long_line(
+        lion,
+        hippo,
+        lemur,
+        bear,
+    )
+    ```
+
+    And another:
+
+    >>> (
+    ...     foo,
+    ...     bar,
+    ...     quux,
+    ... ) = this_is_a_long_line(
+    ...     lion,
+    ...     hippo,
+    ...     lemur,
+    ...     bear,
+    ... )
+    """
+    pass
+
+----- stderr -----
+"###);
+    Ok(())
+}
+
+#[test]
 fn mixed_line_endings() -> Result<()> {
     let tempdir = TempDir::new()?;
 
@@ -162,7 +255,7 @@ fn mixed_line_endings() -> Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    2 files left unchanged
+    2 files already formatted
     "###);
     Ok(())
 }
@@ -232,6 +325,60 @@ OTHER = "OTHER"
 
     ----- stderr -----
     "###);
+    Ok(())
+}
+
+#[test]
+fn messages() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        r#"
+from test import say_hy
+
+if __name__ == "__main__":
+    say_hy("dear Ruff contributor")
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--no-cache", "--isolated", "--check"])
+        .arg("main.py"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    1 file would be reformatted
+
+    ----- stderr -----
+    "###);
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--no-cache", "--isolated"])
+        .arg("main.py"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    "###);
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--no-cache", "--isolated"])
+        .arg("main.py"), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file left unchanged
+
+    ----- stderr -----
+    "###);
+
     Ok(())
 }
 
@@ -783,7 +930,7 @@ fn test_diff() {
 
 
         ----- stderr -----
-        2 files would be reformatted, 1 file left unchanged
+        2 files would be reformatted, 1 file already formatted
         "###);
     });
 }

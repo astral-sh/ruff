@@ -94,6 +94,7 @@ mod tests {
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
+    #[test_case(Rule::TooManyPositional, Path::new("too_many_positional.py"))]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
     #[test_case(
         Rule::TooManyReturnStatements,
@@ -250,6 +251,22 @@ mod tests {
     }
 
     #[test]
+    fn max_positional_args() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_positional_params.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_positional_args: 4,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::TooManyPositional)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn max_branches() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_branches_params.py"),
@@ -323,6 +340,22 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn too_many_locals() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_locals.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_locals: 15,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
             },
         )?;
         assert_messages!(diagnostics);

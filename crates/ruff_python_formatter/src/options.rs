@@ -11,7 +11,7 @@ use std::str::FromStr;
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
-    serde(default)
+    serde(default, deny_unknown_fields)
 )]
 pub struct PyFormatOptions {
     /// Whether we're in a `.py` file or `.pyi` file, which have different rules.
@@ -49,6 +49,11 @@ pub struct PyFormatOptions {
     /// enabled by default (opt-out) in the future.
     docstring_code: DocstringCode,
 
+    /// The preferred line width at which the formatter should wrap lines in
+    /// docstring code examples. This only has an impact when `docstring_code`
+    /// is enabled.
+    docstring_code_line_width: DocstringCodeLineWidth,
+
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
 }
@@ -77,6 +82,7 @@ impl Default for PyFormatOptions {
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
             docstring_code: DocstringCode::default(),
+            docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
         }
     }
@@ -119,7 +125,11 @@ impl PyFormatOptions {
         self.docstring_code
     }
 
-    pub fn preview(&self) -> PreviewMode {
+    pub fn docstring_code_line_width(&self) -> DocstringCodeLineWidth {
+        self.docstring_code_line_width
+    }
+
+    pub const fn preview(&self) -> PreviewMode {
         self.preview
     }
 
@@ -166,6 +176,12 @@ impl PyFormatOptions {
     }
 
     #[must_use]
+    pub fn with_docstring_code_line_width(mut self, line_width: DocstringCodeLineWidth) -> Self {
+        self.docstring_code_line_width = line_width;
+        self
+    }
+
+    #[must_use]
     pub fn with_preview(mut self, preview: PreviewMode) -> Self {
         self.preview = preview;
         self
@@ -207,35 +223,7 @@ pub enum QuoteStyle {
     Single,
     #[default]
     Double,
-}
-
-impl QuoteStyle {
-    pub const fn as_char(self) -> char {
-        match self {
-            QuoteStyle::Single => '\'',
-            QuoteStyle::Double => '"',
-        }
-    }
-
-    #[must_use]
-    pub const fn invert(self) -> QuoteStyle {
-        match self {
-            QuoteStyle::Single => QuoteStyle::Double,
-            QuoteStyle::Double => QuoteStyle::Single,
-        }
-    }
-}
-
-impl TryFrom<char> for QuoteStyle {
-    type Error = ();
-
-    fn try_from(value: char) -> std::result::Result<Self, Self::Error> {
-        match value {
-            '\'' => Ok(QuoteStyle::Single),
-            '"' => Ok(QuoteStyle::Double),
-            _ => Err(()),
-        }
-    }
+    Preserve,
 }
 
 impl FromStr for QuoteStyle {
@@ -245,6 +233,7 @@ impl FromStr for QuoteStyle {
         match s {
             "\"" | "double" | "Double" => Ok(Self::Double),
             "'" | "single" | "Single" => Ok(Self::Single),
+            "preserve" | "Preserve" => Ok(Self::Preserve),
             // TODO: replace this error with a diagnostic
             _ => Err("Value not supported for QuoteStyle"),
         }
@@ -316,5 +305,47 @@ pub enum DocstringCode {
 impl DocstringCode {
     pub const fn is_enabled(self) -> bool {
         matches!(self, DocstringCode::Enabled)
+    }
+}
+
+#[derive(Copy, Clone, Default, Eq, PartialEq, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum DocstringCodeLineWidth {
+    Fixed(LineWidth),
+    #[default]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "deserialize_docstring_code_line_width_dynamic")
+    )]
+    Dynamic,
+}
+
+impl std::fmt::Debug for DocstringCodeLineWidth {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            DocstringCodeLineWidth::Fixed(v) => v.value().fmt(f),
+            DocstringCodeLineWidth::Dynamic => "dynamic".fmt(f),
+        }
+    }
+}
+
+/// Responsible for deserializing the `DocstringCodeLineWidth::Dynamic`
+/// variant.
+fn deserialize_docstring_code_line_width_dynamic<'de, D>(d: D) -> Result<(), D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::{de::Error, Deserialize};
+
+    let value = String::deserialize(d)?;
+    match &*value {
+        "dynamic" => Ok(()),
+        s => Err(D::Error::invalid_value(
+            serde::de::Unexpected::Str(s),
+            &"dynamic",
+        )),
     }
 }

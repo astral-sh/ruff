@@ -56,14 +56,24 @@ pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
         Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
         Expr::NoneLiteral(_) => true,
         Expr::FString(ast::ExprFString { value, .. }) => {
-            value.parts().all(|f_string_part| match f_string_part {
+            value.iter().all(|f_string_part| match f_string_part {
                 ast::FStringPart::Literal(literal) => literal.is_empty(),
-                ast::FStringPart::FString(f_string) => {
-                    f_string.values.iter().all(is_empty_or_null_string)
-                }
+                ast::FStringPart::FString(f_string) => f_string
+                    .elements
+                    .iter()
+                    .all(is_empty_or_null_fstring_element),
             })
         }
         _ => false,
+    }
+}
+
+fn is_empty_or_null_fstring_element(element: &ast::FStringElement) -> bool {
+    match element {
+        ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => value.is_empty(),
+        ast::FStringElement::Expression(ast::FStringExpressionElement { expression, .. }) => {
+            is_empty_or_null_string(expression)
+        }
     }
 }
 

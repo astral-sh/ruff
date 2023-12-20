@@ -170,7 +170,45 @@ impl Cell {
         }
 
         // Detect cell magics (which operate on multiple lines).
-        lines.any(|line| line.trim_start().starts_with("%%"))
+        lines.any(|line| {
+            let Some(first) = line.split_whitespace().next() else {
+                return false;
+            };
+            if first.len() < 2 {
+                return false;
+            }
+            let Some(command) = first.strip_prefix("%%") else {
+                return false;
+            };
+            // These cell magics are special in that the lines following them are valid
+            // Python code and the variables defined in that scope are available to the
+            // rest of the notebook.
+            //
+            // For example:
+            //
+            // Cell 1:
+            // ```python
+            // x = 1
+            // ```
+            //
+            // Cell 2:
+            // ```python
+            // %%time
+            // y = x
+            // ```
+            //
+            // Cell 3:
+            // ```python
+            // print(y)  # Here, `y` is available.
+            // ```
+            //
+            // This is to avoid false positives when these variables are referenced
+            // elsewhere in the notebook.
+            !matches!(
+                command,
+                "capture" | "debug" | "prun" | "pypy" | "python" | "python3" | "time" | "timeit"
+            )
+        })
     }
 }
 

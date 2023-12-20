@@ -34,7 +34,9 @@ use ruff_linter::settings::{
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
 };
-use ruff_python_formatter::{MagicTrailingComma, QuoteStyle};
+use ruff_python_formatter::{
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, QuoteStyle,
+};
 
 use crate::options::{
     Flake8AnnotationsOptions, Flake8BanditOptions, Flake8BugbearOptions, Flake8BuiltinsOptions,
@@ -158,12 +160,21 @@ impl Configuration {
         let format = self.format;
         let format_defaults = FormatterSettings::default();
 
+        let quote_style = format.quote_style.unwrap_or(format_defaults.quote_style);
+        let format_preview = match format.preview.unwrap_or(global_preview) {
+            PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
+            PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
+        };
+
+        if quote_style == QuoteStyle::Preserve && !format_preview.is_enabled() {
+            return Err(anyhow!(
+                "'quote-style = preserve' is a preview only feature. Run with '--preview' to enable it."
+            ));
+        }
+
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
-            preview: match format.preview.unwrap_or(global_preview) {
-                PreviewMode::Disabled => ruff_python_formatter::PreviewMode::Disabled,
-                PreviewMode::Enabled => ruff_python_formatter::PreviewMode::Enabled,
-            },
+            preview: format_preview,
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {
@@ -176,10 +187,16 @@ impl Configuration {
                 .map_or(format_defaults.indent_width, |tab_size| {
                     ruff_formatter::IndentWidth::from(NonZeroU8::from(tab_size))
                 }),
-            quote_style: format.quote_style.unwrap_or(format_defaults.quote_style),
+            quote_style,
             magic_trailing_comma: format
                 .magic_trailing_comma
                 .unwrap_or(format_defaults.magic_trailing_comma),
+            docstring_code_format: format
+                .docstring_code_format
+                .unwrap_or(format_defaults.docstring_code_format),
+            docstring_code_line_width: format
+                .docstring_code_line_width
+                .unwrap_or(format_defaults.docstring_code_line_width),
         };
 
         let lint = self.lint;
@@ -1011,6 +1028,8 @@ pub struct FormatConfiguration {
     pub quote_style: Option<QuoteStyle>,
     pub magic_trailing_comma: Option<MagicTrailingComma>,
     pub line_ending: Option<LineEnding>,
+    pub docstring_code_format: Option<DocstringCode>,
+    pub docstring_code_line_width: Option<DocstringCodeLineWidth>,
 }
 
 impl FormatConfiguration {
@@ -1037,6 +1056,14 @@ impl FormatConfiguration {
                 }
             }),
             line_ending: options.line_ending,
+            docstring_code_format: options.docstring_code_format.map(|yes| {
+                if yes {
+                    DocstringCode::Enabled
+                } else {
+                    DocstringCode::Disabled
+                }
+            }),
+            docstring_code_line_width: options.docstring_code_line_length,
         })
     }
 
@@ -1050,6 +1077,10 @@ impl FormatConfiguration {
             quote_style: self.quote_style.or(other.quote_style),
             magic_trailing_comma: self.magic_trailing_comma.or(other.magic_trailing_comma),
             line_ending: self.line_ending.or(other.line_ending),
+            docstring_code_format: self.docstring_code_format.or(other.docstring_code_format),
+            docstring_code_line_width: self
+                .docstring_code_line_width
+                .or(other.docstring_code_line_width),
         }
     }
 }
