@@ -16,8 +16,8 @@ B<A[0][0]or B
 B or(B)<A[0][0]
 
 # Errors in preview
-['upper'] == UPPER_LIST 
-{} == DummyHandler.CONFIG 
+['upper'] == UPPER_LIST
+{} == DummyHandler.CONFIG
 
 # Errors in stable
 UPPER_LIST == ['upper']
@@ -40,4 +40,3 @@ age == JediOrder.YODA
 SECONDS_IN_DAY == 60 * 60 * 24 # Error in 0.1.8
 SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60) # Error in 0.1.8
 {"non-empty-dict": "is-ok"} == DummyHandler.CONFIG
- 
