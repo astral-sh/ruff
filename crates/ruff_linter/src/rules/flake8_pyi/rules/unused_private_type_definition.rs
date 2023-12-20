@@ -194,13 +194,18 @@ pub(crate) fn unused_private_type_var(
         };
 
         let semantic = checker.semantic();
-        let type_var_like_kind = match func {
-            func if semantic.match_typing_expr(func, "TypeVar") => "TypeVar",
-            func if semantic.match_typing_expr(func, "ParamSpec") => "ParamSpec",
-            func if semantic.match_typing_expr(func, "TypeVarTuple") => "TypeVarTuple",
-            _ => {
-                continue;
+        let Some(type_var_like_kind) = semantic.resolve_call_path(func).and_then(|call_path| {
+            if semantic.match_typing_call_path(&call_path, "TypeVar") {
+                Some("TypeVar")
+            } else if semantic.match_typing_call_path(&call_path, "ParamSpec") {
+                Some("ParamSpec")
+            } else if semantic.match_typing_call_path(&call_path, "TypeVarTuple") {
+                Some("TypeVarTuple")
+            } else {
+                None
             }
+        }) else {
+            continue;
         };
 
         diagnostics.push(Diagnostic::new(
