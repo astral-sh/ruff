@@ -647,6 +647,8 @@ with (yield from 1):
     ...
 with (a := 1):
     ...
+with (open('bla.txt')), (open('bla.txt')):
+    pass
 "
         ));
     }

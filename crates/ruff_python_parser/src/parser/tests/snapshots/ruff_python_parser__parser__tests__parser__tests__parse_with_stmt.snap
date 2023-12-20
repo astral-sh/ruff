@@ -1,11 +1,11 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
-expression: "parse(\"\nwith x:\n    ...\nwith x, y:\n    ...\nwith open() as f:\n    ...\nwith f() as x.attr:\n    pass\nwith x as X, y as Y, z as Z:\n    ...\nwith (x, z as Y, y,):\n    ...\nwith (a) as f:\n    ...\nwith ((a) as f, 1):\n    ...\nwith a:\n    yield a, b\nwith (yield 1):\n    ...\nwith (yield from 1):\n    ...\nwith (a := 1):\n    ...\n\")"
+expression: "parse(\"\nwith x:\n    ...\nwith x, y:\n    ...\nwith open() as f:\n    ...\nwith f() as x.attr:\n    pass\nwith x as X, y as Y, z as Z:\n    ...\nwith (x, z as Y, y,):\n    ...\nwith (a) as f:\n    ...\nwith ((a) as f, 1):\n    ...\nwith a:\n    yield a, b\nwith (yield 1):\n    ...\nwith (yield from 1):\n    ...\nwith (a := 1):\n    ...\nwith (open('bla.txt')), (open('bla.txt')):\n    pass\n\")"
 ---
 ParsedFile {
     ast: Module(
         ModModule {
-            range: 0..308,
+            range: 0..360,
             body: [
                 With(
                     StmtWith {
@@ -581,6 +581,93 @@ ParsedFile {
                                             range: 304..307,
                                         },
                                     ),
+                                },
+                            ),
+                        ],
+                    },
+                ),
+                With(
+                    StmtWith {
+                        range: 308..359,
+                        is_async: false,
+                        items: [
+                            WithItem {
+                                range: 313..330,
+                                context_expr: Call(
+                                    ExprCall {
+                                        range: 314..329,
+                                        func: Name(
+                                            ExprName {
+                                                range: 314..318,
+                                                id: "open",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 318..329,
+                                            args: [
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        range: 319..328,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 319..328,
+                                                                    value: "bla.txt",
+                                                                    unicode: false,
+                                                                },
+                                                            ),
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                            WithItem {
+                                range: 332..349,
+                                context_expr: Call(
+                                    ExprCall {
+                                        range: 333..348,
+                                        func: Name(
+                                            ExprName {
+                                                range: 333..337,
+                                                id: "open",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 337..348,
+                                            args: [
+                                                StringLiteral(
+                                                    ExprStringLiteral {
+                                                        range: 338..347,
+                                                        value: StringLiteralValue {
+                                                            inner: Single(
+                                                                StringLiteral {
+                                                                    range: 338..347,
+                                                                    value: "bla.txt",
+                                                                    unicode: false,
+                                                                },
+                                                            ),
+                                                        },
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                                optional_vars: None,
+                            },
+                        ],
+                        body: [
+                            Pass(
+                                StmtPass {
+                                    range: 355..359,
                                 },
                             ),
                         ],

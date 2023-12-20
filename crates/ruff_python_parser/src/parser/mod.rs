@@ -1705,7 +1705,7 @@ where
             return items;
         }
 
-        let has_seen_open_paren = self.at(TokenKind::Lpar);
+        let has_seen_lpar = self.at(TokenKind::Lpar);
 
         // Consider the two `WithItem` examples below::
         //      1) `(a) as A`
@@ -1728,7 +1728,7 @@ where
         // instead of different `WithItem`s. In such cases, we treat it as an expression like
         // in case 1.
         let mut treat_it_as_expr = false;
-        if self.at(TokenKind::Lpar) {
+        if has_seen_lpar {
             let mut index = 1;
             let mut paren_nesting = 1;
             let mut has_items = false;
@@ -1748,6 +1748,8 @@ where
                     TokenKind::As if paren_nesting == 0 => treat_it_as_expr = true,
                     // check for starred expressions
                     TokenKind::Star if !has_seen_name => treat_it_as_expr = true,
+                    // check for commas outside parens
+                    TokenKind::Comma if paren_nesting == 0 => treat_it_as_expr = true,
                     TokenKind::Colon | TokenKind::Newline => break,
                     _ => {
                         has_seen_name = false;
@@ -1763,18 +1765,18 @@ where
             }
         }
 
-        if !treat_it_as_expr && has_seen_open_paren {
+        if !treat_it_as_expr && has_seen_lpar {
             self.eat(TokenKind::Lpar);
         }
 
-        let ending = if has_seen_open_paren {
-            [TokenKind::Rpar]
-        } else {
+        let ending = if has_seen_lpar && treat_it_as_expr {
             [TokenKind::Colon]
+        } else {
+            [TokenKind::Rpar]
         };
-        // Only allow a trailing delimiter if we've seen a `(`.
         self.parse_separated(
-            has_seen_open_paren,
+            // Only allow a trailing delimiter if we've seen a `(`.
+            has_seen_lpar,
             TokenKind::Comma,
             ending.as_slice(),
             |parser| {
@@ -1800,7 +1802,7 @@ where
             }
         }
 
-        if !treat_it_as_expr && has_seen_open_paren {
+        if !treat_it_as_expr && has_seen_lpar {
             self.expect_and_recover(TokenKind::Rpar, TokenSet::new(&[TokenKind::Colon]));
         }
 
