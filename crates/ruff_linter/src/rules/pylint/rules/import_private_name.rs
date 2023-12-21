@@ -79,7 +79,9 @@ pub(crate) fn import_private_name(
         };
 
         let module = import.module_name();
-        let member = import.member_name();
+        let Some(root_module) = module.first() else {
+            continue;
+        };
 
         // Relative imports are not a public API.
         // Ex) `from . import foo`
@@ -90,28 +92,21 @@ pub(crate) fn import_private_name(
         // We can also ignore dunder names.
         // Ex) `from __future__ import annotations`
         // Ex) `from foo import __version__`
-        let Some(root_module) = module.first() else {
-            continue;
-        };
-        if root_module.starts_with("__") || member.starts_with("__") {
+        if root_module.starts_with("__") || import.member_name().starts_with("__") {
             continue;
         }
 
         // Ignore private imports from the same module.
-        let Some(package) = checker.package() else {
-            continue;
-        };
-        if package.ends_with(root_module) {
+        // Ex) `from foo import _bar` within `foo/baz.py`
+        if checker
+            .package()
+            .is_some_and(|path| path.ends_with(root_module))
+        {
             continue;
         }
 
-        // If any of the names in the call path start with an underscore, we
-        // have a private import.
         let call_path = import.call_path();
         if call_path.iter().any(|name| name.starts_with('_')) {
-            // The private name is the first name that starts with an
-            // underscore, and the external module is everything before it,
-            // joined by dots.
             let private_name = call_path.iter().find(|name| name.starts_with('_')).unwrap();
             let external_module = Some(join(
                 call_path.iter().take_while(|name| name != &private_name),
