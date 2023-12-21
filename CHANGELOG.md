@@ -16,6 +16,7 @@
 - SIM300: CONSTANT_CASE variables are improperly flagged for yoda violation ([#9164](https://github.com/astral-sh/ruff/pull/9164))
 - [flake8-pyi] Expand PYI018 to cover ParamSpecs and TypeVarTuples ([#9198](https://github.com/astral-sh/ruff/pull/9198))
 - [`flake8-bugbear`] Add fix for `zip-without-explicit-strict` (`B905`) ([#9176](https://github.com/astral-sh/ruff/pull/9176))
+- Add fix to automatically remove `print` and `pprint` statements (`T201`, `T203`) ([#9208](https://github.com/astral-sh/ruff/pull/9208))
 
 ### Formatter
 - `can_omit_optional_parentheses`: Exit early for unparenthesized expressions ([#9125](https://github.com/astral-sh/ruff/pull/9125))
@@ -49,11 +50,7 @@
 - Document link between import sorting and formatter ([#9117](https://github.com/astral-sh/ruff/pull/9117))
 
 ### Other changes
-- Split string formatting to individual nodes ([#9058](https://github.com/astral-sh/ruff/pull/9058))
-- Add new `with` and `match` sequence test cases ([#9128](https://github.com/astral-sh/ruff/pull/9128))
-- release: switch to Cargo's default ([#9031](https://github.com/astral-sh/ruff/pull/9031))
 - Extend `can_omit_optional_parentheses` documentation ([#9127](https://github.com/astral-sh/ruff/pull/9127))
-- Add fix to automatically remove `print` and `pprint` statements ([#9208](https://github.com/astral-sh/ruff/pull/9208))
 - Prefer `Never` to `NoReturn` in auto-typing in Python >= 3.11 ([#9213](https://github.com/astral-sh/ruff/pull/9213))
 
 ## 0.1.8
