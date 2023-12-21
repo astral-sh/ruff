@@ -901,6 +901,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "017") => (RuleGroup::Nursery, rules::ruff::rules::QuadraticListSummation),
         (Ruff, "018") => (RuleGroup::Preview, rules::ruff::rules::AssignmentInAssert),
         (Ruff, "019") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryKeyCheck),
+        (Ruff, "020") => (RuleGroup::Preview, rules::ruff::rules::NeverUnion),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
 

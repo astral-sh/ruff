@@ -1,14 +1,16 @@
-use rustc_hash::FxHashSet;
 use std::fmt;
+
+use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 
 /// ## What it does
 /// Checks for the presence of redundant `Literal` types and builtin super

@@ -1505,6 +1505,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
     }
 }
 
+/// Format the expression as a `typing.Optional`-style optional.
 pub fn typing_optional(elt: Expr, binding: String) -> Expr {
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
@@ -1518,18 +1519,19 @@ pub fn typing_optional(elt: Expr, binding: String) -> Expr {
     })
 }
 
+/// Format the expressions as a `typing.Union`-style union.
 pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
-    fn tuple(elts: &[Expr]) -> Expr {
+    fn tuple(elts: &[Expr], binding: String) -> Expr {
         match elts {
             [] => Expr::Tuple(ast::ExprTuple {
                 elts: vec![],
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
             }),
-            [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
+            [Expr::Tuple(ast::ExprTuple { elts, .. })] => typing_union(elts, binding),
             [elt] => elt.clone(),
             [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
-                left: Box::new(tuple(rest)),
+                left: Box::new(tuple(rest, binding)),
                 op: Operator::BitOr,
                 right: Box::new(elt.clone()),
                 range: TextRange::default(),
@@ -1539,11 +1541,11 @@ pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
 
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding,
+            id: binding.clone(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })),
-        slice: Box::new(tuple(elts)),
+        slice: Box::new(tuple(elts, binding)),
         ctx: ExprContext::Load,
         range: TextRange::default(),
     })

@@ -2,11 +2,10 @@ use ast::{ExprSubscript, Operator};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-
-use crate::rules::flake8_pyi::helpers::traverse_union;
 
 /// ## What it does
 /// Checks for the presence of multiple literal types in a union.
