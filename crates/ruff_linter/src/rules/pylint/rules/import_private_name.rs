@@ -1,7 +1,8 @@
+use itertools::join;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Alias, Stmt};
 
+use ruff_python_semantic::{Imported, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -62,64 +63,69 @@ impl Violation for ImportPrivateName {
 
 /// PLC2701
 pub(crate) fn import_private_name(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    names: &[Alias],
-    module: Option<&str>,
-    level: Option<u32>,
-    module_path: Option<&[String]>,
+    checker: &Checker,
+    scope: &Scope,
+    diagnostics: &mut Vec<Diagnostic>,
 ) {
-    // Relative imports are not a public API, so we don't need to check them.
-    if level.map_or(false, |level| level > 0) {
-        return;
-    }
-    if let Some(module) = module {
-        if module.starts_with("__") {
-            return;
+    for binding_id in scope.binding_ids() {
+        let binding = checker.semantic().binding(binding_id);
+
+        let Some(import) = binding.as_any_import() else {
+            continue;
+        };
+
+        let Some(import) = import.from_import() else {
+            continue;
+        };
+
+        let module = import.module_name();
+        let member = import.member_name();
+
+        // Relative imports are not a public API.
+        // Ex) `from . import foo`
+        if module.starts_with(&["."]) {
+            continue;
         }
+
+        // We can also ignore dunder names.
+        // Ex) `from __future__ import annotations`
+        // Ex) `from foo import __version__`
+        let Some(root_module) = module.first() else {
+            continue;
+        };
+        if root_module.starts_with("__") || member.starts_with("__") {
+            continue;
+        }
+
         // Ignore private imports from the same module.
-        // TODO(tjkuson): Detect namespace packages automatically.
-        // https://github.com/astral-sh/ruff/issues/6114
-        if let Some(module_path) = module_path {
-            let root_module = module_path.first().unwrap();
-            if module.starts_with(root_module) {
-                return;
-            }
+        let Some(package) = checker.package() else {
+            continue;
+        };
+        if package.ends_with(root_module) {
+            continue;
         }
-        if module.starts_with('_') || module.contains("._") {
-            let private_name = module
-                .split('.')
-                .find(|name| name.starts_with('_'))
-                .unwrap_or(module);
-            let external_module = Some(
-                module
-                    .split('.')
-                    .take_while(|name| !name.starts_with('_'))
-                    .collect::<Vec<_>>()
-                    .join("."),
-            )
+
+        // If any of the names in the call path start with an underscore, we
+        // have a private import.
+        let call_path = import.call_path();
+        if call_path.iter().any(|name| name.starts_with('_')) {
+            // The private name is the first name that starts with an
+            // underscore, and the external module is everything before it,
+            // joined by dots.
+            let private_name = call_path.iter().find(|name| name.starts_with('_')).unwrap();
+            let external_module = Some(join(
+                call_path.iter().take_while(|name| name != &private_name),
+                ".",
+            ))
             .filter(|module| !module.is_empty());
-            checker.diagnostics.push(Diagnostic::new(
+
+            diagnostics.push(Diagnostic::new(
                 ImportPrivateName {
-                    name: private_name.to_string(),
+                    name: (*private_name).to_string(),
                     module: external_module,
                 },
-                stmt.range(),
+                binding.range(),
             ));
-        }
-        for name in names {
-            if matches!(name.name.as_str(), "_") || name.name.starts_with("__") {
-                continue;
-            }
-            if name.name.starts_with('_') {
-                checker.diagnostics.push(Diagnostic::new(
-                    ImportPrivateName {
-                        name: name.name.to_string(),
-                        module: Some(module.to_string()),
-                    },
-                    name.range(),
-                ));
-            }
         }
     }
 }

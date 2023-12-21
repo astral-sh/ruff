@@ -1,23 +1,23 @@
 # Errors.
-from _foo import bar
-from foo._bar import baz
-from _foo.bar import baz
-from foo import _bar
-from foo import _bar as bar
+from _a import b
+from c._d import e
+from _f.g import h
+from i import _j
+from k import _l as m
 
 # Non-errors.
-import foo
-import foo as _foo
-from foo import bar
-from foo import bar as _bar
-from foo.bar import baz
-from foo.bar import baz as _baz
-from .foo import _bar  # Relative import.
-from .foo._bar import baz  # Relative import.
-from ._foo.bar import baz  # Relative import.
+import n
+import o as _p
+from q import r
+from s import t as _v
+from w.x import y
+from z.aa import bb as _cc
+from .dd import _ee  # Relative import.
+from .ff._gg import hh  # Relative import.
+from ._ii.jj import kk  # Relative import.
 from __future__ import annotations  # __future__ is a special case.
 from __main__ import main  # __main__ is a special case.
-from foo import __version__  # __version__ is a special case.
+from ll import __version__  # __version__ is a special case.
 from import_private_name import _top_level_secret  # Can import from self.
 from import_private_name.submodule import _submodule_secret  # Can import from self.
 from import_private_name.submodule.subsubmodule import (
