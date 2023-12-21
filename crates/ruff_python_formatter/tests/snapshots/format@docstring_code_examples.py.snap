@@ -1368,6 +1368,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -2738,6 +2739,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -4108,6 +4110,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -5478,6 +5481,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -6848,6 +6852,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -8215,6 +8220,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -9582,6 +9588,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -10958,6 +10965,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -12325,6 +12333,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = 60
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -13701,6 +13710,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
