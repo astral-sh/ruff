@@ -2,7 +2,7 @@ use itertools::join;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
-use ruff_python_semantic::{Imported, Scope};
+use ruff_python_semantic::{Imported, ResolvedReference, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -69,11 +69,9 @@ pub(crate) fn import_private_name(
 ) {
     for binding_id in scope.binding_ids() {
         let binding = checker.semantic().binding(binding_id);
-
         let Some(import) = binding.as_any_import() else {
             continue;
         };
-
         let Some(import) = import.from_import() else {
             continue;
         };
@@ -107,13 +105,22 @@ pub(crate) fn import_private_name(
 
         let call_path = import.call_path();
         if call_path.iter().any(|name| name.starts_with('_')) {
+            // Ignore private imports used for typing.
+            if binding.context.is_runtime()
+                && binding
+                    .references()
+                    .map(|reference_id| checker.semantic().reference(reference_id))
+                    .any(is_typing)
+            {
+                continue;
+            }
+
             let private_name = call_path.iter().find(|name| name.starts_with('_')).unwrap();
             let external_module = Some(join(
                 call_path.iter().take_while(|name| name != &private_name),
                 ".",
             ))
             .filter(|module| !module.is_empty());
-
             diagnostics.push(Diagnostic::new(
                 ImportPrivateName {
                     name: (*private_name).to_string(),
@@ -123,4 +130,13 @@ pub(crate) fn import_private_name(
             ));
         }
     }
+}
+
+/// Returns `true` if the [`ResolvedReference`] is in a typing context.
+fn is_typing(reference: &ResolvedReference) -> bool {
+    reference.in_type_checking_block()
+        || reference.in_typing_only_annotation()
+        || reference.in_complex_string_type_definition()
+        || reference.in_simple_string_type_definition()
+        || reference.in_runtime_evaluated_annotation()
 }

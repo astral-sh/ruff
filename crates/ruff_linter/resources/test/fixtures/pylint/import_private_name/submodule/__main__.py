@@ -23,3 +23,19 @@ from import_private_name.submodule import _submodule_secret  # Can import from s
 from import_private_name.submodule.subsubmodule import (
     _subsubmodule_secret,
 )  # Can import from self.
+
+# Non-errors (used for type annotations).
+from mm import _nn
+from oo import _pp as qq
+from _rr import ss
+from tt._uu import vv
+from _ww.xx import yy as zz
+
+some_variable: _nn = None
+
+def func(arg: qq) -> ss:
+    pass
+
+class Class:
+    def __init__(self, arg: vv) -> "zz":
+        pass
