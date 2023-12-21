@@ -334,55 +334,66 @@ pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> boo
 }
 
 /// Traverse a "union" type annotation, applying `func` to each union member.
+///
 /// Supports traversal of `Union` and `|` union expressions.
-/// The function is called with each expression in the union (excluding declarations of nested unions)
-/// and the parent expression (if any).
-pub fn traverse_union<'a, F>(
-    func: &mut F,
-    semantic: &SemanticModel,
-    expr: &'a Expr,
-    parent: Option<&'a Expr>,
-) where
-    F: FnMut(&'a Expr, Option<&'a Expr>),
+///
+/// The function is called with each expression in the union (excluding declarations of nested
+/// unions) and the parent expression.
+pub fn traverse_union<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr)
+where
+    F: FnMut(&'a Expr, &'a Expr),
 {
-    // Ex) x | y
-    if let Expr::BinOp(ast::ExprBinOp {
-        op: Operator::BitOr,
-        left,
-        right,
-        range: _,
-    }) = expr
+    fn inner<'a, F>(
+        func: &mut F,
+        semantic: &SemanticModel,
+        expr: &'a Expr,
+        parent: Option<&'a Expr>,
+    ) where
+        F: FnMut(&'a Expr, &'a Expr),
     {
-        // The union data structure usually looks like this:
-        //  a | b | c -> (a | b) | c
-        //
-        // However, parenthesized expressions can coerce it into any structure:
-        //  a | (b | c)
-        //
-        // So we have to traverse both branches in order (left, then right), to report members
-        // in the order they appear in the source code.
+        // Ex) x | y
+        if let Expr::BinOp(ast::ExprBinOp {
+            op: Operator::BitOr,
+            left,
+            right,
+            range: _,
+        }) = expr
+        {
+            // The union data structure usually looks like this:
+            //  a | b | c -> (a | b) | c
+            //
+            // However, parenthesized expressions can coerce it into any structure:
+            //  a | (b | c)
+            //
+            // So we have to traverse both branches in order (left, then right), to report members
+            // in the order they appear in the source code.
 
-        // Traverse the left then right arms
-        traverse_union(func, semantic, left, Some(expr));
-        traverse_union(func, semantic, right, Some(expr));
-        return;
-    }
+            // Traverse the left then right arms
+            inner(func, semantic, left, Some(expr));
+            inner(func, semantic, right, Some(expr));
+            return;
+        }
 
-    // Ex) Union[x, y]
-    if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
-        if semantic.match_typing_expr(value, "Union") {
-            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                // Traverse each element of the tuple within the union recursively to handle cases
-                // such as `Union[..., Union[...]]
-                elts.iter()
-                    .for_each(|elt| traverse_union(func, semantic, elt, Some(expr)));
-                return;
+        // Ex) Union[x, y]
+        if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+            if semantic.match_typing_expr(value, "Union") {
+                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                    // Traverse each element of the tuple within the union recursively to handle cases
+                    // such as `Union[..., Union[...]]
+                    elts.iter()
+                        .for_each(|elt| inner(func, semantic, elt, Some(expr)));
+                    return;
+                }
             }
+        }
+
+        // Otherwise, call the function on expression, if it's not the top-level expression.
+        if let Some(parent) = parent {
+            func(expr, parent);
         }
     }
 
-    // Otherwise, call the function on expression
-    func(expr, parent);
+    inner(func, semantic, expr, None);
 }
 
 /// Abstraction for a type checker, conservatively checks for the intended type(s).

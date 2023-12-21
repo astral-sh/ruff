@@ -89,7 +89,7 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
     let mut has_complex = false;
     let mut has_int = false;
 
-    let mut func = |expr: &Expr, _parent: Option<&Expr>| {
+    let mut func = |expr: &Expr, _parent: &Expr| {
         let Some(call_path) = checker.semantic().resolve_call_path(expr) else {
             return;
         };
@@ -102,7 +102,7 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
         }
     };
 
-    traverse_union(&mut func, checker.semantic(), annotation, None);
+    traverse_union(&mut func, checker.semantic(), annotation);
 
     if has_complex {
         if has_float {
