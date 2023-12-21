@@ -319,6 +319,19 @@ trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ "' test"
++
+ '" test'
+ 
+ '" test'
+```
+
+
 ### Output 2
 ```
 indent-style               = space
@@ -493,6 +506,19 @@ x = (
 
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ "' test"
++
+ '" test'
+ 
+ '" test'
 ```
 
 
