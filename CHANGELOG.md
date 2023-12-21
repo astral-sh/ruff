@@ -50,8 +50,6 @@
 - Fix typo in SemanticModel.parent_expression docstring ([#9167](https://github.com/astral-sh/ruff/pull/9167))
 - Document link between import sorting and formatter ([#9117](https://github.com/astral-sh/ruff/pull/9117))
 
-### Other changes
-
 ## 0.1.8
 
 This release includes opt-in support for formatting Python snippets within
