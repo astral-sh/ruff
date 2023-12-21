@@ -129,6 +129,19 @@ def docstring_single():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ 'single'
++
+ 'double'
+ r'r single'
+ r'r double'
+```
+
+
 ### Output 2
 ```
 indent-style               = space
@@ -201,6 +214,19 @@ def docstring_single():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ "single"
++
+ "double"
+ r"r single"
+ r"r double"
+```
+
+
 ### Output 3
 ```
 indent-style               = space
@@ -270,6 +296,19 @@ def docstring_double():
 
 def docstring_single():
     "single"
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ 'single'
++
+ "double"
+ r'r single'
+ r"r double"
 ```
 
 

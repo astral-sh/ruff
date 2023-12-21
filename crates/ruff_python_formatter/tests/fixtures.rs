@@ -157,6 +157,39 @@ fn format() {
                     CodeFrame::new("python", &formatted_code)
                 )
                 .unwrap();
+
+                if options.preview().is_enabled() {
+                    continue;
+                }
+
+                // We want to capture the differences in the preview style in our fixtures
+                let options_preview = options.with_preview(PreviewMode::Enabled);
+                let printed_preview = format_module_source(&content, options_preview.clone())
+                    .expect("Formatting to succeed");
+                let formatted_preview = printed_preview.as_code();
+
+                ensure_unchanged_ast(&content, formatted_preview, &options_preview, input_path);
+                ensure_stability_when_formatting_twice(
+                    formatted_preview,
+                    &options_preview,
+                    input_path,
+                );
+
+                if formatted_code != formatted_preview {
+                    // Having both snapshots makes it hard to see the difference, so we're keeping only
+                    // diff.
+                    writeln!(
+                        snapshot,
+                        "#### Preview changes\n{}",
+                        CodeFrame::new(
+                            "diff",
+                            TextDiff::from_lines(formatted_code, formatted_preview)
+                                .unified_diff()
+                                .header("Stable", "Preview")
+                        )
+                    )
+                    .unwrap();
+                }
             }
         } else {
             // We want to capture the differences in the preview style in our fixtures
