@@ -7,9 +7,11 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/pre
 ```python
 from typing import NoReturn, Protocol, Union, overload
 
+class Empty:
+    ...
 
 def dummy(a): ...
-def other(b): ...
+async def other(b): ...
 
 
 @overload
@@ -53,6 +55,14 @@ def b(arg: Union[int, str, object]) -> Union[int, str]:
     if not isinstance(arg, (int, str)):
         raise TypeError
     return arg
+
+def has_comment():
+    ...  # still a dummy
+
+if some_condition:
+    ...
+
+if already_dummy: ...
 ```
 
 ## Black Differences
@@ -60,13 +70,13 @@ def b(arg: Union[int, str, object]) -> Union[int, str]:
 ```diff
 --- Black
 +++ Ruff
-@@ -2,15 +2,23 @@
+@@ -5,15 +5,23 @@
  
  
  def dummy(a): ...
 +
 +
- def other(b): ...
+ async def other(b): ...
  
  
  @overload
@@ -84,7 +94,7 @@ def b(arg: Union[int, str, object]) -> Union[int, str]:
  def a(arg: Union[int, str, object]) -> Union[int, str]:
      if not isinstance(arg, (int, str)):
          raise TypeError
-@@ -21,10 +29,13 @@
+@@ -24,10 +32,13 @@
      def foo(self, a: int) -> int: ...
  
      def bar(self, b: str) -> str: ...
@@ -98,7 +108,7 @@ def b(arg: Union[int, str, object]) -> Union[int, str]:
  @dummy
  def dummy_three(): ...
  
-@@ -38,6 +49,8 @@
+@@ -41,6 +52,8 @@
  
  @overload
  def b(arg: str) -> str: ...
@@ -107,6 +117,17 @@ def b(arg: Union[int, str, object]) -> Union[int, str]:
  @overload
  def b(arg: object) -> NoReturn: ...
  
+@@ -54,8 +67,6 @@
+ def has_comment(): ...  # still a dummy
+ 
+ 
+-if some_condition:
+-    ...
++if some_condition: ...
+ 
+-if already_dummy:
+-    ...
++if already_dummy: ...
 ```
 
 ## Ruff Output
@@ -115,10 +136,13 @@ def b(arg: Union[int, str, object]) -> Union[int, str]:
 from typing import NoReturn, Protocol, Union, overload
 
 
+class Empty: ...
+
+
 def dummy(a): ...
 
 
-def other(b): ...
+async def other(b): ...
 
 
 @overload
@@ -173,6 +197,14 @@ def b(arg: Union[int, str, object]) -> Union[int, str]:
     if not isinstance(arg, (int, str)):
         raise TypeError
     return arg
+
+
+def has_comment(): ...  # still a dummy
+
+
+if some_condition: ...
+
+if already_dummy: ...
 ```
 
 ## Black Output
@@ -181,8 +213,11 @@ def b(arg: Union[int, str, object]) -> Union[int, str]:
 from typing import NoReturn, Protocol, Union, overload
 
 
+class Empty: ...
+
+
 def dummy(a): ...
-def other(b): ...
+async def other(b): ...
 
 
 @overload
@@ -226,6 +261,16 @@ def b(arg: Union[int, str, object]) -> Union[int, str]:
     if not isinstance(arg, (int, str)):
         raise TypeError
     return arg
+
+
+def has_comment(): ...  # still a dummy
+
+
+if some_condition:
+    ...
+
+if already_dummy:
+    ...
 ```
 
 
