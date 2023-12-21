@@ -326,6 +326,7 @@ We use an experimental in-house tool for managing releases.
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
 1. Highlight any breaking changes in `BREAKING_CHANGES.md`
+1. Run `cargo check`. This should update the lock file with new versions.
 1. Create a pull request with the changelog and version updates
 1. Merge the PR
 1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yaml) with:
@@ -345,7 +346,10 @@ We use an experimental in-house tool for managing releases.
     1. Copy the changelog for the release into the GitHub release
         - See previous releases for formatting of section headers
     1. Generate the contributor list with `rooster contributors` and add to the release notes
-1. If needed, [update the schemastore](https://github.com/charliermarsh/ruff/blob/main/scripts/update_schemastore.py)
+1. If needed, [update the schemastore](https://github.com/charliermarsh/ruff/blob/main/scripts/update_schemastore.py).
+    1. One can determine if an update is needed when
+        `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
+    1. Once run successfully, you should follow the link in the output to create a PR.
 1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
 
 ## Ecosystem CI
