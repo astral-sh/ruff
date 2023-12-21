@@ -54,10 +54,7 @@
 - release: switch to Cargo's default ([#9031](https://github.com/astral-sh/ruff/pull/9031))
 - Extend `can_omit_optional_parentheses` documentation ([#9127](https://github.com/astral-sh/ruff/pull/9127))
 - Add fix to automatically remove `print` and `pprint` statements ([#9208](https://github.com/astral-sh/ruff/pull/9208))
-- Update ecosystem check headers to show unchanged project count ([#9157](https://github.com/astral-sh/ruff/pull/9157))
-- Fix ecosystem format line changed counts ([#9158](https://github.com/astral-sh/ruff/pull/9158))
 - Prefer `Never` to `NoReturn` in auto-typing in Python >= 3.11 ([#9213](https://github.com/astral-sh/ruff/pull/9213))
-- Add a non-latin project to the ecosystem checks ([#9199](https://github.com/astral-sh/ruff/pull/9199))
 
 ## 0.1.8
 
