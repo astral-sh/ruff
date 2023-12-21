@@ -48,20 +48,14 @@
 - Document link between import sorting and formatter ([#9117](https://github.com/astral-sh/ruff/pull/9117))
 
 ### Other changes
-- Bump once_cell from 1.18.0 to 1.19.0 ([#9183](https://github.com/astral-sh/ruff/pull/9183))
 - Split string formatting to individual nodes ([#9058](https://github.com/astral-sh/ruff/pull/9058))
 - Add new `with` and `match` sequence test cases ([#9128](https://github.com/astral-sh/ruff/pull/9128))
 - [`flake8-bugbear`] Add fix for `zip-without-explicit-strict` (`B905`) ([#9176](https://github.com/astral-sh/ruff/pull/9176))
-- Bump dawidd6/action-download-artifact from 2 to 3 ([#9178](https://github.com/astral-sh/ruff/pull/9178))
-- Bump unicode_names2 from 1.2.0 to 1.2.1 ([#9184](https://github.com/astral-sh/ruff/pull/9184))
 - release: switch to Cargo's default ([#9031](https://github.com/astral-sh/ruff/pull/9031))
 - Extend `can_omit_optional_parentheses` documentation ([#9127](https://github.com/astral-sh/ruff/pull/9127))
 - Add fix to automatically remove `print` and `pprint` statements ([#9208](https://github.com/astral-sh/ruff/pull/9208))
 - Update ecosystem check headers to show unchanged project count ([#9157](https://github.com/astral-sh/ruff/pull/9157))
 - Fix ecosystem format line changed counts ([#9158](https://github.com/astral-sh/ruff/pull/9158))
-- Bump tracing-indicatif from 0.3.5 to 0.3.6 ([#9180](https://github.com/astral-sh/ruff/pull/9180))
-- Bump toml from 0.7.8 to 0.8.2 ([#9182](https://github.com/astral-sh/ruff/pull/9182))
-- Bump wasm-bindgen-test from 0.3.38 to 0.3.39 ([#9181](https://github.com/astral-sh/ruff/pull/9181))
 - Prefer `Never` to `NoReturn` in auto-typing in Python >= 3.11 ([#9213](https://github.com/astral-sh/ruff/pull/9213))
 - Add a non-latin project to the ecosystem checks ([#9199](https://github.com/astral-sh/ruff/pull/9199))
 
