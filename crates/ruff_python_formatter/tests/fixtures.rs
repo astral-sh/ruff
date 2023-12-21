@@ -355,7 +355,8 @@ line-ending                = {line_ending:?}
 magic-trailing-comma       = {magic_trailing_comma:?}
 docstring-code             = {docstring_code:?}
 docstring-code-line-width  = {docstring_code_line_width:?}
-preview                    = {preview:?}"#,
+preview                    = {preview:?}
+target_version             = {target_version:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
@@ -364,7 +365,8 @@ preview                    = {preview:?}"#,
             magic_trailing_comma = self.0.magic_trailing_comma(),
             docstring_code = self.0.docstring_code(),
             docstring_code_line_width = self.0.docstring_code_line_width(),
-            preview = self.0.preview()
+            preview = self.0.preview(),
+            target_version = self.0.target_version()
         )
     }
 }
