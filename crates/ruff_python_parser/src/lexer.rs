@@ -28,10 +28,10 @@
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 
+use compact_str::CompactString;
 use std::iter::FusedIterator;
 use std::{char, cmp::Ordering, str::FromStr};
 
-use smol_str::SmolStr;
 use unicode_ident::{is_xid_continue, is_xid_start};
 
 use ruff_python_ast::{Int, IpyEscapeKind};
@@ -242,7 +242,7 @@ impl<'source> Lexer<'source> {
             "yield" => Tok::Yield,
             _ => {
                 return Ok(Tok::Name {
-                    name: SmolStr::new(text),
+                    name: CompactString::new(text),
                 })
             }
         };

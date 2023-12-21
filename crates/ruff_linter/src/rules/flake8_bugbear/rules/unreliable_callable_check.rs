@@ -75,7 +75,7 @@ pub(crate) fn unreliable_callable_check(
     }
 
     let mut diagnostic = Diagnostic::new(UnreliableCallableCheck, expr.range());
-    if id == "hasattr" {
+    if *id == "hasattr" {
         if checker.semantic().is_builtin("callable") {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 format!("callable({})", checker.locator().slice(obj)),

@@ -44,7 +44,7 @@ pub(crate) fn no_eval(checker: &mut Checker, func: &Expr) {
     let Expr::Name(ast::ExprName { id, .. }) = func else {
         return;
     };
-    if id != "eval" {
+    if *id != "eval" {
         return;
     }
     if !checker.semantic().is_builtin("eval") {

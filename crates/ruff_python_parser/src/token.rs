@@ -6,9 +6,9 @@
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h;
 use crate::Mode;
 
+use compact_str::CompactString;
 use ruff_python_ast::{Int, IpyEscapeKind};
 use ruff_text_size::TextSize;
-use smol_str::SmolStr;
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
@@ -17,7 +17,7 @@ pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
     Name {
         /// The name value.
-        name: SmolStr,
+        name: CompactString,
     },
     /// Token value for an integer.
     Int {

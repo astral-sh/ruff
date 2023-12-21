@@ -115,7 +115,7 @@ fn get_undecorated_methods(
             }) = value.as_ref()
             {
                 if let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() {
-                    if id == method_name && checker.semantic().is_builtin(method_name) {
+                    if *id == method_name && checker.semantic().is_builtin(method_name) {
                         if targets.len() != 1 {
                             continue;
                         }
@@ -160,7 +160,7 @@ fn get_undecorated_methods(
             // if we find the decorator we're looking for, skip
             if decorator_list.iter().any(|decorator| {
                 if let Expr::Name(ast::ExprName { id, .. }) = &decorator.expression {
-                    if id == method_name && checker.semantic().is_builtin(method_name) {
+                    if *id == method_name && checker.semantic().is_builtin(method_name) {
                         return true;
                     }
                 }

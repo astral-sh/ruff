@@ -80,7 +80,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
             continue;
         };
 
-        if !(id == "type" && checker.semantic().is_builtin("type")) {
+        if !(*id == "type" && checker.semantic().is_builtin("type")) {
             continue;
         }
 
@@ -94,7 +94,7 @@ fn deprecated_type_comparison(checker: &mut Checker, compare: &ast::ExprCompare)
                     continue;
                 };
 
-                if id == "type" && checker.semantic().is_builtin("type") {
+                if *id == "type" && checker.semantic().is_builtin("type") {
                     // Allow comparison for types which are not obvious.
                     if arguments
                         .args
@@ -184,7 +184,7 @@ fn is_type(expr: &Expr, semantic: &SemanticModel) -> bool {
                 return false;
             };
 
-            if !(id == "type" && semantic.is_builtin("type")) {
+            if !(*id == "type" && semantic.is_builtin("type")) {
                 return false;
             };
 

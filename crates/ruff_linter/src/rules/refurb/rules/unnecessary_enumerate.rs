@@ -106,7 +106,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
     let Expr::Name(ast::ExprName { id, .. }) = func.as_ref() else {
         return;
     };
-    if id != "enumerate" {
+    if *id != "enumerate" {
         return;
     };
     if !checker.semantic().is_builtin("enumerate") {

@@ -120,7 +120,9 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
         return;
     };
 
-    if !(first_arg_id == parent_name.as_str() && second_arg_id == parent_arg.as_str()) {
+    if !(first_arg_id.as_str() == parent_name.as_str()
+        && second_arg_id.as_str() == parent_arg.as_str())
+    {
         return;
     }
 
@@ -137,7 +139,7 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
 /// Returns `true` if a call is an argumented `super` invocation.
 fn is_super_call_with_arguments(call: &ast::ExprCall) -> bool {
     if let Expr::Name(ast::ExprName { id, .. }) = call.func.as_ref() {
-        id == "super" && !call.arguments.is_empty()
+        *id == "super" && !call.arguments.is_empty()
     } else {
         false
     }

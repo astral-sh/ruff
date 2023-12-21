@@ -447,7 +447,7 @@ trait BuiltinTypeChecker {
         let Expr::Name(ast::ExprName { id, .. }) = type_expr else {
             return false;
         };
-        id == Self::BUILTIN_TYPE_NAME && semantic.is_builtin(Self::BUILTIN_TYPE_NAME)
+        id.as_str() == Self::BUILTIN_TYPE_NAME && semantic.is_builtin(Self::BUILTIN_TYPE_NAME)
     }
 }
 
@@ -643,7 +643,7 @@ fn match_value<'a>(symbol: &str, target: &Expr, value: &'a Expr) -> Option<&'a E
 /// Returns `true` if the [`Expr`] defines the symbol.
 fn defines(symbol: &str, expr: &Expr) -> bool {
     match expr {
-        Expr::Name(ast::ExprName { id, .. }) => id == symbol,
+        Expr::Name(ast::ExprName { id, .. }) => id.as_str() == symbol,
         Expr::Tuple(ast::ExprTuple { elts, .. })
         | Expr::List(ast::ExprList { elts, .. })
         | Expr::Set(ast::ExprSet { elts, .. }) => elts.iter().any(|elt| defines(symbol, elt)),
