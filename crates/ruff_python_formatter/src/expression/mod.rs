@@ -538,8 +538,8 @@ pub(crate) fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatConte
         false
     } else if visitor.max_precedence_count > 1 {
         false
-    } else if visitor.max_precedence == OperatorPrecedence::None && expr.is_lambda_expr() {
-        // Micha: This seems to exclusively apply for lambda expressions where the body ends in a subscript.
+    } else if visitor.max_precedence == OperatorPrecedence::None {
+        // Micha: This seems to apply for lambda expressions where the body ends in a subscript.
         // Subscripts are excluded by default because breaking them looks odd, but it seems to be fine for lambda expression.
         //
         // ```python
@@ -566,10 +566,19 @@ pub(crate) fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatConte
         //     ]
         // )
         // ```
+        //
+        // Another case are method chains:
+        // ```python
+        // xxxxxxxx.some_kind_of_method(
+        //     some_argument=[
+        //         "first",
+        //         "second",
+        //         "third",
+        //     ]
+        // ).another_method(a)
+        // ```
         true
-    } else if visitor.max_precedence == OperatorPrecedence::Attribute
-        && (expr.is_lambda_expr() || expr.is_named_expr_expr())
-    {
+    } else if visitor.max_precedence == OperatorPrecedence::Attribute {
         // A single method call inside a named expression (`:=`) or as the body of a lambda function:
         // ```python
         // kwargs["open_with"] = lambda path, _: fsspec.open(
