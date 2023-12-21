@@ -11,6 +11,10 @@ use crate::checkers::ast::Checker;
 /// Checks for import statements that import a private name (a name starting
 /// with an underscore `_`) from another module.
 ///
+/// Ignores private name imports that are used for type annotations. Ideally,
+/// types would be public; however, this is not always possible when using
+/// third-party libraries.
+///
 /// ## Why is this bad?
 /// [PEP 8] states that names starting with an underscore are private. Thus,
 /// they are not intended to be used outside of the module in which they are
