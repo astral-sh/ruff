@@ -1,3 +1,4 @@
+# l2 loses the comment with line-length=1 in preview mode
 l1 = [
     "This list should be broken up",
     "into multiple lines",
