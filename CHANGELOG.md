@@ -15,6 +15,7 @@
 ### Rule changes
 - SIM300: CONSTANT_CASE variables are improperly flagged for yoda violation ([#9164](https://github.com/astral-sh/ruff/pull/9164))
 - [flake8-pyi] Expand PYI018 to cover ParamSpecs and TypeVarTuples ([#9198](https://github.com/astral-sh/ruff/pull/9198))
+- [`flake8-bugbear`] Add fix for `zip-without-explicit-strict` (`B905`) ([#9176](https://github.com/astral-sh/ruff/pull/9176))
 
 ### Formatter
 - `can_omit_optional_parentheses`: Exit early for unparenthesized expressions ([#9125](https://github.com/astral-sh/ruff/pull/9125))
@@ -50,7 +51,6 @@
 ### Other changes
 - Split string formatting to individual nodes ([#9058](https://github.com/astral-sh/ruff/pull/9058))
 - Add new `with` and `match` sequence test cases ([#9128](https://github.com/astral-sh/ruff/pull/9128))
-- [`flake8-bugbear`] Add fix for `zip-without-explicit-strict` (`B905`) ([#9176](https://github.com/astral-sh/ruff/pull/9176))
 - release: switch to Cargo's default ([#9031](https://github.com/astral-sh/ruff/pull/9031))
 - Extend `can_omit_optional_parentheses` documentation ([#9127](https://github.com/astral-sh/ruff/pull/9127))
 - Add fix to automatically remove `print` and `pprint` statements ([#9208](https://github.com/astral-sh/ruff/pull/9208))
