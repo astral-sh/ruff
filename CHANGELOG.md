@@ -3,36 +3,41 @@
 ## 0.1.9
 
 ### Breaking changes
+
 - Add site-packages to default exclusions ([#9188](https://github.com/astral-sh/ruff/pull/9188))
 
 ### Preview features
+
 - Fix: Avoid parenthesizing subscript targets and values ([#9209](https://github.com/astral-sh/ruff/pull/9209))
-- [`pylint`] Implement `too-many-locals` (`PLR0914`) ([#9163](https://github.com/astral-sh/ruff/pull/9163))
+- \[`pylint`\] Implement `too-many-locals` (`PLR0914`) ([#9163](https://github.com/astral-sh/ruff/pull/9163))
 - Implement `reimplemented_operator` (FURB118) ([#9171](https://github.com/astral-sh/ruff/pull/9171))
 - Add a rule to detect string members in runtime-evaluated unions ([#9143](https://github.com/astral-sh/ruff/pull/9143))
 - Implement `no_blank_line_before_class_docstring` preview style ([#9154](https://github.com/astral-sh/ruff/pull/9154))
 
 ### Rule changes
-- SIM300: CONSTANT_CASE variables are improperly flagged for yoda violation ([#9164](https://github.com/astral-sh/ruff/pull/9164))
-- [flake8-pyi] Expand PYI018 to cover ParamSpecs and TypeVarTuples ([#9198](https://github.com/astral-sh/ruff/pull/9198))
-- [`flake8-bugbear`] Add fix for `zip-without-explicit-strict` (`B905`) ([#9176](https://github.com/astral-sh/ruff/pull/9176))
+
+- `CONSTANT_CASE` variables are improperly flagged for yoda violation (`SIM300`) ([#9164](https://github.com/astral-sh/ruff/pull/9164))
+- \[`flake8-pyi`\] Cover ParamSpecs and TypeVarTuples (`PYI018`) ([#9198](https://github.com/astral-sh/ruff/pull/9198))
+- \[`flake8-bugbear`\] Add fix for `zip-without-explicit-strict` (`B905`) ([#9176](https://github.com/astral-sh/ruff/pull/9176))
 - Add fix to automatically remove `print` and `pprint` statements (`T201`, `T203`) ([#9208](https://github.com/astral-sh/ruff/pull/9208))
 - Prefer `Never` to `NoReturn` in auto-typing in Python >= 3.11 (`ANN201`) ([#9213](https://github.com/astral-sh/ruff/pull/9213))
 
 ### Formatter
+
 - `can_omit_optional_parentheses`: Exit early for unparenthesized expressions ([#9125](https://github.com/astral-sh/ruff/pull/9125))
-- ruff_python_formatter: fix 'dynamic' mode with doctests ([#9129](https://github.com/astral-sh/ruff/pull/9129))
+- Fix `dynamic` mode with doctests so that it doesn't exceed configured line width ([#9129](https://github.com/astral-sh/ruff/pull/9129))
 - Fix `can_omit_optional_parentheses` for expressions with a right most fstring ([#9124](https://github.com/astral-sh/ruff/pull/9124))
-- Set target versions in Black tests ([#9221](https://github.com/astral-sh/ruff/pull/9221))
 - Add `target_version` to formatter options ([#9220](https://github.com/astral-sh/ruff/pull/9220))
 
 ### CLI
-- Update format.rs to display correct message for already formatted files ([#9153](https://github.com/astral-sh/ruff/pull/9153))
+
+- Update `ruff format --check` to display message for already formatted files ([#9153](https://github.com/astral-sh/ruff/pull/9153))
 
 ### Bug fixes
+
 - Reverse order of arguments for `operator.contains` ([#9192](https://github.com/astral-sh/ruff/pull/9192))
 - Iterate over lambdas in deferred type annotations ([#9175](https://github.com/astral-sh/ruff/pull/9175))
-- Fix panic in D208 with multibyte indent ([#9147](https://github.com/astral-sh/ruff/pull/9147))
+- Fix panic in `D208` with multibyte indent ([#9147](https://github.com/astral-sh/ruff/pull/9147))
 - Add support for `NoReturn` in auto-return-typing ([#9206](https://github.com/astral-sh/ruff/pull/9206))
 - Allow removal of `typing` from `exempt-modules` ([#9214](https://github.com/astral-sh/ruff/pull/9214))
 - Avoid `mutable-class-default` violations for Pydantic subclasses ([#9187](https://github.com/astral-sh/ruff/pull/9187))
@@ -45,6 +50,7 @@
 - Avoid `asyncio-dangling-task` violations on shadowed bindings ([#9215](https://github.com/astral-sh/ruff/pull/9215))
 
 ### Documentation
+
 - Fix blog post URL in changelog ([#9119](https://github.com/astral-sh/ruff/pull/9119))
 - Add error suppression hint for multi-line strings ([#9205](https://github.com/astral-sh/ruff/pull/9205))
 - Fix typo in SemanticModel.parent_expression docstring ([#9167](https://github.com/astral-sh/ruff/pull/9167))
