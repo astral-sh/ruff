@@ -328,8 +328,9 @@ We use an experimental in-house tool for managing releases.
 1. Highlight any breaking changes in `BREAKING_CHANGES.md`
 1. Create a pull request with the changelog and version updates
 1. Merge the PR
-1. Run the release workflow with the version number (without starting `v`) as input. Make sure
-    main has your merged PR as last commit
+1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yaml) with:
+    - The new version number (without starting `v`)
+    - The commit hash of the merged release pull request on `main`
 1. The release workflow will do the following:
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
         uploaded anything, you can restart after pushing a fix.
