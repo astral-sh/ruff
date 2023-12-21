@@ -98,10 +98,11 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::UnnecessaryTypeUnion) {
                         flake8_pyi::rules::unnecessary_type_union(checker, expr);
                     }
-                    if checker.enabled(Rule::NeverUnion) {
-                        ruff::rules::never_union(checker, expr);
-                    }
                 }
+            }
+
+            if checker.enabled(Rule::NeverUnion) {
+                ruff::rules::never_union(checker, expr);
             }
 
             if checker.any_enabled(&[
@@ -1158,6 +1159,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
 
+            if checker.enabled(Rule::NeverUnion) {
+                ruff::rules::never_union(checker, expr);
+            }
+
             // Avoid duplicate checks if the parent is a union, since these rules already
             // traverse nested unions.
             if !checker.semantic.in_nested_union() {
@@ -1177,9 +1182,6 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::RuntimeStringUnion) {
                     flake8_type_checking::rules::runtime_string_union(checker, expr);
-                }
-                if checker.enabled(Rule::NeverUnion) {
-                    ruff::rules::never_union(checker, expr);
                 }
             }
         }

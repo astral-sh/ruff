@@ -1,8 +1,7 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::Expr;
-use ruff_python_semantic::analyze::typing::traverse_union;
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -40,7 +39,7 @@ pub struct NeverUnion {
     union_like: UnionLike,
 }
 
-impl Violation for NeverUnion {
+impl AlwaysFixableViolation for NeverUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self {
@@ -56,52 +55,121 @@ impl Violation for NeverUnion {
             }
         }
     }
+
+    fn fix_title(&self) -> String {
+        let Self { never_like, .. } = self;
+        format!("Remove `{never_like}`")
+    }
 }
 
 /// RUF020
-pub(crate) fn never_union<'a>(checker: &mut Checker, expr: &'a Expr) {
-    let mut expressions: Vec<(NeverLike, UnionLike, &'a Expr)> = Vec::new();
-    let mut rest: Vec<&'a Expr> = Vec::new();
+pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
+    match expr {
+        // Ex) `typing.NoReturn | int`
+        Expr::BinOp(ast::ExprBinOp {
+            op: Operator::BitOr,
+            left,
+            right,
+            range: _,
+        }) => {
+            // Analyze the left-hand side of the `|` operator.
+            if let Some(never_like) = NeverLike::from_expr(left, checker.semantic()) {
+                let mut diagnostic = Diagnostic::new(
+                    NeverUnion {
+                        never_like,
+                        union_like: UnionLike::BinOp,
+                    },
+                    left.range(),
+                );
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    checker.locator().slice(right.as_ref()).to_string(),
+                    expr.range(),
+                )));
+                checker.diagnostics.push(diagnostic);
+            }
 
-    // Find all `typing.Never` and `typing.NoReturn` expressions.
-    let semantic = checker.semantic();
-    let mut collect_never = |expr: &'a Expr, parent: Option<&'a Expr>| {
-        if let Some(call_path) = semantic.resolve_call_path(expr) {
-            let union_like = if parent.is_some_and(Expr::is_bin_op_expr) {
-                UnionLike::BinOp
-            } else {
-                UnionLike::TypingUnion
-            };
-
-            let never_like = if semantic.match_typing_call_path(&call_path, "NoReturn") {
-                Some(NeverLike::NoReturn)
-            } else if semantic.match_typing_call_path(&call_path, "Never") {
-                Some(NeverLike::Never)
-            } else {
-                None
-            };
-
-            if let Some(never_like) = never_like {
-                expressions.push((never_like, union_like, expr));
-                return;
+            // Analyze the right-hand side of the `|` operator.
+            if let Some(never_like) = NeverLike::from_expr(right, checker.semantic()) {
+                let mut diagnostic = Diagnostic::new(
+                    NeverUnion {
+                        never_like,
+                        union_like: UnionLike::BinOp,
+                    },
+                    right.range(),
+                );
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    checker.locator().slice(left.as_ref()).to_string(),
+                    expr.range(),
+                )));
+                checker.diagnostics.push(diagnostic);
             }
         }
 
-        rest.push(expr);
-    };
+        // Ex) `typing.Union[typing.NoReturn, int]`
+        Expr::Subscript(ast::ExprSubscript {
+            value,
+            slice,
+            ctx: _,
+            range: _,
+        }) if checker.semantic().match_typing_expr(value, "Union") => {
+            let Expr::Tuple(ast::ExprTuple {
+                elts,
+                ctx: _,
+                range: _,
+            }) = slice.as_ref()
+            else {
+                return;
+            };
 
-    traverse_union(&mut collect_never, checker.semantic(), expr, None);
+            // Analyze each element of the `Union`.
+            for elt in elts {
+                if let Some(never_like) = NeverLike::from_expr(elt, checker.semantic()) {
+                    // Collect the other elements of the `Union`.
+                    let rest = elts
+                        .iter()
+                        .filter(|other| *other != elt)
+                        .cloned()
+                        .collect::<Vec<_>>();
 
-    // Create a diagnostic for each `typing.Never` and `typing.NoReturn` expression.
-    for (never_like, union_like, child) in expressions {
-        let diagnostic = Diagnostic::new(
-            NeverUnion {
-                never_like,
-                union_like,
-            },
-            child.range(),
-        );
-        checker.diagnostics.push(diagnostic);
+                    // Ignore, e.g., `typing.Union[typing.NoReturn]`.
+                    if rest.is_empty() {
+                        return;
+                    }
+
+                    let mut diagnostic = Diagnostic::new(
+                        NeverUnion {
+                            never_like,
+                            union_like: UnionLike::TypingUnion,
+                        },
+                        elt.range(),
+                    );
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                        if let [only] = rest.as_slice() {
+                            // Ex) `typing.Union[typing.NoReturn, int]` -> `int`
+                            checker.locator().slice(only).to_string()
+                        } else {
+                            // Ex) `typing.Union[typing.NoReturn, int, str]` -> `typing.Union[int, str]`
+                            checker
+                                .generator()
+                                .expr(&Expr::Subscript(ast::ExprSubscript {
+                                    value: value.clone(),
+                                    slice: Box::new(Expr::Tuple(ast::ExprTuple {
+                                        elts: rest,
+                                        ctx: ast::ExprContext::Load,
+                                        range: TextRange::default(),
+                                    })),
+                                    ctx: ast::ExprContext::Load,
+                                    range: TextRange::default(),
+                                }))
+                        },
+                        expr.range(),
+                    )));
+                    checker.diagnostics.push(diagnostic);
+                }
+            }
+        }
+
+        _ => {}
     }
 }
 
@@ -119,6 +187,19 @@ enum NeverLike {
     NoReturn,
     /// E.g., `typing.Never`
     Never,
+}
+
+impl NeverLike {
+    fn from_expr(expr: &Expr, semantic: &ruff_python_semantic::SemanticModel) -> Option<Self> {
+        let call_path = semantic.resolve_call_path(expr)?;
+        if semantic.match_typing_call_path(&call_path, "NoReturn") {
+            Some(NeverLike::NoReturn)
+        } else if semantic.match_typing_call_path(&call_path, "Never") {
+            Some(NeverLike::Never)
+        } else {
+            None
+        }
+    }
 }
 
 impl std::fmt::Display for NeverLike {
