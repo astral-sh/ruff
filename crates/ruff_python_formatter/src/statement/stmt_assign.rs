@@ -9,11 +9,18 @@ use crate::comments::{
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize,
+    is_expression_parenthesized, optional_parentheses, NeedsParentheses, OptionalParentheses,
+    Parentheses, Parenthesize,
 };
-use crate::expression::{has_own_parentheses, has_parentheses, maybe_parenthesize_expression};
+use crate::expression::{
+    can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
+    maybe_parenthesize_expression,
+};
 use crate::prelude::*;
-use crate::preview::is_prefer_splitting_right_hand_side_of_assignments_enabled;
+use crate::preview::{
+    is_parenthesize_long_type_hints_enabled,
+    is_prefer_splitting_right_hand_side_of_assignments_enabled,
+};
 use crate::statement::trailing_semicolon;
 
 #[derive(Default)]
@@ -686,8 +693,17 @@ impl Format<PyFormatContext<'_>> for AnyBeforeOperator<'_> {
                 }
                 // Never parenthesize targets that come with their own parentheses, e.g. don't parenthesize lists or dictionary literals.
                 else if should_parenthesize_target(expression, f.context()) {
-                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                    if is_parenthesize_long_type_hints_enabled(f.context())
+                        && can_omit_optional_parentheses(expression, f.context())
+                    {
+                        optional_parentheses(&expression.format().with_options(Parentheses::Never))
+                            .fmt(f)
+                    } else {
+                        parenthesize_if_expands(
+                            &expression.format().with_options(Parentheses::Never),
+                        )
                         .fmt(f)
+                    }
                 } else {
                     expression.format().with_options(Parentheses::Never).fmt(f)
                 }

@@ -25,6 +25,11 @@ pub(crate) const fn is_prefer_splitting_right_hand_side_of_assignments_enabled(
     context.is_preview()
 }
 
+/// Returns `true` if the [`parenthesize_long_type_hints`](https://github.com/astral-sh/ruff/issues/8894) preview style is enabled.
+pub(crate) const fn is_parenthesize_long_type_hints_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
+
 /// Returns `true` if the [`no_blank_line_before_class_docstring`] preview style is enabled.
 ///
 /// [`no_blank_line_before_class_docstring`]: https://github.com/astral-sh/ruff/issues/8888
