@@ -1745,10 +1745,13 @@ impl<'a> Checker<'a> {
             return;
         }
 
+        // If the expression is the left-hand side of a walrus operator, then it's a named
+        // expression assignment.
         if self
             .semantic
             .current_expressions()
-            .any(Expr::is_named_expr_expr)
+            .filter_map(Expr::as_named_expr_expr)
+            .any(|parent| parent.target.as_ref() == expr)
         {
             self.add_binding(id, expr.range(), BindingKind::NamedExprAssignment, flags);
             return;
