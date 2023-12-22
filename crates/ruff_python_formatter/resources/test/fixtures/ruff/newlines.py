@@ -254,3 +254,22 @@ if True:
 if True:
     def nested_trailing_function():
         pass
+
+
+def overload1(): ...  # trailing comment
+def overload1(a: int): ...
+
+def overload2(): ...  # trailing comment
+
+def overload2(a: int): ...
+
+def overload3():
+    ...
+    # trailing comment
+def overload3(a: int): ...
+
+def overload4():
+    ...
+    # trailing comment
+
+def overload4(a: int): ...

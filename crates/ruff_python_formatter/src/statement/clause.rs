@@ -392,9 +392,13 @@ pub(crate) fn clause_body<'a>(
 
 impl Format<PyFormatContext<'_>> for FormatClauseBody<'_> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'_>>) -> FormatResult<()> {
-        // In stable, stubs are only collapsed in stub files, in preview this is consistently
-        // applied everywhere
-        if (f.options().source_type().is_stub() || is_dummy_implementations_enabled(f.context()))
+        // In stable, stubs are only collapsed in stub files, in preview stubs in functions
+        // or classes are collapsed too
+        let should_collapse_stub = f.options().source_type().is_stub()
+            || (is_dummy_implementations_enabled(f.context())
+                && matches!(self.kind, SuiteKind::Function | SuiteKind::Class));
+
+        if should_collapse_stub
             && contains_only_an_ellipsis(self.body, f.context().comments())
             && self.trailing_comments.is_empty()
         {
