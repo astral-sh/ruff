@@ -1224,7 +1224,8 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
         | Expr::Slice(_)
-        | Expr::IpyEscapeCommand(_) => false,
+        | Expr::IpyEscapeCommand(_)
+        | Expr::Invalid(_) => false,
 
         // Expressions that insert split points when parenthesized.
         Expr::Compare(_)
