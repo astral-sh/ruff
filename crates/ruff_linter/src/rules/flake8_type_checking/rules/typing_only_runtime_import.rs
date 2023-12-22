@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
-use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix, FixAvailability, Violation};
@@ -13,7 +12,9 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
-use crate::rules::flake8_type_checking::helpers::{is_typing_reference, quote_annotation};
+use crate::rules::flake8_type_checking::helpers::{
+    filter_contained, is_typing_reference, quote_annotation,
+};
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 
@@ -472,43 +473,48 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
     )?;
 
     // Step 2) Add the import to a `TYPE_CHECKING` block.
-    let add_import_edit = checker.importer().typing_import_edit(
-        &ImportedMembers {
-            statement,
-            names: member_names.iter().map(AsRef::as_ref).collect(),
-        },
-        at,
-        checker.semantic(),
-        checker.source_type,
-    )?;
+    let (type_checking_edit, add_import_edit) = checker
+        .importer()
+        .typing_import_edit(
+            &ImportedMembers {
+                statement,
+                names: member_names.iter().map(AsRef::as_ref).collect(),
+            },
+            at,
+            checker.semantic(),
+            checker.source_type,
+        )?
+        .into_edits();
 
     // Step 3) Quote any runtime usages of the referenced symbol.
-    let quote_reference_edits = imports
-        .iter()
-        .flat_map(|ImportBinding { binding, .. }| {
-            binding.references.iter().filter_map(|reference_id| {
-                let reference = checker.semantic().reference(*reference_id);
-                if reference.context().is_runtime() {
-                    Some(quote_annotation(
-                        reference.expression_id()?,
-                        checker.semantic(),
-                        checker.locator(),
-                        checker.stylist(),
-                        checker.generator(),
-                    ))
-                } else {
-                    None
-                }
+    let quote_reference_edits = filter_contained(
+        imports
+            .iter()
+            .flat_map(|ImportBinding { binding, .. }| {
+                binding.references.iter().filter_map(|reference_id| {
+                    let reference = checker.semantic().reference(*reference_id);
+                    if reference.context().is_runtime() {
+                        Some(quote_annotation(
+                            reference.expression_id()?,
+                            checker.semantic(),
+                            checker.locator(),
+                            checker.stylist(),
+                            checker.generator(),
+                        ))
+                    } else {
+                        None
+                    }
+                })
             })
-        })
-        .collect::<Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>()?,
+    );
 
     Ok(Fix::unsafe_edits(
-        remove_import_edit,
+        type_checking_edit,
         add_import_edit
-            .into_edits()
             .into_iter()
-            .chain(quote_reference_edits.into_iter().unique()),
+            .chain(std::iter::once(remove_import_edit))
+            .chain(quote_reference_edits),
     )
     .isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),

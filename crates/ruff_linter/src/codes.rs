@@ -252,6 +252,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R0911") => (RuleGroup::Stable, rules::pylint::rules::TooManyReturnStatements),
         (Pylint, "R0912") => (RuleGroup::Stable, rules::pylint::rules::TooManyBranches),
         (Pylint, "R0913") => (RuleGroup::Stable, rules::pylint::rules::TooManyArguments),
+        (Pylint, "R0914") => (RuleGroup::Preview, rules::pylint::rules::TooManyLocals),
         (Pylint, "R0915") => (RuleGroup::Stable, rules::pylint::rules::TooManyStatements),
         (Pylint, "R0916") => (RuleGroup::Preview, rules::pylint::rules::TooManyBooleanExpressions),
         (Pylint, "R0917") => (RuleGroup::Preview, rules::pylint::rules::TooManyPositional),
@@ -807,6 +808,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8TypeChecking, "003") => (RuleGroup::Stable, rules::flake8_type_checking::rules::TypingOnlyStandardLibraryImport),
         (Flake8TypeChecking, "004") => (RuleGroup::Stable, rules::flake8_type_checking::rules::RuntimeImportInTypeCheckingBlock),
         (Flake8TypeChecking, "005") => (RuleGroup::Stable, rules::flake8_type_checking::rules::EmptyTypeCheckingBlock),
+        (Flake8TypeChecking, "006") => (RuleGroup::Preview, rules::flake8_type_checking::rules::RuntimeStringUnion),
 
         // tryceratops
         (Tryceratops, "002") => (RuleGroup::Stable, rules::tryceratops::rules::RaiseVanillaClass),
@@ -899,6 +901,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "017") => (RuleGroup::Nursery, rules::ruff::rules::QuadraticListSummation),
         (Ruff, "018") => (RuleGroup::Preview, rules::ruff::rules::AssignmentInAssert),
         (Ruff, "019") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryKeyCheck),
+        (Ruff, "020") => (RuleGroup::Preview, rules::ruff::rules::NeverUnion),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
 
@@ -951,6 +954,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "105") => (RuleGroup::Preview, rules::refurb::rules::PrintEmptyString),
         #[allow(deprecated)]
         (Refurb, "113") => (RuleGroup::Nursery, rules::refurb::rules::RepeatedAppend),
+        (Refurb, "118") => (RuleGroup::Preview, rules::refurb::rules::ReimplementedOperator),
         #[allow(deprecated)]
         (Refurb, "131") => (RuleGroup::Nursery, rules::refurb::rules::DeleteFullSlice),
         #[allow(deprecated)]

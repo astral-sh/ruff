@@ -1,12 +1,11 @@
-use ast::{ExprSubscript, Operator};
+use ast::Operator;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-
-use crate::rules::flake8_pyi::helpers::traverse_union;
 
 /// ## What it does
 /// Checks for the presence of multiple literal types in a union.
@@ -62,7 +61,7 @@ fn concatenate_bin_ors(exprs: Vec<&Expr>) -> Expr {
     })
 }
 
-fn make_union(subscript: &ExprSubscript, exprs: Vec<&Expr>) -> Expr {
+fn make_union(subscript: &ast::ExprSubscript, exprs: Vec<&Expr>) -> Expr {
     Expr::Subscript(ast::ExprSubscript {
         value: subscript.value.clone(),
         slice: Box::new(Expr::Tuple(ast::ExprTuple {
@@ -108,7 +107,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
     let mut total_literals = 0;
 
     // Split members into `literal_exprs` if they are a `Literal` annotation  and `other_exprs` otherwise
-    let mut collect_literal_expr = |expr: &'a Expr, _| {
+    let mut collect_literal_expr = |expr: &'a Expr, _parent: &'a Expr| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if checker.semantic().match_typing_expr(value, "Literal") {
                 total_literals += 1;
@@ -137,7 +136,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
     };
 
     // Traverse the union, collect all members, split out the literals from the rest.
-    traverse_union(&mut collect_literal_expr, checker.semantic(), expr, None);
+    traverse_union(&mut collect_literal_expr, checker.semantic(), expr);
 
     let union_subscript = expr.as_subscript_expr();
     if union_subscript.is_some_and(|subscript| {

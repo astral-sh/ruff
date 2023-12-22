@@ -6,17 +6,21 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::SourceComment;
-use crate::expression::parentheses::parenthesized;
+use crate::expression::can_omit_optional_parentheses;
+use crate::expression::parentheses::{
+    is_expression_parenthesized, optional_parentheses, parenthesized,
+};
 use crate::other::commas;
 use crate::prelude::*;
+use crate::preview::is_wrap_multiple_context_managers_in_parens_enabled;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
-use crate::PyFormatOptions;
+use crate::{PyFormatOptions, PythonVersion};
 
 #[derive(Default)]
 pub struct FormatStmtWith;
 
 impl FormatNodeRule<StmtWith> for FormatStmtWith {
-    fn fmt_fields(&self, item: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
+    fn fmt_fields(&self, with_stmt: &StmtWith, f: &mut PyFormatter) -> FormatResult<()> {
         // The `with` statement can have one dangling comment on the open parenthesis, like:
         // ```python
         // with (  # comment
@@ -31,9 +35,10 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
         //     ...
         // ```
         let comments = f.context().comments().clone();
-        let dangling_comments = comments.dangling(item.as_any_node_ref());
+        let dangling_comments = comments.dangling(with_stmt.as_any_node_ref());
         let partition_point = dangling_comments.partition_point(|comment| {
-            item.items
+            with_stmt
+                .items
                 .first()
                 .is_some_and(|with_item| with_item.start() > comment.start())
         });
@@ -43,35 +48,26 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
             f,
             [
                 clause_header(
-                    ClauseHeader::With(item),
+                    ClauseHeader::With(with_stmt),
                     colon_comments,
                     &format_with(|f| {
                         write!(
                             f,
                             [
-                                item.is_async
+                                with_stmt
+                                    .is_async
                                     .then_some(format_args![token("async"), space()]),
                                 token("with"),
                                 space()
                             ]
                         )?;
 
-                        if !parenthesized_comments.is_empty() {
-                            let joined = format_with(|f: &mut PyFormatter| {
-                                f.join_comma_separated(item.body.first().unwrap().start())
-                                    .nodes(&item.items)
-                                    .finish()
-                            });
-
-                            parenthesized("(", &joined, ")")
-                                .with_dangling_comments(parenthesized_comments)
-                                .fmt(f)?;
-                        } else if should_parenthesize(item, f.options(), f.context())? {
-                            parenthesize_if_expands(&format_with(|f| {
+                        if parenthesized_comments.is_empty() {
+                            let format_items = format_with(|f| {
                                 let mut joiner =
-                                    f.join_comma_separated(item.body.first().unwrap().start());
+                                    f.join_comma_separated(with_stmt.body.first().unwrap().start());
 
-                                for item in &item.items {
+                                for item in &with_stmt.items {
                                     joiner.entry_with_line_separator(
                                         item,
                                         &item.format(),
@@ -79,26 +75,48 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
                                     );
                                 }
                                 joiner.finish()
-                            }))
-                            .fmt(f)?;
-                        } else if let [item] = item.items.as_slice() {
-                            // This is similar to `maybe_parenthesize_expression`, but we're not
-                            // dealing with an expression here, it's a `WithItem`.
-                            if comments.has_leading(item) || comments.has_trailing(item) {
-                                parenthesized("(", &item.format(), ")").fmt(f)?;
-                            } else {
-                                item.format().fmt(f)?;
+                            });
+
+                            match should_parenthesize(with_stmt, f.options(), f.context())? {
+                                ParenthesizeWith::Optional => {
+                                    optional_parentheses(&format_items).fmt(f)?;
+                                }
+                                ParenthesizeWith::IfExpands => {
+                                    parenthesize_if_expands(&format_items).fmt(f)?;
+                                }
+                                ParenthesizeWith::UnlessCommented => {
+                                    if let [item] = with_stmt.items.as_slice() {
+                                        // This is similar to `maybe_parenthesize_expression`, but we're not
+                                        // dealing with an expression here, it's a `WithItem`.
+                                        if comments.has_leading(item) || comments.has_trailing(item)
+                                        {
+                                            parenthesized("(", &item.format(), ")").fmt(f)?;
+                                        } else {
+                                            item.format().fmt(f)?;
+                                        }
+                                    } else {
+                                        f.join_with(format_args![token(","), space()])
+                                            .entries(with_stmt.items.iter().formatted())
+                                            .finish()?;
+                                    }
+                                }
                             }
                         } else {
-                            f.join_with(format_args![token(","), space()])
-                                .entries(item.items.iter().formatted())
-                                .finish()?;
+                            let joined = format_with(|f: &mut PyFormatter| {
+                                f.join_comma_separated(with_stmt.body.first().unwrap().start())
+                                    .nodes(&with_stmt.items)
+                                    .finish()
+                            });
+
+                            parenthesized("(", &joined, ")")
+                                .with_dangling_comments(parenthesized_comments)
+                                .fmt(f)?;
                         }
 
                         Ok(())
                     })
                 ),
-                clause_body(&item.body, colon_comments)
+                clause_body(&with_stmt.body, colon_comments)
             ]
         )
     }
@@ -113,24 +131,79 @@ impl FormatNodeRule<StmtWith> for FormatStmtWith {
     }
 }
 
-/// Returns `true` if the `with` items should be parenthesized, if at least one item expands.
+/// Determines whether the `with` items should be parenthesized (over parenthesizing each item),
+/// and if so, which parenthesizing layout to use.
 ///
-/// Black parenthesizes `with` items if there's more than one item and they're already
-/// parenthesized, _or_ there's a single item with a trailing comma.
+/// Parenthesize `with` items if
+/// * The last item has a trailing comma (implying that the with items were parenthesized in the source)
+/// * There's more than one item and they're already parenthesized
+/// * There's more than one item, the [`wrap_multiple_context_managers_in_parens`](is_wrap_multiple_context_managers_in_parens) preview style is enabled,
+///     and the target python version is >= 3.9
+/// * There's a single non-parenthesized item. The function returns [`ParenthesizeWith::Optional`]
+///     if the parentheses can be omitted if breaking around parenthesized sub-expressions is sufficient
+///     to make the expression fit. It returns [`ParenthesizeWith::IfExpands`] otherwise.
+/// * The only item is parenthesized and has comments.
 fn should_parenthesize(
     with: &StmtWith,
     options: &PyFormatOptions,
     context: &PyFormatContext,
-) -> FormatResult<bool> {
+) -> FormatResult<ParenthesizeWith> {
     if has_magic_trailing_comma(with, options, context) {
-        return Ok(true);
+        return Ok(ParenthesizeWith::IfExpands);
     }
 
-    if are_with_items_parenthesized(with, context)? {
-        return Ok(true);
+    let can_parenthesize = (is_wrap_multiple_context_managers_in_parens_enabled(context)
+        && options.target_version() >= PythonVersion::Py39)
+        || are_with_items_parenthesized(with, context)?;
+
+    if !can_parenthesize {
+        return Ok(ParenthesizeWith::UnlessCommented);
     }
 
-    Ok(false)
+    if let [single] = with.items.as_slice() {
+        return Ok(
+            // If the with item itself has comments (not the context expression), then keep the parentheses
+            if context.comments().has_leading(single) || context.comments().has_trailing(single) {
+                ParenthesizeWith::IfExpands
+            }
+            // If it is the only expression and it has comments, then the with statement
+            // as well as the with item add parentheses
+            else if is_expression_parenthesized(
+                (&single.context_expr).into(),
+                context.comments().ranges(),
+                context.source(),
+            ) {
+                // Preserve the parentheses around the context expression instead of parenthesizing the entire
+                // with items.
+                ParenthesizeWith::UnlessCommented
+            } else if is_wrap_multiple_context_managers_in_parens_enabled(context)
+                && can_omit_optional_parentheses(&single.context_expr, context)
+            {
+                ParenthesizeWith::Optional
+            } else {
+                ParenthesizeWith::IfExpands
+            },
+        );
+    }
+
+    // Always parenthesize multiple items
+    Ok(ParenthesizeWith::IfExpands)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ParenthesizeWith {
+    /// Don't wrap the with items in parentheses except if it is a single item
+    /// and it has leading or trailing comment.
+    ///
+    /// This is required because `are_with_items_parenthesized` cannot determine if
+    /// `with (expr)` is a parenthesized expression or a parenthesized with item.
+    UnlessCommented,
+
+    /// Wrap the with items in optional parentheses
+    Optional,
+
+    /// Wrap the with items in parentheses if they expand
+    IfExpands,
 }
 
 fn has_magic_trailing_comma(

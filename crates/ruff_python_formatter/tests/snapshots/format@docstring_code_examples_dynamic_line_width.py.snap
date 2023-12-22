@@ -239,6 +239,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -534,6 +535,28 @@ def doctest_extra_indent3():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -270,9 +270,11 @@
+ 
+         Examples
+         --------
+-        >>> df = pl.DataFrame(
+-        ...     {"foo": [1, 2, 3], "bar": [6, 7, 8], "ham": ["a", "b", "c"]}
+-        ... )
++        >>> df = pl.DataFrame({
++        ...     "foo": [1, 2, 3],
++        ...     "bar": [6, 7, 8],
++        ...     "ham": ["a", "b", "c"],
++        ... })
+         """
+ 
+ 
+```
+
+
 ### Output 2
 ```
 indent-style               = space
@@ -545,6 +568,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -841,6 +865,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -1136,6 +1161,28 @@ def doctest_extra_indent3():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -270,9 +270,11 @@
+ 
+ 		Examples
+ 		--------
+-		>>> df = pl.DataFrame(
+-		...     {"foo": [1, 2, 3], "bar": [6, 7, 8], "ham": ["a", "b", "c"]}
+-		... )
++		>>> df = pl.DataFrame({
++		...     "foo": [1, 2, 3],
++		...     "bar": [6, 7, 8],
++		...     "ham": ["a", "b", "c"],
++		... })
+ 		"""
+ 
+ 
+```
+
+
 ### Output 4
 ```
 indent-style               = tab
@@ -1147,6 +1194,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -1869,6 +1917,28 @@ def doctest_extra_indent3():
 	...         df1, df2, df3, on="dt"
 	... )  # doctest: +IGNORE_RESULT
 	"""
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -700,9 +700,11 @@
+ 
+ 		Examples
+ 		--------
+-		>>> df = pl.DataFrame(
+-		...         {"foo": [1, 2, 3], "bar": [6, 7, 8], "ham": ["a", "b", "c"]}
+-		... )
++		>>> df = pl.DataFrame({
++		...         "foo": [1, 2, 3],
++		...         "bar": [6, 7, 8],
++		...         "ham": ["a", "b", "c"],
++		... })
+ 		"""
+ 
+ 
 ```
 
 

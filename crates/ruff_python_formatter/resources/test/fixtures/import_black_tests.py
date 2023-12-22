@@ -51,6 +51,11 @@ def import_fixture(fixture: Path, fixture_set: str):
                 length = int(length)
                 options["line_width"] = 1 if length == 0 else length
 
+            if "--minimum-version=" in flags:
+                [_, version] = flags.split("--minimum-version=", 1)
+                # Convert 3.10 to py310
+                options["target_version"] = f"py{version.strip().replace('.', '')}"
+
             if "--skip-magic-trailing-comma" in flags:
                 options["magic_trailing_comma"] = "ignore"
 

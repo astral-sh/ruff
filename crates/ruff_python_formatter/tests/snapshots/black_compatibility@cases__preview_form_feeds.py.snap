@@ -211,7 +211,7 @@ a = [
  pass
  
  
-@@ -68,7 +68,7 @@
+@@ -68,13 +68,12 @@
  def foo():
      pass
  
@@ -220,7 +220,13 @@ a = [
  pass
  
  
-@@ -84,7 +84,7 @@
+ # form feeds are prohibited inside blocks, or on a line with nonwhitespace
+ def bar(a=1, b: bool = False):
+-
+     pass
+ 
+ 
+@@ -85,7 +84,7 @@
      def something(self):
          pass
  
@@ -416,6 +422,7 @@ pass
 
 # form feeds are prohibited inside blocks, or on a line with nonwhitespace
 def bar(a=1, b: bool = False):
+
     pass
 
 

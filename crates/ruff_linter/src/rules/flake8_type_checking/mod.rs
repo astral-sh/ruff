@@ -35,6 +35,8 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_8.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH006_1.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TCH006_2.py"))]
     #[test_case(Rule::TypingOnlyFirstPartyImport, Path::new("TCH001.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TCH003.py"))]
     #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("snapshot.py"))]
@@ -101,6 +103,35 @@ mod tests {
             },
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("exempt_type_checking_1.py")
+    )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("exempt_type_checking_2.py")
+    )]
+    #[test_case(
+        Rule::TypingOnlyStandardLibraryImport,
+        Path::new("exempt_type_checking_3.py")
+    )]
+    fn exempt_type_checking(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                flake8_type_checking: super::settings::Settings {
+                    exempt_modules: vec![],
+                    strict: true,
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 

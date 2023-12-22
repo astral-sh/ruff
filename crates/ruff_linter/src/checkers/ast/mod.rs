@@ -1745,10 +1745,13 @@ impl<'a> Checker<'a> {
             return;
         }
 
+        // If the expression is the left-hand side of a walrus operator, then it's a named
+        // expression assignment.
         if self
             .semantic
             .current_expressions()
-            .any(Expr::is_named_expr_expr)
+            .filter_map(Expr::as_named_expr_expr)
+            .any(|parent| parent.target.as_ref() == expr)
         {
             self.add_binding(id, expr.range(), BindingKind::NamedExprAssignment, flags);
             return;
@@ -2013,13 +2016,15 @@ pub(crate) fn check_ast(
     // Iterate over the AST.
     checker.visit_body(python_ast);
 
-    // Visit any deferred syntax nodes.
+    // Visit any deferred syntax nodes. Take care to visit in order, such that we avoid adding
+    // new deferred nodes after visiting nodes of that kind. For example, visiting a deferred
+    // function can add a deferred lambda, but the opposite is not true.
     checker.visit_deferred_functions();
-    checker.visit_deferred_lambdas();
-    checker.visit_deferred_future_type_definitions();
     checker.visit_deferred_type_param_definitions();
+    checker.visit_deferred_future_type_definitions();
     let allocator = typed_arena::Arena::new();
     checker.visit_deferred_string_type_definitions(&allocator);
+    checker.visit_deferred_lambdas();
     checker.visit_exports();
 
     // Check docstrings, bindings, and unresolved references.

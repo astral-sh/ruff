@@ -27,7 +27,7 @@ itertools = { version = "0.11.0" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
 memchr = { version = "2.6.4" }
-once_cell = { version = "1.17.1" }
+once_cell = { version = "1.19.0" }
 path-absolutize = { version = "3.1.1" }
 proc-macro2 = { version = "1.0.70" }
 quote = { version = "1.0.23" }
@@ -46,12 +46,12 @@ strum_macros = { version = "0.25.3" }
 syn = { version = "2.0.40" }
 test-case = { version = "3.2.1" }
 thiserror = { version = "1.0.50" }
-toml = { version = "0.7.8" }
+toml = { version = "0.8.2" }
 tracing = { version = "0.1.40" }
-tracing-indicatif = { version = "0.3.4" }
+tracing-indicatif = { version = "0.3.6" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 unicode-ident = { version = "1.0.12" }
-unicode_names2 = { version = "1.2.0" }
+unicode_names2 = { version = "1.2.1" }
 unicode-width = { version = "0.1.11" }
 uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
 wsl = { version = "0.1.0" }

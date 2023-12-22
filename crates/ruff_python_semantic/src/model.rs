@@ -761,6 +761,7 @@ impl<'a> SemanticModel<'a> {
                                     {
                                         return Some(ImportedName {
                                             name: format!("{name}.{member}"),
+                                            source,
                                             range: self.nodes[source].range(),
                                             context: binding.context,
                                         });
@@ -785,6 +786,7 @@ impl<'a> SemanticModel<'a> {
                                         {
                                             return Some(ImportedName {
                                                 name: (*name).to_string(),
+                                                source,
                                                 range: self.nodes[source].range(),
                                                 context: binding.context,
                                             });
@@ -806,6 +808,7 @@ impl<'a> SemanticModel<'a> {
                                     {
                                         return Some(ImportedName {
                                             name: format!("{name}.{member}"),
+                                            source,
                                             range: self.nodes[source].range(),
                                             context: binding.context,
                                         });
@@ -993,7 +996,7 @@ impl<'a> SemanticModel<'a> {
         &self.nodes[node_id]
     }
 
-    /// Given a [`Expr`], return its parent, if any.
+    /// Given a [`NodeId`], return its parent, if any.
     #[inline]
     pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
         self.nodes
@@ -1828,6 +1831,8 @@ pub enum ReadResult {
 pub struct ImportedName {
     /// The name to which the imported symbol is bound.
     name: String,
+    /// The statement from which the symbol is imported.
+    source: NodeId,
     /// The range at which the symbol is imported.
     range: TextRange,
     /// The context in which the symbol is imported.
@@ -1841,6 +1846,10 @@ impl ImportedName {
 
     pub const fn context(&self) -> ExecutionContext {
         self.context
+    }
+
+    pub fn statement<'a>(&self, semantic: &'a SemanticModel) -> &'a Stmt {
+        semantic.statement(self.source)
     }
 }
 

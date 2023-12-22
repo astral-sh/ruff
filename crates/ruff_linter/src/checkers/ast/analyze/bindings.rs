@@ -3,12 +3,11 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
-use crate::rules::{flake8_import_conventions, flake8_pyi, pyflakes, pylint, ruff};
+use crate::rules::{flake8_import_conventions, flake8_pyi, pyflakes, pylint};
 
 /// Run lint rules over the [`Binding`]s.
 pub(crate) fn bindings(checker: &mut Checker) {
     if !checker.any_enabled(&[
-        Rule::AsyncioDanglingTask,
         Rule::InvalidAllFormat,
         Rule::InvalidAllObject,
         Rule::NonAsciiName,
@@ -68,13 +67,6 @@ pub(crate) fn bindings(checker: &mut Checker) {
         if checker.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
             if let Some(diagnostic) =
                 flake8_pyi::rules::unaliased_collections_abc_set_import(checker, binding)
-            {
-                checker.diagnostics.push(diagnostic);
-            }
-        }
-        if checker.enabled(Rule::AsyncioDanglingTask) {
-            if let Some(diagnostic) =
-                ruff::rules::asyncio_dangling_binding(binding, &checker.semantic)
             {
                 checker.diagnostics.push(diagnostic);
             }

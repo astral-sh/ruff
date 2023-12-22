@@ -1,11 +1,10 @@
-use ruff_python_ast::{Expr, Parameters};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{Expr, Parameters};
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_pyi::helpers::traverse_union;
 
 /// ## What it does
 /// Checks for union annotations that contain redundant numeric types (e.g.,
@@ -90,7 +89,7 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
     let mut has_complex = false;
     let mut has_int = false;
 
-    let mut func = |expr: &Expr, _parent: Option<&Expr>| {
+    let mut func = |expr: &Expr, _parent: &Expr| {
         let Some(call_path) = checker.semantic().resolve_call_path(expr) else {
             return;
         };
@@ -103,7 +102,7 @@ fn check_annotation(checker: &mut Checker, annotation: &Expr) {
         }
     };
 
-    traverse_union(&mut func, checker.semantic(), annotation, None);
+    traverse_union(&mut func, checker.semantic(), annotation);
 
     if has_complex {
         if has_float {

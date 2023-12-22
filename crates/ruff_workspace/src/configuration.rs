@@ -175,6 +175,14 @@ impl Configuration {
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             preview: format_preview,
+            target_version: match target_version {
+                PythonVersion::Py37 => ruff_python_formatter::PythonVersion::Py37,
+                PythonVersion::Py38 => ruff_python_formatter::PythonVersion::Py38,
+                PythonVersion::Py39 => ruff_python_formatter::PythonVersion::Py39,
+                PythonVersion::Py310 => ruff_python_formatter::PythonVersion::Py310,
+                PythonVersion::Py311 => ruff_python_formatter::PythonVersion::Py311,
+                PythonVersion::Py312 => ruff_python_formatter::PythonVersion::Py312,
+            },
             line_width: self
                 .line_length
                 .map_or(format_defaults.line_width, |length| {

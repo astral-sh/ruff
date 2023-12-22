@@ -89,6 +89,7 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
     FilePattern::Builtin("build"),
     FilePattern::Builtin("dist"),
     FilePattern::Builtin("node_modules"),
+    FilePattern::Builtin("site-packages"),
     FilePattern::Builtin("venv"),
 ];
 
@@ -116,6 +117,7 @@ impl FileResolverSettings {
 pub struct FormatterSettings {
     pub exclude: FilePatternSet,
     pub preview: PreviewMode,
+    pub target_version: ruff_python_formatter::PythonVersion,
 
     pub line_width: LineWidth,
 
@@ -156,6 +158,7 @@ impl FormatterSettings {
         };
 
         PyFormatOptions::from_source_type(source_type)
+            .with_target_version(self.target_version)
             .with_indent_style(self.indent_style)
             .with_indent_width(self.indent_width)
             .with_quote_style(self.quote_style)
@@ -174,6 +177,7 @@ impl Default for FormatterSettings {
 
         Self {
             exclude: FilePatternSet::default(),
+            target_version: default_options.target_version(),
             preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),
             line_ending: LineEnding::Auto,

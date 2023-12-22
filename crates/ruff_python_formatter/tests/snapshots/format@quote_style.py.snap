@@ -68,6 +68,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -128,6 +129,19 @@ def docstring_single():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ 'single'
++
+ 'double'
+ r'r single'
+ r'r double'
+```
+
+
 ### Output 2
 ```
 indent-style               = space
@@ -139,6 +153,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -199,6 +214,19 @@ def docstring_single():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ "single"
++
+ "double"
+ r"r single"
+ r"r double"
+```
+
+
 ### Output 3
 ```
 indent-style               = space
@@ -210,6 +238,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -267,6 +296,19 @@ def docstring_double():
 
 def docstring_single():
     "single"
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ 'single'
++
+ "double"
+ r'r single'
+ r"r double"
 ```
 
 
