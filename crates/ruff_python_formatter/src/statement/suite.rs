@@ -11,7 +11,9 @@ use crate::comments::{
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::expression::expr_string_literal::ExprStringLiteralKind;
 use crate::prelude::*;
-use crate::preview::is_no_blank_line_before_class_docstring_enabled;
+use crate::preview::{
+    is_module_docstring_newlines_enabled, is_no_blank_line_before_class_docstring_enabled,
+};
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
@@ -166,7 +168,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 && self.kind == SuiteKind::Class
             {
                 true
-            } else if f.options().preview().is_enabled()
+            } else if is_module_docstring_newlines_enabled(f.context())
                 && self.kind == SuiteKind::TopLevel
                 && DocstringStmt::try_from_statement(first.statement(), self.kind).is_some()
             {

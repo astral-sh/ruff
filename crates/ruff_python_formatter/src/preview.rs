@@ -33,3 +33,13 @@ pub(crate) const fn is_no_blank_line_before_class_docstring_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`module_docstring_newlines`](https://github.com/astral-sh/ruff/issues/7995) preview style is enabled.
+pub(crate) const fn is_module_docstring_newlines_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
+
+/// Returns `true` if the [`dummy_implementations`](https://github.com/astral-sh/ruff/issues/8357) preview style is enabled.
+pub(crate) const fn is_dummy_implementations_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
