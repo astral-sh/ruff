@@ -39,6 +39,15 @@ pub(crate) const fn is_no_blank_line_before_class_docstring_enabled(
     context.is_preview()
 }
 
+/// Returns `true` if the [`wrap_multiple_context_managers_in_parens`](https://github.com/astral-sh/ruff/issues/8889) preview style is enabled.
+///
+/// Unlike Black, we re-use the same preview style feature flag for [`improved_async_statements_handling`](https://github.com/astral-sh/ruff/issues/8890)
+pub(crate) const fn is_wrap_multiple_context_managers_in_parens_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}
+
 /// Returns `true` if the [`module_docstring_newlines`](https://github.com/astral-sh/ruff/issues/7995) preview style is enabled.
 pub(crate) const fn is_module_docstring_newlines_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
