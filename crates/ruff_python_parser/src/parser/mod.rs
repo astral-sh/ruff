@@ -163,6 +163,23 @@ const COMPOUND_STMT_SET: TokenSet = TokenSet::new(&[
     TokenKind::Class,
     TokenKind::Async,
 ]);
+/// Tokens that represent simple statements, but doesn't include expressions.
+const SIMPLE_STMT_SET: TokenSet = TokenSet::new(&[
+    TokenKind::Pass,
+    TokenKind::Return,
+    TokenKind::Break,
+    TokenKind::Continue,
+    TokenKind::Global,
+    TokenKind::Nonlocal,
+    TokenKind::Assert,
+    TokenKind::Yield,
+    TokenKind::Del,
+    TokenKind::Raise,
+    TokenKind::Import,
+    TokenKind::Type,
+]);
+/// Tokens that represent simple statements, including expressions.
+const SIMPLE_STMT_SET2: TokenSet = SIMPLE_STMT_SET.union(EXPR_SET);
 
 impl<'src, 'src_path, I> Parser<'src, 'src_path, I>
 where
@@ -383,9 +400,8 @@ where
         self.at_ts(EXPR_SET)
     }
 
-    const SIMPLE_STMT_END_SET: TokenSet = TokenSet::new(&[TokenKind::Comma]).union(NEWLINE_EOF_SET);
     fn at_simple_stmt(&mut self) -> bool {
-        !self.at_compound_stmt() && !self.at_ts(Self::SIMPLE_STMT_END_SET)
+        self.at_ts(SIMPLE_STMT_SET2)
     }
 
     fn at_compound_stmt(&mut self) -> bool {
@@ -528,41 +544,14 @@ where
     ) -> TextRange {
         self.eat(TokenKind::Indent);
 
-        let range = self.current_range();
+        let mut range = self.current_range();
         self.add_error(ParseErrorType::OtherError(error_msg.to_string()), range);
 
-        let mut i = 0;
-        let mut count_stmt = 0;
-        let mut nested_indentations = 0;
-        let mut is_inside_body = false;
-        let mut range = self.current_range();
-        loop {
-            let kind = self.lookahead(i).0;
-
-            if kind == TokenKind::Dedent && nested_indentations == 0 {
-                break;
-            }
-            if kind == TokenKind::Indent {
-                is_inside_body = true;
-                nested_indentations += 1;
-            }
-            if kind == TokenKind::Dedent {
-                is_inside_body = false;
-                nested_indentations -= 1;
-            }
-            if !is_inside_body && kind == TokenKind::Newline {
-                count_stmt += 1;
-            }
-
-            i += 1;
-        }
-
-        for _ in 0..count_stmt {
+        while !self.at(TokenKind::Dedent) {
             let (stmt, stmt_range) = self.parse_statement();
             stmts.push(stmt);
-            range = range.cover(stmt_range);
+            range = stmt_range;
         }
-
         assert!(self.eat(TokenKind::Dedent));
 
         range
@@ -1549,15 +1538,22 @@ where
         let lpar_range = self.current_range();
         self.expect_and_recover(
             TokenKind::Lpar,
-            TokenSet::new(&[TokenKind::Colon, TokenKind::Rarrow, TokenKind::Comma]).union(EXPR_SET),
+            EXPR_SET.union(
+                [TokenKind::Colon, TokenKind::Rarrow, TokenKind::Comma]
+                    .as_slice()
+                    .into(),
+            ),
         );
 
         let mut parameters = self.parse_parameters();
 
         let rpar_range = self.current_range();
+
         self.expect_and_recover(
             TokenKind::Rpar,
-            TokenSet::new(&[TokenKind::Colon, TokenKind::Rarrow]),
+            SIMPLE_STMT_SET
+                .union(COMPOUND_STMT_SET)
+                .union([TokenKind::Colon, TokenKind::Rarrow].as_slice().into()),
         );
 
         parameters.range = lpar_range.cover(rpar_range);
@@ -1579,7 +1575,12 @@ where
             None
         };
 
-        self.expect_and_recover(TokenKind::Colon, [TokenKind::Rarrow].as_slice().into());
+        self.expect_and_recover(
+            TokenKind::Colon,
+            SIMPLE_STMT_SET
+                .union(COMPOUND_STMT_SET)
+                .union([TokenKind::Rarrow].as_slice().into()),
+        );
 
         let (body, body_range) = self.parse_body();
         let range = func_range.cover(body_range);
@@ -2441,7 +2442,7 @@ where
             );
         }
 
-        self.expect_and_recover(TokenKind::Import, EXPR_SET);
+        self.expect_and_recover(TokenKind::Import, TokenSet::EMPTY);
 
         let mut names = vec![];
         let range = if self.at(TokenKind::Lpar) {
@@ -2805,7 +2806,22 @@ where
                 continue;
             }
 
-            let (rhs, rhs_range) = self.expr_bp(op_bp);
+            let (rhs, rhs_range) = if self.at_expr() {
+                self.expr_bp(op_bp)
+            } else {
+                let rhs_range = self.current_range();
+                self.add_error(
+                    ParseErrorType::OtherError("expecting an expression after operand".into()),
+                    rhs_range,
+                );
+                (
+                    Expr::Invalid(ast::ExprInvalid {
+                        value: self.src_text(rhs_range).into(),
+                        range: rhs_range,
+                    }),
+                    rhs_range,
+                )
+            };
             lhs_range = lhs_range.cover(rhs_range);
             lhs = Expr::BinOp(ast::ExprBinOp {
                 left: Box::new(lhs),
@@ -2892,7 +2908,7 @@ where
                 range,
             }),
             // Handle unexpected token
-            _ => {
+            tok => {
                 // Try to parse an expression after seeing an unexpected token
                 let lhs = if self.at_expr() {
                     let (expr, expr_range) = self.parse_exprs();
@@ -4327,9 +4343,10 @@ where
             TokenKind::Newline
         };
 
+        let ending_set = TokenSet::new(&[TokenKind::Rarrow, ending]).union(COMPOUND_STMT_SET);
         let first_param_range = self.current_range();
         let range = self
-            .parse_separated(true, TokenKind::Comma, [ending].as_slice(), |parser| {
+            .parse_separated(true, TokenKind::Comma, ending_set, |parser| {
                 let mut range = parser.current_range();
                 // Don't allow any parameter after we have seen a vararg `**kwargs`
                 if has_seen_vararg {
@@ -4378,20 +4395,19 @@ where
                         args.push(param);
                     }
                 } else {
-                    if matches!(
-                        parser.current_kind(),
-                        TokenKind::Indent | TokenKind::Rarrow | TokenKind::Colon
-                    ) || parser.at_compound_stmt()
-                        || parser.at_simple_stmt()
-                    {
-                        return range;
+                    if parser.at_ts(SIMPLE_STMT_SET) {
+                        return TextRange::default(); // We can return any range here
                     }
-                    let range = parser.current_range();
+
+                    let mut range = parser.current_range();
+                    parser.skip_until(
+                        ending_set.union([TokenKind::Comma, TokenKind::Colon].as_slice().into()),
+                    );
+                    range = range.cover(parser.current_range());
                     parser.add_error(
                         ParseErrorType::OtherError("expected parameter".to_string()),
                         range,
                     );
-                    parser.next_token();
                 }
 
                 range
