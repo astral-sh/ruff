@@ -112,11 +112,15 @@ pub(crate) fn asyncio_dangling_binding(
     for binding_id in scope.binding_ids() {
         // If the binding itself is used, or it's not an assignment, skip it.
         let binding = semantic.binding(binding_id);
-        if binding.is_used() || !binding.kind.is_assignment() {
+        if binding.is_used()
+            || binding.is_global()
+            || binding.is_nonlocal()
+            || !binding.kind.is_assignment()
+        {
             continue;
         }
 
-        // Otherwise, any dangling tasks, including those that are shadowed, as in:
+        // Otherwise, flag any dangling tasks, including those that are shadowed, as in:
         // ```python
         // if x > 0:
         //     task = asyncio.create_task(make_request())
@@ -127,7 +131,11 @@ pub(crate) fn asyncio_dangling_binding(
             std::iter::successors(Some(binding_id), |id| semantic.shadowed_binding(*id))
         {
             let binding = semantic.binding(binding_id);
-            if binding.is_used() || !binding.kind.is_assignment() {
+            if binding.is_used()
+                || binding.is_global()
+                || binding.is_nonlocal()
+                || !binding.kind.is_assignment()
+            {
                 continue;
             }
 
