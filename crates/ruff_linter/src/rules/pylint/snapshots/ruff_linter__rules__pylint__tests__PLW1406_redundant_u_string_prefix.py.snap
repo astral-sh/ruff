@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+redundant_u_string_prefix.py:2:11: PLW1406 [*] The `u` prefix is redundant for string literals in Python >=3.0
+  |
+1 | def ufoo() -> None:
+2 |     print(u"Hello, world!")  # PLW1406
+  |           ^^^^^^^^^^^^^^^^ PLW1406
+3 | 
+4 | def bfoo() -> None:
+  |
+  = help: Remove `u` prefix
+
+ℹ Safe fix
+1 1 | def ufoo() -> None:
+2   |-    print(u"Hello, world!")  # PLW1406
+  2 |+    print("Hello, world!")  # PLW1406
+3 3 | 
+4 4 | def bfoo() -> None:
+5 5 |     print(b"Hello, world!")  # OK
+
+
