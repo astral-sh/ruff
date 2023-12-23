@@ -4123,7 +4123,7 @@ where
 
         let mut await_range = start_range;
 
-        let (expr, expr_range) = self.parse_expr_simple();
+        let (expr, expr_range) = self.expr_bp(19);
         await_range = await_range.cover(expr_range);
 
         if matches!(expr, Expr::Starred(_)) {
