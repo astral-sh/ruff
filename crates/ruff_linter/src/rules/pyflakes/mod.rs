@@ -23,7 +23,7 @@ mod tests {
     use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
-    use crate::linter::{check_path, LinterResult};
+    use crate::linter::{check_path, LinterResult, TokenSource};
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -560,7 +560,6 @@ mod tests {
         } = check_path(
             Path::new("<filename>"),
             None,
-            tokens,
             &locator,
             &stylist,
             &indexer,
@@ -569,6 +568,7 @@ mod tests {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
+            TokenSource::Tokens(tokens),
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics
