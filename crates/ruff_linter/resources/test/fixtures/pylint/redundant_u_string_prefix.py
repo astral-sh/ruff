@@ -12,3 +12,5 @@ def ffoo() -> None:
 
 def foo() -> None:
     print("Hello, world!")  # OK
+    print("u")  # OK
+    # ^ originally, there was a bug for strings that started with `u` due to not looking for the StringLiteral node

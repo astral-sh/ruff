@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::StringLike;
+use ruff_python_ast::{self as ast, StringLike};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -38,6 +38,10 @@ impl AlwaysFixableViolation for RedundantUStringPrefix {
 
 /// PLW1406
 pub(crate) fn redundant_u_string_prefix(checker: &mut Checker, string: StringLike) {
+    let StringLike::StringLiteral(ast::ExprStringLiteral { .. }) = string else {
+        return;
+    };
+
     let prefix_position = TextRange::new(string.start(), string.start() + TextSize::new(1));
 
     if checker.locator().slice(prefix_position) != "u" {
