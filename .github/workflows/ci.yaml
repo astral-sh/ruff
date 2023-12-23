@@ -120,7 +120,7 @@ jobs:
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ruff
           path: target/debug/ruff
@@ -219,7 +219,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         name: Download comparison Ruff binary
         id: ruff-target
         with:
@@ -305,13 +305,13 @@ jobs:
         run: |
           echo ${{ github.event.number }} > pr-number
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         name: Upload PR Number
         with:
           name: pr-number
           path: pr-number
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         name: Upload Results
         with:
           name: ecosystem-result
@@ -459,7 +459,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         name: Download development ruff binary
         id: ruff-target
         with:
