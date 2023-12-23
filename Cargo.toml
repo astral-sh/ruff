@@ -29,7 +29,7 @@ log = { version = "0.4.17" }
 memchr = { version = "2.6.4" }
 once_cell = { version = "1.19.0" }
 path-absolutize = { version = "3.1.1" }
-proc-macro2 = { version = "1.0.70" }
+proc-macro2 = { version = "1.0.71" }
 quote = { version = "1.0.23" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "1.1.0" }
