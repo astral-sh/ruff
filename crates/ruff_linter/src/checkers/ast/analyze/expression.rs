@@ -438,6 +438,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::SuperWithoutBrackets) {
+                pylint::rules::super_without_brackets(checker, func);
+            }
             if checker.enabled(Rule::TypeOfPrimitive) {
                 pyupgrade::rules::type_of_primitive(checker, expr, func, args);
             }

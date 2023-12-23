@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+super_without_brackets.py:10:9: PLW0245 [*] `super` call without parentheses
+   |
+ 8 |     @staticmethod
+ 9 |     def temp() -> None:
+10 |         super.temp()  # PLW0245
+   |         ^^^^^ PLW0245
+11 |         print("But tomato soup is even hotter!")
+   |
+   = help: Add parentheses to `super` call
+
+ℹ Safe fix
+7  7  | class TomatoSoup(Soup):
+8  8  |     @staticmethod
+9  9  |     def temp() -> None:
+10    |-        super.temp()  # PLW0245
+   10 |+        super().temp()  # PLW0245
+11 11 |         print("But tomato soup is even hotter!")
+12 12 | 
+13 13 | class ProperTomatoSoup(Soup):
+
+
