@@ -43,7 +43,7 @@ static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
 strum_macros = { version = "0.25.3" }
 syn = { version = "2.0.40" }
-test-case = { version = "3.2.1" }
+test-case = { version = "3.3.1" }
 thiserror = { version = "1.0.50" }
 toml = { version = "0.8.2" }
 tracing = { version = "0.1.40" }
