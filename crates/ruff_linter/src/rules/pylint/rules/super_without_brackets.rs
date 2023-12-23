@@ -57,6 +57,10 @@ impl AlwaysFixableViolation for SuperWithoutBrackets {
 
 /// PLW0245
 pub(crate) fn super_without_brackets(checker: &mut Checker, func: &Expr) {
+    if !checker.semantic().current_scope().kind.is_function() {
+        return;
+    }
+
     let Expr::Attribute(ast::ExprAttribute { value, .. }) = func else {
         return;
     };
