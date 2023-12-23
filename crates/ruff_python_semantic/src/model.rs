@@ -1715,6 +1715,16 @@ bitflags! {
         /// ```
         const FUTURE_ANNOTATIONS = 1 << 15;
 
+        /// The model has traversed past the module docstring.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// """Module docstring."""
+        ///
+        /// x: int = 1
+        /// ```
+        const MODULE_DOCSTRING = 1 << 16;
+
         /// The model is in a type parameter definition.
         ///
         /// For example, the model could be visiting `Record` in:
@@ -1723,11 +1733,10 @@ bitflags! {
         ///
         /// Record = TypeVar("Record")
         ///
-        const TYPE_PARAM_DEFINITION = 1 << 16;
+        const TYPE_PARAM_DEFINITION = 1 << 17;
 
         /// The context is in any type annotation.
-                const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
-
+        const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
 
         /// The context is in any string type definition.
         const STRING_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()

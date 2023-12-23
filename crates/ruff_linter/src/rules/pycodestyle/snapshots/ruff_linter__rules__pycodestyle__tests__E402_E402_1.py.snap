@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E402_1.py:5:1: E402 Module level import not at top of file
+  |
+3 | """Some other docstring."""
+4 | 
+5 | import b
+  | ^^^^^^^^ E402
+6 | 
+7 | """Some other docstring."""
+  |
+
+E402_1.py:9:1: E402 Module level import not at top of file
+  |
+7 | """Some other docstring."""
+8 | 
+9 | import c
+  | ^^^^^^^^ E402
+  |
+
+

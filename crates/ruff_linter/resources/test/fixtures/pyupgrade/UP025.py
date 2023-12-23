@@ -1,30 +1,28 @@
-# These should change
-x = u"Hello"
+u"Hello"
 
-u'world'
+x = u"Hello"  # UP025
 
-print(u"Hello")
+u'world'  # UP025
 
-print(u'world')
+print(u"Hello")  # UP025
+
+print(u'world')  # UP025
 
 import foo
 
-foo(u"Hello", U"world", a=u"Hello", b=u"world")
+foo(u"Hello", U"world", a=u"Hello", b=u"world")  # UP025
 
-# These should stay quoted they way they are
+# Retain quotes when fixing.
+x = u'hello'  # UP025
+x = u"""hello"""  # UP025
+x = u'''hello'''  # UP025
+x = u'Hello "World"'  # UP025
 
-x = u'hello'
-x = u"""hello"""
-x = u'''hello'''
-x = u'Hello "World"'
-
-# These should not change
-u = "Hello"
-
-u = u
+u = "Hello"  # OK
+u = u  # OK
 
 def hello():
-    return"Hello"
+    return"Hello"  # OK
 
-f"foo"u"bar"
-f"foo" u"bar"
+f"foo"u"bar"  # OK
+f"foo" u"bar"  # OK
