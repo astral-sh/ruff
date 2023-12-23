@@ -161,10 +161,7 @@ mod tests {
     )]
     #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
     #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
-    #[test_case(
-        Rule::RedundantUStringPrefix,
-        Path::new("redundant_u_string_prefix.py")
-    )]
+    #[test_case(Rule::RedundantUnicodePrefix, Path::new("redundant_unicode_prefix.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")

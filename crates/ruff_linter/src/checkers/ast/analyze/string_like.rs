@@ -17,7 +17,7 @@ pub(crate) fn string_like(string_like: StringLike, checker: &mut Checker) {
             flake8_pyi::rules::string_or_bytes_too_long(checker, string_like);
         }
     }
-    if checker.enabled(Rule::RedundantUStringPrefix) {
-        pylint::rules::redundant_u_string_prefix(checker, string_like);
+    if checker.enabled(Rule::RedundantUnicodePrefix) {
+        pylint::rules::redundant_unicode_prefix(checker, string_like);
     }
 }

@@ -65,6 +65,7 @@ KNOWN_FORMATTING_VIOLATIONS = [
     "pass-statement-stub-body",
     "prohibited-trailing-comma",
     "redundant-u-string-prefix",
+    "redundant-unicode-prefix",
     "shebang-leading-whitespace",
     "surrounding-whitespace",
     "tab-indentation",
