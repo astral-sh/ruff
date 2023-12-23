@@ -24,3 +24,8 @@ class SuperSoup(Soup):
         super = "super"
         super.temp()  # OK (according to this rule, at least)
         print(f"But super soup is {super}!")
+
+def super_without_class() -> None:
+    super.blah()  # OK
+
+super.blah()  # OK

@@ -1,4 +1,5 @@
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::{analyze::function_type, ScopeKind};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,8 +58,34 @@ impl AlwaysFixableViolation for SuperWithoutBrackets {
 
 /// PLW0245
 pub(crate) fn super_without_brackets(checker: &mut Checker, func: &Expr) {
-    if !checker.semantic().current_scope().kind.is_function() {
+    let ScopeKind::Function(ast::StmtFunctionDef {
+        name,
+        decorator_list,
+        ..
+    }) = checker.semantic().current_scope().kind
+    else {
         return;
+    };
+
+    let Some(parent) = &checker
+        .semantic()
+        .first_non_type_parent_scope(checker.semantic().current_scope())
+    else {
+        return;
+    };
+
+    match function_type::classify(
+        name,
+        decorator_list,
+        parent,
+        checker.semantic(),
+        &checker.settings.pep8_naming.classmethod_decorators,
+        &checker.settings.pep8_naming.staticmethod_decorators,
+    ) {
+        function_type::FunctionType::Method { .. }
+        | function_type::FunctionType::ClassMethod { .. }
+        | function_type::FunctionType::StaticMethod { .. } => {}
+        function_type::FunctionType::Function { .. } => return,
     }
 
     let Expr::Attribute(ast::ExprAttribute { value, .. }) = func else {
