@@ -409,7 +409,7 @@ pub(crate) fn concatenated_strings(
 
 // TODO: consolidate these with ParseError
 /// An error that occurred during parsing of an f-string.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 struct FStringError {
     /// The type of error that occurred.
     pub(crate) error: FStringErrorType,
@@ -427,7 +427,7 @@ impl From<FStringError> for LexicalError {
 }
 
 /// Represents the different types of errors that can occur during parsing of an f-string.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
