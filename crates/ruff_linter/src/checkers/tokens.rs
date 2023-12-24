@@ -23,6 +23,7 @@ use crate::rules::{
 };
 use crate::settings::LinterSettings;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_tokens(
     tokens: &[LexResult],
     path: &Path,

@@ -504,6 +504,7 @@ impl BlankLinesChecker {
         }
     }
 
+    #[allow(clippy::nonminimal_bool)]
     fn check_line(
         &mut self,
         line: &LogicalLineInfo,
