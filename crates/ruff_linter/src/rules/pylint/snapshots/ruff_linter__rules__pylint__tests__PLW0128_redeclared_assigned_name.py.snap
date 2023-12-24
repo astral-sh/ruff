@@ -43,7 +43,7 @@ redeclared_assigned_name.py:4:23: PLW0128 Redeclared variable `FIRST` in assignm
 4 | FIRST, SECOND, THIRD, FIRST, SECOND = (1, 2, 3, 4)  # PLW0128
   |                       ^^^^^ PLW0128
 5 | 
-6 | FIRST, SECOND = (1, 2)  # OK
+6 | FIRST, SECOND, _, _ = (1, 2, 3, 4)  # OK
   |
 
 redeclared_assigned_name.py:4:30: PLW0128 Redeclared variable `SECOND` in assignment
@@ -53,7 +53,7 @@ redeclared_assigned_name.py:4:30: PLW0128 Redeclared variable `SECOND` in assign
 4 | FIRST, SECOND, THIRD, FIRST, SECOND = (1, 2, 3, 4)  # PLW0128
   |                              ^^^^^^ PLW0128
 5 | 
-6 | FIRST, SECOND = (1, 2)  # OK
+6 | FIRST, SECOND, _, _ = (1, 2, 3, 4)  # OK
   |
 
 

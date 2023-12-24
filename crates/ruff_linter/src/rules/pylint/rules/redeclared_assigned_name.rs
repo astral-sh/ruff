@@ -44,6 +44,10 @@ fn check_expr(checker: &mut Checker, expr: &Expr, names: &mut Vec<String>) {
             }
         }
         Expr::Name(ast::ExprName { id, .. }) => {
+            if *id == "_" {
+                // Ignore `_` assignments
+                return;
+            }
             if names.contains(id) {
                 checker.diagnostics.push(Diagnostic::new(
                     RedeclaredAssignedName {
