@@ -158,21 +158,23 @@ pub(crate) fn definitions(checker: &mut Checker) {
             }
 
             // Extract a `Docstring` from a `Definition`.
-            let Some(expr) = docstring else {
+            let Some(string_literal) = docstring else {
                 pydocstyle::rules::not_missing(checker, definition, *visibility);
                 continue;
             };
 
-            let contents = checker.locator().slice(expr);
+            let contents = checker.locator().slice(string_literal);
 
             let indentation = checker.locator().slice(TextRange::new(
-                checker.locator.line_start(expr.start()),
-                expr.start(),
+                checker.locator.line_start(string_literal.start()),
+                string_literal.start(),
             ));
 
-            if expr.implicit_concatenated {
+            if string_literal.value.is_implicit_concatenated() {
                 #[allow(deprecated)]
-                let location = checker.locator.compute_source_location(expr.start());
+                let location = checker
+                    .locator
+                    .compute_source_location(string_literal.start());
                 warn_user!(
                     "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
                     relativize_path(checker.path),
@@ -186,7 +188,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
             let body_range = raw_contents_range(contents).unwrap();
             let docstring = Docstring {
                 definition,
-                expr,
+                expr: string_literal,
                 contents,
                 body_range,
                 indentation,

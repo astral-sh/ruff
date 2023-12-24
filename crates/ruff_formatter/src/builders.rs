@@ -2555,17 +2555,17 @@ pub struct BestFitting<'a, Context> {
 }
 
 impl<'a, Context> BestFitting<'a, Context> {
-    /// Creates a new best fitting IR with the given variants. The method itself isn't unsafe
-    /// but it is to discourage people from using it because the printer will panic if
-    /// the slice doesn't contain at least the least and most expanded variants.
+    /// Creates a new best fitting IR with the given variants.
+    ///
+    /// Callers are required to ensure that the number of variants given
+    /// is at least 2.
     ///
     /// You're looking for a way to create a `BestFitting` object, use the `best_fitting![least_expanded, most_expanded]` macro.
     ///
-    /// ## Safety
-
-    /// The slice must contain at least two variants.
-    #[allow(unsafe_code)]
-    pub unsafe fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
+    /// # Panics
+    ///
+    /// When the slice contains less than two variants.
+    pub fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
         assert!(
             variants.0.len() >= 2,
             "Requires at least the least expanded and most expanded variants"
@@ -2696,14 +2696,12 @@ impl<Context> Format<Context> for BestFitting<'_, Context> {
             buffer.write_element(FormatElement::Tag(EndBestFittingEntry));
         }
 
-        // SAFETY: The constructor guarantees that there are always at least two variants. It's, therefore,
-        // safe to call into the unsafe `from_vec_unchecked` function
-        #[allow(unsafe_code)]
-        let element = unsafe {
-            FormatElement::BestFitting {
-                variants: BestFittingVariants::from_vec_unchecked(buffer.into_vec()),
-                mode: self.mode,
-            }
+        // OK because the constructor guarantees that there are always at
+        // least two variants.
+        let variants = BestFittingVariants::from_vec_unchecked(buffer.into_vec());
+        let element = FormatElement::BestFitting {
+            variants,
+            mode: self.mode,
         };
 
         f.write_element(element);

@@ -3,9 +3,8 @@ use ruff_python_ast::{Expr, StmtReturn};
 
 use crate::comments::{SourceComment, SuppressionKind};
 use crate::expression::expr_tuple::TupleParentheses;
-use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::Parenthesize;
 use crate::prelude::*;
+use crate::statement::stmt_assign::FormatStatementsLastExpression;
 
 #[derive(Default)]
 pub struct FormatStmtReturn;
@@ -33,7 +32,7 @@ impl FormatNodeRule<StmtReturn> for FormatStmtReturn {
                     f,
                     [
                         space(),
-                        maybe_parenthesize_expression(value, item, Parenthesize::IfBreaks)
+                        FormatStatementsLastExpression::left_to_right(value, item)
                     ]
                 )
             }

@@ -1,5 +1,5 @@
 use crate::registry::Rule;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::TokenKind;
@@ -111,7 +111,7 @@ pub(crate) fn check_logical_lines(
             indent_size,
         ) {
             if settings.rules.enabled(kind.rule()) {
-                context.push(kind, range);
+                context.push_diagnostic(Diagnostic::new(kind, range));
             }
         }
 
@@ -134,18 +134,6 @@ impl<'a> LogicalLinesContext<'a> {
         Self {
             settings,
             diagnostics: Vec::new(),
-        }
-    }
-
-    pub(crate) fn push<K: Into<DiagnosticKind>>(&mut self, kind: K, range: TextRange) {
-        let kind = kind.into();
-        if self.settings.rules.enabled(kind.rule()) {
-            self.diagnostics.push(Diagnostic {
-                kind,
-                range,
-                fix: None,
-                parent: None,
-            });
         }
     }
 

@@ -30,7 +30,7 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// ```python
 /// try:
 ///     ...
-/// except ValueError as e:
+/// except ValueError:
 ///     logger.exception("Found an error")
 /// ```
 #[violation]
@@ -61,11 +61,7 @@ impl<'a> Visitor<'a> for NameVisitor<'a> {
 /// TRY401
 pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) =
-            handler;
-        let Some(target) = name else {
-            continue;
-        };
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
 
         // Find all calls to `logging.exception`.
         let calls = {
@@ -87,8 +83,14 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
                     }
                     names
                 };
+
+                // Find any bound exceptions in the call.
                 for expr in names {
-                    if expr.id == target.as_str() {
+                    let Some(id) = checker.semantic().resolve_name(expr) else {
+                        continue;
+                    };
+                    let binding = checker.semantic().binding(id);
+                    if binding.kind.is_bound_exception() {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(VerboseLogMessage, expr.range()));

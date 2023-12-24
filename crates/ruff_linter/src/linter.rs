@@ -9,8 +9,9 @@ use log::error;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_notebook::Notebook;
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
@@ -72,7 +73,6 @@ pub struct FixerResult<'a> {
 pub fn check_path(
     path: &Path,
     package: Option<&Path>,
-    tokens: Vec<LexResult>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -81,6 +81,7 @@ pub fn check_path(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
+    tokens: TokenSource,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -107,7 +108,8 @@ pub fn check_path(
             locator,
             indexer,
             settings,
-            source_type.is_stub(),
+            source_type,
+            source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
         ));
     }
 
@@ -142,13 +144,10 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
-        match ruff_python_parser::parse_program_tokens(
-            tokens,
-            source_kind.source_code(),
-            &path.to_string_lossy(),
-            source_type.is_ipynb(),
-        ) {
+        // Parse, if the AST wasn't pre-provided provided.
+        match tokens.into_ast_source(source_kind, source_type, path) {
             Ok(python_ast) => {
+                let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
                 if use_ast {
                     diagnostics.extend(check_ast(
                         &python_ast,
@@ -161,6 +160,7 @@ pub fn check_path(
                         path,
                         package,
                         source_type,
+                        cell_offsets,
                     ));
                 }
                 if use_imports {
@@ -173,8 +173,8 @@ pub fn check_path(
                         stylist,
                         path,
                         package,
-                        source_kind,
                         source_type,
+                        cell_offsets,
                     );
                     imports = module_imports;
                     diagnostics.extend(import_diagnostics);
@@ -321,7 +321,6 @@ pub fn add_noqa_to_path(
     } = check_path(
         path,
         package,
-        tokens,
         &locator,
         &stylist,
         &indexer,
@@ -330,6 +329,7 @@ pub fn add_noqa_to_path(
         flags::Noqa::Disabled,
         source_kind,
         source_type,
+        TokenSource::Tokens(tokens),
     );
 
     // Log any parse errors.
@@ -361,10 +361,10 @@ pub fn lint_only(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
+    data: ParseSource,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
-    let tokens: Vec<LexResult> =
-        ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+    let tokens = data.into_token_source(source_kind, source_type);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -387,7 +387,6 @@ pub fn lint_only(
     let result = check_path(
         path,
         package,
-        tokens,
         &locator,
         &stylist,
         &indexer,
@@ -396,6 +395,7 @@ pub fn lint_only(
         noqa,
         source_kind,
         source_type,
+        tokens,
     );
 
     result.map(|(diagnostics, imports)| {
@@ -483,7 +483,6 @@ pub fn lint_fix<'a>(
         let result = check_path(
             path,
             package,
-            tokens,
             &locator,
             &stylist,
             &indexer,
@@ -492,6 +491,7 @@ pub fn lint_fix<'a>(
             noqa,
             &transformed,
             source_type,
+            TokenSource::Tokens(tokens),
         );
 
         if iterations == 0 {
@@ -625,6 +625,95 @@ This indicates a bug in Ruff. If you could open an issue at:
             fs::relativize_path(path),
             codes,
         );
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ParseSource<'a> {
+    /// Extract the tokens and AST from the given source code.
+    None,
+    /// Use the precomputed tokens and AST.
+    Precomputed {
+        tokens: &'a [LexResult],
+        ast: &'a Suite,
+    },
+}
+
+impl<'a> ParseSource<'a> {
+    /// Convert to a [`TokenSource`], tokenizing if necessary.
+    fn into_token_source(
+        self,
+        source_kind: &SourceKind,
+        source_type: PySourceType,
+    ) -> TokenSource<'a> {
+        match self {
+            Self::None => TokenSource::Tokens(ruff_python_parser::tokenize(
+                source_kind.source_code(),
+                source_type.as_mode(),
+            )),
+            Self::Precomputed { tokens, ast } => TokenSource::Precomputed { tokens, ast },
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TokenSource<'a> {
+    /// Use the precomputed tokens to generate the AST.
+    Tokens(Vec<LexResult>),
+    /// Use the precomputed tokens and AST.
+    Precomputed {
+        tokens: &'a [LexResult],
+        ast: &'a Suite,
+    },
+}
+
+impl Deref for TokenSource<'_> {
+    type Target = [LexResult];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Tokens(tokens) => tokens,
+            Self::Precomputed { tokens, .. } => tokens,
+        }
+    }
+}
+
+impl<'a> TokenSource<'a> {
+    /// Convert to an [`AstSource`], parsing if necessary.
+    fn into_ast_source(
+        self,
+        source_kind: &SourceKind,
+        source_type: PySourceType,
+        path: &Path,
+    ) -> Result<AstSource<'a>, ParseError> {
+        match self {
+            Self::Tokens(tokens) => Ok(AstSource::Ast(ruff_python_parser::parse_program_tokens(
+                tokens,
+                source_kind.source_code(),
+                &path.to_string_lossy(),
+                source_type.is_ipynb(),
+            )?)),
+            Self::Precomputed { ast, .. } => Ok(AstSource::Precomputed(ast)),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AstSource<'a> {
+    /// Extract the AST from the given source code.
+    Ast(Suite),
+    /// Use the precomputed AST.
+    Precomputed(&'a Suite),
+}
+
+impl Deref for AstSource<'_> {
+    type Target = Suite;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Ast(ast) => ast,
+            Self::Precomputed(ast) => ast,
+        }
     }
 }
 

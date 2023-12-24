@@ -20,9 +20,10 @@ fn black_compatibility() {
 
         let options_path = input_path.with_extension("options.json");
 
-        let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(options_path) {
+        let options: PyFormatOptions = if let Ok(options_file) = fs::File::open(&options_path) {
             let reader = BufReader::new(options_file);
-            serde_json::from_reader(reader).expect("Options to be a valid Json file")
+            serde_json::from_reader(reader)
+                .unwrap_or_else(|_| panic!("Option file {options_path:?} to be a valid Json file"))
         } else {
             PyFormatOptions::from_extension(input_path)
         };
@@ -34,14 +35,18 @@ fn black_compatibility() {
             )
         });
 
-        let expected_path = input_path.with_extension("py.expect");
+        let extension = input_path
+            .extension()
+            .expect("Test file to have py or pyi extension")
+            .to_string_lossy();
+        let expected_path = input_path.with_extension(format!("{extension}.expect"));
         let expected_output = fs::read_to_string(&expected_path)
             .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
         let formatted_code = printed.as_code();
 
         ensure_unchanged_ast(&content, formatted_code, &options, input_path);
-        ensure_stability_when_formatting_twice(formatted_code, options, input_path);
+        ensure_stability_when_formatting_twice(formatted_code, &options, input_path);
 
         if formatted_code == expected_output {
             // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
@@ -106,7 +111,11 @@ fn black_compatibility() {
         }
     };
 
-    insta::glob!("../resources", "test/fixtures/black/**/*.py", test_file);
+    insta::glob!(
+        "../resources",
+        "test/fixtures/black/**/*.{py,pyi}",
+        test_file
+    );
 }
 
 #[test]
@@ -120,7 +129,7 @@ fn format() {
         let formatted_code = printed.as_code();
 
         ensure_unchanged_ast(&content, formatted_code, &options, input_path);
-        ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
+        ensure_stability_when_formatting_twice(formatted_code, &options, input_path);
 
         let mut snapshot = format!("## Input\n{}", CodeFrame::new("python", &content));
 
@@ -138,7 +147,7 @@ fn format() {
                 let formatted_code = printed.as_code();
 
                 ensure_unchanged_ast(&content, formatted_code, &options, input_path);
-                ensure_stability_when_formatting_twice(formatted_code, options.clone(), input_path);
+                ensure_stability_when_formatting_twice(formatted_code, &options, input_path);
 
                 writeln!(
                     snapshot,
@@ -148,6 +157,39 @@ fn format() {
                     CodeFrame::new("python", &formatted_code)
                 )
                 .unwrap();
+
+                if options.preview().is_enabled() {
+                    continue;
+                }
+
+                // We want to capture the differences in the preview style in our fixtures
+                let options_preview = options.with_preview(PreviewMode::Enabled);
+                let printed_preview = format_module_source(&content, options_preview.clone())
+                    .expect("Formatting to succeed");
+                let formatted_preview = printed_preview.as_code();
+
+                ensure_unchanged_ast(&content, formatted_preview, &options_preview, input_path);
+                ensure_stability_when_formatting_twice(
+                    formatted_preview,
+                    &options_preview,
+                    input_path,
+                );
+
+                if formatted_code != formatted_preview {
+                    // Having both snapshots makes it hard to see the difference, so we're keeping only
+                    // diff.
+                    writeln!(
+                        snapshot,
+                        "#### Preview changes\n{}",
+                        CodeFrame::new(
+                            "diff",
+                            TextDiff::from_lines(formatted_code, formatted_preview)
+                                .unified_diff()
+                                .header("Stable", "Preview")
+                        )
+                    )
+                    .unwrap();
+                }
             }
         } else {
             // We want to capture the differences in the preview style in our fixtures
@@ -157,7 +199,7 @@ fn format() {
             let formatted_preview = printed_preview.as_code();
 
             ensure_unchanged_ast(&content, formatted_preview, &options_preview, input_path);
-            ensure_stability_when_formatting_twice(formatted_preview, options_preview, input_path);
+            ensure_stability_when_formatting_twice(formatted_preview, &options_preview, input_path);
 
             if formatted_code == formatted_preview {
                 writeln!(
@@ -203,10 +245,10 @@ fn format() {
 /// Format another time and make sure that there are no changes anymore
 fn ensure_stability_when_formatting_twice(
     formatted_code: &str,
-    options: PyFormatOptions,
+    options: &PyFormatOptions,
     input_path: &Path,
 ) {
-    let reformatted = match format_module_source(formatted_code, options) {
+    let reformatted = match format_module_source(formatted_code, options.clone()) {
         Ok(reformatted) => reformatted,
         Err(err) => {
             panic!(
@@ -223,7 +265,10 @@ fn ensure_stability_when_formatting_twice(
             .header("Formatted once", "Formatted twice")
             .to_string();
         panic!(
-            r#"Reformatting the formatted code of {} a second time resulted in formatting changes.
+            r#"Reformatting the formatted code of {input_path} a second time resulted in formatting changes.
+
+Options:
+{options}
 ---
 {diff}---
 
@@ -233,9 +278,10 @@ Formatted once:
 
 Formatted twice:
 ---
-{}---"#,
-            input_path.display(),
-            reformatted.as_code(),
+{reformatted}---"#,
+            input_path = input_path.display(),
+            options = &DisplayPyOptions(options),
+            reformatted = reformatted.as_code(),
         );
     }
 }
@@ -334,18 +380,26 @@ impl fmt::Display for DisplayPyOptions<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            r#"indent-style            = {indent_style}
-line-width              = {line_width}
-indent-width            = {indent_width}
-quote-style             = {quote_style:?}
-magic-trailing-comma    = {magic_trailing_comma:?}
-preview                 = {preview:?}"#,
+            r#"indent-style               = {indent_style}
+line-width                 = {line_width}
+indent-width               = {indent_width}
+quote-style                = {quote_style:?}
+line-ending                = {line_ending:?}
+magic-trailing-comma       = {magic_trailing_comma:?}
+docstring-code             = {docstring_code:?}
+docstring-code-line-width  = {docstring_code_line_width:?}
+preview                    = {preview:?}
+target_version             = {target_version:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
             quote_style = self.0.quote_style(),
+            line_ending = self.0.line_ending(),
             magic_trailing_comma = self.0.magic_trailing_comma(),
-            preview = self.0.preview()
+            docstring_code = self.0.docstring_code(),
+            docstring_code_line_width = self.0.docstring_code_line_width(),
+            preview = self.0.preview(),
+            target_version = self.0.target_version()
         )
     }
 }

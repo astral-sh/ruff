@@ -84,3 +84,6 @@ field25: typing.Union[Literal[1], Literal[2] | str]  # Error
 
 # Should emit only once in cases with multiple nested `typing.Union`
 field24: typing.Union[Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]]]  # Error
+
+# Should use the first literal subscript attribute when fixing
+field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error

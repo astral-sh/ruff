@@ -9,6 +9,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
+    use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::assert_messages;
@@ -93,6 +94,7 @@ mod tests {
     #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"))]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"))]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"))]
+    #[test_case(Rule::TooManyPositional, Path::new("too_many_positional.py"))]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"))]
     #[test_case(
         Rule::TooManyReturnStatements,
@@ -153,11 +155,29 @@ mod tests {
         Rule::RepeatedKeywordArgument,
         Path::new("repeated_keyword_argument.py")
     )]
+    #[test_case(
+        Rule::UnnecessaryListIndexLookup,
+        Path::new("unnecessary_list_index_lookup.py")
+    )]
+    #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(
+        Rule::UnnecessaryDictIndexLookup,
+        Path::new("unnecessary_dict_index_lookup.py")
+    )]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
-            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    allow_dunder_method_names: FxHashSet::from_iter([
+                        "__special_custom_magic__".to_string()
+                    ]),
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_messages!(snapshot, diagnostics);
         Ok(())
@@ -224,6 +244,22 @@ mod tests {
             &LinterSettings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap(),
                 ..LinterSettings::for_rule(Rule::TooManyArguments)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn max_positional_args() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_positional_params.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_positional_args: 4,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::TooManyPositional)
             },
         )?;
         assert_messages!(diagnostics);
@@ -305,6 +341,33 @@ mod tests {
                 },
                 ..LinterSettings::for_rules(vec![Rule::TooManyPublicMethods])
             },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn too_many_locals() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_locals.py"),
+            &LinterSettings {
+                pylint: pylint::settings::Settings {
+                    max_locals: 15,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyLocals])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn unspecified_encoding_python39_or_lower() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/unspecified_encoding.py"),
+            &LinterSettings::for_rule(Rule::UnspecifiedEncoding)
+                .with_target_version(PythonVersion::Py39),
         )?;
         assert_messages!(diagnostics);
         Ok(())

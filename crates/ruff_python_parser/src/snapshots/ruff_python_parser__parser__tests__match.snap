@@ -14,9 +14,15 @@ expression: parse_ast
                             StringLiteral(
                                 ExprStringLiteral {
                                     range: 8..14,
-                                    value: "test",
-                                    unicode: false,
-                                    implicit_concatenated: false,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 8..14,
+                                                value: "test",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                         ),
@@ -97,9 +103,15 @@ expression: parse_ast
                             StringLiteral(
                                 ExprStringLiteral {
                                     range: 81..88,
-                                    value: "label",
-                                    unicode: false,
-                                    implicit_concatenated: false,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 81..88,
+                                                value: "label",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                         ),
@@ -108,9 +120,15 @@ expression: parse_ast
                         StringLiteral(
                             ExprStringLiteral {
                                 range: 90..96,
-                                value: "test",
-                                unicode: false,
-                                implicit_concatenated: false,
+                                value: StringLiteralValue {
+                                    inner: Single(
+                                        StringLiteral {
+                                            range: 90..96,
+                                            value: "test",
+                                            unicode: false,
+                                        },
+                                    ),
+                                },
                             },
                         ),
                     ],
@@ -126,9 +144,15 @@ expression: parse_ast
                                 StringLiteral(
                                     ExprStringLiteral {
                                         range: 118..125,
-                                        value: "label",
-                                        unicode: false,
-                                        implicit_concatenated: false,
+                                        value: StringLiteralValue {
+                                            inner: Single(
+                                                StringLiteral {
+                                                    range: 118..125,
+                                                    value: "label",
+                                                    unicode: false,
+                                                },
+                                            ),
+                                        },
                                     },
                                 ),
                             ],

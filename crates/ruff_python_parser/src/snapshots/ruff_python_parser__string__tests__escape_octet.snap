@@ -9,14 +9,20 @@ expression: parse_ast
             value: BytesLiteral(
                 ExprBytesLiteral {
                     range: 0..14,
-                    value: [
-                        35,
-                        97,
-                        4,
-                        83,
-                        52,
-                    ],
-                    implicit_concatenated: false,
+                    value: BytesLiteralValue {
+                        inner: Single(
+                            BytesLiteral {
+                                range: 0..14,
+                                value: [
+                                    35,
+                                    97,
+                                    4,
+                                    83,
+                                    52,
+                                ],
+                            },
+                        ),
+                    },
                 },
             ),
         },

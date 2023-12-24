@@ -24,12 +24,16 @@ not_fixed
 ## Outputs
 ### Output 1
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -54,12 +58,16 @@ not_fixed
 
 ### Output 2
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 2
-quote-style             = Double
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 2
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -84,12 +92,16 @@ not_fixed
 
 ### Output 3
 ```
-indent-style            = tab
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = tab
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python

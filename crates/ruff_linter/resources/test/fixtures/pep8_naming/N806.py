@@ -1,6 +1,6 @@
 import collections
 from collections import namedtuple
-from typing import TypeAlias, TypeVar, NewType, NamedTuple, TypedDict
+from typing import Type, TypeAlias, TypeVar, NewType, NamedTuple, TypedDict
 
 GLOBAL: str = "foo"
 
@@ -25,6 +25,8 @@ def assign():
 
     IntOrStr: TypeAlias = int | str
 
+    type MyInt = int
+
 
 def aug_assign(rank, world_size):
     global CURRENT_PORT
@@ -38,3 +40,21 @@ def loop_assign():
     global CURRENT_PORT
     for CURRENT_PORT in range(5):
         pass
+
+
+def model_assign() -> None:
+    Bad = apps.get_model("zerver", "Stream")  # N806
+    Attachment = apps.get_model("zerver", "Attachment")  # OK
+    Recipient = apps.get_model("zerver", model_name="Recipient")  # OK
+    Address: Type = apps.get_model("zerver", "Address")  # OK
+
+    from django.utils.module_loading import import_string
+
+    Bad = import_string("django.core.exceptions.ValidationError")  # N806
+    ValidationError = import_string("django.core.exceptions.ValidationError")  # OK
+
+    Bad = apps.get_model()  # N806
+    Bad = apps.get_model(model_name="Stream")  # N806
+
+    Address: Type = apps.get_model("zerver", variable)  # OK
+    ValidationError = import_string(variable)  # N806

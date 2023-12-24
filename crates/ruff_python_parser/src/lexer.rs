@@ -1293,7 +1293,7 @@ impl FusedIterator for Lexer<'_> {}
 /// [lexer] implementation.
 ///
 /// [lexer]: crate::lexer
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LexicalError {
     /// The type of error that occurred.
     pub error: LexicalErrorType,
@@ -1309,7 +1309,7 @@ impl LexicalError {
 }
 
 /// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LexicalErrorType {
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.
@@ -2158,6 +2158,14 @@ f"{(lambda x:{x})}"
     fn test_fstring_with_nul_char() {
         let source = r"f'\0'";
         assert_debug_snapshot!(lex_source(source));
+    }
+
+    #[test]
+    fn test_match_softkeyword_in_notebook() {
+        let source = r"match foo:
+    case bar:
+        pass";
+        assert_debug_snapshot!(lex_jupyter_source(source));
     }
 
     fn lex_fstring_error(source: &str) -> FStringErrorType {

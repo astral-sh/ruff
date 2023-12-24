@@ -40,6 +40,8 @@ use crate::rule_selector::RuleSelector;
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PythonVersion {
     Py37,
+    // Make sure to also change the default for `ruff_python_formatter::PythonVersion`
+    // when changing the default here.
     #[default]
     Py38,
     Py39,
@@ -119,16 +121,21 @@ impl From<bool> for PreviewMode {
     }
 }
 
+/// Toggle for unsafe fixes.
+/// `Hint` will not apply unsafe fixes but a message will be shown when they are available.
+/// `Disabled` will not apply unsafe fixes or show a message.
+/// `Enabled` will apply unsafe fixes.
 #[derive(Debug, Copy, Clone, CacheKey, Default, PartialEq, Eq, is_macro::Is)]
 pub enum UnsafeFixes {
     #[default]
+    Hint,
     Disabled,
     Enabled,
 }
 
 impl From<bool> for UnsafeFixes {
-    fn from(version: bool) -> Self {
-        if version {
+    fn from(value: bool) -> Self {
+        if value {
             UnsafeFixes::Enabled
         } else {
             UnsafeFixes::Disabled
@@ -140,7 +147,7 @@ impl UnsafeFixes {
     pub fn required_applicability(&self) -> Applicability {
         match self {
             Self::Enabled => Applicability::Unsafe,
-            Self::Disabled => Applicability::Safe,
+            Self::Disabled | Self::Hint => Applicability::Safe,
         }
     }
 }
@@ -418,6 +425,7 @@ pub enum SerializationFormat {
     Gitlab,
     Pylint,
     Azure,
+    Sarif,
 }
 
 impl Default for SerializationFormat {

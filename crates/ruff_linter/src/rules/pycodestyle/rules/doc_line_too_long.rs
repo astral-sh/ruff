@@ -51,6 +51,19 @@ use crate::settings::LinterSettings;
 ///     """
 /// ```
 ///
+/// ## Error suppression
+/// Hint: when suppressing `W505` errors within multi-line strings (like
+/// docstrings), the `noqa` directive should come at the end of the string
+/// (after the closing triple quote), and will apply to the entire string, like
+/// so:
+///
+/// ```python
+/// """Lorem ipsum dolor sit amet.
+///
+/// Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
+/// """  # noqa: W505
+/// ```
+///
 /// ## Options
 /// - `task-tags`
 /// - `pycodestyle.max-doc-length`

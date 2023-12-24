@@ -74,6 +74,10 @@ with True:
 with True:
     ... # comment
 
+with True:
+    ...
+    # comment
+
 match x:
     case 1:
         ...
@@ -105,7 +109,8 @@ try:
 except:
     ...  # comment
 finally:
-    ...  # comment```
+    ...  # comment
+```
 
 ## Output
 ```python
@@ -162,6 +167,10 @@ with True:
     ...
 
 with True: ...  # comment
+
+with True:
+    ...
+    # comment
 
 match x:
     case 1: ...

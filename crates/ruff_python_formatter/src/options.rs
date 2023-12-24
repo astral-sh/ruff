@@ -11,11 +11,15 @@ use std::str::FromStr;
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
-    serde(default)
+    serde(default, deny_unknown_fields)
 )]
 pub struct PyFormatOptions {
     /// Whether we're in a `.py` file or `.pyi` file, which have different rules.
     source_type: PySourceType,
+
+    /// The (minimum) Python version used to run the formatted code. This is used
+    /// to determine the supported Python syntax.
+    target_version: PythonVersion,
 
     /// Specifies the indent style:
     /// * Either a tab
@@ -43,6 +47,17 @@ pub struct PyFormatOptions {
     /// in the formatted document.
     source_map_generation: SourceMapGeneration,
 
+    /// Whether to format code snippets in docstrings or not.
+    ///
+    /// By default this is disabled (opt-in), but the plan is to make this
+    /// enabled by default (opt-out) in the future.
+    docstring_code: DocstringCode,
+
+    /// The preferred line width at which the formatter should wrap lines in
+    /// docstring code examples. This only has an impact when `docstring_code`
+    /// is enabled.
+    docstring_code_line_width: DocstringCodeLineWidth,
+
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
 }
@@ -63,6 +78,7 @@ impl Default for PyFormatOptions {
     fn default() -> Self {
         Self {
             source_type: PySourceType::default(),
+            target_version: PythonVersion::default(),
             indent_style: default_indent_style(),
             line_width: default_line_width(),
             indent_width: default_indent_width(),
@@ -70,6 +86,8 @@ impl Default for PyFormatOptions {
             line_ending: LineEnding::default(),
             magic_trailing_comma: MagicTrailingComma::default(),
             source_map_generation: SourceMapGeneration::default(),
+            docstring_code: DocstringCode::default(),
+            docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
         }
     }
@@ -88,28 +106,46 @@ impl PyFormatOptions {
         }
     }
 
-    pub fn magic_trailing_comma(&self) -> MagicTrailingComma {
+    pub const fn target_version(&self) -> PythonVersion {
+        self.target_version
+    }
+
+    pub const fn magic_trailing_comma(&self) -> MagicTrailingComma {
         self.magic_trailing_comma
     }
 
-    pub fn quote_style(&self) -> QuoteStyle {
+    pub const fn quote_style(&self) -> QuoteStyle {
         self.quote_style
     }
 
-    pub fn source_type(&self) -> PySourceType {
+    pub const fn source_type(&self) -> PySourceType {
         self.source_type
     }
 
-    pub fn source_map_generation(&self) -> SourceMapGeneration {
+    pub const fn source_map_generation(&self) -> SourceMapGeneration {
         self.source_map_generation
     }
 
-    pub fn line_ending(&self) -> LineEnding {
+    pub const fn line_ending(&self) -> LineEnding {
         self.line_ending
     }
 
-    pub fn preview(&self) -> PreviewMode {
+    pub const fn docstring_code(&self) -> DocstringCode {
+        self.docstring_code
+    }
+
+    pub const fn docstring_code_line_width(&self) -> DocstringCodeLineWidth {
+        self.docstring_code_line_width
+    }
+
+    pub const fn preview(&self) -> PreviewMode {
         self.preview
+    }
+
+    #[must_use]
+    pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
+        self.target_version = target_version;
+        self
     }
 
     #[must_use]
@@ -145,6 +181,18 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_line_ending(mut self, line_ending: LineEnding) -> Self {
         self.line_ending = line_ending;
+        self
+    }
+
+    #[must_use]
+    pub fn with_docstring_code(mut self, docstring_code: DocstringCode) -> Self {
+        self.docstring_code = docstring_code;
+        self
+    }
+
+    #[must_use]
+    pub fn with_docstring_code_line_width(mut self, line_width: DocstringCodeLineWidth) -> Self {
+        self.docstring_code_line_width = line_width;
         self
     }
 
@@ -190,35 +238,7 @@ pub enum QuoteStyle {
     Single,
     #[default]
     Double,
-}
-
-impl QuoteStyle {
-    pub const fn as_char(self) -> char {
-        match self {
-            QuoteStyle::Single => '\'',
-            QuoteStyle::Double => '"',
-        }
-    }
-
-    #[must_use]
-    pub const fn invert(self) -> QuoteStyle {
-        match self {
-            QuoteStyle::Single => QuoteStyle::Double,
-            QuoteStyle::Double => QuoteStyle::Single,
-        }
-    }
-}
-
-impl TryFrom<char> for QuoteStyle {
-    type Error = ();
-
-    fn try_from(value: char) -> std::result::Result<Self, Self::Error> {
-        match value {
-            '\'' => Ok(QuoteStyle::Single),
-            '"' => Ok(QuoteStyle::Double),
-            _ => Err(()),
-        }
-    }
+    Preserve,
 }
 
 impl FromStr for QuoteStyle {
@@ -228,6 +248,7 @@ impl FromStr for QuoteStyle {
         match s {
             "\"" | "double" | "Double" => Ok(Self::Double),
             "'" | "single" | "Single" => Ok(Self::Single),
+            "preserve" | "Preserve" => Ok(Self::Preserve),
             // TODO: replace this error with a diagnostic
             _ => Err("Value not supported for QuoteStyle"),
         }
@@ -283,4 +304,82 @@ impl PreviewMode {
     pub const fn is_enabled(self) -> bool {
         matches!(self, PreviewMode::Enabled)
     }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum DocstringCode {
+    #[default]
+    Disabled,
+
+    Enabled,
+}
+
+impl DocstringCode {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, DocstringCode::Enabled)
+    }
+}
+
+#[derive(Copy, Clone, Default, Eq, PartialEq, CacheKey)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
+#[cfg_attr(feature = "serde", serde(untagged))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum DocstringCodeLineWidth {
+    Fixed(LineWidth),
+    #[default]
+    #[cfg_attr(
+        feature = "serde",
+        serde(deserialize_with = "deserialize_docstring_code_line_width_dynamic")
+    )]
+    Dynamic,
+}
+
+impl std::fmt::Debug for DocstringCodeLineWidth {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            DocstringCodeLineWidth::Fixed(v) => v.value().fmt(f),
+            DocstringCodeLineWidth::Dynamic => "dynamic".fmt(f),
+        }
+    }
+}
+
+/// Responsible for deserializing the `DocstringCodeLineWidth::Dynamic`
+/// variant.
+fn deserialize_docstring_code_line_width_dynamic<'de, D>(d: D) -> Result<(), D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::{de::Error, Deserialize};
+
+    let value = String::deserialize(d)?;
+    match &*value {
+        "dynamic" => Ok(()),
+        s => Err(D::Error::invalid_value(
+            serde::de::Unexpected::Str(s),
+            &"dynamic",
+        )),
+    }
+}
+
+#[derive(CacheKey, Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Default)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "lowercase")
+)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum PythonVersion {
+    Py37,
+    // Make sure to also change the default for `ruff_linter::settings::types::PythonVersion`
+    // when changing the default here.
+    #[default]
+    Py38,
+    Py39,
+    Py310,
+    Py311,
+    Py312,
 }

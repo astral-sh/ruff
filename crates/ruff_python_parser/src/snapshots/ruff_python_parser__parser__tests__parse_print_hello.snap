@@ -22,9 +22,15 @@ expression: parse_ast
                             StringLiteral(
                                 ExprStringLiteral {
                                     range: 6..19,
-                                    value: "Hello world",
-                                    unicode: false,
-                                    implicit_concatenated: false,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 6..19,
+                                                value: "Hello world",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                         ],

@@ -25,6 +25,10 @@ use super::helpers;
 /// ```python
 /// {x: f(x) for x in foo}
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryListComprehensionDict;
 

@@ -1,0 +1,137 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF020.py:3:7: RUF020 [*] `Union[Never, T]` is equivalent to `T`
+  |
+1 | from typing import Never, NoReturn, Union
+2 | 
+3 | Union[Never, int]
+  |       ^^^^^ RUF020
+4 | Union[NoReturn, int]
+5 | Never | int
+  |
+  = help: Remove `Never`
+
+ℹ Safe fix
+1 1 | from typing import Never, NoReturn, Union
+2 2 | 
+3   |-Union[Never, int]
+  3 |+int
+4 4 | Union[NoReturn, int]
+5 5 | Never | int
+6 6 | NoReturn | int
+
+RUF020.py:4:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
+  |
+3 | Union[Never, int]
+4 | Union[NoReturn, int]
+  |       ^^^^^^^^ RUF020
+5 | Never | int
+6 | NoReturn | int
+  |
+  = help: Remove `NoReturn`
+
+ℹ Safe fix
+1 1 | from typing import Never, NoReturn, Union
+2 2 | 
+3 3 | Union[Never, int]
+4   |-Union[NoReturn, int]
+  4 |+int
+5 5 | Never | int
+6 6 | NoReturn | int
+7 7 | Union[Union[Never, int], Union[NoReturn, int]]
+
+RUF020.py:5:1: RUF020 [*] `Never | T` is equivalent to `T`
+  |
+3 | Union[Never, int]
+4 | Union[NoReturn, int]
+5 | Never | int
+  | ^^^^^ RUF020
+6 | NoReturn | int
+7 | Union[Union[Never, int], Union[NoReturn, int]]
+  |
+  = help: Remove `Never`
+
+ℹ Safe fix
+2 2 | 
+3 3 | Union[Never, int]
+4 4 | Union[NoReturn, int]
+5   |-Never | int
+  5 |+int
+6 6 | NoReturn | int
+7 7 | Union[Union[Never, int], Union[NoReturn, int]]
+8 8 | Union[NoReturn, int, float]
+
+RUF020.py:6:1: RUF020 [*] `NoReturn | T` is equivalent to `T`
+  |
+4 | Union[NoReturn, int]
+5 | Never | int
+6 | NoReturn | int
+  | ^^^^^^^^ RUF020
+7 | Union[Union[Never, int], Union[NoReturn, int]]
+8 | Union[NoReturn, int, float]
+  |
+  = help: Remove `NoReturn`
+
+ℹ Safe fix
+3 3 | Union[Never, int]
+4 4 | Union[NoReturn, int]
+5 5 | Never | int
+6   |-NoReturn | int
+  6 |+int
+7 7 | Union[Union[Never, int], Union[NoReturn, int]]
+8 8 | Union[NoReturn, int, float]
+
+RUF020.py:7:13: RUF020 [*] `Union[Never, T]` is equivalent to `T`
+  |
+5 | Never | int
+6 | NoReturn | int
+7 | Union[Union[Never, int], Union[NoReturn, int]]
+  |             ^^^^^ RUF020
+8 | Union[NoReturn, int, float]
+  |
+  = help: Remove `Never`
+
+ℹ Safe fix
+4 4 | Union[NoReturn, int]
+5 5 | Never | int
+6 6 | NoReturn | int
+7   |-Union[Union[Never, int], Union[NoReturn, int]]
+  7 |+Union[int, Union[NoReturn, int]]
+8 8 | Union[NoReturn, int, float]
+
+RUF020.py:7:32: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
+  |
+5 | Never | int
+6 | NoReturn | int
+7 | Union[Union[Never, int], Union[NoReturn, int]]
+  |                                ^^^^^^^^ RUF020
+8 | Union[NoReturn, int, float]
+  |
+  = help: Remove `NoReturn`
+
+ℹ Safe fix
+4 4 | Union[NoReturn, int]
+5 5 | Never | int
+6 6 | NoReturn | int
+7   |-Union[Union[Never, int], Union[NoReturn, int]]
+  7 |+Union[Union[Never, int], int]
+8 8 | Union[NoReturn, int, float]
+
+RUF020.py:8:7: RUF020 [*] `Union[NoReturn, T]` is equivalent to `T`
+  |
+6 | NoReturn | int
+7 | Union[Union[Never, int], Union[NoReturn, int]]
+8 | Union[NoReturn, int, float]
+  |       ^^^^^^^^ RUF020
+  |
+  = help: Remove `NoReturn`
+
+ℹ Safe fix
+5 5 | Never | int
+6 6 | NoReturn | int
+7 7 | Union[Union[Never, int], Union[NoReturn, int]]
+8   |-Union[NoReturn, int, float]
+  8 |+Union[int, float]
+
+

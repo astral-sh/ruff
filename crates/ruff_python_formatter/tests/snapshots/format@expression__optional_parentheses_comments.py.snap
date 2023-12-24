@@ -421,4 +421,44 @@ def test6():
 ```
 
 
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -72,13 +72,13 @@
+ ## Breaking left
+ 
+ # Should break `[a]` first
+-____[
+-    a
+-] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
++____[a] = (
++    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # c
++)
+ 
+-____[
+-    a
+-] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # cc
++____[a] = (
++    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvv  # cc
++)
+ 
+ (
+     # some weird comments
+@@ -136,9 +136,9 @@
+ # 89 characters parenthesized (collapse)
+ ____a: a = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
+ 
+-_a: a[
+-    b
+-] = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
++_a: a[b] = (
++    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbvvvvvvvvvvvv  # c
++)
+ 
+ ## Augmented Assign
+ 
+```
+
+
 

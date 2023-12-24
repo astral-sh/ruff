@@ -1,14 +1,16 @@
-use rustc_hash::FxHashSet;
 use std::fmt;
+
+use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 
 /// ## What it does
 /// Checks for the presence of redundant `Literal` types and builtin super
@@ -64,7 +66,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr
 
     // Adds a member to `literal_exprs` for each value in a `Literal`, and any builtin types
     // to `builtin_types_in_union`.
-    let mut func = |expr: &'a Expr, _| {
+    let mut func = |expr: &'a Expr, _parent: &'a Expr| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if checker.semantic().match_typing_expr(value, "Literal") {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
@@ -82,7 +84,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr
         builtin_types_in_union.insert(builtin_type);
     };
 
-    traverse_union(&mut func, checker.semantic(), union, None);
+    traverse_union(&mut func, checker.semantic(), union);
 
     for typing_literal_expr in typing_literal_exprs {
         let Some(literal_type) = match_literal_type(typing_literal_expr) else {

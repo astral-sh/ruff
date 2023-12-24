@@ -9,9 +9,15 @@ expression: parse_ast
             value: StringLiteral(
                 ExprStringLiteral {
                     range: 0..45,
-                    value: "\u{89}",
-                    unicode: false,
-                    implicit_concatenated: false,
+                    value: StringLiteralValue {
+                        inner: Single(
+                            StringLiteral {
+                                range: 0..45,
+                                value: "\u{89}",
+                                unicode: false,
+                            },
+                        ),
+                    },
                 },
             ),
         },

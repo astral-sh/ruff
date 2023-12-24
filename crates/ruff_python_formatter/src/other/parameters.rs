@@ -252,6 +252,19 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
             // No parameters, format any dangling comments between `()`
             write!(f, [empty_parenthesized("(", dangling, ")")])
+        } else if num_parameters == 1 && posonlyargs.is_empty() && kwonlyargs.is_empty() {
+            // If we have a single argument, avoid the inner group, to ensure that we insert a
+            // trailing comma if the outer group breaks.
+            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
+            write!(
+                f,
+                [
+                    token("("),
+                    dangling_open_parenthesis_comments(parenthesis_dangling),
+                    soft_block_indent(&format_inner),
+                    token(")")
+                ]
+            )
         } else {
             // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
             // We want parameters to be grouped alongside return types, one level up, so we

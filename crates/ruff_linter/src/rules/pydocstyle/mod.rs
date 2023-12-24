@@ -46,6 +46,7 @@ mod tests {
     #[test_case(Rule::NoBlankLineBeforeFunction, Path::new("D.py"))]
     #[test_case(Rule::BlankLinesBetweenHeaderAndContent, Path::new("sections.py"))]
     #[test_case(Rule::OverIndentation, Path::new("D.py"))]
+    #[test_case(Rule::OverIndentation, Path::new("D208.py"))]
     #[test_case(Rule::NoSignature, Path::new("D.py"))]
     #[test_case(Rule::SurroundingWhitespace, Path::new("D.py"))]
     #[test_case(Rule::DocstringStartsWithThis, Path::new("D.py"))]
@@ -62,6 +63,7 @@ mod tests {
     #[test_case(Rule::UndocumentedPublicMethod, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedPublicMethod, Path::new("setter.py"))]
     #[test_case(Rule::UndocumentedPublicModule, Path::new("D.py"))]
+    #[test_case(Rule::UndocumentedPublicModule, Path::new("D100.ipynb"))]
     #[test_case(
         Rule::UndocumentedPublicModule,
         Path::new("_unrelated/pkg/D100_pub.py")

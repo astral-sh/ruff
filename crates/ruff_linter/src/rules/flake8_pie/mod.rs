@@ -21,6 +21,7 @@ mod tests {
     #[test_case(Rule::UnnecessarySpread, Path::new("PIE800.py"))]
     #[test_case(Rule::ReimplementedContainerBuiltin, Path::new("PIE807.py"))]
     #[test_case(Rule::NonUniqueEnums, Path::new("PIE796.py"))]
+    #[test_case(Rule::NonUniqueEnums, Path::new("PIE796.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -705,8 +705,6 @@ impl Violation for OsReadlink {
 /// ## Examples
 /// ```python
 /// import os
-///
-/// import os
 /// from pwd import getpwuid
 /// from grp import getgrgid
 ///
@@ -717,8 +715,6 @@ impl Violation for OsReadlink {
 ///
 /// Use instead:
 /// ```python
-/// from pathlib import Path
-///
 /// from pathlib import Path
 ///
 /// file_path = Path(file_name)

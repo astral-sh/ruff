@@ -34,7 +34,7 @@ use crate::args::{CliOverrides, FormatArguments};
 use crate::cache::{Cache, FileCacheKey, PackageCacheMap, PackageCaches};
 use crate::panic::{catch_unwind, PanicError};
 use crate::resolve::resolve;
-use crate::ExitStatus;
+use crate::{resolve_default_files, ExitStatus};
 
 #[derive(Debug, Copy, Clone, is_macro::Is)]
 pub(crate) enum FormatMode {
@@ -60,7 +60,7 @@ impl FormatMode {
 
 /// Format a set of files, and return the exit status.
 pub(crate) fn format(
-    cli: &FormatArguments,
+    cli: FormatArguments,
     overrides: &CliOverrides,
     log_level: LogLevel,
 ) -> Result<ExitStatus> {
@@ -70,8 +70,9 @@ pub(crate) fn format(
         overrides,
         cli.stdin_filename.as_deref(),
     )?;
-    let mode = FormatMode::from_cli(cli);
-    let (paths, resolver) = python_files_in_path(&cli.files, &pyproject_config, overrides)?;
+    let mode = FormatMode::from_cli(&cli);
+    let files = resolve_default_files(cli.files, false);
+    let (paths, resolver) = python_files_in_path(&files, &pyproject_config, overrides)?;
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -514,7 +515,7 @@ impl<'a> FormatResults<'a> {
         if changed > 0 && unchanged > 0 {
             writeln!(
                 f,
-                "{} file{} {}, {} file{} left unchanged",
+                "{} file{} {}, {} file{} {}",
                 changed,
                 if changed == 1 { "" } else { "s" },
                 match self.mode {
@@ -523,6 +524,10 @@ impl<'a> FormatResults<'a> {
                 },
                 unchanged,
                 if unchanged == 1 { "" } else { "s" },
+                match self.mode {
+                    FormatMode::Write => "left unchanged",
+                    FormatMode::Check | FormatMode::Diff => "already formatted",
+                },
             )
         } else if changed > 0 {
             writeln!(
@@ -538,9 +543,13 @@ impl<'a> FormatResults<'a> {
         } else if unchanged > 0 {
             writeln!(
                 f,
-                "{} file{} left unchanged",
+                "{} file{} {}",
                 unchanged,
                 if unchanged == 1 { "" } else { "s" },
+                match self.mode {
+                    FormatMode::Write => "left unchanged",
+                    FormatMode::Check | FormatMode::Diff => "already formatted",
+                },
             )
         } else {
             Ok(())

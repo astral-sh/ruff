@@ -333,6 +333,69 @@ pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> boo
     })
 }
 
+/// Traverse a "union" type annotation, applying `func` to each union member.
+///
+/// Supports traversal of `Union` and `|` union expressions.
+///
+/// The function is called with each expression in the union (excluding declarations of nested
+/// unions) and the parent expression.
+pub fn traverse_union<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr)
+where
+    F: FnMut(&'a Expr, &'a Expr),
+{
+    fn inner<'a, F>(
+        func: &mut F,
+        semantic: &SemanticModel,
+        expr: &'a Expr,
+        parent: Option<&'a Expr>,
+    ) where
+        F: FnMut(&'a Expr, &'a Expr),
+    {
+        // Ex) x | y
+        if let Expr::BinOp(ast::ExprBinOp {
+            op: Operator::BitOr,
+            left,
+            right,
+            range: _,
+        }) = expr
+        {
+            // The union data structure usually looks like this:
+            //  a | b | c -> (a | b) | c
+            //
+            // However, parenthesized expressions can coerce it into any structure:
+            //  a | (b | c)
+            //
+            // So we have to traverse both branches in order (left, then right), to report members
+            // in the order they appear in the source code.
+
+            // Traverse the left then right arms
+            inner(func, semantic, left, Some(expr));
+            inner(func, semantic, right, Some(expr));
+            return;
+        }
+
+        // Ex) Union[x, y]
+        if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+            if semantic.match_typing_expr(value, "Union") {
+                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                    // Traverse each element of the tuple within the union recursively to handle cases
+                    // such as `Union[..., Union[...]]
+                    elts.iter()
+                        .for_each(|elt| inner(func, semantic, elt, Some(expr)));
+                    return;
+                }
+            }
+        }
+
+        // Otherwise, call the function on expression, if it's not the top-level expression.
+        if let Some(parent) = parent {
+            func(expr, parent);
+        }
+    }
+
+    inner(func, semantic, expr, None);
+}
+
 /// Abstraction for a type checker, conservatively checks for the intended type(s).
 trait TypeChecker {
     /// Check annotation expression to match the intended type(s).
@@ -567,4 +630,127 @@ pub fn resolve_assignment<'a>(
         }
         _ => None,
     }
+}
+
+/// Find the assigned [`Expr`] for a given symbol, if any.
+///
+/// For example given:
+/// ```python
+///  foo = 42
+///  (bar, bla) = 1, "str"
+/// ```
+///
+/// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
+/// `StringLiteral` with value `"str"` when called with `bla`.
+pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
+    let binding_id = semantic.lookup_symbol(symbol)?;
+    let binding = semantic.binding(binding_id);
+    match binding.kind {
+        // Ex) `x := 1`
+        BindingKind::NamedExprAssignment => {
+            let parent_id = binding.source?;
+            let parent = semantic
+                .expressions(parent_id)
+                .find_map(|expr| expr.as_named_expr_expr());
+            if let Some(ast::ExprNamedExpr { target, value, .. }) = parent {
+                return match_value(symbol, target.as_ref(), value.as_ref());
+            }
+        }
+        // Ex) `x = 1`
+        BindingKind::Assignment => {
+            let parent_id = binding.source?;
+            let parent = semantic.statement(parent_id);
+            match parent {
+                Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
+                    if let Some(target) = targets.iter().find(|target| defines(symbol, target)) {
+                        return match_value(symbol, target, value.as_ref());
+                    }
+                }
+                Stmt::AnnAssign(ast::StmtAnnAssign {
+                    value: Some(value),
+                    target,
+                    ..
+                }) => {
+                    return match_value(symbol, target, value.as_ref());
+                }
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+    None
+}
+
+/// Given a target and value, find the value that's assigned to the given symbol.
+fn match_value<'a>(symbol: &str, target: &Expr, value: &'a Expr) -> Option<&'a Expr> {
+    match target {
+        Expr::Name(ast::ExprName { id, .. }) if id.as_str() == symbol => Some(value),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            match value {
+                Expr::Tuple(ast::ExprTuple {
+                    elts: value_elts, ..
+                })
+                | Expr::List(ast::ExprList {
+                    elts: value_elts, ..
+                })
+                | Expr::Set(ast::ExprSet {
+                    elts: value_elts, ..
+                }) => get_value_by_id(symbol, elts, value_elts),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Returns `true` if the [`Expr`] defines the symbol.
+fn defines(symbol: &str, expr: &Expr) -> bool {
+    match expr {
+        Expr::Name(ast::ExprName { id, .. }) => id == symbol,
+        Expr::Tuple(ast::ExprTuple { elts, .. })
+        | Expr::List(ast::ExprList { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. }) => elts.iter().any(|elt| defines(symbol, elt)),
+        _ => false,
+    }
+}
+
+fn get_value_by_id<'a>(target_id: &str, targets: &[Expr], values: &'a [Expr]) -> Option<&'a Expr> {
+    for (target, value) in targets.iter().zip(values.iter()) {
+        match target {
+            Expr::Tuple(ast::ExprTuple {
+                elts: target_elts, ..
+            })
+            | Expr::List(ast::ExprList {
+                elts: target_elts, ..
+            })
+            | Expr::Set(ast::ExprSet {
+                elts: target_elts, ..
+            }) => {
+                // Collection types can be mismatched like in: (a, b, [c, d]) = [1, 2, {3, 4}]
+                match value {
+                    Expr::Tuple(ast::ExprTuple {
+                        elts: value_elts, ..
+                    })
+                    | Expr::List(ast::ExprList {
+                        elts: value_elts, ..
+                    })
+                    | Expr::Set(ast::ExprSet {
+                        elts: value_elts, ..
+                    }) => {
+                        if let Some(result) = get_value_by_id(target_id, target_elts, value_elts) {
+                            return Some(result);
+                        }
+                    }
+                    _ => (),
+                };
+            }
+            Expr::Name(ast::ExprName { id, .. }) => {
+                if *id == target_id {
+                    return Some(value);
+                }
+            }
+            _ => (),
+        }
+    }
+    None
 }

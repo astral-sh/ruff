@@ -266,6 +266,8 @@ RSE102.py:84:10: RSE102 [*] Unnecessary parentheses on raised exception
 83 | # RSE102
 84 | raise Foo()
    |          ^^ RSE102
+85 | 
+86 | # OK
    |
    = help: Remove unnecessary parentheses
 
@@ -275,5 +277,8 @@ RSE102.py:84:10: RSE102 [*] Unnecessary parentheses on raised exception
 83 83 | # RSE102
 84    |-raise Foo()
    84 |+raise Foo
+85 85 | 
+86 86 | # OK
+87 87 | raise ctypes.WinError()
 
 

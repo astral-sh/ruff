@@ -8,9 +8,13 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::comments::{
     leading_comments, trailing_comments, Comments, LeadingDanglingTrailingComments,
 };
-use crate::context::{NodeLevel, TopLevelStatementPosition, WithNodeLevel};
-use crate::expression::string::StringLayout;
+use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
+use crate::expression::expr_string_literal::ExprStringLiteralKind;
 use crate::prelude::*;
+use crate::preview::{
+    is_dummy_implementations_enabled, is_module_docstring_newlines_enabled,
+    is_no_blank_line_before_class_docstring_enabled,
+};
 use crate::statement::stmt_expr::FormatStmtExpr;
 use crate::verbatim::{
     suppressed_node, write_suppressed_statements_starting_with_leading_comment,
@@ -71,7 +75,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let source = f.context().source();
         let source_type = f.options().source_type();
 
-        let f = &mut WithNodeLevel::new(node_level, f);
+        let f = WithNodeLevel::new(node_level, f);
+        let f = &mut WithIndentLevel::new(f.context().indent_level().increment(), f);
 
         // Format the first statement in the body, which often has special formatting rules.
         let first = match self.kind {
@@ -107,13 +112,23 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     if !comments.has_leading(first)
                         && lines_before(first.start(), source) > 1
                         && !source_type.is_stub()
+                        && !is_no_blank_line_before_class_docstring_enabled(f.context())
                     {
                         // Allow up to one empty line before a class docstring, e.g., this is
                         // stable formatting:
+                        //
                         // ```python
                         // class Test:
                         //
                         //     """Docstring"""
+                        // ```
+                        //
+                        // But, in preview mode, we don't want to allow any empty lines before a
+                        // class docstring, e.g., this is preview formatting:
+                        //
+                        // ```python
+                        // class Test:
+                        //   """Docstring"""
                         // ```
                         empty_line().fmt(f)?;
                     }
@@ -154,7 +169,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 && self.kind == SuiteKind::Class
             {
                 true
-            } else if f.options().preview().is_enabled()
+            } else if is_module_docstring_newlines_enabled(f.context())
                 && self.kind == SuiteKind::TopLevel
                 && DocstringStmt::try_from_statement(first.statement(), self.kind).is_some()
             {
@@ -247,12 +262,31 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         f,
                     )?;
                 } else {
-                    match self.kind {
-                        SuiteKind::TopLevel => {
-                            write!(f, [empty_line(), empty_line()])?;
-                        }
-                        SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
-                            empty_line().fmt(f)?;
+                    // Preserve empty lines after a stub implementation but don't insert a new one if there isn't any present in the source.
+                    // This is useful when having multiple function overloads that should be grouped to getter by omitting new lines between them.
+                    let is_preceding_stub_function_without_empty_line =
+                        is_dummy_implementations_enabled(f.context())
+                            && following.is_function_def_stmt()
+                            && preceding
+                                .as_function_def_stmt()
+                                .is_some_and(|preceding_stub| {
+                                    contains_only_an_ellipsis(
+                                        &preceding_stub.body,
+                                        f.context().comments(),
+                                    ) && lines_after_ignoring_end_of_line_trivia(
+                                        preceding_stub.end(),
+                                        f.context().source(),
+                                    ) < 2
+                                });
+
+                    if !is_preceding_stub_function_without_empty_line {
+                        match self.kind {
+                            SuiteKind::TopLevel => {
+                                write!(f, [empty_line(), empty_line()])?;
+                            }
+                            SuiteKind::Function | SuiteKind::Class | SuiteKind::Other => {
+                                empty_line().fmt(f)?;
+                            }
                         }
                     }
                 }
@@ -511,7 +545,9 @@ pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> b
             let [node] = body else {
                 return false;
             };
-            value.is_ellipsis_literal_expr() && !comments.has_leading(node)
+            value.is_ellipsis_literal_expr()
+                && !comments.has_leading(node)
+                && !comments.has_trailing_own_line(node)
         }
         _ => false,
     }
@@ -569,10 +605,14 @@ impl<'a> DocstringStmt<'a> {
         };
 
         match value.as_ref() {
-            Expr::StringLiteral(value) if !value.implicit_concatenated => Some(DocstringStmt {
-                docstring: stmt,
-                suite_kind,
-            }),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                if !value.is_implicit_concatenated() =>
+            {
+                Some(DocstringStmt {
+                    docstring: stmt,
+                    suite_kind,
+                })
+            }
             _ => None,
         }
     }
@@ -602,7 +642,7 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
                     leading_comments(node_comments.leading),
                     string_literal
                         .format()
-                        .with_options(StringLayout::DocString),
+                        .with_options(ExprStringLiteralKind::Docstring),
                 ]
             )?;
 
