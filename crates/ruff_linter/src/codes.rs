@@ -133,17 +133,17 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         #[allow(deprecated)]
         (Pycodestyle, "E275") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::MissingWhitespaceAfterKeyword),
         #[allow(deprecated)]
-        (Pycodestyle, "E301") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLineBetweenMethods),
+        (Pycodestyle, "E301") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLineBetweenMethods),
         #[allow(deprecated)]
-        (Pycodestyle, "E302") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLinesTopLevel),
+        (Pycodestyle, "E302") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLinesTopLevel),
         #[allow(deprecated)]
-        (Pycodestyle, "E303") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::TooManyBlankLines),
+        (Pycodestyle, "E303") => (RuleGroup::Nursery, rules::pycodestyle::rules::TooManyBlankLines),
         #[allow(deprecated)]
-        (Pycodestyle, "E304") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLineAfterDecorator),
+        (Pycodestyle, "E304") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLineAfterDecorator),
         #[allow(deprecated)]
-        (Pycodestyle, "E305") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLinesAfterFunctionOrClass),
+        (Pycodestyle, "E305") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLinesAfterFunctionOrClass),
         #[allow(deprecated)]
-        (Pycodestyle, "E306") => (RuleGroup::Nursery, rules::pycodestyle::rules::logical_lines::BlankLinesBeforeNestedDefinition),
+        (Pycodestyle, "E306") => (RuleGroup::Nursery, rules::pycodestyle::rules::BlankLinesBeforeNestedDefinition),
         (Pycodestyle, "E401") => (RuleGroup::Stable, rules::pycodestyle::rules::MultipleImportsOnOneLine),
         (Pycodestyle, "E402") => (RuleGroup::Stable, rules::pycodestyle::rules::ModuleImportNotAtTopOfFile),
         (Pycodestyle, "E501") => (RuleGroup::Stable, rules::pycodestyle::rules::LineTooLong),

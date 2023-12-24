@@ -1,4 +1,3 @@
-pub(crate) use blank_lines::*;
 pub(crate) use extraneous_whitespace::*;
 pub(crate) use indentation::*;
 pub(crate) use missing_whitespace::*;
@@ -21,7 +20,6 @@ use ruff_python_parser::TokenKind;
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::Locator;
 
-mod blank_lines;
 mod extraneous_whitespace;
 mod indentation;
 mod missing_whitespace;

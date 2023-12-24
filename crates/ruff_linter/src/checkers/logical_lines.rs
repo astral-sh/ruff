@@ -1,3 +1,4 @@
+use crate::registry::Rule;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
@@ -10,9 +11,9 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, space_after_comma, space_around_operator,
     whitespace_around_keywords, whitespace_around_named_parameter_equals,
-    whitespace_before_comment, whitespace_before_parameters, BlankLinesChecker, LogicalLines,
-    TokenFlags,
+    whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
+use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::settings::LinterSettings;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of 8.
@@ -39,12 +40,21 @@ pub(crate) fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
-    let mut blank_lines_checker = BlankLinesChecker::default();
     let mut non_comment_prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
-    blank_lines_checker.check_content(tokens, locator, stylist, &mut context);
+    if settings.rules.any_enabled(&[
+        Rule::BlankLineBetweenMethods,
+        Rule::BlankLinesTopLevel,
+        Rule::TooManyBlankLines,
+        Rule::BlankLineAfterDecorator,
+        Rule::BlankLinesAfterFunctionOrClass,
+        Rule::BlankLinesBeforeNestedDefinition,
+    ]) {
+        let mut blank_lines_checker = BlankLinesChecker::default();
+        blank_lines_checker.check_content(tokens, locator, stylist, &mut context);
+    }
 
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
