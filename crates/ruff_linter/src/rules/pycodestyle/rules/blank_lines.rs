@@ -383,35 +383,27 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut parens = 0u32;
 
         while let Some((token, range)) = self.tokens.next() {
-            if first_token.is_none() && !matches!(token, Tok::Indent | Tok::Dedent | Tok::Newline) {
-                first_token = Some(token.clone());
-                first_token_range = *range;
+            if matches!(token, Tok::Indent | Tok::Dedent) {
+                continue;
             }
 
-            if !matches!(
-                token,
-                Tok::Comment(_) | Tok::Indent | Tok::Dedent | Tok::Newline | Tok::NonLogicalNewline
-            ) {
-                line_is_comment_only = false;
-            }
+            if !matches!(token, Tok::Newline) {
+                if first_token.is_none() {
+                    first_token = Some(token.clone());
+                    first_token_range = *range;
+                }
 
-            // Allow a comment to follow a docstring.
-            if !matches!(
-                token,
-                Tok::String { .. }
-                    | Tok::Comment(_)
-                    | Tok::Indent
-                    | Tok::Dedent
-                    | Tok::Newline
-                    | Tok::NonLogicalNewline
-            ) {
-                is_docstring = false;
-            }
+                if !matches!(token, Tok::NonLogicalNewline) {
+                    if !matches!(token, Tok::Comment(_)) {
+                        line_is_comment_only = false;
+                    }
 
-            if !matches!(
-                token,
-                Tok::Indent | Tok::Dedent | Tok::Newline | Tok::NonLogicalNewline
-            ) {
+                    // Allow a comment to follow a docstring.
+                    if !matches!(token, Tok::String { .. } | Tok::Comment(_)) {
+                        is_docstring = false;
+                    }
+                }
+
                 last_token = Some(token.clone());
             }
 
