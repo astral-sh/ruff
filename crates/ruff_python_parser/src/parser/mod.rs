@@ -4335,9 +4335,9 @@ where
         let mut has_seen_vararg = false;
         let mut has_seen_default_param = false;
 
-        let ending = if self.has_in_curr_or_parent_ctx(ParserCtxFlags::FUNC_DEF_STMT) {
+        let ending = if self.has_ctx(ParserCtxFlags::FUNC_DEF_STMT) {
             TokenKind::Rpar
-        } else if self.has_in_curr_or_parent_ctx(ParserCtxFlags::LAMBDA_EXPR) {
+        } else if self.has_ctx(ParserCtxFlags::LAMBDA_EXPR) {
             TokenKind::Colon
         } else {
             TokenKind::Newline
@@ -4382,7 +4382,7 @@ where
                     // Don't allow non-default parameters after default parameters e.g. `a=1, b`,
                     // can't place `b` after `a=1`. Non-default parameters are only allowed after
                     // default parameters if we have a `*` before them, e.g. `a=1, *, b`.
-                    if param.default.is_none() && has_seen_default_param {
+                    if param.default.is_none() && has_seen_default_param && !has_seen_asterisk {
                         let range = parser.current_range();
                         parser.add_error(ParseErrorType::DefaultArgumentError, range);
                     }
