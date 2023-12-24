@@ -1184,7 +1184,7 @@ where
                 if parser.eat(TokenKind::DoubleStar) {
                     rest = Some(parser.parse_identifier());
                 } else {
-                    let (pattern, pattern_range) = parser.parse_match_pattern_literal();
+                    let (pattern, pattern_range) = parser.parse_match_pattern_lhs();
                     let key = match pattern {
                         Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
                         Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range }) => {
