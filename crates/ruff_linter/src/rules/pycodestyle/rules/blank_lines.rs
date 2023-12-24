@@ -16,7 +16,6 @@ use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
-use crate::checkers::logical_lines::LogicalLinesContext;
 
 /// Contains variables used for the linting of blank lines.
 #[derive(Debug, Default)]
