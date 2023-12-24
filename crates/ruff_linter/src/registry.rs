@@ -264,6 +264,11 @@ impl Rule {
             | Rule::BadQuotesMultilineString
             | Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
+            | Rule::BlankLineAfterDecorator
+            | Rule::BlankLineBetweenMethods
+            | Rule::BlankLinesAfterFunctionOrClass
+            | Rule::BlankLinesBeforeNestedDefinition
+            | Rule::BlankLinesTopLevel
             | Rule::CommentedOutCode
             | Rule::ExtraneousParentheses
             | Rule::InvalidCharacterBackspace
@@ -295,6 +300,7 @@ impl Rule {
             | Rule::ShebangNotFirstLine
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TabIndentation
+            | Rule::TooManyBlankLines
             | Rule::TrailingCommaOnBareTuple
             | Rule::TypeCommentInStub
             | Rule::UselessSemicolon
@@ -302,12 +308,7 @@ impl Rule {
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
-            Rule::BlankLineAfterDecorator
-            | Rule::BlankLineBetweenMethods
-            | Rule::BlankLinesAfterFunctionOrClass
-            | Rule::BlankLinesBeforeNestedDefinition
-            | Rule::BlankLinesTopLevel
-            | Rule::IndentationWithInvalidMultiple
+            Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace
             | Rule::MissingWhitespaceAfterKeyword
@@ -333,7 +334,6 @@ impl Rule {
             | Rule::TabBeforeKeyword
             | Rule::TabBeforeOperator
             | Rule::TooFewSpacesBeforeInlineComment
-            | Rule::TooManyBlankLines
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
             | Rule::UnexpectedSpacesAroundKeywordParameterEquals

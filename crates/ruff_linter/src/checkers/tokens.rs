@@ -46,6 +46,7 @@ pub(crate) fn check_tokens(
         let mut blank_lines_checker = BlankLinesChecker::default();
         blank_lines_checker.check_content(tokens, locator, stylist, &mut diagnostics);
     }
+
     if settings.rules.enabled(Rule::BlanketNOQA) {
         pygrep_hooks::rules::blanket_noqa(&mut diagnostics, indexer, locator);
     }
