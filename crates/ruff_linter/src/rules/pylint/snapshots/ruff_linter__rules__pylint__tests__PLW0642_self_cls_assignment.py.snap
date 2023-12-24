@@ -1,0 +1,81 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+self_cls_assignment.py:4:9: PLW0642 Assignment of variable `cls`
+  |
+2 |     @classmethod
+3 |     def list_fruits(cls) -> None:
+4 |         cls = "apple"
+  |         ^^^ PLW0642
+5 |         cls: Fruit = "apple"
+6 |         cls += "orange"
+  |
+
+self_cls_assignment.py:5:9: PLW0642 Assignment of variable `cls`
+  |
+3 |     def list_fruits(cls) -> None:
+4 |         cls = "apple"
+5 |         cls: Fruit = "apple"
+  |         ^^^ PLW0642
+6 |         cls += "orange"
+7 |         cls, blah = "apple", "orange"
+  |
+
+self_cls_assignment.py:6:9: PLW0642 Assignment of variable `cls`
+  |
+4 |         cls = "apple"
+5 |         cls: Fruit = "apple"
+6 |         cls += "orange"
+  |         ^^^ PLW0642
+7 |         cls, blah = "apple", "orange"
+  |
+
+self_cls_assignment.py:7:9: PLW0642 Assignment of variable `cls`
+  |
+5 |         cls: Fruit = "apple"
+6 |         cls += "orange"
+7 |         cls, blah = "apple", "orange"
+  |         ^^^ PLW0642
+8 | 
+9 |     def print_color(self) -> None:
+  |
+
+self_cls_assignment.py:10:9: PLW0642 Assignment of variable `self`
+   |
+ 9 |     def print_color(self) -> None:
+10 |         self = "red"
+   |         ^^^^ PLW0642
+11 |         self: Self = "red"
+12 |         self += "blue"
+   |
+
+self_cls_assignment.py:11:9: PLW0642 Assignment of variable `self`
+   |
+ 9 |     def print_color(self) -> None:
+10 |         self = "red"
+11 |         self: Self = "red"
+   |         ^^^^ PLW0642
+12 |         self += "blue"
+13 |         self, blah = "red", "blue"
+   |
+
+self_cls_assignment.py:12:9: PLW0642 Assignment of variable `self`
+   |
+10 |         self = "red"
+11 |         self: Self = "red"
+12 |         self += "blue"
+   |         ^^^^ PLW0642
+13 |         self, blah = "red", "blue"
+   |
+
+self_cls_assignment.py:13:9: PLW0642 Assignment of variable `self`
+   |
+11 |         self: Self = "red"
+12 |         self += "blue"
+13 |         self, blah = "red", "blue"
+   |         ^^^^ PLW0642
+14 |     
+15 |     def ok(self) -> None:
+   |
+
+

@@ -1060,6 +1060,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
+            if checker.enabled(Rule::SelfClsAssignment) {
+                pylint::rules::self_cls_assignment(checker, target);
+            }
             if checker.enabled(Rule::GlobalStatement) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     pylint::rules::global_statement(checker, id);
@@ -1389,6 +1392,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Assign(assign @ ast::StmtAssign { targets, value, .. }) => {
+            if checker.enabled(Rule::SelfClsAssignment) {
+                for target in targets {
+                    pylint::rules::self_cls_assignment(checker, target);
+                }
+            }
             if checker.enabled(Rule::LambdaAssignment) {
                 if let [target] = &targets[..] {
                     pycodestyle::rules::lambda_assignment(checker, target, value, None, stmt);
@@ -1513,6 +1521,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                         stmt,
                     );
                 }
+            }
+            if checker.enabled(Rule::SelfClsAssignment) {
+                pylint::rules::self_cls_assignment(checker, target);
             }
             if checker.enabled(Rule::SelfAssigningVariable) {
                 pylint::rules::self_annotated_assignment(checker, assign_stmt);
