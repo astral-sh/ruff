@@ -488,13 +488,19 @@ impl BlankLinesChecker {
         tokens: &[LexResult],
         locator: &Locator,
         stylist: &Stylist,
-        context: &mut LogicalLinesContext,
+        diagnostics: &mut Vec<Diagnostic>,
     ) {
         let mut prev_indent_level: Option<usize> = None;
         let line_preprocessor = LinePreprocessor::new(tokens, locator);
 
         for logical_line in line_preprocessor {
-            self.check_line(&logical_line, prev_indent_level, locator, stylist, context);
+            self.check_line(
+                &logical_line,
+                prev_indent_level,
+                locator,
+                stylist,
+                diagnostics,
+            );
             prev_indent_level = Some(logical_line.indent_level);
         }
     }
@@ -505,7 +511,7 @@ impl BlankLinesChecker {
         prev_indent_level: Option<usize>,
         locator: &Locator,
         stylist: &Stylist,
-        context: &mut LogicalLinesContext,
+        diagnostics: &mut Vec<Diagnostic>,
     ) {
         let indent_size: usize = 4;
 
@@ -570,7 +576,7 @@ impl BlankLinesChecker {
                     locator.line_start(self.last_non_comment_line_end),
                 )));
 
-                context.push_diagnostic(diagnostic);
+                diagnostics.push(diagnostic);
             }
 
             if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
@@ -597,7 +603,7 @@ impl BlankLinesChecker {
                     locator.line_start(self.last_non_comment_line_end),
                 )));
 
-                context.push_diagnostic(diagnostic);
+                diagnostics.push(diagnostic);
             }
 
             if line.blank_lines > BLANK_LINES_TOP_LEVEL
@@ -616,7 +622,7 @@ impl BlankLinesChecker {
                 let start = end - TextSize::new(chars_to_remove);
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(start, end)));
 
-                context.push_diagnostic(diagnostic);
+                diagnostics.push(diagnostic);
             }
 
             if matches!(self.follows, Follows::Decorator) && line.preceding_blank_lines > 0 {
@@ -630,7 +636,7 @@ impl BlankLinesChecker {
                     locator.line_start(range.start()),
                 )));
 
-                context.push_diagnostic(diagnostic);
+                diagnostics.push(diagnostic);
             }
 
             if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
@@ -654,7 +660,7 @@ impl BlankLinesChecker {
                     locator.line_start(line.first_token_range.start()),
                 )));
 
-                context.push_diagnostic(diagnostic);
+                diagnostics.push(diagnostic);
             }
 
             if line.preceding_blank_lines == 0
@@ -681,7 +687,7 @@ impl BlankLinesChecker {
                     locator.line_start(line.first_token_range.start()),
                 )));
 
-                context.push_diagnostic(diagnostic);
+                diagnostics.push(diagnostic);
             }
         }
 

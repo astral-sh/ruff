@@ -1,4 +1,3 @@
-use crate::registry::Rule;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
@@ -13,7 +12,6 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     whitespace_around_keywords, whitespace_around_named_parameter_equals,
     whitespace_before_comment, whitespace_before_parameters, LogicalLines, TokenFlags,
 };
-use crate::rules::pycodestyle::rules::BlankLinesChecker;
 use crate::settings::LinterSettings;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of 8.
@@ -43,18 +41,6 @@ pub(crate) fn check_logical_lines(
     let mut non_comment_prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
-
-    if settings.rules.any_enabled(&[
-        Rule::BlankLineBetweenMethods,
-        Rule::BlankLinesTopLevel,
-        Rule::TooManyBlankLines,
-        Rule::BlankLineAfterDecorator,
-        Rule::BlankLinesAfterFunctionOrClass,
-        Rule::BlankLinesBeforeNestedDefinition,
-    ]) {
-        let mut blank_lines_checker = BlankLinesChecker::default();
-        blank_lines_checker.check_content(tokens, locator, stylist, &mut context);
-    }
 
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
