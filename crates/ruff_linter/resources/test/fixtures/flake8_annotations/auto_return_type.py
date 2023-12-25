@@ -212,3 +212,20 @@ def func(x: int):
         raise ValueError
     else:
         return 1
+
+
+from typing import overload
+
+
+@overload
+def overloaded(i: int) -> "int":
+    ...
+
+
+@overload
+def overloaded(i: "str") -> "str":
+    ...
+
+
+def overloaded(i):
+    return i
