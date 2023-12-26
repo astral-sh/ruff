@@ -479,23 +479,24 @@ async def compare_check(
     options: CheckOptions,
     cloned_repo: ClonedRepository,
 ) -> Comparison:
-    async with asyncio.TaskGroup() as tg:
-        baseline_task = tg.create_task(
-            ruff_check(
-                executable=ruff_baseline_executable.resolve(),
-                path=cloned_repo.path,
-                name=cloned_repo.fullname,
-                options=options,
-            ),
-        )
-        comparison_task = tg.create_task(
-            ruff_check(
-                executable=ruff_comparison_executable.resolve(),
-                path=cloned_repo.path,
-                name=cloned_repo.fullname,
-                options=options,
-            ),
-        )
+    with options.update_toml(cloned_repo.path):
+        async with asyncio.TaskGroup() as tg:
+            baseline_task = tg.create_task(
+                ruff_check(
+                    executable=ruff_baseline_executable.resolve(),
+                    path=cloned_repo.path,
+                    name=cloned_repo.fullname,
+                    options=options,
+                ),
+            )
+            comparison_task = tg.create_task(
+                ruff_check(
+                    executable=ruff_comparison_executable.resolve(),
+                    path=cloned_repo.path,
+                    name=cloned_repo.fullname,
+                    options=options,
+                ),
+            )
 
     baseline_output, comparison_output = (
         baseline_task.result(),

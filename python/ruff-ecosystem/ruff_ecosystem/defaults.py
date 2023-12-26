@@ -45,7 +45,12 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="pypa", name="build", ref="main")),
     Project(repo=Repository(owner="pypa", name="cibuildwheel", ref="main")),
     Project(repo=Repository(owner="pypa", name="pip", ref="main")),
-    Project(repo=Repository(owner="pypa", name="setuptools", ref="main")),
+    Project(
+        repo=Repository(owner="pypa", name="setuptools", ref="main"),
+        check_options=CheckOptions(
+            toml_overrides=(("no-preview.format.quote-style", "double"),)
+        ),
+    ),
     Project(repo=Repository(owner="python", name="mypy", ref="master")),
     Project(
         repo=Repository(

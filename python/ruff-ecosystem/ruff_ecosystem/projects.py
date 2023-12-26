@@ -5,13 +5,17 @@ Abstractions and utilities for working with projects to run ecosystem checks on.
 from __future__ import annotations
 
 import abc
+import contextlib
 import dataclasses
 from asyncio import create_subprocess_exec
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from subprocess import DEVNULL, PIPE
-from typing import Self
+from typing import Any, Self
+
+import tomli
+import tomli_w
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.types import Serializable
@@ -42,6 +46,9 @@ class RuffCommand(Enum):
 
 @dataclass(frozen=True)
 class CommandOptions(Serializable, abc.ABC):
+    preview: bool = False
+    toml_overrides: tuple[tuple[str, Any]] | None = None
+
     def with_options(self: Self, **kwargs) -> Self:
         """
         Return a copy of self with the given options set.
@@ -51,6 +58,54 @@ class CommandOptions(Serializable, abc.ABC):
     @abc.abstractmethod
     def to_ruff_args(self) -> list[str]:
         pass
+
+    @contextlib.contextmanager
+    def update_toml(self, dirpath: Path) -> None:
+        ruff_toml = dirpath / "ruff.toml"
+        pyproject_toml = dirpath / "pyproject.toml"
+        if ruff_toml.exists():
+            path = ruff_toml
+            base = []
+        else:
+            path = pyproject_toml
+            base = ["tool", "ruff"]
+
+        if self.toml_overrides and path.exists():
+            contents = path.read_text()
+            toml = tomli.loads(contents)
+
+            # Update the TOML, using `.` to descend into nested keys
+            for key, value in self.toml_overrides:
+                # Allow "preview" only overrides
+                if key.startswith("preview."):
+                    if not self.preview:
+                        continue
+                    else:
+                        key = key[len("preview.") :]
+
+                # Allow "no-preview" only overrides
+                if key.startswith("no-preview."):
+                    if self.preview:
+                        continue
+                    else:
+                        key = key[len("no-preview.") :]
+
+                target = toml
+                names = base + key.split(".")
+                for name in names[:-1]:
+                    target = target[name]
+                target[names[-1]] = value
+
+            tomli_w.dump(toml, path.open("wb"))
+
+            yield
+
+            # Restore the contents
+            path.write_text(contents)
+
+        else:
+            # Do nothing...
+            yield
 
 
 @dataclass(frozen=True)
@@ -62,7 +117,6 @@ class CheckOptions(CommandOptions):
     select: str = ""
     ignore: str = ""
     exclude: str = ""
-    preview: bool = False
 
     # Generating fixes is slow and verbose
     show_fixes: bool = False
@@ -96,6 +150,8 @@ class FormatOptions(CommandOptions):
 
     preview: bool = False
     exclude: str = ""
+
+    toml_overrides: dict | None = None
 
     def to_ruff_args(self) -> list[str]:
         args = ["format", f"--{'' if self.preview else 'no-'}preview"]
