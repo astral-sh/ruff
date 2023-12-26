@@ -245,6 +245,7 @@ pub struct PreviewOptions {
 
 impl PreviewOptions {
     /// Return a copy with the same preview mode setting but require explicit disabled.
+    #[must_use]
     pub fn without_require_explicit(&self) -> Self {
         Self {
             mode: self.mode,
