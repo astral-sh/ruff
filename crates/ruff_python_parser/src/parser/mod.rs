@@ -171,6 +171,7 @@ const SIMPLE_STMT_SET: TokenSet = TokenSet::new(&[
     TokenKind::Del,
     TokenKind::Raise,
     TokenKind::Import,
+    TokenKind::From,
     TokenKind::Type,
 ]);
 /// Tokens that represent simple statements, including expressions.
