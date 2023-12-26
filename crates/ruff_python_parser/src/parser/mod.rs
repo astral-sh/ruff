@@ -32,31 +32,24 @@ pub struct ParsedFile {
 
 bitflags! {
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-    struct ParserCtxFlags: u32 {
-        const LIST_EXPR = 1 << 0;
-        const TUPLE_EXPR = 1 << 1;
-        const SUBSCRIPT_EXPR = 1 << 2;
-        const PARENTHESIZED_EXPR = 1 << 3;
-        const BRACESIZED_EXPR = 1 << 4;
-        const SET_COMP_EXPR = 1 << 5;
-        const LAMBDA_EXPR = 1 << 6;
-        const LIST_COMP_EXPR = 1 << 7;
-        const GENERATOR_EXPR = 1 << 8;
-        const DICT_COMP_EXPR = 1 << 9;
-
-        const IF_STMT = 1 << 10;
-        const FUNC_DEF_STMT = 1 << 11;
-        const CLASS_DEF_STMT = 1 << 12;
         const WITH_STMT = 1 << 13;
-        const FOR_STMT = 1 << 14;
-        const WHILE_STMT  = 1 << 15;
-        const MATCH_STMT  = 1 << 16;
+    struct ParserCtxFlags: u16 {
+        const TUPLE_EXPR = 1 << 0;
+        const PARENTHESIZED_EXPR = 1 << 1;
+        const BRACKETSIZED_EXPR = 1 << 2;
+        const BRACESIZED_EXPR = 1 << 3;
+        const LAMBDA_EXPR = 1 << 4;
 
-        const ARGUMENTS = 1 << 17;
-        const FOR_TARGET = 1 << 18;
-        const AWAIT_EXPR = 1 << 19;
-        const WITH_ITEM = 1 << 20;
-        const DECORATOR = 1 << 21;
+        const IF_STMT = 1 << 5;
+        const FUNC_DEF_STMT = 1 << 6;
+        const CLASS_DEF_STMT = 1 << 7;
+        const WITH_STMT = 1 << 8;
+        const FOR_STMT = 1 << 9;
+        const WHILE_STMT  = 1 << 10;
+        const MATCH_STMT  = 1 << 11;
+
+        const ARGUMENTS = 1 << 12;
+        const FOR_TARGET = 1 << 13;
     }
 }
 
@@ -79,8 +72,8 @@ where
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
     /// This tracks the current expression or statement being parsed. For example,
-    /// if we're parsing a list expression, e.g. `[1, 2]`, `ctx` has the value
-    /// `ParserCtxFlags::LIST_EXPR`.
+    /// if we're parsing a tuple expression, e.g. `(1, 2)`, `ctx` has the value
+    /// `ParserCtxFlags::TUPLE_EXPR`.
     ///
     /// The `ctx` is also used to create custom error messages and forbid certain
     /// expressions or statements of being parsed. The `ctx` should be empty after
@@ -517,22 +510,6 @@ where
             | TokenKind::Dot
             | TokenKind::Async
             | TokenKind::For => true,
-            TokenKind::ColonEqual
-                if self.has_in_curr_or_parent_ctx(
-                    ParserCtxFlags::IF_STMT
-                        | ParserCtxFlags::ARGUMENTS
-                        | ParserCtxFlags::WITH_ITEM
-                        | ParserCtxFlags::BRACESIZED_EXPR
-                        | ParserCtxFlags::LIST_EXPR
-                        | ParserCtxFlags::SUBSCRIPT_EXPR
-                        | ParserCtxFlags::PARENTHESIZED_EXPR
-                        | ParserCtxFlags::WHILE_STMT
-                        | ParserCtxFlags::MATCH_STMT
-                        | ParserCtxFlags::DECORATOR,
-                ) =>
-            {
-                true
-            }
             _ => false,
         }
     }
@@ -579,7 +556,15 @@ where
         let mut range = self.current_range();
 
         self.eat(TokenKind::Match);
-        let (subject, _) = self.parse_exprs_and_recover(
+        let (subject, _) = self.parse_expr_with_recovery(
+            |parser| {
+                let (expr, expr_range) = parser.parse_expr2();
+                if parser.at(TokenKind::Comma) {
+                    return parser
+                        .parse_tuple_expr(expr, expr_range, |parser| parser.parse_expr2());
+                }
+                (expr, expr_range)
+            },
             [TokenKind::Colon].as_slice(),
             "expecting expression after `match` keyword",
         );
@@ -619,7 +604,7 @@ where
         let (pattern, _) = self.parse_match_patterns();
 
         let guard = if self.eat(TokenKind::If) {
-            let (expr, _) = self.parse_exprs();
+            let (expr, _) = self.parse_expr2();
             Some(Box::new(expr))
         } else {
             None
@@ -1279,7 +1264,8 @@ where
         let mut range = self.current_range();
         self.eat(TokenKind::While);
 
-        let (test, _) = self.parse_expr_and_recover(
+        let (test, _) = self.parse_expr_with_recovery(
+            |parser| parser.parse_expr2(),
             [TokenKind::Colon].as_slice(),
             "expecting expression after `while` keyword",
         );
@@ -1317,7 +1303,8 @@ where
         self.eat(TokenKind::For);
 
         self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let (mut target, _) = self.parse_exprs_and_recover(
+        let (mut target, _) = self.parse_expr_with_recovery(
+            |parser| parser.parse_exprs(),
             [TokenKind::In, TokenKind::Colon].as_slice(),
             "expecting expression after `for` keyword",
         );
@@ -1327,7 +1314,8 @@ where
 
         self.expect_and_recover(TokenKind::In, TokenSet::new(&[TokenKind::Colon]));
 
-        let (iter, _) = self.parse_exprs_and_recover(
+        let (iter, _) = self.parse_expr_with_recovery(
+            |parser| parser.parse_exprs(),
             EXPR_SET.union([TokenKind::Colon, TokenKind::Indent].as_slice().into()),
             "expecting an expression after `in` keyword",
         );
@@ -1386,7 +1374,7 @@ where
                 None
             } else {
                 let (expr, expr_range) = self.parse_exprs();
-                if self.last_ctx.contains(ParserCtxFlags::TUPLE_EXPR)
+                if !self.last_ctx.contains(ParserCtxFlags::PARENTHESIZED_EXPR)
                     && matches!(expr, Expr::Tuple(_))
                 {
                     self.add_error(
@@ -1471,7 +1459,6 @@ where
     }
 
     fn parse_decorators(&mut self) -> StmtWithRange {
-        self.set_ctx(ParserCtxFlags::DECORATOR);
         let range = self.current_range();
         let mut decorators = vec![];
 
@@ -1479,14 +1466,13 @@ where
             let range = self.current_range();
             self.eat(TokenKind::At);
 
-            let (expression, expr_range) = self.parse_expr();
+            let (expression, expr_range) = self.parse_expr2();
             decorators.push(ast::Decorator {
                 expression,
                 range: range.cover(expr_range),
             });
             self.eat(TokenKind::Newline);
         }
-        self.clear_ctx(ParserCtxFlags::DECORATOR);
 
         let (kind, kind_range) = self.current_token();
         match kind {
@@ -2488,7 +2474,8 @@ where
         let mut if_range = self.current_range();
         assert!(self.eat(TokenKind::If));
 
-        let (test, _) = self.parse_expr_and_recover(
+        let (test, _) = self.parse_expr_with_recovery(
+            |parser| parser.parse_expr2(),
             [TokenKind::Colon].as_slice(),
             "expecting expression after `if` keyword",
         );
@@ -2525,7 +2512,8 @@ where
             let elif_range = self.current_range();
             self.eat(TokenKind::Elif);
 
-            let (test, _) = self.parse_expr_and_recover(
+            let (test, _) = self.parse_expr_with_recovery(
+                |parser| parser.parse_expr2(),
                 [TokenKind::Colon].as_slice(),
                 "expecting expression after `elif` keyword",
             );
@@ -2624,12 +2612,12 @@ where
         let (expr, expr_range) = self.parse_expr();
 
         if self.at(TokenKind::Comma) {
-            return self.parse_tuple_expr(expr, expr_range);
+            return self.parse_tuple_expr(expr, expr_range, |parser| parser.parse_expr());
         }
         (expr, expr_range)
     }
 
-    /// Parses every Python expression except unparenthesized tuple.
+    /// Parses every Python expression except unparenthesized tuple and named expressions.
     ///
     /// NOTE: If you have expressions separated by commas and want to parse them individually,
     /// instead of a tuple, use this function!
@@ -2643,77 +2631,38 @@ where
         (expr, expr_range)
     }
 
+    /// Parses every Python expression except unparenthesized tuple.
+    ///
+    /// NOTE: If you have expressions separated by commas and want to parse them individually,
+    /// instead of a tuple, use this function!
+    fn parse_expr2(&mut self) -> ExprWithRange {
+        let (expr, expr_range) = self.parse_expr();
+
+        if self.at(TokenKind::ColonEqual) {
+            return self.parse_named_expr(expr, expr_range);
+        }
+
+        (expr, expr_range)
+    }
+
     /// Parses every Python expression except unparenthesized tuple and `if` expression.
     fn parse_expr_simple(&mut self) -> ExprWithRange {
         self.expr_bp(1)
     }
 
-    /// Tries to parse an expression (using `parse_expr_simple`), and recovers
-    /// from errors by skipping until a specified set of tokens.
-    ///
-    /// If the current token is not part of an expression, adds the `error_msg`
-    /// to the list of errors and returns an `Expr::Invalid`.
-    fn parse_expr_simple_and_recover(
-        &mut self,
-        recover_set: impl Into<TokenSet>,
-        error_msg: impl Display,
-    ) -> ExprWithRange {
-        if self.at_expr() {
-            self.parse_expr_simple()
-        } else {
-            let range = self.current_range();
-            self.add_error(ParseErrorType::OtherError(error_msg.to_string()), range);
-            self.skip_until(NEWLINE_EOF_SET.union(recover_set.into()));
-
-            (
-                Expr::Invalid(ast::ExprInvalid {
-                    value: self.src_text(range).into(),
-                    range,
-                }),
-                range,
-            )
-        }
-    }
-
-    /// Tries to parse an expression (using `parse_expr`), and recovers from
+    /// Tries to parse an expression (using `parse_func`), and recovers from
     /// errors by skipping until a specified set of tokens.
     ///
     /// If the current token is not part of an expression, adds the `error_msg`
     /// to the list of errors and returns an `Expr::Invalid`.
-    fn parse_expr_and_recover(
+    fn parse_expr_with_recovery(
         &mut self,
+        mut parse_func: impl FnMut(&mut Parser<'src, 'src_path, I>) -> ExprWithRange,
         recover_set: impl Into<TokenSet>,
         error_msg: impl Display,
     ) -> ExprWithRange {
         if self.at_expr() {
-            self.parse_expr()
-        } else {
-            let range = self.current_range();
-            self.add_error(ParseErrorType::OtherError(error_msg.to_string()), range);
-            self.skip_until(NEWLINE_EOF_SET.union(recover_set.into()));
-
-            (
-                Expr::Invalid(ast::ExprInvalid {
-                    value: self.src_text(range).into(),
-                    range,
-                }),
-                range,
-            )
-        }
-    }
-
-    /// Tries to parse an expression (using `parse_exprs`), and recovers from
-    /// errors by skipping until a specified set of tokens.
-    ///
-    /// If the current token is not part of an expression, adds the `error_msg`
-    /// to the list of errors and returns an `Expr::Invalid`.
-    fn parse_exprs_and_recover(
-        &mut self,
-        recover_set: impl Into<TokenSet>,
-        error_msg: impl Display,
-    ) -> ExprWithRange {
-        if self.at_expr() {
-            self.parse_exprs()
+            parse_func(self)
         } else {
             let range = self.current_range();
             self.add_error(ParseErrorType::OtherError(error_msg.to_string()), range);
@@ -2947,7 +2896,6 @@ where
                 TokenKind::Lpar => self.parse_call_expr(lhs, lhs_range),
                 TokenKind::Lsqb => self.parse_subscript_expr(lhs, lhs_range),
                 TokenKind::Dot => self.parse_attribute_expr(lhs, lhs_range),
-                TokenKind::ColonEqual => self.parse_named_expr(lhs, lhs_range),
                 _ => break,
             };
         }
@@ -2997,7 +2945,7 @@ where
 
                     has_seen_kw_unpack = true;
                 } else {
-                    let (mut expr, expr_range) = parser.parse_expr();
+                    let (mut expr, expr_range) = parser.parse_expr2();
 
                     match parser.current_kind() {
                         TokenKind::Async | TokenKind::For => {
@@ -3065,7 +3013,6 @@ where
     }
 
     fn parse_subscript_expr(&mut self, mut value: Expr, value_range: TextRange) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::SUBSCRIPT_EXPR);
         assert!(self.eat(TokenKind::Lsqb));
 
         // To prevent the `value` context from being `Del` within a `del` statement,
@@ -3080,7 +3027,6 @@ where
             let range = value_range.cover(close_bracket_range);
             let slice_range = close_bracket_range.sub_start(1.into());
             self.add_error(ParseErrorType::EmptySlice, range);
-            self.clear_ctx(ParserCtxFlags::SUBSCRIPT_EXPR);
             return (
                 Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(value),
@@ -3124,7 +3070,6 @@ where
         self.expect_and_recover(TokenKind::Rsqb, TokenSet::EMPTY);
 
         let range = value_range.cover(end_range);
-        self.clear_ctx(ParserCtxFlags::SUBSCRIPT_EXPR);
         (
             Expr::Subscript(ast::ExprSubscript {
                 value: Box::new(value),
@@ -3144,14 +3089,19 @@ where
     fn parse_slice(&mut self) -> ExprWithRange {
         let mut range = self.current_range();
         let lower = if self.at_expr() {
-            let (expr, expr_range) = self.parse_expr();
+            let (expr, expr_range) = self.parse_expr2();
             range = range.cover(expr_range);
             Some(expr)
         } else {
             None
         };
 
-        if self.at(TokenKind::Colon) {
+        if self.at(TokenKind::Colon)
+            && (lower.is_none()
+                || lower
+                    .as_ref()
+                    .is_some_and(|expr| !matches!(expr, Expr::NamedExpr(_))))
+        {
             let (_, colon_range) = self.next_token();
             range = range.cover(colon_range);
             let lower = lower.map(Box::new);
@@ -3547,7 +3497,8 @@ where
         let range = self.current_range();
 
         let has_open_brace = self.eat(TokenKind::Lbrace);
-        let (value, value_range) = self.parse_exprs_and_recover(
+        let (value, value_range) = self.parse_expr_with_recovery(
+            |parser| parser.parse_exprs(),
             [
                 TokenKind::Exclamation,
                 TokenKind::Colon,
@@ -3626,8 +3577,7 @@ where
     }
 
     fn parse_bracketsized_expr(&mut self, open_bracket_range: TextRange) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::LIST_EXPR);
-
+        self.set_ctx(ParserCtxFlags::BRACKETSIZED_EXPR);
         // Nice error message when having a unclosed open bracket `[`
         if self.at_ts(NEWLINE_EOF_SET) {
             let range = self.current_range();
@@ -3639,12 +3589,11 @@ where
 
         // Return an empty `ListExpr` when finding a `]` right after the `[`
         if self.at(TokenKind::Rsqb) {
+            self.clear_ctx(ParserCtxFlags::BRACKETSIZED_EXPR);
             let close_bracket_range = self.current_range();
             let range = open_bracket_range.cover(close_bracket_range);
 
             self.eat(TokenKind::Rsqb);
-            self.clear_ctx(ParserCtxFlags::LIST_EXPR);
-
             return (
                 Expr::List(ast::ExprList {
                     elts: vec![],
@@ -3655,7 +3604,7 @@ where
             );
         }
 
-        let (mut expr, expr_range) = self.parse_expr();
+        let (mut expr, expr_range) = self.parse_expr2();
 
         match self.current_kind() {
             TokenKind::Async | TokenKind::For => {
@@ -3675,15 +3624,13 @@ where
         if matches!(expr, Expr::List(_) | Expr::ListComp(_)) {
             helpers::set_expr_range(&mut expr, range);
         }
-
-        self.clear_ctx(ParserCtxFlags::LIST_EXPR);
+        self.clear_ctx(ParserCtxFlags::BRACKETSIZED_EXPR);
 
         (expr, range)
     }
 
     fn parse_bracesized_expr(&mut self, lbrace_range: TextRange) -> ExprWithRange {
         self.set_ctx(ParserCtxFlags::BRACESIZED_EXPR);
-
         // Nice error message when having a unclosed open brace `{`
         if self.at_ts(NEWLINE_EOF_SET) {
             let range = self.current_range();
@@ -3695,12 +3642,11 @@ where
 
         // Return an empty `DictExpr` when finding a `}` right after the `{`
         if self.at(TokenKind::Rbrace) {
+            self.clear_ctx(ParserCtxFlags::BRACESIZED_EXPR);
             let close_brace_range = self.current_range();
             let range = lbrace_range.cover(close_brace_range);
 
             self.eat(TokenKind::Rbrace);
-            self.clear_ctx(ParserCtxFlags::BRACESIZED_EXPR);
-
             return (
                 Expr::Dict(ast::ExprDict {
                     keys: vec![],
@@ -3716,7 +3662,7 @@ where
             let (value, _) = self.parse_expr();
             self.parse_dict_expr(None, value)
         } else {
-            self.parse_expr()
+            self.parse_expr2()
         };
 
         match self.current_kind() {
@@ -3766,7 +3712,6 @@ where
         ) {
             helpers::set_expr_range(&mut expr, range);
         }
-
         self.clear_ctx(ParserCtxFlags::BRACESIZED_EXPR);
 
         (expr, range)
@@ -3802,11 +3747,11 @@ where
             );
         }
 
-        let (mut expr, expr_range) = self.parse_expr();
+        let (mut expr, expr_range) = self.parse_expr2();
 
         match self.current_kind() {
             TokenKind::Comma => {
-                (expr, _) = self.parse_tuple_expr(expr, expr_range);
+                (expr, _) = self.parse_tuple_expr(expr, expr_range, |parser| parser.parse_expr2());
             }
             TokenKind::Async | TokenKind::For => {
                 (expr, _) = self.parse_generator_expr(expr, expr_range);
@@ -3831,10 +3776,13 @@ where
         (expr, range)
     }
 
+    /// Parses multiple items separated by a comma into a `TupleExpr` node.
+    /// Uses `parse_func` to parse each item.
     fn parse_tuple_expr(
         &mut self,
         first_element: Expr,
         first_element_range: TextRange,
+        mut parse_func: impl FnMut(&mut Parser<'src, 'src_path, I>) -> ExprWithRange,
     ) -> ExprWithRange {
         self.set_ctx(ParserCtxFlags::TUPLE_EXPR);
         // In case of the tuple only having one element, we need to cover the
@@ -3845,7 +3793,7 @@ where
         let mut elts = vec![first_element];
 
         while self.at_expr() {
-            let (expr, expr_range) = self.parse_expr();
+            let (expr, expr_range) = parse_func(self);
             elts.push(expr);
             final_range = final_range.cover(expr_range);
 
@@ -3882,7 +3830,7 @@ where
                 TokenKind::Comma,
                 [TokenKind::Rsqb].as_slice(),
                 |parser| {
-                    let (expr, range) = parser.parse_expr();
+                    let (expr, range) = parser.parse_expr2();
                     elts.push(expr);
                     range
                 },
@@ -3911,7 +3859,7 @@ where
                 TokenKind::Comma,
                 [TokenKind::Rbrace].as_slice(),
                 |parser| {
-                    let (expr, range) = parser.parse_expr();
+                    let (expr, range) = parser.parse_expr2();
                     elts.push(expr);
                     range
                 },
@@ -3974,7 +3922,8 @@ where
         self.eat(TokenKind::For);
 
         self.set_ctx(ParserCtxFlags::FOR_TARGET);
-        let (mut target, _) = self.parse_exprs_and_recover(
+        let (mut target, _) = self.parse_expr_with_recovery(
+            |parser| parser.parse_exprs(),
             [TokenKind::In, TokenKind::Colon].as_slice(),
             "expecting expression after `for` keyword",
         );
@@ -3984,7 +3933,8 @@ where
 
         self.expect_and_recover(TokenKind::In, TokenSet::new(&[TokenKind::Rsqb]));
 
-        let (iter, iter_expr) = self.parse_expr_simple_and_recover(
+        let (iter, iter_expr) = self.parse_expr_with_recovery(
+            |parser| parser.parse_expr_simple(),
             EXPR_SET.union(
                 [
                     TokenKind::Rpar,
@@ -4031,9 +3981,7 @@ where
     }
 
     fn parse_generator_expr(&mut self, element: Expr, element_range: TextRange) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::GENERATOR_EXPR);
         let (generators, range) = self.parse_generators(element_range);
-        self.clear_ctx(ParserCtxFlags::GENERATOR_EXPR);
 
         (
             Expr::GeneratorExp(ast::ExprGeneratorExp {
@@ -4050,9 +3998,7 @@ where
         element: Expr,
         element_range: TextRange,
     ) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::LIST_COMP_EXPR);
         let (generators, range) = self.parse_generators(element_range);
-        self.clear_ctx(ParserCtxFlags::LIST_COMP_EXPR);
 
         (
             Expr::ListComp(ast::ExprListComp {
@@ -4070,9 +4016,7 @@ where
         value: Expr,
         range: TextRange,
     ) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::DICT_COMP_EXPR);
         let (generators, range) = self.parse_generators(range);
-        self.clear_ctx(ParserCtxFlags::DICT_COMP_EXPR);
 
         (
             Expr::DictComp(ast::ExprDictComp {
@@ -4090,9 +4034,7 @@ where
         element: Expr,
         element_range: TextRange,
     ) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::SET_COMP_EXPR);
         let (generators, range) = self.parse_generators(element_range);
-        self.clear_ctx(ParserCtxFlags::SET_COMP_EXPR);
 
         (
             Expr::SetComp(ast::ExprSetComp {
@@ -4119,8 +4061,6 @@ where
     }
 
     fn parse_await_expr(&mut self, start_range: TextRange) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::AWAIT_EXPR);
-
         let mut await_range = start_range;
 
         let (expr, expr_range) = self.expr_bp(19);
@@ -4136,7 +4076,6 @@ where
             );
         }
 
-        self.clear_ctx(ParserCtxFlags::AWAIT_EXPR);
         (
             Expr::Await(ast::ExprAwait {
                 value: Box::new(expr),
