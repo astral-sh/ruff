@@ -714,7 +714,9 @@ impl LintConfiguration {
             .collect();
 
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.rules(&preview).collect();
+        let mut fixable_set: RuleSet = RuleSelector::All
+            .rules(&preview.without_require_explicit())
+            .collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`

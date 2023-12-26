@@ -243,6 +243,16 @@ pub struct PreviewOptions {
     pub require_explicit: bool,
 }
 
+impl PreviewOptions {
+    /// Return a copy with the same preview mode setting but require explicit disabled.
+    pub fn without_require_explicit(&self) -> Self {
+        Self {
+            mode: self.mode,
+            require_explicit: false,
+        }
+    }
+}
+
 #[cfg(feature = "schemars")]
 mod schema {
     use itertools::Itertools;
