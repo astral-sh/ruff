@@ -77,26 +77,28 @@ pub(crate) fn self_cls_assignment(checker: &mut Checker, target: &Expr) {
         _ => return,
     };
 
+    check_expr(checker, target, keyword);
+}
+
+fn check_expr(checker: &mut Checker, target: &Expr, keyword: &str) {
     match target {
-        Expr::Name(_) => check_name(checker, target, keyword),
+        Expr::Name(_) => {
+            if let Expr::Name(ast::ExprName { id, .. }) = target {
+                if id.as_str() == keyword {
+                    checker.diagnostics.push(Diagnostic::new(
+                        SelfClsAssignment {
+                            keyword: keyword.to_string(),
+                        },
+                        target.range(),
+                    ));
+                }
+            }
+        }
         Expr::Tuple(ast::ExprTuple { elts, .. }) => {
             for element in elts {
-                check_name(checker, element, keyword);
+                check_expr(checker, element, keyword);
             }
         }
         _ => {}
-    }
-}
-
-fn check_name(checker: &mut Checker, target: &Expr, keyword: &str) {
-    if let Expr::Name(ast::ExprName { id, .. }) = target {
-        if id.as_str() == keyword {
-            checker.diagnostics.push(Diagnostic::new(
-                SelfClsAssignment {
-                    keyword: keyword.to_string(),
-                },
-                target.range(),
-            ));
-        }
     }
 }
