@@ -649,6 +649,9 @@ with (a := 1):
     ...
 with (open('bla.txt')), (open('bla.txt')):
     pass
+with (a := 1, x):
+    ...
+with (p / 'new_file').open('wb'): ...
 "
         ));
     }

@@ -32,7 +32,6 @@ pub struct ParsedFile {
 
 bitflags! {
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-        const WITH_STMT = 1 << 13;
     struct ParserCtxFlags: u16 {
         const TUPLE_EXPR = 1 << 0;
         const PARENTHESIZED_EXPR = 1 << 1;
@@ -99,13 +98,20 @@ where
 }
 
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new(&[TokenKind::Newline, TokenKind::EndOfFile]);
-/// Tokens that are usually an expression or the start of one.
-const EXPR_SET: TokenSet = TokenSet::new(&[
+const LITERAL_SET: TokenSet = TokenSet::new(&[
     TokenKind::Name,
     TokenKind::Int,
     TokenKind::Float,
     TokenKind::Complex,
     TokenKind::Plus,
+    TokenKind::String,
+    TokenKind::Ellipsis,
+    TokenKind::True,
+    TokenKind::False,
+    TokenKind::None,
+]);
+/// Tokens that are usually an expression or the start of one.
+const EXPR_SET: TokenSet = TokenSet::new(&[
     TokenKind::Minus,
     TokenKind::Tilde,
     TokenKind::Star,
@@ -114,17 +120,13 @@ const EXPR_SET: TokenSet = TokenSet::new(&[
     TokenKind::Lpar,
     TokenKind::Lbrace,
     TokenKind::Lsqb,
-    TokenKind::String,
-    TokenKind::Ellipsis,
     TokenKind::Lambda,
     TokenKind::Await,
-    TokenKind::False,
-    TokenKind::None,
     TokenKind::Not,
-    TokenKind::True,
     TokenKind::Yield,
     TokenKind::FStringStart,
-]);
+])
+.union(LITERAL_SET);
 /// Tokens that can appear after an expression.
 const END_EXPR_SET: TokenSet = TokenSet::new(&[
     TokenKind::Newline,
@@ -1630,9 +1632,7 @@ where
     }
 
     fn parse_with_item(&mut self) -> ast::WithItem {
-        self.set_ctx(ParserCtxFlags::WITH_ITEM);
         let (context_expr, mut range) = self.parse_expr();
-
         match context_expr {
             Expr::Starred(_) => {
                 self.add_error(
@@ -1672,7 +1672,6 @@ where
             None
         };
 
-        self.clear_ctx(ParserCtxFlags::WITH_ITEM);
         ast::WithItem {
             range,
             context_expr,
@@ -1694,7 +1693,7 @@ where
 
         let has_seen_lpar = self.at(TokenKind::Lpar);
 
-        // Consider the two `WithItem` examples below::
+        // Consider the two `WithItem` examples below:
         //      1) `(a) as A`
         //      2) `(a)`
         //
@@ -1705,50 +1704,73 @@ where
         // However, this assumption doesn't hold for the first case, `(a) as A`, where
         // `(a)` represents a parenthesized expression.
         //
-        // To disambiguate, the following heuristic was created. We lookahead in the
-        // token stream to locate the `as` keyword outside of parenthesis. If the `as`
-        // keyword is found outiside of parenthesis, we're dealing with case 1; otherwise
-        // it's case 2.
+        // To disambiguate, the following heuristic was created. First, assume we're
+        // parsing an expression, then we look for the following tokens:
+        //      i) `as` keyword outside parenthesis
+        //      ii) `,` outside or inside parenthesis
+        //      iii) `:=` inside an 1-level nested parenthesis
+        //      iv) `*` inside an 1-level nested parenthesis, representing a starred
+        //         expression
         //
-        // For some reason, if a `NamedExpr` or `ExprStarred` is present within parentheses
-        // along with other expressions, such as `(a := b, x)`, it will be parsed as a tuple
-        // instead of different `WithItem`s. In such cases, we treat it as an expression like
-        // in case 1.
-        let mut treat_it_as_expr = false;
+        // If we find case i we treat it as in case 1. For case ii, we only treat it as in
+        // case 1 if the comma is outside of parenthesis and we've seen an `Rpar` or `Lpar`
+        // before the comma.
+        // Cases iii and iv are special cases, when we find them, we treat it as in case 2.
+        // The reason for this is that the resulting AST node needs to be a tuple for cases
+        // iii and iv instead of multiple `WithItem`s. For example, `with (a, b := 0, c): ...`
+        // will be parsed as one `WithItem` containing a tuple, instead of three different `WithItem`s.
+        let mut treat_it_as_expr = true;
         if has_seen_lpar {
             let mut index = 1;
             let mut paren_nesting = 1;
-            let mut has_items = false;
-            // Helper flag to check for starred expressions.
-            let mut has_seen_name = false;
+            let mut ignore_comma_check = false;
+            let mut has_seen_rpar = false;
+            let mut has_seen_colon_equal = false;
+            let mut has_seen_star = false;
+            let mut prev_token = self.current_kind();
             loop {
                 let (kind, _) = self.lookahead(index);
                 match kind {
-                    TokenKind::Name => {
-                        has_seen_name = true;
-                        has_items = true;
+                    TokenKind::Lpar => {
+                        paren_nesting += 1;
                     }
-                    TokenKind::Lpar => paren_nesting += 1,
-                    TokenKind::Rpar => paren_nesting -= 1,
-                    TokenKind::ColonEqual if paren_nesting == 1 => treat_it_as_expr = true,
-                    // check for `as` keyword outside parens
-                    TokenKind::As if paren_nesting == 0 => treat_it_as_expr = true,
-                    // check for starred expressions
-                    TokenKind::Star if !has_seen_name => treat_it_as_expr = true,
-                    // check for commas outside parens
-                    TokenKind::Comma if paren_nesting == 0 => treat_it_as_expr = true,
+                    TokenKind::Rpar => {
+                        paren_nesting -= 1;
+                        has_seen_rpar = true;
+                    }
+                    // Check for `:=` inside an 1-level nested parens, e.g. `with (a, b := c): ...`
+                    TokenKind::ColonEqual if paren_nesting == 1 => {
+                        treat_it_as_expr = true;
+                        ignore_comma_check = true;
+                        has_seen_colon_equal = true;
+                    }
+                    // Check for starred expressions inside an 1-level nested parens,
+                    // e.g. `with (a, *b): ...`
+                    TokenKind::Star if paren_nesting == 1 && !LITERAL_SET.contains(prev_token) => {
+                        treat_it_as_expr = true;
+                        ignore_comma_check = true;
+                        has_seen_star = true;
+                    }
+                    // Check for `as` keyword outside parens
+                    TokenKind::As => {
+                        treat_it_as_expr = paren_nesting == 0;
+                        ignore_comma_check = true;
+                    }
+                    TokenKind::Comma if !ignore_comma_check => {
+                        // If the comma is outside of parens, treat it as an expression
+                        // if we've seen `(` and `)`.
+                        if paren_nesting == 0 {
+                            treat_it_as_expr = has_seen_lpar && has_seen_rpar;
+                        } else if !has_seen_star && !has_seen_colon_equal {
+                            treat_it_as_expr = false;
+                        }
+                    }
                     TokenKind::Colon | TokenKind::Newline => break,
-                    _ => {
-                        has_seen_name = false;
-                        has_items = true;
-                    }
+                    _ => {}
                 }
-                index += 1;
-            }
 
-            // Treat a `()` as an expression.
-            if !has_items {
-                treat_it_as_expr = true;
+                index += 1;
+                prev_token = kind;
             }
         }
 
@@ -1773,17 +1795,23 @@ where
                 range
             },
         );
-        // Special-case: if the `WithItem` is a parenthesized named expression, then the item
-        // should _exclude_ the outer parentheses in its range. For example:
+        // Special-case: if we have a parenthesized `WithItem` that was parsed as
+        // an expression, then the item should _exclude_ the outer parentheses in
+        // its range. For example:
         // ```python
         // with (a := 0): pass
+        // with (*a): pass
+        // with (a): pass
+        // with (1 + 2): pass
         // ```
         // In this case, the `(` and `)` are part of the `with` statement.
+        // The exception is when `WithItem` is an `()` (empty tuple).
         if items.len() == 1 {
             let with_item = items.last_mut().unwrap();
             if treat_it_as_expr
                 && with_item.optional_vars.is_none()
-                && matches!(with_item.context_expr, Expr::NamedExpr(_))
+                && self.last_ctx.contains(ParserCtxFlags::PARENTHESIZED_EXPR)
+                && !matches!(with_item.context_expr, Expr::Tuple(_))
             {
                 with_item.range = with_item.range.add_start(1.into()).sub_end(1.into());
             }
