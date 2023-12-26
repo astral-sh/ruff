@@ -1257,7 +1257,7 @@ impl FusedIterator for Lexer<'_> {}
 /// [lexer] implementation.
 ///
 /// [lexer]: crate::lexer
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LexicalError {
     /// The type of error that occurred.
     pub error: LexicalErrorType,
@@ -1273,7 +1273,7 @@ impl LexicalError {
 }
 
 /// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LexicalErrorType {
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.

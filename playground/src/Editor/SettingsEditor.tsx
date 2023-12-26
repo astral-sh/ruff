@@ -24,7 +24,7 @@ export default function SettingsEditor({
     monaco?.languages.json.jsonDefaults.setDiagnosticsOptions({
       schemas: [
         {
-          uri: "https://raw.githubusercontent.com/charliermarsh/ruff/main/ruff.schema.json",
+          uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/ruff.schema.json",
           fileMatch: ["*"],
           schema,
         },

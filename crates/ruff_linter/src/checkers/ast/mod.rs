@@ -287,7 +287,18 @@ where
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
+            Stmt::Expr(ast::StmtExpr { value, .. })
+                if !self
+                    .semantic
+                    .flags
+                    .intersects(SemanticModelFlags::MODULE_DOCSTRING)
+                    && value.is_string_literal_expr() =>
+            {
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+            }
             Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+
                 // Allow __future__ imports until we see a non-__future__ import.
                 if let Some("__future__") = module.as_deref() {
                     if names
@@ -301,9 +312,11 @@ where
                 }
             }
             Stmt::Import(_) => {
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !(self.semantic.seen_import_boundary()
                     || helpers::is_assignment_to_a_dunder(stmt)
@@ -1435,11 +1448,8 @@ where
 
 impl<'a> Checker<'a> {
     /// Visit a [`Module`]. Returns `true` if the module contains a module-level docstring.
-    fn visit_module(&mut self, python_ast: &'a Suite) -> bool {
+    fn visit_module(&mut self, python_ast: &'a Suite) {
         analyze::module(python_ast, self);
-
-        let docstring = docstrings::extraction::docstring_from(python_ast);
-        docstring.is_some()
     }
 
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
@@ -2006,14 +2016,8 @@ pub(crate) fn check_ast(
     );
     checker.bind_builtins();
 
-    // Check for module docstring.
-    let python_ast = if checker.visit_module(python_ast) {
-        &python_ast[1..]
-    } else {
-        python_ast
-    };
-
     // Iterate over the AST.
+    checker.visit_module(python_ast);
     checker.visit_body(python_ast);
 
     // Visit any deferred syntax nodes. Take care to visit in order, such that we avoid adding
