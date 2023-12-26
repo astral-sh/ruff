@@ -1511,7 +1511,7 @@ pub fn pep_604_union(elts: &[Expr]) -> Expr {
 pub fn typing_optional(elt: Expr, binding: String) -> Expr {
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding.into(),
+            id: binding,
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })),
@@ -1543,7 +1543,7 @@ pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
 
     Expr::Subscript(ast::ExprSubscript {
         value: Box::new(Expr::Name(ast::ExprName {
-            id: binding.clone().into(),
+            id: binding.clone(),
             range: TextRange::default(),
             ctx: ExprContext::Load,
         })),
