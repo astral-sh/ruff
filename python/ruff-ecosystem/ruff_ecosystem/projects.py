@@ -47,7 +47,18 @@ class RuffCommand(Enum):
 @dataclass(frozen=True)
 class CommandOptions(Serializable, abc.ABC):
     preview: bool = False
+
     toml_overrides: tuple[tuple[str, Any]] | None = None
+    """
+    A collection of key, value pairs to override in the Ruff configuration file.
+    
+    The key describes a member to override in the toml file; '.' may be used to indicate a 
+    nested value e.g. `format.quote-style`. Keys can be prefixed with `preview::` or 
+    `no-preview::` to limit updates to when ecosystem checks are being run with or without
+    preview enabled.
+
+    If a Ruff configuration file does not exist and overrides are provided, it will be createad.
+    """
 
     def with_options(self: Self, **kwargs) -> Self:
         """
@@ -63,6 +74,8 @@ class CommandOptions(Serializable, abc.ABC):
     def update_toml(self, dirpath: Path) -> None:
         ruff_toml = dirpath / "ruff.toml"
         pyproject_toml = dirpath / "pyproject.toml"
+
+        # Prefer `ruff.toml` over `pyproject.toml`
         if ruff_toml.exists():
             path = ruff_toml
             base = []
@@ -70,25 +83,30 @@ class CommandOptions(Serializable, abc.ABC):
             path = pyproject_toml
             base = ["tool", "ruff"]
 
-        if self.toml_overrides and path.exists():
-            contents = path.read_text()
-            toml = tomli.loads(contents)
+        if self.toml_overrides:
+            # Read the existing content if the file is present
+            if path.exists():
+                contents = path.read_text()
+                toml = tomli.loads(contents)
+            else:
+                contents = None
+                toml = {}
 
             # Update the TOML, using `.` to descend into nested keys
             for key, value in self.toml_overrides:
                 # Allow "preview" only overrides
-                if key.startswith("preview."):
+                if key.startswith("preview::"):
                     if not self.preview:
                         continue
                     else:
-                        key = key[len("preview.") :]
+                        key = key[len("preview::") :]
 
                 # Allow "no-preview" only overrides
-                if key.startswith("no-preview."):
+                if key.startswith("no-preview::"):
                     if self.preview:
                         continue
                     else:
-                        key = key[len("no-preview.") :]
+                        key = key[len("no-preview::") :]
 
                 target = toml
                 names = base + key.split(".")
@@ -100,8 +118,11 @@ class CommandOptions(Serializable, abc.ABC):
 
             yield
 
-            # Restore the contents
-            path.write_text(contents)
+            # Restore the contents or delete the file
+            if contents is None:
+                path.unlink()
+            else:
+                path.write_text(contents)
 
         else:
             # Do nothing...

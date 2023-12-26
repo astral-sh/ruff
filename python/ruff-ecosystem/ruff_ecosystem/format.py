@@ -164,23 +164,24 @@ async def format_then_format(
     options: FormatOptions,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
-    # Run format to get the baseline
-    await format(
-        formatter=baseline_formatter,
-        executable=ruff_baseline_executable.resolve(),
-        path=cloned_repo.path,
-        name=cloned_repo.fullname,
-        options=options,
-    )
-    # Then get the diff from stdout
-    diff = await format(
-        formatter=Formatter.ruff,
-        executable=ruff_comparison_executable.resolve(),
-        path=cloned_repo.path,
-        name=cloned_repo.fullname,
-        options=options,
-        diff=True,
-    )
+    with options.update_toml(cloned_repo.path):
+        # Run format to get the baseline
+        await format(
+            formatter=baseline_formatter,
+            executable=ruff_baseline_executable.resolve(),
+            path=cloned_repo.path,
+            name=cloned_repo.fullname,
+            options=options,
+        )
+        # Then get the diff from stdout
+        diff = await format(
+            formatter=Formatter.ruff,
+            executable=ruff_comparison_executable.resolve(),
+            path=cloned_repo.path,
+            name=cloned_repo.fullname,
+            options=options,
+            diff=True,
+        )
     return diff
 
 
@@ -191,30 +192,36 @@ async def format_and_format(
     options: FormatOptions,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
-    # Run format without diff to get the baseline
-    await format(
-        formatter=baseline_formatter,
-        executable=ruff_baseline_executable.resolve(),
-        path=cloned_repo.path,
-        name=cloned_repo.fullname,
-        options=options,
-    )
+    with options.update_toml(cloned_repo.path):
+        # Run format without diff to get the baseline
+        await format(
+            formatter=baseline_formatter,
+            executable=ruff_baseline_executable.resolve(),
+            path=cloned_repo.path,
+            name=cloned_repo.fullname,
+            options=options,
+        )
+
     # Commit the changes
     commit = await cloned_repo.commit(
         message=f"Formatted with baseline {ruff_baseline_executable}"
     )
     # Then reset
     await cloned_repo.reset()
-    # Then run format again
-    await format(
-        formatter=Formatter.ruff,
-        executable=ruff_comparison_executable.resolve(),
-        path=cloned_repo.path,
-        name=cloned_repo.fullname,
-        options=options,
-    )
+
+    with options.update_toml(cloned_repo.path):
+        # Then run format again
+        await format(
+            formatter=Formatter.ruff,
+            executable=ruff_comparison_executable.resolve(),
+            path=cloned_repo.path,
+            name=cloned_repo.fullname,
+            options=options,
+        )
+
     # Then get the diff from the commit
     diff = await cloned_repo.diff(commit)
+
     return diff
 
 

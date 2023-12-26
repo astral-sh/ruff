@@ -47,8 +47,13 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="pypa", name="pip", ref="main")),
     Project(
         repo=Repository(owner="pypa", name="setuptools", ref="main"),
+        # Since `setuptools` opts into the "preserve" quote style which
+        # require preview mode, we must disable it during the `--no-preview` run
         check_options=CheckOptions(
-            toml_overrides=(("no-preview.format.quote-style", "double"),)
+            toml_overrides=(("no-preview::format.quote-style", "double"),)
+        ),
+        format_options=FormatOptions(
+            toml_overrides=(("no-preview::format.quote-style", "double"),)
         ),
     ),
     Project(repo=Repository(owner="python", name="mypy", ref="master")),
