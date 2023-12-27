@@ -136,7 +136,7 @@ impl AutoPythonType {
                     )
                     .ok()?;
                 let expr = Expr::Name(ast::ExprName {
-                    id: binding.into(),
+                    id: binding,
                     range: TextRange::default(),
                     ctx: ExprContext::Load,
                 });

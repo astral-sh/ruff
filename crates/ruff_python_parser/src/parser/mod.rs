@@ -511,14 +511,10 @@ where
     }
 
     fn is_current_token_postfix(&mut self) -> bool {
-        match self.current_kind() {
-            TokenKind::Lpar
-            | TokenKind::Lsqb
-            | TokenKind::Dot
-            | TokenKind::Async
-            | TokenKind::For => true,
-            _ => false,
-        }
+        matches!(
+            self.current_kind(),
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Dot | TokenKind::Async | TokenKind::For
+        )
     }
 
     fn handle_unexpected_indentation(
@@ -567,8 +563,7 @@ where
             |parser| {
                 let (expr, expr_range) = parser.parse_expr2();
                 if parser.at(TokenKind::Comma) {
-                    return parser
-                        .parse_tuple_expr(expr, expr_range, |parser| parser.parse_expr2());
+                    return parser.parse_tuple_expr(expr, expr_range, Parser::parse_expr2);
                 }
                 (expr, expr_range)
             },
@@ -1272,7 +1267,7 @@ where
         self.eat(TokenKind::While);
 
         let (test, _) = self.parse_expr_with_recovery(
-            |parser| parser.parse_expr2(),
+            Parser::parse_expr2,
             [TokenKind::Colon].as_slice(),
             "expecting expression after `while` keyword",
         );
@@ -1311,7 +1306,7 @@ where
 
         self.set_ctx(ParserCtxFlags::FOR_TARGET);
         let (mut target, _) = self.parse_expr_with_recovery(
-            |parser| parser.parse_exprs(),
+            Parser::parse_exprs,
             [TokenKind::In, TokenKind::Colon].as_slice(),
             "expecting expression after `for` keyword",
         );
@@ -1322,7 +1317,7 @@ where
         self.expect_and_recover(TokenKind::In, TokenSet::new(&[TokenKind::Colon]));
 
         let (iter, _) = self.parse_expr_with_recovery(
-            |parser| parser.parse_exprs(),
+            Parser::parse_exprs,
             EXPR_SET.union([TokenKind::Colon, TokenKind::Indent].as_slice().into()),
             "expecting an expression after `in` keyword",
         );
@@ -2508,7 +2503,7 @@ where
         assert!(self.eat(TokenKind::If));
 
         let (test, _) = self.parse_expr_with_recovery(
-            |parser| parser.parse_expr2(),
+            Parser::parse_expr2,
             [TokenKind::Colon].as_slice(),
             "expecting expression after `if` keyword",
         );
@@ -2546,7 +2541,7 @@ where
             self.eat(TokenKind::Elif);
 
             let (test, _) = self.parse_expr_with_recovery(
-                |parser| parser.parse_expr2(),
+                Parser::parse_expr2,
                 [TokenKind::Colon].as_slice(),
                 "expecting expression after `elif` keyword",
             );
@@ -2645,7 +2640,7 @@ where
         let (expr, expr_range) = self.parse_expr();
 
         if self.at(TokenKind::Comma) {
-            return self.parse_tuple_expr(expr, expr_range, |parser| parser.parse_expr());
+            return self.parse_tuple_expr(expr, expr_range, Parser::parse_expr);
         }
         (expr, expr_range)
     }
@@ -2840,7 +2835,7 @@ where
             ast::Identifier { id: name, range }
         } else {
             ast::Identifier {
-                id: "".into(),
+                id: String::new(),
                 range,
             }
         }
@@ -3007,7 +3002,7 @@ where
                                 expr_range,
                             );
                             ast::Identifier {
-                                id: "".into(),
+                                id: String::new(),
                                 range: expr_range,
                             }
                         };
@@ -3531,7 +3526,7 @@ where
 
         let has_open_brace = self.eat(TokenKind::Lbrace);
         let (value, value_range) = self.parse_expr_with_recovery(
-            |parser| parser.parse_exprs(),
+            Parser::parse_exprs,
             [
                 TokenKind::Exclamation,
                 TokenKind::Colon,
@@ -3784,7 +3779,7 @@ where
 
         match self.current_kind() {
             TokenKind::Comma => {
-                (expr, _) = self.parse_tuple_expr(expr, expr_range, |parser| parser.parse_expr2());
+                (expr, _) = self.parse_tuple_expr(expr, expr_range, Parser::parse_expr2);
             }
             TokenKind::Async | TokenKind::For => {
                 (expr, _) = self.parse_generator_expr(expr, expr_range);
@@ -3956,7 +3951,7 @@ where
 
         self.set_ctx(ParserCtxFlags::FOR_TARGET);
         let (mut target, _) = self.parse_expr_with_recovery(
-            |parser| parser.parse_exprs(),
+            Parser::parse_exprs,
             [TokenKind::In, TokenKind::Colon].as_slice(),
             "expecting expression after `for` keyword",
         );
@@ -3967,7 +3962,7 @@ where
         self.expect_and_recover(TokenKind::In, TokenSet::new(&[TokenKind::Rsqb]));
 
         let (iter, iter_expr) = self.parse_expr_with_recovery(
-            |parser| parser.parse_expr_simple(),
+            Parser::parse_expr_simple,
             EXPR_SET.union(
                 [
                     TokenKind::Rpar,

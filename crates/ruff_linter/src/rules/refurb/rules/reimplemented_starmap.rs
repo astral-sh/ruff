@@ -297,7 +297,7 @@ fn try_construct_call(
 /// Construct the call to `itertools.starmap` for suggestion.
 fn construct_starmap_call(starmap_binding: String, iter: &Expr, func: &Expr) -> ast::ExprCall {
     let starmap = ast::ExprName {
-        id: starmap_binding.into(),
+        id: starmap_binding,
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
