@@ -1052,6 +1052,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (WemakePythonStyleguide, "214") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyMethods),
         (WemakePythonStyleguide, "215") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyBaseClasses),
         // (WemakePythonStyleguide, "216") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyDecorators),
+        (WemakePythonStyleguide, "217") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyAwaits),
         (WemakePythonStyleguide, "218") => (RuleGroup::Unspecified, rules::wemake_python_styleguide::TooManyAsserts),
         _ => return None,
     })

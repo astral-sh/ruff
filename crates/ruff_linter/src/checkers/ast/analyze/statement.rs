@@ -362,6 +362,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::SslWithBadDefaults) {
                 flake8_bandit::rules::ssl_with_bad_defaults(checker, function_def);
             }
+            if checker.enabled(Rule::TooManyAwaits) {
+                if let Some(diagnostic) = wemake_python_styleguide::too_many_awaits(function_def) {
+                    checker.diagnostics.push(diagnostic)
+                }
+            }
             if checker.enabled(Rule::TooManyAsserts) {
                 if let Some(diagnostic) = wemake_python_styleguide::too_many_asserts(function_def) {
                     checker.diagnostics.push(diagnostic)
