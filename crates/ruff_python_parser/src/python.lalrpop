@@ -339,7 +339,7 @@ IpyEscapeCommandStatement: ast::Stmt = {
         } else {
             Err(LexicalError {
                 error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
-                location,
+                location: (location..end_location).into(),
             })?
         }
     }
@@ -352,7 +352,7 @@ IpyEscapeCommandExpr: crate::parser::ParenthesizedExpr = {
             if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
                 return Err(LexicalError {
                     error: LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string()),
-                    location,
+                    location: (location..end_location).into(),
                 })?;
             }
             Ok(ast::ExprIpyEscapeCommand {
@@ -363,7 +363,7 @@ IpyEscapeCommandExpr: crate::parser::ParenthesizedExpr = {
         } else {
             Err(LexicalError {
                 error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
-                location,
+                location: (location..end_location).into(),
             })?
         }
     }
@@ -383,7 +383,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                     let ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: ast::Number::Int(integer), .. }) = slice.as_ref() else {
                         return Err(LexicalError {
                             error: LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string()),
-                            location: range.start(),
+                            location: *range,
                         });
                     };
                     unparse_expr(value, buffer)?;
@@ -399,7 +399,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                 _ => {
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
-                        location: expr.start(),
+                        location: expr.range(),
                     });
                 }
             }
@@ -410,7 +410,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
             return Err(ParseError::User {
                 error: LexicalError {
                     error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
-                    location,
+                    location: (location..end_location).into(),
                 },
             });
         }
@@ -422,7 +422,7 @@ IpyHelpEndEscapeCommandStatement: ast::Stmt = {
                 return Err(ParseError::User {
                     error: LexicalError {
                         error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
-                        location,
+                        location: (location..end_location).into(),
                     },
                 });
             }
@@ -563,7 +563,7 @@ AsPattern: ast::Pattern = {
         if name.as_str() == "_" {
             Err(LexicalError {
                 error: LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
-                location,
+                location: (location..end_location).into(),
             })?
         } else {
             Ok(ast::Pattern::MatchAs(
@@ -1249,7 +1249,7 @@ ParameterListStarArgs<ParameterType, StarParameterType, DoubleStarParameterType>
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
             return Err(LexicalError {
                 error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
-                location,
+                location: (location..location).into(),
             })?;
         }
 
@@ -1366,7 +1366,7 @@ LambdaDef: crate::parser::ParenthesizedExpr = {
         if fstring_middle.is_some() {
             return Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
-                location,
+                location: (location..end_location).into(),
             })?;
         }
         parameters.as_ref().map(validate_arguments).transpose()?;
@@ -1632,7 +1632,7 @@ FStringReplacementField: ast::FStringElement = {
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
             return Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
-                location: value.start(),
+                location: value.range(),
             })?;
         }
         let debug_text = debug.map(|_| {
@@ -1683,7 +1683,7 @@ FStringConversion: (TextSize, ast::ConversionFlag) = {
             "a" => ast::ConversionFlag::Ascii,
             _ => Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
-                location: name_location,
+                location: (location..name_location).into(),
             })?
         };
         Ok((location, conversion))
@@ -1724,7 +1724,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
             if mid.expr.is_starred_expr() {
                 return Err(LexicalError{
                     error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
-                    location: mid.start(),
+                    location: mid.range(),
                 })?;
             }
             Ok(crate::parser::ParenthesizedExpr {
@@ -1753,7 +1753,7 @@ Atom<Goal>: crate::parser::ParenthesizedExpr = {
     "(" <location:@L> "**" <e:Expression<"all">> ")" <end_location:@R> =>? {
         Err(LexicalError{
             error : LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
-            location,
+            location: (location..end_location).into(),
         }.into())
     },
     <location:@L> "{" <e:DictLiteralValues?> "}" <end_location:@R> => {

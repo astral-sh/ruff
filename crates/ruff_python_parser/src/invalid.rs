@@ -5,7 +5,9 @@ These routines are named in a way that supports qualified use. For example,
 `invalid::assignment_targets`.
 */
 
-use {ruff_python_ast::Expr, ruff_text_size::TextSize};
+use ruff_python_ast::Expr;
+
+use ruff_text_size::TextRange;
 
 use crate::lexer::{LexicalError, LexicalErrorType};
 
@@ -37,42 +39,43 @@ pub(crate) fn assignment_target(target: &Expr) -> Result<(), LexicalError> {
     #[allow(clippy::enum_glob_use)]
     use self::Expr::*;
 
-    let err = |location: TextSize| -> LexicalError {
+    let err = |location: TextRange| -> LexicalError {
         let error = LexicalErrorType::AssignmentError;
         LexicalError { error, location }
     };
     match *target {
-        BoolOp(ref e) => Err(err(e.range.start())),
-        NamedExpr(ref e) => Err(err(e.range.start())),
-        BinOp(ref e) => Err(err(e.range.start())),
-        UnaryOp(ref e) => Err(err(e.range.start())),
-        Lambda(ref e) => Err(err(e.range.start())),
-        IfExp(ref e) => Err(err(e.range.start())),
-        Dict(ref e) => Err(err(e.range.start())),
-        Set(ref e) => Err(err(e.range.start())),
-        ListComp(ref e) => Err(err(e.range.start())),
-        SetComp(ref e) => Err(err(e.range.start())),
-        DictComp(ref e) => Err(err(e.range.start())),
-        GeneratorExp(ref e) => Err(err(e.range.start())),
-        Await(ref e) => Err(err(e.range.start())),
-        Yield(ref e) => Err(err(e.range.start())),
-        YieldFrom(ref e) => Err(err(e.range.start())),
-        Compare(ref e) => Err(err(e.range.start())),
-        Call(ref e) => Err(err(e.range.start())),
+        BoolOp(ref e) => Err(err(e.range)),
+        NamedExpr(ref e) => Err(err(e.range)),
+        BinOp(ref e) => Err(err(e.range)),
+        UnaryOp(ref e) => Err(err(e.range)),
+        Lambda(ref e) => Err(err(e.range)),
+        IfExp(ref e) => Err(err(e.range)),
+        Dict(ref e) => Err(err(e.range)),
+        Set(ref e) => Err(err(e.range)),
+        ListComp(ref e) => Err(err(e.range)),
+        SetComp(ref e) => Err(err(e.range)),
+        DictComp(ref e) => Err(err(e.range)),
+        GeneratorExp(ref e) => Err(err(e.range)),
+        Await(ref e) => Err(err(e.range)),
+        Yield(ref e) => Err(err(e.range)),
+        YieldFrom(ref e) => Err(err(e.range)),
+        Compare(ref e) => Err(err(e.range)),
+        Call(ref e) => Err(err(e.range)),
         // FString is recursive, but all its forms are invalid as an
         // assignment target, so we can reject it without exploring it.
-        FString(ref e) => Err(err(e.range.start())),
-        StringLiteral(ref e) => Err(err(e.range.start())),
-        BytesLiteral(ref e) => Err(err(e.range.start())),
-        NumberLiteral(ref e) => Err(err(e.range.start())),
-        BooleanLiteral(ref e) => Err(err(e.range.start())),
-        NoneLiteral(ref e) => Err(err(e.range.start())),
-        EllipsisLiteral(ref e) => Err(err(e.range.start())),
+        FString(ref e) => Err(err(e.range)),
+        StringLiteral(ref e) => Err(err(e.range)),
+        BytesLiteral(ref e) => Err(err(e.range)),
+        NumberLiteral(ref e) => Err(err(e.range)),
+        BooleanLiteral(ref e) => Err(err(e.range)),
+        NoneLiteral(ref e) => Err(err(e.range)),
+        EllipsisLiteral(ref e) => Err(err(e.range)),
+        Invalid(ref e) => Err(err(e.range)),
         // This isn't in the Python grammar but is Jupyter notebook specific.
         // It seems like this should be an error. It does also seem like the
         // parser prevents this from ever appearing as an assignment target
         // anyway. ---AG
-        IpyEscapeCommand(ref e) => Err(err(e.range.start())),
+        IpyEscapeCommand(ref e) => Err(err(e.range)),
         // The only nested expressions allowed as an assignment target
         // are star exprs, lists and tuples.
         Starred(ref e) => assignment_target(&e.value),

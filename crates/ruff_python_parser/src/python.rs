@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 031689e389556292d9dbd8a1b1ff8ca29bac76d83f1b345630481d620b89e1c2
+// sha3: 52e64382de1e21f3c91daed0357aca8393fb6527eed65a03431979f289401bc0
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -33655,7 +33655,7 @@ fn __action74<
         } else {
             Err(LexicalError {
                 error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
-                location,
+                location: (location..end_location).into(),
             })?
         }
     }
@@ -33678,7 +33678,7 @@ fn __action75<
             if !matches!(c.0, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
                 return Err(LexicalError {
                     error: LexicalErrorType::OtherError("IPython escape command expr is only allowed for % and !".to_string()),
-                    location,
+                    location: (location..end_location).into(),
                 })?;
             }
             Ok(ast::ExprIpyEscapeCommand {
@@ -33689,7 +33689,7 @@ fn __action75<
         } else {
             Err(LexicalError {
                 error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
-                location,
+                location: (location..end_location).into(),
             })?
         }
     }
@@ -33717,7 +33717,7 @@ fn __action76<
                     let ast::Expr::NumberLiteral(ast::ExprNumberLiteral { value: ast::Number::Int(integer), .. }) = slice.as_ref() else {
                         return Err(LexicalError {
                             error: LexicalErrorType::OtherError("only integer literals are allowed in Subscript expressions in help end escape command".to_string()),
-                            location: range.start(),
+                            location: *range,
                         });
                     };
                     unparse_expr(value, buffer)?;
@@ -33733,7 +33733,7 @@ fn __action76<
                 _ => {
                     return Err(LexicalError {
                         error: LexicalErrorType::OtherError("only Name, Subscript and Attribute expressions are allowed in help end escape command".to_string()),
-                        location: expr.start(),
+                        location: expr.range(),
                     });
                 }
             }
@@ -33744,7 +33744,7 @@ fn __action76<
             return Err(ParseError::User {
                 error: LexicalError {
                     error: LexicalErrorType::OtherError("IPython escape commands are only allowed in `Mode::Ipython`".to_string()),
-                    location,
+                    location: (location..end_location).into(),
                 },
             });
         }
@@ -33756,7 +33756,7 @@ fn __action76<
                 return Err(ParseError::User {
                     error: LexicalError {
                         error: LexicalErrorType::OtherError("maximum of 2 `?` tokens are allowed in help end escape command".to_string()),
-                        location,
+                        location: (location..end_location).into(),
                     },
                 });
             }
@@ -34128,7 +34128,7 @@ fn __action95<
         if name.as_str() == "_" {
             Err(LexicalError {
                 error: LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
-                location,
+                location: (location..end_location).into(),
             })?
         } else {
             Ok(ast::Pattern::MatchAs(
@@ -35919,7 +35919,7 @@ fn __action184<
         if fstring_middle.is_some() {
             return Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
-                location,
+                location: (location..end_location).into(),
             })?;
         }
         parameters.as_ref().map(validate_arguments).transpose()?;
@@ -36443,7 +36443,7 @@ fn __action221<
         if value.expr.is_lambda_expr() && !value.is_parenthesized() {
             return Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::LambdaWithoutParentheses),
-                location: value.start(),
+                location: value.range(),
             })?;
         }
         let debug_text = debug.map(|_| {
@@ -36524,7 +36524,7 @@ fn __action224<
             "a" => ast::ConversionFlag::Ascii,
             _ => Err(LexicalError {
                 error: LexicalErrorType::FStringError(FStringErrorType::InvalidConversionFlag),
-                location: name_location,
+                location: (location..name_location).into(),
             })?
         };
         Ok((location, conversion))
@@ -39670,7 +39670,7 @@ fn __action445<
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
             return Err(LexicalError {
                 error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
-                location,
+                location: (location..location).into(),
             })?;
         }
 
@@ -39795,7 +39795,7 @@ fn __action453<
         if va.is_none() && kwonlyargs.is_empty() && kwarg.is_none() {
             return Err(LexicalError {
                 error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
-                location,
+                location: (location..location).into(),
             })?;
         }
 
@@ -41298,7 +41298,7 @@ fn __action554<
             if mid.expr.is_starred_expr() {
                 return Err(LexicalError{
                     error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
-                    location: mid.start(),
+                    location: mid.range(),
                 })?;
             }
             Ok(crate::parser::ParenthesizedExpr {
@@ -41388,7 +41388,7 @@ fn __action558<
     {
         Err(LexicalError{
             error : LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
-            location,
+            location: (location..end_location).into(),
         }.into())
     }
 }
@@ -41996,7 +41996,7 @@ fn __action596<
             if mid.expr.is_starred_expr() {
                 return Err(LexicalError{
                     error: LexicalErrorType::OtherError("cannot use starred expression here".to_string()),
-                    location: mid.start(),
+                    location: mid.range(),
                 })?;
             }
             Ok(crate::parser::ParenthesizedExpr {
@@ -42086,7 +42086,7 @@ fn __action600<
     {
         Err(LexicalError{
             error : LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
-            location,
+            location: (location..end_location).into(),
         }.into())
     }
 }

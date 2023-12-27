@@ -41,7 +41,7 @@ pub(crate) fn validate_arguments(arguments: &ast::Parameters) -> Result<(), Lexi
         if !all_arg_names.insert(arg_name) {
             return Err(LexicalError {
                 error: LexicalErrorType::DuplicateArgumentError(arg_name.to_string()),
-                location: range.start(),
+                location: range,
             });
         }
     }
@@ -66,7 +66,7 @@ pub(crate) fn validate_pos_params(
     if let Some(invalid) = first_invalid {
         return Err(LexicalError {
             error: LexicalErrorType::DefaultArgumentError,
-            location: invalid.parameter.start(),
+            location: invalid.parameter.range(),
         });
     }
     Ok(())
@@ -98,7 +98,7 @@ pub(crate) fn parse_arguments(
                         error: LexicalErrorType::DuplicateKeywordArgumentError(
                             keyword_name.to_string(),
                         ),
-                        location: start,
+                        location: TextRange::new(start, end),
                     });
                 }
             } else {
@@ -115,14 +115,14 @@ pub(crate) fn parse_arguments(
             if !keywords.is_empty() && !is_starred(&value) {
                 return Err(LexicalError {
                     error: LexicalErrorType::PositionalArgumentError,
-                    location: value.start(),
+                    location: value.range(),
                 });
                 // Allow starred arguments after keyword arguments but
                 // not after double-starred arguments.
             } else if double_starred {
                 return Err(LexicalError {
                     error: LexicalErrorType::UnpackedArgumentError,
-                    location: value.start(),
+                    location: value.range(),
                 });
             }
 
