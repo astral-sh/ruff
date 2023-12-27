@@ -12,7 +12,7 @@ use rustc_hash::FxHashMap;
 
 use crate::cache::{Cache, FileCacheKey, LintCacheData};
 use ruff_diagnostics::Diagnostic;
-use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
+use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
 use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
@@ -303,12 +303,28 @@ pub(crate) fn lint_path(
             (result, fixed)
         } else {
             // If we fail to fix, lint the original source code.
-            let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
+            let result = lint_only(
+                path,
+                package,
+                settings,
+                noqa,
+                &source_kind,
+                source_type,
+                ParseSource::None,
+            );
             let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
-        let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
+        let result = lint_only(
+            path,
+            package,
+            settings,
+            noqa,
+            &source_kind,
+            source_type,
+            ParseSource::None,
+        );
         let fixed = FxHashMap::default();
         (result, fixed)
     };
@@ -444,6 +460,7 @@ pub(crate) fn lint_stdin(
                 noqa,
                 &source_kind,
                 source_type,
+                ParseSource::None,
             );
             let fixed = FxHashMap::default();
 
@@ -462,6 +479,7 @@ pub(crate) fn lint_stdin(
             noqa,
             &source_kind,
             source_type,
+            ParseSource::None,
         );
         let fixed = FxHashMap::default();
         (result, fixed)

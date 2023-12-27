@@ -123,9 +123,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.75"
+version = "1.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
+checksum = "59d2a3357dde987206219e78ecfbbb6e8dad06cbb65292758d3270e6254f7355"
 
 [[package]]
 name = "argfile"
@@ -434,11 +434,10 @@ checksum = "acbf1af155f9b9ef647e42cdc158db4b64a1b61f743629225fde6f3e0be2a7c7"
 
 [[package]]
 name = "colored"
-version = "2.0.4"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2674ec482fbc38012cf31e6c42ba0177b431a0cb6f15fe40efa5aab1bda516f6"
+checksum = "cbf2150cce219b664a8a70df7a1f933836724b503f8a413af9365b4dcc4d90b8"
 dependencies = [
- "is-terminal",
  "lazy_static",
  "windows-sys 0.48.0",
 ]
@@ -736,9 +735,9 @@ checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
 name = "env_logger"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
+checksum = "95b3f3e67048839cb0d0781f445682a35113da7121f7c949db0e2be96a4fbece"
 dependencies = [
  "humantime",
  "is-terminal",
@@ -818,7 +817,7 @@ dependencies = [
  "itertools 0.11.0",
  "log",
  "once_cell",
- "pep440_rs",
+ "pep440_rs 0.4.0",
  "pretty_assertions",
  "regex",
  "ruff_linter",
@@ -998,17 +997,16 @@ dependencies = [
 
 [[package]]
 name = "ignore"
-version = "0.4.20"
+version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbe7873dab538a9a44ad79ede1faf5f30d49f9a5c883ddbab48bce81b64b7492"
+checksum = "747ad1b4ae841a78e8aba0d63adbfbeaea26b517b63705d47856b73015d27060"
 dependencies = [
+ "crossbeam-deque",
  "globset",
- "lazy_static",
  "log",
  "memchr",
- "regex",
+ "regex-automata 0.4.3",
  "same-file",
- "thread_local",
  "walkdir",
  "winapi-util",
 ]
@@ -1606,13 +1604,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "pep440_rs"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0c29f9c43de378b4e4e0cd7dbcce0e5cfb80443de8c05620368b2948bc936a1"
+dependencies = [
+ "once_cell",
+ "regex",
+ "serde",
+ "unicode-width",
+]
+
+[[package]]
 name = "pep508_rs"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0713d7bb861ca2b7d4c50a38e1f31a4b63a2e2df35ef1e5855cc29e108453e2"
 dependencies = [
  "once_cell",
- "pep440_rs",
+ "pep440_rs 0.3.12",
  "regex",
  "serde",
  "thiserror",
@@ -1808,7 +1818,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46d4a5e69187f23a29f8aa0ea57491d104ba541bc55f76552c2a74962aa20e04"
 dependencies = [
  "indexmap",
- "pep440_rs",
+ "pep440_rs 0.3.12",
  "pep508_rs",
  "serde",
  "toml",
@@ -2222,7 +2232,7 @@ dependencies = [
  "once_cell",
  "path-absolutize",
  "pathdiff",
- "pep440_rs",
+ "pep440_rs 0.4.0",
  "pretty_assertions",
  "pyproject-toml",
  "quick-junit",
@@ -2528,7 +2538,7 @@ dependencies = [
  "log",
  "once_cell",
  "path-absolutize",
- "pep440_rs",
+ "pep440_rs 0.4.0",
  "regex",
  "ruff_cache",
  "ruff_formatter",
