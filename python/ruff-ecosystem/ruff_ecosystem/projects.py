@@ -30,48 +30,43 @@ class Project(Serializable):
     repo: Repository
     check_options: CheckOptions = field(default_factory=lambda: CheckOptions())
     format_options: FormatOptions = field(default_factory=lambda: FormatOptions())
+    config_overrides: ConfigOverrides = field(default_factory=lambda: ConfigOverrides())
 
     def with_preview_enabled(self: Self) -> Self:
         return type(self)(
             repo=self.repo,
             check_options=self.check_options.with_options(preview=True),
             format_options=self.format_options.with_options(preview=True),
+            config_overrides=self.config_overrides,
         )
 
 
-class RuffCommand(Enum):
-    check = "check"
-    format = "format"
-
-
 @dataclass(frozen=True)
-class CommandOptions(Serializable, abc.ABC):
-    preview: bool = False
-
-    toml_overrides: tuple[tuple[str, Any]] | None = None
+class ConfigOverrides(Serializable):
     """
     A collection of key, value pairs to override in the Ruff configuration file.
-    
-    The key describes a member to override in the toml file; '.' may be used to indicate a 
-    nested value e.g. `format.quote-style`. Keys can be prefixed with `preview::` or 
-    `no-preview::` to limit updates to when ecosystem checks are being run with or without
-    preview enabled.
+
+    The key describes a member to override in the toml file; '.' may be used to indicate a
+    nested value e.g. `format.quote-style`.
 
     If a Ruff configuration file does not exist and overrides are provided, it will be createad.
     """
 
-    def with_options(self: Self, **kwargs) -> Self:
-        """
-        Return a copy of self with the given options set.
-        """
-        return type(self)(**{**dataclasses.asdict(self), **kwargs})
+    preview: dict[str, Any] = field(default_factory=dict)
+    no_preview: dict[str, Any] = field(default_factory=dict)
 
-    @abc.abstractmethod
-    def to_ruff_args(self) -> list[str]:
-        pass
+    def __hash__(self) -> int:
+        return hash(tuple(self.preview.items()) + tuple(self.no_preview.items()))
 
     @contextlib.contextmanager
-    def update_toml(self, dirpath: Path) -> None:
+    def patch_config(
+        self,
+        dirpath: Path,
+        preview: bool,
+    ) -> None:
+        """
+        Temporarily patch the Ruff configuration file in the given directory.
+        """
         ruff_toml = dirpath / "ruff.toml"
         pyproject_toml = dirpath / "pyproject.toml"
 
@@ -83,7 +78,9 @@ class CommandOptions(Serializable, abc.ABC):
             path = pyproject_toml
             base = ["tool", "ruff"]
 
-        if self.toml_overrides:
+        overrides = self.preview if preview else self.no_preview
+
+        if overrides:
             # Read the existing content if the file is present
             if path.exists():
                 contents = path.read_text()
@@ -93,20 +90,8 @@ class CommandOptions(Serializable, abc.ABC):
                 toml = {}
 
             # Update the TOML, using `.` to descend into nested keys
-            for key, value in self.toml_overrides:
-                # Allow "preview" only overrides
-                if key.startswith("preview::"):
-                    if not self.preview:
-                        continue
-                    else:
-                        key = key[len("preview::") :]
-
-                # Allow "no-preview" only overrides
-                if key.startswith("no-preview::"):
-                    if self.preview:
-                        continue
-                    else:
-                        key = key[len("no-preview::") :]
+            for key, value in overrides.items():
+                logger.debug(f"Setting {key}={value!r} in {path}")
 
                 target = toml
                 names = base + key.split(".")
@@ -127,6 +112,26 @@ class CommandOptions(Serializable, abc.ABC):
         else:
             # Do nothing...
             yield
+
+
+class RuffCommand(Enum):
+    check = "check"
+    format = "format"
+
+
+@dataclass(frozen=True)
+class CommandOptions(Serializable, abc.ABC):
+    preview: bool = False
+
+    def with_options(self: Self, **kwargs) -> Self:
+        """
+        Return a copy of self with the given options set.
+        """
+        return type(self)(**{**dataclasses.asdict(self), **kwargs})
+
+    @abc.abstractmethod
+    def to_ruff_args(self) -> list[str]:
+        pass
 
 
 @dataclass(frozen=True)
@@ -171,8 +176,6 @@ class FormatOptions(CommandOptions):
 
     preview: bool = False
     exclude: str = ""
-
-    toml_overrides: dict | None = None
 
     def to_ruff_args(self) -> list[str]:
         args = ["format", f"--{'' if self.preview else 'no-'}preview"]

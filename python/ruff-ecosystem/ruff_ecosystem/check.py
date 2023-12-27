@@ -28,7 +28,12 @@ from ruff_ecosystem.types import (
 )
 
 if TYPE_CHECKING:
-    from ruff_ecosystem.projects import CheckOptions, ClonedRepository, Project
+    from ruff_ecosystem.projects import (
+        CheckOptions,
+        ClonedRepository,
+        ConfigOverrides,
+        Project,
+    )
 
 
 # Matches lines that are summaries rather than diagnostics
@@ -477,9 +482,10 @@ async def compare_check(
     ruff_baseline_executable: Path,
     ruff_comparison_executable: Path,
     options: CheckOptions,
+    config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Comparison:
-    with options.update_toml(cloned_repo.path):
+    with config_overrides.patch_config(cloned_repo.path, options.preview):
         async with asyncio.TaskGroup() as tg:
             baseline_task = tg.create_task(
                 ruff_check(

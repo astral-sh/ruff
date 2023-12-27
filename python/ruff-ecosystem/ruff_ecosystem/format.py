@@ -18,7 +18,7 @@ from ruff_ecosystem.markdown import markdown_project_section
 from ruff_ecosystem.types import Comparison, Diff, Result, ToolError
 
 if TYPE_CHECKING:
-    from ruff_ecosystem.projects import ClonedRepository, FormatOptions
+    from ruff_ecosystem.projects import ClonedRepository, ConfigOverrides, FormatOptions
 
 
 def markdown_format_result(result: Result) -> str:
@@ -137,10 +137,17 @@ async def compare_format(
     ruff_baseline_executable: Path,
     ruff_comparison_executable: Path,
     options: FormatOptions,
+    config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
     format_comparison: FormatComparison,
 ):
-    args = (ruff_baseline_executable, ruff_comparison_executable, options, cloned_repo)
+    args = (
+        ruff_baseline_executable,
+        ruff_comparison_executable,
+        options,
+        config_overrides,
+        cloned_repo,
+    )
     match format_comparison:
         case FormatComparison.ruff_then_ruff:
             coro = format_then_format(Formatter.ruff, *args)
@@ -162,9 +169,10 @@ async def format_then_format(
     ruff_baseline_executable: Path,
     ruff_comparison_executable: Path,
     options: FormatOptions,
+    config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
-    with options.update_toml(cloned_repo.path):
+    with config_overrides.patch_config(cloned_repo.path, options.preview):
         # Run format to get the baseline
         await format(
             formatter=baseline_formatter,
@@ -190,9 +198,10 @@ async def format_and_format(
     ruff_baseline_executable: Path,
     ruff_comparison_executable: Path,
     options: FormatOptions,
+    config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Sequence[str]:
-    with options.update_toml(cloned_repo.path):
+    with config_overrides.patch_config(cloned_repo.path, options.preview):
         # Run format without diff to get the baseline
         await format(
             formatter=baseline_formatter,
@@ -209,7 +218,7 @@ async def format_and_format(
     # Then reset
     await cloned_repo.reset()
 
-    with options.update_toml(cloned_repo.path):
+    with config_overrides.patch_config(cloned_repo.path, options.preview):
         # Then run format again
         await format(
             formatter=Formatter.ruff,

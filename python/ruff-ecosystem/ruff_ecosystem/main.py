@@ -113,11 +113,17 @@ async def clone_and_compare(
 
     match command:
         case RuffCommand.check:
-            compare, options, kwargs = (compare_check, target.check_options, {})
+            compare, options, overrides, kwargs = (
+                compare_check,
+                target.check_options,
+                target.config_overrides,
+                {},
+            )
         case RuffCommand.format:
-            compare, options, kwargs = (
+            compare, options, overrides, kwargs = (
                 compare_format,
                 target.format_options,
+                target.config_overrides,
                 {"format_comparison": format_comparison},
             )
         case _:
@@ -131,6 +137,7 @@ async def clone_and_compare(
             baseline_executable,
             comparison_executable,
             options,
+            overrides,
             cloned_repo,
             **kwargs,
         )
