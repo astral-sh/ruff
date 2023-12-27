@@ -9,6 +9,8 @@ use ruff_python_ast::{BoolOp, Int, IpyEscapeKind, Operator, UnaryOp};
 use ruff_text_size::TextSize;
 use std::fmt;
 
+use crate::Mode;
+
 /// The set of tokens the Python source code can be tokenized in.
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Tok {
@@ -218,6 +220,18 @@ pub enum Tok {
     Yield,
 
     Invalid,
+    // RustPython specific.
+    StartModule,
+    StartExpression,
+}
+
+impl Tok {
+    pub fn start_marker(mode: Mode) -> Self {
+        match mode {
+            Mode::Module | Mode::Ipython => Tok::StartModule,
+            Mode::Expression => Tok::StartExpression,
+        }
+    }
 }
 
 impl fmt::Display for Tok {
@@ -245,6 +259,8 @@ impl fmt::Display for Tok {
             NonLogicalNewline => f.write_str("NonLogicalNewline"),
             Indent => f.write_str("Indent"),
             Dedent => f.write_str("Dedent"),
+            StartModule => f.write_str("StartProgram"),
+            StartExpression => f.write_str("StartExpression"),
             EndOfFile => f.write_str("EOF"),
             Question => f.write_str("'?'"),
             Exclamation => f.write_str("'!'"),
@@ -612,6 +628,10 @@ pub enum TokenKind {
     Yield,
 
     Invalid,
+    // RustPython specific.
+    StartModule,
+    StartInteractive,
+    StartExpression,
 }
 
 impl TokenKind {
@@ -905,6 +925,8 @@ impl TokenKind {
             Tok::With => TokenKind::With,
             Tok::Yield => TokenKind::Yield,
             Tok::Invalid => TokenKind::Invalid,
+            Tok::StartModule => TokenKind::StartModule,
+            Tok::StartExpression => TokenKind::StartExpression,
         }
     }
 }

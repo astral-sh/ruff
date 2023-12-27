@@ -9,6 +9,7 @@ homepage = { workspace = true }
 documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
+build = "build.rs"
 
 [lib]
 
@@ -20,6 +21,7 @@ anyhow = { workspace = true }
 bitflags = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
+lalrpop-util = { version = "0.20.0", default-features = false }
 memchr = { workspace = true }
 unicode-ident = { workspace = true }
 unicode_names2 = { workspace = true }
@@ -28,6 +30,11 @@ static_assertions = "1.1.0"
 
 [dev-dependencies]
 insta = { workspace = true }
+
+[build-dependencies]
+anyhow = { workspace = true }
+lalrpop = { version = "0.20.0", default-features = false, optional = true }
+tiny-keccak = { version = "2", features = ["sha3"] }
 
 [lints]
 workspace = true

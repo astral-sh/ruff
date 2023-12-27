@@ -22,7 +22,11 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 mod functions;
 mod tests;
-pub use functions::*;
+pub(super) use functions::ParenthesizedExpr;
+pub use functions::{
+    parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
+    parse_starts_at, parse_suite, parse_tokens,
+};
 
 #[derive(Debug)]
 pub struct ParsedFile {
