@@ -55,7 +55,9 @@ DEFAULT_TARGETS = [
         repo=Repository(owner="pypa", name="setuptools", ref="main"),
         # Since `setuptools` opts into the "preserve" quote style which
         # require preview mode, we must disable it during the `--no-preview` run
-        config_overrides=ConfigOverrides(no_preview={"format.quote-style": "double"}),
+        config_overrides=ConfigOverrides(
+            when_no_preview={"format.quote-style": "double"}
+        ),
     ),
     Project(repo=Repository(owner="python", name="mypy", ref="master")),
     Project(

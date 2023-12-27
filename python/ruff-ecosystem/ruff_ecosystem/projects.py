@@ -10,6 +10,7 @@ import dataclasses
 from asyncio import create_subprocess_exec
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import cache
 from pathlib import Path
 from subprocess import DEVNULL, PIPE
 from typing import Any, Self
@@ -40,6 +41,14 @@ class Project(Serializable):
             config_overrides=self.config_overrides,
         )
 
+    def __post_init__(self):
+        # Convert bare dictionaries for `config_overrides` into the correct type
+        if isinstance(self.config_overrides, dict):
+            # Bypass the frozen attribute
+            object.__setattr__(
+                self, "config_overrides", ConfigOverrides(always=self.config_overrides)
+            )
+
 
 @dataclass(frozen=True)
 class ConfigOverrides(Serializable):
@@ -52,11 +61,24 @@ class ConfigOverrides(Serializable):
     If a Ruff configuration file does not exist and overrides are provided, it will be createad.
     """
 
-    preview: dict[str, Any] = field(default_factory=dict)
-    no_preview: dict[str, Any] = field(default_factory=dict)
+    always: dict[str, Any] = field(default_factory=dict)
+    when_preview: dict[str, Any] = field(default_factory=dict)
+    when_no_preview: dict[str, Any] = field(default_factory=dict)
 
     def __hash__(self) -> int:
-        return hash(tuple(self.preview.items()) + tuple(self.no_preview.items()))
+        # Avoid computing this hash repeatedly since this object is intended
+        # to be immutable and serializing to toml is not necessarily cheap
+        @cache
+        def as_string():
+            return tomli_w.dumps(
+                {
+                    "always": self.always,
+                    "when_preview": self.when_preview,
+                    "when_no_preview": self.when_no_preview,
+                }
+            )
+
+        return hash(as_string())
 
     @contextlib.contextmanager
     def patch_config(
@@ -78,40 +100,45 @@ class ConfigOverrides(Serializable):
             path = pyproject_toml
             base = ["tool", "ruff"]
 
-        overrides = self.preview if preview else self.no_preview
+        overrides = {
+            **self.always,
+            **(self.when_preview if preview else self.when_no_preview),
+        }
 
-        if overrides:
-            # Read the existing content if the file is present
-            if path.exists():
-                contents = path.read_text()
-                toml = tomli.loads(contents)
-            else:
-                contents = None
-                toml = {}
-
-            # Update the TOML, using `.` to descend into nested keys
-            for key, value in overrides.items():
-                logger.debug(f"Setting {key}={value!r} in {path}")
-
-                target = toml
-                names = base + key.split(".")
-                for name in names[:-1]:
-                    target = target[name]
-                target[names[-1]] = value
-
-            tomli_w.dump(toml, path.open("wb"))
-
+        if not overrides:
             yield
+            return
 
+        # Read the existing content if the file is present
+        if path.exists():
+            contents = path.read_text()
+            toml = tomli.loads(contents)
+        else:
+            contents = None
+            toml = {}
+
+        # Update the TOML, using `.` to descend into nested keys
+        for key, value in overrides.items():
+            logger.debug(f"Setting {key}={value!r} in {path}")
+
+            target = toml
+            names = base + key.split(".")
+            for name in names[:-1]:
+                if name not in target:
+                    target[name] = {}
+                target = target[name]
+            target[names[-1]] = value
+
+        tomli_w.dump(toml, path.open("wb"))
+
+        try:
+            yield
+        finally:
             # Restore the contents or delete the file
             if contents is None:
                 path.unlink()
             else:
                 path.write_text(contents)
-
-        else:
-            # Do nothing...
-            yield
 
 
 class RuffCommand(Enum):
