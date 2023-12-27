@@ -12,6 +12,8 @@
 //! [Abstract Syntax Tree]: https://en.wikipedia.org/wiki/Abstract_syntax_tree
 //! [`Mode`]: crate::mode
 
+use std::iter;
+
 use itertools::Itertools;
 pub(super) use lalrpop_util::ParseError as LalrpopError;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -22,7 +24,7 @@ use crate::{
     token::Tok,
     Mode,
 };
-use crate::{ParseError, ParseErrorType};
+use crate::{python, ParseError, ParseErrorType};
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprBooleanLiteral, ExprBytesLiteral,
     ExprCall, ExprCompare, ExprDict, ExprDictComp, ExprEllipsisLiteral, ExprFString,
@@ -241,15 +243,28 @@ pub fn parse_ok_tokens(
     mode: Mode,
     source_path: &str,
 ) -> Result<Mod, ParseError> {
-    let lxr = lxr
-        .into_iter()
-        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline))
-        .map(Ok::<(Tok, TextRange), LexicalError>);
-    let parsed_file = Parser::new(source, source_path, mode, lxr).parse();
-    if parsed_file.parse_errors.is_empty() {
-        Ok(parsed_file.ast)
+    if std::env::var("NEW_PARSER").is_ok() {
+        let lxr = lxr
+            .into_iter()
+            .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline))
+            .map(Ok::<(Tok, TextRange), LexicalError>);
+        let parsed_file = Parser::new(source, source_path, mode, lxr).parse();
+        if parsed_file.parse_errors.is_empty() {
+            Ok(parsed_file.ast)
+        } else {
+            Err(parsed_file.parse_errors.into_iter().next().unwrap())
+        }
     } else {
-        Err(parsed_file.parse_errors.into_iter().next().unwrap())
+        let lxr = lxr
+            .into_iter()
+            .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
+        let marker_token = (Tok::start_marker(mode), TextRange::default());
+        let lexer = iter::once(marker_token)
+            .chain(lxr)
+            .map(|(t, range)| (range.start(), t, range.end()));
+        python::TopParser::new()
+            .parse(source, mode, lexer)
+            .map_err(|e| parse_error_from_lalrpop(e, source_path))
     }
 }
 
@@ -259,11 +274,23 @@ fn parse_filtered_tokens(
     mode: Mode,
     source_path: &str,
 ) -> Result<Mod, ParseError> {
-    let parsed_file = Parser::new(source, source_path, mode, lxr.into_iter()).parse();
-    if parsed_file.parse_errors.is_empty() {
-        Ok(parsed_file.ast)
+    if std::env::var("NEW_PARSER").is_ok() {
+        let parsed_file = Parser::new(source, source_path, mode, lxr.into_iter()).parse();
+        if parsed_file.parse_errors.is_empty() {
+            Ok(parsed_file.ast)
+        } else {
+            Err(parsed_file.parse_errors.into_iter().next().unwrap())
+        }
     } else {
-        Err(parsed_file.parse_errors.into_iter().next().unwrap())
+        let marker_token = (Tok::start_marker(mode), TextRange::default());
+        let lexer = iter::once(Ok(marker_token)).chain(lxr);
+        python::TopParser::new()
+            .parse(
+                source,
+                mode,
+                lexer.map_ok(|(t, range)| (range.start(), t, range.end())),
+            )
+            .map_err(|e| parse_error_from_lalrpop(e, source_path))
     }
 }
 
