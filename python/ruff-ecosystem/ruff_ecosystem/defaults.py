@@ -9,6 +9,8 @@ from ruff_ecosystem.projects import (
     Repository,
 )
 
+JUPYTER_NOTEBOOK_SELECT = "A,E703,F704,B015,B018,D100"
+
 # TODO(zanieb): Consider exporting this as JSON and loading from there instead
 DEFAULT_TARGETS = [
     Project(repo=Repository(owner="DisnakeDev", name="disnake", ref="master")),
@@ -92,5 +94,16 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="zulip", name="zulip", ref="main"),
         check_options=CheckOptions(select="ALL"),
+    ),
+    # Jupyter Notebooks
+    Project(
+        repo=Repository(owner="huggingface", name="notebooks", ref="main"),
+        check_options=CheckOptions(select=JUPYTER_NOTEBOOK_SELECT),
+        config_overrides={"include": ["*.ipynb"]},
+    ),
+    Project(
+        repo=Repository(owner="openai", name="openai-cookbook", ref="main"),
+        check_options=CheckOptions(select=JUPYTER_NOTEBOOK_SELECT),
+        config_overrides={"include": ["*.ipynb"]},
     ),
 ]
