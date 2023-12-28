@@ -90,7 +90,7 @@ impl CommentRanges {
             let offset = comment_range.start();
             let line_start = locator.line_start(offset);
 
-            if CommentRanges::any_code_before_comment(locator, line_start) {
+            if Self::is_end_of_line(locator, line_start) {
                 if current_block.len() > 1 {
                     block_comments.push(current_block);
                     current_block = vec![];
@@ -129,7 +129,8 @@ impl CommentRanges {
         block_comments
     }
 
-    fn any_code_before_comment(locator: &Locator, offset_line_start: TextSize) -> bool {
+    /// Returns `true` if a comment is an end-of-line comment (as opposed to an own-line comment).
+    fn is_end_of_line(locator: &Locator, offset_line_start: TextSize) -> bool {
         let contents = locator.full_line(offset_line_start);
         for char in contents.chars() {
             if char == '#' || char == '\r' || char == '\n' {
@@ -138,7 +139,7 @@ impl CommentRanges {
                 return true;
             }
         }
-        unreachable!("The above loop should always return with a valid Locator");
+        false
     }
 }
 
