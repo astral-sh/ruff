@@ -38,8 +38,8 @@ use crate::importer::{ImportRequest, Importer};
 /// ## References
 #[violation]
 pub struct ReimplementedOperator {
-    target: &'static str,
     operator: &'static str,
+    target: FunctionLikeKind,
 }
 
 impl Violation for ReimplementedOperator {
@@ -48,7 +48,14 @@ impl Violation for ReimplementedOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ReimplementedOperator { operator, target } = self;
-        format!("Use `operator.{operator}` instead of defining a {target}")
+        match target {
+            FunctionLikeKind::Function => {
+                format!("Use `operator.{operator}` instead of defining a function")
+            }
+            FunctionLikeKind::Lambda => {
+                format!("Use `operator.{operator}` instead of defining a lambda")
+            }
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -129,10 +136,10 @@ impl FunctionLike<'_> {
     }
 
     /// Return the display kind of the function-like node.
-    fn kind(&self) -> &'static str {
+    fn kind(&self) -> FunctionLikeKind {
         match self {
-            Self::Lambda(_) => "lambda",
-            Self::Function(_) => "function",
+            Self::Lambda(_) => FunctionLikeKind::Lambda,
+            Self::Function(_) => FunctionLikeKind::Function,
         }
     }
 
@@ -169,6 +176,12 @@ fn get_operator(expr: &Expr, params: &ast::Parameters) -> Option<&'static str> {
         Expr::Compare(expr) => cmp_op(expr, params),
         _ => None,
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum FunctionLikeKind {
+    Lambda,
+    Function,
 }
 
 /// Return the name of the `operator` implemented by the given unary expression.
