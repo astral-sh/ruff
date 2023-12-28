@@ -2,6 +2,7 @@ use ruff_python_ast::BytesLiteral;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
+use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
 use crate::string::{Quoting, StringPart};
 
 #[derive(Default)]
@@ -17,6 +18,7 @@ impl FormatNodeRule<BytesLiteral> for FormatBytesLiteral {
                 &locator,
                 f.options().quote_style(),
                 f.context().docstring(),
+                is_hex_codes_in_unicode_sequences_enabled(f.context()),
             )
             .fmt(f)
     }

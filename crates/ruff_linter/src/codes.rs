@@ -965,6 +965,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
         (Refurb, "148") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryEnumerate),
         (Refurb, "152") => (RuleGroup::Preview, rules::refurb::rules::MathConstant),
+        (Refurb, "161") => (RuleGroup::Preview, rules::refurb::rules::BitCount),
         (Refurb, "163") => (RuleGroup::Preview, rules::refurb::rules::RedundantLogBase),
         (Refurb, "168") => (RuleGroup::Preview, rules::refurb::rules::IsinstanceTypeNone),
         (Refurb, "169") => (RuleGroup::Preview, rules::refurb::rules::TypeNoneComparison),
