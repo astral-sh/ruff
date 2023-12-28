@@ -438,6 +438,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::BitCount) {
+                refurb::rules::bit_count(checker, call);
+            }
             if checker.enabled(Rule::TypeOfPrimitive) {
                 pyupgrade::rules::type_of_primitive(checker, expr, func, args);
             }
