@@ -1980,6 +1980,17 @@ where
         }
 
         if !has_eaten_newline && self.at_compound_stmt() {
+            // Avoid create `SimpleStmtAndCompoundStmtInSameLine` error when the
+            // current node is `Expr::Invalid`. Example of when this may happen:
+            // ```python
+            // ! def x(): ...
+            // ```
+            // The `!` (an unexpected token) will be parsed as `Expr::Invalid`.
+            if let Stmt::Expr(expr) = &stmt.0 {
+                if let Expr::Invalid(_) = expr.value.as_ref() {
+                    return stmt;
+                }
+            }
             let range = self.current_range();
             self.add_error(
                 ParseErrorType::SimpleStmtAndCompoundStmtInSameLine,
@@ -2877,13 +2888,22 @@ where
             Tok::Lsqb => return self.parse_bracketsized_expr(range),
             Tok::Lbrace => return self.parse_bracesized_expr(range),
             Tok::Yield => return self.parse_yield_expr(range),
-            // `Invalid` tokens are created when there's a lexical error, so
-            // we only create an `Expr::Invalid` it here to avoid creating
-            // unexpected token errors
-            Tok::Invalid => Expr::Invalid(ast::ExprInvalid {
-                value: self.src_text(range).into(),
-                range,
-            }),
+            // `Invalid` tokens are created when there's a lexical error, to
+            // avoid creating an "unexpected token" error for `Tok::Invalid`
+            // we handle it here. We try to parse an expression to avoid
+            // creating "statements in the same line" error in some cases.
+            Tok::Invalid => {
+                if self.at_expr() {
+                    let (expr, expr_range) = self.parse_exprs();
+                    range = expr_range;
+                    expr
+                } else {
+                    Expr::Invalid(ast::ExprInvalid {
+                        value: self.src_text(range).into(),
+                        range,
+                    })
+                }
+            }
             // Handle unexpected token
             tok => {
                 // Try to parse an expression after seeing an unexpected token
