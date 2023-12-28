@@ -2210,12 +2210,12 @@ where
     fn parse_return_stmt(&mut self, mut range: TextRange) -> StmtWithRange {
         self.eat(TokenKind::Return);
 
-        let value = if self.at(TokenKind::Newline) {
-            None
-        } else {
+        let value = if self.at_expr() {
             let (value, value_range) = self.parse_exprs();
             range = range.cover(value_range);
             Some(Box::new(value))
+        } else {
+            None
         };
 
         (Stmt::Return(ast::StmtReturn { range, value }), range)
