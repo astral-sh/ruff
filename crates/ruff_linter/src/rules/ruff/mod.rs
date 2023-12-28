@@ -224,6 +224,25 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn ruff_per_file_ignores() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_per_file_ignores.py"),
+            &settings::LinterSettings {
+                per_file_ignores: resolve_per_file_ignores(vec![PerFileIgnore::new(
+                    "ruff_per_file_ignores.py".to_string(),
+                    &["F401".parse().unwrap(), "RUF100".parse().unwrap()],
+                    None,
+                )])
+                .unwrap(),
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn flake8_noqa() -> Result<()> {
         let diagnostics = test_path(
