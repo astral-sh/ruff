@@ -2,6 +2,7 @@ use ruff_python_ast::StringLiteral;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
+use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
 use crate::string::{docstring, Quoting, StringPart};
 use crate::QuoteStyle;
 
@@ -61,6 +62,7 @@ impl Format<PyFormatContext<'_>> for FormatStringLiteral<'_> {
             &locator,
             quote_style,
             f.context().docstring(),
+            is_hex_codes_in_unicode_sequences_enabled(f.context()),
         );
 
         if self.layout.is_docstring() {
