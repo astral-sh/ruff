@@ -71,6 +71,10 @@ pub(crate) fn unsafe_yaml_load(checker: &mut Checker, call: &ast::ExprCall) {
                 .resolve_call_path(loader_arg)
                 .is_some_and(|call_path| {
                     matches!(call_path.as_slice(), ["yaml", "SafeLoader" | "CSafeLoader"])
+                        || matches!(
+                            call_path.as_slice(),
+                            ["yaml", "loader", "SafeLoader" | "CSafeLoader"]
+                        )
                 })
             {
                 let loader = match loader_arg {
