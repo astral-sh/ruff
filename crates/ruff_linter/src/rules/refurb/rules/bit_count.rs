@@ -159,7 +159,8 @@ pub(crate) fn bit_count(checker: &mut Checker, call: &ExprCall) {
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
         | Expr::Attribute(_)
-        | Expr::Subscript(_) => false,
+        | Expr::Subscript(_)
+        | Expr::Invalid(_) => false,
     };
 
     let replacement = if parenthesize {
