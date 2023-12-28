@@ -31,7 +31,7 @@ use crate::fix::{fix_file, FixResult};
 use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::noqa::add_noqa;
-use crate::registry::{AsRule, Rule};
+use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rules::pycodestyle;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
@@ -213,12 +213,14 @@ pub fn check_path(
     }
 
     // Ignore diagnostics based on per-file-ignores.
-    if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
-        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores);
-        if !ignores.is_empty() {
-            diagnostics.retain(|diagnostic| !ignores.contains(diagnostic.kind.rule()));
-        }
+    let per_file_ignores = if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
+        fs::ignores_from_path(path, &settings.per_file_ignores)
+    } else {
+        RuleSet::empty()
     };
+    if !per_file_ignores.is_empty() {
+        diagnostics.retain(|diagnostic| !per_file_ignores.contains(diagnostic.kind.rule()));
+    }
 
     // Enforce `noqa` directives.
     if (noqa.into() && !diagnostics.is_empty())
@@ -234,6 +236,7 @@ pub fn check_path(
             indexer.comment_ranges(),
             &directives.noqa_line_for,
             error.is_none(),
+            &per_file_ignores,
             settings,
         );
         if noqa.into() {
