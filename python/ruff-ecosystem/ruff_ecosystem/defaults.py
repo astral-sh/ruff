@@ -101,7 +101,7 @@ DEFAULT_TARGETS = [
         repo=Repository(
             owner="zanieb",
             name="huggingface-notebooks",
-            ref="68cd6fa1a2831c5189f85257c13d691cb76292db",
+            ref="zb/fix-syntax",
         ),
         check_options=CheckOptions(select=JUPYTER_NOTEBOOK_SELECT),
         config_overrides={"include": ["*.ipynb"]},
