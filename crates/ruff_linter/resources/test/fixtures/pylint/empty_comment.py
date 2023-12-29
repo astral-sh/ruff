@@ -2,9 +2,9 @@
     # this line is also OK, but the three following lines are not
 #
     #
-        #    
+        #
 
-# this non-empty comment has trailing whitespace and is OK    
+# this non-empty comment has trailing whitespace and is OK
 
 # Many codebases use multiple `#` characters on a single line to visually
 # separate sections of code, so we don't consider these empty comments.
@@ -15,7 +15,7 @@
 
 
 def foo():  # this comment is OK, the one below is not
-    pass  #    
+    pass  #
 
 
 # the lines below have no comments and are OK
@@ -36,12 +36,18 @@ def bar():
 The following lines are all fine:
 #
     #
-        #    
+        #
 """
 
 # These should be removed, despite being an empty "block comment".
 
+#
+#
+
+# These should also be removed.
+
 x = 1
 
 #
+##
 #

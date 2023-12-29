@@ -52,7 +52,7 @@ impl CommentRanges {
     /// Given a [`CommentRanges`], determine which comments are grouped together
     /// in "comment blocks". A "comment block" is a sequence of consecutive
     /// own-line comments in which the comment hash (`#`) appears in the same
-    /// column in each line.
+    /// column in each line, and at least one comment is non-empty.
     ///
     /// Returns a vector containing the offset of the leading hash (`#`) for
     /// each comment in any block comment.
@@ -84,7 +84,6 @@ impl CommentRanges {
 
         let mut current_block: Vec<TextSize> = Vec::new();
         let mut current_block_column: Option<TextSize> = None;
-        let mut current_block_offset: Option<TextSize> = None;
         let mut current_block_non_empty = false;
 
         let mut prev_line_end = None;
@@ -93,6 +92,7 @@ impl CommentRanges {
             let offset = comment_range.start();
             let line_start = locator.line_start(offset);
             let line_end = locator.full_line_end(offset);
+            let column = offset - line_start;
 
             // If this is an end-of-line comment, reset the current block.
             if !Self::is_own_line(offset, locator) {
@@ -102,7 +102,6 @@ impl CommentRanges {
                 }
                 current_block = vec![];
                 current_block_column = None;
-                current_block_offset = None;
                 current_block_non_empty = false;
                 prev_line_end = Some(line_end);
                 continue;
@@ -113,51 +112,52 @@ impl CommentRanges {
             if prev_line_end.is_some_and(|prev_line_end| {
                 locator.contains_line_break(TextRange::new(prev_line_end, line_start))
             }) {
-                // Push the current block, and reset.
+                // Push the current block.
                 if current_block.len() > 1 && current_block_non_empty {
                     block_comments.extend(current_block);
                 }
-                current_block = vec![];
-                current_block_column = None;
-                current_block_offset = None;
-                current_block_non_empty = false;
+
+                // Reset the block state.
+                current_block = vec![offset];
+                current_block_column = Some(column);
+                current_block_non_empty = !Self::is_empty(*comment_range, locator);
                 prev_line_end = Some(line_end);
                 continue;
             }
 
-            let column = offset - line_start;
             if let Some(current_column) = current_block_column {
-                if let Some(current_offset) = current_block_offset {
-                    if column == current_column && line_start == current_offset {
-                        // Add the comment to the current block.
-                        current_block.push(offset);
-                        current_block_offset = Some(line_end);
-                        current_block_non_empty |= !Self::is_empty(*comment_range, locator);
-                    } else {
-                        // Push the current block, and reset.
-                        if current_block.len() > 1 && current_block_non_empty {
-                            block_comments.extend(current_block);
-                        }
-                        current_block = vec![offset];
-                        current_block_column = Some(column);
-                        current_block_offset = Some(line_end);
-                        current_block_non_empty |= !Self::is_empty(*comment_range, locator);
+                if column == current_column {
+                    // Add the comment to the current block.
+                    current_block.push(offset);
+                    current_block_non_empty |= !Self::is_empty(*comment_range, locator);
+                    prev_line_end = Some(line_end);
+                } else {
+                    // Push the current block.
+                    if current_block.len() > 1 && current_block_non_empty {
+                        block_comments.extend(current_block);
                     }
+
+                    // Reset the block state.
+                    current_block = vec![offset];
+                    current_block_column = Some(column);
+                    current_block_non_empty = !Self::is_empty(*comment_range, locator);
+                    prev_line_end = Some(line_end);
                 }
             } else {
-                // Push the current block, and reset.
+                // Push the current block.
                 if current_block.len() > 1 && current_block_non_empty {
                     block_comments.extend(current_block);
                 }
+
+                // Reset the block state.
                 current_block = vec![offset];
                 current_block_column = Some(column);
-                current_block_offset = Some(line_end);
-                current_block_non_empty |= !Self::is_empty(*comment_range, locator);
+                current_block_non_empty = !Self::is_empty(*comment_range, locator);
+                prev_line_end = Some(line_end);
             }
-
-            prev_line_end = Some(line_end);
         }
 
+        // Push any lingering blocks.
         if current_block.len() > 1 && current_block_non_empty {
             block_comments.extend(current_block);
         }
