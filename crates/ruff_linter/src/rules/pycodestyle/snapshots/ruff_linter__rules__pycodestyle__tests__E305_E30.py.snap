@@ -1,102 +1,102 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:560:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+E30.py:576:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
     |
-559 |     # another comment
-560 | fn()
+575 |     # another comment
+576 | fn()
     | ^^ E305
-561 | # end
+577 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-557 557 |     # comment
-558 558 | 
-559 559 |     # another comment
-    560 |+
-    561 |+
-560 562 | fn()
-561 563 | # end
-562 564 | 
+573 573 |     # comment
+574 574 | 
+575 575 |     # another comment
+    576 |+
+    577 |+
+576 578 | fn()
+577 579 | # end
+578 580 | 
 
-E30.py:571:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+E30.py:587:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
     |
-570 |     # another comment
-571 | a = 1
+586 |     # another comment
+587 | a = 1
     | ^ E305
-572 | # end
+588 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-568 568 |     # comment
-569 569 | 
-570 570 |     # another comment
-    571 |+
-    572 |+
-571 573 | a = 1
-572 574 | # end
-573 575 | 
+584 584 |     # comment
+585 585 | 
+586 586 |     # another comment
+    587 |+
+    588 |+
+587 589 | a = 1
+588 590 | # end
+589 591 | 
 
-E30.py:583:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+E30.py:599:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
     |
-581 |     # another comment
-582 | 
-583 | try:
+597 |     # another comment
+598 | 
+599 | try:
     | ^^^ E305
-584 |     fn()
-585 | except Exception:
+600 |     fn()
+601 | except Exception:
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-580 580 | 
-581 581 |     # another comment
-582 582 | 
-    583 |+
-583 584 | try:
-584 585 |     fn()
-585 586 | except Exception:
+596 596 | 
+597 597 |     # another comment
+598 598 | 
+    599 |+
+599 600 | try:
+600 601 |     fn()
+601 602 | except Exception:
 
-E30.py:595:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
+E30.py:611:1: E305 [*] expected 2 blank lines after class or function definition, found (0)
     |
-594 | # Two spaces before comments, too.
-595 | if a():
+610 | # Two spaces before comments, too.
+611 | if a():
     | ^^ E305
-596 |     a()
-597 | # end
+612 |     a()
+613 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-592 592 |     print
-593 593 | 
-594 594 | # Two spaces before comments, too.
-    595 |+
-    596 |+
-595 597 | if a():
-596 598 |     a()
-597 599 | # end
+608 608 |     print
+609 609 | 
+610 610 | # Two spaces before comments, too.
+    611 |+
+    612 |+
+611 613 | if a():
+612 614 |     a()
+613 615 | # end
 
-E30.py:608:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
+E30.py:624:1: E305 [*] expected 2 blank lines after class or function definition, found (1)
     |
-606 |     blah, blah
-607 | 
-608 | if __name__ == '__main__':
+622 |     blah, blah
+623 | 
+624 | if __name__ == '__main__':
     | ^^ E305
-609 |     main()
-610 | # end
+625 |     main()
+626 | # end
     |
     = help: Add missing blank line(s)
 
 ℹ Safe fix
-605 605 | def main():
-606 606 |     blah, blah
-607 607 | 
-    608 |+
-608 609 | if __name__ == '__main__':
-609 610 |     main()
-610 611 | # end
+621 621 | def main():
+622 622 |     blah, blah
+623 623 | 
+    624 |+
+624 625 | if __name__ == '__main__':
+625 626 |     main()
+626 627 | # end
 
 

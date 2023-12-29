@@ -492,7 +492,9 @@ impl BlankLinesChecker {
                 stylist,
                 diagnostics,
             );
-            prev_indent_level = Some(logical_line.indent_level);
+            if !logical_line.is_comment_only {
+                prev_indent_level = Some(logical_line.indent_level);
+            }
         }
     }
 

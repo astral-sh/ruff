@@ -356,6 +356,22 @@ def f():
 # end
 
 
+# no error
+class MyClass:
+    # comment
+    def method(self) -> None:
+        pass
+# end
+
+
+# no error
+def function1():
+    # Comment
+    def function2():
+        pass
+# end
+
+
 # E301
 class Class(object):
 
