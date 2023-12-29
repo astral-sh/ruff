@@ -294,14 +294,17 @@ class Repository(Serializable):
         )
 
         process = await create_subprocess_exec(
-            *command, env={"GIT_TERMINAL_PROMPT": "0"}
+            *command,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
         )
 
-        status_code = await process.wait()
-
-        logger.debug(
-            f"Finished cloning {self.fullname} with status {status_code}",
-        )
+        if await process.wait() != 0:
+            _, stderr = await process.communicate()
+            raise ProjectSetupError(
+                f"Failed to clone {self.fullname}: {stderr.decode()}"
+            )
 
         # Configure git user — needed for `self.commit` to work
         await (
