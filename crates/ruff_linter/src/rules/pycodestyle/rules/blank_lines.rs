@@ -324,12 +324,12 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
 
 /// Returns `true` if the token is Async, Class or Def
 fn is_top_level_token(token: &Option<Tok>) -> bool {
-    matches!(&token, Some(Tok::Class | Tok::Def | Tok::Async))
+    matches!(&token, Some(Tok::Class | Tok::Def))
 }
 
 /// Returns `true` if the token is At, Async, Class or Def
 fn is_top_level_token_or_decorator(token: &Tok) -> bool {
-    matches!(&token, Tok::Class | Tok::Def | Tok::Async | Tok::At)
+    matches!(&token, Tok::Class | Tok::Def | Tok::At)
 }
 
 #[derive(Debug)]
