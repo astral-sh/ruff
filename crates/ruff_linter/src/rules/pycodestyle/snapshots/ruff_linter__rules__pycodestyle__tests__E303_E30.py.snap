@@ -1,163 +1,163 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E30.py:486:5: E303 [*] Too many blank lines (2)
+E30.py:499:5: E303 [*] Too many blank lines (2)
     |
-486 |     # arbitrary comment
+499 |     # arbitrary comment
     |     ^^^^^^^^^^^^^^^^^^^ E303
-487 | 
-488 |     def inner():  # E306 not expected
+500 | 
+501 |     def inner():  # E306 not expected
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-482 482 | def fn():
-483 483 |     _ = None
-484 484 | 
-485     |-
-486 485 |     # arbitrary comment
-487 486 | 
-488 487 |     def inner():  # E306 not expected
+495 495 | def fn():
+496 496 |     _ = None
+497 497 | 
+498     |-
+499 498 |     # arbitrary comment
+500 499 | 
+501 500 |     def inner():  # E306 not expected
 
-E30.py:498:5: E303 [*] Too many blank lines (2)
+E30.py:511:5: E303 [*] Too many blank lines (2)
     |
-498 |     # arbitrary comment
+511 |     # arbitrary comment
     |     ^^^^^^^^^^^^^^^^^^^ E303
-499 |     def inner():  # E306 not expected
-500 |         pass
+512 |     def inner():  # E306 not expected
+513 |         pass
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-494 494 | def fn():
-495 495 |     _ = None
-496 496 | 
-497     |-
-498 497 |     # arbitrary comment
-499 498 |     def inner():  # E306 not expected
-500 499 |         pass
+507 507 | def fn():
+508 508 |     _ = None
+509 509 | 
+510     |-
+511 510 |     # arbitrary comment
+512 511 |     def inner():  # E306 not expected
+513 512 |         pass
 
-E30.py:509:1: E303 [*] Too many blank lines (3)
+E30.py:522:1: E303 [*] Too many blank lines (3)
     |
-509 | print()
+522 | print()
     | ^^^^^ E303
-510 | # end
+523 | # end
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-505 505 | print()
-506 506 | 
-507 507 | 
-508     |-
-509 508 | print()
-510 509 | # end
-511 510 | 
+518 518 | print()
+519 519 | 
+520 520 | 
+521     |-
+522 521 | print()
+523 522 | # end
+524 523 | 
 
-E30.py:518:1: E303 [*] Too many blank lines (3)
+E30.py:531:1: E303 [*] Too many blank lines (3)
     |
-518 | # comment
+531 | # comment
     | ^^^^^^^^^ E303
-519 | 
-520 | print()
+532 | 
+533 | print()
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-514 514 | print()
-515 515 | 
-516 516 | 
-517     |-
-518 517 | # comment
-519 518 | 
-520 519 | print()
+527 527 | print()
+528 528 | 
+529 529 | 
+530     |-
+531 530 | # comment
+532 531 | 
+533 532 | print()
 
-E30.py:529:5: E303 [*] Too many blank lines (2)
+E30.py:542:5: E303 [*] Too many blank lines (2)
     |
-529 |     # comment
+542 |     # comment
     |     ^^^^^^^^^ E303
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-525 525 | def a():
-526 526 |     print()
-527 527 | 
-528     |-
-529 528 |     # comment
-530 529 | 
-531 530 | 
-
-E30.py:532:5: E303 [*] Too many blank lines (2)
-    |
-532 |     # another comment
-    |     ^^^^^^^^^^^^^^^^^ E303
-533 | 
-534 |     print()
-    |
-    = help: Remove extraneous blank line(s)
-
-ℹ Safe fix
-528 528 | 
-529 529 |     # comment
-530 530 | 
-531     |-
-532 531 |     # another comment
-533 532 | 
-534 533 |     print()
-
-E30.py:543:1: E303 [*] Too many blank lines (3)
-    |
-543 | / """This class docstring comes on line 5.
-544 | | It gives error E303: too many blank lines (3)
-545 | | """
-    | |___^ E303
-546 |   # end
-    |
-    = help: Remove extraneous blank line(s)
-
-ℹ Safe fix
-539 539 | #!python
+538 538 | def a():
+539 539 |     print()
 540 540 | 
+541     |-
+542 541 |     # comment
+543 542 | 
+544 543 | 
+
+E30.py:545:5: E303 [*] Too many blank lines (2)
+    |
+545 |     # another comment
+    |     ^^^^^^^^^^^^^^^^^ E303
+546 | 
+547 |     print()
+    |
+    = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
 541 541 | 
-542     |-
-543 542 | """This class docstring comes on line 5.
-544 543 | It gives error E303: too many blank lines (3)
-545 544 | """
+542 542 |     # comment
+543 543 | 
+544     |-
+545 544 |     # another comment
+546 545 | 
+547 546 |     print()
 
-E30.py:555:5: E303 [*] Too many blank lines (2)
+E30.py:556:1: E303 [*] Too many blank lines (3)
     |
-555 |     def b(self):
-    |     ^^^ E303
-556 |         pass
-557 | # end
+556 | / """This class docstring comes on line 5.
+557 | | It gives error E303: too many blank lines (3)
+558 | | """
+    | |___^ E303
+559 |   # end
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-551 551 |     def a(self):
-552 552 |         pass
+552 552 | #!python
 553 553 | 
-554     |-
-555 554 |     def b(self):
-556 555 |         pass
-557 556 | # end
+554 554 | 
+555     |-
+556 555 | """This class docstring comes on line 5.
+557 556 | It gives error E303: too many blank lines (3)
+558 557 | """
 
-E30.py:565:5: E303 [*] Too many blank lines (2)
+E30.py:568:5: E303 [*] Too many blank lines (2)
     |
-565 |     a = 2
-    |     ^ E303
-566 | # end
+568 |     def b(self):
+    |     ^^^ E303
+569 |         pass
+570 | # end
     |
     = help: Remove extraneous blank line(s)
 
 ℹ Safe fix
-561 561 | if True:
-562 562 |     a = 1
-563 563 | 
-564     |-
-565 564 |     a = 2
-566 565 | # end
-567 566 | 
+564 564 |     def a(self):
+565 565 |         pass
+566 566 | 
+567     |-
+568 567 |     def b(self):
+569 568 |         pass
+570 569 | # end
+
+E30.py:578:5: E303 [*] Too many blank lines (2)
+    |
+578 |     a = 2
+    |     ^ E303
+579 | # end
+    |
+    = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+574 574 | if True:
+575 575 |     a = 1
+576 576 | 
+577     |-
+578 577 |     a = 2
+579 578 | # end
+580 579 | 
 
 
