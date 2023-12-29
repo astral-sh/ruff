@@ -97,7 +97,12 @@ DEFAULT_TARGETS = [
     ),
     # Jupyter Notebooks
     Project(
-        repo=Repository(owner="huggingface", name="notebooks", ref="main"),
+        # fork of `huggingface` without syntax errors in notebooks
+        repo=Repository(
+            owner="zanieb",
+            name="notebooks",
+            ref="68cd6fa1a2831c5189f85257c13d691cb76292db",
+        ),
         check_options=CheckOptions(select=JUPYTER_NOTEBOOK_SELECT),
         config_overrides={"include": ["*.ipynb"]},
     ),
