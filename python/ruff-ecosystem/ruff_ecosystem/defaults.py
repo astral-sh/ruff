@@ -100,7 +100,7 @@ DEFAULT_TARGETS = [
         # fork of `huggingface` without syntax errors in notebooks
         repo=Repository(
             owner="zanieb",
-            name="notebooks",
+            name="huggingface-notebooks",
             ref="68cd6fa1a2831c5189f85257c13d691cb76292db",
         ),
         check_options=CheckOptions(select=JUPYTER_NOTEBOOK_SELECT),
