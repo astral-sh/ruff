@@ -25,12 +25,12 @@ impl Violation for TooManyAwaits {
 
 
 #[derive(Default)]
-pub struct AwaitStatementVisitor<'a> {
+pub struct AwaitExprVisitor<'a> {
     pub awaits: Vec<&'a ast::ExprAwait>,
 }
 
 
-impl<'a> Visitor<'a> for AwaitStatementVisitor<'a> {
+impl<'a> Visitor<'a> for AwaitExprVisitor<'a> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         if expr.is_await_expr() {
             self.awaits.push(expr.as_await_expr().unwrap())
@@ -40,7 +40,7 @@ impl<'a> Visitor<'a> for AwaitStatementVisitor<'a> {
 
 
 fn num_awaits(body: &[Stmt]) -> usize {
-    let mut visitor = AwaitStatementVisitor::default();
+    let mut visitor = AwaitExprVisitor::default();
     visitor.visit_body(body);
     visitor.awaits.len()
 }
