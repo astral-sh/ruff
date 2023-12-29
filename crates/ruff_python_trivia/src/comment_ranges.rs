@@ -85,18 +85,21 @@ impl CommentRanges {
         let mut current_block: Vec<TextSize> = Vec::new();
         let mut current_block_column: Option<TextSize> = None;
         let mut current_block_offset: Option<TextSize> = None;
+        let mut current_block_non_empty = false;
 
         for comment_range in &self.raw {
             let offset = comment_range.start();
             let line_start = locator.line_start(offset);
 
-            if !Self::is_own_line(locator, offset) {
-                if current_block.len() > 1 {
+            if !Self::is_own_line(offset, locator) {
+                // Push the current block, and reset.
+                if current_block.len() > 1 && current_block_non_empty {
                     block_comments.extend(current_block);
-                    current_block = vec![];
-                    current_block_column = None;
-                    current_block_offset = None;
                 }
+                current_block = vec![];
+                current_block_column = None;
+                current_block_offset = None;
+                current_block_non_empty = false;
                 continue;
             }
 
@@ -106,33 +109,51 @@ impl CommentRanges {
             if let Some(current_column) = current_block_column {
                 if let Some(current_offset) = current_block_offset {
                     if column == current_column && line_start == current_offset {
+                        // Add the comment to the current block.
                         current_block.push(offset);
                         current_block_offset = Some(line_end);
+                        current_block_non_empty |= !Self::is_empty(*comment_range, locator);
                     } else {
-                        if current_block.len() > 1 {
+                        // Push the current block, and reset.
+                        if current_block.len() > 1 && current_block_non_empty {
                             block_comments.extend(current_block);
                         }
                         current_block = vec![offset];
                         current_block_column = Some(column);
                         current_block_offset = Some(line_end);
+                        current_block_non_empty |= !Self::is_empty(*comment_range, locator);
                     }
                 }
             } else {
+                // Push the current block, and reset.
+                if current_block.len() > 1 && current_block_non_empty {
+                    block_comments.extend(current_block);
+                }
                 current_block = vec![offset];
                 current_block_column = Some(column);
                 current_block_offset = Some(line_end);
+                current_block_non_empty |= !Self::is_empty(*comment_range, locator);
             }
         }
 
-        if current_block.len() > 1 {
+        if current_block.len() > 1 && current_block_non_empty {
             block_comments.extend(current_block);
         }
 
         block_comments
     }
 
+    /// Returns `true` if the given range is an empty comment.
+    fn is_empty(range: TextRange, locator: &Locator) -> bool {
+        locator
+            .slice(range)
+            .chars()
+            .skip(1)
+            .all(is_python_whitespace)
+    }
+
     /// Returns `true` if a comment is an own-line comment (as opposed to an end-of-line comment).
-    fn is_own_line(locator: &Locator, offset: TextSize) -> bool {
+    fn is_own_line(offset: TextSize, locator: &Locator) -> bool {
         let range = TextRange::new(locator.line_start(offset), offset);
         locator.slice(range).chars().all(is_python_whitespace)
     }

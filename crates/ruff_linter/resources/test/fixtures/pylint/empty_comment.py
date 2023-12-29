@@ -38,3 +38,10 @@ The following lines are all fine:
     #
         #    
 """
+
+# These should be removed, despite being an empty "block comment".
+
+x = 1
+
+#
+#
