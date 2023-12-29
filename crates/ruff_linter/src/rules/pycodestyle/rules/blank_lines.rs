@@ -378,7 +378,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut line_is_comment_only = true;
         let mut is_docstring = true;
         let mut first_token: Option<Tok> = None;
-        let mut first_token_range = TextRange::new(0.into(), 0.into());
+        let mut first_token_range: Option<TextRange> = None;
         let mut last_token: Option<Tok> = None;
         let mut parens = 0u32;
 
@@ -388,9 +388,13 @@ impl<'a> Iterator for LinePreprocessor<'a> {
             }
 
             if !matches!(token, Tok::Newline) {
-                if first_token.is_none() {
+                // Ideally, we would like to have a "async def" token since we care about the "def" part.
+                // As a work around, we ignore the first token if it is "async".
+                if first_token.is_none() && !matches!(token, Tok::Async) {
                     first_token = Some(token.clone());
-                    first_token_range = *range;
+                }
+                if first_token_range.is_none() {
+                    first_token_range = Some(*range);
                 }
 
                 if !matches!(token, Tok::NonLogicalNewline) {
@@ -421,12 +425,14 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         is_docstring = false;
                     }
 
+                    let first_range = first_token_range.unwrap();
+
                     let range = if matches!(first_token, Some(Tok::Indent)) {
-                        first_token_range
+                        first_range
                     } else {
                         TextRange::new(
-                            self.locator.line_start(first_token_range.start()),
-                            first_token_range.start(),
+                            self.locator.line_start(first_range.start()),
+                            first_range.start(),
                         )
                     };
                     let indent_level = expand_indent(self.locator.slice(range));
@@ -435,7 +441,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     if matches!(first_token, Some(Tok::NonLogicalNewline)) {
                         self.current_blank_lines += 1;
                         self.current_blank_characters +=
-                            range.end() - first_token_range.start() + TextSize::new(1);
+                            range.end() - first_range.start() + TextSize::new(1);
                         return self.next();
                     }
 
@@ -445,7 +451,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
                     let logical_line = LogicalLineInfo {
                         first_token: first_token.clone().unwrap(),
-                        first_token_range,
+                        first_token_range: first_range,
                         last_token: last_token.unwrap(),
                         last_token_range,
                         is_comment_only: line_is_comment_only,

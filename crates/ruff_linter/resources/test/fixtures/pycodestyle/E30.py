@@ -372,6 +372,14 @@ def function1():
 # end
 
 
+# no error
+async def function1():
+    await function2()
+    async with function3():
+        pass
+# end
+
+
 # E301
 class Class(object):
 
