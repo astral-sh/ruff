@@ -77,4 +77,34 @@ empty_comment.py:18:11: PLR2044 [*] Line with empty comment
 20 20 | 
 21 21 | # the lines below have no comments and are OK
 
+empty_comment.py:46:1: PLR2044 [*] Line with empty comment
+   |
+44 | x = 1
+45 | 
+46 | #
+   | ^ PLR2044
+47 | #
+   |
+   = help: Delete the empty comment
+
+ℹ Safe fix
+44 44 | x = 1
+45 45 | 
+46 46 | #
+47    |-#
+
+empty_comment.py:47:1: PLR2044 [*] Line with empty comment
+   |
+46 | #
+47 | #
+   | ^ PLR2044
+   |
+   = help: Delete the empty comment
+
+ℹ Safe fix
+44 44 | x = 1
+45 45 | 
+46 46 | #
+47    |-#
+
 

@@ -87,10 +87,14 @@ impl CommentRanges {
         let mut current_block_offset: Option<TextSize> = None;
         let mut current_block_non_empty = false;
 
+        let mut prev_line_end = None;
+
         for comment_range in &self.raw {
             let offset = comment_range.start();
             let line_start = locator.line_start(offset);
+            let line_end = locator.full_line_end(offset);
 
+            // If this is an end-of-line comment, reset the current block.
             if !Self::is_own_line(offset, locator) {
                 // Push the current block, and reset.
                 if current_block.len() > 1 && current_block_non_empty {
@@ -100,12 +104,28 @@ impl CommentRanges {
                 current_block_column = None;
                 current_block_offset = None;
                 current_block_non_empty = false;
+                prev_line_end = Some(line_end);
                 continue;
             }
 
-            let line_end = locator.full_line_end(offset);
-            let column = offset - line_start;
+            // If there's a blank line between this comment and the previous
+            // comment, reset the current block.
+            if prev_line_end.is_some_and(|prev_line_end| {
+                locator.contains_line_break(TextRange::new(prev_line_end, line_start))
+            }) {
+                // Push the current block, and reset.
+                if current_block.len() > 1 && current_block_non_empty {
+                    block_comments.extend(current_block);
+                }
+                current_block = vec![];
+                current_block_column = None;
+                current_block_offset = None;
+                current_block_non_empty = false;
+                prev_line_end = Some(line_end);
+                continue;
+            }
 
+            let column = offset - line_start;
             if let Some(current_column) = current_block_column {
                 if let Some(current_offset) = current_block_offset {
                     if column == current_column && line_start == current_offset {
@@ -134,6 +154,8 @@ impl CommentRanges {
                 current_block_offset = Some(line_end);
                 current_block_non_empty |= !Self::is_empty(*comment_range, locator);
             }
+
+            prev_line_end = Some(line_end);
         }
 
         if current_block.len() > 1 && current_block_non_empty {
