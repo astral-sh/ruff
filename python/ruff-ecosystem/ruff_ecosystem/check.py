@@ -121,7 +121,7 @@ def markdown_check_result(result: Result) -> str:
         if len(" ".join(lines)) > GITHUB_MAX_COMMENT_LENGTH // 3:
             lines.append("")
             lines.append(
-                "_... Truncated remaining completed projected reports due to GitHub comment length restrictions_"
+                "_... Truncated remaining completed project reports due to GitHub comment length restrictions_"
             )
             lines.append("")
             break
