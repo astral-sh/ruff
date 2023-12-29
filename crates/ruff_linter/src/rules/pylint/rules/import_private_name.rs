@@ -1,8 +1,9 @@
 use itertools::join;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use std::borrow::Cow;
 
-use ruff_python_semantic::{Imported, ResolvedReference, Scope};
+use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -76,25 +77,27 @@ pub(crate) fn import_private_name(
         let Some(import) = binding.as_any_import() else {
             continue;
         };
-        let Some(import) = import.from_import() else {
-            continue;
+
+        let import_info = match import {
+            import if import.is_import() => ImportInfo::from(import.import().unwrap()),
+            import if import.is_from_import() => ImportInfo::from(import.from_import().unwrap()),
+            _ => return,
         };
 
-        let module = import.module_name();
-        let Some(root_module) = module.first() else {
+        let Some(root_module) = import_info.module_name.first() else {
             continue;
         };
 
         // Relative imports are not a public API.
         // Ex) `from . import foo`
-        if module.starts_with(&["."]) {
+        if import_info.module_name.starts_with(&["."]) {
             continue;
         }
 
         // We can also ignore dunder names.
         // Ex) `from __future__ import annotations`
         // Ex) `from foo import __version__`
-        if root_module.starts_with("__") || import.member_name().starts_with("__") {
+        if root_module.starts_with("__") || import_info.member_name.starts_with("__") {
             continue;
         }
 
@@ -107,8 +110,11 @@ pub(crate) fn import_private_name(
             continue;
         }
 
-        let call_path = import.call_path();
-        if call_path.iter().any(|name| name.starts_with('_')) {
+        if import_info
+            .call_path
+            .iter()
+            .any(|name| name.starts_with('_'))
+        {
             // Ignore private imports used for typing.
             if binding.context.is_runtime()
                 && binding
@@ -119,9 +125,16 @@ pub(crate) fn import_private_name(
                 continue;
             }
 
-            let private_name = call_path.iter().find(|name| name.starts_with('_')).unwrap();
+            let private_name = import_info
+                .call_path
+                .iter()
+                .find(|name| name.starts_with('_'))
+                .unwrap();
             let external_module = Some(join(
-                call_path.iter().take_while(|name| name != &private_name),
+                import_info
+                    .call_path
+                    .iter()
+                    .take_while(|name| name != &private_name),
                 ".",
             ))
             .filter(|module| !module.is_empty());
@@ -143,4 +156,36 @@ fn is_typing(reference: &ResolvedReference) -> bool {
         || reference.in_complex_string_type_definition()
         || reference.in_simple_string_type_definition()
         || reference.in_runtime_evaluated_annotation()
+}
+
+struct ImportInfo<'a> {
+    module_name: &'a [&'a str],
+    member_name: Cow<'a, str>,
+    call_path: &'a [&'a str],
+}
+
+impl<'a> From<&'a FromImport<'_>> for ImportInfo<'a> {
+    fn from(import: &'a FromImport) -> Self {
+        let module_name = import.module_name();
+        let member_name = import.member_name();
+        let call_path = import.call_path();
+        Self {
+            module_name,
+            member_name,
+            call_path,
+        }
+    }
+}
+
+impl<'a> From<&'a Import<'_>> for ImportInfo<'a> {
+    fn from(import: &'a Import) -> Self {
+        let module_name = import.module_name();
+        let member_name = import.member_name();
+        let call_path = import.call_path();
+        Self {
+            module_name,
+            member_name,
+            call_path,
+        }
+    }
 }

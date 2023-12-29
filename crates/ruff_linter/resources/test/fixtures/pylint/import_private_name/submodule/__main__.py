@@ -4,6 +4,8 @@ from c._d import e
 from _f.g import h
 from i import _j
 from k import _l as m
+import _aaa
+import bbb._ccc
 
 # Non-errors.
 import n
@@ -30,6 +32,7 @@ from oo import _pp as qq
 from _rr import ss
 from tt._uu import vv
 from _ww.xx import yy as zz
+import _ddd as ddd
 
 some_variable: _nn = None
 
@@ -37,5 +40,7 @@ def func(arg: qq) -> ss:
     pass
 
 class Class:
+    lst: list[ddd]
+
     def __init__(self, arg: vv) -> "zz":
         pass
