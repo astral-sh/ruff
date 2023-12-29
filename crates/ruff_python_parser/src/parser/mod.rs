@@ -4200,7 +4200,11 @@ where
 
         self.expect_and_recover(TokenKind::Else, TokenSet::EMPTY);
 
-        let (orelse, orelse_range) = self.parse_expr();
+        let (orelse, orelse_range) = self.parse_expr_with_recovery(
+            Parser::parse_expr,
+            TokenSet::EMPTY,
+            "expecting expression after `else` keyword",
+        );
         let if_range = body_range.cover(orelse_range);
 
         (
