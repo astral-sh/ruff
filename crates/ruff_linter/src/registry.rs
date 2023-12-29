@@ -250,7 +250,6 @@ impl Rule {
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
-            | Rule::EmptyComment
             | Rule::LineTooLong
             | Rule::MissingCopyrightNotice
             | Rule::MissingNewlineAtEndOfFile
@@ -266,6 +265,7 @@ impl Rule {
             | Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::CommentedOutCode
+            | Rule::EmptyComment
             | Rule::ExtraneousParentheses
             | Rule::InvalidCharacterBackspace
             | Rule::InvalidCharacterEsc

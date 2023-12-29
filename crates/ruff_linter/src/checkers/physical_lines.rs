@@ -1,7 +1,5 @@
 //! Lint rules based on checking physical lines.
 
-use std::collections::HashSet;
-
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -35,17 +33,8 @@ pub(crate) fn check_physical_lines(
     let enforce_blank_line_contains_whitespace =
         settings.rules.enabled(Rule::BlankLineWithWhitespace);
     let enforce_copyright_notice = settings.rules.enabled(Rule::MissingCopyrightNotice);
-    let enforce_empty_comment = settings.rules.enabled(Rule::EmptyComment);
 
     let mut doc_lines_iter = doc_lines.iter().peekable();
-
-    let block_comment_line_offsets: HashSet<TextSize> = indexer
-        .comment_ranges()
-        .block_comments(locator)
-        .into_iter()
-        .flatten()
-        .map(|o| locator.line_start(o))
-        .collect();
 
     for line in locator.contents().universal_newlines() {
         while doc_lines_iter
@@ -77,15 +66,6 @@ pub(crate) fn check_physical_lines(
 
         if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
             if let Some(diagnostic) = trailing_whitespace(&line, locator, indexer, settings) {
-                diagnostics.push(diagnostic);
-            }
-        }
-
-        if enforce_empty_comment
-            && !block_comment_line_offsets.contains(&line.start())
-            && indexer.comment_ranges().intersects(line.range())
-        {
-            if let Some(diagnostic) = pylint::rules::empty_comment(&line) {
                 diagnostics.push(diagnostic);
             }
         }

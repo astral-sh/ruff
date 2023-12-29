@@ -1,8 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_index::Indexer;
 use ruff_python_trivia::is_python_whitespace;
-use ruff_source_file::newlines::Line;
+
+use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
+use rustc_hash::FxHashSet;
 
 /// ## What it does
 /// Checks for a # symbol appearing on a line not followed by an actual comment.
@@ -42,52 +45,62 @@ impl Violation for EmptyComment {
 }
 
 /// PLR2044
-pub(crate) fn empty_comment(line: &Line) -> Option<Diagnostic> {
-    let first_hash_col = u32::try_from(
-        line.as_str()
-            .char_indices()
-            .find(|&(_, char)| char == '#')? // indicates the line does not contain a comment
-            .0,
-    )
-    .unwrap(); // SAFETY: already know line is valid and all TextSize indices are u32
+pub(crate) fn empty_comments(
+    diagnostics: &mut Vec<Diagnostic>,
+    indexer: &Indexer,
+    locator: &Locator,
+) {
+    let block_comments = FxHashSet::from_iter(indexer.comment_ranges().block_comments(locator));
 
-    let last_non_whitespace_col = u32::try_from(
-        line.as_str()
-            .char_indices()
-            .rev()
-            .find(|&(_, char)| !is_python_whitespace(char))
-            .unwrap() // SAFETY: already verified at least one '#' char is in the line
-            .0,
-    )
-    .unwrap(); // SAFETY: already know line is valid and all TextSize indices are u32
+    for range in indexer.comment_ranges() {
+        // Ignore comments that are part of multi-line "comment blocks".
+        if block_comments.contains(&range.start()) {
+            continue;
+        }
 
-    if last_non_whitespace_col != first_hash_col {
-        return None; // the comment is not empty
+        // If the line contains an empty comment, add a diagnostic.
+        if let Some(diagnostic) = empty_comment(*range, locator) {
+            diagnostics.push(diagnostic);
+        }
+    }
+}
+
+/// Return a [`Diagnostic`] if the comment at the given [`TextRange`] is empty.
+fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
+    // Check: is the comment empty?
+    if !locator
+        .slice(range)
+        .chars()
+        .skip(1)
+        .all(is_python_whitespace)
+    {
+        return None;
     }
 
-    let deletion_start_col = match line
-        .as_str()
+    // Find the location of the `#`.
+    let first_hash_col = range.start();
+
+    // Find the start of the line.
+    let line = locator.line_range(first_hash_col);
+
+    // Find the last character in the line that precedes the comment, if any.
+    let deletion_start_col = locator
+        .slice(TextRange::new(line.start(), first_hash_col))
         .char_indices()
         .rev()
         .find(|&(_, c)| !is_python_whitespace(c) && c != '#')
-    {
-        Some((last_non_whitespace_non_comment_col, _)) => {
-            // SAFETY: (last_non_whitespace_non_comment_col + 1) <= u32::MAX because last_non_whitespace_col <= u32::MAX
-            // and last_non_whitespace_non_comment_col < last_non_whitespace_col
-            line.start()
-                + TextSize::new(u32::try_from(last_non_whitespace_non_comment_col + 1).unwrap())
-        }
-        None => line.start(),
-    };
+        .map(|(last_non_whitespace_non_comment_col, _)| {
+            // SAFETY: (last_non_whitespace_non_comment_col + 1) <= first_hash_col
+            TextSize::try_from(last_non_whitespace_non_comment_col).unwrap() + TextSize::new(1)
+        });
 
     Some(
-        Diagnostic::new(
-            EmptyComment,
-            TextRange::new(line.start() + TextSize::new(first_hash_col), line.end()),
-        )
-        .with_fix(Fix::safe_edit(Edit::deletion(
-            deletion_start_col,
-            line.end(),
-        ))),
+        Diagnostic::new(EmptyComment, TextRange::new(first_hash_col, line.end())).with_fix(
+            Fix::safe_edit(if let Some(deletion_start_col) = deletion_start_col {
+                Edit::deletion(line.start() + deletion_start_col, line.end())
+            } else {
+                Edit::range_deletion(locator.full_line_range(first_hash_col))
+            }),
+        ),
     )
 }

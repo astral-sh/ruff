@@ -49,15 +49,15 @@ impl CommentRanges {
         }
     }
 
-    /// Given a `CommentRanges`, determine which comments are grouped together
-    /// in block comments. Block comments are defined as a sequence of consecutive
-    /// lines which only contain comments and which all contain the first
-    /// `#` character in the same column.
+    /// Given a [`CommentRanges`], determine which comments are grouped together
+    /// in "comment blocks". A "comment block" is a sequence of consecutive
+    /// own-line comments in which the comment hash (`#`) appears in the same
+    /// column in each line.
     ///
-    /// Returns a vector of vectors, with each representing a block comment, and
-    /// the values of each being the offset of the leading `#` character of the comment.
+    /// Returns a vector containing the offset of the leading hash (`#`) for
+    /// each comment in any block comment.
     ///
-    /// Example:
+    /// ## Examples
     /// ```python
     /// # This is a block comment
     /// # because it spans multiple lines
@@ -79,20 +79,20 @@ impl CommentRanges {
     /// # contained within a multi-line string/comment
     /// """
     /// ```
-    pub fn block_comments(&self, locator: &Locator) -> Vec<Vec<TextSize>> {
-        let mut block_comments: Vec<Vec<TextSize>> = Vec::new();
+    pub fn block_comments(&self, locator: &Locator) -> Vec<TextSize> {
+        let mut block_comments: Vec<TextSize> = Vec::new();
 
         let mut current_block: Vec<TextSize> = Vec::new();
-        let mut current_block_column: Option<u32> = None;
-        let mut current_block_offset: Option<u32> = None;
+        let mut current_block_column: Option<TextSize> = None;
+        let mut current_block_offset: Option<TextSize> = None;
 
         for comment_range in &self.raw {
             let offset = comment_range.start();
             let line_start = locator.line_start(offset);
 
-            if Self::is_end_of_line(locator, line_start) {
+            if !Self::is_own_line(locator, offset) {
                 if current_block.len() > 1 {
-                    block_comments.push(current_block);
+                    block_comments.extend(current_block);
                     current_block = vec![];
                     current_block_column = None;
                     current_block_offset = None;
@@ -100,17 +100,17 @@ impl CommentRanges {
                 continue;
             }
 
-            let line_end = locator.full_line_end(offset).to_u32();
-            let column = (offset - line_start).to_u32();
+            let line_end = locator.full_line_end(offset);
+            let column = offset - line_start;
 
-            if let Some(c) = current_block_column {
-                if let Some(o) = current_block_offset {
-                    if column == c && line_start.to_u32() == o {
+            if let Some(current_column) = current_block_column {
+                if let Some(current_offset) = current_block_offset {
+                    if column == current_column && line_start == current_offset {
                         current_block.push(offset);
                         current_block_offset = Some(line_end);
                     } else {
                         if current_block.len() > 1 {
-                            block_comments.push(current_block);
+                            block_comments.extend(current_block);
                         }
                         current_block = vec![offset];
                         current_block_column = Some(column);
@@ -123,23 +123,18 @@ impl CommentRanges {
                 current_block_offset = Some(line_end);
             }
         }
+
         if current_block.len() > 1 {
-            block_comments.push(current_block);
+            block_comments.extend(current_block);
         }
+
         block_comments
     }
 
-    /// Returns `true` if a comment is an end-of-line comment (as opposed to an own-line comment).
-    fn is_end_of_line(locator: &Locator, offset_line_start: TextSize) -> bool {
-        let contents = locator.full_line(offset_line_start);
-        for char in contents.chars() {
-            if char == '#' || char == '\r' || char == '\n' {
-                return false;
-            } else if !is_python_whitespace(char) {
-                return true;
-            }
-        }
-        false
+    /// Returns `true` if a comment is an own-line comment (as opposed to an end-of-line comment).
+    fn is_own_line(locator: &Locator, offset: TextSize) -> bool {
+        let range = TextRange::new(locator.line_start(offset), offset);
+        locator.slice(range).chars().all(is_python_whitespace)
     }
 }
 
@@ -186,10 +181,7 @@ mod tests {
         let block_comments = indexer.comment_ranges().block_comments(&locator);
 
         // assert
-        assert_eq!(
-            block_comments,
-            vec![vec![TextSize::new(0), TextSize::new(9)]]
-        );
+        assert_eq!(block_comments, vec![TextSize::new(0), TextSize::new(9)]);
     }
 
     #[test]
@@ -204,10 +196,7 @@ mod tests {
         let block_comments = indexer.comment_ranges().block_comments(&locator);
 
         // assert
-        assert_eq!(
-            block_comments,
-            vec![vec![TextSize::new(4), TextSize::new(17)]]
-        );
+        assert_eq!(block_comments, vec![TextSize::new(4), TextSize::new(17)]);
     }
 
     #[test]
@@ -222,7 +211,7 @@ mod tests {
         let block_comments = indexer.comment_ranges().block_comments(&locator);
 
         // assert
-        assert_eq!(block_comments, Vec::<Vec<TextSize>>::new());
+        assert_eq!(block_comments, Vec::<TextSize>::new());
     }
 
     #[test]
@@ -237,7 +226,7 @@ mod tests {
         let block_comments = indexer.comment_ranges().block_comments(&locator);
 
         // assert
-        assert_eq!(block_comments, Vec::<Vec<TextSize>>::new());
+        assert_eq!(block_comments, Vec::<TextSize>::new());
     }
 
     #[test]
@@ -252,7 +241,7 @@ mod tests {
         let block_comments = indexer.comment_ranges().block_comments(&locator);
 
         // assert
-        assert_eq!(block_comments, Vec::<Vec<TextSize>>::new());
+        assert_eq!(block_comments, Vec::<TextSize>::new());
     }
 
     #[test]
@@ -272,7 +261,7 @@ mod tests {
         let block_comments = indexer.comment_ranges().block_comments(&locator);
 
         // assert
-        assert_eq!(block_comments, Vec::<Vec<TextSize>>::new());
+        assert_eq!(block_comments, Vec::<TextSize>::new());
     }
 
     #[test]
@@ -312,9 +301,16 @@ y = 2  # do not form a block comment
         assert_eq!(
             block_comments,
             vec![
-                vec![TextSize::new(1), TextSize::new(26)],
-                vec![TextSize::new(174), TextSize::new(212)],
-                vec![TextSize::new(219), TextSize::new(225), TextSize::new(247)]
+                // Block #1
+                TextSize::new(1),
+                TextSize::new(26),
+                // Block #2
+                TextSize::new(174),
+                TextSize::new(212),
+                // Block #3
+                TextSize::new(219),
+                TextSize::new(225),
+                TextSize::new(247)
             ]
         );
     }
