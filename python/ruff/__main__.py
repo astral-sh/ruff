@@ -2,6 +2,7 @@ import os
 import sys
 import sysconfig
 
+
 def find_ruff_bin() -> str:
     """Return the ruff binary path."""
 
