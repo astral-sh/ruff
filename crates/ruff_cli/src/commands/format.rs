@@ -408,11 +408,13 @@ pub(crate) fn format_source(
 pub(crate) enum FormatResult {
     /// The file was formatted.
     Formatted,
+
     /// The file was formatted, [`SourceKind`] contains the formatted code
     Diff {
         unformatted: SourceKind,
         formatted: SourceKind,
     },
+
     /// The file was unchanged, as the formatted contents matched the existing contents.
     Unchanged,
 

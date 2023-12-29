@@ -305,12 +305,6 @@ impl fmt::Display for ParseError {
     }
 }
 
-impl ParseError {
-    pub fn error(self) -> ParseErrorType {
-        self.error
-    }
-}
-
 /// Represents the different types of errors that can occur during parsing.
 #[derive(Debug, PartialEq)]
 pub enum ParseErrorType {
