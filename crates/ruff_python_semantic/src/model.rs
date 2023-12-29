@@ -707,7 +707,20 @@ impl<'a> SemanticModel<'a> {
                     };
                 Some(resolved)
             }
-            BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
+            BindingKind::Builtin => {
+                if value.is_name_expr() {
+                    // Ex) `dict`
+                    Some(smallvec!["", head.id.as_str()])
+                } else {
+                    // Ex) `dict.__dict__`
+                    let value_path = collect_call_path(value)?;
+                    Some(
+                        std::iter::once("")
+                            .chain(value_path.iter().copied())
+                            .collect(),
+                    )
+                }
+            }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
                 let value_path = collect_call_path(value)?;
                 let resolved: CallPath = self
