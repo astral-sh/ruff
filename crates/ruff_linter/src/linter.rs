@@ -336,10 +336,10 @@ pub fn add_noqa_to_path(
     );
 
     // Log any parse errors.
-    if let Some(err) = error {
+    if let Some(error) = error {
         error!(
             "{}",
-            DisplayParseError::new(err, locator.to_source_code(), source_kind)
+            DisplayParseError::new(error, locator.to_source_code(), source_kind)
         );
     }
 
