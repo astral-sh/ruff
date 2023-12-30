@@ -360,13 +360,13 @@ pub(crate) fn lint_path(
         error!(
             "{}",
             DisplayParseError::new(
-                err,
-                SourceCode::new(
+                &err,
+                &SourceCode::new(
                     source_kind.source_code(),
                     &LineIndex::from_source_text(source_kind.source_code())
                 ),
                 &source_kind,
-                path,
+                Some(path),
             )
         );
     }

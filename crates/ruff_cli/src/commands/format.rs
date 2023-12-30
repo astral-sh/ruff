@@ -17,13 +17,14 @@ use tracing::debug;
 
 use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
-use ruff_linter::logging::LogLevel;
+use ruff_linter::logging::{DisplayParseError, LogLevel};
 use ruff_linter::registry::Rule;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError, QuoteStyle};
+use ruff_source_file::{LineIndex, SourceCode};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::{
     match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile, Resolver,
@@ -244,7 +245,7 @@ pub(crate) fn format_path(
     // Extract the sources from the file.
     let unformatted = match SourceKind::from_path(path, source_type) {
         Ok(Some(source_kind)) => source_kind,
-        // Non Python Jupyter notebook
+        // Non-Python Jupyter notebook.
         Ok(None) => return Ok(FormatResult::Skipped),
         Err(err) => {
             return Err(FormatCommandError::Read(Some(path.to_path_buf()), err));
@@ -321,12 +322,13 @@ pub(crate) fn format_source(
     path: Option<&Path>,
     settings: &FormatterSettings,
 ) -> Result<FormattedSource, FormatCommandError> {
-    match source_kind {
+    match &source_kind {
         SourceKind::Python(unformatted) => {
             let options = settings.to_format_options(source_type, unformatted);
 
-            let formatted = format_module_source(unformatted, options)
-                .map_err(|err| FormatCommandError::Format(path.map(Path::to_path_buf), err))?;
+            let formatted = format_module_source(unformatted, options).map_err(|err| {
+                FormatCommandError::Format(path.map(Path::to_path_buf), source_kind.clone(), err)
+            })?;
 
             let formatted = formatted.into_code();
             if formatted.len() == unformatted.len() && formatted == *unformatted {
@@ -352,8 +354,14 @@ pub(crate) fn format_source(
                 let unformatted = &notebook.source_code()[range];
 
                 // Format the cell.
-                let formatted = format_module_source(unformatted, options.clone())
-                    .map_err(|err| FormatCommandError::Format(path.map(Path::to_path_buf), err))?;
+                let formatted =
+                    format_module_source(unformatted, options.clone()).map_err(|err| {
+                        FormatCommandError::Format(
+                            path.map(Path::to_path_buf),
+                            source_kind.clone(),
+                            err,
+                        )
+                    })?;
 
                 // If the cell is unchanged, skip it.
                 let formatted = formatted.as_code();
@@ -565,7 +573,7 @@ pub(crate) enum FormatCommandError {
     Ignore(#[from] ignore::Error),
     Panic(Option<PathBuf>, PanicError),
     Read(Option<PathBuf>, SourceError),
-    Format(Option<PathBuf>, FormatModuleError),
+    Format(Option<PathBuf>, SourceKind, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
     Diff(Option<PathBuf>, io::Error),
 }
@@ -582,7 +590,7 @@ impl FormatCommandError {
             }
             Self::Panic(path, _)
             | Self::Read(path, _)
-            | Self::Format(path, _)
+            | Self::Format(path, _, _)
             | Self::Write(path, _)
             | Self::Diff(path, _) => path.as_deref(),
         }
@@ -639,7 +647,22 @@ impl Display for FormatCommandError {
                     write!(f, "{}{} {err}", "Failed to write".bold(), ":".bold())
                 }
             }
-            Self::Format(path, err) => {
+            Self::Format(path, source_kind, FormatModuleError::ParseError(err)) => {
+                write!(
+                    f,
+                    "{}",
+                    DisplayParseError::new(
+                        err,
+                        &SourceCode::new(
+                            source_kind.source_code(),
+                            &LineIndex::from_source_text(source_kind.source_code()),
+                        ),
+                        source_kind,
+                        path.as_deref(),
+                    )
+                )
+            }
+            Self::Format(path, _source_kind, err) => {
                 if let Some(path) = path {
                     write!(
                         f,

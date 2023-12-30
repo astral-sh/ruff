@@ -348,7 +348,7 @@ from module import =
     ----- stdout -----
 
     ----- stderr -----
-    error: Failed to format main.py: source contains syntax errors: invalid syntax. Got unexpected token '=' at byte offset 20
+    error: Failed to parse main.py:2:20: Unexpected token '='
     "###);
 
     Ok(())

@@ -4,8 +4,8 @@
 
 use std::{borrow::Cow, collections::VecDeque};
 
+use ruff_python_parser::ParseError;
 use {once_cell::sync::Lazy, regex::Regex};
-
 use {
     ruff_formatter::{write, FormatOptions, IndentStyle, LineWidth, Printed},
     ruff_python_trivia::{is_python_whitespace, PythonWhitespace},
@@ -499,11 +499,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
         let printed = match docstring_format_source(options, self.quote_char, &codeblob) {
             Ok(printed) => printed,
             Err(FormatModuleError::FormatError(err)) => return Err(err),
-            Err(
-                FormatModuleError::LexError(_)
-                | FormatModuleError::ParseError(_)
-                | FormatModuleError::PrintError(_),
-            ) => {
+            Err(FormatModuleError::ParseError(_) | FormatModuleError::PrintError(_)) => {
                 return Ok(None);
             }
         };
@@ -1518,7 +1514,8 @@ fn docstring_format_source(
     use ruff_python_parser::AsMode;
 
     let source_type = options.source_type();
-    let (tokens, comment_ranges) = ruff_python_index::tokens_and_ranges(source, source_type)?;
+    let (tokens, comment_ranges) =
+        ruff_python_index::tokens_and_ranges(source, source_type).map_err(ParseError::from)?;
     let module = ruff_python_parser::parse_ok_tokens(tokens, source, source_type.as_mode())?;
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(&module, source_code, &comment_ranges);

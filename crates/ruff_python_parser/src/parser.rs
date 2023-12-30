@@ -391,6 +391,15 @@ impl ParseErrorType {
     }
 }
 
+impl From<LexicalError> for ParseError {
+    fn from(error: LexicalError) -> Self {
+        ParseError {
+            error: ParseErrorType::Lexical(error.error),
+            offset: error.location,
+        }
+    }
+}
+
 /// An expression that may be parenthesized.
 #[derive(Clone, Debug)]
 pub(super) struct ParenthesizedExpr {

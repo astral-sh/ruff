@@ -339,7 +339,7 @@ pub fn add_noqa_to_path(
     if let Some(error) = error {
         error!(
             "{}",
-            DisplayParseError::new(error, locator.to_source_code(), source_kind, path)
+            DisplayParseError::new(&error, &locator.to_source_code(), source_kind, Some(path))
         );
     }
 
