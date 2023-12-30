@@ -10,7 +10,6 @@ use colored::Colorize;
 use log::{debug, error, warn};
 use rustc_hash::FxHashMap;
 
-use crate::cache::{Cache, FileCacheKey, LintCacheData};
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
 use ruff_linter::logging::DisplayParseError;
@@ -24,9 +23,11 @@ use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
-use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
+use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
+
+use crate::cache::{Cache, FileCacheKey, LintCacheData};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -356,18 +357,10 @@ pub(crate) fn lint_path(
         }
     }
 
-    if let Some(err) = parse_error {
+    if let Some(error) = parse_error {
         error!(
             "{}",
-            DisplayParseError::new(
-                &err,
-                &SourceCode::new(
-                    source_kind.source_code(),
-                    &LineIndex::from_source_text(source_kind.source_code())
-                ),
-                &source_kind,
-                Some(path),
-            )
+            DisplayParseError::from_source_kind(error, Some(path.to_path_buf()), &source_kind,)
         );
     }
 
