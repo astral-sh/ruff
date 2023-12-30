@@ -1416,7 +1416,7 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let stmt = parse_suite(contents, "<filename>").unwrap();
+        let stmt = parse_suite(contents).unwrap();
         let mut generator = Generator::new(&indentation, quote, line_ending);
         generator.unparse_suite(&stmt);
         generator.generate()
@@ -1428,7 +1428,7 @@ mod tests {
         line_ending: LineEnding,
         contents: &str,
     ) -> String {
-        let stmt = parse_suite(contents, "<filename>").unwrap();
+        let stmt = parse_suite(contents).unwrap();
         let mut generator = Generator::new(indentation, quote, line_ending);
         generator.unparse_suite(&stmt);
         generator.generate()
@@ -1438,7 +1438,7 @@ mod tests {
         let indentation = Indentation::default();
         let quote = Quote::default();
         let line_ending = LineEnding::default();
-        let ast = ruff_python_parser::parse(contents, Mode::Ipython, "<filename>").unwrap();
+        let ast = ruff_python_parser::parse(contents, Mode::Ipython).unwrap();
         let Mod::Module(ModModule { body, .. }) = ast else {
             panic!("Source code didn't return ModModule")
         };

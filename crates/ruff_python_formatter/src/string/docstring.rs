@@ -524,11 +524,7 @@ impl<'ast, 'buf, 'fmt, 'src> DocstringLinePrinter<'ast, 'buf, 'fmt, 'src> {
                 std::format!(r#""""{}""""#, printed.as_code())
             }
         };
-        let result = ruff_python_parser::parse(
-            &wrapped,
-            self.f.options().source_type().as_mode(),
-            "<filename>",
-        );
+        let result = ruff_python_parser::parse(&wrapped, self.f.options().source_type().as_mode());
         // If the resulting code is not valid, then reset and pass through
         // the docstring lines as-is.
         if result.is_err() {
@@ -1523,8 +1519,7 @@ fn docstring_format_source(
 
     let source_type = options.source_type();
     let (tokens, comment_ranges) = ruff_python_index::tokens_and_ranges(source, source_type)?;
-    let module =
-        ruff_python_parser::parse_ok_tokens(tokens, source, source_type.as_mode(), "<filename>")?;
+    let module = ruff_python_parser::parse_ok_tokens(tokens, source, source_type.as_mode())?;
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(&module, source_code, &comment_ranges);
     let locator = Locator::new(source);

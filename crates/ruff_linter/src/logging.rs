@@ -140,6 +140,7 @@ pub struct DisplayParseError<'a> {
     error: ParseError,
     source_code: SourceCode<'a, 'a>,
     source_kind: &'a SourceKind,
+    path: &'a Path,
 }
 
 impl<'a> DisplayParseError<'a> {
@@ -147,11 +148,13 @@ impl<'a> DisplayParseError<'a> {
         error: ParseError,
         source_code: SourceCode<'a, 'a>,
         source_kind: &'a SourceKind,
+        path: &'a Path,
     ) -> Self {
         Self {
             error,
             source_code,
             source_kind,
+            path,
         }
     }
 }
@@ -162,7 +165,7 @@ impl Display for DisplayParseError<'_> {
             f,
             "{header} {path}{colon}",
             header = "Failed to parse".bold(),
-            path = fs::relativize_path(Path::new(&self.error.source_path)).bold(),
+            path = fs::relativize_path(self.path).bold(),
             colon = ":".cyan(),
         )?;
 
