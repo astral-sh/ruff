@@ -701,6 +701,19 @@ impl<'source> Lexer<'source> {
                     }
                 }
                 Some('\r' | '\n') if !triple_quoted => {
+                    if let Some(fstring) = self.fstrings.current() {
+                        // When we are in an f-string, check whether does the initial quote
+                        // matches with f-strings quotes and if it is, then this must be a
+                        // missing '}' token so raise the proper error.
+                        if fstring.quote_char() == quote && !fstring.is_triple_quoted() {
+                            return Err(LexicalError {
+                                error: LexicalErrorType::FStringError(
+                                    FStringErrorType::UnclosedLbrace,
+                                ),
+                                location: self.token_range(),
+                            });
+                        }
+                    }
                     return Err(LexicalError {
                         error: LexicalErrorType::UnclosedStringError,
                         location: self.token_range(),
@@ -718,6 +731,21 @@ impl<'source> Lexer<'source> {
 
                 Some(_) => {}
                 None => {
+                    if let Some(fstring) = self.fstrings.current() {
+                        // When we are in an f-string, check whether does the initial quote
+                        // matches with f-strings quotes and if it is, then this must be a
+                        // missing '}' token so raise the proper error.
+                        if fstring.quote_char() == quote
+                            && fstring.is_triple_quoted() == triple_quoted
+                        {
+                            return Err(LexicalError {
+                                error: LexicalErrorType::FStringError(
+                                    FStringErrorType::UnclosedLbrace,
+                                ),
+                                location: self.token_range(),
+                            });
+                        }
+                    }
                     return Err(LexicalError {
                         error: LexicalErrorType::UnclosedStringError,
                         location: self.token_range(),
@@ -804,7 +832,7 @@ impl<'source> Lexer<'source> {
         } else {
             // Reached the end of the file. Emit a trailing newline token if not at the beginning of a logical line,
             // empty the dedent stack, and finally, return the EndOfFile token.
-            Ok(self.consume_end())
+            self.consume_end()
         }
     }
 
@@ -932,24 +960,28 @@ impl<'source> Lexer<'source> {
         Ok(token)
     }
 
-    fn consume_end(&mut self) -> Spanned {
+    fn consume_end(&mut self) -> Result<Spanned, LexicalError> {
         // We reached end of file.
         // First of all, we need all nestings to be finished.
         if self.nesting > 0 {
             // Reset the nesting to avoid going into infinite loop.
             self.nesting = 0;
+            return Err(LexicalError {
+                error: LexicalErrorType::Eof,
+                location: self.token_range(),
+            });
         }
 
         // Next, insert a trailing newline, if required.
         if !self.state.is_new_logical_line() {
             self.state = State::AfterNewline;
-            (Tok::Newline, TextRange::empty(self.offset()))
+            Ok((Tok::Newline, TextRange::empty(self.offset())))
         }
         // Next, flush the indentation stack to zero.
         else if self.indentations.dedent().is_some() {
-            (Tok::Dedent, TextRange::empty(self.offset()))
+            Ok((Tok::Dedent, TextRange::empty(self.offset())))
         } else {
-            (Tok::EndOfFile, TextRange::empty(self.offset()))
+            Ok((Tok::EndOfFile, TextRange::empty(self.offset())))
         }
     }
 
@@ -2158,7 +2190,9 @@ f"{(lambda x:{x})}"
 
     #[test]
     fn test_fstring_error() {
-        use FStringErrorType::{SingleRbrace, UnterminatedString, UnterminatedTripleQuotedString};
+        use FStringErrorType::{
+            SingleRbrace, UnclosedLbrace, UnterminatedString, UnterminatedTripleQuotedString,
+        };
 
         assert_eq!(lex_fstring_error("f'}'"), SingleRbrace);
         assert_eq!(lex_fstring_error("f'{{}'"), SingleRbrace);
@@ -2168,6 +2202,17 @@ f"{(lambda x:{x})}"
         assert_eq!(lex_fstring_error("f'{a:b}}'"), SingleRbrace);
         assert_eq!(lex_fstring_error("f'{3:}}>10}'"), SingleRbrace);
         assert_eq!(lex_fstring_error(r"f'\{foo}\}'"), SingleRbrace);
+        assert_eq!(lex_fstring_error("f'{'"), UnclosedLbrace);
+        assert_eq!(lex_fstring_error("f'{foo!r'"), UnclosedLbrace);
+        assert_eq!(lex_fstring_error("f'{foo='"), UnclosedLbrace);
+        assert_eq!(
+            lex_fstring_error(
+                r#"f"{"
+"#
+            ),
+            UnclosedLbrace
+        );
+        assert_eq!(lex_fstring_error(r#"f"""{""""#), UnclosedLbrace);
 
         assert_eq!(lex_fstring_error(r#"f""#), UnterminatedString);
         assert_eq!(lex_fstring_error(r"f'"), UnterminatedString);
