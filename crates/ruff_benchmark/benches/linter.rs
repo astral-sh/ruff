@@ -58,8 +58,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                 let tokens = lexer::lex(case.code(), Mode::Module).collect::<Vec<_>>();
 
                 // Parse the source.
-                let ast =
-                    parse_program_tokens(tokens.clone(), case.code(), case.name(), false).unwrap();
+                let ast = parse_program_tokens(tokens.clone(), case.code(), false).unwrap();
 
                 b.iter(|| {
                     let path = case.path();

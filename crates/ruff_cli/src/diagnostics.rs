@@ -366,6 +366,7 @@ pub(crate) fn lint_path(
                     &LineIndex::from_source_text(source_kind.source_code())
                 ),
                 &source_kind,
+                path,
             )
         );
     }
