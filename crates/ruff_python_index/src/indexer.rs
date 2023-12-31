@@ -62,13 +62,22 @@ impl Indexer {
             comment_ranges_builder.visit_token(tok, *range);
             fstring_ranges_builder.visit_token(tok, *range);
 
-            if matches!(tok, Tok::Newline | Tok::NonLogicalNewline) {
-                line_start = range.end();
+            match tok {
+                Tok::Newline | Tok::NonLogicalNewline => {
+                    line_start = range.end();
+                }
+                Tok::String { .. } => {
+                    // If the previous token was a string, find the start of the line that contains
+                    // the closing delimiter, since the token itself can span multiple lines.
+                    line_start = locator.line_start(range.end());
+                }
+                _ => {}
             }
 
             prev_token = Some(tok);
             prev_end = range.end();
         }
+
         Self {
             comment_ranges: comment_ranges_builder.finish(),
             continuation_lines,
