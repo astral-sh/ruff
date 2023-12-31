@@ -8,7 +8,6 @@ use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallP
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
-use ruff_python_stdlib::typing::is_typing_extension;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -175,18 +174,11 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
-        if call_path.as_slice() == ["typing", target] {
+        if matches!(
+            call_path.as_slice(),
+            ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
+        ) {
             return true;
-        }
-
-        if call_path.as_slice() == ["_typeshed", target] {
-            return true;
-        }
-
-        if is_typing_extension(target) {
-            if call_path.as_slice() == ["typing_extensions", target] {
-                return true;
-            }
         }
 
         if self.typing_modules.iter().any(|module| {
