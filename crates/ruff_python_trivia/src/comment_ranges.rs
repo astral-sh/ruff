@@ -54,8 +54,8 @@ impl CommentRanges {
     /// own-line comments in which the comment hash (`#`) appears in the same
     /// column in each line, and at least one comment is non-empty.
     ///
-    /// Returns a vector containing the offset of the leading hash (`#`) for
-    /// each comment in any block comment.
+    /// Returns a sorted vector containing the offset of the leading hash (`#`)
+    /// for each comment in any block comment.
     ///
     /// ## Examples
     /// ```python
