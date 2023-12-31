@@ -88,10 +88,13 @@ fn empty_comment(range: TextRange, locator: &Locator) -> Option<Diagnostic> {
         .slice(TextRange::new(line.start(), first_hash_col))
         .char_indices()
         .rev()
-        .find(|&(_, c)| !is_python_whitespace(c) && c != '#')
-        .map(|(last_non_whitespace_non_comment_col, _)| {
-            // SAFETY: (last_non_whitespace_non_comment_col + 1) <= first_hash_col
-            TextSize::try_from(last_non_whitespace_non_comment_col).unwrap() + TextSize::new(1)
+        .find_map(|(index, char)| {
+            if is_python_whitespace(char) || char == '#' {
+                None
+            } else {
+                // SAFETY: <= first_hash_col
+                Some(TextSize::try_from(index + char.len_utf8()).unwrap())
+            }
         });
 
     Some(

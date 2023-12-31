@@ -115,4 +115,19 @@ empty_comment.py:45:1: PLR2044 [*] Line with empty comment
 47 46 | # These should also be removed.
 48 47 | 
 
+empty_comment.py:58:2: PLR2044 [*] Line with empty comment
+   |
+57 | α = 1
+58 | α#
+   |  ^ PLR2044
+   |
+   = help: Delete the empty comment
+
+ℹ Safe fix
+55 55 | # This should be removed.
+56 56 | 
+57 57 | α = 1
+58    |-α#
+   58 |+α
+
 
