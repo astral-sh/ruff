@@ -8,6 +8,15 @@ PYI050.py:13:24: PYI050 Prefer `typing.Never` over `NoReturn` for argument annot
 14 |     ...
    |
 
+PYI050.py:18:10: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
+   |
+17 | def foo_no_return_typing_extensions(
+18 |     arg: typing_extensions.NoReturn,
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI050
+19 | ):
+20 |     ...
+   |
+
 PYI050.py:23:44: PYI050 Prefer `typing.Never` over `NoReturn` for argument annotations
    |
 23 | def foo_no_return_kwarg(arg: int, *, arg2: NoReturn):
