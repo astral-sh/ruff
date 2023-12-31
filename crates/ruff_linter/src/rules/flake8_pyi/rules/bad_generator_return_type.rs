@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
-use ruff_python_semantic::{ScopeKind, SemanticModel};
+use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 
@@ -73,7 +73,7 @@ pub(crate) fn bad_generator_return_type(
     name: &str,
     returns: Option<&ast::Expr>,
     parameters: &ast::Parameters,
-    body: &Vec<ast::Stmt>,
+    body: &[ast::Stmt],
 ) {
     if is_async {
         return;
@@ -87,7 +87,7 @@ pub(crate) fn bad_generator_return_type(
 
     let semantic = checker.semantic();
 
-    if !matches!(checker.semantic().current_scope().kind, ScopeKind::Class(_)) {
+    if !semantic.current_scope().kind.is_class() {
         return;
     }
 
@@ -126,7 +126,7 @@ pub(crate) fn bad_generator_return_type(
         return;
     };
 
-    // `Generator`` allows three type parameters; `AsyncGenerator`` allows two.
+    // `Generator` allows three type parameters; `AsyncGenerator` allows two.
     // If type parameters are present,
     // Check that all parameters except the first one are either `typing.Any` or `None`;
     // if not, don't emit the diagnostic
@@ -138,7 +138,7 @@ pub(crate) fn bad_generator_return_type(
             (name, &elts[..]),
             ("__iter__", [_, _, _]) | ("__aiter__", [_, _])
         ) {
-            if !&elts[1..].iter().all(|elt| is_any_or_none(semantic, elt)) {
+            if !&elts.iter().skip(1).all(|elt| is_any_or_none(elt, semantic)) {
                 return;
             }
         } else {
@@ -186,6 +186,6 @@ pub(crate) fn bad_generator_return_type(
     ));
 }
 
-fn is_any_or_none(semantic: &SemanticModel, expr: &ast::Expr) -> bool {
+fn is_any_or_none(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
     semantic.match_typing_expr(expr, "Any") || matches!(expr, ast::Expr::NoneLiteral(_))
 }
