@@ -2,10 +2,8 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_python_trivia::is_python_whitespace;
-
 use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
-use rustc_hash::FxHashSet;
 
 /// ## What it does
 /// Checks for a # symbol appearing on a line not followed by an actual comment.
@@ -50,11 +48,11 @@ pub(crate) fn empty_comments(
     indexer: &Indexer,
     locator: &Locator,
 ) {
-    let block_comments = FxHashSet::from_iter(indexer.comment_ranges().block_comments(locator));
+    let block_comments = indexer.comment_ranges().block_comments(locator);
 
     for range in indexer.comment_ranges() {
         // Ignore comments that are part of multi-line "comment blocks".
-        if block_comments.contains(&range.start()) {
+        if block_comments.binary_search(&range.start()).is_ok() {
             continue;
         }
 
