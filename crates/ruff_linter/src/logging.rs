@@ -136,19 +136,21 @@ pub fn set_up_logging(level: &LogLevel) -> Result<()> {
     Ok(())
 }
 
+/// A wrapper around [`ParseError`] to translate byte offsets to user-facing
+/// source code locations (typically, line and column numbers).
 pub struct DisplayParseError<'a> {
-    error: ParseError,
-    source_code: SourceCode<'a, 'a>,
+    error: &'a ParseError,
+    source_code: &'a SourceCode<'a, 'a>,
     source_kind: &'a SourceKind,
-    path: &'a Path,
+    path: Option<&'a Path>,
 }
 
 impl<'a> DisplayParseError<'a> {
     pub fn new(
-        error: ParseError,
-        source_code: SourceCode<'a, 'a>,
+        error: &'a ParseError,
+        source_code: &'a SourceCode<'a, 'a>,
         source_kind: &'a SourceKind,
-        path: &'a Path,
+        path: Option<&'a Path>,
     ) -> Self {
         Self {
             error,
@@ -161,13 +163,22 @@ impl<'a> DisplayParseError<'a> {
 
 impl Display for DisplayParseError<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{header} {path}{colon}",
-            header = "Failed to parse".bold(),
-            path = fs::relativize_path(self.path).bold(),
-            colon = ":".cyan(),
-        )?;
+        if let Some(path) = self.path {
+            write!(
+                f,
+                "{header} {path}{colon}",
+                header = "Failed to parse".bold(),
+                path = fs::relativize_path(path).bold(),
+                colon = ":".cyan(),
+            )?;
+        } else {
+            write!(
+                f,
+                "{header}{colon}",
+                header = "Failed to parse".bold(),
+                colon = ":".cyan(),
+            )?;
+        }
 
         let source_location = self.source_code.source_location(self.error.offset);
 
