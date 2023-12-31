@@ -77,7 +77,7 @@ fn runtime_required_base_class(
     base_classes: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_over_body(class_def, semantic, &|call_path| {
+    analyze::class::any_call_path(class_def, semantic, &|call_path| {
         base_classes
             .iter()
             .any(|base_class| from_qualified_name(base_class) == call_path)
