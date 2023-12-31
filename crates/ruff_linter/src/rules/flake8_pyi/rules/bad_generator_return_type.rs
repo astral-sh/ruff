@@ -67,17 +67,14 @@ impl Violation for GeneratorReturnFromIterMethod {
 
 /// PYI058
 pub(crate) fn bad_generator_return_type(
+    function_def: &ast::StmtFunctionDef,
     checker: &mut Checker,
-    stmt: &ast::Stmt,
-    is_async: bool,
-    name: &str,
-    returns: Option<&ast::Expr>,
-    parameters: &ast::Parameters,
-    body: &[ast::Stmt],
 ) {
-    if is_async {
+    if function_def.is_async {
         return;
     }
+
+    let name = function_def.name.as_str();
 
     let better_return_type = match name {
         "__iter__" => "Iterator",
@@ -91,6 +88,8 @@ pub(crate) fn bad_generator_return_type(
         return;
     }
 
+    let parameters = &function_def.parameters;
+
     if !parameters.kwonlyargs.is_empty()
         || parameters.kwarg.is_some()
         || parameters.vararg.is_some()
@@ -102,8 +101,9 @@ pub(crate) fn bad_generator_return_type(
         return;
     }
 
-    let Some(returns) = returns else {
-        return;
+    let returns = match &function_def.returns {
+        Some(returns) => returns.as_ref(),
+        _ => return,
     };
 
     if !semantic
@@ -152,7 +152,7 @@ pub(crate) fn bad_generator_return_type(
     // it's more likely we'll be emitting a false positive here
     if !checker.source_type.is_stub() {
         let mut yield_encountered = false;
-        for stmt in body {
+        for stmt in &function_def.body {
             match stmt {
                 ast::Stmt::Pass(_) => continue,
                 ast::Stmt::Return(ast::StmtReturn { value, .. }) => {
@@ -182,7 +182,7 @@ pub(crate) fn bad_generator_return_type(
             better_return_type: better_return_type.to_string(),
             method_name: name.to_string(),
         },
-        stmt.identifier(),
+        function_def.identifier(),
     ));
 }
 

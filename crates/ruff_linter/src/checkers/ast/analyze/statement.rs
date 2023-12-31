@@ -155,15 +155,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::GeneratorReturnFromIterMethod) {
-                flake8_pyi::rules::bad_generator_return_type(
-                    checker,
-                    stmt,
-                    *is_async,
-                    name,
-                    returns.as_ref().map(AsRef::as_ref),
-                    parameters,
-                    body,
-                );
+                flake8_pyi::rules::bad_generator_return_type(function_def, checker);
             }
             if checker.enabled(Rule::CustomTypeVarReturnType) {
                 flake8_pyi::rules::custom_type_var_return_type(
