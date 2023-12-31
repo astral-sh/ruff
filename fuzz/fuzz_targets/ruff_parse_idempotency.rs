@@ -13,9 +13,9 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     };
 
     // round trip it once to get a formatted version
-    if let Ok(first) = round_trip(code, "fuzzed-source.py") {
+    if let Ok(first) = round_trip(code) {
         // round trip it a second time to get a case to compare against
-        if let Ok(second) = round_trip(&first, "fuzzed-source.py") {
+        if let Ok(second) = round_trip(&first) {
             if cfg!(feature = "full-idempotency") {
                 // potentially, we don't want to test for full idempotency, but just for unsteady states
                 // enable the "full-idempotency" feature when fuzzing for full idempotency
@@ -31,8 +31,7 @@ fn do_fuzz(case: &[u8]) -> Corpus {
             } else if first != second {
                 // by the third time we've round-tripped it, we shouldn't be introducing any more
                 // changes; if we do, then it's likely that we're in an unsteady parsing state
-                let third = round_trip(&second, "fuzzed-source.py")
-                    .expect("Couldn't round-trip the processed source.");
+                let third = round_trip(&second).expect("Couldn't round-trip the processed source.");
                 let diff = TextDiff::from_lines(&second, &third)
                     .unified_diff()
                     .header("Parsed twice", "Parsed three times")

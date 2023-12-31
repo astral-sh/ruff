@@ -248,7 +248,7 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = ruff_python_parser::parse(contents, Mode::Module, ".").map_err(into_error)?;
+        let parsed = ruff_python_parser::parse(contents, Mode::Module).map_err(into_error)?;
 
         Ok(format!("{parsed:#?}"))
     }
@@ -271,20 +271,20 @@ struct ParsedModule<'a> {
 }
 
 impl<'a> ParsedModule<'a> {
-    fn from_source(source: &'a str) -> Result<Self, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source, Mode::Module).collect();
+    fn from_source(source_code: &'a str) -> Result<Self, Error> {
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source_code, Mode::Module).collect();
         let mut comment_ranges = CommentRangesBuilder::default();
 
         for (token, range) in tokens.iter().flatten() {
             comment_ranges.visit_token(token, *range);
         }
         let comment_ranges = comment_ranges.finish();
-        let module = parse_tokens(tokens, source, Mode::Module, ".").map_err(into_error)?;
+        let module = parse_tokens(tokens, source_code, Mode::Module).map_err(into_error)?;
 
         Ok(Self {
-            source_code: source,
-            comment_ranges,
+            source_code,
             module,
+            comment_ranges,
         })
     }
 

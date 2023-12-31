@@ -1632,13 +1632,16 @@ pub struct Flake8TypeCheckingOptions {
     )]
     pub runtime_evaluated_base_classes: Option<Vec<String>>,
 
-    /// Exempt classes decorated with any of the enumerated decorators from
-    /// needing to be moved into type-checking blocks.
+    /// Exempt classes and functions decorated with any of the enumerated
+    /// decorators from being moved into type-checking blocks.
+    ///
+    /// Common examples include Pydantic's `@pydantic.validate_call` decorator
+    /// (for functions) and attrs' `@attrs.define` decorator (for classes).
     #[option(
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            runtime-evaluated-decorators = ["attrs.define", "attrs.frozen"]
+            runtime-evaluated-decorators = ["pydantic.validate_call", "attrs.define"]
         "#
     )]
     pub runtime_evaluated_decorators: Option<Vec<String>>,

@@ -28,21 +28,29 @@ pub(super) enum AnnotationContext {
 impl AnnotationContext {
     pub(super) fn from_model(semantic: &SemanticModel, settings: &LinterSettings) -> Self {
         // If the annotation is in a class scope (e.g., an annotated assignment for a
-        // class field), and that class is marked as annotation as runtime-required.
-        if semantic
-            .current_scope()
-            .kind
-            .as_class()
-            .is_some_and(|class_def| {
-                flake8_type_checking::helpers::runtime_required_class(
+        // class field) or a function scope, and that class or function is marked as
+        // runtime-required, treat the annotation as runtime-required.
+        match semantic.current_scope().kind {
+            ScopeKind::Class(class_def)
+                if flake8_type_checking::helpers::runtime_required_class(
                     class_def,
                     &settings.flake8_type_checking.runtime_required_base_classes,
                     &settings.flake8_type_checking.runtime_required_decorators,
                     semantic,
-                )
-            })
-        {
-            return Self::RuntimeRequired;
+                ) =>
+            {
+                return Self::RuntimeRequired
+            }
+            ScopeKind::Function(function_def)
+                if flake8_type_checking::helpers::runtime_required_function(
+                    function_def,
+                    &settings.flake8_type_checking.runtime_required_decorators,
+                    semantic,
+                ) =>
+            {
+                return Self::RuntimeRequired
+            }
+            _ => {}
         }
 
         // If `__future__` annotations are enabled, then annotations are never evaluated

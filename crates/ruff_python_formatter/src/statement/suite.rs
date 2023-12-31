@@ -746,7 +746,7 @@ def trailing_func():
     pass
 ";
 
-        let statements = parse_suite(source, "test.py").unwrap();
+        let statements = parse_suite(source).unwrap();
 
         let comment_ranges = CommentRanges::default();
         let context = PyFormatContext::new(

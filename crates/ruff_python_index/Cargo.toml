@@ -20,8 +20,6 @@ ruff_python_parser = { path = "../ruff_python_parser" }
 ruff_source_file = { path = "../ruff_source_file" }
 ruff_text_size = { path = "../ruff_text_size" }
 
-itertools = { workspace = true }
-
 [dev-dependencies]
 
 [lints]

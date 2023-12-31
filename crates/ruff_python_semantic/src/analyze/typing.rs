@@ -15,7 +15,7 @@ use crate::analyze::type_inference::{PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
 use crate::{Binding, BindingKind};
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Callable {
     Bool,
     Cast,
@@ -26,7 +26,7 @@ pub enum Callable {
     MypyExtension,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum SubscriptKind {
     /// A subscript of the form `typing.Literal["foo", "bar"]`, i.e., a literal.
     Literal,

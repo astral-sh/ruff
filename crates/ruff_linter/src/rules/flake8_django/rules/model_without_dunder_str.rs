@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{analyze, SemanticModel};
 
 use crate::checkers::ast::Checker;
 
@@ -55,9 +55,11 @@ pub(crate) fn model_without_dunder_str(checker: &mut Checker, class_def: &ast::S
     if !is_non_abstract_model(class_def, checker.semantic()) {
         return;
     }
-    if has_dunder_method(class_def) {
+
+    if has_dunder_method(class_def, checker.semantic()) {
         return;
     }
+
     checker.diagnostics.push(Diagnostic::new(
         DjangoModelWithoutDunderStr,
         class_def.identifier(),
@@ -65,10 +67,12 @@ pub(crate) fn model_without_dunder_str(checker: &mut Checker, class_def: &ast::S
 }
 
 /// Returns `true` if the class has `__str__` method.
-fn has_dunder_method(class_def: &ast::StmtClassDef) -> bool {
-    class_def.body.iter().any(|val| match val {
-        Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name == "__str__",
-        _ => false,
+fn has_dunder_method(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    analyze::class::any_super_class(class_def, semantic, &|class_def| {
+        class_def.body.iter().any(|val| match val {
+            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name == "__str__",
+            _ => false,
+        })
     })
 }
 
