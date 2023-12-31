@@ -24,7 +24,6 @@ use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError, QuoteStyle};
-use ruff_source_file::{LineIndex, SourceCode};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::resolver::{
     match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile, Resolver,
@@ -327,7 +326,16 @@ pub(crate) fn format_source(
             let options = settings.to_format_options(source_type, unformatted);
 
             let formatted = format_module_source(unformatted, options).map_err(|err| {
-                FormatCommandError::Format(path.map(Path::to_path_buf), source_kind.clone(), err)
+                if let FormatModuleError::ParseError(err) = err {
+                    DisplayParseError::from_source_kind(
+                        err,
+                        path.map(Path::to_path_buf),
+                        source_kind,
+                    )
+                    .into()
+                } else {
+                    FormatCommandError::Format(path.map(Path::to_path_buf), err)
+                }
             })?;
 
             let formatted = formatted.into_code();
@@ -356,11 +364,16 @@ pub(crate) fn format_source(
                 // Format the cell.
                 let formatted =
                     format_module_source(unformatted, options.clone()).map_err(|err| {
-                        FormatCommandError::Format(
-                            path.map(Path::to_path_buf),
-                            source_kind.clone(),
-                            err,
-                        )
+                        if let FormatModuleError::ParseError(err) = err {
+                            DisplayParseError::from_source_kind(
+                                err,
+                                path.map(Path::to_path_buf),
+                                source_kind,
+                            )
+                            .into()
+                        } else {
+                            FormatCommandError::Format(path.map(Path::to_path_buf), err)
+                        }
                     })?;
 
                 // If the cell is unchanged, skip it.
@@ -571,9 +584,10 @@ impl<'a> FormatResults<'a> {
 #[derive(Error, Debug)]
 pub(crate) enum FormatCommandError {
     Ignore(#[from] ignore::Error),
+    Parse(#[from] DisplayParseError),
     Panic(Option<PathBuf>, PanicError),
     Read(Option<PathBuf>, SourceError),
-    Format(Option<PathBuf>, SourceKind, FormatModuleError),
+    Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
     Diff(Option<PathBuf>, io::Error),
 }
@@ -588,9 +602,10 @@ impl FormatCommandError {
                     None
                 }
             }
+            Self::Parse(err) => err.path(),
             Self::Panic(path, _)
             | Self::Read(path, _)
-            | Self::Format(path, _, _)
+            | Self::Format(path, _)
             | Self::Write(path, _)
             | Self::Diff(path, _) => path.as_deref(),
         }
@@ -621,6 +636,9 @@ impl Display for FormatCommandError {
                     )
                 }
             }
+            Self::Parse(err) => {
+                write!(f, "{err}")
+            }
             Self::Read(path, err) => {
                 if let Some(path) = path {
                     write!(
@@ -647,22 +665,7 @@ impl Display for FormatCommandError {
                     write!(f, "{}{} {err}", "Failed to write".bold(), ":".bold())
                 }
             }
-            Self::Format(path, source_kind, FormatModuleError::ParseError(err)) => {
-                write!(
-                    f,
-                    "{}",
-                    DisplayParseError::new(
-                        err,
-                        &SourceCode::new(
-                            source_kind.source_code(),
-                            &LineIndex::from_source_text(source_kind.source_code()),
-                        ),
-                        source_kind,
-                        path.as_deref(),
-                    )
-                )
-            }
-            Self::Format(path, _source_kind, err) => {
+            Self::Format(path, err) => {
                 if let Some(path) = path {
                     write!(
                         f,

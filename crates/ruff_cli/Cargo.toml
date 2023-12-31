@@ -15,16 +15,16 @@ readme = "../../README.md"
 name = "ruff"
 
 [dependencies]
-ruff_linter = { path = "../ruff_linter", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
-ruff_notebook = { path = "../ruff_notebook" }
+ruff_linter = { path = "../ruff_linter", features = ["clap"] }
 ruff_macros = { path = "../ruff_macros" }
+ruff_notebook = { path = "../ruff_notebook" }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_formatter = { path = "../ruff_python_formatter" }
 ruff_source_file = { path = "../ruff_source_file" }
-ruff_workspace = { path = "../ruff_workspace" }
 ruff_text_size = { path = "../ruff_text_size" }
+ruff_workspace = { path = "../ruff_workspace" }
 
 anyhow = { workspace = true }
 argfile = { version = "0.1.6" }
