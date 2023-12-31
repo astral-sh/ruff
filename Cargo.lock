@@ -443,12 +443,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "configparser"
-version = "3.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0e56e414a2a52ab2a104f85cd40933c2fbc278b83637facf646ecf451b49237"
-
-[[package]]
 name = "console"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -805,30 +799,6 @@ name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
-
-[[package]]
-name = "flake8-to-ruff"
-version = "0.1.9"
-dependencies = [
- "anyhow",
- "clap",
- "colored",
- "configparser",
- "itertools 0.11.0",
- "log",
- "once_cell",
- "pep440_rs 0.4.0",
- "pretty_assertions",
- "regex",
- "ruff_linter",
- "ruff_workspace",
- "rustc-hash",
- "serde",
- "serde_json",
- "strum",
- "strum_macros",
- "toml",
-]
 
 [[package]]
 name = "flate2"
