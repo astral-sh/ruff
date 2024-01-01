@@ -53,19 +53,19 @@ use super::Parser;
 ///
 /// print(foo())
 /// "#;
-/// let program = parser::parse_program(source, "<embedded>");
+/// let program = parser::parse_program(source);
 /// assert!(program.is_ok());
 /// ```
-pub fn parse_program(source: &str, source_path: &str) -> Result<ModModule, ParseError> {
+pub fn parse_program(source: &str) -> Result<ModModule, ParseError> {
     let lexer = lex(source, Mode::Module);
-    match parse_tokens(lexer, source, Mode::Module, source_path)? {
+    match parse_tokens(lexer, source, Mode::Module)? {
         Mod::Module(m) => Ok(m),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
 }
 
-pub fn parse_suite(source: &str, source_path: &str) -> Result<Suite, ParseError> {
-    parse_program(source, source_path).map(|m| m.body)
+pub fn parse_suite(source: &str) -> Result<Suite, ParseError> {
+    parse_program(source).map(|m| m.body)
 }
 
 /// Parses a single Python expression.
@@ -79,14 +79,14 @@ pub fn parse_suite(source: &str, source_path: &str) -> Result<Suite, ParseError>
 ///
 ///  ```
 /// use ruff_python_parser as parser;
-/// let expr = parser::parse_expression("1 + 2", "<embedded>");
+/// let expr = parser::parse_expression("1 + 2");
 ///
 /// assert!(expr.is_ok());
 ///
 /// ```
-pub fn parse_expression(source: &str, source_path: &str) -> Result<Expr, ParseError> {
+pub fn parse_expression(source: &str) -> Result<Expr, ParseError> {
     let lexer = lex(source, Mode::Expression);
-    match parse_tokens(lexer, source, Mode::Expression, source_path)? {
+    match parse_tokens(lexer, source, Mode::Expression)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
     }
@@ -106,16 +106,12 @@ pub fn parse_expression(source: &str, source_path: &str) -> Result<Expr, ParseEr
 /// use ruff_python_parser::{parse_expression_starts_at};
 /// # use ruff_text_size::TextSize;
 ///
-/// let expr = parse_expression_starts_at("1 + 2", "<embedded>", TextSize::from(400));
+/// let expr = parse_expression_starts_at("1 + 2", TextSize::from(400));
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_expression_starts_at(
-    source: &str,
-    source_path: &str,
-    offset: TextSize,
-) -> Result<Expr, ParseError> {
+pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr, ParseError> {
     let lexer = lex_starts_at(source, Mode::Module, offset);
-    match parse_tokens(lexer, source, Mode::Expression, source_path)? {
+    match parse_tokens(lexer, source, Mode::Expression)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
     }
@@ -135,7 +131,7 @@ pub fn parse_expression_starts_at(
 /// ```
 /// use ruff_python_parser::{Mode, parse};
 ///
-/// let expr = parse("1 + 2", Mode::Expression, "<embedded>");
+/// let expr = parse("1 + 2", Mode::Expression);
 /// assert!(expr.is_ok());
 /// ```
 ///
@@ -150,7 +146,7 @@ pub fn parse_expression_starts_at(
 ///   def greet(self):
 ///    print("Hello, world!")
 /// "#;
-/// let program = parse(source, Mode::Module, "<embedded>");
+/// let program = parse(source, Mode::Module);
 /// assert!(program.is_ok());
 /// ```
 ///
@@ -164,11 +160,11 @@ pub fn parse_expression_starts_at(
 /// ?str.replace
 /// !ls
 /// "#;
-/// let program = parse(source, Mode::Ipython, "<embedded>");
+/// let program = parse(source, Mode::Ipython);
 /// assert!(program.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<Mod, ParseError> {
-    parse_starts_at(source, mode, source_path, TextSize::default())
+pub fn parse(source: &str, mode: Mode) -> Result<Mod, ParseError> {
+    parse_starts_at(source, mode, TextSize::default())
 }
 
 /// Parse the given Python source code using the specified [`Mode`] and [`TextSize`].
@@ -191,17 +187,12 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<Mod, ParseEr
 ///
 /// print(fib(42))
 /// "#;
-/// let program = parse_starts_at(source, Mode::Module, "<embedded>", TextSize::from(0));
+/// let program = parse_starts_at(source, Mode::Module, TextSize::from(0));
 /// assert!(program.is_ok());
 /// ```
-pub fn parse_starts_at(
-    source: &str,
-    mode: Mode,
-    source_path: &str,
-    offset: TextSize,
-) -> Result<Mod, ParseError> {
+pub fn parse_starts_at(source: &str, mode: Mode, offset: TextSize) -> Result<Mod, ParseError> {
     let lxr = lexer::lex_starts_at(source, mode, offset);
-    parse_tokens(lxr, source, mode, source_path)
+    parse_tokens(lxr, source, mode)
 }
 
 /// Parse an iterator of [`LexResult`]s using the specified [`Mode`].
@@ -217,14 +208,13 @@ pub fn parse_starts_at(
 /// use ruff_python_parser::{lexer::lex, Mode, parse_tokens};
 ///
 /// let source = "1 + 2";
-/// let expr = parse_tokens(lex(source, Mode::Expression), source, Mode::Expression, "<embedded>");
+/// let expr = parse_tokens(lex(source, Mode::Expression), source, Mode::Expression);
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_tokens(
     lxr: impl IntoIterator<Item = LexResult>,
     source: &str,
     mode: Mode,
-    source_path: &str,
 ) -> Result<Mod, ParseError> {
     let lxr = lxr.into_iter();
 
@@ -232,7 +222,6 @@ pub fn parse_tokens(
         lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline)),
         source,
         mode,
-        source_path,
     )
 }
 
@@ -240,13 +229,12 @@ pub fn parse_ok_tokens_new(
     lxr: impl IntoIterator<Item = Spanned>,
     source: &str,
     mode: Mode,
-    source_path: &str,
 ) -> Result<Mod, ParseError> {
     let lxr = lxr
         .into_iter()
         .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline))
         .map(Ok::<(Tok, TextRange), LexicalError>);
-    let parsed_file = Parser::new(source, source_path, mode, lxr).parse();
+    let parsed_file = Parser::new(source, mode, lxr).parse();
     if parsed_file.parse_errors.is_empty() {
         Ok(parsed_file.ast)
     } else {
@@ -258,7 +246,6 @@ pub fn parse_ok_tokens_lalrpop(
     lxr: impl IntoIterator<Item = Spanned>,
     source: &str,
     mode: Mode,
-    source_path: &str,
 ) -> Result<Mod, ParseError> {
     let lxr = lxr
         .into_iter()
@@ -269,7 +256,7 @@ pub fn parse_ok_tokens_lalrpop(
         .map(|(t, range)| (range.start(), t, range.end()));
     python::TopParser::new()
         .parse(source, mode, lexer)
-        .map_err(|e| parse_error_from_lalrpop(e, source_path))
+        .map_err(|e| parse_error_from_lalrpop(e))
 }
 
 /// Parse tokens into an AST like [`parse_tokens`], but we already know all tokens are valid.
@@ -277,12 +264,11 @@ pub fn parse_ok_tokens(
     lxr: impl IntoIterator<Item = Spanned>,
     source: &str,
     mode: Mode,
-    source_path: &str,
 ) -> Result<Mod, ParseError> {
     if std::env::var("NEW_PARSER").is_ok() {
-        parse_ok_tokens_new(lxr, source, mode, source_path)
+        parse_ok_tokens_new(lxr, source, mode)
     } else {
-        parse_ok_tokens_lalrpop(lxr, source, mode, source_path)
+        parse_ok_tokens_lalrpop(lxr, source, mode)
     }
 }
 
@@ -290,10 +276,9 @@ fn parse_filtered_tokens(
     lxr: impl IntoIterator<Item = LexResult>,
     source: &str,
     mode: Mode,
-    source_path: &str,
 ) -> Result<Mod, ParseError> {
     if std::env::var("NEW_PARSER").is_ok() {
-        let parsed_file = Parser::new(source, source_path, mode, lxr.into_iter()).parse();
+        let parsed_file = Parser::new(source, mode, lxr.into_iter()).parse();
         if parsed_file.parse_errors.is_empty() {
             Ok(parsed_file.ast)
         } else {
@@ -308,32 +293,24 @@ fn parse_filtered_tokens(
                 mode,
                 lexer.map_ok(|(t, range)| (range.start(), t, range.end())),
             )
-            .map_err(|e| parse_error_from_lalrpop(e, source_path))
+            .map_err(|e| parse_error_from_lalrpop(e))
     }
 }
 
-fn parse_error_from_lalrpop(
-    err: LalrpopError<TextSize, Tok, LexicalError>,
-    source_path: &str,
-) -> ParseError {
-    let source_path = source_path.to_owned();
-
+fn parse_error_from_lalrpop(err: LalrpopError<TextSize, Tok, LexicalError>) -> ParseError {
     match err {
         // TODO: Are there cases where this isn't an EOF?
         LalrpopError::InvalidToken { location } => ParseError {
             error: ParseErrorType::Eof,
             location: TextRange::empty(location),
-            source_path,
         },
         LalrpopError::ExtraToken { token } => ParseError {
             error: ParseErrorType::ExtraToken(token.1),
             location: TextRange::new(token.0, token.2),
-            source_path,
         },
         LalrpopError::User { error } => ParseError {
             error: ParseErrorType::Lexical(error.error),
             location: error.location,
-            source_path,
         },
         LalrpopError::UnrecognizedToken { token, expected } => {
             // Hacky, but it's how CPython does it. See PyParser_AddToken,
@@ -342,7 +319,6 @@ fn parse_error_from_lalrpop(
             ParseError {
                 error: ParseErrorType::UnrecognizedToken(token.1, expected),
                 location: TextRange::new(token.0, token.2),
-                source_path,
             }
         }
         LalrpopError::UnrecognizedEof { location, expected } => {
@@ -352,13 +328,11 @@ fn parse_error_from_lalrpop(
                 ParseError {
                     error: ParseErrorType::Lexical(LexicalErrorType::IndentationError),
                     location: TextRange::empty(location),
-                    source_path,
                 }
             } else {
                 ParseError {
                     error: ParseErrorType::Eof,
                     location: TextRange::empty(location),
-                    source_path,
                 }
             }
         }

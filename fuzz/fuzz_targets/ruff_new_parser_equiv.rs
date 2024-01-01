@@ -20,12 +20,8 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         return Corpus::Keep; // keep even rejected source code as this may allow us to explore later
     };
 
-    let source_path = "fuzzed-source.py";
-
-    let module_new =
-        parse_ok_tokens_new(tokens.clone(), source, source_type.as_mode(), source_path);
-    let module_lalrpop =
-        parse_ok_tokens_lalrpop(tokens, source, source_type.as_mode(), source_path);
+    let module_new = parse_ok_tokens_new(tokens.clone(), source, source_type.as_mode());
+    let module_lalrpop = parse_ok_tokens_lalrpop(tokens, source, source_type.as_mode());
 
     assert_eq!(module_lalrpop.is_ok(), module_new.is_ok());
 

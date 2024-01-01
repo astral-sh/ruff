@@ -114,10 +114,7 @@ pub(crate) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
 }
 
 // Perform validation of function/lambda parameters in a function definition.
-pub(crate) fn validate_parameters(
-    parameters: &ast::Parameters,
-    src_path: &str,
-) -> Result<(), ParseError> {
+pub(crate) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), ParseError> {
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         parameters.posonlyargs.len()
             + parameters.args.len()
@@ -146,7 +143,6 @@ pub(crate) fn validate_parameters(
         if !all_arg_names.insert(arg_name) {
             return Err(ParseError {
                 error: ParseErrorType::DuplicateArgumentError(arg_name.to_string()),
-                source_path: src_path.to_string(),
                 location: range,
             });
         }
@@ -155,10 +151,7 @@ pub(crate) fn validate_parameters(
     Ok(())
 }
 
-pub(crate) fn validate_arguments(
-    arguments: &ast::Arguments,
-    src_path: &str,
-) -> Result<(), ParseError> {
+pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), ParseError> {
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         arguments.keywords.len(),
         BuildHasherDefault::default(),
@@ -173,7 +166,6 @@ pub(crate) fn validate_arguments(
         if !all_arg_names.insert(arg_name) {
             return Err(ParseError {
                 error: ParseErrorType::DuplicateKeywordArgumentError(arg_name.to_string()),
-                source_path: src_path.to_string(),
                 location: range,
             });
         }

@@ -10,7 +10,6 @@ use crate::{lexer::LexicalErrorType, Tok, TokenKind};
 pub struct ParseError {
     pub error: ParseErrorType,
     pub location: TextRange,
-    pub source_path: String,
 }
 
 impl std::ops::Deref for ParseError {

@@ -12,7 +12,7 @@ mod tests {
         let mode = Mode::Module;
         let lexer = lex(src, mode)
             .filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-        let parser = Parser::new(src, "<test>", mode, lexer);
+        let parser = Parser::new(src, mode, lexer);
         parser.parse()
     }
 

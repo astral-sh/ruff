@@ -65,12 +65,11 @@ enum Associativity {
     Right,
 }
 
-pub(crate) struct Parser<'src, 'src_path, I>
+pub(crate) struct Parser<'src, I>
 where
     I: Iterator<Item = LexResult>,
 {
     source: &'src str,
-    source_path: &'src_path str,
     lexer: PeekNth<I>,
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
@@ -181,20 +180,18 @@ const SIMPLE_STMT_SET: TokenSet = TokenSet::new(&[
 /// Tokens that represent simple statements, including expressions.
 const SIMPLE_STMT_SET2: TokenSet = SIMPLE_STMT_SET.union(EXPR_SET);
 
-impl<'src, 'src_path, I> Parser<'src, 'src_path, I>
+impl<'src, I> Parser<'src, I>
 where
     I: Iterator<Item = LexResult>,
 {
     pub(crate) fn new(
         source: &'src str,
-        source_path: &'src_path str,
         mode: Mode,
         lexer: I,
-    ) -> Parser<'src, 'src_path, impl Iterator<Item = LexResult>> {
+    ) -> Parser<'src, impl Iterator<Item = LexResult>> {
         Parser {
             mode,
             source,
-            source_path,
             errors: Vec::new(),
             ctx_stack: Vec::new(),
             ctx: ParserCtxFlags::empty(),
@@ -378,7 +375,6 @@ where
         self.errors.push(ParseError {
             error,
             location: range,
-            source_path: self.source_path.to_string(),
         });
     }
 
@@ -448,7 +444,7 @@ where
         opening: TokenKind,
         delim: TokenKind,
         closing: TokenKind,
-        mut func: impl FnMut(&mut Parser<'src, 'src_path, I>),
+        mut func: impl FnMut(&mut Parser<'src, I>),
     ) -> TextRange {
         let start_range = self.current_range();
         assert!(self.eat(opening));
@@ -482,7 +478,7 @@ where
         allow_trailing_delim: bool,
         delim: TokenKind,
         ending_set: impl Into<TokenSet>,
-        mut func: impl FnMut(&mut Parser<'src, 'src_path, I>) -> TextRange,
+        mut func: impl FnMut(&mut Parser<'src, I>) -> TextRange,
     ) -> Option<TextRange> {
         let ending_set = NEWLINE_EOF_SET.union(ending_set.into());
         let mut final_range = None;
@@ -2696,7 +2692,7 @@ where
     /// to the list of errors and returns an `Expr::Invalid`.
     fn parse_expr_with_recovery(
         &mut self,
-        mut parse_func: impl FnMut(&mut Parser<'src, 'src_path, I>) -> ExprWithRange,
+        mut parse_func: impl FnMut(&mut Parser<'src, I>) -> ExprWithRange,
         recover_set: impl Into<TokenSet>,
         error_msg: impl Display,
     ) -> ExprWithRange {
@@ -3053,7 +3049,7 @@ where
             keywords,
         };
 
-        if let Err(error) = helpers::validate_arguments(&arguments, self.source_path) {
+        if let Err(error) = helpers::validate_arguments(&arguments) {
             self.errors.push(error);
         }
 
@@ -3830,7 +3826,7 @@ where
         &mut self,
         first_element: Expr,
         first_element_range: TextRange,
-        mut parse_func: impl FnMut(&mut Parser<'src, 'src_path, I>) -> ExprWithRange,
+        mut parse_func: impl FnMut(&mut Parser<'src, I>) -> ExprWithRange,
     ) -> ExprWithRange {
         self.set_ctx(ParserCtxFlags::TUPLE_EXPR);
         // In case of the tuple only having one element, we need to cover the
@@ -4414,7 +4410,7 @@ where
             kwarg,
         };
 
-        if let Err(error) = helpers::validate_parameters(&parameters, self.source_path) {
+        if let Err(error) = helpers::validate_parameters(&parameters) {
             self.errors.push(error);
         }
 
