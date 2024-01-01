@@ -1324,7 +1324,7 @@ impl std::fmt::Display for LexicalError {
             f,
             "{} at byte offset {}",
             &self.error,
-            u32::from(self.location)
+            u32::from(self.location.start())
         )
     }
 }
