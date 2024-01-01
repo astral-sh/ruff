@@ -7,63 +7,63 @@ mod tests {
 
     #[test]
     fn test_parse_empty() {
-        let parse_ast = parse_suite("", "<test>").unwrap();
+        let parse_ast = parse_suite("").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_string() {
         let source = "'Hello world'";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_f_string() {
         let source = "f'Hello world'";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_print_hello() {
         let source = "print('Hello world')";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_print_2() {
         let source = "print('Hello world', 2)";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_kwargs() {
         let source = "my_func('positional', keyword=2)";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_if_elif_else() {
         let source = "if 1: 10\nelif 2: 20\nelse: 30";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_lambda() {
         let source = "lambda x, y: x * y"; // lambda(x, y): x * y";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_lambda_no_args() {
         let source = "lambda: 1";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -71,7 +71,7 @@ mod tests {
     fn test_parse_tuples() {
         let source = "a, b = 4, 5";
 
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -83,7 +83,7 @@ class Foo(A, B):
  def method_with_default(self, arg='default'):
   pass
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -114,7 +114,7 @@ class Foo[**P](): ...
 class Foo[X, Y: str, *U, **P]():
   pass
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
     #[test]
     fn test_parse_function_definition() {
@@ -140,76 +140,76 @@ def func[**P](*args: P.args, **kwargs: P.kwargs):
 def func[T, U: str, *Ts, **P]():
     pass
   ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
     fn test_parse_dict_comprehension() {
         let source = "{x1: x2 for y in z}";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_list_comprehension() {
         let source = "[x for y in z]";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_double_list_comprehension() {
         let source = "[x for y, y2 in z for a in b if a < 5 if a > 10]";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_generator_comprehension() {
         let source = "(x for y in z)";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_named_expression_generator_comprehension() {
         let source = "(x := y + 1 for y in z)";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_if_else_generator_comprehension() {
         let source = "(x if y else y for y in z)";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_bool_op_or() {
         let source = "x or y";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_bool_op_and() {
         let source = "x and y";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_slice() {
         let source = "x[1:2:3]";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_named_expression() {
         let source = "(x := ( y * z ))";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -243,7 +243,7 @@ with (0 as a,): pass
 with (0 as a, 1 as b): pass
 with (0 as a, 1 as b,): pass
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -267,7 +267,7 @@ with (yield from a): pass
 with ((yield)): pass
 with ((yield from a)): pass
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -289,7 +289,7 @@ with ((yield from a)): pass
             "with a := 0 as x: pass",
             "with (a := 0 as x): pass",
         ] {
-            assert!(parse_suite(source, "<test>").is_err());
+            assert!(parse_suite(source).is_err());
         }
     }
 
@@ -301,7 +301,7 @@ array[0, *indexes, -1] = array_slice
 array[*indexes_to_select, *indexes_to_select]
 array[3:5, *indexes_to_select]
 ";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -314,7 +314,7 @@ array[3:5, *indexes_to_select]
         ("OFFSET %d" % offset) if offset else None,
     )
 )"#;
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -327,7 +327,6 @@ except TypeError as e:
     print(f'caught {type(e)}')
 except OSError as e:
     print(f'caught {type(e)}')",
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -343,7 +342,6 @@ except* TypeError as e:
     print(f'caught {type(e)} with nested {e.exceptions}')
 except* OSError as e:
     print(f'caught {type(e)} with nested {e.exceptions}')"#,
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -351,7 +349,7 @@ except* OSError as e:
 
     #[test]
     fn test_dict_unpacking() {
-        let parse_ast = parse_expression(r#"{"a": "b", **c, "d": "e"}"#, "<test>").unwrap();
+        let parse_ast = parse_expression(r#"{"a": "b", **c, "d": "e"}"#).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -359,8 +357,8 @@ except* OSError as e:
     fn test_modes() {
         let source = "a[0][1][2][3][4]";
 
-        assert!(parse(source, Mode::Expression, "<embedded>").is_ok());
-        assert!(parse(source, Mode::Module, "<embedded>").is_ok());
+        assert!(parse(source, Mode::Expression).is_ok());
+        assert!(parse(source, Mode::Module).is_ok());
     }
 
     #[test]
@@ -407,7 +405,7 @@ type X[T] \
 type X = int; type X = str; type X = type
 class X: type X = int
 "#;
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -445,13 +443,13 @@ type = x = 1
 x = type = 1
 lambda x: type
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
     fn test_invalid_type() {
-        assert!(parse_suite("a: type X = int", "<test>").is_err());
-        assert!(parse_suite("lambda: type X = int", "<test>").is_err());
+        assert!(parse_suite("a: type X = int").is_err());
+        assert!(parse_suite("lambda: type X = int").is_err());
     }
 
     #[test]
@@ -476,7 +474,7 @@ x = 10000
 x = 133333
 ";
 
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -502,7 +500,7 @@ if 10 .real:
 y = 100[no]
 y = 100(no)
 ";
-        assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -530,7 +528,7 @@ match match:
 match = lambda query: query == event
 print(match(12))
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -700,7 +698,7 @@ match w := x,:
     case y as v,:
         z = 0
 "#;
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -737,7 +735,6 @@ match x, y,:
     case z:
         pass
 "#,
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -752,7 +749,6 @@ match x:
     case f"{y}":
         pass
 "#,
-            "<test>",
         )
         .err();
         assert!(
@@ -767,7 +763,6 @@ match x:
             r"
 def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
 ",
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -786,7 +781,6 @@ class Abcd:
     pass
 "
             .trim(),
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -863,7 +857,6 @@ foo.bar[0].baz[2].egg??
 "
             .trim(),
             Mode::Ipython,
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -877,7 +870,7 @@ a = 1
     "
         .trim();
         let lxr = lexer::lex_starts_at(source, Mode::Ipython, TextSize::default());
-        let parse_err = parse_tokens(lxr, source, Mode::Module, "<test>").unwrap_err();
+        let parse_err = parse_tokens(lxr, source, Mode::Module).unwrap_err();
         assert_eq!(
             parse_err.to_string(),
             "IPython escape commands are only allowed in `Mode::Ipython` at byte range 6..20"
@@ -917,7 +910,6 @@ f"""{
 }"""
 "#
             .trim(),
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -933,7 +925,6 @@ u"foo" f"{bar}" "baz" " some"
 u"foo" f"bar {baz} really" u"bar" "no"
 "#
             .trim(),
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -942,7 +933,7 @@ u"foo" f"bar {baz} really" u"bar" "no"
     #[test]
     fn test_unicode_aliases() {
         // https://github.com/RustPython/RustPython/issues/4566
-        let parse_ast = parse_suite(r#"x = "\N{BACKSPACE}another cool trick""#, "<test>").unwrap();
+        let parse_ast = parse_suite(r#"x = "\N{BACKSPACE}another cool trick""#).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 }

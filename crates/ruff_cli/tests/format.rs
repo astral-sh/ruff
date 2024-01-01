@@ -329,6 +329,32 @@ OTHER = "OTHER"
 }
 
 #[test]
+fn syntax_error() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        r#"
+from module import =
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--no-cache", "--isolated", "--check"])
+        .arg("main.py"), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to parse main.py:2:20: Unexpected token '='
+    "###);
+
+    Ok(())
+}
+
+#[test]
 fn messages() -> Result<()> {
     let tempdir = TempDir::new()?;
 

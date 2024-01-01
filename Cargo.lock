@@ -443,12 +443,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "configparser"
-version = "3.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0e56e414a2a52ab2a104f85cd40933c2fbc278b83637facf646ecf451b49237"
-
-[[package]]
 name = "console"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -805,30 +799,6 @@ name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
-
-[[package]]
-name = "flake8-to-ruff"
-version = "0.1.9"
-dependencies = [
- "anyhow",
- "clap",
- "colored",
- "configparser",
- "itertools 0.11.0",
- "log",
- "once_cell",
- "pep440_rs 0.4.0",
- "pretty_assertions",
- "regex",
- "ruff_linter",
- "ruff_workspace",
- "rustc-hash",
- "serde",
- "serde_json",
- "strum",
- "strum_macros",
- "toml",
-]
 
 [[package]]
 name = "flate2"
@@ -2066,7 +2036,6 @@ dependencies = [
 name = "ruff_cli"
 version = "0.1.9"
 dependencies = [
- "annotate-snippets 0.9.2",
  "anyhow",
  "argfile",
  "assert_cmd",
@@ -2079,7 +2048,6 @@ dependencies = [
  "clearscreen",
  "colored",
  "filetime",
- "glob",
  "ignore",
  "insta",
  "insta-cmd",
@@ -2093,14 +2061,11 @@ dependencies = [
  "regex",
  "ruff_cache",
  "ruff_diagnostics",
- "ruff_formatter",
  "ruff_linter",
  "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_formatter",
- "ruff_python_stdlib",
- "ruff_python_trivia",
  "ruff_source_file",
  "ruff_text_size",
  "ruff_workspace",
@@ -2108,7 +2073,6 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
- "similar",
  "strum",
  "tempfile",
  "test-case",
@@ -2132,7 +2096,6 @@ dependencies = [
  "indoc",
  "itertools 0.11.0",
  "libcst",
- "once_cell",
  "pretty_assertions",
  "rayon",
  "regex",
@@ -2144,7 +2107,6 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_codegen",
  "ruff_python_formatter",
- "ruff_python_literal",
  "ruff_python_parser",
  "ruff_python_stdlib",
  "ruff_python_trivia",
@@ -2154,7 +2116,6 @@ dependencies = [
  "serde_json",
  "similar",
  "strum",
- "strum_macros",
  "tempfile",
  "toml",
  "tracing",
@@ -2302,8 +2263,6 @@ dependencies = [
  "insta",
  "is-macro",
  "itertools 0.11.0",
- "memchr",
- "once_cell",
  "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_source_file",
@@ -2363,7 +2322,6 @@ dependencies = [
 name = "ruff_python_index"
 version = "0.0.0"
 dependencies = [
- "itertools 0.11.0",
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_python_trivia",
@@ -2445,6 +2403,7 @@ dependencies = [
  "insta",
  "itertools 0.11.0",
  "ruff_python_ast",
+ "ruff_python_index",
  "ruff_python_parser",
  "ruff_source_file",
  "ruff_text_size",
@@ -2496,7 +2455,6 @@ dependencies = [
  "console_log",
  "js-sys",
  "log",
- "ruff_diagnostics",
  "ruff_formatter",
  "ruff_linter",
  "ruff_python_ast",

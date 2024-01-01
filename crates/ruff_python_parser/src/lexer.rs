@@ -1304,6 +1304,31 @@ impl LexicalError {
     }
 }
 
+impl std::ops::Deref for LexicalError {
+    type Target = LexicalErrorType;
+
+    fn deref(&self) -> &Self::Target {
+        &self.error
+    }
+}
+
+impl std::error::Error for LexicalError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
+    }
+}
+
+impl std::fmt::Display for LexicalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{} at byte offset {}",
+            &self.error,
+            u32::from(self.location)
+        )
+    }
+}
+
 /// Represents the different types of errors that can occur during lexing.
 #[derive(Debug, Clone, PartialEq)]
 pub enum LexicalErrorType {
@@ -1350,6 +1375,8 @@ pub enum LexicalErrorType {
     /// An unexpected error occurred.
     OtherError(String),
 }
+
+impl std::error::Error for LexicalErrorType {}
 
 impl std::fmt::Display for LexicalErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

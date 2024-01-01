@@ -145,7 +145,7 @@ pub fn check_path(
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
         // Parse, if the AST wasn't pre-provided provided.
-        match tokens.into_ast_source(source_kind, source_type, path) {
+        match tokens.into_ast_source(source_kind, source_type) {
             Ok(python_ast) => {
                 let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
                 if use_ast {
@@ -336,10 +336,15 @@ pub fn add_noqa_to_path(
     );
 
     // Log any parse errors.
-    if let Some(err) = error {
+    if let Some(error) = error {
         error!(
             "{}",
-            DisplayParseError::new(err, locator.to_source_code(), source_kind)
+            DisplayParseError::from_source_code(
+                error,
+                Some(path.to_path_buf()),
+                &locator.to_source_code(),
+                source_kind,
+            )
         );
     }
 
@@ -687,13 +692,11 @@ impl<'a> TokenSource<'a> {
         self,
         source_kind: &SourceKind,
         source_type: PySourceType,
-        path: &Path,
     ) -> Result<AstSource<'a>, ParseError> {
         match self {
             Self::Tokens(tokens) => Ok(AstSource::Ast(ruff_python_parser::parse_program_tokens(
                 tokens,
                 source_kind.source_code(),
-                &path.to_string_lossy(),
                 source_type.is_ipynb(),
             )?)),
             Self::Precomputed { ast, .. } => Ok(AstSource::Precomputed(ast)),

@@ -85,7 +85,7 @@
 //!    return bool(i & 1)
 //! "#;
 //! let tokens = lex(python_source, Mode::Module);
-//! let ast = parse_tokens(tokens, python_source, Mode::Module, "<embedded>");
+//! let ast = parse_tokens(tokens, python_source, Mode::Module);
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -100,7 +100,7 @@
 //! def is_odd(i):
 //!   return bool(i & 1)
 //! "#;
-//! let ast = parse_suite(python_source, "<embedded>");
+//! let ast = parse_suite(python_source);
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -150,7 +150,6 @@ pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
 pub fn parse_program_tokens(
     lxr: Vec<LexResult>,
     source: &str,
-    source_path: &str,
     is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
     let mode = if is_jupyter_notebook {
@@ -158,7 +157,7 @@ pub fn parse_program_tokens(
     } else {
         Mode::Module
     };
-    match parse_tokens(lxr, source, mode, source_path)? {
+    match parse_tokens(lxr, source, mode)? {
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
@@ -381,7 +380,7 @@ mod tests {
     #[test]
     fn extract_cmp_op_location() -> Result<()> {
         let contents = "x == 1";
-        let expr = parse_expression(contents, "<filename>")?;
+        let expr = parse_expression(contents)?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -391,7 +390,7 @@ mod tests {
         );
 
         let contents = "x != 1";
-        let expr = parse_expression(contents, "<filename>")?;
+        let expr = parse_expression(contents)?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -401,7 +400,7 @@ mod tests {
         );
 
         let contents = "x is 1";
-        let expr = parse_expression(contents, "<filename>")?;
+        let expr = parse_expression(contents)?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -411,7 +410,7 @@ mod tests {
         );
 
         let contents = "x is not 1";
-        let expr = parse_expression(contents, "<filename>")?;
+        let expr = parse_expression(contents)?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -421,7 +420,7 @@ mod tests {
         );
 
         let contents = "x in 1";
-        let expr = parse_expression(contents, "<filename>")?;
+        let expr = parse_expression(contents)?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -431,7 +430,7 @@ mod tests {
         );
 
         let contents = "x not in 1";
-        let expr = parse_expression(contents, "<filename>")?;
+        let expr = parse_expression(contents)?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
@@ -441,7 +440,7 @@ mod tests {
         );
 
         let contents = "x != (1 is not 2)";
-        let expr = parse_expression(contents, "<filename>")?;
+        let expr = parse_expression(contents)?;
         assert_eq!(
             locate_cmp_ops(&expr, contents),
             vec![LocatedCmpOp::new(
