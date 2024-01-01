@@ -23,8 +23,10 @@ ruff_linter = { path = "../crates/ruff_linter" }
 ruff_python_ast = { path = "../crates/ruff_python_ast" }
 ruff_python_codegen = { path = "../crates/ruff_python_codegen" }
 ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
+ruff_python_index = { path = "../crates/ruff_python_index" }
 ruff_python_parser = { path = "../crates/ruff_python_parser" }
 ruff_source_file = { path = "../crates/ruff_source_file" }
+ruff_text_size = { path = "../crates/ruff_text_size" }
 similar = { version = "2.2.1" }
 
 # Prevent this from interfering with workspaces
@@ -34,6 +36,10 @@ members = ["."]
 [[bin]]
 name = "ruff_parse_simple"
 path = "fuzz_targets/ruff_parse_simple.rs"
+
+[[bin]]
+name = "ruff_new_parser_equiv"
+path = "fuzz_targets/ruff_new_parser_equiv.rs"
 
 [[bin]]
 name = "ruff_fix_validity"

@@ -110,8 +110,8 @@
 //! [lexer]: crate::lexer
 
 pub use parser::{
-    parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
-    parse_starts_at, parse_suite, parse_tokens, ParsedFile,
+    parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_ok_tokens_lalrpop,
+    parse_ok_tokens_new, parse_program, parse_starts_at, parse_suite, parse_tokens, ParsedFile,
 };
 use ruff_python_ast::{CmpOp, Expr, Mod, PySourceType, Suite};
 use ruff_text_size::{Ranged, TextRange, TextSize};

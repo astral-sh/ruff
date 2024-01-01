@@ -101,3 +101,11 @@ This fuzz harness checks that fixes applied by Ruff do not introduce new errors 
 [`ruff_linter::test::test_snippet`](../crates/ruff_linter/src/test.rs) testing utility.
 It currently is only configured to use default settings, but may be extended in future versions to
 test non-default linter settings.
+
+### `ruff_new_parser_equiv`
+
+This fuzz harness was introduced to ensure that the handwritten parser ("new" parser) is
+equivalent to the one which is automatically generated from a grammar.
+This ensures that optimisations applied to the handwritten parser are indeed valid.
+It is implemented by executing both the lalrpop-generated and the new parsers, then comparing
+their output.

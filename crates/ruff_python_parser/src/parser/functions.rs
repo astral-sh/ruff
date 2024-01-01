@@ -236,6 +236,42 @@ pub fn parse_tokens(
     )
 }
 
+pub fn parse_ok_tokens_new(
+    lxr: impl IntoIterator<Item = Spanned>,
+    source: &str,
+    mode: Mode,
+    source_path: &str,
+) -> Result<Mod, ParseError> {
+    let lxr = lxr
+        .into_iter()
+        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline))
+        .map(Ok::<(Tok, TextRange), LexicalError>);
+    let parsed_file = Parser::new(source, source_path, mode, lxr).parse();
+    if parsed_file.parse_errors.is_empty() {
+        Ok(parsed_file.ast)
+    } else {
+        Err(parsed_file.parse_errors.into_iter().next().unwrap())
+    }
+}
+
+pub fn parse_ok_tokens_lalrpop(
+    lxr: impl IntoIterator<Item = Spanned>,
+    source: &str,
+    mode: Mode,
+    source_path: &str,
+) -> Result<Mod, ParseError> {
+    let lxr = lxr
+        .into_iter()
+        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
+    let marker_token = (Tok::start_marker(mode), TextRange::default());
+    let lexer = iter::once(marker_token)
+        .chain(lxr)
+        .map(|(t, range)| (range.start(), t, range.end()));
+    python::TopParser::new()
+        .parse(source, mode, lexer)
+        .map_err(|e| parse_error_from_lalrpop(e, source_path))
+}
+
 /// Parse tokens into an AST like [`parse_tokens`], but we already know all tokens are valid.
 pub fn parse_ok_tokens(
     lxr: impl IntoIterator<Item = Spanned>,
@@ -244,27 +280,9 @@ pub fn parse_ok_tokens(
     source_path: &str,
 ) -> Result<Mod, ParseError> {
     if std::env::var("NEW_PARSER").is_ok() {
-        let lxr = lxr
-            .into_iter()
-            .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline))
-            .map(Ok::<(Tok, TextRange), LexicalError>);
-        let parsed_file = Parser::new(source, source_path, mode, lxr).parse();
-        if parsed_file.parse_errors.is_empty() {
-            Ok(parsed_file.ast)
-        } else {
-            Err(parsed_file.parse_errors.into_iter().next().unwrap())
-        }
+        parse_ok_tokens_new(lxr, source, mode, source_path)
     } else {
-        let lxr = lxr
-            .into_iter()
-            .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-        let marker_token = (Tok::start_marker(mode), TextRange::default());
-        let lexer = iter::once(marker_token)
-            .chain(lxr)
-            .map(|(t, range)| (range.start(), t, range.end()));
-        python::TopParser::new()
-            .parse(source, mode, lexer)
-            .map_err(|e| parse_error_from_lalrpop(e, source_path))
+        parse_ok_tokens_lalrpop(lxr, source, mode, source_path)
     }
 }
 
