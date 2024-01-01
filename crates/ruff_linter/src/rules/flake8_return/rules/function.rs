@@ -1,7 +1,5 @@
-use std::ops::Add;
-
 use ruff_python_ast::{self as ast, ElifElseClause, Expr, Stmt};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::Ranged;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
@@ -12,7 +10,6 @@ use ruff_python_ast::stmt_if::elif_else_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::SemanticModel;
-use ruff_python_trivia::is_python_whitespace;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
@@ -490,17 +487,19 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
         };
 
         // Identify, e.g., `x = 1`.
-        if assign.targets.len() > 1 {
+        let targets = assign.targets();
+        if assign.targets().len() > 1 {
             continue;
         }
 
-        let Some(target) = assign.targets.first() else {
+        let Some(target) = targets.first() else {
             continue;
         };
 
         let Expr::Name(ast::ExprName {
-            id: assigned_id, ..
-        }) = target
+            id: ref assigned_id,
+            ..
+        }) = **target
         else {
             continue;
         };
@@ -526,37 +525,12 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack) {
             let delete_return =
                 edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
-            // Replace the `x = 1` statement with `return 1`.
-            let content = checker.locator().slice(assign);
-            let equals_index = content
-                .find('=')
-                .ok_or(anyhow::anyhow!("expected '=' in assignment statement"))?;
-            let after_equals = equals_index + 1;
+            let edit_result = assign.create_edit(checker);
 
-            let replace_assign = Edit::range_replacement(
-                // If necessary, add whitespace after the `return` keyword.
-                // Ex) Convert `x=y` to `return y` (instead of `returny`).
-                if content[after_equals..]
-                    .chars()
-                    .next()
-                    .is_some_and(is_python_whitespace)
-                {
-                    "return".to_string()
-                } else {
-                    "return ".to_string()
-                },
-                // Replace from the start of the assignment statement to the end of the equals
-                // sign.
-                TextRange::new(
-                    assign.start(),
-                    assign
-                        .range()
-                        .start()
-                        .add(TextSize::try_from(after_equals)?),
-                ),
-            );
-
-            Ok(Fix::unsafe_edits(replace_assign, [delete_return]))
+            match edit_result {
+                Ok(edit_res) => Ok(Fix::unsafe_edits(edit_res, [delete_return])),
+                Err(e) => Err(e),
+            }
         });
         checker.diagnostics.push(diagnostic);
     }

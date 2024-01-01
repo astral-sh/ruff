@@ -363,3 +363,27 @@ def foo():
 def mavko_debari(P_kbar):
     D=0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
     return D
+
+
+def foo():
+    a: int = 1 # RET504
+    return a
+
+
+def foo():
+    a = 1
+    a += 1
+    return a
+
+
+def foo():
+    with open("foo.txt", "r") as f:
+        x = f.read()
+        x += 1
+    return x # RET504
+
+
+def foo():
+    with open("foo.txt", "r") as f:
+        x: int = f.read()
+    return x # RET504

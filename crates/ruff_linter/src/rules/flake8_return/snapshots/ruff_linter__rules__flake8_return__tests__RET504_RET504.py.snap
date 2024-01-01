@@ -217,5 +217,85 @@ RET504.py:365:12: RET504 [*] Unnecessary assignment to `D` before `return` state
 364     |-    D=0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
 365     |-    return D
     364 |+    return 0.4853881 + 3.6006116*P - 0.0117368*(P-1.3822)**2
+366 365 | 
+367 366 | 
+368 367 | def foo():
+
+RET504.py:370:12: RET504 [*] Unnecessary assignment to `a` before `return` statement
+    |
+368 | def foo():
+369 |     a: int = 1 # RET504
+370 |     return a
+    |            ^ RET504
+    |
+    = help: Remove unnecessary assignment
+
+ℹ Unsafe fix
+366 366 | 
+367 367 | 
+368 368 | def foo():
+369     |-    a: int = 1 # RET504
+370     |-    return a
+    369 |+    return 1 # RET504
+371 370 | 
+372 371 | 
+373 372 | def foo():
+
+RET504.py:376:12: RET504 [*] Unnecessary assignment to `a` before `return` statement
+    |
+374 |     a = 1
+375 |     a += 1
+376 |     return a
+    |            ^ RET504
+    |
+    = help: Remove unnecessary assignment
+
+ℹ Unsafe fix
+372 372 | 
+373 373 | def foo():
+374 374 |     a = 1
+375     |-    a += 1
+376     |-    return a
+    375 |+    return a + 1
+377 376 | 
+378 377 | 
+379 378 | def foo():
+
+RET504.py:383:12: RET504 [*] Unnecessary assignment to `x` before `return` statement
+    |
+381 |         x = f.read()
+382 |         x += 1
+383 |     return x # RET504
+    |            ^ RET504
+    |
+    = help: Remove unnecessary assignment
+
+ℹ Unsafe fix
+379 379 | def foo():
+380 380 |     with open("foo.txt", "r") as f:
+381 381 |         x = f.read()
+382     |-        x += 1
+383     |-    return x # RET504
+    382 |+        return x + 1
+384 383 | 
+385 384 | 
+386 385 | def foo():
+
+RET504.py:389:12: RET504 [*] Unnecessary assignment to `x` before `return` statement
+    |
+387 |     with open("foo.txt", "r") as f:
+388 |         x: int = f.read()
+389 |     return x # RET504
+    |            ^ RET504
+    |
+    = help: Remove unnecessary assignment
+
+ℹ Unsafe fix
+385 385 | 
+386 386 | def foo():
+387 387 |     with open("foo.txt", "r") as f:
+388     |-        x: int = f.read()
+389     |-    return x # RET504
+    388 |+        return f.read()
 
 
