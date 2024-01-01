@@ -39,7 +39,7 @@ class Foo:
     TCLS = typing.TypeVar["TCLS"]
     y: typing.TypeAlias = list[TCLS]
 
-# UP040 wont add generics in fix
+# UP040 won't add generics in fix
 T = typing.TypeVar(*args)
 x: typing.TypeAlias = list[T]
 

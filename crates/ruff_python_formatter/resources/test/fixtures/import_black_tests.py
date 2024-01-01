@@ -32,7 +32,7 @@ def import_fixture(fixture: Path, fixture_set: str):
                 input.append(line)
 
         if not expected:
-            # If there's no output marker, tread the whole file as already pre-formatted
+            # If there's no output marker, treat the whole file as already pre-formatted
             expected = input
 
         options = {}
