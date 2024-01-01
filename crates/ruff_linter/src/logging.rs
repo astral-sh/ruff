@@ -173,7 +173,7 @@ impl DisplayParseError {
         // Translate the byte offset to a location in the originating source.
         let location =
             if let Some(jupyter_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-                let source_location = source_code.source_location(error.offset);
+                let source_location = source_code.source_location(error.location.start());
 
                 ErrorLocation::Cell(
                     jupyter_index
@@ -187,7 +187,7 @@ impl DisplayParseError {
                     },
                 )
             } else {
-                ErrorLocation::File(source_code.source_location(error.offset))
+                ErrorLocation::File(source_code.source_location(error.location.start()))
             };
 
         Self {
