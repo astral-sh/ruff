@@ -1,0 +1,57 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI058.py:7:9: PYI058 Use `Iterator` as the return value for simple `__iter__` methods
+  |
+6 | class IteratorReturningSimpleGenerator1:
+7 |     def __iter__(self) -> Generator:  # PYI058 (use `Iterator`)
+  |         ^^^^^^^^ PYI058
+8 |         return (x for x in range(42))
+  |
+
+PYI058.py:11:9: PYI058 Use `Iterator` as the return value for simple `__iter__` methods
+   |
+10 | class IteratorReturningSimpleGenerator2:
+11 |     def __iter__(self, /) -> collections.abc.Generator[str, Any, None]:  # PYI058 (use `Iterator`)
+   |         ^^^^^^^^ PYI058
+12 |         """Fully documented, because I'm a runtime function!"""
+13 |         yield from "abcdefg"
+   |
+
+PYI058.py:17:9: PYI058 Use `Iterator` as the return value for simple `__iter__` methods
+   |
+16 | class IteratorReturningSimpleGenerator3:
+17 |     def __iter__(self, /) -> collections.abc.Generator[str, None, typing.Any]:  # PYI058 (use `Iterator`)
+   |         ^^^^^^^^ PYI058
+18 |         yield "a"
+19 |         yield "b"
+   |
+
+PYI058.py:24:9: PYI058 Use `AsyncIterator` as the return value for simple `__aiter__` methods
+   |
+23 | class AsyncIteratorReturningSimpleAsyncGenerator1:
+24 |     def __aiter__(self) -> typing.AsyncGenerator: pass # PYI058 (Use `AsyncIterator`)
+   |         ^^^^^^^^^ PYI058
+25 | 
+26 | class AsyncIteratorReturningSimpleAsyncGenerator2:
+   |
+
+PYI058.py:27:9: PYI058 Use `AsyncIterator` as the return value for simple `__aiter__` methods
+   |
+26 | class AsyncIteratorReturningSimpleAsyncGenerator2:
+27 |     def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, Any]: ...  # PYI058 (Use `AsyncIterator`)
+   |         ^^^^^^^^^ PYI058
+28 | 
+29 | class AsyncIteratorReturningSimpleAsyncGenerator3:
+   |
+
+PYI058.py:30:9: PYI058 Use `AsyncIterator` as the return value for simple `__aiter__` methods
+   |
+29 | class AsyncIteratorReturningSimpleAsyncGenerator3:
+30 |     def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, None]: pass  # PYI058 (Use `AsyncIterator`)
+   |         ^^^^^^^^^ PYI058
+31 | 
+32 | class CorrectIterator:
+   |
+
+
