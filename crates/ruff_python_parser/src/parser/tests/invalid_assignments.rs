@@ -12,9 +12,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..1,
-                source_path: "<test>",
             },
         )
         "###);
@@ -28,9 +29,11 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: NamedAssignmentError,
-                location: 1..2,
-                source_path: "<test>",
+                error: UnrecognizedToken(
+                    ColonEqual,
+                    None,
+                ),
+                location: 3..5,
             },
         )
         "###);
@@ -42,9 +45,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AugAssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..1,
-                source_path: "<test>",
             },
         )
         "###);
@@ -56,9 +60,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
-                location: 0..3,
-                source_path: "<test>",
+                error: Lexical(
+                    AssignmentError,
+                ),
+                location: 1..2,
             },
         )
         "###);
@@ -72,9 +77,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..6,
-                source_path: "<test>",
             },
         )
         "###);
@@ -86,9 +92,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 1..7,
-                source_path: "<test>",
             },
         )
         "###);
@@ -100,9 +107,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..5,
-                source_path: "<test>",
             },
         )
         "###);
@@ -114,9 +122,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..2,
-                source_path: "<test>",
             },
         )
         "###);
@@ -128,9 +137,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 1..12,
-                source_path: "<test>",
             },
         )
         "###);
@@ -142,9 +152,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..13,
-                source_path: "<test>",
             },
         )
         "###);
@@ -156,9 +167,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..7,
-                source_path: "<test>",
             },
         )
         "###);
@@ -170,9 +182,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..3,
-                source_path: "<test>",
             },
         )
         "###);
@@ -184,9 +197,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..15,
-                source_path: "<test>",
             },
         )
         "###);
@@ -198,9 +212,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..15,
-                source_path: "<test>",
             },
         )
         "###);
@@ -212,9 +227,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..20,
-                source_path: "<test>",
             },
         )
         "###);
@@ -226,9 +242,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..15,
-                source_path: "<test>",
             },
         )
         "###);
@@ -240,9 +257,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..7,
-                source_path: "<test>",
             },
         )
         "###);
@@ -254,9 +272,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 1..8,
-                source_path: "<test>",
             },
         )
         "###);
@@ -268,9 +287,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 1..14,
-                source_path: "<test>",
             },
         )
         "###);
@@ -282,9 +302,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..9,
-                source_path: "<test>",
             },
         )
         "###);
@@ -296,9 +317,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..5,
-                source_path: "<test>",
             },
         )
         "###);
@@ -321,9 +343,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..9,
-                source_path: "<test>",
             },
         )
         "###);
@@ -335,9 +358,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..18,
-                source_path: "<test>",
             },
         )
         "###);
@@ -349,9 +373,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..5,
-                source_path: "<test>",
             },
         )
         "###);
@@ -363,9 +388,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..6,
-                source_path: "<test>",
             },
         )
         "###);
@@ -377,9 +403,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..3,
-                source_path: "<test>",
             },
         )
         "###);
@@ -391,9 +418,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..4,
-                source_path: "<test>",
             },
         )
         "###);
@@ -405,9 +433,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..4,
-                source_path: "<test>",
             },
         )
         "###);
@@ -419,9 +448,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
+                error: Lexical(
+                    AssignmentError,
+                ),
                 location: 0..3,
-                source_path: "<test>",
             },
         )
         "###);
@@ -433,9 +463,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
-                location: 0..6,
-                source_path: "<test>",
+                error: Lexical(
+                    AssignmentError,
+                ),
+                location: 1..6,
             },
         )
         "###);
@@ -447,9 +478,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
-                location: 0..13,
-                source_path: "<test>",
+                error: Lexical(
+                    AssignmentError,
+                ),
+                location: 4..9,
             },
         )
         "###);
@@ -461,9 +493,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
-                location: 0..19,
-                source_path: "<test>",
+                error: Lexical(
+                    AssignmentError,
+                ),
+                location: 11..13,
             },
         )
         "###);
@@ -475,9 +508,10 @@ mod tests {
         insta::assert_debug_snapshot!(ast, @r###"
         Err(
             ParseError {
-                error: AssignmentError,
-                location: 0..13,
-                source_path: "<test>",
+                error: Lexical(
+                    AssignmentError,
+                ),
+                location: 4..9,
             },
         )
         "###);

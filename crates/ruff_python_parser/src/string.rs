@@ -435,6 +435,7 @@ pub(crate) fn concatenated_strings(
 
 #[cfg(test)]
 mod tests {
+    use crate::lexer::LexicalErrorType;
     use crate::parser::parse_suite;
     use crate::{FStringErrorType, ParseErrorType, Suite};
 
@@ -521,7 +522,7 @@ mod tests {
     fn parse_fstring_error(source: &str) -> FStringErrorType {
         parse_suite(source)
             .map_err(|e| match e.error {
-                ParseErrorType::FStringError(e) => e,
+                ParseErrorType::Lexical(LexicalErrorType::FStringError(e)) => e,
                 e => unreachable!("Expected FStringError: {:?}", e),
             })
             .expect_err("Expected error")

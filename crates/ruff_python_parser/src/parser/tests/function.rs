@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use crate::lexer::LexicalErrorType;
     use crate::parser::parse_suite;
     use crate::ParseErrorType;
 
@@ -57,22 +58,22 @@ mod tests {
 
     function_and_lambda_error! {
         // Check definitions
-        test_duplicates_f1: "def f(a, a): pass", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_f2: "def f(a, *, a): pass", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_f3: "def f(a, a=20): pass", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_f4: "def f(a, *a): pass", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_f5: "def f(a, *, **a): pass", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l1: "lambda a, a: 1", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l2: "lambda a, *, a: 1", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l3: "lambda a, a=20: 1", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l4: "lambda a, *a: 1", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_duplicates_l5: "lambda a, *, **a: 1", ParseErrorType::DuplicateArgumentError("a".to_string()),
-        test_default_arg_error_f: "def f(a, b=20, c): pass", ParseErrorType::DefaultArgumentError,
-        test_default_arg_error_l: "lambda a, b=20, c: 1", ParseErrorType::DefaultArgumentError,
+        test_duplicates_f1: "def f(a, a): pass", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_duplicates_f2: "def f(a, *, a): pass", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_duplicates_f3: "def f(a, a=20): pass", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_duplicates_f4: "def f(a, *a): pass", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_duplicates_f5: "def f(a, *, **a): pass", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_duplicates_l1: "lambda a, a: 1", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_duplicates_l2: "lambda a, *, a: 1", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_duplicates_l3: "lambda a, a=20: 1", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_duplicates_l4: "lambda a, *a: 1", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_duplicates_l5: "lambda a, *, **a: 1", ParseErrorType::Lexical(LexicalErrorType::DuplicateArgumentError("a".to_string())),
+        test_default_arg_error_f: "def f(a, b=20, c): pass", ParseErrorType::Lexical(LexicalErrorType::DefaultArgumentError),
+        test_default_arg_error_l: "lambda a, b=20, c: 1", ParseErrorType::Lexical(LexicalErrorType::DefaultArgumentError),
 
         // Check some calls.
-        test_positional_arg_error_f: "f(b=20, c)", ParseErrorType::PositionalArgumentError,
-        test_unpacked_arg_error_f: "f(**b, *c)", ParseErrorType::UnpackedArgumentError,
-        test_duplicate_kw_f1: "f(a=20, a=30)", ParseErrorType::DuplicateKeywordArgumentError("a".to_string()),
+        test_positional_arg_error_f: "f(b=20, c)", ParseErrorType::Lexical(LexicalErrorType::PositionalArgumentError),
+        test_unpacked_arg_error_f: "f(**b, *c)", ParseErrorType::Lexical(LexicalErrorType::UnpackedArgumentError),
+        test_duplicate_kw_f1: "f(a=20, a=30)", ParseErrorType::Lexical(LexicalErrorType::DuplicateKeywordArgumentError("a".to_string())),
     }
 }
