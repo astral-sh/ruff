@@ -2,7 +2,10 @@ use std::fmt;
 
 use ruff_text_size::TextRange;
 
-use crate::{lexer::LexicalErrorType, Tok, TokenKind};
+use crate::{
+    lexer::{LexicalError, LexicalErrorType},
+    Tok, TokenKind,
+};
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
@@ -29,6 +32,15 @@ impl std::error::Error for ParseError {
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{} at byte range {:?}", &self.error, self.location)
+    }
+}
+
+impl From<LexicalError> for ParseError {
+    fn from(error: LexicalError) -> Self {
+        ParseError {
+            error: ParseErrorType::Lexical(error.error),
+            location: error.location,
+        }
     }
 }
 
