@@ -1,31 +1,33 @@
-class Soup:
+class Animal:
     @staticmethod
-    def temp() -> None:
-        print("Soup is hot!")
+    def speak():
+        return f"This animal says something."
 
 
-class TomatoSoup(Soup):
+class BadDog(Animal):
     @staticmethod
-    def temp() -> None:
-        super.temp()  # PLW0245
-        print("But tomato soup is even hotter!")
+    def speak():
+        original_speak = super.speak()  # PLW0245
+        return f"{original_speak} But as a dog, it barks!"
 
-class ProperTomatoSoup(Soup):
+
+class GoodDog(Animal):
     @staticmethod
-    def temp() -> None:
-        super().temp()  # OK
-        print("But tomato soup is even hotter!")
+    def speak():
+        original_speak = super().speak()  # OK
+        return f"{original_speak} But as a dog, it barks!"
 
 
-class SuperSoup(Soup):
+class FineDog(Animal):
     @staticmethod
-    def temp() -> None:
-        # override the super builtin
+    def speak():
         super = "super"
-        super.temp()  # OK (according to this rule, at least)
-        print(f"But super soup is {super}!")
+        original_speak = super.speak()  # OK
+        return f"{original_speak} But as a dog, it barks!"
+
 
 def super_without_class() -> None:
     super.blah()  # OK
+
 
 super.blah()  # OK
