@@ -9,8 +9,16 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-// TODO: Docs
-// ref: https://github.com/PyCQA/bandit/blob/6b2e24722bdcc40ea37c3bc155b6856961763814/bandit/blacklists/imports.py#L17
+/// ## What it does
+/// Checks for imports of the`telnetlib` module.
+///
+/// ## Why is this bad?
+/// Telnet is considered insecure. Use SSH or some other encrypted protocol.
+///
+/// ## Example
+/// ```python
+/// import telnetlib
+/// ```
 #[violation]
 pub struct SuspiciousTelnetlibImport;
 
@@ -21,6 +29,16 @@ impl Violation for SuspiciousTelnetlibImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `ftplib` module.
+///
+/// ## Why is this bad?
+/// FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.
+///
+/// ## Example
+/// ```python
+/// import ftplib
+/// ```
 #[violation]
 pub struct SuspiciousFtplibImport;
 
@@ -31,6 +49,19 @@ impl Violation for SuspiciousFtplibImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `pickle`, `cPickle`, `dill` and `shelve` modules.
+///
+/// ## Why is this bad?
+/// It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Consider
+/// possible security implications associated with these modules.
+///
+/// ## Example
+/// ```python
+/// import pickle
+/// ```
+/// /// ## References
+/// - [Python Docs](https://docs.python.org/3/library/pickle.html)
 #[violation]
 pub struct SuspiciousPickleImport;
 
@@ -41,6 +72,17 @@ impl Violation for SuspiciousPickleImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `subprocess` module
+///
+/// ## Why is this bad?
+/// It is possible to inject malicious commands into subprocess calls. Consider possible security implications
+/// associated with this module.
+///
+/// ## Example
+/// ```python
+/// import subprocess
+/// ```
 #[violation]
 pub struct SuspiciousSubprocessImport;
 
@@ -51,6 +93,18 @@ impl Violation for SuspiciousSubprocessImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `xml.etree.cElementTree` and `xml.etree.ElementTree` modules
+///
+/// ## Why is this bad?
+/// Using various methods from these modules to parse untrusted XML data is known to be vulnerable to XML attacks.
+/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
+/// called.
+///
+/// ## Example
+/// ```python
+/// import xml.etree.cElementTree
+/// ```
 #[violation]
 pub struct SuspiciousXmlEtreeImport;
 
@@ -61,6 +115,18 @@ impl Violation for SuspiciousXmlEtreeImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `xml.sax` module
+///
+/// ## Why is this bad?
+/// Using various methods from this modules to parse untrusted XML data is known to be vulnerable to XML attacks.
+/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
+/// called.
+///
+/// ## Example
+/// ```python
+/// import xml.sax
+/// ```
 #[violation]
 pub struct SuspiciousXmlSaxImport;
 
@@ -71,6 +137,18 @@ impl Violation for SuspiciousXmlSaxImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `xml.dom.expatbuilder` module
+///
+/// ## Why is this bad?
+/// Using various methods from this modules to parse untrusted XML data is known to be vulnerable to XML attacks.
+/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
+/// called.
+///
+/// ## Example
+/// ```python
+/// import xml.dom.expatbuilder
+/// ```
 #[violation]
 pub struct SuspiciousXmlExpatImport;
 
@@ -81,6 +159,18 @@ impl Violation for SuspiciousXmlExpatImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `xml.dom.minidom` module
+///
+/// ## Why is this bad?
+/// Using various methods from this modules to parse untrusted XML data is known to be vulnerable to XML attacks.
+/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
+/// called.
+///
+/// ## Example
+/// ```python
+/// import xml.dom.minidom
+/// ```
 #[violation]
 pub struct SuspiciousXmlMinidomImport;
 
@@ -91,6 +181,18 @@ impl Violation for SuspiciousXmlMinidomImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `xml.dom.pulldom` module
+///
+/// ## Why is this bad?
+/// Using various methods from this modules to parse untrusted XML data is known to be vulnerable to XML attacks.
+/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
+/// called.
+///
+/// ## Example
+/// ```python
+/// import xml.dom.pulldom
+/// ```
 #[violation]
 pub struct SuspiciousXmlPulldomImport;
 
@@ -101,6 +203,17 @@ impl Violation for SuspiciousXmlPulldomImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the`lxml` module
+///
+/// ## Why is this bad?
+/// Using various methods from this module to parse untrusted XML data is known to be vulnerable toXML attacks. Replace
+/// vulnerable imports with the equivalent defusedxml package.
+///
+/// ## Example
+/// ```python
+/// import lxml
+/// ```
 #[violation]
 pub struct SuspiciousLxmlImport;
 
@@ -111,16 +224,41 @@ impl Violation for SuspiciousLxmlImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `xmlrpc` module
+///
+/// ## Why is this bad?
+/// XMLRPC is a particularly dangerous XML module as it is also concerned with communicating data over a network. Use
+/// defused.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate remote XML attacks.
+///
+/// ## Example
+/// ```python
+/// import xmlrpc
+/// ```
 #[violation]
 pub struct SuspiciousXmlrpcImport;
 
 impl Violation for SuspiciousXmlrpcImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("XMLRPC is particularly dangerous as it is also concerned with communicating data over a network")
+        format!("XMLRPC is vulnerable to remote XML attacks")
     }
 }
 
+/// ## What it does
+/// Checks for imports of `wsgiref.handlers.CGIHandler` and `twisted.web.twcgi.CGIScript`
+///
+/// ## Why is this bad?
+/// httpoxy is a set of vulnerabilities that affect application code running in CGI, or CGI-like environments. The use
+/// of CGI for web applications should be avoided to prevent this class of attack. More details are available.
+///
+/// ## Example
+/// ```python
+/// import wsgiref.handlers.CGIHandler
+/// ```
+///
+/// ## References
+/// - [httpoxy website](https://httpoxy.org/)
 #[violation]
 pub struct SuspiciousHttpoxyImport;
 
@@ -131,6 +269,20 @@ impl Violation for SuspiciousHttpoxyImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of several unsafe Crypto modules.
+///
+/// ## Why is this bad?
+/// pycrypto library is known to have publicly disclosed buffer overflow vulnerability. It is no longer actively
+/// maintained and has been deprecated in favor of pyca/cryptography library.
+///
+/// ## Example
+/// ```python
+/// import Crypto.Random
+/// ```
+///
+/// ## References
+/// - [Buffer Overflow Issue](https://github.com/pycrypto/pycrypto/issues/176)
 #[violation]
 pub struct SuspiciousPycryptoImport;
 
@@ -143,6 +295,18 @@ impl Violation for SuspiciousPycryptoImport {
     }
 }
 
+/// ## What it does
+/// Checks for imports of the `pyghmi` module
+///
+/// ## Why is this bad?
+/// `pyghmi` is an IPMI related module. IPMI is considered insecure. Use an encrypted protocol.
+/// ## Example
+/// ```python
+/// import pyghmi
+/// ```
+///
+/// ## References
+/// - [Buffer Overflow Issue](https://github.com/pycrypto/pycrypto/issues/176)
 #[violation]
 pub struct SuspiciousPyghmiImport;
 
