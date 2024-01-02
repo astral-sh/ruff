@@ -7,6 +7,7 @@ use std::{io, iter};
 
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
+use rand::Rng;
 use serde::Serialize;
 use serde_json::error::Category;
 use thiserror::Error;
@@ -145,8 +146,10 @@ impl Notebook {
         // Add cell ids to 4.5+ notebooks if they are missing
         // https://github.com/astral-sh/ruff/issues/6834
         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
+        // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
         if raw_notebook.nbformat == 4 && raw_notebook.nbformat_minor >= 5 {
-            let mut id_index: u128 = 0;
+            // We use a mock random number generator to generate deterministic uuids
+            let mut rng = rand::rngs::mock::StepRng::new(0, 1);
             let mut existing_ids = HashSet::new();
 
             for cell in &raw_notebook.cells {
@@ -168,14 +171,10 @@ impl Notebook {
                 };
                 if id.is_none() {
                     loop {
-                        // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
-                        let new_id = uuid::Builder::from_u128(id_index)
+                        let new_id = uuid::Builder::from_random_bytes(rng.gen())
                             .into_uuid()
                             .as_hyphenated()
                             .to_string();
-
-                        // Increment the index
-                        id_index += 1;
 
                         if !existing_ids.contains(&new_id) {
                             existing_ids.insert(new_id.clone());
