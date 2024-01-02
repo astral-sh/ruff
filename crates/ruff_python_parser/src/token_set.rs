@@ -21,6 +21,10 @@ impl TokenSet {
         TokenSet(self.0 | other.0)
     }
 
+    pub(crate) const fn remove(self, kind: TokenKind) -> TokenSet {
+        TokenSet(self.0 & !mask(kind))
+    }
+
     pub(crate) const fn contains(&self, kind: TokenKind) -> bool {
         self.0 & mask(kind) != 0
     }
@@ -39,8 +43,10 @@ impl From<&[TokenKind]> for TokenSet {
 #[test]
 fn token_set_works_for_tokens() {
     use crate::TokenKind::*;
-    let ts = TokenSet::new(&[EndOfFile, Name]);
+    let mut ts = TokenSet::new(&[EndOfFile, Name]);
     assert!(ts.contains(EndOfFile));
     assert!(ts.contains(Name));
     assert!(!ts.contains(Plus));
+    ts = ts.remove(Name);
+    assert!(!ts.contains(Name));
 }
