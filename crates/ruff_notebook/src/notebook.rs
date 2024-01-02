@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -9,7 +10,6 @@ use once_cell::sync::OnceCell;
 use serde::Serialize;
 use serde_json::error::Category;
 use thiserror::Error;
-use uuid::Uuid;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
 use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
@@ -146,6 +146,8 @@ impl Notebook {
         // https://github.com/astral-sh/ruff/issues/6834
         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
         if raw_notebook.nbformat == 4 && raw_notebook.nbformat_minor >= 5 {
+            let mut id_index: u128 = 0;
+            let mut seen_ids = HashSet::new();
             for cell in &mut raw_notebook.cells {
                 let id = match cell {
                     Cell::Code(cell) => &mut cell.id,
@@ -153,8 +155,24 @@ impl Notebook {
                     Cell::Raw(cell) => &mut cell.id,
                 };
                 if id.is_none() {
-                    // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
-                    *id = Some(Uuid::new_v4().to_string());
+                    loop {
+                        // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
+                        let new_id = uuid::Builder::from_u128(id_index.clone())
+                            .into_uuid()
+                            .as_hyphenated()
+                            .to_string();
+
+                        // Increment the index
+                        id_index += 1;
+
+                        if !seen_ids.contains(&new_id) {
+                            *id = Some(new_id);
+                            break;
+                        }
+                    }
+                }
+                if let Some(id) = id {
+                    seen_ids.insert(id);
                 }
             }
         }
