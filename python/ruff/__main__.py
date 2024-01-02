@@ -22,7 +22,7 @@ def find_ruff_bin() -> str:
         user_scheme = "posix_user"
 
     path = os.path.join(sysconfig.get_path("scripts", scheme=user_scheme), ruff_exe)
-    if path.is_file():
+    if os.path.isfile(path):
         return path
 
     raise FileNotFoundError(path)
