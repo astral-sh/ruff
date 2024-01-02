@@ -23,6 +23,7 @@ globset = { version = "0.4.14" }
 ignore = { version = "0.4.21" }
 insta = { version = "1.34.0", feature = ["filters", "glob"] }
 is-macro = { version = "0.3.4" }
+is-wsl = { version = "0.4.0" }
 itertools = { version = "0.11.0" }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
@@ -53,7 +54,6 @@ unicode-ident = { version = "1.0.12" }
 unicode_names2 = { version = "1.2.1" }
 unicode-width = { version = "0.1.11" }
 uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
-wsl = { version = "0.1.0" }
 
 [workspace.lints.rust]
 unsafe_code = "warn"

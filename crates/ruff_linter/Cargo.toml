@@ -41,6 +41,7 @@ glob = { workspace = true }
 globset = { workspace = true }
 imperative = { version = "1.0.4" }
 is-macro = { workspace = true }
+is-wsl = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
 log = { workspace = true }
@@ -72,7 +73,6 @@ typed-arena = { version = "2.0.2" }
 unicode-width = { workspace = true }
 unicode_names2 = { workspace = true }
 url = { version = "2.2.2" }
-wsl = { version = "0.1.0" }
 
 [dev-dependencies]
 insta = { workspace = true }
