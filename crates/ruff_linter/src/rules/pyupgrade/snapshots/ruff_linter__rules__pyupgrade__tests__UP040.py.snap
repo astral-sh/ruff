@@ -195,7 +195,7 @@ UP040.py:40:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of t
 40 |     y: typing.TypeAlias = list[TCLS]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
 41 | 
-42 | # UP040 wont add generics in fix
+42 | # UP040 won't add generics in fix
    |
    = help: Use the `type` keyword
 
@@ -206,12 +206,12 @@ UP040.py:40:5: UP040 [*] Type alias `y` uses `TypeAlias` annotation instead of t
 40    |-    y: typing.TypeAlias = list[TCLS]
    40 |+    type y[TCLS] = list[TCLS]
 41 41 | 
-42 42 | # UP040 wont add generics in fix
+42 42 | # UP040 won't add generics in fix
 43 43 | T = typing.TypeVar(*args)
 
 UP040.py:44:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keyword
    |
-42 | # UP040 wont add generics in fix
+42 | # UP040 won't add generics in fix
 43 | T = typing.TypeVar(*args)
 44 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP040
@@ -222,7 +222,7 @@ UP040.py:44:1: UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of t
 
 ℹ Unsafe fix
 41 41 | 
-42 42 | # UP040 wont add generics in fix
+42 42 | # UP040 won't add generics in fix
 43 43 | T = typing.TypeVar(*args)
 44    |-x: typing.TypeAlias = list[T]
    44 |+type x = list[T]
