@@ -8,12 +8,20 @@ class IteratorReturningSimpleGenerator1:
         return (x for x in range(42))
 
 class IteratorReturningSimpleGenerator2:
+    def __iter__(self) -> typing.Generator:  # PYI058 (use `Iterator`)
+        return (x for x in range(42))
+
+class IteratorReturningSimpleGenerator3:
+    def __iter__(self) -> collections.abc.Generator:  # PYI058 (use `Iterator`)
+        return (x for x in range(42))
+
+class IteratorReturningSimpleGenerator4:
     def __iter__(self, /) -> collections.abc.Generator[str, Any, None]:  # PYI058 (use `Iterator`)
         """Fully documented, because I'm a runtime function!"""
         yield from "abcdefg"
         return None
 
-class IteratorReturningSimpleGenerator3:
+class IteratorReturningSimpleGenerator5:
     def __iter__(self, /) -> collections.abc.Generator[str, None, typing.Any]:  # PYI058 (use `Iterator`)
         yield "a"
         yield "b"

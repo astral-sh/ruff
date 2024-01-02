@@ -7,6 +7,12 @@ class IteratorReturningSimpleGenerator1:
     def __iter__(self) -> Generator: ...  # PYI058 (use `Iterator`)
 
 class IteratorReturningSimpleGenerator2:
+    def __iter__(self) -> typing.Generator: ...  # PYI058 (use `Iterator`)
+
+class IteratorReturningSimpleGenerator3:
+    def __iter__(self) -> collections.abc.Generator: ...  # PYI058 (use `Iterator`)
+
+class IteratorReturningSimpleGenerator2:
     def __iter__(self, /) -> collections.abc.Generator[str, Any, None]: ...  # PYI058 (use `Iterator`)
 
 class IteratorReturningSimpleGenerator3:
