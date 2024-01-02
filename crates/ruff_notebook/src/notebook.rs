@@ -173,7 +173,7 @@ impl Notebook {
                     loop {
                         let new_id = uuid::Builder::from_random_bytes(rng.gen())
                             .into_uuid()
-                            .as_hyphenated()
+                            .as_simple()
                             .to_string();
 
                         if existing_ids.insert(new_id.clone()) {
