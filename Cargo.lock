@@ -2094,7 +2094,6 @@ dependencies = [
  "thiserror",
  "tikv-jemallocator",
  "tracing",
- "ureq",
  "walkdir",
  "wild",
 ]

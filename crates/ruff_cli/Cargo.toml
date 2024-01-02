@@ -63,7 +63,6 @@ insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { version = "0.4.0" }
 tempfile = "3.8.1"
 test-case = { workspace = true }
-ureq = { version = "2.9.1", features = [] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = "0.1.39"
