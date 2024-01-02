@@ -146,6 +146,7 @@ const END_EXPR_SET: TokenSet = TokenSet::new(&[
     TokenKind::From,
     TokenKind::For,
     TokenKind::Async,
+    TokenKind::In,
 ]);
 /// Tokens that represent compound statements.
 const COMPOUND_STMT_SET: TokenSet = TokenSet::new(&[
