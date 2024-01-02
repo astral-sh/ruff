@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.11
+
+### Preview features
+
+- \[`pylint`\] Implement `super-without-brackets` (`W0245`) ([#9257](https://github.com/astral-sh/ruff/pull/9257))
+
+### Bug fixes
+
+- Check path string properly in `python -m ruff` invocations ([#9367](https://github.com/astral-sh/ruff/pull/9367))
+
+### Documentation
+
+- Tweak `relative-imports` message ([#9365](https://github.com/astral-sh/ruff/pull/9365))
+- Add fix safety note for `yield-in-for-loop` ([#9364](https://github.com/astral-sh/ruff/pull/9364))
+
 ## 0.1.10
 
 ### Preview features
