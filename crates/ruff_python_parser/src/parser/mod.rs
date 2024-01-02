@@ -3827,6 +3827,7 @@ where
         (expr, range)
     }
 
+    const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
     /// Parses multiple items separated by a comma into a `TupleExpr` node.
     /// Uses `parse_func` to parse each item.
     fn parse_tuple_expr(
@@ -3839,26 +3840,20 @@ where
         // In case of the tuple only having one element, we need to cover the
         // range of the comma.
         let mut final_range = first_element_range.cover(self.current_range());
-        self.eat(TokenKind::Comma);
+        if !self.at_ts(Self::END_SEQUENCE_SET) {
+            self.expect(TokenKind::Comma);
+        }
 
         let mut elts = vec![first_element];
 
-        while self.at_expr() {
-            let (expr, expr_range) = parse_func(self);
-            elts.push(expr);
-            final_range = final_range.cover(expr_range);
-
-            if self.at(TokenKind::Comma) {
-                final_range = final_range.cover(self.current_range());
-                self.eat(TokenKind::Comma);
-            } else {
-                if self.at_expr() {
-                    self.expect(TokenKind::Comma);
-                } else {
-                    break;
-                }
-            }
-        }
+        final_range = final_range.cover(
+            self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
+                let (expr, range) = parse_func(parser);
+                elts.push(expr);
+                range
+            })
+            .unwrap_or(final_range),
+        );
 
         self.clear_ctx(ParserCtxFlags::TUPLE_EXPR);
         (
@@ -3872,20 +3867,17 @@ where
     }
 
     fn parse_list_expr(&mut self, first_element: Expr) -> ExprWithRange {
-        self.eat(TokenKind::Comma);
+        if !self.at_ts(Self::END_SEQUENCE_SET) {
+            self.expect(TokenKind::Comma);
+        }
         let mut elts = vec![first_element];
 
         let range = self
-            .parse_separated(
-                true,
-                TokenKind::Comma,
-                [TokenKind::Rsqb].as_slice(),
-                |parser| {
-                    let (expr, range) = parser.parse_expr2();
-                    elts.push(expr);
-                    range
-                },
-            )
+            .parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
+                let (expr, range) = parser.parse_expr2();
+                elts.push(expr);
+                range
+            })
             // Doesn't really matter what range we get here, since the range will
             // be modified later in `parse_bracketsized_expr`.
             .unwrap_or_default();
@@ -3901,20 +3893,17 @@ where
     }
 
     fn parse_set_expr(&mut self, first_element: Expr) -> ExprWithRange {
-        self.eat(TokenKind::Comma);
+        if !self.at_ts(Self::END_SEQUENCE_SET) {
+            self.expect(TokenKind::Comma);
+        }
         let mut elts = vec![first_element];
 
         let range = self
-            .parse_separated(
-                true,
-                TokenKind::Comma,
-                [TokenKind::Rbrace].as_slice(),
-                |parser| {
-                    let (expr, range) = parser.parse_expr2();
-                    elts.push(expr);
-                    range
-                },
-            )
+            .parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
+                let (expr, range) = parser.parse_expr2();
+                elts.push(expr);
+                range
+            })
             // Doesn't really matter what range we get here, since the range will
             // be modified later in `parse_bracesized_expr`.
             .unwrap_or_default();
@@ -3923,33 +3912,30 @@ where
     }
 
     fn parse_dict_expr(&mut self, key: Option<Expr>, value: Expr) -> ExprWithRange {
-        self.eat(TokenKind::Comma);
+        if !self.at_ts(Self::END_SEQUENCE_SET) {
+            self.expect(TokenKind::Comma);
+        }
 
         let mut keys = vec![key];
         let mut values = vec![value];
 
         let range = self
-            .parse_separated(
-                true,
-                TokenKind::Comma,
-                [TokenKind::Rbrace, TokenKind::For, TokenKind::Async].as_slice(),
-                |parser| {
-                    if parser.eat(TokenKind::DoubleStar) {
-                        keys.push(None);
-                    } else {
-                        let (key, _) = parser.parse_expr();
-                        keys.push(Some(key));
+            .parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
+                if parser.eat(TokenKind::DoubleStar) {
+                    keys.push(None);
+                } else {
+                    let (key, _) = parser.parse_expr();
+                    keys.push(Some(key));
 
-                        parser.expect_and_recover(
-                            TokenKind::Colon,
-                            TokenSet::new(&[TokenKind::Comma]).union(EXPR_SET),
-                        );
-                    }
-                    let (value, range) = parser.parse_expr();
-                    values.push(value);
-                    range
-                },
-            )
+                    parser.expect_and_recover(
+                        TokenKind::Colon,
+                        TokenSet::new(&[TokenKind::Comma]).union(EXPR_SET),
+                    );
+                }
+                let (value, range) = parser.parse_expr();
+                values.push(value);
+                range
+            })
             // Doesn't really matter what range we get here, since the range will
             // be modified later in `parse_bracesized_expr`.
             .unwrap_or_default();
