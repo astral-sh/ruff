@@ -3,7 +3,6 @@
 use std::path::Path;
 
 use ruff_text_size::{Ranged, TextRange};
-use wsl;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,7 +44,7 @@ impl Violation for ShebangMissingExecutableFile {
 pub(crate) fn shebang_missing_executable_file(filepath: &Path) -> Option<Diagnostic> {
     // WSL supports Windows file systems, which do not have executable bits.
     // Instead, everything is executable. Therefore, we skip this rule on WSL.
-    if wsl::is_wsl() {
+    if is_wsl::is_wsl() {
         return None;
     }
     if let Ok(true) = is_executable(filepath) {
