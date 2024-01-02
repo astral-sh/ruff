@@ -176,8 +176,7 @@ impl Notebook {
                             .as_hyphenated()
                             .to_string();
 
-                        if !existing_ids.contains(&new_id) {
-                            existing_ids.insert(new_id.clone());
+                        if existing_ids.insert(new_id.clone()) {
                             *id = Some(new_id);
                             break;
                         }
