@@ -256,7 +256,7 @@ pub fn parse_ok_tokens_lalrpop(
         .map(|(t, range)| (range.start(), t, range.end()));
     python::TopParser::new()
         .parse(source, mode, lexer)
-        .map_err(|e| parse_error_from_lalrpop(e))
+        .map_err(parse_error_from_lalrpop)
 }
 
 /// Parse tokens into an AST like [`parse_tokens`], but we already know all tokens are valid.
@@ -293,7 +293,7 @@ fn parse_filtered_tokens(
                 mode,
                 lexer.map_ok(|(t, range)| (range.start(), t, range.end())),
             )
-            .map_err(|e| parse_error_from_lalrpop(e))
+            .map_err(parse_error_from_lalrpop)
     }
 }
 
