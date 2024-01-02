@@ -147,7 +147,19 @@ impl Notebook {
         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
         if raw_notebook.nbformat == 4 && raw_notebook.nbformat_minor >= 5 {
             let mut id_index: u128 = 0;
-            let mut seen_ids = HashSet::new();
+            let mut existing_ids = HashSet::new();
+
+            for cell in &raw_notebook.cells {
+                let id = match cell {
+                    Cell::Code(cell) => &cell.id,
+                    Cell::Markdown(cell) => &cell.id,
+                    Cell::Raw(cell) => &cell.id,
+                };
+                if let Some(id) = id {
+                    existing_ids.insert(id.clone());
+                }
+            }
+
             for cell in &mut raw_notebook.cells {
                 let id = match cell {
                     Cell::Code(cell) => &mut cell.id,
@@ -165,14 +177,12 @@ impl Notebook {
                         // Increment the index
                         id_index += 1;
 
-                        if !seen_ids.contains(&new_id) {
+                        if !existing_ids.contains(&new_id) {
+                            existing_ids.insert(new_id.clone());
                             *id = Some(new_id);
                             break;
                         }
                     }
-                }
-                if let Some(id) = id {
-                    seen_ids.insert(id);
                 }
             }
         }
