@@ -37,6 +37,12 @@ use crate::checkers::ast::Checker;
 /// for value in obj.values():
 ///     print(value)
 /// ```
+///
+/// ## Fix safety
+/// The fix does not perform any type analysis. The fix will be incorrect if the
+/// object in question does not duck-type as a mapping, e.g. because it is
+/// missing `.keys()` or `.values()` or because those methods behave differently
+/// than they do on mappings.
 #[violation]
 pub struct IncorrectDictIterator {
     subset: DictSubset,
