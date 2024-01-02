@@ -2836,12 +2836,18 @@ where
         (lhs, lhs_range)
     }
 
-    #[inline]
     fn parse_identifier(&mut self) -> ast::Identifier {
-        let (tok, range) = self.next_token();
-        if let Tok::Name { name } = tok {
+        let (kind, range) = self.current_token();
+        if kind == TokenKind::Name {
+            let (Tok::Name { name }, _) = self.next_token() else {
+                unreachable!();
+            };
             ast::Identifier { id: name, range }
         } else {
+            self.add_error(
+                ParseErrorType::OtherError("expecting an identifier".into()),
+                range,
+            );
             ast::Identifier {
                 id: String::new(),
                 range,
