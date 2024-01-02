@@ -124,6 +124,8 @@ test_particular = [
     b'c'
     )
 }
+
+b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 ## Outputs
@@ -277,6 +279,8 @@ test_particular = [
 
 # Parenthesized string continuation with messed up indentation
 {"key": ([], b"a" b"b" b"c")}
+
+b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 
@@ -430,6 +434,8 @@ test_particular = [
 
 # Parenthesized string continuation with messed up indentation
 {'key': ([], b'a' b'b' b'c')}
+
+b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
 ```
 
 

@@ -22,7 +22,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
         println!("{}", ruff_notebook::round_trip(path)?);
     } else {
         let contents = fs::read_to_string(&args.file)?;
-        println!("{}", round_trip(&contents, &args.file.to_string_lossy())?);
+        println!("{}", round_trip(&contents)?);
     }
     Ok(())
 }

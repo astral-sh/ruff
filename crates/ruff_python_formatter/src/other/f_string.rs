@@ -2,6 +2,7 @@ use ruff_python_ast::FString;
 use ruff_text_size::Ranged;
 
 use crate::prelude::*;
+use crate::preview::is_hex_codes_in_unicode_sequences_enabled;
 use crate::string::{Quoting, StringPart};
 
 /// Formats an f-string which is part of a larger f-string expression.
@@ -31,6 +32,7 @@ impl Format<PyFormatContext<'_>> for FormatFString<'_> {
                 &locator,
                 f.options().quote_style(),
                 f.context().docstring(),
+                is_hex_codes_in_unicode_sequences_enabled(f.context()),
             )
             .fmt(f);
 

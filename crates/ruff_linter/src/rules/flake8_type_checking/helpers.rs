@@ -3,7 +3,7 @@ use anyhow::Result;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Decorator, Expr};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_semantic::{
     analyze, Binding, BindingKind, NodeId, ResolvedReference, SemanticModel,
@@ -43,6 +43,19 @@ pub(crate) fn is_valid_runtime_import(
     }
 }
 
+/// Returns `true` if a function's parameters should be treated as runtime-required.
+pub(crate) fn runtime_required_function(
+    function_def: &ast::StmtFunctionDef,
+    decorators: &[String],
+    semantic: &SemanticModel,
+) -> bool {
+    if runtime_required_decorators(&function_def.decorator_list, decorators, semantic) {
+        return true;
+    }
+    false
+}
+
+/// Returns `true` if a class's assignments should be treated as runtime-required.
 pub(crate) fn runtime_required_class(
     class_def: &ast::StmtClassDef,
     base_classes: &[String],
@@ -52,7 +65,7 @@ pub(crate) fn runtime_required_class(
     if runtime_required_base_class(class_def, base_classes, semantic) {
         return true;
     }
-    if runtime_required_decorators(class_def, decorators, semantic) {
+    if runtime_required_decorators(&class_def.decorator_list, decorators, semantic) {
         return true;
     }
     false
@@ -64,7 +77,7 @@ fn runtime_required_base_class(
     base_classes: &[String],
     semantic: &SemanticModel,
 ) -> bool {
-    analyze::class::any_over_body(class_def, semantic, &|call_path| {
+    analyze::class::any_call_path(class_def, semantic, &|call_path| {
         base_classes
             .iter()
             .any(|base_class| from_qualified_name(base_class) == call_path)
@@ -72,7 +85,7 @@ fn runtime_required_base_class(
 }
 
 fn runtime_required_decorators(
-    class_def: &ast::StmtClassDef,
+    decorator_list: &[Decorator],
     decorators: &[String],
     semantic: &SemanticModel,
 ) -> bool {
@@ -80,7 +93,7 @@ fn runtime_required_decorators(
         return false;
     }
 
-    class_def.decorator_list.iter().any(|decorator| {
+    decorator_list.iter().any(|decorator| {
         semantic
             .resolve_call_path(map_callable(&decorator.expression))
             .is_some_and(|call_path| {

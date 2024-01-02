@@ -12,7 +12,7 @@ else:
     pass
 "
     .trim();
-    let stmts = parse_suite(contents, "<filename>")?;
+    let stmts = parse_suite(contents)?;
     let stmt = stmts.first().unwrap();
     let range = identifier::else_(stmt, contents).unwrap();
     assert_eq!(&contents[range], "else");

@@ -118,3 +118,5 @@ test_particular = [
     b'c'
     )
 }
+
+b"Unicode Escape sequence don't apply to bytes: \N{0x} \u{ABCD} \U{ABCDEFGH}"
