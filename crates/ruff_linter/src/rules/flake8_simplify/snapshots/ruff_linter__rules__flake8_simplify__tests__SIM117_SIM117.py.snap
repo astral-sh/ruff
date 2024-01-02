@@ -322,7 +322,7 @@ SIM117.py:126:1: SIM117 [*] Use a single `with` statement with multiple contexts
 
 SIM117.py:163:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
     |
-162 |   # Do not supress combination, if a context manager is already combined with another.
+162 |   # Do not suppress combination, if a context manager is already combined with another.
 163 | / async with asyncio.timeout(1), A():
 164 | |     async with B():
     | |___________________^ SIM117
@@ -333,7 +333,7 @@ SIM117.py:163:1: SIM117 [*] Use a single `with` statement with multiple contexts
 ℹ Unsafe fix
 160 160 |                                     pass
 161 161 | 
-162 162 | # Do not supress combination, if a context manager is already combined with another.
+162 162 | # Do not suppress combination, if a context manager is already combined with another.
 163     |-async with asyncio.timeout(1), A():
 164     |-    async with B():
 165     |-        pass

@@ -212,3 +212,55 @@ def func(x: int):
         raise ValueError
     else:
         return 1
+
+
+from typing import overload
+
+
+@overload
+def overloaded(i: int) -> "int":
+    ...
+
+
+@overload
+def overloaded(i: "str") -> "str":
+    ...
+
+
+def overloaded(i):
+    return i
+
+
+def func(x: int):
+    if not x:
+        return 1
+    raise ValueError
+
+
+def func(x: int):
+    if not x:
+        return 1
+    else:
+        return 2
+    raise ValueError
+
+
+def func():
+    try:
+        raise ValueError
+    except:
+        return 2
+
+
+def func():
+    try:
+        return 1
+    except:
+        pass
+
+
+def func(x: int):
+    for _ in range(3):
+        if x > 0:
+            return 1
+    raise ValueError

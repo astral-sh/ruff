@@ -159,7 +159,7 @@ async with asyncio.timeout(1):
                                 async with trio.move_on_at(1):
                                     pass
 
-# Do not supress combination, if a context manager is already combined with another.
+# Do not suppress combination, if a context manager is already combined with another.
 async with asyncio.timeout(1), A():
     async with B():
         pass

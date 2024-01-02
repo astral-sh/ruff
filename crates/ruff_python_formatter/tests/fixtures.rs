@@ -300,22 +300,14 @@ fn ensure_unchanged_ast(
     let source_type = options.source_type();
 
     // Parse the unformatted code.
-    let mut unformatted_ast = parse(
-        unformatted_code,
-        source_type.as_mode(),
-        &input_path.to_string_lossy(),
-    )
-    .expect("Unformatted code to be valid syntax");
+    let mut unformatted_ast = parse(unformatted_code, source_type.as_mode())
+        .expect("Unformatted code to be valid syntax");
     Normalizer.visit_module(&mut unformatted_ast);
     let unformatted_ast = ComparableMod::from(&unformatted_ast);
 
     // Parse the formatted code.
-    let mut formatted_ast = parse(
-        formatted_code,
-        source_type.as_mode(),
-        &input_path.to_string_lossy(),
-    )
-    .expect("Formatted code to be valid syntax");
+    let mut formatted_ast =
+        parse(formatted_code, source_type.as_mode()).expect("Formatted code to be valid syntax");
     Normalizer.visit_module(&mut formatted_ast);
     let formatted_ast = ComparableMod::from(&formatted_ast);
 

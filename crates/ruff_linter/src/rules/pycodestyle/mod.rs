@@ -29,13 +29,15 @@ mod tests {
     #[test_case(Rule::LambdaAssignment, Path::new("E731.py"))]
     #[test_case(Rule::BareExcept, Path::new("E722.py"))]
     #[test_case(Rule::BlankLineWithWhitespace, Path::new("W29.py"))]
+    #[test_case(Rule::BlankLineWithWhitespace, Path::new("W293.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_0.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_1.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501_3.py"))]
     #[test_case(Rule::MixedSpacesAndTabs, Path::new("E101.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
-    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_1.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.ipynb"))]
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::MultipleStatementsOnOneLineColon, Path::new("E70.py"))]
@@ -65,7 +67,7 @@ mod tests {
     }
 
     #[test_case(Rule::IsLiteral, Path::new("constant_literals.py"))]
-    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.py"))]
+    #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(

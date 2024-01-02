@@ -195,6 +195,7 @@ mod tests {
                     runtime_required_decorators: vec![
                         "attrs.define".to_string(),
                         "attrs.frozen".to_string(),
+                        "pydantic.validate_call".to_string(),
                     ],
                     ..Default::default()
                 },

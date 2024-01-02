@@ -13,14 +13,14 @@ license = { workspace = true }
 
 [dependencies]
 bitflags = { workspace = true }
-hexf-parse = "0.2.1"
-is-macro.workspace = true
+hexf-parse = { workspace = true }
+is-macro = { workspace = true }
 itertools = { workspace = true }
-lexical-parse-float = { version = "0.8.0", features = ["format"] }
-unic-ucd-category = "0.9"
+lexical-parse-float = { workspace = true, features = ["format"] }
+unic-ucd-category = { workspace = true }
 
 [dev-dependencies]
-rand = "0.8.5"
+rand = { workspace = true }
 
 [lints]
 workspace = true

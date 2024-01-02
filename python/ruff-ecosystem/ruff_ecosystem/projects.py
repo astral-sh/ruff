@@ -5,13 +5,18 @@ Abstractions and utilities for working with projects to run ecosystem checks on.
 from __future__ import annotations
 
 import abc
+import contextlib
 import dataclasses
 from asyncio import create_subprocess_exec
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import cache
 from pathlib import Path
 from subprocess import DEVNULL, PIPE
-from typing import Self
+from typing import Any, Self
+
+import tomli
+import tomli_w
 
 from ruff_ecosystem import logger
 from ruff_ecosystem.types import Serializable
@@ -26,13 +31,114 @@ class Project(Serializable):
     repo: Repository
     check_options: CheckOptions = field(default_factory=lambda: CheckOptions())
     format_options: FormatOptions = field(default_factory=lambda: FormatOptions())
+    config_overrides: ConfigOverrides = field(default_factory=lambda: ConfigOverrides())
 
     def with_preview_enabled(self: Self) -> Self:
         return type(self)(
             repo=self.repo,
             check_options=self.check_options.with_options(preview=True),
             format_options=self.format_options.with_options(preview=True),
+            config_overrides=self.config_overrides,
         )
+
+    def __post_init__(self):
+        # Convert bare dictionaries for `config_overrides` into the correct type
+        if isinstance(self.config_overrides, dict):
+            # Bypass the frozen attribute
+            object.__setattr__(
+                self, "config_overrides", ConfigOverrides(always=self.config_overrides)
+            )
+
+
+@dataclass(frozen=True)
+class ConfigOverrides(Serializable):
+    """
+    A collection of key, value pairs to override in the Ruff configuration file.
+
+    The key describes a member to override in the toml file; '.' may be used to indicate a
+    nested value e.g. `format.quote-style`.
+
+    If a Ruff configuration file does not exist and overrides are provided, it will be createad.
+    """
+
+    always: dict[str, Any] = field(default_factory=dict)
+    when_preview: dict[str, Any] = field(default_factory=dict)
+    when_no_preview: dict[str, Any] = field(default_factory=dict)
+
+    def __hash__(self) -> int:
+        # Avoid computing this hash repeatedly since this object is intended
+        # to be immutable and serializing to toml is not necessarily cheap
+        @cache
+        def as_string():
+            return tomli_w.dumps(
+                {
+                    "always": self.always,
+                    "when_preview": self.when_preview,
+                    "when_no_preview": self.when_no_preview,
+                }
+            )
+
+        return hash(as_string())
+
+    @contextlib.contextmanager
+    def patch_config(
+        self,
+        dirpath: Path,
+        preview: bool,
+    ) -> None:
+        """
+        Temporarily patch the Ruff configuration file in the given directory.
+        """
+        ruff_toml = dirpath / "ruff.toml"
+        pyproject_toml = dirpath / "pyproject.toml"
+
+        # Prefer `ruff.toml` over `pyproject.toml`
+        if ruff_toml.exists():
+            path = ruff_toml
+            base = []
+        else:
+            path = pyproject_toml
+            base = ["tool", "ruff"]
+
+        overrides = {
+            **self.always,
+            **(self.when_preview if preview else self.when_no_preview),
+        }
+
+        if not overrides:
+            yield
+            return
+
+        # Read the existing content if the file is present
+        if path.exists():
+            contents = path.read_text()
+            toml = tomli.loads(contents)
+        else:
+            contents = None
+            toml = {}
+
+        # Update the TOML, using `.` to descend into nested keys
+        for key, value in overrides.items():
+            logger.debug(f"Setting {key}={value!r} in {path}")
+
+            target = toml
+            names = base + key.split(".")
+            for name in names[:-1]:
+                if name not in target:
+                    target[name] = {}
+                target = target[name]
+            target[names[-1]] = value
+
+        tomli_w.dump(toml, path.open("wb"))
+
+        try:
+            yield
+        finally:
+            # Restore the contents or delete the file
+            if contents is None:
+                path.unlink()
+            else:
+                path.write_text(contents)
 
 
 class RuffCommand(Enum):
@@ -42,6 +148,8 @@ class RuffCommand(Enum):
 
 @dataclass(frozen=True)
 class CommandOptions(Serializable, abc.ABC):
+    preview: bool = False
+
     def with_options(self: Self, **kwargs) -> Self:
         """
         Return a copy of self with the given options set.
@@ -62,7 +170,6 @@ class CheckOptions(CommandOptions):
     select: str = ""
     ignore: str = ""
     exclude: str = ""
-    preview: bool = False
 
     # Generating fixes is slow and verbose
     show_fixes: bool = False
@@ -187,14 +294,17 @@ class Repository(Serializable):
         )
 
         process = await create_subprocess_exec(
-            *command, env={"GIT_TERMINAL_PROMPT": "0"}
+            *command,
+            env={"GIT_TERMINAL_PROMPT": "0"},
+            stdout=PIPE,
+            stderr=PIPE,
         )
 
-        status_code = await process.wait()
-
-        logger.debug(
-            f"Finished cloning {self.fullname} with status {status_code}",
-        )
+        if await process.wait() != 0:
+            _, stderr = await process.communicate()
+            raise ProjectSetupError(
+                f"Failed to clone {self.fullname}: {stderr.decode()}"
+            )
 
         # Configure git user — needed for `self.commit` to work
         await (

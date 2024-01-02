@@ -2,20 +2,21 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-use ruff_text_size::{Ranged, TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub mod line_index;
-mod locator;
-pub mod newlines;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use crate::line_index::{LineIndex, OneIndexed};
-pub use locator::Locator;
-pub use newlines::{
+pub use crate::locator::Locator;
+pub use crate::newlines::{
     find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
     UniversalNewlines,
 };
+
+mod line_index;
+mod locator;
+mod newlines;
 
 /// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`SourceLocation`].
 #[derive(Debug)]
