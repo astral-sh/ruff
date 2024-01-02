@@ -15,7 +15,7 @@ license = "MIT"
 anyhow = { version = "1.0.76" }
 bitflags = { version = "2.4.1" }
 chrono = { version = "0.4.31", default-features = false, features = ["clock"] }
-clap = { version = "4.4.7", features = ["derive"] }
+clap = { version = "4.4.12", features = ["derive"] }
 colored = { version = "2.1.0" }
 filetime = { version = "0.2.23" }
 glob = { version = "0.3.1" }
