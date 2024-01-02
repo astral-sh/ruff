@@ -672,7 +672,8 @@ format = "json"
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to parse `[RUFF-TOML-PATH]`: TOML parse error at line 2, column 10
+          Cause: Failed to parse [RUFF-TOML-PATH]
+          Cause: TOML parse error at line 2, column 10
           |
         2 | format = "json"
           |          ^^^^^^

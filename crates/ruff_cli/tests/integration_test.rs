@@ -1047,7 +1047,10 @@ fn unreadable_pyproject_toml() -> Result<()> {
         err.chain()
             .map(std::string::ToString::to_string)
             .collect::<Vec<_>>(),
-        vec!["Permission denied (os error 13)".to_string()],
+        vec![
+            format!("Failed to read {}/pyproject.toml", tempdir.path().display()),
+            "Permission denied (os error 13)".to_string()
+        ],
     );
     Ok(())
 }
