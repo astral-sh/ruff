@@ -169,7 +169,7 @@ impl Notebook {
                 if id.is_none() {
                     loop {
                         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
-                        let new_id = uuid::Builder::from_u128(id_index.clone())
+                        let new_id = uuid::Builder::from_u128(id_index)
                             .into_uuid()
                             .as_hyphenated()
                             .to_string();
