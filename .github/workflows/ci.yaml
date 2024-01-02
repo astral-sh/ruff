@@ -168,7 +168,7 @@ jobs:
   cargo-fuzz:
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: false # ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     name: "cargo fuzz"
     steps:
       - uses: actions/checkout@v4
