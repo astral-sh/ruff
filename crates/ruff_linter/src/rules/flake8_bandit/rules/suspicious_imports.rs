@@ -13,7 +13,8 @@ use crate::registry::AsRule;
 /// Checks for imports of the`telnetlib` module.
 ///
 /// ## Why is this bad?
-/// Telnet is considered insecure. Use SSH or some other encrypted protocol.
+/// Telnet is considered insecure. Instead, ise SSH or another encrypted
+/// protocol.
 ///
 /// ## Example
 /// ```python
@@ -25,7 +26,7 @@ pub struct SuspiciousTelnetlibImport;
 impl Violation for SuspiciousTelnetlibImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`telnetlib` and related modules are considered insecure. Use SSH or some other encrypted protocol")
+        format!("`telnetlib` and related modules are considered insecure. Use SSH or another encrypted protocol.")
     }
 }
 
@@ -33,7 +34,8 @@ impl Violation for SuspiciousTelnetlibImport {
 /// Checks for imports of the `ftplib` module.
 ///
 /// ## Why is this bad?
-/// FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol.
+/// FTP is considered insecure. Instead, use SSH, SFTP, SCP, or another
+/// encrypted protocol.
 ///
 /// ## Example
 /// ```python
@@ -45,16 +47,17 @@ pub struct SuspiciousFtplibImport;
 impl Violation for SuspiciousFtplibImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`ftplib` and related modules are considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol")
+        format!("`ftplib` and related modules are considered insecure. Use SSH, SFTP, SCP, or another encrypted protocol.")
     }
 }
 
 /// ## What it does
-/// Checks for imports of the `pickle`, `cPickle`, `dill` and `shelve` modules.
+/// Checks for imports of the `pickle`, `cPickle`, `dill`, and `shelve` modules.
 ///
 /// ## Why is this bad?
-/// It is possible to construct malicious pickle data which will execute arbitrary code during unpickling. Consider
-/// possible security implications associated with these modules.
+/// It is possible to construct malicious pickle data which will execute
+/// arbitrary code during unpickling. Consider possible security implications
+/// associated with these modules.
 ///
 /// ## Example
 /// ```python
@@ -68,16 +71,16 @@ pub struct SuspiciousPickleImport;
 impl Violation for SuspiciousPickleImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`pickle`, `cPickle`, `dill` and `shelve` modules are possibly insecure")
+        format!("`pickle`, `cPickle`, `dill`, and `shelve` modules are possibly insecure")
     }
 }
 
 /// ## What it does
-/// Checks for imports of the `subprocess` module
+/// Checks for imports of the `subprocess` module.
 ///
 /// ## Why is this bad?
-/// It is possible to inject malicious commands into subprocess calls. Consider possible security implications
-/// associated with this module.
+/// It is possible to inject malicious commands into subprocess calls. Consider
+/// possible security implications associated with this module.
 ///
 /// ## Example
 /// ```python
@@ -97,9 +100,10 @@ impl Violation for SuspiciousSubprocessImport {
 /// Checks for imports of the `xml.etree.cElementTree` and `xml.etree.ElementTree` modules
 ///
 /// ## Why is this bad?
-/// Using various methods from these modules to parse untrusted XML data is known to be vulnerable to XML attacks.
-/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
-/// called.
+/// Using various methods from these modules to parse untrusted XML data is
+/// known to be vulnerable to XML attacks. Replace vulnerable imports with the
+/// equivalent `defusedxml` package, or make sure `defusedxml.defuse_stdlib()` is
+/// called before parsing XML data.
 ///
 /// ## Example
 /// ```python
@@ -116,12 +120,13 @@ impl Violation for SuspiciousXmlEtreeImport {
 }
 
 /// ## What it does
-/// Checks for imports of the `xml.sax` module
+/// Checks for imports of the `xml.sax` module.
 ///
 /// ## Why is this bad?
-/// Using various methods from this modules to parse untrusted XML data is known to be vulnerable to XML attacks.
-/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
-/// called.
+/// Using various methods from these modules to parse untrusted XML data is
+/// known to be vulnerable to XML attacks. Replace vulnerable imports with the
+/// equivalent `defusedxml` package, or make sure `defusedxml.defuse_stdlib()` is
+/// called before parsing XML data.
 ///
 /// ## Example
 /// ```python
@@ -138,12 +143,13 @@ impl Violation for SuspiciousXmlSaxImport {
 }
 
 /// ## What it does
-/// Checks for imports of the `xml.dom.expatbuilder` module
+/// Checks for imports of the `xml.dom.expatbuilder` module.
 ///
 /// ## Why is this bad?
-/// Using various methods from this modules to parse untrusted XML data is known to be vulnerable to XML attacks.
-/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
-/// called.
+/// Using various methods from these modules to parse untrusted XML data is
+/// known to be vulnerable to XML attacks. Replace vulnerable imports with the
+/// equivalent `defusedxml` package, or make sure `defusedxml.defuse_stdlib()` is
+/// called before parsing XML data.
 ///
 /// ## Example
 /// ```python
@@ -160,12 +166,13 @@ impl Violation for SuspiciousXmlExpatImport {
 }
 
 /// ## What it does
-/// Checks for imports of the `xml.dom.minidom` module
+/// Checks for imports of the `xml.dom.minidom` module.
 ///
 /// ## Why is this bad?
-/// Using various methods from this modules to parse untrusted XML data is known to be vulnerable to XML attacks.
-/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
-/// called.
+/// Using various methods from these modules to parse untrusted XML data is
+/// known to be vulnerable to XML attacks. Replace vulnerable imports with the
+/// equivalent `defusedxml` package, or make sure `defusedxml.defuse_stdlib()` is
+/// called before parsing XML data.
 ///
 /// ## Example
 /// ```python
@@ -182,12 +189,13 @@ impl Violation for SuspiciousXmlMinidomImport {
 }
 
 /// ## What it does
-/// Checks for imports of the `xml.dom.pulldom` module
+/// Checks for imports of the `xml.dom.pulldom` module.
 ///
 /// ## Why is this bad?
-/// Using various methods from this modules to parse untrusted XML data is known to be vulnerable to XML attacks.
-/// Replace vulnerable imports with the equivalent defusedxml package, or make sure defusedxml.defuse_stdlib() is
-/// called.
+/// Using various methods from these modules to parse untrusted XML data is
+/// known to be vulnerable to XML attacks. Replace vulnerable imports with the
+/// equivalent `defusedxml` package, or make sure `defusedxml.defuse_stdlib()` is
+/// called before parsing XML data.
 ///
 /// ## Example
 /// ```python
@@ -204,11 +212,12 @@ impl Violation for SuspiciousXmlPulldomImport {
 }
 
 /// ## What it does
-/// Checks for imports of the`lxml` module
+/// Checks for imports of the`lxml` module.
 ///
 /// ## Why is this bad?
-/// Using various methods from this module to parse untrusted XML data is known to be vulnerable toXML attacks. Replace
-/// vulnerable imports with the equivalent defusedxml package.
+/// Using various methods from the `lxml` module to parse untrusted XML data is
+/// known to be vulnerable to XML attacks. Replace vulnerable imports with the
+/// equivalent `defusedxml` package.
 ///
 /// ## Example
 /// ```python
@@ -225,11 +234,13 @@ impl Violation for SuspiciousLxmlImport {
 }
 
 /// ## What it does
-/// Checks for imports of the `xmlrpc` module
+/// Checks for imports of the `xmlrpc` module.
 ///
 /// ## Why is this bad?
-/// XMLRPC is a particularly dangerous XML module as it is also concerned with communicating data over a network. Use
-/// defused.xmlrpc.monkey_patch() function to monkey-patch xmlrpclib and mitigate remote XML attacks.
+/// XMLRPC is a particularly dangerous XML module as it is also concerned with
+/// communicating data over a network. Use the `defused.xmlrpc.monkey_patch()`
+/// function to monkey-patch the `xmlrpclib` module and mitigate remote XML
+/// attacks.
 ///
 /// ## Example
 /// ```python
@@ -246,11 +257,13 @@ impl Violation for SuspiciousXmlrpcImport {
 }
 
 /// ## What it does
-/// Checks for imports of `wsgiref.handlers.CGIHandler` and `twisted.web.twcgi.CGIScript`
+/// Checks for imports of `wsgiref.handlers.CGIHandler` and
+/// `twisted.web.twcgi.CGIScript`.
 ///
 /// ## Why is this bad?
-/// httpoxy is a set of vulnerabilities that affect application code running in CGI, or CGI-like environments. The use
-/// of CGI for web applications should be avoided to prevent this class of attack. More details are available.
+/// httpoxy is a set of vulnerabilities that affect application code running in
+/// CGI or CGI-like environments. The use of CGI for web applications should be
+/// avoided to prevent this class of attack.
 ///
 /// ## Example
 /// ```python
@@ -270,11 +283,12 @@ impl Violation for SuspiciousHttpoxyImport {
 }
 
 /// ## What it does
-/// Checks for imports of several unsafe Crypto modules.
+/// Checks for imports of several unsafe cryptography modules.
 ///
 /// ## Why is this bad?
-/// pycrypto library is known to have publicly disclosed buffer overflow vulnerability. It is no longer actively
-/// maintained and has been deprecated in favor of pyca/cryptography library.
+/// The `pycrypto` library is known to have a publicly disclosed buffer
+/// overflow vulnerability. It is no longer actively maintained and has been
+/// deprecated in favor of the `pyca/cryptography` library.
 ///
 /// ## Example
 /// ```python
@@ -296,10 +310,12 @@ impl Violation for SuspiciousPycryptoImport {
 }
 
 /// ## What it does
-/// Checks for imports of the `pyghmi` module
+/// Checks for imports of the `pyghmi` module.
 ///
 /// ## Why is this bad?
-/// `pyghmi` is an IPMI related module. IPMI is considered insecure. Use an encrypted protocol.
+/// `pyghmi` is an IPMI-related module, but IPMI is considered insecure.
+/// Instead, use an encrypted protocol.
+///
 /// ## Example
 /// ```python
 /// import pyghmi
@@ -313,7 +329,7 @@ pub struct SuspiciousPyghmiImport;
 impl Violation for SuspiciousPyghmiImport {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("An IPMI-related module is being imported. IPMI is considered insecure. Use an encrypted protocol")
+        format!("An IPMI-related module is being imported. Prefer an encrypted protocol over IPMI.")
     }
 }
 
@@ -422,7 +438,7 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 ),
                 "xml.etree" => {
                     for name in names {
-                        if &name.name == "cElementTree" || &name.name == "ElementTree" {
+                        if matches!(name.name.as_str(), "cElementTree" | "ElementTree") {
                             check_and_push_diagnostic(
                                 checker,
                                 DiagnosticKind::from(SuspiciousXmlEtreeImport),
@@ -440,7 +456,7 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 }
                 "xml" => {
                     for name in names {
-                        if &name.name == "sax" {
+                        if name.name.as_str() == "sax" {
                             check_and_push_diagnostic(
                                 checker,
                                 DiagnosticKind::from(SuspiciousXmlSaxImport),
@@ -503,7 +519,7 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 ),
                 "wsgiref.handlers" => {
                     for name in names {
-                        if &name.name == "CGIHandler" {
+                        if name.name.as_str() == "CGIHandler" {
                             check_and_push_diagnostic(
                                 checker,
                                 DiagnosticKind::from(SuspiciousHttpoxyImport),
@@ -514,7 +530,7 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 }
                 "twisted.web.twcgi" => {
                     for name in names {
-                        if &name.name == "CGIScript" {
+                        if name.name.as_str() == "CGIScript" {
                             check_and_push_diagnostic(
                                 checker,
                                 DiagnosticKind::from(SuspiciousHttpoxyImport),
@@ -525,15 +541,17 @@ pub(crate) fn suspicious_imports(checker: &mut Checker, stmt: &Stmt) {
                 }
                 "Crypto" => {
                     for name in names {
-                        if &name.name == "Cipher"
-                            || &name.name == "Hash"
-                            || &name.name == "IO"
-                            || &name.name == "Protocol"
-                            || &name.name == "PublicKey"
-                            || &name.name == "Random"
-                            || &name.name == "Signature"
-                            || &name.name == "Util"
-                        {
+                        if matches!(
+                            name.name.as_str(),
+                            "Cipher"
+                                | "Hash"
+                                | "IO"
+                                | "Protocol"
+                                | "PublicKey"
+                                | "Random"
+                                | "Signature"
+                                | "Util"
+                        ) {
                             check_and_push_diagnostic(
                                 checker,
                                 DiagnosticKind::from(SuspiciousPycryptoImport),
