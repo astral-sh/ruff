@@ -438,6 +438,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::SuperWithoutBrackets) {
+                pylint::rules::super_without_brackets(checker, func);
+            }
             if checker.enabled(Rule::BitCount) {
                 refurb::rules::bit_count(checker, call);
             }
@@ -958,6 +961,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::TrioZeroSleepCall) {
                 flake8_trio::rules::zero_sleep_call(checker, call);
+            }
+            if checker.enabled(Rule::UnnecessaryDunderCall) {
+                pylint::rules::unnecessary_dunder_call(checker, call);
             }
         }
         Expr::Dict(dict) => {

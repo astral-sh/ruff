@@ -265,8 +265,8 @@ impl<'a> Deref for Definitions<'a> {
 }
 
 impl<'a> IntoIterator for Definitions<'a> {
-    type IntoIter = std::vec::IntoIter<Self::Item>;
     type Item = Definition<'a>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()

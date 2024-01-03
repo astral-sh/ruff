@@ -941,7 +941,7 @@ impl UnicodeEscape {
                             }
                         }
                     } else {
-                        // Unterminated escape sequence, dont' normalise it.
+                        // Unterminated escape sequence, don't normalise it.
                         return None;
                     }
                 }

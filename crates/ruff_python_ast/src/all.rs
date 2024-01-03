@@ -1,6 +1,7 @@
+use bitflags::bitflags;
+
 use crate::helpers::map_subscript;
 use crate::{self as ast, Expr, Stmt};
-use bitflags::bitflags;
 
 bitflags! {
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]

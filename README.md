@@ -150,7 +150,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.9
+  rev: v0.1.11
   hooks:
     # Run the linter.
     - id: ruff
@@ -386,6 +386,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Benchling ([Refac](https://github.com/benchling/refac))
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- CERN ([Indico](https://getindico.io/))
 - [DVC](https://github.com/iterative/dvc)
 - [Dagger](https://github.com/dagger/dagger)
 - [Dagster](https://github.com/dagster-io/dagster)

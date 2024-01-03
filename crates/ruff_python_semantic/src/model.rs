@@ -802,8 +802,10 @@ impl<'a> SemanticModel<'a> {
                         }
                         // Ex) Given `module="os"` and `object="name"`:
                         // `import os.path ` -> `os.name`
-                        BindingKind::SubmoduleImport(SubmoduleImport { .. }) => {
-                            if name == module {
+                        // Ex) Given `module="os.path"` and `object="join"`:
+                        // `import os.path ` -> `os.path.join`
+                        BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
+                            if call_path.starts_with(&module_path) {
                                 if let Some(source) = binding.source {
                                     // Verify that `os` isn't bound in an inner scope.
                                     if self
@@ -812,7 +814,7 @@ impl<'a> SemanticModel<'a> {
                                         .all(|scope| !scope.has(name))
                                     {
                                         return Some(ImportedName {
-                                            name: format!("{name}.{member}"),
+                                            name: format!("{module}.{member}"),
                                             source,
                                             range: self.nodes[source].range(),
                                             context: binding.context,

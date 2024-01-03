@@ -657,7 +657,7 @@ impl<'a> FlatBinaryExpressionSlice<'a> {
 /// The formatting is recursive (with a depth of `O(operators)` where `operators` are operators with different precedences).
 ///
 /// Comments before or after the first operand must be formatted by the caller because they shouldn't be part of the group
-/// wrapping the whole binary chain. This is to avoid that `b * c` expands in the following example because of its trailing comemnt:
+/// wrapping the whole binary chain. This is to avoid that `b * c` expands in the following example because of its trailing comment:
 ///
 /// ```python
 ///

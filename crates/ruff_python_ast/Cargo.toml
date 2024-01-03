@@ -23,7 +23,7 @@ itertools = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
-static_assertions = "1.1.0"
+static_assertions = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

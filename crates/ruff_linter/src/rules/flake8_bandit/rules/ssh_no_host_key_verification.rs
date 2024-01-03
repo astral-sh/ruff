@@ -28,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// from paramiko import client
 ///
 /// ssh_client = client.SSHClient()
-/// ssh_client.set_missing_host_key_policy()
+/// ssh_client.set_missing_host_key_policy(client.RejectPolicy)
 /// ```
 ///
 /// ## References
