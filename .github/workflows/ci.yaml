@@ -168,7 +168,7 @@ jobs:
   cargo-fuzz:
     runs-on: ubuntu-latest
     needs: determine_changes
-    if: false # ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     name: "cargo fuzz"
     steps:
       - uses: actions/checkout@v4
@@ -180,7 +180,7 @@ jobs:
       - name: "Install cargo-fuzz"
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-fuzz@0.11
+          tool: cargo-fuzz@0.11.2
       - run: cargo fuzz build -s none
 
   scripts:
