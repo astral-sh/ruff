@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 /// Checks for calls to `ssl.wrap_socket()` with no version set
 ///
 /// ## Why is this bad?
-/// Theis method is known to provide a default value that maximizes compatibility, but permits use
+/// This method is known to provide a default value that maximizes compatibility, but permits use
 /// of the aforementioned broken protocol versions.
 ///
 /// ## Example

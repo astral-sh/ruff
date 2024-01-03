@@ -13,7 +13,7 @@ use crate::registry::AsRule;
 /// Checks for imports of the`telnetlib` module.
 ///
 /// ## Why is this bad?
-/// Telnet is considered insecure. Instead, ise SSH or another encrypted
+/// Telnet is considered insecure. Instead, use SSH or another encrypted
 /// protocol.
 ///
 /// ## Example
