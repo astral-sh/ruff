@@ -6,12 +6,10 @@ use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-
-use itertools::Itertools;
 
 /// ## What it does
 /// Checks for simple `__iter__` methods that return `Generator`, and for
@@ -69,8 +67,6 @@ pub struct GeneratorReturnFromIterMethod {
 }
 
 impl Violation for GeneratorReturnFromIterMethod {
-    // Fixable iff the fully qualified name is being used:
-    // one of {typing.Generator, typing_extensions.Generator, collections.abc.Generator}
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -91,11 +87,6 @@ impl Violation for GeneratorReturnFromIterMethod {
             "Convert the return annotation of your `{method_name}` method to `{better_return_type}`"
         ))
     }
-}
-
-struct YieldTypeInfo {
-    expr: ast::Expr,
-    range: TextRange,
 }
 
 /// PYI058
@@ -139,13 +130,17 @@ pub(crate) fn bad_generator_return_type(
         _ => return,
     };
 
+    // Determine the module from which the existing annotation is imported (e.g., `typing` or
+    // `collections.abc`)
     let module_name = {
         let Some(call_path) = semantic.resolve_call_path(map_subscript(returns)) else {
             return;
         };
         match (name, call_path.as_slice()) {
-            ("__iter__", ["typing" | "typing_extensions", "Generator"])
-            | ("__aiter__", ["typing" | "typing_extensions", "AsyncGenerator"]) => call_path[0],
+            ("__iter__", [module_name @ ("typing" | "typing_extensions"), "Generator"])
+            | ("__aiter__", [module_name @ ("typing" | "typing_extensions"), "AsyncGenerator"]) => {
+                module_name
+            }
             ("__iter__", ["collections", "abc", "Generator"])
             | ("__aiter__", ["collections", "abc", "AsyncGenerator"]) => "collections.abc",
             _ => return,
@@ -160,7 +155,7 @@ pub(crate) fn bad_generator_return_type(
     let yield_type_info = match returns {
         ast::Expr::Subscript(ast::ExprSubscript { slice, .. }) => match slice.as_ref() {
             ast::Expr::Tuple(slice_tuple @ ast::ExprTuple { .. }) => {
-                if !&slice_tuple
+                if !slice_tuple
                     .elts
                     .iter()
                     .skip(1)
@@ -168,13 +163,13 @@ pub(crate) fn bad_generator_return_type(
                 {
                     return;
                 }
-                let yield_type = match (name, &slice_tuple.elts[..]) {
+                let yield_type = match (name, slice_tuple.elts.as_slice()) {
                     ("__iter__", [yield_type, _, _]) => yield_type,
                     ("__aiter__", [yield_type, _]) => yield_type,
                     _ => return,
                 };
                 Some(YieldTypeInfo {
-                    expr: yield_type.to_owned(),
+                    expr: yield_type,
                     range: slice_tuple.range,
                 })
             }
@@ -195,9 +190,7 @@ pub(crate) fn bad_generator_return_type(
                 ast::Stmt::Pass(_) => continue,
                 ast::Stmt::Return(ast::StmtReturn { value, .. }) => {
                     if let Some(ret_val) = value {
-                        if yield_encountered
-                            && !matches!(ret_val.as_ref(), ast::Expr::NoneLiteral(_))
-                        {
+                        if yield_encountered && !ret_val.is_none_literal_expr() {
                             return;
                         }
                     }
@@ -234,8 +227,21 @@ pub(crate) fn bad_generator_return_type(
     checker.diagnostics.push(diagnostic);
 }
 
+/// Returns `true` if the [`ast::Expr`] is a `None` literal or a `typing.Any` expression.
 fn is_any_or_none(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
-    semantic.match_typing_expr(expr, "Any") || matches!(expr, ast::Expr::NoneLiteral(_))
+    expr.is_none_literal_expr() || semantic.match_typing_expr(expr, "Any")
+}
+
+#[derive(Debug)]
+struct YieldTypeInfo<'a> {
+    expr: &'a ast::Expr,
+    range: TextRange,
+}
+
+impl Ranged for YieldTypeInfo<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
 }
 
 fn get_fix(
@@ -246,7 +252,7 @@ fn get_fix(
     yield_type_info: Option<YieldTypeInfo>,
     module_name: &str,
 ) -> Option<Fix> {
-    let edits = match returns {
+    let mut edits = match returns {
         ast::Expr::Attribute(attribute @ ast::ExprAttribute { .. }) => {
             get_attribute_edits(attribute)
         }
@@ -261,34 +267,25 @@ fn get_fix(
             _ => None,
         },
         _ => None,
-    };
+    }?;
 
-    let Some(edits) = edits else {
-        return None;
-    };
-    let [first_edit, ..] = &edits[..] else {
-        return None;
-    };
-    let mut rest = edits.iter().skip(1).map(ToOwned::to_owned).collect_vec();
     if let Some(yield_type_info) = yield_type_info {
-        rest.push(Edit::range_replacement(
+        edits.push(Edit::range_replacement(
             checker.generator().expr(&yield_type_info.expr),
-            yield_type_info.range,
+            yield_type_info.range(),
         ));
     }
 
-    // Mark as unsafe if it's a runtime Python file
-    // and the body has more than one statement in it.
+    // Mark as unsafe if it's a runtime Python file and the body has more than one statement in it.
     let applicability = if is_stub || function_def.body.len() == 1 {
         Applicability::Safe
     } else {
         Applicability::Unsafe
     };
-    Some(Fix::applicable_edits(
-        first_edit.to_owned(),
-        rest,
-        applicability,
-    ))
+
+    let head = edits.pop()?;
+    let rest = edits;
+    Some(Fix::applicable_edits(head, rest, applicability))
 }
 
 fn get_attribute_edits(expr: &ast::ExprAttribute) -> Option<Vec<Edit>> {
