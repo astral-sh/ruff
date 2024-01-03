@@ -16,7 +16,7 @@ license = { workspace = true }
 ruff_macros = { path = "../ruff_macros" }
 
 [dev-dependencies]
-static_assertions = "1.1.0"
+static_assertions = { workspace = true }
 
 [lints]
 workspace = true

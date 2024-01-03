@@ -293,7 +293,7 @@ auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public f
 83 |     match x:
 84 |         case [1, 2, 3]:
    |
-   = help: Add return type annotation: `Union[str | int]`
+   = help: Add return type annotation: `Union[str | int | None]`
 
 ℹ Unsafe fix
    1  |+from typing import Union
@@ -305,7 +305,7 @@ auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public f
 80 81 | 
 81 82 | 
 82    |-def func(x: int):
-   83 |+def func(x: int) -> Union[str | int]:
+   83 |+def func(x: int) -> Union[str | int | None]:
 83 84 |     match x:
 84 85 |         case [1, 2, 3]:
 85 86 |             return 1
@@ -446,17 +446,22 @@ auto_return_type.py:137:5: ANN201 [*] Missing return type annotation for public 
 138 |     try:
 139 |         return 1
     |
-    = help: Add return type annotation: `int`
+    = help: Add return type annotation: `Optional[int]`
 
 ℹ Unsafe fix
-134 134 |         return 2
-135 135 | 
-136 136 | 
+    1   |+from typing import Optional
+1   2   | def func():
+2   3   |     return 1
+3   4   | 
+--------------------------------------------------------------------------------
+134 135 |         return 2
+135 136 | 
+136 137 | 
 137     |-def func(x: int):
-    137 |+def func(x: int) -> int:
-138 138 |     try:
-139 139 |         return 1
-140 140 |     except:
+    138 |+def func(x: int) -> Optional[int]:
+138 139 |     try:
+139 140 |         return 1
+140 141 |     except:
 
 auto_return_type.py:146:5: ANN201 [*] Missing return type annotation for public function `func`
     |
@@ -754,5 +759,118 @@ auto_return_type.py:262:5: ANN201 [*] Missing return type annotation for public 
 263 263 |     for _ in range(3):
 264 264 |         if x > 0:
 265 265 |             return 1
+
+auto_return_type.py:269:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+269 | def func(x: int):
+    |     ^^^^ ANN201
+270 |     if x > 5:
+271 |         raise ValueError
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+266 266 |     raise ValueError
+267 267 | 
+268 268 | 
+269     |-def func(x: int):
+    269 |+def func(x: int) -> None:
+270 270 |     if x > 5:
+271 271 |         raise ValueError
+272 272 |     else:
+
+auto_return_type.py:276:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+276 | def func(x: int):
+    |     ^^^^ ANN201
+277 |     if x > 5:
+278 |         raise ValueError
+    |
+    = help: Add return type annotation: `None`
+
+ℹ Unsafe fix
+273 273 |         pass
+274 274 | 
+275 275 | 
+276     |-def func(x: int):
+    276 |+def func(x: int) -> None:
+277 277 |     if x > 5:
+278 278 |         raise ValueError
+279 279 |     elif x > 10:
+
+auto_return_type.py:283:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+283 | def func(x: int):
+    |     ^^^^ ANN201
+284 |     if x > 5:
+285 |         raise ValueError
+    |
+    = help: Add return type annotation: `Optional[int]`
+
+ℹ Unsafe fix
+214 214 |         return 1
+215 215 | 
+216 216 | 
+217     |-from typing import overload
+    217 |+from typing import overload, Optional
+218 218 | 
+219 219 | 
+220 220 | @overload
+--------------------------------------------------------------------------------
+280 280 |         pass
+281 281 | 
+282 282 | 
+283     |-def func(x: int):
+    283 |+def func(x: int) -> Optional[int]:
+284 284 |     if x > 5:
+285 285 |         raise ValueError
+286 286 |     elif x > 10:
+
+auto_return_type.py:290:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+290 | def func():
+    |     ^^^^ ANN201
+291 |     try:
+292 |         return 5
+    |
+    = help: Add return type annotation: `int`
+
+ℹ Unsafe fix
+287 287 |         return 5
+288 288 | 
+289 289 | 
+290     |-def func():
+    290 |+def func() -> int:
+291 291 |     try:
+292 292 |         return 5
+293 293 |     except:
+
+auto_return_type.py:299:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+299 | def func(x: int):
+    |     ^^^^ ANN201
+300 |     match x:
+301 |         case [1, 2, 3]:
+    |
+    = help: Add return type annotation: `Union[str | int]`
+
+ℹ Unsafe fix
+214 214 |         return 1
+215 215 | 
+216 216 | 
+217     |-from typing import overload
+    217 |+from typing import overload, Union
+218 218 | 
+219 219 | 
+220 220 | @overload
+--------------------------------------------------------------------------------
+296 296 |     raise ValueError
+297 297 | 
+298 298 | 
+299     |-def func(x: int):
+    299 |+def func(x: int) -> Union[str | int]:
+300 300 |     match x:
+301 301 |         case [1, 2, 3]:
+302 302 |             return 1
 
 
