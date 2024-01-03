@@ -642,6 +642,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "413") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousPycryptoImport),
         (Flake8Bandit, "415") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousPyghmiImport),
         (Flake8Bandit, "501") => (RuleGroup::Stable, rules::flake8_bandit::rules::RequestWithNoCertValidation),
+        (Flake8Bandit, "504") => (RuleGroup::Preview, rules::flake8_bandit::rules::SslWithNoVersion),
         (Flake8Bandit, "505") => (RuleGroup::Preview, rules::flake8_bandit::rules::WeakCryptographicKey),
         (Flake8Bandit, "506") => (RuleGroup::Stable, rules::flake8_bandit::rules::UnsafeYAMLLoad),
         (Flake8Bandit, "507") => (RuleGroup::Preview, rules::flake8_bandit::rules::SSHNoHostKeyVerification),
