@@ -3,7 +3,7 @@ use ruff_macros::CacheKey;
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
-const RULESET_SIZE: usize = 12;
+const RULESET_SIZE: usize = 13;
 
 /// A set of [`Rule`]s.
 ///
