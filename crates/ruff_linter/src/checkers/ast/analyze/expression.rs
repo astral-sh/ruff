@@ -963,7 +963,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_trio::rules::zero_sleep_call(checker, call);
             }
             if checker.enabled(Rule::UnnecessaryDunderCall) {
-                pylint::rules::unnecessary_dunder_call(checker, expr);
+                pylint::rules::unnecessary_dunder_call(checker, call);
             }
         }
         Expr::Dict(dict) => {

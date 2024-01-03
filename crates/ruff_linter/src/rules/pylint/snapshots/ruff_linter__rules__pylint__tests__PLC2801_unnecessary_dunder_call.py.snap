@@ -1,14 +1,14 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-unnecessary_dunder_call.py:4:7: PLC2801 [*] Unnecessary dunder call `3.0.__add__(4.0)`. Use `+` operator.
+unnecessary_dunder_call.py:4:7: PLC2801 [*] Unnecessary dunder call to `__add__`. Use `+` operator.
   |
 4 | print((3.0).__add__(4.0))  # PLC2801
   |       ^^^^^^^^^^^^^^^^^^ PLC2801
 5 | print((3.0).__sub__(4.0))  # PLC2801
 6 | print((3.0).__mul__(4.0))  # PLC2801
   |
-  = help: Use `+` operator.
+  = help: Use `+` operator
 
 ℹ Safe fix
 1 1 | from typing import Any
@@ -20,7 +20,7 @@ unnecessary_dunder_call.py:4:7: PLC2801 [*] Unnecessary dunder call `3.0.__add__
 6 6 | print((3.0).__mul__(4.0))  # PLC2801
 7 7 | print((3.0).__truediv__(4.0))  # PLC2801
 
-unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call `3.0.__sub__(4.0)`. Use `-` operator.
+unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call to `__sub__`. Use `-` operator.
   |
 4 | print((3.0).__add__(4.0))  # PLC2801
 5 | print((3.0).__sub__(4.0))  # PLC2801
@@ -28,7 +28,7 @@ unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call `3.0.__sub__
 6 | print((3.0).__mul__(4.0))  # PLC2801
 7 | print((3.0).__truediv__(4.0))  # PLC2801
   |
-  = help: Use `-` operator.
+  = help: Use `-` operator
 
 ℹ Safe fix
 2 2 | 
@@ -40,7 +40,7 @@ unnecessary_dunder_call.py:5:7: PLC2801 [*] Unnecessary dunder call `3.0.__sub__
 7 7 | print((3.0).__truediv__(4.0))  # PLC2801
 8 8 | print((3.0).__floordiv__(4.0))  # PLC2801
 
-unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call `3.0.__mul__(4.0)`. Use `*` operator.
+unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call to `__mul__`. Use `*` operator.
   |
 4 | print((3.0).__add__(4.0))  # PLC2801
 5 | print((3.0).__sub__(4.0))  # PLC2801
@@ -49,7 +49,7 @@ unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call `3.0.__mul__
 7 | print((3.0).__truediv__(4.0))  # PLC2801
 8 | print((3.0).__floordiv__(4.0))  # PLC2801
   |
-  = help: Use `*` operator.
+  = help: Use `*` operator
 
 ℹ Safe fix
 3 3 | 
@@ -61,7 +61,7 @@ unnecessary_dunder_call.py:6:7: PLC2801 [*] Unnecessary dunder call `3.0.__mul__
 8 8 | print((3.0).__floordiv__(4.0))  # PLC2801
 9 9 | print((3.0).__mod__(4.0))  # PLC2801
 
-unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call `3.0.__truediv__(4.0)`. Use `/` operator.
+unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call to `__truediv__`. Use `/` operator.
   |
 5 | print((3.0).__sub__(4.0))  # PLC2801
 6 | print((3.0).__mul__(4.0))  # PLC2801
@@ -70,7 +70,7 @@ unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call `3.0.__trued
 8 | print((3.0).__floordiv__(4.0))  # PLC2801
 9 | print((3.0).__mod__(4.0))  # PLC2801
   |
-  = help: Use `/` operator.
+  = help: Use `/` operator
 
 ℹ Safe fix
 4 4 | print((3.0).__add__(4.0))  # PLC2801
@@ -82,7 +82,7 @@ unnecessary_dunder_call.py:7:7: PLC2801 [*] Unnecessary dunder call `3.0.__trued
 9 9 | print((3.0).__mod__(4.0))  # PLC2801
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
 
-unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call `3.0.__floordiv__(4.0)`. Use `//` operator.
+unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call to `__floordiv__`. Use `//` operator.
    |
  6 | print((3.0).__mul__(4.0))  # PLC2801
  7 | print((3.0).__truediv__(4.0))  # PLC2801
@@ -91,7 +91,7 @@ unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call `3.0.__floor
  9 | print((3.0).__mod__(4.0))  # PLC2801
 10 | print((3.0).__eq__(4.0))  # PLC2801
    |
-   = help: Use `//` operator.
+   = help: Use `//` operator
 
 ℹ Safe fix
 5 5 | print((3.0).__sub__(4.0))  # PLC2801
@@ -103,7 +103,7 @@ unnecessary_dunder_call.py:8:7: PLC2801 [*] Unnecessary dunder call `3.0.__floor
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
 
-unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call `3.0.__mod__(4.0)`. Use `%` operator.
+unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call to `__mod__`. Use `%` operator.
    |
  7 | print((3.0).__truediv__(4.0))  # PLC2801
  8 | print((3.0).__floordiv__(4.0))  # PLC2801
@@ -112,7 +112,7 @@ unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call `3.0.__mod__
 10 | print((3.0).__eq__(4.0))  # PLC2801
 11 | print((3.0).__ne__(4.0))  # PLC2801
    |
-   = help: Use `%` operator.
+   = help: Use `%` operator
 
 ℹ Safe fix
 6  6  | print((3.0).__mul__(4.0))  # PLC2801
@@ -124,7 +124,7 @@ unnecessary_dunder_call.py:9:7: PLC2801 [*] Unnecessary dunder call `3.0.__mod__
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
 
-unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call `3.0.__eq__(4.0)`. Use `==` operator.
+unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call to `__eq__`. Use `==` operator.
    |
  8 | print((3.0).__floordiv__(4.0))  # PLC2801
  9 | print((3.0).__mod__(4.0))  # PLC2801
@@ -133,7 +133,7 @@ unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call `3.0.__eq__
 11 | print((3.0).__ne__(4.0))  # PLC2801
 12 | print((3.0).__lt__(4.0))  # PLC2801
    |
-   = help: Use `==` operator.
+   = help: Use `==` operator
 
 ℹ Safe fix
 7  7  | print((3.0).__truediv__(4.0))  # PLC2801
@@ -145,7 +145,7 @@ unnecessary_dunder_call.py:10:7: PLC2801 [*] Unnecessary dunder call `3.0.__eq__
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
 13 13 | print((3.0).__le__(4.0))  # PLC2801
 
-unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call `3.0.__ne__(4.0)`. Use `!=` operator.
+unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call to `__ne__`. Use `!=` operator.
    |
  9 | print((3.0).__mod__(4.0))  # PLC2801
 10 | print((3.0).__eq__(4.0))  # PLC2801
@@ -154,7 +154,7 @@ unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call `3.0.__ne__
 12 | print((3.0).__lt__(4.0))  # PLC2801
 13 | print((3.0).__le__(4.0))  # PLC2801
    |
-   = help: Use `!=` operator.
+   = help: Use `!=` operator
 
 ℹ Safe fix
 8  8  | print((3.0).__floordiv__(4.0))  # PLC2801
@@ -166,7 +166,7 @@ unnecessary_dunder_call.py:11:7: PLC2801 [*] Unnecessary dunder call `3.0.__ne__
 13 13 | print((3.0).__le__(4.0))  # PLC2801
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
 
-unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call `3.0.__lt__(4.0)`. Use `<` operator.
+unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call to `__lt__`. Use `<` operator.
    |
 10 | print((3.0).__eq__(4.0))  # PLC2801
 11 | print((3.0).__ne__(4.0))  # PLC2801
@@ -175,7 +175,7 @@ unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call `3.0.__lt__
 13 | print((3.0).__le__(4.0))  # PLC2801
 14 | print((3.0).__gt__(4.0))  # PLC2801
    |
-   = help: Use `<` operator.
+   = help: Use `<` operator
 
 ℹ Safe fix
 9  9  | print((3.0).__mod__(4.0))  # PLC2801
@@ -187,7 +187,7 @@ unnecessary_dunder_call.py:12:7: PLC2801 [*] Unnecessary dunder call `3.0.__lt__
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
 
-unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call `3.0.__le__(4.0)`. Use `<=` operator.
+unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call to `__le__`. Use `<=` operator.
    |
 11 | print((3.0).__ne__(4.0))  # PLC2801
 12 | print((3.0).__lt__(4.0))  # PLC2801
@@ -196,7 +196,7 @@ unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call `3.0.__le__
 14 | print((3.0).__gt__(4.0))  # PLC2801
 15 | print((3.0).__ge__(4.0))  # PLC2801
    |
-   = help: Use `<=` operator.
+   = help: Use `<=` operator
 
 ℹ Safe fix
 10 10 | print((3.0).__eq__(4.0))  # PLC2801
@@ -208,7 +208,7 @@ unnecessary_dunder_call.py:13:7: PLC2801 [*] Unnecessary dunder call `3.0.__le__
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
 16 16 | print((3.0).__str__())  # PLC2801
 
-unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call `3.0.__gt__(4.0)`. Use `>` operator.
+unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call to `__gt__`. Use `>` operator.
    |
 12 | print((3.0).__lt__(4.0))  # PLC2801
 13 | print((3.0).__le__(4.0))  # PLC2801
@@ -217,7 +217,7 @@ unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call `3.0.__gt__
 15 | print((3.0).__ge__(4.0))  # PLC2801
 16 | print((3.0).__str__())  # PLC2801
    |
-   = help: Use `>` operator.
+   = help: Use `>` operator
 
 ℹ Safe fix
 11 11 | print((3.0).__ne__(4.0))  # PLC2801
@@ -229,7 +229,7 @@ unnecessary_dunder_call.py:14:7: PLC2801 [*] Unnecessary dunder call `3.0.__gt__
 16 16 | print((3.0).__str__())  # PLC2801
 17 17 | print((3.0).__repr__())  # PLC2801
 
-unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call `3.0.__ge__(4.0)`. Use `>=` operator.
+unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call to `__ge__`. Use `>=` operator.
    |
 13 | print((3.0).__le__(4.0))  # PLC2801
 14 | print((3.0).__gt__(4.0))  # PLC2801
@@ -238,7 +238,7 @@ unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call `3.0.__ge__
 16 | print((3.0).__str__())  # PLC2801
 17 | print((3.0).__repr__())  # PLC2801
    |
-   = help: Use `>=` operator.
+   = help: Use `>=` operator
 
 ℹ Safe fix
 12 12 | print((3.0).__lt__(4.0))  # PLC2801
@@ -250,7 +250,7 @@ unnecessary_dunder_call.py:15:7: PLC2801 [*] Unnecessary dunder call `3.0.__ge__
 17 17 | print((3.0).__repr__())  # PLC2801
 18 18 | print([1, 2, 3].__len__())  # PLC2801
 
-unnecessary_dunder_call.py:16:7: PLC2801 [*] Unnecessary dunder call `3.0.__str__()`. Use `str()` builtin.
+unnecessary_dunder_call.py:16:7: PLC2801 [*] Unnecessary dunder call to `__str__`. Use `str()` builtin.
    |
 14 | print((3.0).__gt__(4.0))  # PLC2801
 15 | print((3.0).__ge__(4.0))  # PLC2801
@@ -259,7 +259,7 @@ unnecessary_dunder_call.py:16:7: PLC2801 [*] Unnecessary dunder call `3.0.__str_
 17 | print((3.0).__repr__())  # PLC2801
 18 | print([1, 2, 3].__len__())  # PLC2801
    |
-   = help: Use `str()` builtin.
+   = help: Use `str()` builtin
 
 ℹ Safe fix
 13 13 | print((3.0).__le__(4.0))  # PLC2801
@@ -271,7 +271,7 @@ unnecessary_dunder_call.py:16:7: PLC2801 [*] Unnecessary dunder call `3.0.__str_
 18 18 | print([1, 2, 3].__len__())  # PLC2801
 19 19 | print((1).__neg__())  # PLC2801
 
-unnecessary_dunder_call.py:17:7: PLC2801 [*] Unnecessary dunder call `3.0.__repr__()`. Use `repr()` builtin.
+unnecessary_dunder_call.py:17:7: PLC2801 [*] Unnecessary dunder call to `__repr__`. Use `repr()` builtin.
    |
 15 | print((3.0).__ge__(4.0))  # PLC2801
 16 | print((3.0).__str__())  # PLC2801
@@ -280,7 +280,7 @@ unnecessary_dunder_call.py:17:7: PLC2801 [*] Unnecessary dunder call `3.0.__repr
 18 | print([1, 2, 3].__len__())  # PLC2801
 19 | print((1).__neg__())  # PLC2801
    |
-   = help: Use `repr()` builtin.
+   = help: Use `repr()` builtin
 
 ℹ Safe fix
 14 14 | print((3.0).__gt__(4.0))  # PLC2801
@@ -292,7 +292,7 @@ unnecessary_dunder_call.py:17:7: PLC2801 [*] Unnecessary dunder call `3.0.__repr
 19 19 | print((1).__neg__())  # PLC2801
 20 20 | 
 
-unnecessary_dunder_call.py:18:7: PLC2801 [*] Unnecessary dunder call `[1, 2, 3].__len__()`. Use `len()` builtin.
+unnecessary_dunder_call.py:18:7: PLC2801 [*] Unnecessary dunder call to `__len__`. Use `len()` builtin.
    |
 16 | print((3.0).__str__())  # PLC2801
 17 | print((3.0).__repr__())  # PLC2801
@@ -300,7 +300,7 @@ unnecessary_dunder_call.py:18:7: PLC2801 [*] Unnecessary dunder call `[1, 2, 3].
    |       ^^^^^^^^^^^^^^^^^^^ PLC2801
 19 | print((1).__neg__())  # PLC2801
    |
-   = help: Use `len()` builtin.
+   = help: Use `len()` builtin
 
 ℹ Safe fix
 15 15 | print((3.0).__ge__(4.0))  # PLC2801
@@ -312,13 +312,13 @@ unnecessary_dunder_call.py:18:7: PLC2801 [*] Unnecessary dunder call `[1, 2, 3].
 20 20 | 
 21 21 | 
 
-unnecessary_dunder_call.py:19:7: PLC2801 Unnecessary dunder call `(1).__neg__()`. Multiply by -1 instead.
+unnecessary_dunder_call.py:19:7: PLC2801 Unnecessary dunder call to `__neg__`. Multiply by -1 instead.
    |
 17 | print((3.0).__repr__())  # PLC2801
 18 | print([1, 2, 3].__len__())  # PLC2801
 19 | print((1).__neg__())  # PLC2801
    |       ^^^^^^^^^^^^^ PLC2801
    |
-   = help: Multiply by -1 instead.
+   = help: Multiply by -1 instead
 
 

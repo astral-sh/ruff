@@ -21,7 +21,10 @@ print((1).__neg__())  # PLC2801
 
 class Thing:
     def __init__(self, stuff: Any) -> None:
-        super().__init__()  # Ok
-        super().__class__(stuff=(1, 2, 3))  # Ok
+        super().__init__()  # OK
+        super().__class__(stuff=(1, 2, 3))  # OK
 
-blah = lambda: {"a": 1}.__delitem__("a")  # Ok
+
+blah = lambda: {"a": 1}.__delitem__("a")  # OK
+
+blah = dict[{"a": 1}.__delitem__("a")]  # OK
