@@ -965,6 +965,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryDunderCall) {
                 pylint::rules::unnecessary_dunder_call(checker, call);
             }
+            if checker.enabled(Rule::SslWithNoVersion) {
+                flake8_bandit::rules::ssl_with_no_version(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
