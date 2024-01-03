@@ -214,6 +214,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0415") => (RuleGroup::Preview, rules::pylint::rules::ImportOutsideTopLevel),
         (Pylint, "C2401") => (RuleGroup::Preview, rules::pylint::rules::NonAsciiName),
         (Pylint, "C2403") => (RuleGroup::Preview, rules::pylint::rules::NonAsciiImportName),
+        (Pylint, "C2801") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDunderCall),
         #[allow(deprecated)]
         (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
         (Pylint, "C3002") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryDirectLambdaCall),
@@ -275,6 +276,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0127") => (RuleGroup::Stable, rules::pylint::rules::SelfAssigningVariable),
         (Pylint, "W0129") => (RuleGroup::Stable, rules::pylint::rules::AssertOnStringLiteral),
         (Pylint, "W0131") => (RuleGroup::Stable, rules::pylint::rules::NamedExprWithoutContext),
+        (Pylint, "W0245") => (RuleGroup::Preview, rules::pylint::rules::SuperWithoutBrackets),
         (Pylint, "W0406") => (RuleGroup::Stable, rules::pylint::rules::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),
         (Pylint, "W0604") => (RuleGroup::Preview, rules::pylint::rules::GlobalAtModuleLevel),
