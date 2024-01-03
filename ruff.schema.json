@@ -1222,7 +1222,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes decorated with any of the enumerated decorators from needing to be moved into type-checking blocks.",
+          "description": "Exempt classes and functions decorated with any of the enumerated decorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator (for functions) and attrs' `@attrs.define` decorator (for classes).",
           "type": [
             "array",
             "null"
@@ -2410,6 +2410,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-locals": {
+          "description": "Maximum number of local variables allowed for a function or method body (see: `PLR0914`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-positional-args": {
           "description": "Maximum number of positional arguments allowed for a function or method definition (see: `PLR0917`).\n\nIf not specified, defaults to the value of `max-args`.",
           "type": [
@@ -2903,6 +2912,7 @@
         "FURB105",
         "FURB11",
         "FURB113",
+        "FURB118",
         "FURB13",
         "FURB131",
         "FURB132",
@@ -2914,6 +2924,7 @@
         "FURB15",
         "FURB152",
         "FURB16",
+        "FURB161",
         "FURB163",
         "FURB168",
         "FURB169",
@@ -3171,6 +3182,7 @@
         "PLR0911",
         "PLR0912",
         "PLR0913",
+        "PLR0914",
         "PLR0915",
         "PLR0916",
         "PLR0917",
@@ -3192,6 +3204,8 @@
         "PLR20",
         "PLR200",
         "PLR2004",
+        "PLR204",
+        "PLR2044",
         "PLR5",
         "PLR55",
         "PLR550",
@@ -3214,6 +3228,9 @@
         "PLW0129",
         "PLW013",
         "PLW0131",
+        "PLW02",
+        "PLW024",
+        "PLW0245",
         "PLW04",
         "PLW040",
         "PLW0406",
@@ -3377,6 +3394,7 @@
         "PYI054",
         "PYI055",
         "PYI056",
+        "PYI058",
         "Q",
         "Q0",
         "Q00",
@@ -3421,6 +3439,8 @@
         "RUF017",
         "RUF018",
         "RUF019",
+        "RUF02",
+        "RUF020",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -3565,6 +3585,7 @@
         "TCH003",
         "TCH004",
         "TCH005",
+        "TCH006",
         "TD",
         "TD0",
         "TD00",

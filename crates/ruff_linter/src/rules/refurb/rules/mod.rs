@@ -1,3 +1,4 @@
+pub(crate) use bit_count::*;
 pub(crate) use check_and_remove_from_set::*;
 pub(crate) use delete_full_slice::*;
 pub(crate) use hashlib_digest_hex::*;
@@ -8,6 +9,7 @@ pub(crate) use math_constant::*;
 pub(crate) use print_empty_string::*;
 pub(crate) use read_whole_file::*;
 pub(crate) use redundant_log_base::*;
+pub(crate) use reimplemented_operator::*;
 pub(crate) use reimplemented_starmap::*;
 pub(crate) use repeated_append::*;
 pub(crate) use single_item_membership_test::*;
@@ -15,6 +17,7 @@ pub(crate) use slice_copy::*;
 pub(crate) use type_none_comparison::*;
 pub(crate) use unnecessary_enumerate::*;
 
+mod bit_count;
 mod check_and_remove_from_set;
 mod delete_full_slice;
 mod hashlib_digest_hex;
@@ -25,6 +28,7 @@ mod math_constant;
 mod print_empty_string;
 mod read_whole_file;
 mod redundant_log_base;
+mod reimplemented_operator;
 mod reimplemented_starmap;
 mod repeated_append;
 mod single_item_membership_test;

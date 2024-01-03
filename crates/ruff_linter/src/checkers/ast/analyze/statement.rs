@@ -154,6 +154,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     parameters,
                 );
             }
+            if checker.enabled(Rule::GeneratorReturnFromIterMethod) {
+                flake8_pyi::rules::bad_generator_return_type(function_def, checker);
+            }
             if checker.enabled(Rule::CustomTypeVarReturnType) {
                 flake8_pyi::rules::custom_type_var_return_type(
                     checker,
@@ -367,6 +370,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 checker
                     .diagnostics
                     .extend(ruff::rules::unreachable::in_function(name, body));
+            }
+            if checker.enabled(Rule::ReimplementedOperator) {
+                refurb::rules::reimplemented_operator(checker, &function_def.into());
             }
         }
         Stmt::Return(_) => {

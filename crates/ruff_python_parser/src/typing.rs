@@ -33,15 +33,11 @@ pub fn parse_type_annotation(
         // isn't the case, e.g., for implicit concatenations, or for annotations that contain
         // escaped quotes.
         let leading_quote = str::leading_quote(expression).unwrap();
-        let expr = parse_expression_starts_at(
-            value,
-            "<filename>",
-            range.start() + leading_quote.text_len(),
-        )?;
+        let expr = parse_expression_starts_at(value, range.start() + leading_quote.text_len())?;
         Ok((expr, AnnotationKind::Simple))
     } else {
         // Otherwise, consider this a "complex" annotation.
-        let mut expr = parse_expression(value, "<filename>")?;
+        let mut expr = parse_expression(value)?;
         relocate_expr(&mut expr, range);
         Ok((expr, AnnotationKind::Complex))
     }

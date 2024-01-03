@@ -292,6 +292,10 @@ quote.py:78:24: TCH002 [*] Move third-party import `pandas.DataFrame` into a typ
 88    |-            int
 89    |-        ] = 1
    89 |+        x: "DataFrame[int]" = 1
+90 90 | 
+91    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
+   91 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
+92 92 |         ...
 
 quote.py:78:35: TCH002 [*] Move third-party import `pandas.Series` into a type-checking block
    |
@@ -329,5 +333,9 @@ quote.py:78:35: TCH002 [*] Move third-party import `pandas.Series` into a type-c
 88    |-            int
 89    |-        ] = 1
    89 |+        x: "DataFrame[int]" = 1
+90 90 | 
+91    |-    def func() -> DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]:
+   91 |+    def func() -> "DataFrame[[DataFrame[_P, _R]], DataFrame[_P, _R]]":
+92 92 |         ...
 
 

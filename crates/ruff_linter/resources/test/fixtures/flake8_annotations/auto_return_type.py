@@ -182,3 +182,123 @@ class Foo(abc.ABC):
             return 1
         else:
             return 1.5
+
+
+def func(x: int):
+    try:
+        pass
+    except:
+        return 2
+
+
+def func(x: int):
+    try:
+        pass
+    except:
+        return 2
+    else:
+        return 3
+
+
+def func(x: int):
+    if not x:
+        raise ValueError
+    else:
+        raise TypeError
+
+
+def func(x: int):
+    if not x:
+        raise ValueError
+    else:
+        return 1
+
+
+from typing import overload
+
+
+@overload
+def overloaded(i: int) -> "int":
+    ...
+
+
+@overload
+def overloaded(i: "str") -> "str":
+    ...
+
+
+def overloaded(i):
+    return i
+
+
+def func(x: int):
+    if not x:
+        return 1
+    raise ValueError
+
+
+def func(x: int):
+    if not x:
+        return 1
+    else:
+        return 2
+    raise ValueError
+
+
+def func():
+    try:
+        raise ValueError
+    except:
+        return 2
+
+
+def func():
+    try:
+        return 1
+    except:
+        pass
+
+
+def func(x: int):
+    for _ in range(3):
+        if x > 0:
+            return 1
+    raise ValueError
+
+
+def func(x: int):
+    if x > 5:
+        raise ValueError
+    else:
+        pass
+
+
+def func(x: int):
+    if x > 5:
+        raise ValueError
+    elif x > 10:
+        pass
+
+
+def func(x: int):
+    if x > 5:
+        raise ValueError
+    elif x > 10:
+        return 5
+
+
+def func():
+    try:
+        return 5
+    except:
+        pass
+
+    raise ValueError
+
+
+def func(x: int):
+    match x:
+        case [1, 2, 3]:
+            return 1
+        case y:
+            return "foo"

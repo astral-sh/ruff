@@ -326,16 +326,18 @@ We use an experimental in-house tool for managing releases.
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
 1. Highlight any breaking changes in `BREAKING_CHANGES.md`
+1. Run `cargo check`. This should update the lock file with new versions.
 1. Create a pull request with the changelog and version updates
 1. Merge the PR
-1. Run the release workflow with the version number (without starting `v`) as input. Make sure
-    main has your merged PR as last commit
+1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yaml) with:
+    - The new version number (without starting `v`)
+    - The commit hash of the merged release pull request on `main`
 1. The release workflow will do the following:
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
         uploaded anything, you can restart after pushing a fix.
     1. Upload to PyPI.
     1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
-        after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/charliermarsh/ruff/issues/4468)).
+        after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/astral-sh/ruff/issues/4468)).
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
@@ -344,7 +346,10 @@ We use an experimental in-house tool for managing releases.
     1. Copy the changelog for the release into the GitHub release
         - See previous releases for formatting of section headers
     1. Generate the contributor list with `rooster contributors` and add to the release notes
-1. If needed, [update the schemastore](https://github.com/charliermarsh/ruff/blob/main/scripts/update_schemastore.py)
+1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
+    1. One can determine if an update is needed when
+        `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
+    1. Once run successfully, you should follow the link in the output to create a PR.
 1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
 
 ## Ecosystem CI

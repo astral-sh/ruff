@@ -4,8 +4,9 @@
 use std::borrow::Cow;
 use std::cmp;
 
+use ruff_source_file::UniversalNewlines;
+
 use crate::PythonWhitespace;
-use ruff_source_file::newlines::UniversalNewlines;
 
 /// Indent each line by the given prefix.
 ///

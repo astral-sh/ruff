@@ -447,7 +447,7 @@ mod tests {
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
-        let expr = parse_expression(expression, "<filename>").unwrap();
+        let expr = parse_expression(expression).unwrap();
         assert!(!is_expression_parenthesized(
             ExpressionRef::from(&expr),
             &CommentRanges::default(),

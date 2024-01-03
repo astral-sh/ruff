@@ -50,8 +50,8 @@ pub fn format_and_debug_print(source: &str, cli: &Cli, source_path: &Path) -> Re
         .map_err(|err| format_err!("Source contains syntax errors {err:?}"))?;
 
     // Parse the AST.
-    let module = parse_ok_tokens(tokens, source, source_type.as_mode(), "<filename>")
-        .context("Syntax error in input")?;
+    let module =
+        parse_ok_tokens(tokens, source, source_type.as_mode()).context("Syntax error in input")?;
 
     let options = PyFormatOptions::from_extension(source_path)
         .with_preview(if cli.preview {

@@ -244,7 +244,12 @@ fn non_none_annotation_element<'a>(
 ) -> Option<&'a Expr> {
     // E.g., `typing.Union` or `typing.Optional`
     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation {
-        if semantic.match_typing_expr(value, "Optional") {
+        let call_path = semantic.resolve_call_path(value);
+
+        if call_path
+            .as_ref()
+            .is_some_and(|value| semantic.match_typing_call_path(value, "Optional"))
+        {
             return if slice.is_none_literal_expr() {
                 None
             } else {
@@ -252,7 +257,10 @@ fn non_none_annotation_element<'a>(
             };
         }
 
-        if !semantic.match_typing_expr(value, "Union") {
+        if !call_path
+            .as_ref()
+            .is_some_and(|value| semantic.match_typing_call_path(value, "Union"))
+        {
             return None;
         }
 

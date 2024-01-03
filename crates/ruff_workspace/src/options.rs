@@ -1632,13 +1632,16 @@ pub struct Flake8TypeCheckingOptions {
     )]
     pub runtime_evaluated_base_classes: Option<Vec<String>>,
 
-    /// Exempt classes decorated with any of the enumerated decorators from
-    /// needing to be moved into type-checking blocks.
+    /// Exempt classes and functions decorated with any of the enumerated
+    /// decorators from being moved into type-checking blocks.
+    ///
+    /// Common examples include Pydantic's `@pydantic.validate_call` decorator
+    /// (for functions) and attrs' `@attrs.define` decorator (for classes).
     #[option(
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            runtime-evaluated-decorators = ["attrs.define", "attrs.frozen"]
+            runtime-evaluated-decorators = ["pydantic.validate_call", "attrs.define"]
         "#
     )]
     pub runtime_evaluated_decorators: Option<Vec<String>>,
@@ -2703,6 +2706,11 @@ pub struct PylintOptions {
     #[option(default = r"3", value_type = "int", example = r"max-pos-args = 3")]
     pub max_positional_args: Option<usize>,
 
+    /// Maximum number of local variables allowed for a function or method body (see:
+    /// `PLR0914`).
+    #[option(default = r"15", value_type = "int", example = r"max-locals = 15")]
+    pub max_locals: Option<usize>,
+
     /// Maximum number of statements allowed for a function or method body (see:
     /// `PLR0915`).
     #[option(default = r"50", value_type = "int", example = r"max-statements = 50")]
@@ -2742,6 +2750,7 @@ impl PylintOptions {
             max_public_methods: self
                 .max_public_methods
                 .unwrap_or(defaults.max_public_methods),
+            max_locals: self.max_locals.unwrap_or(defaults.max_locals),
         }
     }
 }

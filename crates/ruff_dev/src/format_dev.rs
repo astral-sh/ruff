@@ -35,6 +35,7 @@ use ruff_linter::settings::types::{FilePattern, FilePatternSet};
 use ruff_python_formatter::{
     format_module_source, FormatModuleError, MagicTrailingComma, PreviewMode, PyFormatOptions,
 };
+use ruff_python_parser::ParseError;
 use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile, Resolver};
 
 /// Find files that ruff would check so we can format them. Adapted from `ruff_cli`.
@@ -742,11 +743,11 @@ enum CheckFileError {
         reformatted: String,
     },
     /// The input file was already invalid (not a bug)
-    SyntaxErrorInInput(FormatModuleError),
+    SyntaxErrorInInput(ParseError),
     /// The formatter introduced a syntax error
     SyntaxErrorInOutput {
         formatted: String,
-        error: FormatModuleError,
+        error: ParseError,
     },
     /// The formatter failed (bug)
     FormatError(FormatError),
@@ -796,7 +797,7 @@ fn format_dev_file(
     let start = Instant::now();
     let printed = match format_module_source(&content, options.clone()) {
         Ok(printed) => printed,
-        Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
+        Err(FormatModuleError::ParseError(err)) => {
             return Err(CheckFileError::SyntaxErrorInInput(err));
         }
         Err(FormatModuleError::FormatError(err)) => {
@@ -823,7 +824,7 @@ fn format_dev_file(
     if stability_check {
         let reformatted = match format_module_source(formatted, options) {
             Ok(reformatted) => reformatted,
-            Err(err @ (FormatModuleError::LexError(_) | FormatModuleError::ParseError(_))) => {
+            Err(FormatModuleError::ParseError(err)) => {
                 return Err(CheckFileError::SyntaxErrorInOutput {
                     formatted: formatted.to_string(),
                     error: err,

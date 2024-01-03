@@ -128,6 +128,7 @@ REPOSITORIES: list[Repository] = [
     Repository("docker", "docker-py", "main"),
     Repository("freedomofpress", "securedrop", "develop"),
     Repository("fronzbot", "blinkpy", "dev"),
+    Repository("binary-husky", "gpt_academic", "master"),
     Repository("ibis-project", "ibis", "master"),
     Repository("ing-bank", "probatus", "main"),
     Repository("jrnl-org", "jrnl", "develop"),

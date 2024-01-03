@@ -157,6 +157,39 @@ fn format() {
                     CodeFrame::new("python", &formatted_code)
                 )
                 .unwrap();
+
+                if options.preview().is_enabled() {
+                    continue;
+                }
+
+                // We want to capture the differences in the preview style in our fixtures
+                let options_preview = options.with_preview(PreviewMode::Enabled);
+                let printed_preview = format_module_source(&content, options_preview.clone())
+                    .expect("Formatting to succeed");
+                let formatted_preview = printed_preview.as_code();
+
+                ensure_unchanged_ast(&content, formatted_preview, &options_preview, input_path);
+                ensure_stability_when_formatting_twice(
+                    formatted_preview,
+                    &options_preview,
+                    input_path,
+                );
+
+                if formatted_code != formatted_preview {
+                    // Having both snapshots makes it hard to see the difference, so we're keeping only
+                    // diff.
+                    writeln!(
+                        snapshot,
+                        "#### Preview changes\n{}",
+                        CodeFrame::new(
+                            "diff",
+                            TextDiff::from_lines(formatted_code, formatted_preview)
+                                .unified_diff()
+                                .header("Stable", "Preview")
+                        )
+                    )
+                    .unwrap();
+                }
             }
         } else {
             // We want to capture the differences in the preview style in our fixtures
@@ -267,22 +300,14 @@ fn ensure_unchanged_ast(
     let source_type = options.source_type();
 
     // Parse the unformatted code.
-    let mut unformatted_ast = parse(
-        unformatted_code,
-        source_type.as_mode(),
-        &input_path.to_string_lossy(),
-    )
-    .expect("Unformatted code to be valid syntax");
+    let mut unformatted_ast = parse(unformatted_code, source_type.as_mode())
+        .expect("Unformatted code to be valid syntax");
     Normalizer.visit_module(&mut unformatted_ast);
     let unformatted_ast = ComparableMod::from(&unformatted_ast);
 
     // Parse the formatted code.
-    let mut formatted_ast = parse(
-        formatted_code,
-        source_type.as_mode(),
-        &input_path.to_string_lossy(),
-    )
-    .expect("Formatted code to be valid syntax");
+    let mut formatted_ast =
+        parse(formatted_code, source_type.as_mode()).expect("Formatted code to be valid syntax");
     Normalizer.visit_module(&mut formatted_ast);
     let formatted_ast = ComparableMod::from(&formatted_ast);
 
@@ -355,7 +380,8 @@ line-ending                = {line_ending:?}
 magic-trailing-comma       = {magic_trailing_comma:?}
 docstring-code             = {docstring_code:?}
 docstring-code-line-width  = {docstring_code_line_width:?}
-preview                    = {preview:?}"#,
+preview                    = {preview:?}
+target_version             = {target_version:?}"#,
             indent_style = self.0.indent_style(),
             indent_width = self.0.indent_width().value(),
             line_width = self.0.line_width().value(),
@@ -364,7 +390,8 @@ preview                    = {preview:?}"#,
             magic_trailing_comma = self.0.magic_trailing_comma(),
             docstring_code = self.0.docstring_code(),
             docstring_code_line_width = self.0.docstring_code_line_width(),
-            preview = self.0.preview()
+            preview = self.0.preview(),
+            target_version = self.0.target_version()
         )
     }
 }

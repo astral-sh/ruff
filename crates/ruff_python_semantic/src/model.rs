@@ -8,7 +8,6 @@ use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallP
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
-use ruff_python_stdlib::typing::is_typing_extension;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -175,18 +174,11 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
-        if call_path.as_slice() == ["typing", target] {
+        if matches!(
+            call_path.as_slice(),
+            ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
+        ) {
             return true;
-        }
-
-        if call_path.as_slice() == ["_typeshed", target] {
-            return true;
-        }
-
-        if is_typing_extension(target) {
-            if call_path.as_slice() == ["typing_extensions", target] {
-                return true;
-            }
         }
 
         if self.typing_modules.iter().any(|module| {
@@ -707,7 +699,20 @@ impl<'a> SemanticModel<'a> {
                     };
                 Some(resolved)
             }
-            BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
+            BindingKind::Builtin => {
+                if value.is_name_expr() {
+                    // Ex) `dict`
+                    Some(smallvec!["", head.id.as_str()])
+                } else {
+                    // Ex) `dict.__dict__`
+                    let value_path = collect_call_path(value)?;
+                    Some(
+                        std::iter::once("")
+                            .chain(value_path.iter().copied())
+                            .collect(),
+                    )
+                }
+            }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
                 let value_path = collect_call_path(value)?;
                 let resolved: CallPath = self
@@ -761,6 +766,7 @@ impl<'a> SemanticModel<'a> {
                                     {
                                         return Some(ImportedName {
                                             name: format!("{name}.{member}"),
+                                            source,
                                             range: self.nodes[source].range(),
                                             context: binding.context,
                                         });
@@ -785,6 +791,7 @@ impl<'a> SemanticModel<'a> {
                                         {
                                             return Some(ImportedName {
                                                 name: (*name).to_string(),
+                                                source,
                                                 range: self.nodes[source].range(),
                                                 context: binding.context,
                                             });
@@ -806,6 +813,7 @@ impl<'a> SemanticModel<'a> {
                                     {
                                         return Some(ImportedName {
                                             name: format!("{name}.{member}"),
+                                            source,
                                             range: self.nodes[source].range(),
                                             context: binding.context,
                                         });
@@ -993,7 +1001,7 @@ impl<'a> SemanticModel<'a> {
         &self.nodes[node_id]
     }
 
-    /// Given a [`Expr`], return its parent, if any.
+    /// Given a [`NodeId`], return its parent, if any.
     #[inline]
     pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
         self.nodes
@@ -1712,6 +1720,16 @@ bitflags! {
         /// ```
         const FUTURE_ANNOTATIONS = 1 << 15;
 
+        /// The model has traversed past the module docstring.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// """Module docstring."""
+        ///
+        /// x: int = 1
+        /// ```
+        const MODULE_DOCSTRING = 1 << 16;
+
         /// The model is in a type parameter definition.
         ///
         /// For example, the model could be visiting `Record` in:
@@ -1720,11 +1738,10 @@ bitflags! {
         ///
         /// Record = TypeVar("Record")
         ///
-        const TYPE_PARAM_DEFINITION = 1 << 16;
+        const TYPE_PARAM_DEFINITION = 1 << 17;
 
         /// The context is in any type annotation.
-                const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
-
+        const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
 
         /// The context is in any string type definition.
         const STRING_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()
@@ -1828,6 +1845,8 @@ pub enum ReadResult {
 pub struct ImportedName {
     /// The name to which the imported symbol is bound.
     name: String,
+    /// The statement from which the symbol is imported.
+    source: NodeId,
     /// The range at which the symbol is imported.
     range: TextRange,
     /// The context in which the symbol is imported.
@@ -1841,6 +1860,10 @@ impl ImportedName {
 
     pub const fn context(&self) -> ExecutionContext {
         self.context
+    }
+
+    pub fn statement<'a>(&self, semantic: &'a SemanticModel) -> &'a Stmt {
+        semantic.statement(self.source)
     }
 }
 

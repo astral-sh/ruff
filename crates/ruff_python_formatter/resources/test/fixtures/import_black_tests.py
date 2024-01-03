@@ -32,7 +32,7 @@ def import_fixture(fixture: Path, fixture_set: str):
                 input.append(line)
 
         if not expected:
-            # If there's no output marker, tread the whole file as already pre-formatted
+            # If there's no output marker, treat the whole file as already pre-formatted
             expected = input
 
         options = {}
@@ -50,6 +50,11 @@ def import_fixture(fixture: Path, fixture_set: str):
                 length = length_and_rest.split(" ", 1)[0]
                 length = int(length)
                 options["line_width"] = 1 if length == 0 else length
+
+            if "--minimum-version=" in flags:
+                [_, version] = flags.split("--minimum-version=", 1)
+                # Convert 3.10 to py310
+                options["target_version"] = f"py{version.strip().replace('.', '')}"
 
             if "--skip-magic-trailing-comma" in flags:
                 options["magic_trailing_comma"] = "ignore"

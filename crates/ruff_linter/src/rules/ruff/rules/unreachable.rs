@@ -1053,7 +1053,7 @@ mod tests {
     fn control_flow_graph(filename: &str) {
         let path = PathBuf::from_iter(["resources/test/fixtures/control-flow-graph", filename]);
         let source = fs::read_to_string(path).expect("failed to read file");
-        let stmts = parse(&source, Mode::Module, filename)
+        let stmts = parse(&source, Mode::Module)
             .unwrap_or_else(|err| panic!("failed to parse source: '{source}': {err}"))
             .expect_module()
             .body;

@@ -74,6 +74,7 @@ pass
 
 # form feeds are prohibited inside blocks, or on a line with nonwhitespace
 def bar(a=1, b: bool = False):
+
     pass
 
 

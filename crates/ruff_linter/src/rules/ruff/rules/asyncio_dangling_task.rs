@@ -4,7 +4,7 @@ use ast::Stmt;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::{analyze::typing, Binding, SemanticModel};
+use ruff_python_semantic::{analyze::typing, Scope, SemanticModel};
 use ruff_text_size::Ranged;
 
 /// ## What it does
@@ -105,22 +105,58 @@ pub(crate) fn asyncio_dangling_task(expr: &Expr, semantic: &SemanticModel) -> Op
 
 /// RUF006
 pub(crate) fn asyncio_dangling_binding(
-    binding: &Binding,
+    scope: &Scope,
     semantic: &SemanticModel,
-) -> Option<Diagnostic> {
-    if binding.is_used() || !binding.kind.is_assignment() {
-        return None;
-    }
-
-    let source = binding.source?;
-    match semantic.statement(source) {
-        Stmt::Assign(ast::StmtAssign { value, targets, .. }) if targets.len() == 1 => {
-            asyncio_dangling_task(value, semantic)
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    for binding_id in scope.binding_ids() {
+        // If the binding itself is used, or it's not an assignment, skip it.
+        let binding = semantic.binding(binding_id);
+        if binding.is_used()
+            || binding.is_global()
+            || binding.is_nonlocal()
+            || !binding.kind.is_assignment()
+        {
+            continue;
         }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value), ..
-        }) => asyncio_dangling_task(value, semantic),
-        _ => None,
+
+        // Otherwise, flag any dangling tasks, including those that are shadowed, as in:
+        // ```python
+        // if x > 0:
+        //     task = asyncio.create_task(make_request())
+        // else:
+        //     task = asyncio.create_task(make_request())
+        // ```
+        for binding_id in
+            std::iter::successors(Some(binding_id), |id| semantic.shadowed_binding(*id))
+        {
+            let binding = semantic.binding(binding_id);
+            if binding.is_used()
+                || binding.is_global()
+                || binding.is_nonlocal()
+                || !binding.kind.is_assignment()
+            {
+                continue;
+            }
+
+            let Some(source) = binding.source else {
+                continue;
+            };
+
+            let diagnostic = match semantic.statement(source) {
+                Stmt::Assign(ast::StmtAssign { value, targets, .. }) if targets.len() == 1 => {
+                    asyncio_dangling_task(value, semantic)
+                }
+                Stmt::AnnAssign(ast::StmtAnnAssign {
+                    value: Some(value), ..
+                }) => asyncio_dangling_task(value, semantic),
+                _ => None,
+            };
+
+            if let Some(diagnostic) = diagnostic {
+                diagnostics.push(diagnostic);
+            }
+        }
     }
 }
 

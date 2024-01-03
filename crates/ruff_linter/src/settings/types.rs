@@ -40,6 +40,8 @@ use crate::rule_selector::RuleSelector;
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PythonVersion {
     Py37,
+    // Make sure to also change the default for `ruff_python_formatter::PythonVersion`
+    // when changing the default here.
     #[default]
     Py38,
     Py39,

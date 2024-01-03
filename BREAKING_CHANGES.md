@@ -1,5 +1,42 @@
 # Breaking Changes
 
+## 0.1.9
+
+### `site-packages` is now excluded by default ([#5513](https://github.com/astral-sh/ruff/pull/5513))
+
+Ruff maintains a list of default exclusions, which now consists of the following patterns:
+
+- `.bzr`
+- `.direnv`
+- `.eggs`
+- `.git-rewrite`
+- `.git`
+- `.hg`
+- `.ipynb_checkpoints`
+- `.mypy_cache`
+- `.nox`
+- `.pants.d`
+- `.pyenv`
+- `.pytest_cache`
+- `.pytype`
+- `.ruff_cache`
+- `.svn`
+- `.tox`
+- `.venv`
+- `.vscode`
+- `__pypackages__`
+- `_build`
+- `buck-out`
+- `build`
+- `dist`
+- `node_modules`
+- `site-packages`
+- `venv`
+
+Previously, the `site-packages` directory was not excluded by default. While `site-packages` tends
+to be excluded anyway by virtue of the `.venv` exclusion, this may not be the case when using Ruff
+from VS Code outside a virtual environment.
+
 ## 0.1.0
 
 ### The deprecated `format` setting has been removed

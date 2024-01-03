@@ -122,3 +122,43 @@ async def f():
 # OK
 async def f():
     task[i] = asyncio.create_task(coordinator.ws_connect())
+
+
+# OK
+async def f(x: int):
+    if x > 0:
+        task = asyncio.create_task(make_request())
+    else:
+        task = asyncio.create_task(make_request())
+    await task
+
+
+# OK
+async def f(x: bool):
+    if x:
+        t = asyncio.create_task(asyncio.sleep(1))
+    else:
+        t = None
+    try:
+        await asyncio.sleep(1)
+    finally:
+        if t:
+            await t
+
+
+# Error
+async def f(x: bool):
+    if x:
+        t = asyncio.create_task(asyncio.sleep(1))
+    else:
+        t = None
+
+
+# OK
+async def f(x: bool):
+    global T
+
+    if x:
+        T = asyncio.create_task(asyncio.sleep(1))
+    else:
+        T = None

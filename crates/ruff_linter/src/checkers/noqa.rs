@@ -11,11 +11,12 @@ use ruff_source_file::Locator;
 
 use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
-use crate::registry::{AsRule, Rule};
+use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     path: &Path,
@@ -23,6 +24,7 @@ pub(crate) fn check_noqa(
     comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
+    per_file_ignores: &RuleSet,
     settings: &LinterSettings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
@@ -119,7 +121,7 @@ pub(crate) fn check_noqa(
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
-                    let mut self_ignore = false;
+                    let mut self_ignore = per_file_ignores.contains(Rule::UnusedNOQA);
                     for code in directive.codes() {
                         let code = get_redirect_target(code).unwrap_or(code);
                         if Rule::UnusedNOQA.noqa_code() == code {

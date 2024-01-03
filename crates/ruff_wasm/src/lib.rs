@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::linter::{check_path, LinterResult};
+use ruff_linter::linter::{check_path, LinterResult, TokenSource};
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
@@ -182,7 +182,6 @@ impl Workspace {
         } = check_path(
             Path::new("<filename>"),
             None,
-            tokens,
             &locator,
             &stylist,
             &indexer,
@@ -191,6 +190,7 @@ impl Workspace {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
+            TokenSource::Tokens(tokens),
         );
 
         let source_code = locator.to_source_code();
@@ -248,7 +248,7 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = ruff_python_parser::parse(contents, Mode::Module, ".").map_err(into_error)?;
+        let parsed = ruff_python_parser::parse(contents, Mode::Module).map_err(into_error)?;
 
         Ok(format!("{parsed:#?}"))
     }
@@ -271,20 +271,20 @@ struct ParsedModule<'a> {
 }
 
 impl<'a> ParsedModule<'a> {
-    fn from_source(source: &'a str) -> Result<Self, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source, Mode::Module).collect();
+    fn from_source(source_code: &'a str) -> Result<Self, Error> {
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source_code, Mode::Module).collect();
         let mut comment_ranges = CommentRangesBuilder::default();
 
         for (token, range) in tokens.iter().flatten() {
             comment_ranges.visit_token(token, *range);
         }
         let comment_ranges = comment_ranges.finish();
-        let module = parse_tokens(tokens, source, Mode::Module, ".").map_err(into_error)?;
+        let module = parse_tokens(tokens, source_code, Mode::Module).map_err(into_error)?;
 
         Ok(Self {
-            source_code: source,
-            comment_ranges,
+            source_code,
             module,
+            comment_ranges,
         })
     }
 

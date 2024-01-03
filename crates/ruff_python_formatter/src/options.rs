@@ -17,6 +17,10 @@ pub struct PyFormatOptions {
     /// Whether we're in a `.py` file or `.pyi` file, which have different rules.
     source_type: PySourceType,
 
+    /// The (minimum) Python version used to run the formatted code. This is used
+    /// to determine the supported Python syntax.
+    target_version: PythonVersion,
+
     /// Specifies the indent style:
     /// * Either a tab
     /// * or a specific amount of spaces
@@ -74,6 +78,7 @@ impl Default for PyFormatOptions {
     fn default() -> Self {
         Self {
             source_type: PySourceType::default(),
+            target_version: PythonVersion::default(),
             indent_style: default_indent_style(),
             line_width: default_line_width(),
             indent_width: default_indent_width(),
@@ -101,36 +106,46 @@ impl PyFormatOptions {
         }
     }
 
-    pub fn magic_trailing_comma(&self) -> MagicTrailingComma {
+    pub const fn target_version(&self) -> PythonVersion {
+        self.target_version
+    }
+
+    pub const fn magic_trailing_comma(&self) -> MagicTrailingComma {
         self.magic_trailing_comma
     }
 
-    pub fn quote_style(&self) -> QuoteStyle {
+    pub const fn quote_style(&self) -> QuoteStyle {
         self.quote_style
     }
 
-    pub fn source_type(&self) -> PySourceType {
+    pub const fn source_type(&self) -> PySourceType {
         self.source_type
     }
 
-    pub fn source_map_generation(&self) -> SourceMapGeneration {
+    pub const fn source_map_generation(&self) -> SourceMapGeneration {
         self.source_map_generation
     }
 
-    pub fn line_ending(&self) -> LineEnding {
+    pub const fn line_ending(&self) -> LineEnding {
         self.line_ending
     }
 
-    pub fn docstring_code(&self) -> DocstringCode {
+    pub const fn docstring_code(&self) -> DocstringCode {
         self.docstring_code
     }
 
-    pub fn docstring_code_line_width(&self) -> DocstringCodeLineWidth {
+    pub const fn docstring_code_line_width(&self) -> DocstringCodeLineWidth {
         self.docstring_code_line_width
     }
 
     pub const fn preview(&self) -> PreviewMode {
         self.preview
+    }
+
+    #[must_use]
+    pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
+        self.target_version = target_version;
+        self
     }
 
     #[must_use]
@@ -348,4 +363,23 @@ where
             &"dynamic",
         )),
     }
+}
+
+#[derive(CacheKey, Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Default)]
+#[cfg_attr(
+    feature = "serde",
+    derive(serde::Serialize, serde::Deserialize),
+    serde(rename_all = "lowercase")
+)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum PythonVersion {
+    Py37,
+    // Make sure to also change the default for `ruff_linter::settings::types::PythonVersion`
+    // when changing the default here.
+    #[default]
+    Py38,
+    Py39,
+    Py310,
+    Py311,
+    Py312,
 }

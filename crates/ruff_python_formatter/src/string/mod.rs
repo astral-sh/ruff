@@ -253,6 +253,7 @@ impl StringPart {
         locator: &'a Locator,
         configured_style: QuoteStyle,
         parent_docstring_quote_char: Option<QuoteChar>,
+        normalize_hex: bool,
     ) -> NormalizedString<'a> {
         // Per PEP 8, always prefer double quotes for triple-quoted strings.
         let preferred_style = if self.quotes.triple {
@@ -310,7 +311,7 @@ impl StringPart {
             configured_style
         };
 
-        let raw_content = locator.slice(self.content_range);
+        let raw_content = &locator.slice(self.content_range);
 
         let quotes = match quoting {
             Quoting::Preserve => self.quotes,
@@ -327,7 +328,7 @@ impl StringPart {
             }
         };
 
-        let normalized = normalize_string(locator.slice(self.content_range), quotes, self.prefix);
+        let normalized = normalize_string(raw_content, quotes, self.prefix, normalize_hex);
 
         NormalizedString {
             prefix: self.prefix,
@@ -422,6 +423,10 @@ impl StringPrefix {
 
     pub(super) const fn is_fstring(self) -> bool {
         self.contains(StringPrefix::F_STRING)
+    }
+
+    pub(super) const fn is_byte(self) -> bool {
+        self.contains(StringPrefix::BYTE)
     }
 }
 
@@ -722,7 +727,12 @@ impl TryFrom<char> for QuoteChar {
 /// with the provided [`StringQuotes`] style.
 ///
 /// Returns the normalized string and whether it contains new lines.
-fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> Cow<str> {
+fn normalize_string(
+    input: &str,
+    quotes: StringQuotes,
+    prefix: StringPrefix,
+    normalize_hex: bool,
+) -> Cow<str> {
     // The normalized string if `input` is not yet normalized.
     // `output` must remain empty if `input` is already normalized.
     let mut output = String::new();
@@ -766,24 +776,50 @@ fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> 
             }
 
             last_index = index + '\r'.len_utf8();
-        } else if !quotes.triple && !is_raw {
+        } else if !is_raw {
             if c == '\\' {
-                if let Some((_, next)) = chars.peek().copied() {
-                    #[allow(clippy::if_same_then_else)]
-                    if next == opposite_quote && formatted_value_nesting == 0 {
-                        // Remove the escape by ending before the backslash and starting again with the quote
-                        chars.next();
-                        output.push_str(&input[last_index..index]);
-                        last_index = index + '\\'.len_utf8();
-                    } else if next == preferred_quote {
-                        // Quote is already escaped, skip over it.
-                        chars.next();
-                    } else if next == '\\' {
+                if let Some((_, next)) = chars.clone().next() {
+                    if next == '\\' {
                         // Skip over escaped backslashes
                         chars.next();
+                    } else if normalize_hex {
+                        if let Some(normalised) = UnicodeEscape::new(next, !prefix.is_byte())
+                            .and_then(|escape| {
+                                escape.normalize(&input[index + c.len_utf8() + next.len_utf8()..])
+                            })
+                        {
+                            // Length of the `\` plus the length of the escape sequence character (`u` | `U` | `x`)
+                            let escape_start_len = '\\'.len_utf8() + next.len_utf8();
+                            let escape_start_offset = index + escape_start_len;
+                            if let Cow::Owned(normalised) = &normalised {
+                                output.push_str(&input[last_index..escape_start_offset]);
+                                output.push_str(normalised);
+                                last_index = escape_start_offset + normalised.len();
+                            };
+
+                            // Move the `chars` iterator passed the escape sequence.
+                            // Simply reassigning `chars` doesn't work because the indices` would
+                            // then be off.
+                            for _ in 0..next.len_utf8() + normalised.len() {
+                                chars.next();
+                            }
+                        }
+                    }
+
+                    if !quotes.triple {
+                        #[allow(clippy::if_same_then_else)]
+                        if next == opposite_quote && formatted_value_nesting == 0 {
+                            // Remove the escape by ending before the backslash and starting again with the quote
+                            chars.next();
+                            output.push_str(&input[last_index..index]);
+                            last_index = index + '\\'.len_utf8();
+                        } else if next == preferred_quote {
+                            // Quote is already escaped, skip over it.
+                            chars.next();
+                        }
                     }
                 }
-            } else if c == preferred_quote && formatted_value_nesting == 0 {
+            } else if !quotes.triple && c == preferred_quote && formatted_value_nesting == 0 {
                 // Escape the quote
                 output.push_str(&input[last_index..index]);
                 output.push('\\');
@@ -801,4 +837,154 @@ fn normalize_string(input: &str, quotes: StringQuotes, prefix: StringPrefix) -> 
     };
 
     normalized
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum UnicodeEscape {
+    /// A hex escape sequence of either 2 (`\x`), 4 (`\u`) or 8 (`\U`) hex characters.
+    Hex(usize),
+
+    /// An escaped unicode name (`\N{name}`)
+    CharacterName,
+}
+
+impl UnicodeEscape {
+    fn new(first: char, allow_unicode: bool) -> Option<UnicodeEscape> {
+        Some(match first {
+            'x' => UnicodeEscape::Hex(2),
+            'u' if allow_unicode => UnicodeEscape::Hex(4),
+            'U' if allow_unicode => UnicodeEscape::Hex(8),
+            'N' if allow_unicode => UnicodeEscape::CharacterName,
+            _ => return None,
+        })
+    }
+
+    /// Normalises `\u..`, `\U..`, `\x..` and `\N{..}` escape sequences to:
+    ///
+    /// * `\u`, `\U'` and `\x`: To use lower case for the characters `a-f`.
+    /// * `\N`: To use uppercase letters
+    fn normalize(self, input: &str) -> Option<Cow<str>> {
+        let mut normalised = String::new();
+
+        let len = match self {
+            UnicodeEscape::Hex(len) => {
+                // It's not a valid escape sequence if the input string has fewer characters
+                // left than required by the escape sequence.
+                if input.len() < len {
+                    return None;
+                }
+
+                for (index, c) in input.char_indices().take(len) {
+                    match c {
+                        '0'..='9' | 'a'..='f' => {
+                            if !normalised.is_empty() {
+                                normalised.push(c);
+                            }
+                        }
+                        'A'..='F' => {
+                            if normalised.is_empty() {
+                                normalised.reserve(len);
+                                normalised.push_str(&input[..index]);
+                                normalised.push(c.to_ascii_lowercase());
+                            } else {
+                                normalised.push(c.to_ascii_lowercase());
+                            }
+                        }
+                        _ => {
+                            // not a valid escape sequence
+                            return None;
+                        }
+                    }
+                }
+
+                len
+            }
+            UnicodeEscape::CharacterName => {
+                let mut char_indices = input.char_indices();
+
+                if !matches!(char_indices.next(), Some((_, '{'))) {
+                    return None;
+                }
+
+                loop {
+                    if let Some((index, c)) = char_indices.next() {
+                        match c {
+                            '}' => {
+                                if !normalised.is_empty() {
+                                    normalised.push('}');
+                                }
+
+                                // Name must be at least two characters long.
+                                if index < 3 {
+                                    return None;
+                                }
+
+                                break index + '}'.len_utf8();
+                            }
+                            '0'..='9' | 'A'..='Z' | ' ' | '-' => {
+                                if !normalised.is_empty() {
+                                    normalised.push(c);
+                                }
+                            }
+                            'a'..='z' => {
+                                if normalised.is_empty() {
+                                    normalised.reserve(c.len_utf8() + '}'.len_utf8());
+                                    normalised.push_str(&input[..index]);
+                                    normalised.push(c.to_ascii_uppercase());
+                                } else {
+                                    normalised.push(c.to_ascii_uppercase());
+                                }
+                            }
+                            _ => {
+                                // Seems like an invalid escape sequence, don't normalise it.
+                                return None;
+                            }
+                        }
+                    } else {
+                        // Unterminated escape sequence, don't normalise it.
+                        return None;
+                    }
+                }
+            }
+        };
+
+        Some(if normalised.is_empty() {
+            Cow::Borrowed(&input[..len])
+        } else {
+            Cow::Owned(normalised)
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::string::{normalize_string, QuoteChar, StringPrefix, StringQuotes, UnicodeEscape};
+    use std::borrow::Cow;
+
+    #[test]
+    fn normalize_32_escape() {
+        let escape_sequence = UnicodeEscape::new('U', true).unwrap();
+
+        assert_eq!(
+            Some(Cow::Owned("0001f60e".to_string())),
+            escape_sequence.normalize("0001F60E")
+        );
+    }
+
+    #[test]
+    fn normalize_hex_in_byte_string() {
+        let input = r"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A";
+
+        let normalized = normalize_string(
+            input,
+            StringQuotes {
+                triple: false,
+                quote_char: QuoteChar::Double,
+            },
+            StringPrefix::BYTE,
+            true,
+        );
+
+        assert_eq!(r"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a", &normalized);
+    }
 }

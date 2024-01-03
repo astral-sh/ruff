@@ -15,8 +15,9 @@ use crate::rules::{
     flake8_comprehensions, flake8_datetimez, flake8_debugger, flake8_django,
     flake8_future_annotations, flake8_gettext, flake8_implicit_str_concat, flake8_logging,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_self,
-    flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_use_pathlib, flynt, numpy,
-    pandas_vet, pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade, refurb, ruff,
+    flake8_simplify, flake8_tidy_imports, flake8_trio, flake8_type_checking, flake8_use_pathlib,
+    flynt, numpy, pandas_vet, pep8_naming, pycodestyle, pyflakes, pygrep_hooks, pylint, pyupgrade,
+    refurb, ruff,
 };
 use crate::settings::types::PythonVersion;
 
@@ -80,6 +81,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 Rule::DuplicateUnionMember,
                 Rule::RedundantLiteralUnion,
                 Rule::UnnecessaryTypeUnion,
+                Rule::NeverUnion,
             ]) {
                 // Avoid duplicate checks if the parent is a union, since these rules already
                 // traverse nested unions.
@@ -97,6 +99,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         flake8_pyi::rules::unnecessary_type_union(checker, expr);
                     }
                 }
+            }
+
+            if checker.enabled(Rule::NeverUnion) {
+                ruff::rules::never_union(checker, expr);
             }
 
             if checker.any_enabled(&[
@@ -431,6 +437,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                 }
+            }
+            if checker.enabled(Rule::SuperWithoutBrackets) {
+                pylint::rules::super_without_brackets(checker, func);
+            }
+            if checker.enabled(Rule::BitCount) {
+                refurb::rules::bit_count(checker, call);
             }
             if checker.enabled(Rule::TypeOfPrimitive) {
                 pyupgrade::rules::type_of_primitive(checker, expr, func, args);
@@ -1156,6 +1168,10 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
 
+            if checker.enabled(Rule::NeverUnion) {
+                ruff::rules::never_union(checker, expr);
+            }
+
             // Avoid duplicate checks if the parent is a union, since these rules already
             // traverse nested unions.
             if !checker.semantic.in_nested_union() {
@@ -1172,6 +1188,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::UnnecessaryTypeUnion) {
                     flake8_pyi::rules::unnecessary_type_union(checker, expr);
+                }
+                if checker.enabled(Rule::RuntimeStringUnion) {
+                    flake8_type_checking::rules::runtime_string_union(checker, expr);
                 }
             }
         }

@@ -1,0 +1,260 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_allow_empty_first_line.py
+---
+## Input
+
+```python
+def foo():
+    """
+    Docstring
+    """
+
+    # Here we go
+    if x:
+
+        # This is also now fine
+        a = 123
+
+    else:
+        # But not necessary
+        a = 123
+
+    if y:
+
+        while True:
+
+            """
+            Long comment here
+            """
+            a = 123
+    
+    if z:
+
+        for _ in range(100):
+            a = 123
+    else:
+
+        try:
+
+            # this should be ok
+            a = 123
+        except:
+
+            """also this"""
+            a = 123
+
+
+def bar():
+
+    if x:
+        a = 123
+
+
+def baz():
+
+    # OK
+    if x:
+        a = 123
+
+def quux():
+
+    new_line = here
+
+
+class Cls:
+
+    def method(self):
+
+        pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -5,7 +5,6 @@
+ 
+     # Here we go
+     if x:
+-
+         # This is also now fine
+         a = 123
+ 
+@@ -14,49 +13,39 @@
+         a = 123
+ 
+     if y:
+-
+         while True:
+-
+             """
+             Long comment here
+             """
+             a = 123
+ 
+     if z:
+-
+         for _ in range(100):
+             a = 123
+     else:
+-
+         try:
+-
+             # this should be ok
+             a = 123
+         except:
+-
+             """also this"""
+             a = 123
+ 
+ 
+ def bar():
+-
+     if x:
+         a = 123
+ 
+ 
+ def baz():
+-
+     # OK
+     if x:
+         a = 123
+ 
+ 
+ def quux():
+-
+     new_line = here
+ 
+ 
+ class Cls:
+     def method(self):
+-
+         pass
+```
+
+## Ruff Output
+
+```python
+def foo():
+    """
+    Docstring
+    """
+
+    # Here we go
+    if x:
+        # This is also now fine
+        a = 123
+
+    else:
+        # But not necessary
+        a = 123
+
+    if y:
+        while True:
+            """
+            Long comment here
+            """
+            a = 123
+
+    if z:
+        for _ in range(100):
+            a = 123
+    else:
+        try:
+            # this should be ok
+            a = 123
+        except:
+            """also this"""
+            a = 123
+
+
+def bar():
+    if x:
+        a = 123
+
+
+def baz():
+    # OK
+    if x:
+        a = 123
+
+
+def quux():
+    new_line = here
+
+
+class Cls:
+    def method(self):
+        pass
+```
+
+## Black Output
+
+```python
+def foo():
+    """
+    Docstring
+    """
+
+    # Here we go
+    if x:
+
+        # This is also now fine
+        a = 123
+
+    else:
+        # But not necessary
+        a = 123
+
+    if y:
+
+        while True:
+
+            """
+            Long comment here
+            """
+            a = 123
+
+    if z:
+
+        for _ in range(100):
+            a = 123
+    else:
+
+        try:
+
+            # this should be ok
+            a = 123
+        except:
+
+            """also this"""
+            a = 123
+
+
+def bar():
+
+    if x:
+        a = 123
+
+
+def baz():
+
+    # OK
+    if x:
+        a = 123
+
+
+def quux():
+
+    new_line = here
+
+
+class Cls:
+    def method(self):
+
+        pass
+```
+
+

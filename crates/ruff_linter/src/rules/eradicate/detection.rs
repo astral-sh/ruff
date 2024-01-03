@@ -74,7 +74,7 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     }
 
     // Finally, compile the source code.
-    parse_suite(line, "<filename>").is_ok()
+    parse_suite(line).is_ok()
 }
 
 #[cfg(test)]

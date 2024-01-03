@@ -10,8 +10,8 @@ serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 
 [dev-dependencies]
-serde_test = { version = "1.0.152" }
-static_assertions = { version = "1.1.0" }
+serde_test = { workspace = true }
+static_assertions = { workspace = true }
 
 [features]
 serde = ["dep:serde"]

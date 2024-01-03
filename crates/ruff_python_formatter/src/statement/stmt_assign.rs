@@ -1,5 +1,7 @@
 use ruff_formatter::{format_args, write, FormatError};
-use ruff_python_ast::{AnyNodeRef, Expr, Operator, StmtAssign, TypeParams};
+use ruff_python_ast::{
+    AnyNodeRef, Expr, ExprAttribute, ExprCall, Operator, StmtAssign, TypeParams,
+};
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{
@@ -7,11 +9,18 @@ use crate::comments::{
 };
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize,
+    is_expression_parenthesized, optional_parentheses, NeedsParentheses, OptionalParentheses,
+    Parentheses, Parenthesize,
 };
-use crate::expression::{has_own_parentheses, maybe_parenthesize_expression};
+use crate::expression::{
+    can_omit_optional_parentheses, has_own_parentheses, has_parentheses,
+    maybe_parenthesize_expression,
+};
 use crate::prelude::*;
-use crate::preview::is_prefer_splitting_right_hand_side_of_assignments_enabled;
+use crate::preview::{
+    is_parenthesize_long_type_hints_enabled,
+    is_prefer_splitting_right_hand_side_of_assignments_enabled,
+};
 use crate::statement::trailing_semicolon;
 
 #[derive(Default)]
@@ -56,7 +65,7 @@ impl FormatNodeRule<StmtAssign> for FormatStmtAssign {
                 }
                 .fmt(f)?;
             }
-            // Avoid parenthesizing the value for single-target assignments that where the
+            // Avoid parenthesizing the value for single-target assignments where the
             // target has its own parentheses (list, dict, tuple, ...) and the target expands.
             else if has_target_own_parentheses(first, f.context())
                 && !is_expression_parenthesized(
@@ -193,13 +202,13 @@ impl Format<PyFormatContext<'_>> for FormatTargetWithEqualOperator<'_> {
             || f.context().comments().has_trailing(self.target)
         {
             self.target.format().fmt(f)?;
-        } else if has_target_own_parentheses(self.target, f.context()) {
+        } else if should_parenthesize_target(self.target, f.context()) {
+            parenthesize_if_expands(&self.target.format().with_options(Parentheses::Never))
+                .fmt(f)?;
+        } else {
             self.target
                 .format()
                 .with_options(Parentheses::Never)
-                .fmt(f)?;
-        } else {
-            parenthesize_if_expands(&self.target.format().with_options(Parentheses::Never))
                 .fmt(f)?;
         }
 
@@ -554,7 +563,9 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
 
                 // For call expressions, prefer breaking after the call expression's opening parentheses
                 // over parenthesizing the entire call expression.
-                if value.is_call_expr() {
+                // For subscripts, try breaking the subscript first
+                // For attribute chains that contain any parenthesized value: Try expanding the parenthesized value first.
+                if value.is_call_expr() || value.is_subscript_expr() || value.is_attribute_expr() {
                     best_fitting![
                         format_flat,
                         // Avoid parenthesizing the call expression if the `(` fit on the line
@@ -681,11 +692,20 @@ impl Format<PyFormatContext<'_>> for AnyBeforeOperator<'_> {
                         .fmt(f)
                 }
                 // Never parenthesize targets that come with their own parentheses, e.g. don't parenthesize lists or dictionary literals.
-                else if has_target_own_parentheses(expression, f.context()) {
-                    expression.format().with_options(Parentheses::Never).fmt(f)
-                } else {
-                    parenthesize_if_expands(&expression.format().with_options(Parentheses::Never))
+                else if should_parenthesize_target(expression, f.context()) {
+                    if is_parenthesize_long_type_hints_enabled(f.context())
+                        && can_omit_optional_parentheses(expression, f.context())
+                    {
+                        optional_parentheses(&expression.format().with_options(Parentheses::Never))
+                            .fmt(f)
+                    } else {
+                        parenthesize_if_expands(
+                            &expression.format().with_options(Parentheses::Never),
+                        )
                         .fmt(f)
+                    }
+                } else {
+                    expression.format().with_options(Parentheses::Never).fmt(f)
                 }
             }
             // Never parenthesize type params
@@ -717,7 +737,7 @@ fn should_inline_comments(
     }
 }
 
-/// Tests whether an expression that for which comments shouldn't be inlined should use the best fit layout
+/// Tests whether an expression for which comments shouldn't be inlined should use the best fit layout
 fn should_non_inlineable_use_best_fit(
     expr: &Expr,
     parent: AnyNodeRef,
@@ -728,12 +748,32 @@ fn should_non_inlineable_use_best_fit(
             attribute.needs_parentheses(parent, context) == OptionalParentheses::BestFit
         }
         Expr::Call(call) => call.needs_parentheses(parent, context) == OptionalParentheses::BestFit,
+        Expr::Subscript(subscript) => {
+            subscript.needs_parentheses(parent, context) == OptionalParentheses::BestFit
+        }
         _ => false,
     }
 }
 
-/// Returns `true` for targets that should not be parenthesized if they split because their expanded
-/// layout comes with their own set of parentheses.
+/// Returns `true` for targets that have their own set of parentheses when they split,
+/// in which case we want to avoid parenthesizing the assigned value.
 pub(super) fn has_target_own_parentheses(target: &Expr, context: &PyFormatContext) -> bool {
     matches!(target, Expr::Tuple(_)) || has_own_parentheses(target, context).is_some()
+}
+
+pub(super) fn should_parenthesize_target(target: &Expr, context: &PyFormatContext) -> bool {
+    !(has_target_own_parentheses(target, context)
+        || is_attribute_with_parenthesized_value(target, context))
+}
+
+fn is_attribute_with_parenthesized_value(target: &Expr, context: &PyFormatContext) -> bool {
+    match target {
+        Expr::Attribute(ExprAttribute { value, .. }) => {
+            has_parentheses(value.as_ref(), context).is_some()
+                || is_attribute_with_parenthesized_value(value, context)
+        }
+        Expr::Subscript(_) => true,
+        Expr::Call(ExprCall { arguments, .. }) => !arguments.is_empty(),
+        _ => false,
+    }
 }

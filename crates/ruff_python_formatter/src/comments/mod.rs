@@ -568,7 +568,7 @@ mod tests {
             let source_type = PySourceType::Python;
             let (tokens, comment_ranges) =
                 tokens_and_ranges(source, source_type).expect("Expect source to be valid Python");
-            let parsed = parse_ok_tokens(tokens, source, source_type.as_mode(), "test.py")
+            let parsed = parse_ok_tokens(tokens, source, source_type.as_mode())
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {

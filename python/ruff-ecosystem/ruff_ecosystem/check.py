@@ -28,7 +28,12 @@ from ruff_ecosystem.types import (
 )
 
 if TYPE_CHECKING:
-    from ruff_ecosystem.projects import CheckOptions, ClonedRepository, Project
+    from ruff_ecosystem.projects import (
+        CheckOptions,
+        ClonedRepository,
+        ConfigOverrides,
+        Project,
+    )
 
 
 # Matches lines that are summaries rather than diagnostics
@@ -116,7 +121,7 @@ def markdown_check_result(result: Result) -> str:
         if len(" ".join(lines)) > GITHUB_MAX_COMMENT_LENGTH // 3:
             lines.append("")
             lines.append(
-                "_... Truncated remaining completed projected reports due to GitHub comment length restrictions_"
+                "_... Truncated remaining completed project reports due to GitHub comment length restrictions_"
             )
             lines.append("")
             break
@@ -477,25 +482,27 @@ async def compare_check(
     ruff_baseline_executable: Path,
     ruff_comparison_executable: Path,
     options: CheckOptions,
+    config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Comparison:
-    async with asyncio.TaskGroup() as tg:
-        baseline_task = tg.create_task(
-            ruff_check(
-                executable=ruff_baseline_executable.resolve(),
-                path=cloned_repo.path,
-                name=cloned_repo.fullname,
-                options=options,
-            ),
-        )
-        comparison_task = tg.create_task(
-            ruff_check(
-                executable=ruff_comparison_executable.resolve(),
-                path=cloned_repo.path,
-                name=cloned_repo.fullname,
-                options=options,
-            ),
-        )
+    with config_overrides.patch_config(cloned_repo.path, options.preview):
+        async with asyncio.TaskGroup() as tg:
+            baseline_task = tg.create_task(
+                ruff_check(
+                    executable=ruff_baseline_executable.resolve(),
+                    path=cloned_repo.path,
+                    name=cloned_repo.fullname,
+                    options=options,
+                ),
+            )
+            comparison_task = tg.create_task(
+                ruff_check(
+                    executable=ruff_comparison_executable.resolve(),
+                    path=cloned_repo.path,
+                    name=cloned_repo.fullname,
+                    options=options,
+                ),
+            )
 
     baseline_output, comparison_output = (
         baseline_task.result(),

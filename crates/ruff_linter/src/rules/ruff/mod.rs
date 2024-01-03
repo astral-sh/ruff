@@ -27,6 +27,7 @@ mod tests {
     #[test_case(Rule::FunctionCallInDataclassDefaultArgument, Path::new("RUF009.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
     #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]
     #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
     #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
     #[test_case(Rule::PairwiseOverZipped, Path::new("RUF007.py"))]
@@ -44,6 +45,7 @@ mod tests {
     #[test_case(Rule::QuadraticListSummation, Path::new("RUF017_0.py"))]
     #[test_case(Rule::AssignmentInAssert, Path::new("RUF018.py"))]
     #[test_case(Rule::UnnecessaryKeyCheck, Path::new("RUF019.py"))]
+    #[test_case(Rule::NeverUnion, Path::new("RUF020.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -223,6 +225,25 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn ruff_per_file_ignores() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_per_file_ignores.py"),
+            &settings::LinterSettings {
+                per_file_ignores: resolve_per_file_ignores(vec![PerFileIgnore::new(
+                    "ruff_per_file_ignores.py".to_string(),
+                    &["F401".parse().unwrap(), "RUF100".parse().unwrap()],
+                    None,
+                )])
+                .unwrap(),
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn flake8_noqa() -> Result<()> {
         let diagnostics = test_path(

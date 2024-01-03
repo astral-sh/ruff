@@ -1,17 +1,15 @@
 import os
-import subprocess
 import sys
 import sysconfig
-from pathlib import Path
 
 
-def find_ruff_bin() -> Path:
+def find_ruff_bin() -> str:
     """Return the ruff binary path."""
 
     ruff_exe = "ruff" + sysconfig.get_config_var("EXE")
 
-    path = Path(sysconfig.get_path("scripts")) / ruff_exe
-    if path.is_file():
+    path = os.path.join(sysconfig.get_path("scripts"), ruff_exe)
+    if os.path.isfile(path):
         return path
 
     if sys.version_info >= (3, 10):
@@ -23,16 +21,19 @@ def find_ruff_bin() -> Path:
     else:
         user_scheme = "posix_user"
 
-    path = Path(sysconfig.get_path("scripts", scheme=user_scheme)) / ruff_exe
-    if path.is_file():
+    path = os.path.join(sysconfig.get_path("scripts", scheme=user_scheme), ruff_exe)
+    if os.path.isfile(path):
         return path
 
     raise FileNotFoundError(path)
 
 
 if __name__ == "__main__":
-    ruff = find_ruff_bin()
-    # Passing a path-like to `subprocess.run()` on windows is only supported in 3.8+,
-    # but we also support 3.7
-    completed_process = subprocess.run([os.fsdecode(ruff), *sys.argv[1:]])
-    sys.exit(completed_process.returncode)
+    ruff = os.fsdecode(find_ruff_bin())
+    if sys.platform == "win32":
+        import subprocess
+
+        completed_process = subprocess.run([ruff, *sys.argv[1:]])
+        sys.exit(completed_process.returncode)
+    else:
+        os.execvp(ruff, [ruff, *sys.argv[1:]])

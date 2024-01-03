@@ -233,7 +233,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -250,7 +250,7 @@ def doctest_long_lines():
     But this one is long enough to get wrapped.
     >>> foo, bar, quux = this_is_a_long_line(lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard)
     '''
-    # This demostrates a normal line that will get wrapped but won't
+    # This demonstrates a normal line that will get wrapped but won't
     # get wrapped in the docstring above because of how the line-width
     # setting gets reset at the first column in each code snippet.
     foo, bar, quux = this_is_a_long_line(lion, giraffe, hippo, zeba, lemur, penguin, monkey)
@@ -1368,6 +1368,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -1600,7 +1601,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -1617,7 +1618,7 @@ def doctest_long_lines():
     But this one is long enough to get wrapped.
     >>> foo, bar, quux = this_is_a_long_line(lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard)
     """
-    # This demostrates a normal line that will get wrapped but won't
+    # This demonstrates a normal line that will get wrapped but won't
     # get wrapped in the docstring above because of how the line-width
     # setting gets reset at the first column in each code snippet.
     foo, bar, quux = this_is_a_long_line(
@@ -2738,6 +2739,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -2970,7 +2972,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -2987,7 +2989,7 @@ def doctest_long_lines():
   But this one is long enough to get wrapped.
   >>> foo, bar, quux = this_is_a_long_line(lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard)
   """
-  # This demostrates a normal line that will get wrapped but won't
+  # This demonstrates a normal line that will get wrapped but won't
   # get wrapped in the docstring above because of how the line-width
   # setting gets reset at the first column in each code snippet.
   foo, bar, quux = this_is_a_long_line(
@@ -4108,6 +4110,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -4340,7 +4343,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -4357,7 +4360,7 @@ def doctest_long_lines():
 	But this one is long enough to get wrapped.
 	>>> foo, bar, quux = this_is_a_long_line(lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard)
 	"""
-	# This demostrates a normal line that will get wrapped but won't
+	# This demonstrates a normal line that will get wrapped but won't
 	# get wrapped in the docstring above because of how the line-width
 	# setting gets reset at the first column in each code snippet.
 	foo, bar, quux = this_is_a_long_line(
@@ -5478,6 +5481,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -5710,7 +5714,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -5727,7 +5731,7 @@ def doctest_long_lines():
 	But this one is long enough to get wrapped.
 	>>> foo, bar, quux = this_is_a_long_line(lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard)
 	"""
-	# This demostrates a normal line that will get wrapped but won't
+	# This demonstrates a normal line that will get wrapped but won't
 	# get wrapped in the docstring above because of how the line-width
 	# setting gets reset at the first column in each code snippet.
 	foo, bar, quux = this_is_a_long_line(
@@ -6848,6 +6852,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -7078,7 +7083,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -7099,7 +7104,7 @@ def doctest_long_lines():
     ...     lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
     ... )
     """
-    # This demostrates a normal line that will get wrapped but won't
+    # This demonstrates a normal line that will get wrapped but won't
     # get wrapped in the docstring above because of how the line-width
     # setting gets reset at the first column in each code snippet.
     foo, bar, quux = this_is_a_long_line(
@@ -8215,6 +8220,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -8445,7 +8451,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -8466,7 +8472,7 @@ def doctest_long_lines():
   ...   lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
   ... )
   """
-  # This demostrates a normal line that will get wrapped but won't
+  # This demonstrates a normal line that will get wrapped but won't
   # get wrapped in the docstring above because of how the line-width
   # setting gets reset at the first column in each code snippet.
   foo, bar, quux = this_is_a_long_line(
@@ -9582,6 +9588,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -9812,7 +9819,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -9842,7 +9849,7 @@ def doctest_long_lines():
 	...         leopard,
 	... )
 	"""
-	# This demostrates a normal line that will get wrapped but won't
+	# This demonstrates a normal line that will get wrapped but won't
 	# get wrapped in the docstring above because of how the line-width
 	# setting gets reset at the first column in each code snippet.
 	foo, bar, quux = this_is_a_long_line(
@@ -10958,6 +10965,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -11188,7 +11196,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -11209,7 +11217,7 @@ def doctest_long_lines():
 	...     lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
 	... )
 	"""
-	# This demostrates a normal line that will get wrapped but won't
+	# This demonstrates a normal line that will get wrapped but won't
 	# get wrapped in the docstring above because of how the line-width
 	# setting gets reset at the first column in each code snippet.
 	foo, bar, quux = this_is_a_long_line(
@@ -12325,6 +12333,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = 60
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -12555,7 +12564,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -12585,7 +12594,7 @@ def doctest_long_lines():
     ...     leopard,
     ... )
     """
-    # This demostrates a normal line that will get wrapped but won't
+    # This demonstrates a normal line that will get wrapped but won't
     # get wrapped in the docstring above because of how the line-width
     # setting gets reset at the first column in each code snippet.
     foo, bar, quux = this_is_a_long_line(
@@ -13701,6 +13710,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Enabled
 docstring-code-line-width  = "dynamic"
 preview                    = Disabled
+target_version             = Py38
 ```
 
 ```python
@@ -13931,7 +13941,7 @@ def doctest_varying_start_column():
 # actually extend past the configured line limit.
 #
 # It's not quite clear whether this is desirable or not. We could in
-# theory compute the intendation length of a code snippet and then
+# theory compute the indentation length of a code snippet and then
 # adjust the line-width setting on a recursive call to the formatter.
 # But there are assuredly pathological cases to consider. Another path
 # would be to expose another formatter option for controlling the
@@ -13952,7 +13962,7 @@ def doctest_long_lines():
     ...     lion, giraffe, hippo, zeba, lemur, penguin, monkey, spider, bear, leopard
     ... )
     """
-    # This demostrates a normal line that will get wrapped but won't
+    # This demonstrates a normal line that will get wrapped but won't
     # get wrapped in the docstring above because of how the line-width
     # setting gets reset at the first column in each code snippet.
     foo, bar, quux = this_is_a_long_line(

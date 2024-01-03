@@ -10,7 +10,7 @@ fn extract_elif_else_range() -> Result<(), ParseError> {
 elif b:
     ...
 ";
-    let mut stmts = parse_suite(contents, "<filename>")?;
+    let mut stmts = parse_suite(contents)?;
     let stmt = stmts
         .pop()
         .and_then(ruff_python_ast::Stmt::if_stmt)
@@ -24,7 +24,7 @@ elif b:
 else:
     ...
 ";
-    let mut stmts = parse_suite(contents, "<filename>")?;
+    let mut stmts = parse_suite(contents)?;
     let stmt = stmts
         .pop()
         .and_then(ruff_python_ast::Stmt::if_stmt)

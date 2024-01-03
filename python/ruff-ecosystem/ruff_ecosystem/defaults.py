@@ -1,7 +1,13 @@
 """
 Default projects for ecosystem checks
 """
-from ruff_ecosystem.projects import CheckOptions, FormatOptions, Project, Repository
+from ruff_ecosystem.projects import (
+    CheckOptions,
+    ConfigOverrides,
+    FormatOptions,
+    Project,
+    Repository,
+)
 
 # TODO(zanieb): Consider exporting this as JSON and loading from there instead
 DEFAULT_TARGETS = [
@@ -45,7 +51,14 @@ DEFAULT_TARGETS = [
     Project(repo=Repository(owner="pypa", name="build", ref="main")),
     Project(repo=Repository(owner="pypa", name="cibuildwheel", ref="main")),
     Project(repo=Repository(owner="pypa", name="pip", ref="main")),
-    Project(repo=Repository(owner="pypa", name="setuptools", ref="main")),
+    Project(
+        repo=Repository(owner="pypa", name="setuptools", ref="main"),
+        # Since `setuptools` opts into the "preserve" quote style which
+        # require preview mode, we must disable it during the `--no-preview` run
+        config_overrides=ConfigOverrides(
+            when_no_preview={"format.quote-style": "double"}
+        ),
+    ),
     Project(repo=Repository(owner="python", name="mypy", ref="master")),
     Project(
         repo=Repository(
@@ -62,7 +75,17 @@ DEFAULT_TARGETS = [
     Project(
         repo=Repository(owner="scikit-build", name="scikit-build-core", ref="main")
     ),
-    Project(repo=Repository(owner="sphinx-doc", name="sphinx", ref="master")),
+    Project(
+        repo=Repository(
+            owner="sphinx-doc",
+            name="sphinx",
+            ref="master",
+        ),
+        format_options=FormatOptions(
+            # Does not contain valid UTF-8
+            exclude="tests/roots/test-pycode/cp_1251_coded.py"
+        ),
+    ),
     Project(repo=Repository(owner="spruceid", name="siwe-py", ref="main")),
     Project(repo=Repository(owner="tiangolo", name="fastapi", ref="master")),
     Project(repo=Repository(owner="yandex", name="ch-backup", ref="main")),

@@ -10,9 +10,8 @@ use colored::Colorize;
 use log::{debug, error, warn};
 use rustc_hash::FxHashMap;
 
-use crate::cache::{Cache, FileCacheKey, LintCacheData};
 use ruff_diagnostics::Diagnostic;
-use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
+use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
 use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
@@ -24,9 +23,11 @@ use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
-use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
+use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
+
+use crate::cache::{Cache, FileCacheKey, LintCacheData};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -303,12 +304,28 @@ pub(crate) fn lint_path(
             (result, fixed)
         } else {
             // If we fail to fix, lint the original source code.
-            let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
+            let result = lint_only(
+                path,
+                package,
+                settings,
+                noqa,
+                &source_kind,
+                source_type,
+                ParseSource::None,
+            );
             let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
-        let result = lint_only(path, package, settings, noqa, &source_kind, source_type);
+        let result = lint_only(
+            path,
+            package,
+            settings,
+            noqa,
+            &source_kind,
+            source_type,
+            ParseSource::None,
+        );
         let fixed = FxHashMap::default();
         (result, fixed)
     };
@@ -340,17 +357,10 @@ pub(crate) fn lint_path(
         }
     }
 
-    if let Some(err) = parse_error {
+    if let Some(error) = parse_error {
         error!(
             "{}",
-            DisplayParseError::new(
-                err,
-                SourceCode::new(
-                    source_kind.source_code(),
-                    &LineIndex::from_source_text(source_kind.source_code())
-                ),
-                &source_kind,
-            )
+            DisplayParseError::from_source_kind(error, Some(path.to_path_buf()), &source_kind,)
         );
     }
 
@@ -444,6 +454,7 @@ pub(crate) fn lint_stdin(
                 noqa,
                 &source_kind,
                 source_type,
+                ParseSource::None,
             );
             let fixed = FxHashMap::default();
 
@@ -462,6 +473,7 @@ pub(crate) fn lint_stdin(
             noqa,
             &source_kind,
             source_type,
+            ParseSource::None,
         );
         let fixed = FxHashMap::default();
         (result, fixed)

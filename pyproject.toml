@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.1.8"
+version = "0.1.11"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -74,7 +74,7 @@ force-exclude = '''
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
 
-changelog_ignore_labels = ["internal"]
+changelog_ignore_labels = ["internal", "ci"]
 
 changelog_sections.breaking = "Breaking changes"
 changelog_sections.preview = "Preview features"
@@ -91,9 +91,8 @@ changelog_sections.__unknown__ = "Other changes"
 changelog_contributors = false
 
 version_files = [
-  "README.md", 
+  "README.md",
   "docs/integrations.md",
-  "crates/flake8_to_ruff/Cargo.toml",
   "crates/ruff_cli/Cargo.toml",
   "crates/ruff_linter/Cargo.toml",
   "crates/ruff_shrinking/Cargo.toml",

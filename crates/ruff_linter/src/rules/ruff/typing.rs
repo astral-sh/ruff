@@ -76,30 +76,30 @@ impl<'a> TypingTarget<'a> {
     ) -> Option<Self> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                if semantic.match_typing_expr(value, "Optional") {
-                    Some(TypingTarget::Optional(slice.as_ref()))
-                } else if semantic.match_typing_expr(value, "Literal") {
-                    Some(TypingTarget::Literal(slice))
-                } else if semantic.match_typing_expr(value, "Union") {
-                    Some(TypingTarget::Union(slice))
-                } else if semantic.match_typing_expr(value, "Annotated") {
-                    resolve_slice_value(slice.as_ref())
-                        .next()
-                        .map(TypingTarget::Annotated)
-                } else {
-                    semantic.resolve_call_path(value).map_or(
-                        // If we can't resolve the call path, it must be defined
-                        // in the same file and could be a type alias.
-                        Some(TypingTarget::Unknown),
-                        |call_path| {
+                semantic.resolve_call_path(value).map_or(
+                    // If we can't resolve the call path, it must be defined
+                    // in the same file and could be a type alias.
+                    Some(TypingTarget::Unknown),
+                    |call_path| {
+                        if semantic.match_typing_call_path(&call_path, "Optional") {
+                            Some(TypingTarget::Optional(slice.as_ref()))
+                        } else if semantic.match_typing_call_path(&call_path, "Literal") {
+                            Some(TypingTarget::Literal(slice.as_ref()))
+                        } else if semantic.match_typing_call_path(&call_path, "Union") {
+                            Some(TypingTarget::Union(slice.as_ref()))
+                        } else if semantic.match_typing_call_path(&call_path, "Annotated") {
+                            resolve_slice_value(slice.as_ref())
+                                .next()
+                                .map(TypingTarget::Annotated)
+                        } else {
                             if is_known_type(&call_path, minor_version) {
                                 Some(TypingTarget::Known)
                             } else {
                                 Some(TypingTarget::Unknown)
                             }
-                        },
-                    )
-                }
+                        }
+                    },
+                )
             }
             Expr::BinOp(ast::ExprBinOp {
                 left,
