@@ -263,14 +263,14 @@ auto_return_type.py:82:5: ANN201 [*] Missing return type annotation for public f
 83 |     match x:
 84 |         case [1, 2, 3]:
    |
-   = help: Add return type annotation: `str | int`
+   = help: Add return type annotation: `str | int | None`
 
 ℹ Unsafe fix
 79 79 |         return 1
 80 80 | 
 81 81 | 
 82    |-def func(x: int):
-   82 |+def func(x: int) -> str | int:
+   82 |+def func(x: int) -> str | int | None:
 83 83 |     match x:
 84 84 |         case [1, 2, 3]:
 85 85 |             return 1
@@ -749,5 +749,24 @@ auto_return_type.py:290:5: ANN201 [*] Missing return type annotation for public 
 291 291 |     try:
 292 292 |         return 5
 293 293 |     except:
+
+auto_return_type.py:299:5: ANN201 [*] Missing return type annotation for public function `func`
+    |
+299 | def func(x: int):
+    |     ^^^^ ANN201
+300 |     match x:
+301 |         case [1, 2, 3]:
+    |
+    = help: Add return type annotation: `str | int`
+
+ℹ Unsafe fix
+296 296 |     raise ValueError
+297 297 | 
+298 298 | 
+299     |-def func(x: int):
+    299 |+def func(x: int) -> str | int:
+300 300 |     match x:
+301 301 |         case [1, 2, 3]:
+302 302 |             return 1
 
 

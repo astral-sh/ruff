@@ -294,3 +294,11 @@ def func():
         pass
 
     raise ValueError
+
+
+def func(x: int):
+    match x:
+        case [1, 2, 3]:
+            return 1
+        case y:
+            return "foo"

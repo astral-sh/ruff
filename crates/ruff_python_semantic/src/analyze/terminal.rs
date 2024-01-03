@@ -11,7 +11,7 @@ pub enum Terminal {
     /// No path through the function ends with a `return` statement.
     Return,
     /// Every path through the function ends with a `return` or `raise` statement.
-    Explicit,
+    RaiseOrReturn,
     /// At least one path through the function ends with a `return` statement.
     ConditionalReturn,
 }
@@ -20,6 +20,19 @@ impl Terminal {
     /// Returns the [`Terminal`] behavior of the function, if it can be determined.
     pub fn from_function(function: &ast::StmtFunctionDef) -> Terminal {
         Self::from_body(&function.body)
+    }
+
+    /// Returns `true` if the [`Terminal`] behavior includes at least one `return` path.
+    pub fn has_any_return(self) -> bool {
+        matches!(
+            self,
+            Self::Return | Self::RaiseOrReturn | Self::ConditionalReturn
+        )
+    }
+
+    /// Returns `true` if the [`Terminal`] behavior includes at least one implicit `return` path.
+    pub fn has_implicit_return(self) -> bool {
+        matches!(self, Self::None | Self::Implicit | Self::ConditionalReturn)
     }
 
     /// Returns the [`Terminal`] behavior of the body, if it can be determined.
@@ -58,7 +71,7 @@ impl Terminal {
                     if elif_else_clauses.iter().any(|clause| clause.test.is_none()) {
                         // And all branches return, then the `if` statement returns.
                         terminal = terminal.and_then(branch_terminal);
-                    } else if branch_terminal.has_return() {
+                    } else if branch_terminal.has_any_return() {
                         // Otherwise, if any branch returns, we know this can't be a
                         // non-returning function.
                         terminal = terminal.and_then(Terminal::ConditionalReturn);
@@ -77,7 +90,7 @@ impl Terminal {
                     } else {
                         // Otherwise, if any branch returns, we know this can't be a
                         // non-returning function.
-                        if branch_terminal.has_return() {
+                        if branch_terminal.has_any_return() {
                             terminal = terminal.and_then(Terminal::ConditionalReturn);
                         }
                     }
@@ -89,16 +102,19 @@ impl Terminal {
                     finalbody,
                     ..
                 }) => {
-                    // If the body returns, then this can't be a non-returning function.
+                    // If the body returns, then this can't be a non-returning function. We assume
+                    // that _any_ statement in the body could raise an exception, so we don't
+                    // consider the body to be exhaustive. In other words, we assume the exception
+                    // handlers exist for a reason.
                     let body_terminal = Self::from_body(body);
-                    if body_terminal.has_return() {
+                    if body_terminal.has_any_return() {
                         terminal = terminal.and_then(Terminal::ConditionalReturn);
                     }
 
-                    // If the `finally` block returns, the `try` block must also return.
+                    // If the `finally` block returns, the `try` block must also return. (Similarly,
+                    // if the `finally` block raises, the `try` block must also raise.)
                     terminal = terminal.and_then(Self::from_body(finalbody));
 
-                    // If all the handlers return, the `try` block may also return.
                     let branch_terminal = Terminal::branches(handlers.iter().map(|handler| {
                         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                             body,
@@ -108,12 +124,14 @@ impl Terminal {
                     }));
 
                     if orelse.is_empty() {
-                        // If there's no `else`, we may fall through.
-                        if branch_terminal.has_return() {
+                        // If there's no `else`, we may fall through, so only mark that this can't
+                        // be a non-returning function if any of the branches return.
+                        if branch_terminal.has_any_return() {
                             terminal = terminal.and_then(Terminal::ConditionalReturn);
                         }
                     } else {
-                        // If there's an `else`, we won't fall through.
+                        // If there's an `else`, we won't fall through. If all the handlers and
+                        // the `else` block return,, the `try` block also returns.
                         terminal =
                             terminal.and_then(branch_terminal.branch(Terminal::from_body(orelse)));
                     }
@@ -122,7 +140,7 @@ impl Terminal {
                     terminal = terminal.and_then(Self::from_body(body));
                 }
                 Stmt::Return(_) => {
-                    terminal = terminal.and_then(Terminal::Explicit);
+                    terminal = terminal.and_then(Terminal::RaiseOrReturn);
                 }
                 Stmt::Raise(_) => {
                     terminal = terminal.and_then(Terminal::Raise);
@@ -135,14 +153,6 @@ impl Terminal {
             Terminal::None => Terminal::Implicit,
             _ => terminal,
         }
-    }
-
-    /// Returns `true` if the [`Terminal`] behavior includes at least one `return` path.
-    fn has_return(self) -> bool {
-        matches!(
-            self,
-            Self::Return | Self::Explicit | Self::ConditionalReturn
-        )
     }
 
     /// Combine two [`Terminal`] operators, with one appearing after the other.
@@ -161,8 +171,8 @@ impl Terminal {
 
             // If one of the operators is `Raise`, then the function ends with an explicit `raise`
             // or `return` statement.
-            (Self::Raise, Self::ConditionalReturn) => Self::Explicit,
-            (Self::ConditionalReturn, Self::Raise) => Self::Explicit,
+            (Self::Raise, Self::ConditionalReturn) => Self::RaiseOrReturn,
+            (Self::ConditionalReturn, Self::Raise) => Self::RaiseOrReturn,
 
             // If one of the operators is `Return`, then the function returns.
             (Self::Return, Self::ConditionalReturn) => Self::Return,
@@ -175,14 +185,14 @@ impl Terminal {
             (Self::Return, Self::Return) => Self::Return,
 
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Raise, Self::Return) => Self::Explicit,
+            (Self::Raise, Self::Return) => Self::RaiseOrReturn,
 
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Return, Self::Raise) => Self::Explicit,
+            (Self::Return, Self::Raise) => Self::RaiseOrReturn,
 
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Explicit, _) => Self::Explicit,
-            (_, Self::Explicit) => Self::Explicit,
+            (Self::RaiseOrReturn, _) => Self::RaiseOrReturn,
+            (_, Self::RaiseOrReturn) => Self::RaiseOrReturn,
         }
     }
 
@@ -199,16 +209,16 @@ impl Terminal {
             (Self::Raise, Self::Implicit) => Self::Implicit,
             (Self::Implicit, Self::Return) => Self::ConditionalReturn,
             (Self::Return, Self::Implicit) => Self::ConditionalReturn,
-            (Self::Implicit, Self::Explicit) => Self::ConditionalReturn,
-            (Self::Explicit, Self::Implicit) => Self::ConditionalReturn,
+            (Self::Implicit, Self::RaiseOrReturn) => Self::ConditionalReturn,
+            (Self::RaiseOrReturn, Self::Implicit) => Self::ConditionalReturn,
             (Self::Implicit, Self::ConditionalReturn) => Self::ConditionalReturn,
             (Self::ConditionalReturn, Self::Implicit) => Self::ConditionalReturn,
 
             // If both operators are conditional returns, the result is a conditional return.
             (Self::ConditionalReturn, Self::ConditionalReturn) => Self::ConditionalReturn,
 
-            (Self::Raise, Self::ConditionalReturn) => Self::Explicit,
-            (Self::ConditionalReturn, Self::Raise) => Self::Explicit,
+            (Self::Raise, Self::ConditionalReturn) => Self::RaiseOrReturn,
+            (Self::ConditionalReturn, Self::Raise) => Self::RaiseOrReturn,
 
             (Self::Return, Self::ConditionalReturn) => Self::Return,
             (Self::ConditionalReturn, Self::Return) => Self::Return,
@@ -218,12 +228,12 @@ impl Terminal {
             // All paths through the function end with a `return` statement.
             (Self::Return, Self::Return) => Self::Return,
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Raise, Self::Return) => Self::Explicit,
+            (Self::Raise, Self::Return) => Self::RaiseOrReturn,
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Return, Self::Raise) => Self::Explicit,
+            (Self::Return, Self::Raise) => Self::RaiseOrReturn,
             // All paths through the function end with a `return` or `raise` statement.
-            (Self::Explicit, _) => Self::Explicit,
-            (_, Self::Explicit) => Self::Explicit,
+            (Self::RaiseOrReturn, _) => Self::RaiseOrReturn,
+            (_, Self::RaiseOrReturn) => Self::RaiseOrReturn,
         }
     }
 
@@ -238,7 +248,7 @@ fn sometimes_breaks(stmts: &[Stmt]) -> bool {
     for stmt in stmts {
         match stmt {
             Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-                if Terminal::from_body(body).has_return() {
+                if Terminal::from_body(body).has_any_return() {
                     return false;
                 }
                 if sometimes_breaks(orelse) {
@@ -246,7 +256,7 @@ fn sometimes_breaks(stmts: &[Stmt]) -> bool {
                 }
             }
             Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                if Terminal::from_body(body).has_return() {
+                if Terminal::from_body(body).has_any_return() {
                     return false;
                 }
                 if sometimes_breaks(orelse) {
