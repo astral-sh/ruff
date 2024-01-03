@@ -264,3 +264,33 @@ def func(x: int):
         if x > 0:
             return 1
     raise ValueError
+
+
+def func(x: int):
+    if x > 5:
+        raise ValueError
+    else:
+        pass
+
+
+def func(x: int):
+    if x > 5:
+        raise ValueError
+    elif x > 10:
+        pass
+
+
+def func(x: int):
+    if x > 5:
+        raise ValueError
+    elif x > 10:
+        return 5
+
+
+def func():
+    try:
+        return 5
+    except:
+        pass
+
+    raise ValueError

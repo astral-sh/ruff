@@ -89,7 +89,10 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
     //     if x > 0:
     //         return 1
     // ```
-    if terminal == Terminal::ConditionalReturn || terminal == Terminal::None {
+    if terminal == Terminal::ConditionalReturn
+        || terminal == Terminal::None
+        || terminal == Terminal::Implicit
+    {
         return_type = return_type.union(ResolvedPythonType::Atom(PythonType::None));
     }
 
