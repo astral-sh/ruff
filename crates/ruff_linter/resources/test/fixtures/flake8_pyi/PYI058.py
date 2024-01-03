@@ -1,5 +1,6 @@
 import collections.abc
 import typing
+import typing_extensions
 from collections.abc import AsyncGenerator, Generator
 from typing import Any
 
@@ -28,8 +29,12 @@ class IteratorReturningSimpleGenerator5:
         yield "c"
         return
 
+class IteratorReturningSimpleGenerator6:
+    def __iter__(self) -> Generator[int, None, None]:  # PYI058 (use `Iterator`)
+        yield from range(42)
+
 class AsyncIteratorReturningSimpleAsyncGenerator1:
-    def __aiter__(self) -> typing.AsyncGenerator: pass # PYI058 (Use `AsyncIterator`)
+    def __aiter__(self) -> typing_extensions.AsyncGenerator: pass # PYI058 (Use `AsyncIterator`)
 
 class AsyncIteratorReturningSimpleAsyncGenerator2:
     def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, Any]: ...  # PYI058 (Use `AsyncIterator`)

@@ -1,3 +1,5 @@
+use std::borrow::ToOwned;
+
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -7,6 +9,9 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+
+use itertools::Itertools;
 
 /// ## What it does
 /// Checks for simple `__iter__` methods that return `Generator`, and for
@@ -134,24 +139,17 @@ pub(crate) fn bad_generator_return_type(
         _ => return,
     };
 
-    if !semantic
-        .resolve_call_path(map_subscript(returns))
-        .is_some_and(|call_path| {
-            matches!(
-                (name, call_path.as_slice()),
-                (
-                    "__iter__",
-                    ["typing" | "typing_extensions", "Generator"]
-                        | ["collections", "abc", "Generator"]
-                ) | (
-                    "__aiter__",
-                    ["typing" | "typing_extensions", "AsyncGenerator"]
-                        | ["collections", "abc", "AsyncGenerator"]
-                )
-            )
-        })
-    {
-        return;
+    let module_name = {
+        let Some(call_path) = semantic.resolve_call_path(map_subscript(returns)) else {
+            return;
+        };
+        match (name, call_path.as_slice()) {
+            ("__iter__", ["typing" | "typing_extensions", "Generator"])
+            | ("__aiter__", ["typing" | "typing_extensions", "AsyncGenerator"]) => call_path[0],
+            ("__iter__", ["collections", "abc", "Generator"])
+            | ("__aiter__", ["collections", "abc", "AsyncGenerator"]) => "collections.abc",
+            _ => return,
+        }
     };
 
     // `Generator` allows three type parameters; `AsyncGenerator` allows two.
@@ -223,7 +221,14 @@ pub(crate) fn bad_generator_return_type(
         },
         function_def.identifier(),
     );
-    if let Some(fix) = get_fix(function_def, checker, returns, is_stub, yield_type_info) {
+    if let Some(fix) = get_fix(
+        function_def,
+        checker,
+        returns,
+        is_stub,
+        yield_type_info,
+        module_name,
+    ) {
         diagnostic.set_fix(fix);
     };
     checker.diagnostics.push(diagnostic);
@@ -239,17 +244,32 @@ fn get_fix(
     returns: &ast::Expr,
     is_stub: bool,
     yield_type_info: Option<YieldTypeInfo>,
+    module_name: &str,
 ) -> Option<Fix> {
-    let edit = match returns {
-        ast::Expr::Attribute(_) => get_edit(returns),
-        ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => get_edit(value.as_ref()),
+    let edits = match returns {
+        ast::Expr::Attribute(attribute @ ast::ExprAttribute { .. }) => {
+            get_attribute_edits(attribute)
+        }
+        ast::Expr::Name(name @ ast::ExprName { .. }) => get_name_edits(name, module_name, checker),
+        ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => match value.as_ref() {
+            ast::Expr::Attribute(attribute @ ast::ExprAttribute { .. }) => {
+                get_attribute_edits(attribute)
+            }
+            ast::Expr::Name(name @ ast::ExprName { .. }) => {
+                get_name_edits(name, module_name, checker)
+            }
+            _ => None,
+        },
         _ => None,
     };
 
-    let Some(edit) = edit else {
+    let Some(edits) = edits else {
         return None;
     };
-    let mut rest = vec![];
+    let [first_edit, ..] = &edits[..] else {
+        return None;
+    };
+    let mut rest = edits.iter().skip(1).map(ToOwned::to_owned).collect_vec();
     if let Some(yield_type_info) = yield_type_info {
         rest.push(Edit::range_replacement(
             checker.generator().expr(&yield_type_info.expr),
@@ -264,16 +284,17 @@ fn get_fix(
     } else {
         Applicability::Unsafe
     };
-    Some(Fix::applicable_edits(edit, rest, applicability))
+    Some(Fix::applicable_edits(
+        first_edit.to_owned(),
+        rest,
+        applicability,
+    ))
 }
 
-fn get_edit(expr: &ast::Expr) -> Option<Edit> {
-    let ast::Expr::Attribute(ast::ExprAttribute {
+fn get_attribute_edits(expr: &ast::ExprAttribute) -> Option<Vec<Edit>> {
+    let ast::ExprAttribute {
         value, attr, range, ..
-    }) = expr
-    else {
-        return None;
-    };
+    } = expr;
 
     let new_return = match attr.as_str() {
         "Generator" => "Iterator",
@@ -295,5 +316,24 @@ fn get_edit(expr: &ast::Expr) -> Option<Edit> {
     }
 
     let repl = format!("{module}.{new_return}");
-    Some(Edit::range_replacement(repl, range.to_owned()))
+    Some(vec![Edit::range_replacement(repl, range.to_owned())])
+}
+
+fn get_name_edits(expr: &ast::ExprName, module_name: &str, checker: &Checker) -> Option<Vec<Edit>> {
+    let ast::ExprName { id, range, .. } = expr;
+    let new_return = match id.as_str() {
+        "Generator" => "Iterator",
+        "AsyncGenerator" => "AsyncIterator",
+        _ => return None,
+    };
+    let (edit1, binding) = checker
+        .importer()
+        .get_or_import_symbol(
+            &ImportRequest::import_from(module_name, new_return),
+            range.start(),
+            checker.semantic(),
+        )
+        .ok()?;
+    let edit2 = Edit::range_replacement(binding, *range);
+    Some(vec![edit1, edit2])
 }
