@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S402.py:1:8: S402 `ftplib` and related modules are considered insecure. Use SSH, SFTP, SCP, or another encrypted protocol.
+  |
+1 | import ftplib  # S402
+  |        ^^^^^^ S402
+2 | from ftplib import FTP  # S402
+  |
+
+S402.py:2:6: S402 `ftplib` and related modules are considered insecure. Use SSH, SFTP, SCP, or another encrypted protocol.
+  |
+1 | import ftplib  # S402
+2 | from ftplib import FTP  # S402
+  |      ^^^^^^ S402
+  |
+
+

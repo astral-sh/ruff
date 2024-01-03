@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S405.py:1:8: S405 `xml.etree` methods are vulnerable to XML attacks
+  |
+1 | import xml.etree.cElementTree  # S405
+  |        ^^^^^^^^^^^^^^^^^^^^^^ S405
+2 | from xml.etree import cElementTree  # S405
+3 | import xml.etree.ElementTree  # S405
+  |
+
+S405.py:2:6: S405 `xml.etree` methods are vulnerable to XML attacks
+  |
+1 | import xml.etree.cElementTree  # S405
+2 | from xml.etree import cElementTree  # S405
+  |      ^^^^^^^^^ S405
+3 | import xml.etree.ElementTree  # S405
+4 | from xml.etree import ElementTree  # S405
+  |
+
+S405.py:3:8: S405 `xml.etree` methods are vulnerable to XML attacks
+  |
+1 | import xml.etree.cElementTree  # S405
+2 | from xml.etree import cElementTree  # S405
+3 | import xml.etree.ElementTree  # S405
+  |        ^^^^^^^^^^^^^^^^^^^^^ S405
+4 | from xml.etree import ElementTree  # S405
+  |
+
+S405.py:4:6: S405 `xml.etree` methods are vulnerable to XML attacks
+  |
+2 | from xml.etree import cElementTree  # S405
+3 | import xml.etree.ElementTree  # S405
+4 | from xml.etree import ElementTree  # S405
+  |      ^^^^^^^^^ S405
+  |
+
+
