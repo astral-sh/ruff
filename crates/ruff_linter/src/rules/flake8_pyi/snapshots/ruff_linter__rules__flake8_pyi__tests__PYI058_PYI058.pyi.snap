@@ -57,11 +57,20 @@ PYI058.pyi:14:9: PYI058 [*] Use `Iterator` as the return value for simple `__ite
    = help: Convert the return annotation of your `__iter__` method to `Iterator`
 
 ℹ Safe fix
+1  1  | import collections.abc
+2  2  | import typing
+3  3  | import typing_extensions
+4     |-from collections.abc import AsyncGenerator, Generator
+   4  |+from collections.abc import AsyncGenerator, Generator, Iterator
+5  5  | from typing import Any
+6  6  | 
+7  7  | class IteratorReturningSimpleGenerator1:
+--------------------------------------------------------------------------------
 11 11 |     def __iter__(self) -> typing.Generator: ...  # PYI058 (use `Iterator`)
 12 12 | 
 13 13 | class IteratorReturningSimpleGenerator3:
 14    |-    def __iter__(self) -> collections.abc.Generator: ...  # PYI058 (use `Iterator`)
-   14 |+    def __iter__(self) -> collections.abc.Iterator: ...  # PYI058 (use `Iterator`)
+   14 |+    def __iter__(self) -> Iterator: ...  # PYI058 (use `Iterator`)
 15 15 | 
 16 16 | class IteratorReturningSimpleGenerator4:
 17 17 |     def __iter__(self, /) -> collections.abc.Generator[str, Any, None]: ...  # PYI058 (use `Iterator`)
@@ -77,11 +86,20 @@ PYI058.pyi:17:9: PYI058 [*] Use `Iterator` as the return value for simple `__ite
    = help: Convert the return annotation of your `__iter__` method to `Iterator`
 
 ℹ Safe fix
+1  1  | import collections.abc
+2  2  | import typing
+3  3  | import typing_extensions
+4     |-from collections.abc import AsyncGenerator, Generator
+   4  |+from collections.abc import AsyncGenerator, Generator, Iterator
+5  5  | from typing import Any
+6  6  | 
+7  7  | class IteratorReturningSimpleGenerator1:
+--------------------------------------------------------------------------------
 14 14 |     def __iter__(self) -> collections.abc.Generator: ...  # PYI058 (use `Iterator`)
 15 15 | 
 16 16 | class IteratorReturningSimpleGenerator4:
 17    |-    def __iter__(self, /) -> collections.abc.Generator[str, Any, None]: ...  # PYI058 (use `Iterator`)
-   17 |+    def __iter__(self, /) -> collections.abc.Iterator[str]: ...  # PYI058 (use `Iterator`)
+   17 |+    def __iter__(self, /) -> Iterator[str]: ...  # PYI058 (use `Iterator`)
 18 18 | 
 19 19 | class IteratorReturningSimpleGenerator5:
 20 20 |     def __iter__(self, /) -> collections.abc.Generator[str, None, typing.Any]: ...  # PYI058 (use `Iterator`)
@@ -97,11 +115,20 @@ PYI058.pyi:20:9: PYI058 [*] Use `Iterator` as the return value for simple `__ite
    = help: Convert the return annotation of your `__iter__` method to `Iterator`
 
 ℹ Safe fix
+1  1  | import collections.abc
+2  2  | import typing
+3  3  | import typing_extensions
+4     |-from collections.abc import AsyncGenerator, Generator
+   4  |+from collections.abc import AsyncGenerator, Generator, Iterator
+5  5  | from typing import Any
+6  6  | 
+7  7  | class IteratorReturningSimpleGenerator1:
+--------------------------------------------------------------------------------
 17 17 |     def __iter__(self, /) -> collections.abc.Generator[str, Any, None]: ...  # PYI058 (use `Iterator`)
 18 18 | 
 19 19 | class IteratorReturningSimpleGenerator5:
 20    |-    def __iter__(self, /) -> collections.abc.Generator[str, None, typing.Any]: ...  # PYI058 (use `Iterator`)
-   20 |+    def __iter__(self, /) -> collections.abc.Iterator[str]: ...  # PYI058 (use `Iterator`)
+   20 |+    def __iter__(self, /) -> Iterator[str]: ...  # PYI058 (use `Iterator`)
 21 21 | 
 22 22 | class IteratorReturningSimpleGenerator6:
 23 23 |     def __iter__(self, /) -> Generator[str, None, None]: ...  # PYI058 (use `Iterator`)
@@ -166,11 +193,20 @@ PYI058.pyi:29:9: PYI058 [*] Use `AsyncIterator` as the return value for simple `
    = help: Convert the return annotation of your `__aiter__` method to `AsyncIterator`
 
 ℹ Safe fix
+1  1  | import collections.abc
+2  2  | import typing
+3  3  | import typing_extensions
+4     |-from collections.abc import AsyncGenerator, Generator
+   4  |+from collections.abc import AsyncGenerator, Generator, AsyncIterator
+5  5  | from typing import Any
+6  6  | 
+7  7  | class IteratorReturningSimpleGenerator1:
+--------------------------------------------------------------------------------
 26 26 |     def __aiter__(self) -> typing_extensions.AsyncGenerator: ...  # PYI058 (Use `AsyncIterator`)
 27 27 | 
 28 28 | class AsyncIteratorReturningSimpleAsyncGenerator2:
 29    |-    def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, Any]: ...  # PYI058 (Use `AsyncIterator`)
-   29 |+    def __aiter__(self, /) -> collections.abc.AsyncIterator[str]: ...  # PYI058 (Use `AsyncIterator`)
+   29 |+    def __aiter__(self, /) -> AsyncIterator[str]: ...  # PYI058 (Use `AsyncIterator`)
 30 30 | 
 31 31 | class AsyncIteratorReturningSimpleAsyncGenerator3:
 32 32 |     def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, None]: ...  # PYI058 (Use `AsyncIterator`)
@@ -186,11 +222,20 @@ PYI058.pyi:32:9: PYI058 [*] Use `AsyncIterator` as the return value for simple `
    = help: Convert the return annotation of your `__aiter__` method to `AsyncIterator`
 
 ℹ Safe fix
+1  1  | import collections.abc
+2  2  | import typing
+3  3  | import typing_extensions
+4     |-from collections.abc import AsyncGenerator, Generator
+   4  |+from collections.abc import AsyncGenerator, Generator, AsyncIterator
+5  5  | from typing import Any
+6  6  | 
+7  7  | class IteratorReturningSimpleGenerator1:
+--------------------------------------------------------------------------------
 29 29 |     def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, Any]: ...  # PYI058 (Use `AsyncIterator`)
 30 30 | 
 31 31 | class AsyncIteratorReturningSimpleAsyncGenerator3:
 32    |-    def __aiter__(self, /) -> collections.abc.AsyncGenerator[str, None]: ...  # PYI058 (Use `AsyncIterator`)
-   32 |+    def __aiter__(self, /) -> collections.abc.AsyncIterator[str]: ...  # PYI058 (Use `AsyncIterator`)
+   32 |+    def __aiter__(self, /) -> AsyncIterator[str]: ...  # PYI058 (Use `AsyncIterator`)
 33 33 | 
 34 34 | class CorrectIterator:
 35 35 |     def __iter__(self) -> Iterator[str]: ...  # OK

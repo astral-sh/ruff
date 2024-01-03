@@ -1,5 +1,3 @@
-use std::borrow::ToOwned;
-
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -62,8 +60,8 @@ use crate::importer::ImportRequest;
 /// more than two statements (including docstrings) in its body.
 #[violation]
 pub struct GeneratorReturnFromIterMethod {
-    better_return_type: String,
-    method_name: String,
+    return_type: Iterator,
+    method: Method,
 }
 
 impl Violation for GeneratorReturnFromIterMethod {
@@ -72,19 +70,19 @@ impl Violation for GeneratorReturnFromIterMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         let GeneratorReturnFromIterMethod {
-            better_return_type,
-            method_name,
+            return_type,
+            method,
         } = self;
-        format!("Use `{better_return_type}` as the return value for simple `{method_name}` methods")
+        format!("Use `{return_type}` as the return value for simple `{method}` methods")
     }
 
     fn fix_title(&self) -> Option<String> {
         let GeneratorReturnFromIterMethod {
-            better_return_type,
-            method_name,
+            return_type,
+            method,
         } = self;
         Some(format!(
-            "Convert the return annotation of your `{method_name}` method to `{better_return_type}`"
+            "Convert the return annotation of your `{method}` method to `{return_type}`"
         ))
     }
 }
@@ -99,12 +97,6 @@ pub(crate) fn bad_generator_return_type(
     }
 
     let name = function_def.name.as_str();
-
-    let better_return_type = match name {
-        "__iter__" => "Iterator",
-        "__aiter__" => "AsyncIterator",
-        _ => return,
-    };
 
     let semantic = checker.semantic();
 
@@ -132,17 +124,33 @@ pub(crate) fn bad_generator_return_type(
 
     // Determine the module from which the existing annotation is imported (e.g., `typing` or
     // `collections.abc`)
-    let module_name = {
+    let (method, module, member) = {
         let Some(call_path) = semantic.resolve_call_path(map_subscript(returns)) else {
             return;
         };
         match (name, call_path.as_slice()) {
-            ("__iter__", [module_name @ ("typing" | "typing_extensions"), "Generator"])
-            | ("__aiter__", [module_name @ ("typing" | "typing_extensions"), "AsyncGenerator"]) => {
-                module_name
+            ("__iter__", ["typing", "Generator"]) => {
+                (Method::Iter, Module::Typing, Generator::Generator)
             }
-            ("__iter__", ["collections", "abc", "Generator"])
-            | ("__aiter__", ["collections", "abc", "AsyncGenerator"]) => "collections.abc",
+            ("__aiter__", ["typing", "AsyncGenerator"]) => {
+                (Method::AIter, Module::Typing, Generator::AsyncGenerator)
+            }
+            ("__iter__", ["typing_extensions", "Generator"]) => {
+                (Method::Iter, Module::TypingExtensions, Generator::Generator)
+            }
+            ("__aiter__", ["typing_extensions", "AsyncGenerator"]) => (
+                Method::AIter,
+                Module::TypingExtensions,
+                Generator::AsyncGenerator,
+            ),
+            ("__iter__", ["collections", "abc", "Generator"]) => {
+                (Method::Iter, Module::CollectionsAbc, Generator::Generator)
+            }
+            ("__aiter__", ["collections", "abc", "AsyncGenerator"]) => (
+                Method::AIter,
+                Module::CollectionsAbc,
+                Generator::AsyncGenerator,
+            ),
             _ => return,
         }
     };
@@ -182,8 +190,7 @@ pub(crate) fn bad_generator_return_type(
     // only emit the lint if it's a simple __(a)iter__ implementation
     // -- for more complex function bodies,
     // it's more likely we'll be emitting a false positive here
-    let is_stub = checker.source_type.is_stub();
-    if !is_stub {
+    if !checker.source_type.is_stub() {
         let mut yield_encountered = false;
         for stmt in &function_def.body {
             match stmt {
@@ -209,18 +216,18 @@ pub(crate) fn bad_generator_return_type(
     };
     let mut diagnostic = Diagnostic::new(
         GeneratorReturnFromIterMethod {
-            better_return_type: better_return_type.to_string(),
-            method_name: name.to_string(),
+            return_type: member.to_iter(),
+            method,
         },
         function_def.identifier(),
     );
-    if let Some(fix) = get_fix(
+    if let Some(fix) = generate_fix(
         function_def,
-        checker,
         returns,
-        is_stub,
         yield_type_info,
-        module_name,
+        module,
+        member,
+        checker,
     ) {
         diagnostic.set_fix(fix);
     };
@@ -230,6 +237,47 @@ pub(crate) fn bad_generator_return_type(
 /// Returns `true` if the [`ast::Expr`] is a `None` literal or a `typing.Any` expression.
 fn is_any_or_none(expr: &ast::Expr, semantic: &SemanticModel) -> bool {
     expr.is_none_literal_expr() || semantic.match_typing_expr(expr, "Any")
+}
+
+/// Generate a [`Fix`] to convert the return type annotation to `Iterator` or `AsyncIterator`.
+fn generate_fix(
+    function_def: &ast::StmtFunctionDef,
+    returns: &ast::Expr,
+    yield_type_info: Option<YieldTypeInfo>,
+    module: Module,
+    member: Generator,
+    checker: &Checker,
+) -> Option<Fix> {
+    let expr = map_subscript(returns);
+
+    let (import_edit, binding) = checker
+        .importer()
+        .get_or_import_symbol(
+            &ImportRequest::import_from(&module.to_string(), &member.to_iter().to_string()),
+            expr.start(),
+            checker.semantic(),
+        )
+        .ok()?;
+    let binding_edit = Edit::range_replacement(binding, expr.range());
+    let yield_edit = yield_type_info.map(|yield_type_info| {
+        Edit::range_replacement(
+            checker.generator().expr(yield_type_info.expr),
+            yield_type_info.range(),
+        )
+    });
+
+    // Mark as unsafe if it's a runtime Python file and the body has more than one statement in it.
+    let applicability = if checker.source_type.is_stub() || function_def.body.len() == 1 {
+        Applicability::Safe
+    } else {
+        Applicability::Unsafe
+    };
+
+    Some(Fix::applicable_edits(
+        import_edit,
+        std::iter::once(binding_edit).chain(yield_edit),
+        applicability,
+    ))
 }
 
 #[derive(Debug)]
@@ -244,93 +292,73 @@ impl Ranged for YieldTypeInfo<'_> {
     }
 }
 
-fn get_fix(
-    function_def: &ast::StmtFunctionDef,
-    checker: &Checker,
-    returns: &ast::Expr,
-    is_stub: bool,
-    yield_type_info: Option<YieldTypeInfo>,
-    module_name: &str,
-) -> Option<Fix> {
-    let mut edits = match returns {
-        ast::Expr::Attribute(attribute @ ast::ExprAttribute { .. }) => {
-            get_attribute_edits(attribute)
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum Module {
+    Typing,
+    TypingExtensions,
+    CollectionsAbc,
+}
+
+impl std::fmt::Display for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Module::Typing => write!(f, "typing"),
+            Module::TypingExtensions => write!(f, "typing_extensions"),
+            Module::CollectionsAbc => write!(f, "collections.abc"),
         }
-        ast::Expr::Name(name @ ast::ExprName { .. }) => get_name_edits(name, module_name, checker),
-        ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => match value.as_ref() {
-            ast::Expr::Attribute(attribute @ ast::ExprAttribute { .. }) => {
-                get_attribute_edits(attribute)
-            }
-            ast::Expr::Name(name @ ast::ExprName { .. }) => {
-                get_name_edits(name, module_name, checker)
-            }
-            _ => None,
-        },
-        _ => None,
-    }?;
-
-    if let Some(yield_type_info) = yield_type_info {
-        edits.push(Edit::range_replacement(
-            checker.generator().expr(&yield_type_info.expr),
-            yield_type_info.range(),
-        ));
     }
-
-    // Mark as unsafe if it's a runtime Python file and the body has more than one statement in it.
-    let applicability = if is_stub || function_def.body.len() == 1 {
-        Applicability::Safe
-    } else {
-        Applicability::Unsafe
-    };
-
-    let head = edits.pop()?;
-    let rest = edits;
-    Some(Fix::applicable_edits(head, rest, applicability))
 }
 
-fn get_attribute_edits(expr: &ast::ExprAttribute) -> Option<Vec<Edit>> {
-    let ast::ExprAttribute {
-        value, attr, range, ..
-    } = expr;
-
-    let new_return = match attr.as_str() {
-        "Generator" => "Iterator",
-        "AsyncGenerator" => "AsyncIterator",
-        _ => return None,
-    };
-
-    let module = match value.as_ref() {
-        ast::Expr::Name(ast::ExprName { id, .. }) => id.to_owned(),
-        ast::Expr::Attribute(ast::ExprAttribute { attr, value, .. }) => match value.as_ref() {
-            ast::Expr::Name(ast::ExprName { id, .. }) => format!("{id}.{attr}"),
-            _ => return None,
-        },
-        _ => return None,
-    };
-
-    if !["typing", "typing_extensions", "collections.abc"].contains(&module.as_str()) {
-        return None;
-    }
-
-    let repl = format!("{module}.{new_return}");
-    Some(vec![Edit::range_replacement(repl, range.to_owned())])
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum Method {
+    Iter,
+    AIter,
 }
 
-fn get_name_edits(expr: &ast::ExprName, module_name: &str, checker: &Checker) -> Option<Vec<Edit>> {
-    let ast::ExprName { id, range, .. } = expr;
-    let new_return = match id.as_str() {
-        "Generator" => "Iterator",
-        "AsyncGenerator" => "AsyncIterator",
-        _ => return None,
-    };
-    let (edit1, binding) = checker
-        .importer()
-        .get_or_import_symbol(
-            &ImportRequest::import_from(module_name, new_return),
-            range.start(),
-            checker.semantic(),
-        )
-        .ok()?;
-    let edit2 = Edit::range_replacement(binding, *range);
-    Some(vec![edit1, edit2])
+impl std::fmt::Display for Method {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Method::Iter => write!(f, "__iter__"),
+            Method::AIter => write!(f, "__aiter__"),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum Generator {
+    Generator,
+    AsyncGenerator,
+}
+
+impl std::fmt::Display for Generator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Generator::Generator => write!(f, "Generator"),
+            Generator::AsyncGenerator => write!(f, "AsyncGenerator"),
+        }
+    }
+}
+
+impl Generator {
+    fn to_iter(self) -> Iterator {
+        match self {
+            Generator::Generator => Iterator::Iterator,
+            Generator::AsyncGenerator => Iterator::AsyncIterator,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum Iterator {
+    Iterator,
+    AsyncIterator,
+}
+
+impl std::fmt::Display for Iterator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Iterator::Iterator => write!(f, "Iterator"),
+            Iterator::AsyncIterator => write!(f, "AsyncIterator"),
+        }
+    }
 }
