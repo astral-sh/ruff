@@ -20,7 +20,7 @@ if [ ! -d corpus/ruff_fix_validity ]; then
   curl -L 'https://github.com/python/cpython/archive/refs/tags/v3.12.0b2.tar.gz' | tar xz
   cp -r "../../../crates/ruff_linter/resources/test" .
   cd -
-  cargo fuzz cmin -s none ruff_fix_validity
+  cargo fuzz cmin -s none ruff_fix_validity -- -timeout=5
 fi
 
 echo "Done! You are ready to fuzz."
