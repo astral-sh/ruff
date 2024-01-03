@@ -7,7 +7,7 @@ use std::{io, iter};
 
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use serde::Serialize;
 use serde_json::error::Category;
 use thiserror::Error;
@@ -148,8 +148,8 @@ impl Notebook {
         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
         if raw_notebook.nbformat == 4 && raw_notebook.nbformat_minor >= 5 {
-            // We use a mock random number generator to generate deterministic uuids
-            let mut rng = rand::rngs::mock::StepRng::new(0, 1);
+            // We use a insecure random number generator to generate deterministic uuids
+            let mut rng = rand::rngs::StdRng::seed_from_u64(0);
             let mut existing_ids = HashSet::new();
 
             for cell in &raw_notebook.cells {
