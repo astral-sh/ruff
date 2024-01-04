@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::ExprCall;
+use ruff_python_ast::{ExprCall, StmtFunctionDef};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -44,4 +44,4 @@ impl Violation for SslWithBadDefaults {
 }
 
 /// S503
-pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, call: &ExprCall) {}
+pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, call: &StmtFunctionDef) {}
