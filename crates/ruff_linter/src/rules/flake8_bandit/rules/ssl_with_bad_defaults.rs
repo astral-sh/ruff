@@ -22,6 +22,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import ssl
 ///
+///
 /// def func(version=ssl.PROTOCOL_TLSv1):
 ///     ...
 /// ```
@@ -29,6 +30,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// import ssl
+///
 ///
 /// def func(version=ssl.PROTOCOL_TLSv1_2):
 ///     ...
@@ -77,10 +79,14 @@ pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFu
             if let Some(default) = &param.default {
                 match default.as_ref() {
                     Expr::Name(ast::ExprName { id, range, .. }) => {
-                        check_default_arg_for_insecure_ssl_violation(id.as_str(), checker, range)
+                        check_default_arg_for_insecure_ssl_violation(id.as_str(), checker, *range);
                     }
                     Expr::Attribute(ast::ExprAttribute { attr, range, .. }) => {
-                        check_default_arg_for_insecure_ssl_violation(attr.as_str(), checker, range)
+                        check_default_arg_for_insecure_ssl_violation(
+                            attr.as_str(),
+                            checker,
+                            *range,
+                        );
                     }
                     _ => {}
                 }
@@ -88,17 +94,13 @@ pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFu
         });
 }
 
-fn check_default_arg_for_insecure_ssl_violation(
-    id: &str,
-    checker: &mut Checker,
-    range: &TextRange,
-) {
+fn check_default_arg_for_insecure_ssl_violation(id: &str, checker: &mut Checker, range: TextRange) {
     if INSECURE_SSL_PROTOCOLS.contains(&id) {
         checker.diagnostics.push(Diagnostic::new(
             SslWithBadDefaults {
                 protocol: id.to_string(),
             },
-            *range,
+            range,
         ));
     }
 }
