@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F402.ipynb:3:5: F402 Import `os` from cell 1, line 1 shadowed by loop variable
+  |
+1 | import os
+2 | import os.path as path
+3 | for os in range(3):
+  |     ^^ F402
+4 |     pass
+5 | for path in range(3):
+  |
+
+F402.ipynb:5:5: F402 Import `path` from cell 1, line 2 shadowed by loop variable
+  |
+3 | for os in range(3):
+4 |     pass
+5 | for path in range(3):
+  |     ^^^^ F402
+6 |     pass
+  |
+
+

@@ -1,6 +1,6 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_source_file::OneIndexed;
+use ruff_source_file::SourceRow;
 
 /// ## What it does
 /// Checks for import bindings that are shadowed by loop variables.
@@ -32,14 +32,14 @@ use ruff_source_file::OneIndexed;
 #[violation]
 pub struct ImportShadowedByLoopVar {
     pub(crate) name: String,
-    pub(crate) line: OneIndexed,
+    pub(crate) row: SourceRow,
 }
 
 impl Violation for ImportShadowedByLoopVar {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportShadowedByLoopVar { name, line } = self;
-        format!("Import `{name}` from line {line} shadowed by loop variable")
+        let ImportShadowedByLoopVar { name, row } = self;
+        format!("Import `{name}` from {row} shadowed by loop variable")
     }
 }
 

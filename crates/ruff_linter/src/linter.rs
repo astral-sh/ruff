@@ -148,6 +148,7 @@ pub fn check_path(
         match tokens.into_ast_source(source_kind, source_type) {
             Ok(python_ast) => {
                 let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
+                let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
                 if use_ast {
                     diagnostics.extend(check_ast(
                         &python_ast,
@@ -161,6 +162,7 @@ pub fn check_path(
                         package,
                         source_type,
                         cell_offsets,
+                        notebook_index,
                     ));
                 }
                 if use_imports {
