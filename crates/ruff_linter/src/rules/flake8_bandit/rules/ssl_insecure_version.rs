@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::ExprCall;
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_semantic::analyze::typing::find_assigned_value;
 
 use crate::checkers::ast::Checker;
 
@@ -33,7 +33,7 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct SslInsecureVersion {
-    protocol: String
+    protocol: String,
 }
 
 impl Violation for SslInsecureVersion {
@@ -43,5 +43,85 @@ impl Violation for SslInsecureVersion {
     }
 }
 
+const INSECURSE_SSL_PROTOCOLS: &[&str] = &[
+    "PROTOCOL_SSLv2",
+    "PROTOCOL_SSLv3",
+    "PROTOCOL_TLSv1",
+    "PROTOCOL_TLSv1_1",
+    "SSLv2_METHOD",
+    "SSLv23_METHOD",
+    "SSLv3_METHOD",
+    "TLSv1_METHOD",
+    "TLSv1_1_METHOD",
+];
+
 /// S502
-pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {}
+pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
+    let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) else {
+        return;
+    };
+
+    let keywords = match call_path.as_slice() {
+        &["ssl", "wrap_socket"] => vec!["ssl_version"],
+        &["OpenSSL", "SSL", "Context"] => vec!["method"],
+        _ => vec!["ssl_version", "method"],
+    };
+
+    let mut violations: Vec<Diagnostic> = vec![];
+
+    for arg in keywords {
+        let Some(keyword) = call.arguments.find_keyword(arg) else {
+            return;
+        };
+        match &keyword.value {
+            Expr::Name(ast::ExprName { id, .. }) => {
+                let Some(val) = find_assigned_value(id, checker.semantic()) else {
+                    continue;
+                };
+                println!("ASSIGNED VALUE: {:?}", val);
+                match val {
+                    Expr::Name(ast::ExprName { id, .. }) => {
+                        if INSECURSE_SSL_PROTOCOLS.contains(&id.as_str()) {
+                            violations.push(Diagnostic::new(
+                                SslInsecureVersion {
+                                    protocol: id.to_string(),
+                                },
+                                keyword.range,
+                            ));
+                        }
+                    }
+                    Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                        if INSECURSE_SSL_PROTOCOLS.contains(&attr.as_str()) {
+                            violations.push(Diagnostic::new(
+                                SslInsecureVersion {
+                                    protocol: attr.to_string(),
+                                },
+                                keyword.range,
+                            ))
+                        }
+                    }
+                    _ => {
+                        continue;
+                    }
+                }
+            }
+            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                if INSECURSE_SSL_PROTOCOLS.contains(&attr.as_str()) {
+                    violations.push(Diagnostic::new(
+                        SslInsecureVersion {
+                            protocol: attr.to_string(),
+                        },
+                        keyword.range,
+                    ))
+                }
+            }
+            _ => {
+                return;
+            }
+        }
+    }
+
+    for violation in violations {
+        checker.diagnostics.push(violation)
+    }
+}
