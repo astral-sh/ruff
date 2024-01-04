@@ -97,3 +97,8 @@
 [data-md-color-scheme="astral-dark"] details summary a {
   color: var(--flare);
 }
+
+/* See: https://github.com/astral-sh/ruff/issues/9046 */
+[data-md-color-scheme="astral-dark"] div.admonition p a {
+  color: var(--flare);
+}
