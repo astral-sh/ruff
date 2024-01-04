@@ -58,14 +58,12 @@ const INSECURE_SSL_PROTOCOLS: &[&str] = &[
 /// S502
 pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
     let keywords = match checker.semantic().resolve_call_path(call.func.as_ref()) {
-        Some(call_path) => {
-            match *call_path.as_slice() {
-                ["ssl", "wrap_socket"] => vec!["ssl_version"],
-                ["OpenSSL", "SSL", "Context"] => vec!["method"],
-                _ => vec!["ssl_version", "method"],
-            }
+        Some(call_path) => match *call_path.as_slice() {
+            ["ssl", "wrap_socket"] => vec!["ssl_version"],
+            ["OpenSSL", "SSL", "Context"] => vec!["method"],
+            _ => vec!["ssl_version", "method"],
         },
-        None => vec!["ssl_version", "method"]
+        None => vec!["ssl_version", "method"],
     };
 
     for arg in keywords {
