@@ -43,7 +43,7 @@ impl Violation for SslInsecureVersion {
     }
 }
 
-const INSECURSE_SSL_PROTOCOLS: &[&str] = &[
+const INSECURE_SSL_PROTOCOLS: &[&str] = &[
     "PROTOCOL_SSLv2",
     "PROTOCOL_SSLv3",
     "PROTOCOL_TLSv1",
@@ -57,32 +57,30 @@ const INSECURSE_SSL_PROTOCOLS: &[&str] = &[
 
 /// S502
 pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
-    let Some(call_path) = checker.semantic().resolve_call_path(call.func.as_ref()) else {
-        return;
+    let keywords = match checker.semantic().resolve_call_path(call.func.as_ref()) {
+        Some(call_path) => {
+            match *call_path.as_slice() {
+                ["ssl", "wrap_socket"] => vec!["ssl_version"],
+                ["OpenSSL", "SSL", "Context"] => vec!["method"],
+                _ => vec!["ssl_version", "method"],
+            }
+        },
+        None => vec!["ssl_version", "method"]
     };
-
-    let keywords = match call_path.as_slice() {
-        &["ssl", "wrap_socket"] => vec!["ssl_version"],
-        &["OpenSSL", "SSL", "Context"] => vec!["method"],
-        _ => vec!["ssl_version", "method"],
-    };
-
-    let mut violations: Vec<Diagnostic> = vec![];
 
     for arg in keywords {
         let Some(keyword) = call.arguments.find_keyword(arg) else {
-            return;
+            continue;
         };
         match &keyword.value {
             Expr::Name(ast::ExprName { id, .. }) => {
                 let Some(val) = find_assigned_value(id, checker.semantic()) else {
                     continue;
                 };
-                println!("ASSIGNED VALUE: {:?}", val);
                 match val {
                     Expr::Name(ast::ExprName { id, .. }) => {
-                        if INSECURSE_SSL_PROTOCOLS.contains(&id.as_str()) {
-                            violations.push(Diagnostic::new(
+                        if INSECURE_SSL_PROTOCOLS.contains(&id.as_str()) {
+                            checker.diagnostics.push(Diagnostic::new(
                                 SslInsecureVersion {
                                     protocol: id.to_string(),
                                 },
@@ -91,13 +89,13 @@ pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
                         }
                     }
                     Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                        if INSECURSE_SSL_PROTOCOLS.contains(&attr.as_str()) {
-                            violations.push(Diagnostic::new(
+                        if INSECURE_SSL_PROTOCOLS.contains(&attr.as_str()) {
+                            checker.diagnostics.push(Diagnostic::new(
                                 SslInsecureVersion {
                                     protocol: attr.to_string(),
                                 },
                                 keyword.range,
-                            ))
+                            ));
                         }
                     }
                     _ => {
@@ -106,22 +104,18 @@ pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
                 }
             }
             Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                if INSECURSE_SSL_PROTOCOLS.contains(&attr.as_str()) {
-                    violations.push(Diagnostic::new(
+                if INSECURE_SSL_PROTOCOLS.contains(&attr.as_str()) {
+                    checker.diagnostics.push(Diagnostic::new(
                         SslInsecureVersion {
                             protocol: attr.to_string(),
                         },
                         keyword.range,
-                    ))
+                    ));
                 }
             }
             _ => {
-                return;
+                continue;
             }
         }
-    }
-
-    for violation in violations {
-        checker.diagnostics.push(violation)
     }
 }
