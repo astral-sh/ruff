@@ -36,6 +36,7 @@ mod tests {
     #[test_case(Rule::SSHNoHostKeyVerification, Path::new("S507.py"))]
     #[test_case(Rule::SnmpInsecureVersion, Path::new("S508.py"))]
     #[test_case(Rule::SnmpWeakCryptography, Path::new("S509.py"))]
+    #[test_case(Rule::SslInsecureVersoin, Path::new("S502.py"))]
     #[test_case(Rule::SslWithNoVersion, Path::new("S504.py"))]
     #[test_case(Rule::StartProcessWithAShell, Path::new("S605.py"))]
     #[test_case(Rule::StartProcessWithNoShell, Path::new("S606.py"))]
