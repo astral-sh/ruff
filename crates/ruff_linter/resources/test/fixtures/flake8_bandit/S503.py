@@ -19,5 +19,5 @@ def func(protocol=PROTOCOL_TLSv1):  # S503
     pass
 
 
-def func(version=SSL.TLSv1_1_METHOD):  # OK
+def func(version=SSL.TLSv1_2_METHOD):  # OK
     pass

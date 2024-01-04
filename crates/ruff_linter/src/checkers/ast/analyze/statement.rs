@@ -375,7 +375,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());
             }
             if checker.enabled(Rule::SslWithBadDefaults) {
-                    flake8_bandit::rules::ssl_with_bad_defaults(checker, function_def);
+                flake8_bandit::rules::ssl_with_bad_defaults(checker, function_def);
             }
         }
         Stmt::Return(_) => {
