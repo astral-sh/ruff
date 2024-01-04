@@ -23,6 +23,7 @@ use crate::checkers::ast::Checker;
 /// import ssl
 ///
 /// def func(version=ssl.PROTOCOL_TLSv1):
+///     ...
 /// ```
 ///
 /// Use instead:
@@ -30,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// import ssl
 ///
 /// def func(version=ssl.PROTOCOL_TLSv1_2):
+///     ...
 /// ```
 #[violation]
 pub struct SslWithBadDefaults {
