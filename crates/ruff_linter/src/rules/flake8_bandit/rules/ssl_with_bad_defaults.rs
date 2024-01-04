@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, StmtFunctionDef};
-use ruff_text_size::Ranged;
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 
@@ -75,33 +75,30 @@ pub(crate) fn ssl_with_bad_defaults(checker: &mut Checker, function_def: &StmtFu
         )
         .for_each(|param| {
             if let Some(default) = &param.default {
-                check_default_arg_for_insecure_ssl_violation(default, checker);
+                match default.as_ref() {
+                    Expr::Name(ast::ExprName { id, range, .. }) => {
+                        check_default_arg_for_insecure_ssl_violation(id.as_str(), checker, range)
+                    }
+                    Expr::Attribute(ast::ExprAttribute { attr, range, .. }) => {
+                        check_default_arg_for_insecure_ssl_violation(attr.as_str(), checker, range)
+                    }
+                    _ => {}
+                }
             }
         });
 }
 
-fn check_default_arg_for_insecure_ssl_violation(expr: &Expr, checker: &mut Checker) {
-    match expr {
-        Expr::Name(ast::ExprName { id, .. }) => {
-            if INSECURE_SSL_PROTOCOLS.contains(&id.as_str()) {
-                checker.diagnostics.push(Diagnostic::new(
-                    SslWithBadDefaults {
-                        protocol: id.to_string(),
-                    },
-                    expr.range(),
-                ));
-            }
-        }
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-            if INSECURE_SSL_PROTOCOLS.contains(&attr.as_str()) {
-                checker.diagnostics.push(Diagnostic::new(
-                    SslWithBadDefaults {
-                        protocol: attr.to_string(),
-                    },
-                    expr.range(),
-                ));
-            }
-        }
-        _ => {}
+fn check_default_arg_for_insecure_ssl_violation(
+    id: &str,
+    checker: &mut Checker,
+    range: &TextRange,
+) {
+    if INSECURE_SSL_PROTOCOLS.contains(&id) {
+        checker.diagnostics.push(Diagnostic::new(
+            SslWithBadDefaults {
+                protocol: id.to_string(),
+            },
+            *range,
+        ));
     }
 }
