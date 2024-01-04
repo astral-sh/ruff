@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
 #[cfg(feature = "serde")]
@@ -251,5 +251,22 @@ impl Debug for SourceLocation {
             .field("row", &self.row.get())
             .field("column", &self.column.get())
             .finish()
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum SourceRow {
+    /// A row within a cell in a Jupyter Notebook.
+    Notebook { cell: OneIndexed, line: OneIndexed },
+    /// A row within a source file.
+    SourceFile { line: OneIndexed },
+}
+
+impl Display for SourceRow {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SourceRow::Notebook { cell, line } => write!(f, "cell {cell}, line {line}"),
+            SourceRow::SourceFile { line } => write!(f, "line {line}"),
+        }
     }
 }
