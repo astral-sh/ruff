@@ -151,13 +151,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         continue;
                     }
 
-                    #[allow(deprecated)]
-                    let line = checker.locator.compute_line_index(shadowed.start());
-
                     checker.diagnostics.push(Diagnostic::new(
                         pyflakes::rules::ImportShadowedByLoopVar {
                             name: name.to_string(),
-                            line,
+                            row: checker.compute_source_row(shadowed.start()),
                         },
                         binding.range(),
                     ));
@@ -243,12 +240,10 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         continue;
                     }
 
-                    #[allow(deprecated)]
-                    let line = checker.locator.compute_line_index(shadowed.start());
                     let mut diagnostic = Diagnostic::new(
                         pyflakes::rules::RedefinedWhileUnused {
                             name: (*name).to_string(),
-                            line,
+                            row: checker.compute_source_row(shadowed.start()),
                         },
                         binding.range(),
                     );
