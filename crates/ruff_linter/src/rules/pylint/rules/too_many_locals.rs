@@ -32,7 +32,7 @@ impl Violation for TooManyLocals {
             current_amount,
             max_amount,
         } = self;
-        format!("Too many local variables: ({current_amount}/{max_amount})")
+        format!("Too many local variables ({current_amount}/{max_amount})")
     }
 }
 
