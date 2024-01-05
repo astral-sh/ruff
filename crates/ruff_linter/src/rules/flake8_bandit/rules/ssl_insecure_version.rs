@@ -1,22 +1,25 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, ExprCall};
-use ruff_python_semantic::analyze::typing::find_assigned_value;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for calls to Python methods with parameters that indicate the used broken SSL/TLS
-/// protocol versions.
+/// Checks for function calls with parameters that indicate the use of insecure
+/// SSL and TLS protocol versions.
 ///
 /// ## Why is this bad?
-/// Several highly publicized exploitable flaws have been discovered in all versions of SSL and
-/// early versions of TLS. It is strongly recommended that use of the following known broken
-/// protocol versions be avoided:
-///     - SSL v2
-///     - SSL v3
-///     - TLS v1
-///     - TLS v1.1
+/// Several highly publicized exploitable flaws have been discovered in all
+/// versions of SSL and early versions of TLS. The following versions are
+/// considered insecure, and should be avoided:
+/// - SSL v2
+/// - SSL v3
+/// - TLS v1
+/// - TLS v1.1
+///
+/// This method supports detection on the Python's built-in `ssl` module and
+/// the `pyOpenSSL` module.
 ///
 /// ## Example
 /// ```python
@@ -39,81 +42,66 @@ pub struct SslInsecureVersion {
 impl Violation for SslInsecureVersion {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Call made with insecure SSL protocol: {}", self.protocol)
+        let SslInsecureVersion { protocol } = self;
+        format!("Call made with insecure SSL protocol: `{protocol}`")
     }
 }
 
-const INSECURE_SSL_PROTOCOLS: &[&str] = &[
-    "PROTOCOL_SSLv2",
-    "PROTOCOL_SSLv3",
-    "PROTOCOL_TLSv1",
-    "PROTOCOL_TLSv1_1",
-    "SSLv2_METHOD",
-    "SSLv23_METHOD",
-    "SSLv3_METHOD",
-    "TLSv1_METHOD",
-    "TLSv1_1_METHOD",
-];
-
 /// S502
 pub(crate) fn ssl_insecure_version(checker: &mut Checker, call: &ExprCall) {
-    let keywords = match checker.semantic().resolve_call_path(call.func.as_ref()) {
-        Some(call_path) => match *call_path.as_slice() {
-            ["ssl", "wrap_socket"] => vec!["ssl_version"],
-            ["OpenSSL", "SSL", "Context"] => vec!["method"],
-            _ => vec!["ssl_version", "method"],
-        },
-        None => vec!["ssl_version", "method"],
+    let Some(keyword) = checker
+        .semantic()
+        .resolve_call_path(call.func.as_ref())
+        .and_then(|call_path| match call_path.as_slice() {
+            ["ssl", "wrap_socket"] => Some("ssl_version"),
+            ["OpenSSL", "SSL", "Context"] => Some("method"),
+            _ => None,
+        })
+    else {
+        return;
     };
 
-    for arg in keywords {
-        let Some(keyword) = call.arguments.find_keyword(arg) else {
-            continue;
-        };
-        match &keyword.value {
-            Expr::Name(ast::ExprName { id, .. }) => {
-                let Some(val) = find_assigned_value(id, checker.semantic()) else {
-                    continue;
-                };
-                match val {
-                    Expr::Name(ast::ExprName { id, .. }) => {
-                        if INSECURE_SSL_PROTOCOLS.contains(&id.as_str()) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                SslInsecureVersion {
-                                    protocol: id.to_string(),
-                                },
-                                keyword.range,
-                            ));
-                        }
-                    }
-                    Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                        if INSECURE_SSL_PROTOCOLS.contains(&attr.as_str()) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                SslInsecureVersion {
-                                    protocol: attr.to_string(),
-                                },
-                                keyword.range,
-                            ));
-                        }
-                    }
-                    _ => {
-                        continue;
-                    }
-                }
-            }
-            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                if INSECURE_SSL_PROTOCOLS.contains(&attr.as_str()) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        SslInsecureVersion {
-                            protocol: attr.to_string(),
-                        },
-                        keyword.range,
-                    ));
-                }
-            }
-            _ => {
-                continue;
+    let Some(keyword) = call.arguments.find_keyword(keyword) else {
+        return;
+    };
+
+    match &keyword.value {
+        Expr::Name(ast::ExprName { id, .. }) => {
+            if is_insecure_protocol(id) {
+                checker.diagnostics.push(Diagnostic::new(
+                    SslInsecureVersion {
+                        protocol: id.to_string(),
+                    },
+                    keyword.range(),
+                ));
             }
         }
+        Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+            if is_insecure_protocol(attr) {
+                checker.diagnostics.push(Diagnostic::new(
+                    SslInsecureVersion {
+                        protocol: attr.to_string(),
+                    },
+                    keyword.range(),
+                ));
+            }
+        }
+        _ => {}
     }
+}
+
+/// Returns `true` if the given protocol name is insecure.
+fn is_insecure_protocol(name: &str) -> bool {
+    matches!(
+        name,
+        "PROTOCOL_SSLv2"
+            | "PROTOCOL_SSLv3"
+            | "PROTOCOL_TLSv1"
+            | "PROTOCOL_TLSv1_1"
+            | "SSLv2_METHOD"
+            | "SSLv23_METHOD"
+            | "SSLv3_METHOD"
+            | "TLSv1_METHOD"
+            | "TLSv1_1_METHOD"
+    )
 }
