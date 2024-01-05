@@ -4,10 +4,7 @@ use ruff_python_ast::MatchCase;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::SourceComment;
-use crate::expression::maybe_parenthesize_expression;
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::prelude::*;
 use crate::statement::clause::{clause_body, clause_header, ClauseHeader};
 
@@ -61,19 +58,7 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
                         }
 
                         if let Some(guard) = guard {
-                            write!(
-                                f,
-                                [
-                                    space(),
-                                    token("if"),
-                                    space(),
-                                    maybe_parenthesize_expression(
-                                        guard,
-                                        item,
-                                        Parenthesize::Optional
-                                    )
-                                ]
-                            )?;
+                            write!(f, [space(), token("if"), space(), guard.format()])?;
                         }
 
                         Ok(())
