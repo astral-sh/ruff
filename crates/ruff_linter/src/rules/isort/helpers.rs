@@ -26,7 +26,7 @@ pub(super) fn trailing_comma(
         if count == 1 {
             if matches!(
                 tok,
-                Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent | Tok::Comment(_)
+                Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent | Tok::Comment
             ) {
                 continue;
             } else if matches!(tok, Tok::Comma) {

@@ -48,7 +48,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
             return None;
         };
         match tok {
-            Tok::Comment(..) | Tok::NonLogicalNewline => {
+            Tok::Comment | Tok::NonLogicalNewline => {
                 i += 1;
             }
             Tok::Lpar => {
@@ -88,12 +88,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
     let end = i;
 
     // Verify that we're not in an empty tuple.
-    if (start + 1..i).all(|i| {
-        matches!(
-            tokens[i],
-            Ok((Tok::Comment(..) | Tok::NonLogicalNewline, _))
-        )
-    }) {
+    if (start + 1..i).all(|i| matches!(tokens[i], Ok((Tok::Comment | Tok::NonLogicalNewline, _)))) {
         return None;
     }
 
@@ -107,7 +102,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
             return None;
         };
         match tok {
-            Tok::Comment(..) | Tok::NonLogicalNewline => {
+            Tok::Comment | Tok::NonLogicalNewline => {
                 i += 1;
             }
             _ => {

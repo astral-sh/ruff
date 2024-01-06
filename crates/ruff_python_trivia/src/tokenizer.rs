@@ -1019,7 +1019,7 @@ mod tests {
             let comment_ranges: Vec<_> = lex(self.source, Mode::Module)
                 .filter_map(|result| {
                     let (token, range) = result.expect("Input to be a valid python program.");
-                    if matches!(token, Tok::Comment(_)) {
+                    if matches!(token, Tok::Comment) {
                         Some(range)
                     } else {
                         None

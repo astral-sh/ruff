@@ -19,9 +19,7 @@ expression: lex_source(source)
         21..22,
     ),
     (
-        Comment(
-            "# comment {",
-        ),
+        Comment,
         23..34,
     ),
     (

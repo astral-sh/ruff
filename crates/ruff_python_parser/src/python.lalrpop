@@ -2076,6 +2076,6 @@ extern {
         },
         "\n" => token::Tok::Newline,
         ";" => token::Tok::Semi,
-        // "#" => token::Tok::Comment(_),
+        // "#" => token::Tok::Comment,
     }
 }

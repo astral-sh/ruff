@@ -10,9 +10,7 @@ expression: lex_source(&source)
         0..5,
     ),
     (
-        Comment(
-            "# ",
-        ),
+        Comment,
         7..9,
     ),
     (

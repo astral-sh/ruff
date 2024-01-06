@@ -10,9 +10,7 @@ expression: comment_until_eol(MAC_EOL)
         0..3,
     ),
     (
-        Comment(
-            "# Foo",
-        ),
+        Comment,
         5..10,
     ),
     (

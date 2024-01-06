@@ -61,7 +61,7 @@ pub(crate) fn check_tokens(
                     }
                 }
                 Tok::FStringMiddle { .. } => Context::String,
-                Tok::Comment(_) => Context::Comment,
+                Tok::Comment => Context::Comment,
                 _ => continue,
             };
             ruff::rules::ambiguous_unicode_character(

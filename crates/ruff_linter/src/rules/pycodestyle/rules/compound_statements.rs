@@ -239,7 +239,7 @@ pub(crate) fn compound_statements(
                 semi = Some((range.start(), range.end()));
                 allow_ellipsis = false;
             }
-            Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
+            Tok::Comment | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
             _ => {
                 if let Some((start, end)) = semi {
                     diagnostics.push(Diagnostic::new(
@@ -347,7 +347,7 @@ fn has_non_trivia_tokens_till<'a>(
         }
         if !matches!(
             tok,
-            Tok::Newline | Tok::Comment(_) | Tok::EndOfFile | Tok::NonLogicalNewline
+            Tok::Newline | Tok::Comment | Tok::EndOfFile | Tok::NonLogicalNewline
         ) {
             return true;
         }

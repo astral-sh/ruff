@@ -461,7 +461,7 @@ pub(crate) fn check_string_quotes(
                     // range to the sequence.
                     sequence.push(fstring_range_builder.finish());
                 }
-                Tok::Comment(..) | Tok::NonLogicalNewline => continue,
+                Tok::Comment | Tok::NonLogicalNewline => continue,
                 _ => {
                     // Otherwise, consume the sequence.
                     if !sequence.is_empty() {
