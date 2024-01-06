@@ -1,5 +1,6 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
+use std::borrow::Cow;
 use std::fs::File;
 use std::io;
 use std::ops::{Add, AddAssign};
@@ -273,6 +274,7 @@ pub(crate) fn lint_path(
             data: (messages, imports),
             error: parse_error,
         },
+        transformed,
         fixed,
     ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok(FixerResult {
@@ -301,7 +303,12 @@ pub(crate) fn lint_path(
                     flags::FixMode::Generate => {}
                 }
             }
-            (result, fixed)
+            let transformed = if let Cow::Owned(transformed) = transformed {
+                transformed
+            } else {
+                source_kind
+            };
+            (result, transformed, fixed)
         } else {
             // If we fail to fix, lint the original source code.
             let result = lint_only(
@@ -313,8 +320,9 @@ pub(crate) fn lint_path(
                 source_type,
                 ParseSource::None,
             );
+            let transformed = source_kind;
             let fixed = FxHashMap::default();
-            (result, fixed)
+            (result, transformed, fixed)
         }
     } else {
         let result = lint_only(
@@ -326,8 +334,9 @@ pub(crate) fn lint_path(
             source_type,
             ParseSource::None,
         );
+        let transformed = source_kind;
         let fixed = FxHashMap::default();
-        (result, fixed)
+        (result, transformed, fixed)
     };
 
     let imports = imports.unwrap_or_default();
@@ -335,7 +344,7 @@ pub(crate) fn lint_path(
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
         if parse_error.is_none() {
-            // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
+            // `FixMode::Apply` and `FixMode::Diff` rely on side-effects (writing to disk,
             // and writing the diff to stdout, respectively). If a file has diagnostics, we
             // need to avoid reading from and writing to the cache in these modes.
             if match fix_mode {
@@ -350,7 +359,7 @@ pub(crate) fn lint_path(
                     LintCacheData::from_messages(
                         &messages,
                         imports.clone(),
-                        source_kind.as_ipy_notebook().map(Notebook::index).cloned(),
+                        transformed.as_ipy_notebook().map(Notebook::index).cloned(),
                     ),
                 );
             }
@@ -360,11 +369,11 @@ pub(crate) fn lint_path(
     if let Some(error) = parse_error {
         error!(
             "{}",
-            DisplayParseError::from_source_kind(error, Some(path.to_path_buf()), &source_kind,)
+            DisplayParseError::from_source_kind(error, Some(path.to_path_buf()), &transformed)
         );
     }
 
-    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
+    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
         FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
     } else {
         FxHashMap::default()
@@ -415,6 +424,7 @@ pub(crate) fn lint_stdin(
             data: (messages, imports),
             error: parse_error,
         },
+        transformed,
         fixed,
     ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok(FixerResult {
@@ -443,8 +453,12 @@ pub(crate) fn lint_stdin(
                 }
                 flags::FixMode::Generate => {}
             }
-
-            (result, fixed)
+            let transformed = if let Cow::Owned(transformed) = transformed {
+                transformed
+            } else {
+                source_kind
+            };
+            (result, transformed, fixed)
         } else {
             // If we fail to fix, lint the original source code.
             let result = lint_only(
@@ -456,14 +470,15 @@ pub(crate) fn lint_stdin(
                 source_type,
                 ParseSource::None,
             );
-            let fixed = FxHashMap::default();
 
             // Write the contents to stdout anyway.
             if fix_mode.is_apply() {
                 source_kind.write(&mut io::stdout().lock())?;
             }
 
-            (result, fixed)
+            let transformed = source_kind;
+            let fixed = FxHashMap::default();
+            (result, transformed, fixed)
         }
     } else {
         let result = lint_only(
@@ -475,8 +490,9 @@ pub(crate) fn lint_stdin(
             source_type,
             ParseSource::None,
         );
+        let transformed = source_kind;
         let fixed = FxHashMap::default();
-        (result, fixed)
+        (result, transformed, fixed)
     };
 
     let imports = imports.unwrap_or_default();
@@ -488,7 +504,7 @@ pub(crate) fn lint_stdin(
         );
     }
 
-    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
+    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
         FxHashMap::from_iter([(
             path.map_or_else(|| "-".into(), |path| path.to_string_lossy().to_string()),
             notebook.into_index(),
