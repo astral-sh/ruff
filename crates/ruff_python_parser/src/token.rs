@@ -66,7 +66,7 @@ pub enum Tok {
         kind: IpyEscapeKind,
     },
     /// Token value for a comment. These are filtered out of the token stream prior to parsing.
-    Comment(String),
+    Comment,
     /// Token value for a newline.
     Newline,
     /// Token value for a newline that is not a logical line break. These are filtered out of
@@ -268,7 +268,7 @@ impl fmt::Display for Tok {
             Rsqb => f.write_str("']'"),
             Colon => f.write_str("':'"),
             Comma => f.write_str("','"),
-            Comment(value) => f.write_str(value),
+            Comment => f.write_str("Comment"),
             Semi => f.write_str("';'"),
             Plus => f.write_str("'+'"),
             Minus => f.write_str("'-'"),
@@ -806,7 +806,7 @@ impl TokenKind {
             Tok::FStringMiddle { .. } => TokenKind::FStringMiddle,
             Tok::FStringEnd => TokenKind::FStringEnd,
             Tok::IpyEscapeCommand { .. } => TokenKind::EscapeCommand,
-            Tok::Comment(_) => TokenKind::Comment,
+            Tok::Comment => TokenKind::Comment,
             Tok::Newline => TokenKind::Newline,
             Tok::NonLogicalNewline => TokenKind::NonLogicalNewline,
             Tok::Indent => TokenKind::Indent,

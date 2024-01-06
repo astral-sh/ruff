@@ -174,7 +174,7 @@ impl<'a> Insertion<'a> {
                 // Once we've seen the colon, we're looking for a newline; otherwise, there's no
                 // block body (e.g. `if True: pass`).
                 Awaiting::Newline => match tok {
-                    Tok::Comment(..) => {}
+                    Tok::Comment => {}
                     Tok::Newline => {
                         state = Awaiting::Indent;
                     }
@@ -185,7 +185,7 @@ impl<'a> Insertion<'a> {
                 },
                 // Once we've seen the newline, we're looking for the indentation of the block body.
                 Awaiting::Indent => match tok {
-                    Tok::Comment(..) => {}
+                    Tok::Comment => {}
                     Tok::NonLogicalNewline => {}
                     Tok::Indent => {
                         // This is like:

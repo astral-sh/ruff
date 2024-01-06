@@ -242,7 +242,7 @@ pub(crate) fn trailing_commas(
         .flatten()
         .filter_map(|spanned @ (tok, tok_range)| match tok {
             // Completely ignore comments -- they just interfere with the logic.
-            Tok::Comment(_) => None,
+            Tok::Comment => None,
             // F-strings are handled as `String` token type with the complete range
             // of the outermost f-string. This means that the expression inside the
             // f-string is not checked for trailing commas.

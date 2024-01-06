@@ -33,11 +33,9 @@ pub(crate) struct StateMachine {
 impl StateMachine {
     pub(crate) fn consume(&mut self, tok: &Tok) -> bool {
         match tok {
-            Tok::NonLogicalNewline
-            | Tok::Newline
-            | Tok::Indent
-            | Tok::Dedent
-            | Tok::Comment(..) => false,
+            Tok::NonLogicalNewline | Tok::Newline | Tok::Indent | Tok::Dedent | Tok::Comment => {
+                false
+            }
 
             Tok::String { .. } => {
                 if matches!(

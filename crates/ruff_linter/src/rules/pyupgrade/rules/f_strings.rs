@@ -426,7 +426,7 @@ pub(crate) fn f_strings(
     if !lexer::lex_starts_at(rest, Mode::Expression, prev_end)
         .flatten()
         .all(|(token, _)| match token {
-            Tok::Comment(_) | Tok::Newline | Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent => {
+            Tok::Comment | Tok::Newline | Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent => {
                 true
             }
             Tok::String { value, .. } => value.is_empty(),

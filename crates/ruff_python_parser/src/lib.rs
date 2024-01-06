@@ -176,7 +176,7 @@ pub fn locate_cmp_ops(expr: &Expr, source: &str) -> Vec<LocatedCmpOp> {
         .flatten()
         .skip(1)
         .map(|(tok, range)| (tok, range - TextSize::from(1)))
-        .filter(|(tok, _)| !matches!(tok, Tok::NonLogicalNewline | Tok::Comment(_)))
+        .filter(|(tok, _)| !matches!(tok, Tok::NonLogicalNewline | Tok::Comment))
         .peekable();
 
     let mut ops: Vec<LocatedCmpOp> = vec![];

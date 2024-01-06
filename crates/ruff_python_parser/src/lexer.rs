@@ -411,7 +411,7 @@ impl<'source> Lexer<'source> {
         let offset = memchr::memchr2(b'\n', b'\r', bytes).unwrap_or(bytes.len());
         self.cursor.skip_bytes(offset);
 
-        Tok::Comment(self.token_text().to_string())
+        Tok::Comment
     }
 
     /// Lex a single IPython escape command.

@@ -39,7 +39,7 @@ impl Iterator for DocLines<'_> {
             let (tok, range) = self.inner.next()?;
 
             match tok {
-                Tok::Comment(..) => {
+                Tok::Comment => {
                     if at_start_of_line {
                         break Some(range.start());
                     }
