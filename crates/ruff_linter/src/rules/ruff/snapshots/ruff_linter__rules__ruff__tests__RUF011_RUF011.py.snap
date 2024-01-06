@@ -1,60 +1,80 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF011.py:12:2: RUF011 Dictionary comprehension uses static key: `"key"`
+RUF011.py:15:2: RUF011 Dictionary comprehension uses static key: `"key"`
    |
-11 | # Errors
-12 | {"key": value.upper() for value in data}
+14 | # Errors
+15 | {"key": value.upper() for value in data}
    |  ^^^^^ RUF011
-13 | {True: value.upper() for value in data}
-14 | {0: value.upper() for value in data}
+16 | {True: value.upper() for value in data}
+17 | {0: value.upper() for value in data}
    |
 
-RUF011.py:13:2: RUF011 Dictionary comprehension uses static key: `True`
+RUF011.py:16:2: RUF011 Dictionary comprehension uses static key: `True`
    |
-11 | # Errors
-12 | {"key": value.upper() for value in data}
-13 | {True: value.upper() for value in data}
+14 | # Errors
+15 | {"key": value.upper() for value in data}
+16 | {True: value.upper() for value in data}
    |  ^^^^ RUF011
-14 | {0: value.upper() for value in data}
-15 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+17 | {0: value.upper() for value in data}
+18 | {(1, "a"): value.upper() for value in data}  # Constant tuple
    |
 
-RUF011.py:14:2: RUF011 Dictionary comprehension uses static key: `0`
+RUF011.py:17:2: RUF011 Dictionary comprehension uses static key: `0`
    |
-12 | {"key": value.upper() for value in data}
-13 | {True: value.upper() for value in data}
-14 | {0: value.upper() for value in data}
+15 | {"key": value.upper() for value in data}
+16 | {True: value.upper() for value in data}
+17 | {0: value.upper() for value in data}
    |  ^ RUF011
-15 | {(1, "a"): value.upper() for value in data}  # Constant tuple
-16 | {constant: value.upper() for value in data}
+18 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+19 | {constant: value.upper() for value in data}
    |
 
-RUF011.py:15:2: RUF011 Dictionary comprehension uses static key: `(1, "a")`
+RUF011.py:18:2: RUF011 Dictionary comprehension uses static key: `(1, "a")`
    |
-13 | {True: value.upper() for value in data}
-14 | {0: value.upper() for value in data}
-15 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+16 | {True: value.upper() for value in data}
+17 | {0: value.upper() for value in data}
+18 | {(1, "a"): value.upper() for value in data}  # Constant tuple
    |  ^^^^^^^^ RUF011
-16 | {constant: value.upper() for value in data}
-17 | {constant + constant: value.upper() for value in data}
+19 | {constant: value.upper() for value in data}
+20 | {constant + constant: value.upper() for value in data}
    |
 
-RUF011.py:16:2: RUF011 Dictionary comprehension uses static key: `constant`
+RUF011.py:19:2: RUF011 Dictionary comprehension uses static key: `constant`
    |
-14 | {0: value.upper() for value in data}
-15 | {(1, "a"): value.upper() for value in data}  # Constant tuple
-16 | {constant: value.upper() for value in data}
+17 | {0: value.upper() for value in data}
+18 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+19 | {constant: value.upper() for value in data}
    |  ^^^^^^^^ RUF011
-17 | {constant + constant: value.upper() for value in data}
+20 | {constant + constant: value.upper() for value in data}
+21 | {constant.attribute: value.upper() for value in data}
    |
 
-RUF011.py:17:2: RUF011 Dictionary comprehension uses static key: `constant + constant`
+RUF011.py:20:2: RUF011 Dictionary comprehension uses static key: `constant + constant`
    |
-15 | {(1, "a"): value.upper() for value in data}  # Constant tuple
-16 | {constant: value.upper() for value in data}
-17 | {constant + constant: value.upper() for value in data}
+18 | {(1, "a"): value.upper() for value in data}  # Constant tuple
+19 | {constant: value.upper() for value in data}
+20 | {constant + constant: value.upper() for value in data}
    |  ^^^^^^^^^^^^^^^^^^^ RUF011
+21 | {constant.attribute: value.upper() for value in data}
+22 | {constant[0]: value.upper() for value in data}
+   |
+
+RUF011.py:21:2: RUF011 Dictionary comprehension uses static key: `constant.attribute`
+   |
+19 | {constant: value.upper() for value in data}
+20 | {constant + constant: value.upper() for value in data}
+21 | {constant.attribute: value.upper() for value in data}
+   |  ^^^^^^^^^^^^^^^^^^ RUF011
+22 | {constant[0]: value.upper() for value in data}
+   |
+
+RUF011.py:22:2: RUF011 Dictionary comprehension uses static key: `constant[0]`
+   |
+20 | {constant + constant: value.upper() for value in data}
+21 | {constant.attribute: value.upper() for value in data}
+22 | {constant[0]: value.upper() for value in data}
+   |  ^^^^^^^^^^^ RUF011
    |
 
 
