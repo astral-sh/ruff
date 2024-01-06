@@ -284,7 +284,8 @@ fn stdin_fix_jupyter() {
    "metadata": {},
    "outputs": [],
    "source": [
-    "import os"
+    "import os\n",
+    "print(1)"
    ]
   },
   {
@@ -302,7 +303,8 @@ fn stdin_fix_jupyter() {
    "metadata": {},
    "outputs": [],
    "source": [
-    "import sys"
+    "import sys\n",
+    "print(x)"
    ]
   },
   {
@@ -354,8 +356,8 @@ fn stdin_fix_jupyter() {
  "nbformat": 4,
  "nbformat_minor": 5
 }"#), @r###"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     {
      "cells": [
@@ -365,7 +367,9 @@ fn stdin_fix_jupyter() {
        "id": "dccc687c-96e2-4604-b957-a8a89b5bec06",
        "metadata": {},
        "outputs": [],
-       "source": []
+       "source": [
+        "print(1)"
+       ]
       },
       {
        "cell_type": "markdown",
@@ -381,7 +385,9 @@ fn stdin_fix_jupyter() {
        "id": "cdce7b92-b0fb-4c02-86f6-e233b26fa84f",
        "metadata": {},
        "outputs": [],
-       "source": []
+       "source": [
+        "print(x)"
+       ]
       },
       {
        "cell_type": "code",
@@ -433,7 +439,8 @@ fn stdin_fix_jupyter() {
      "nbformat_minor": 5
     }
     ----- stderr -----
-    Found 2 errors (2 fixed, 0 remaining).
+    Jupyter.ipynb:cell 3:1:7: F821 Undefined name `x`
+    Found 3 errors (2 fixed, 1 remaining).
     "###);
 }
 
