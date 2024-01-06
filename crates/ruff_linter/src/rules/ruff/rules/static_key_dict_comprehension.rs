@@ -1,16 +1,18 @@
-use ruff_python_ast::Expr;
+use rustc_hash::FxHashMap;
 
-use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_constant;
+use ruff_python_ast::helpers::NameFinder;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
 /// Checks for dictionary comprehensions that use a static key, like a string
-/// literal.
+/// literal or a variable defined outside the comprehension.
 ///
 /// ## Why is this bad?
 /// Using a static key (like a string literal) in a dictionary comprehension
@@ -46,13 +48,40 @@ impl Violation for StaticKeyDictComprehension {
 }
 
 /// RUF011
-pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, key: &Expr) {
-    if is_constant(key) {
+pub(crate) fn static_key_dict_comprehension(checker: &mut Checker, dict_comp: &ast::ExprDictComp) {
+    // Collect the bound names in the comprehension's generators.
+    let names = {
+        let mut visitor = NameFinder::default();
+        for generator in &dict_comp.generators {
+            visitor.visit_expr(&generator.target);
+        }
+        visitor.names
+    };
+
+    if is_constant(&dict_comp.key, &names) {
         checker.diagnostics.push(Diagnostic::new(
             StaticKeyDictComprehension {
-                key: SourceCodeSnippet::from_str(checker.locator().slice(key)),
+                key: SourceCodeSnippet::from_str(checker.locator().slice(dict_comp.key.as_ref())),
             },
-            key.range(),
+            dict_comp.key.range(),
         ));
+    }
+}
+
+/// Returns `true` if the given expression is a constant in the context of the dictionary
+/// comprehension.
+fn is_constant(key: &Expr, names: &FxHashMap<&str, &ast::ExprName>) -> bool {
+    match key {
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(|elt| is_constant(elt, names)),
+        Expr::Name(ast::ExprName { id, .. }) => !names.contains_key(id.as_str()),
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+            is_constant(left, names) && is_constant(right, names)
+        }
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+            values.iter().all(|value| is_constant(value, names))
+        }
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_constant(operand, names),
+        expr if expr.is_literal_expr() => true,
+        _ => false,
     }
 }
