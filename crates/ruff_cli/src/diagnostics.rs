@@ -497,10 +497,10 @@ pub(crate) fn lint_stdin(
 
     let imports = imports.unwrap_or_default();
 
-    if let Some(err) = parse_error {
+    if let Some(error) = parse_error {
         error!(
-            "Failed to parse {}: {err}",
-            path.map_or_else(|| "-".into(), fs::relativize_path).bold()
+            "{}",
+            DisplayParseError::from_source_kind(error, path.map(Path::to_path_buf), &transformed)
         );
     }
 

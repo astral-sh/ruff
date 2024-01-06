@@ -727,6 +727,22 @@ fn stdin_format_jupyter() {
 }
 
 #[test]
+fn stdin_parse_error() {
+    let mut cmd = RuffCheck::default().build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("from foo import =\n"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:17: E999 SyntaxError: Unexpected token '='
+    Found 1 error.
+
+    ----- stderr -----
+    error: Failed to parse at 1:17: Unexpected token '='
+    "###);
+}
+
+#[test]
 fn show_source() {
     let mut cmd = RuffCheck::default().args(["--show-source"]).build();
     assert_cmd_snapshot!(cmd
@@ -750,6 +766,7 @@ fn show_source() {
 fn explain_status_codes_f401() {
     assert_cmd_snapshot!(ruff_cmd().args(["--explain", "F401"]));
 }
+
 #[test]
 fn explain_status_codes_ruf404() {
     assert_cmd_snapshot!(ruff_cmd().args(["--explain", "RUF404"]), @r###"
