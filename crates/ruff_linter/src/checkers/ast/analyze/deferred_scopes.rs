@@ -144,9 +144,9 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
-                        binding.source.map_or(true, |right| {
-                            checker.semantic.different_branches(left, right)
-                        })
+                        binding
+                            .source
+                            .map_or(true, |right| !checker.semantic.same_branch(left, right))
                     }) {
                         continue;
                     }
@@ -233,9 +233,9 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
-                        binding.source.map_or(true, |right| {
-                            checker.semantic.different_branches(left, right)
-                        })
+                        binding
+                            .source
+                            .map_or(true, |right| !checker.semantic.same_branch(left, right))
                     }) {
                         continue;
                     }

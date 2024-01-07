@@ -1163,11 +1163,11 @@ impl<'a> SemanticModel<'a> {
         false
     }
 
-    /// Returns `true` if `left` and `right` are on different branches of an `if`, `match`, or
+    /// Returns `true` if `left` and `right` are in the same branches of an `if`, `match`, or
     /// `try` statement.
     ///
     /// This implementation assumes that the statements are in the same scope.
-    pub fn different_branches(&self, left: NodeId, right: NodeId) -> bool {
+    pub fn same_branch(&self, left: NodeId, right: NodeId) -> bool {
         // Collect the branch path for the left statement.
         let left = self
             .nodes
@@ -1184,10 +1184,7 @@ impl<'a> SemanticModel<'a> {
             .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
             .collect::<Vec<_>>();
 
-        !left
-            .iter()
-            .zip(right.iter())
-            .all(|(left, right)| left == right)
+        left == right
     }
 
     /// Returns `true` if the given expression is an unused variable, or consists solely of
