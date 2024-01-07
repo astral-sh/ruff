@@ -2,6 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, StringLike};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -44,13 +45,15 @@ impl AlwaysFixableViolation for StringOrBytesTooLong {
 
 /// PYI053
 pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike) {
+    let semantic = checker.semantic();
+
     // Ignore docstrings.
-    if is_docstring_stmt(checker.semantic().current_statement()) {
+    if is_docstring_stmt(semantic.current_statement()) {
         return;
     }
 
     if let Some(depr_message) =
-        warnings_dot_deprecated_message(checker.semantic().current_expression_parent(), checker)
+        warnings_dot_deprecated_message(semantic.current_expression_parent(), semantic)
     {
         if let StringLike::StringLiteral(literal) = string {
             if depr_message == literal {
@@ -80,7 +83,7 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
 
 fn warnings_dot_deprecated_message<'a>(
     expr: Option<&'a ast::Expr>,
-    checker: &Checker,
+    semantic: &SemanticModel,
 ) -> Option<&'a ast::ExprStringLiteral> {
     // If `expr` represents a call to `warnings.deprecated()`
     // (or the `typing_extensions`` backport), return the string-literal
@@ -99,16 +102,12 @@ fn warnings_dot_deprecated_message<'a>(
     else {
         return None;
     };
-    if checker
-        .semantic()
-        .resolve_call_path(func)
-        .is_some_and(|call_path| {
-            matches!(
-                call_path.as_slice(),
-                ["warnings" | "typing_extensions", "deprecated"]
-            )
-        })
-    {
+    if semantic.resolve_call_path(func).is_some_and(|call_path| {
+        matches!(
+            call_path.as_slice(),
+            ["warnings" | "typing_extensions", "deprecated"]
+        )
+    }) {
         Some(depr_message)
     } else {
         None
