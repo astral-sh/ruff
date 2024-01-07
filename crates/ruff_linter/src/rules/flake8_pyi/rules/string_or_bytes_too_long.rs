@@ -89,25 +89,21 @@ fn warnings_dot_deprecated_message<'a>(
     // (or the `typing_extensions`` backport), return the string-literal
     // deprecation message passed as the first argument to the call.
     // Else, return `None`.
-    let ast::Expr::Call(ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, .. },
-        ..
-    }) = expr?
-    else {
-        return None;
-    };
+    let call = expr?.as_call_expr()?;
     let [ast::Expr::StringLiteral(depr_message @ ast::ExprStringLiteral { .. }), ..] =
-        &args.as_slice()
+        &call.arguments.args.as_slice()
     else {
         return None;
     };
-    if semantic.resolve_call_path(func).is_some_and(|call_path| {
-        matches!(
-            call_path.as_slice(),
-            ["warnings" | "typing_extensions", "deprecated"]
-        )
-    }) {
+    if semantic
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| {
+            matches!(
+                call_path.as_slice(),
+                ["warnings" | "typing_extensions", "deprecated"]
+            )
+        })
+    {
         Some(depr_message)
     } else {
         None
