@@ -168,13 +168,15 @@ pub(crate) fn avoidable_escaped_quote(
 
         match tok {
             Tok::String {
-                value: string_contents,
+                value,
                 kind,
                 triple_quoted,
             } => {
                 if kind.is_raw() || *triple_quoted {
                     continue;
                 }
+
+                let string_contents = locator.slice(&value);
 
                 // Check if we're using the preferred quotation style.
                 if !leading_quote(locator.slice(tok_range)).is_some_and(|text| {
@@ -312,13 +314,15 @@ pub(crate) fn unnecessary_escaped_quote(
 
         match tok {
             Tok::String {
-                value: string_contents,
+                value,
                 kind,
                 triple_quoted,
             } => {
                 if kind.is_raw() || *triple_quoted {
                     continue;
                 }
+
+                let string_contents = locator.slice(&value);
 
                 let leading = match leading_quote(locator.slice(tok_range)) {
                     Some("\"") => Quote::Double,

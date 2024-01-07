@@ -5,7 +5,7 @@ expression: triple_quoted_eol(WINDOWS_EOL)
 [
     (
         String {
-            value: "\r\n test string\r\n ",
+            value: 3..20,
             kind: String,
             triple_quoted: true,
         },

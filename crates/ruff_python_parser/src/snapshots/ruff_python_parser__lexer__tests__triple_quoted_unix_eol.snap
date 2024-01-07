@@ -5,7 +5,7 @@ expression: triple_quoted_eol(UNIX_EOL)
 [
     (
         String {
-            value: "\n test string\n ",
+            value: 3..18,
             kind: String,
             triple_quoted: true,
         },

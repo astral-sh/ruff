@@ -137,7 +137,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "",
+            value: 32..32,
             kind: String,
             triple_quoted: false,
         },

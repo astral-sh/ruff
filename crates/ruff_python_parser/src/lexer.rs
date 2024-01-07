@@ -759,7 +759,7 @@ impl<'source> Lexer<'source> {
         };
 
         let tok = Tok::String {
-            value: self.source[TextRange::new(value_start, value_end)].to_string(),
+            value: TextRange::new(value_start, value_end),
             kind,
             triple_quoted,
         };

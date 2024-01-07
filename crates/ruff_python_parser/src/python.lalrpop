@@ -1605,8 +1605,8 @@ StringLiteralOrFString: StringType = {
 
 StringLiteral: StringType = {
     <location:@L> <string:string> <end_location:@R> =>? {
-        let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(&source, kind, triple_quoted, (location..end_location).into())?)
+        let (value, kind, triple_quoted) = string;
+        Ok(parse_string_literal(&source_code[value], kind, triple_quoted, (location..end_location).into())?)
     }
 };
 
@@ -2061,7 +2061,7 @@ extern {
         float => token::Tok::Float { value: <f64> },
         complex => token::Tok::Complex { real: <f64>, imag: <f64> },
         string => token::Tok::String {
-            value: <String>,
+            value: <TextRange>,
             kind: <StringKind>,
             triple_quoted: <bool>
         },

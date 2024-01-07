@@ -1,5 +1,5 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 031689e389556292d9dbd8a1b1ff8ca29bac76d83f1b345630481d620b89e1c2
+// sha3: 28f158c07e00e286b0a28fb9af14b474f60e5d67d1dd47e5dddc93a4b622c46b
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
@@ -54,7 +54,7 @@ mod __parse__Top {
         Variant4(Int),
         Variant5((IpyEscapeKind, String)),
         Variant6(String),
-        Variant7((String, StringKind, bool)),
+        Variant7((TextRange, StringKind, bool)),
         Variant8(core::option::Option<token::Tok>),
         Variant9(Option<Box<ast::Parameter>>),
         Variant10(core::option::Option<Option<Box<ast::Parameter>>>),
@@ -18373,16 +18373,6 @@ mod __parse__Top {
             _ => __symbol_type_mismatch()
         }
     }
-    fn __pop_Variant7<
-    >(
-        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
-    ) -> (TextSize, (String, StringKind, bool), TextSize)
-     {
-        match __symbols.pop() {
-            Some((__l, __Symbol::Variant7(__v), __r)) => (__l, __v, __r),
-            _ => __symbol_type_mismatch()
-        }
-    }
     fn __pop_Variant3<
     >(
         __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
@@ -18390,6 +18380,16 @@ mod __parse__Top {
      {
         match __symbols.pop() {
             Some((__l, __Symbol::Variant3(__v), __r)) => (__l, __v, __r),
+            _ => __symbol_type_mismatch()
+        }
+    }
+    fn __pop_Variant7<
+    >(
+        __symbols: &mut alloc::vec::Vec<(TextSize,__Symbol<>,TextSize)>
+    ) -> (TextSize, (TextRange, StringKind, bool), TextSize)
+     {
+        match __symbols.pop() {
+            Some((__l, __Symbol::Variant7(__v), __r)) => (__l, __v, __r),
             _ => __symbol_type_mismatch()
         }
     }
@@ -36363,13 +36363,13 @@ fn __action217<
     source_code: &str,
     mode: Mode,
     (_, location, _): (TextSize, TextSize, TextSize),
-    (_, string, _): (TextSize, (String, StringKind, bool), TextSize),
+    (_, string, _): (TextSize, (TextRange, StringKind, bool), TextSize),
     (_, end_location, _): (TextSize, TextSize, TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     {
-        let (source, kind, triple_quoted) = string;
-        Ok(parse_string_literal(&source, kind, triple_quoted, (location..end_location).into())?)
+        let (value, kind, triple_quoted) = string;
+        Ok(parse_string_literal(&source_code[value], kind, triple_quoted, (location..end_location).into())?)
     }
 }
 
@@ -52719,7 +52719,7 @@ fn __action937<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (String, StringKind, bool), TextSize),
+    __0: (TextSize, (TextRange, StringKind, bool), TextSize),
     __1: (TextSize, TextSize, TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
@@ -69997,7 +69997,7 @@ fn __action1494<
 >(
     source_code: &str,
     mode: Mode,
-    __0: (TextSize, (String, StringKind, bool), TextSize),
+    __0: (TextSize, (TextRange, StringKind, bool), TextSize),
 ) -> Result<StringType,__lalrpop_util::ParseError<TextSize,token::Tok,LexicalError>>
 {
     let __start0 = __0.2;

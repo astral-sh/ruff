@@ -5,7 +5,7 @@ expression: string_continuation_with_eol(UNIX_EOL)
 [
     (
         String {
-            value: "abc\\\ndef",
+            value: 1..9,
             kind: String,
             triple_quoted: false,
         },

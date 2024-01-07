@@ -5,7 +5,7 @@ expression: lex_source(source)
 [
     (
         String {
-            value: "double",
+            value: 1..7,
             kind: String,
             triple_quoted: false,
         },
@@ -13,7 +13,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "single",
+            value: 10..16,
             kind: String,
             triple_quoted: false,
         },
@@ -21,7 +21,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "can\\'t",
+            value: 19..25,
             kind: String,
             triple_quoted: false,
         },
@@ -29,7 +29,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "\\\\\\\"",
+            value: 28..32,
             kind: String,
             triple_quoted: false,
         },
@@ -37,7 +37,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "\\t\\r\\n",
+            value: 35..41,
             kind: String,
             triple_quoted: false,
         },
@@ -45,7 +45,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "\\g",
+            value: 44..46,
             kind: String,
             triple_quoted: false,
         },
@@ -53,7 +53,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "raw\\'",
+            value: 50..55,
             kind: RawString,
             triple_quoted: false,
         },
@@ -61,7 +61,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "\\420",
+            value: 58..62,
             kind: String,
             triple_quoted: false,
         },
@@ -69,7 +69,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "\\200\\0a",
+            value: 65..72,
             kind: String,
             triple_quoted: false,
         },

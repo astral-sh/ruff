@@ -5,7 +5,7 @@ expression: lex_source(source)
 [
     (
         String {
-            value: "\\N{EN SPACE}",
+            value: 1..13,
             kind: String,
             triple_quoted: false,
         },

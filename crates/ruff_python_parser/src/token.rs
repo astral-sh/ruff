@@ -7,7 +7,7 @@
 use crate::Mode;
 
 use ruff_python_ast::{Int, IpyEscapeKind};
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
@@ -37,8 +37,8 @@ pub enum Tok {
     },
     /// Token value for a string.
     String {
-        /// The string value.
-        value: String,
+        /// The range of the string value.
+        value: TextRange,
         /// The kind of string.
         kind: StringKind,
         /// Whether the string is triple quoted.
@@ -51,6 +51,8 @@ pub enum Tok {
     /// part of the expression part and isn't an opening or closing brace.
     FStringMiddle {
         /// The string value.
+        // TODO(charlie): This could _maybe_ be a range, but we'd have to move logic into the parser
+        // to handle some escaping.
         value: String,
         /// Whether the string is raw or not.
         is_raw: bool,
@@ -241,14 +243,7 @@ impl fmt::Display for Tok {
             Int { value } => write!(f, "'{value}'"),
             Float { value } => write!(f, "'{value}'"),
             Complex { real, imag } => write!(f, "{real}j{imag}"),
-            String {
-                value,
-                kind,
-                triple_quoted,
-            } => {
-                let quotes = "\"".repeat(if *triple_quoted { 3 } else { 1 });
-                write!(f, "{kind}{quotes}{value}{quotes}")
-            }
+            String { .. } => write!(f, "String"),
             FStringStart => f.write_str("FStringStart"),
             FStringMiddle { value, .. } => f.write_str(value),
             FStringEnd => f.write_str("FStringEnd"),

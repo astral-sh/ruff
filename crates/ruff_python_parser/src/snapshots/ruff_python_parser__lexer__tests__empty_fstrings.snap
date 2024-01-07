@@ -13,7 +13,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "",
+            value: 5..5,
             kind: String,
             triple_quoted: false,
         },
@@ -37,7 +37,7 @@ expression: lex_source(source)
     ),
     (
         String {
-            value: "",
+            value: 16..16,
             kind: String,
             triple_quoted: false,
         },
