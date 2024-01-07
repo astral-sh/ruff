@@ -64,9 +64,7 @@ expression: lex_source(source)
         80..81,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name,
         81..82,
     ),
     (

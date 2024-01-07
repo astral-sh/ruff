@@ -19,9 +19,7 @@ expression: lex_source(source)
         5..6,
     ),
     (
-        Name {
-            name: "BULLET",
-        },
+        Name,
         6..12,
     ),
     (

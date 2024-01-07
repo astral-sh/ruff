@@ -14,10 +14,7 @@ use std::fmt;
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
-    Name {
-        /// The name value.
-        name: String,
-    },
+    Name,
     /// Token value for an integer.
     Int {
         /// The integer value.
@@ -237,7 +234,7 @@ impl fmt::Display for Tok {
         #[allow(clippy::enum_glob_use)]
         use Tok::*;
         match self {
-            Name { name } => write!(f, "'{name}'"),
+            Name => write!(f, "Name"),
             Int { value } => write!(f, "'{value}'"),
             Float { value } => write!(f, "'{value}'"),
             Complex { real, imag } => write!(f, "{real}j{imag}"),
@@ -448,7 +445,6 @@ impl StringKind {
     }
 }
 
-// TODO move to ruff_python_parser?
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.
@@ -797,7 +793,7 @@ impl TokenKind {
 
     pub const fn from_token(token: &Tok) -> Self {
         match token {
-            Tok::Name { .. } => TokenKind::Name,
+            Tok::Name => TokenKind::Name,
             Tok::Int { .. } => TokenKind::Int,
             Tok::Float { .. } => TokenKind::Float,
             Tok::Complex { .. } => TokenKind::Complex,

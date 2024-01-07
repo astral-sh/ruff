@@ -86,10 +86,10 @@ where
                             first = false;
                         }
                         if !seen_colon {
-                            next = Some(Ok((soft_to_name(tok), *range)));
+                            next = Some(Ok((Tok::Name, *range)));
                         }
                     } else {
-                        next = Some(Ok((soft_to_name(tok), *range)));
+                        next = Some(Ok((Tok::Name, *range)));
                     }
                 }
                 // For `type` all of the following conditions must be met:
@@ -105,7 +105,7 @@ where
                         if let Some(Ok((tok, _))) = self.underlying.peek() {
                             if matches!(
                                 tok,
-                                Tok::Name { .. } |
+                                Tok::Name |
                                 // We treat a soft keyword token following a type token as a
                                 // name to support cases like `type type = int` or `type match = int`
                                 Tok::Type | Tok::Match | Tok::Case
@@ -129,10 +129,10 @@ where
                             }
                         }
                         if !is_type_alias {
-                            next = Some(Ok((soft_to_name(tok), *range)));
+                            next = Some(Ok((Tok::Name, *range)));
                         }
                     } else {
-                        next = Some(Ok((soft_to_name(tok), *range)));
+                        next = Some(Ok((Tok::Name, *range)));
                     }
                 }
                 _ => (), // Not a soft keyword token
@@ -191,19 +191,6 @@ where
         }
 
         next
-    }
-}
-
-#[inline]
-fn soft_to_name(tok: &Tok) -> Tok {
-    let name = match tok {
-        Tok::Match => "match",
-        Tok::Case => "case",
-        Tok::Type => "type",
-        _ => unreachable!("other tokens never reach here"),
-    };
-    Tok::Name {
-        name: name.to_owned(),
     }
 }
 

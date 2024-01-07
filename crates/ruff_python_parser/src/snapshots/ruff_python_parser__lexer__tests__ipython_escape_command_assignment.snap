@@ -4,9 +4,7 @@ expression: lex_jupyter_source(source)
 ---
 [
     (
-        Name {
-            name: "pwd",
-        },
+        Name,
         0..3,
     ),
     (
@@ -25,9 +23,7 @@ expression: lex_jupyter_source(source)
         10..11,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name,
         11..14,
     ),
     (
@@ -46,9 +42,7 @@ expression: lex_jupyter_source(source)
         30..31,
     ),
     (
-        Name {
-            name: "bar",
-        },
+        Name,
         31..34,
     ),
     (
@@ -67,9 +61,7 @@ expression: lex_jupyter_source(source)
         50..51,
     ),
     (
-        Name {
-            name: "baz",
-        },
+        Name,
         51..54,
     ),
     (

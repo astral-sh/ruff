@@ -4,9 +4,7 @@ expression: newline_in_brackets_eol(MAC_EOL)
 ---
 [
     (
-        Name {
-            name: "x",
-        },
+        Name,
         0..1,
     ),
     (

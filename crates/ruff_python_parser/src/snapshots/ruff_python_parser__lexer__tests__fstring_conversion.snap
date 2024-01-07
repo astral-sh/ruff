@@ -12,9 +12,7 @@ expression: lex_source(source)
         2..3,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name,
         3..4,
     ),
     (
@@ -22,9 +20,7 @@ expression: lex_source(source)
         4..5,
     ),
     (
-        Name {
-            name: "s",
-        },
+        Name,
         5..6,
     ),
     (
@@ -43,9 +39,7 @@ expression: lex_source(source)
         8..9,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name,
         9..10,
     ),
     (
@@ -57,9 +51,7 @@ expression: lex_source(source)
         11..12,
     ),
     (
-        Name {
-            name: "r",
-        },
+        Name,
         12..13,
     ),
     (
@@ -78,9 +70,7 @@ expression: lex_source(source)
         15..16,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name,
         16..17,
     ),
     (

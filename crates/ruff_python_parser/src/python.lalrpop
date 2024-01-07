@@ -287,8 +287,8 @@ ImportAsAlias<I>: ast::Alias = {
 
 // A name like abc or abc.def.ghi
 DottedName: ast::Identifier = {
-    <location:@L> <n:name> <end_location:@R> => ast::Identifier::new(n, (location..end_location).into()),
-    <location:@L> <n:name> <n2: ("." Identifier)+> <end_location:@R> => {
+    <location:@L> <n:Name> <end_location:@R> => ast::Identifier::new(n, (location..end_location).into()),
+    <location:@L> <n:Name> <n2: ("." Identifier)+> <end_location:@R> => {
         let mut r = n;
         for x in n2 {
             r.push('.');
@@ -1676,8 +1676,9 @@ FStringFormatSpec: ast::FStringFormatSpec = {
 };
 
 FStringConversion: (TextSize, ast::ConversionFlag) = {
-    <location:@L> "!" <name_location:@L> <s:name> =>? {
-        let conversion = match s.as_str() {
+    <location:@L> "!" <name_location:@L> <n:name> <name_end_location:@R> =>? {
+        let s = &source_code[TextRange::new(name_location, name_end_location)];
+        let conversion = match s {
             "s" => ast::ConversionFlag::Str,
             "r" => ast::ConversionFlag::Repr,
             "a" => ast::ConversionFlag::Ascii,
@@ -1956,7 +1957,11 @@ Number: ast::Number = {
 };
 
 Identifier: ast::Identifier = {
-    <location:@L> <s:name> <end_location:@R> => ast::Identifier::new(s, (location..end_location).into())
+    <location:@L> <n:Name> <end_location:@R> => ast::Identifier::new(n, (location..end_location).into())
+};
+
+Name: String = {
+    <location:@L> <s:name> <end_location:@R> => source_code[TextRange::new(location, end_location)].to_string()
 };
 
 // Hook external lexer:
@@ -2069,13 +2074,12 @@ extern {
             value: <String>,
             is_raw: <bool>
         },
-        name => token::Tok::Name { name: <String> },
+        name => token::Tok::Name,
         ipy_escape_command => token::Tok::IpyEscapeCommand {
             kind: <IpyEscapeKind>,
             value: <String>
         },
         "\n" => token::Tok::Newline,
         ";" => token::Tok::Semi,
-        // "#" => token::Tok::Comment,
     }
 }

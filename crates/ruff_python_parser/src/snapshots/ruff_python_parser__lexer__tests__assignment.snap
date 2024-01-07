@@ -4,9 +4,7 @@ expression: lex_source(source)
 ---
 [
     (
-        Name {
-            name: "a_variable",
-        },
+        Name,
         0..10,
     ),
     (

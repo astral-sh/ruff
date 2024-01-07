@@ -32,8 +32,9 @@ pub fn parse_type_annotation(
         // `List[int]` within "List[int]") exactly matches the parsed representation. This
         // isn't the case, e.g., for implicit concatenations, or for annotations that contain
         // escaped quotes.
+        // STOPSHIP(charlie): Add offset.
         let leading_quote = str::leading_quote(expression).unwrap();
-        let expr = parse_expression_starts_at(value, range.start() + leading_quote.text_len())?;
+        let expr = parse_expression(value)?; // , range.start() + leading_quote.text_len())?;
         Ok((expr, AnnotationKind::Simple))
     } else {
         // Otherwise, consider this a "complex" annotation.

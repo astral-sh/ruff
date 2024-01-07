@@ -200,7 +200,7 @@ impl<'source> Lexer<'source> {
 
         let text = self.token_text();
 
-        let keyword = match text {
+        Ok(match text {
             "False" => Tok::False,
             "None" => Tok::None,
             "True" => Tok::True,
@@ -239,14 +239,8 @@ impl<'source> Lexer<'source> {
             "while" => Tok::While,
             "with" => Tok::With,
             "yield" => Tok::Yield,
-            _ => {
-                return Ok(Tok::Name {
-                    name: text.to_string(),
-                })
-            }
-        };
-
-        Ok(keyword)
+            _ => Tok::Name,
+        })
     }
 
     /// Numeric lexing. The feast can start!

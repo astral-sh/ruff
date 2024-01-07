@@ -64,7 +64,7 @@ impl From<&Spanned> for Token {
             Tok::Lambda => TokenType::Lambda,
             // Import treated like a function.
             Tok::Import => TokenType::Named,
-            Tok::Name { .. } => TokenType::Named,
+            Tok::Name => TokenType::Named,
             Tok::String { .. } => TokenType::String,
             Tok::Comma => TokenType::Comma,
             Tok::Lpar => TokenType::OpeningBracket,

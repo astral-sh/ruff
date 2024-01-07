@@ -47,20 +47,26 @@ pub(crate) fn remove_import_members(contents: &str, members: &[&str]) -> String 
         .flatten()
         .skip_while(|(tok, _)| !matches!(tok, Tok::Import))
     {
-        if let Tok::Name { name } = &tok {
-            if matches!(prev_tok, Some(Tok::As)) {
-                // Adjust the location to take the alias into account.
-                let last_range = names.last_mut().unwrap();
-                *last_range = TextRange::new(last_range.start(), range.end());
-            } else {
-                if members.contains(&name.as_str()) {
-                    removal_indices.push(names.len());
+        match &tok {
+            Tok::Name => {
+                if matches!(prev_tok, Some(Tok::As)) {
+                    // Adjust the location to take the alias into account.
+                    let last_range = names.last_mut().unwrap();
+                    *last_range = TextRange::new(last_range.start(), range.end());
+                } else {
+                    let name = &contents[range];
+                    if members.contains(&name) {
+                        removal_indices.push(names.len());
+                    }
+                    names.push(range);
                 }
-                names.push(range);
             }
-        } else if matches!(tok, Tok::Comma) {
-            commas.push(range);
+            Tok::Comma => {
+                commas.push(range);
+            }
+            _ => {}
         }
+
         prev_tok = Some(tok);
     }
 

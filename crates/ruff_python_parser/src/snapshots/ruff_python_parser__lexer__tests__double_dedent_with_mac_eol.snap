@@ -8,9 +8,7 @@ expression: double_dedent_with_eol(MAC_EOL)
         0..3,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name,
         4..7,
     ),
     (
@@ -38,9 +36,7 @@ expression: double_dedent_with_eol(MAC_EOL)
         12..14,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name,
         15..16,
     ),
     (

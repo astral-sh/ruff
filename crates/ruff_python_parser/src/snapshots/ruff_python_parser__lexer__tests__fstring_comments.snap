@@ -27,9 +27,7 @@ expression: lex_source(source)
         34..35,
     ),
     (
-        Name {
-            name: "x",
-        },
+        Name,
         39..40,
     ),
     (

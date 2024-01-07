@@ -8,9 +8,7 @@ expression: indentation_with_eol(MAC_EOL)
         0..3,
     ),
     (
-        Name {
-            name: "foo",
-        },
+        Name,
         4..7,
     ),
     (
