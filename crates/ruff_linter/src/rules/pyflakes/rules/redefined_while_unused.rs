@@ -1,4 +1,4 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::SourceRow;
 
@@ -22,6 +22,23 @@ use ruff_source_file::SourceRow;
 /// import foo
 /// import bar
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as removing a redefinition across
+/// branches or scopes may change the behavior of the program in subtle
+/// ways.
+///
+/// For example:
+/// ```python
+/// import module
+///
+/// x = int(input())
+///
+/// if x > 0:
+///     from package import module
+/// ```
+///
+/// Removing the redefinition would change the `module` binding when `x > 0`.
 #[violation]
 pub struct RedefinedWhileUnused {
     pub name: String,
@@ -29,9 +46,16 @@ pub struct RedefinedWhileUnused {
 }
 
 impl Violation for RedefinedWhileUnused {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let RedefinedWhileUnused { name, row } = self;
         format!("Redefinition of unused `{name}` from {row}")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let RedefinedWhileUnused { name, .. } = self;
+        Some(format!("Remove definition: `{name}`"))
     }
 }
