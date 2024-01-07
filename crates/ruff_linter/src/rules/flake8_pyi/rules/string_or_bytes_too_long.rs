@@ -52,14 +52,8 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         return;
     }
 
-    if let Some(depr_message) =
-        warnings_dot_deprecated_message(semantic.current_expression_parent(), semantic)
-    {
-        if let StringLike::StringLiteral(literal) = string {
-            if depr_message == literal {
-                return;
-            }
-        }
+    if is_warnings_dot_deprecated(semantic.current_expression_parent(), semantic) {
+        return;
     }
 
     let length = match string {
@@ -81,21 +75,15 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
     checker.diagnostics.push(diagnostic);
 }
 
-fn warnings_dot_deprecated_message<'a>(
-    expr: Option<&'a ast::Expr>,
-    semantic: &SemanticModel,
-) -> Option<&'a ast::ExprStringLiteral> {
-    // If `expr` represents a call to `warnings.deprecated()`
-    // (or the `typing_extensions`` backport), return the string-literal
-    // deprecation message passed as the first argument to the call.
-    // Else, return `None`.
-    let call = expr?.as_call_expr()?;
-    let [ast::Expr::StringLiteral(depr_message @ ast::ExprStringLiteral { .. }), ..] =
-        &call.arguments.args.as_slice()
-    else {
-        return None;
+fn is_warnings_dot_deprecated(expr: Option<&ast::Expr>, semantic: &SemanticModel) -> bool {
+    // Does `expr` represent a call to `warnings.deprecated` or `typing_extensions.deprecated`?
+    let Some(expr) = expr else {
+        return false;
     };
-    if semantic
+    let Some(call) = expr.as_call_expr() else {
+        return false;
+    };
+    semantic
         .resolve_call_path(&call.func)
         .is_some_and(|call_path| {
             matches!(
@@ -103,9 +91,4 @@ fn warnings_dot_deprecated_message<'a>(
                 ["warnings" | "typing_extensions", "deprecated"]
             )
         })
-    {
-        Some(depr_message)
-    } else {
-        None
-    }
 }
