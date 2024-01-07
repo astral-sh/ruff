@@ -93,7 +93,8 @@ fn warnings_dot_deprecated_message<'a>(
         func,
         arguments: ast::Arguments { args, .. },
         ..
-    }) = expr? else {
+    }) = expr?
+    else {
         return None;
     };
     let [ast::Expr::StringLiteral(depr_message @ ast::ExprStringLiteral { .. }), ..] =
