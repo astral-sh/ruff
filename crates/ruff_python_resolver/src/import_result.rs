@@ -76,6 +76,7 @@ pub(crate) struct ImportResult {
 
     /// If the import resolved to a type hint (i.e., a `.pyi` file), then
     /// a non-type-hint resolution will be stored here.
+    #[allow(clippy::struct_field_names)]
     pub(crate) non_stub_import_result: Option<Box<ImportResult>>,
 
     /// Information extracted from the `py.typed` in the package used to

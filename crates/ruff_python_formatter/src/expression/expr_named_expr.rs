@@ -3,7 +3,9 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprNamedExpr;
 
 use crate::comments::{dangling_comments, SourceComment};
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
+use crate::expression::parentheses::{
+    in_parentheses_only_soft_line_break_or_space, NeedsParentheses, OptionalParentheses,
+};
 use crate::prelude::*;
 
 #[derive(Default)]
@@ -24,7 +26,10 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
         write!(
             f,
             [
-                group(&format_args!(target.format(), soft_line_break_or_space())),
+                group(&format_args![
+                    target.format(),
+                    in_parentheses_only_soft_line_break_or_space()
+                ]),
                 token(":=")
             ]
         )?;
