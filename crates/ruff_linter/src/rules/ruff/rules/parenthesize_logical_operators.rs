@@ -50,18 +50,31 @@ pub(crate) fn parenthesize_chained_logical_operators(
     checker: &mut Checker,
     expr: &ast::ExprBoolOp,
 ) {
+    // We're only interested in `and` expressions inside `or` expressions:
+    // - `a or b or c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=Or)`
+    // - `a and b and c` => `BoolOp(values=[Name("a"), Name("b"), Name("c")], op=And)`
+    // - `a or b and c` => `BoolOp(value=[Name("a"), BoolOp(values=[Name("b"), Name("c")], op=And), op=Or)`
+    //
+    // While it is *possible* to get an `Or` node inside an `And` node,
+    // you can only achieve it by parenthesizing the `or` subexpression
+    // (since normally, `and` always binds more tightly):
+    // - `a and (b or c)` => `BoolOp(values=[Name("a"), BoolOp(values=[Name("b"), Name("c"), op=Or), op=And)`
+    //
+    // We only care about unparenthesized boolean subexpressions here
+    // (if they're parenthesized already, that's great!),
+    // so we can ignore all cases where an `Or` node
+    // exists inside an `And` node.
+    if expr.op.is_and() {
+        return;
+    }
     for condition in &expr.values {
         match condition {
-            // If we find a BoolOp expression inside a BoolOp expression,
-            // it means a different operator is being used for the subexpression
-            // than in the superexpression:
-            // `a or b or c` => `BoolOp(values=[Name('a'), Name('b'), Name('c')], op=Or)`
-            // `a or b and c` => `BoolOp(values=[Name('a'), BoolOp(values=[Name('b'), Name('c')], op=And)], op=Or)`
-            ast::Expr::BoolOp(bool_op) => {
-                // `and` binds more tightly than `or`, and the AST reflects this:
-                // the BoolOp subexpression *must*, logically, be an `And`
-                // (and the superexpression *must*, logically, be an `Or`)
-                assert!(bool_op.op.is_and());
+            ast::Expr::BoolOp(
+                bool_op @ ast::ExprBoolOp {
+                    op: ast::BoolOp::And,
+                    ..
+                },
+            ) => {
                 if parenthesized_range(
                     bool_op.into(),
                     expr.into(),

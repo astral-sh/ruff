@@ -63,9 +63,13 @@ x = not a or not b or not c  # OK
 
 a, b, c = 1, 0, 2
 x = a or (b and c)  # OK
+x2 = (a or b) and c  # OK
+x3 = (a or b) or c  # OK
+x4 = (a and b) and c  # OK
 
 a, b, c = 0, 1, 2
 y = (a and b) or c  # OK
+yy = a and (b or c)  # OK
 
 a, b, c, d = 1, 2, 0, 3
 if a or b or (c and d):  # OK
