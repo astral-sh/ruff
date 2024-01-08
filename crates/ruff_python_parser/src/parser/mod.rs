@@ -17,7 +17,7 @@ use ast::{
 use bitflags::bitflags;
 use itertools::PeekNth;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 mod functions;
 mod helpers;
@@ -246,7 +246,8 @@ where
 
         // After parsing, the `ctx` and `ctx_stack` should be empty.
         // If it's not, you probably forgot to call `clear_ctx` somewhere.
-        assert!(self.ctx.is_empty() && self.ctx_stack.is_empty());
+        assert!(self.ctx.is_empty());
+        assert_eq!(&self.ctx_stack, &[]);
 
         ParsedFile {
             ast,
@@ -299,27 +300,14 @@ where
                     (Tok::Invalid, lex_error.location)
                 }
             })
-            .unwrap_or((
-                Tok::EndOfFile,
-                TextRange::empty(
-                    self.source
-                        .len()
-                        .try_into()
-                        .expect("source length is bigger than u32 max"),
-                ),
-            ))
+            .unwrap_or((Tok::EndOfFile, TextRange::empty(self.source.text_len())))
     }
 
     fn lookahead(&mut self, offset: usize) -> (TokenKind, TextRange) {
         self.lexer.peek_nth(offset).map_or(
             (
                 TokenKind::EndOfFile,
-                TextRange::empty(
-                    self.source
-                        .len()
-                        .try_into()
-                        .expect("source length is  bigger than u32 max"),
-                ),
+                TextRange::empty(self.source.text_len()),
             ),
             |result| match result {
                 Ok((tok, range)) => (tok.into(), *range),
@@ -420,12 +408,7 @@ where
         // TODO: Create the proper range here.
         let src_len = self.source.len();
         if range.start().to_usize() > src_len || range.end().to_usize() > src_len {
-            range = TextRange::new(
-                0.into(),
-                (self.source.len() - 1)
-                    .try_into()
-                    .expect("source length is bigger than u32 max"),
-            );
+            range = TextRange::new(0.into(), self.source.text_len() - TextSize::from(1));
         }
         &self.source[range]
     }
