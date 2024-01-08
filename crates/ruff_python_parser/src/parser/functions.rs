@@ -225,7 +225,7 @@ pub fn parse_tokens(
     )
 }
 
-pub fn parse_ok_tokens_new(
+fn parse_ok_tokens_new(
     lxr: impl IntoIterator<Item = Spanned>,
     source: &str,
     mode: Mode,
@@ -242,7 +242,7 @@ pub fn parse_ok_tokens_new(
     }
 }
 
-pub fn parse_ok_tokens_lalrpop(
+fn parse_ok_tokens_lalrpop(
     lxr: impl IntoIterator<Item = Spanned>,
     source: &str,
     mode: Mode,
