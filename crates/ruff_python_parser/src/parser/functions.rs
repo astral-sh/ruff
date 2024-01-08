@@ -13,6 +13,7 @@
 //! [`Mode`]: crate::mode
 
 use itertools::Itertools;
+use std::cell::Cell;
 
 use ruff_python_ast::{Expr, Mod, ModModule, Suite};
 use ruff_text_size::{TextRange, TextSize};
@@ -26,6 +27,19 @@ use crate::{
 };
 
 use super::Parser;
+
+thread_local! {
+    static NEW_PARSER: Cell<bool> = Cell::new(std::env::var("NEW_PARSER").is_ok());
+}
+
+/// Controls whether the current thread uses the new hand written or the old lalrpop based parser.
+///
+/// Uses the new hand written parser if `use_new_parser` is true.
+///
+/// Defaults to use the new handwritten parser if the environment variable `NEW_PARSER` is set.
+pub fn set_new_parser(use_new_parser: bool) {
+    NEW_PARSER.set(use_new_parser);
+}
 
 /// Parse a full Python program usually consisting of multiple lines.
 ///
@@ -239,7 +253,7 @@ pub fn parse_ok_tokens(
     source: &str,
     mode: Mode,
 ) -> Result<Mod, ParseError> {
-    if std::env::var("NEW_PARSER").is_ok() {
+    if NEW_PARSER.get() {
         parse_ok_tokens_new(lxr, source, mode)
     } else {
         crate::lalrpop::parse_ok_tokens(lxr, source, mode)
@@ -251,7 +265,7 @@ fn parse_filtered_tokens(
     source: &str,
     mode: Mode,
 ) -> Result<Mod, ParseError> {
-    if std::env::var("NEW_PARSER").is_ok() {
+    if NEW_PARSER.get() {
         let parsed_file = Parser::new(source, mode, lxr.into_iter()).parse();
         if parsed_file.parse_errors.is_empty() {
             Ok(parsed_file.ast)

@@ -24,7 +24,7 @@ mod helpers;
 mod tests;
 pub use functions::{
     parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
-    parse_starts_at, parse_suite, parse_tokens,
+    parse_starts_at, parse_suite, parse_tokens, set_new_parser,
 };
 
 #[derive(Debug)]

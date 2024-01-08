@@ -7,7 +7,7 @@ use libfuzzer_sys::{fuzz_target, Corpus};
 
 use ruff_python_ast::PySourceType;
 use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse_ok_tokens_lalrpop, parse_ok_tokens_new, AsMode};
+use ruff_python_parser::{parse_ok_tokens, set_new_parser, AsMode};
 
 // modified from ruff_python_formatter::quick_test
 fn do_fuzz(case: &[u8]) -> Corpus {
@@ -20,8 +20,11 @@ fn do_fuzz(case: &[u8]) -> Corpus {
         return Corpus::Keep; // keep even rejected source code as this may allow us to explore later
     };
 
-    let module_new = parse_ok_tokens_new(tokens.clone(), source, source_type.as_mode());
-    let module_lalrpop = parse_ok_tokens_lalrpop(tokens, source, source_type.as_mode());
+    set_new_parser(true);
+    let module_new = parse_ok_tokens(tokens.clone(), source, source_type.as_mode());
+
+    set_new_parser(false);
+    let module_lalrpop = parse_ok_tokens(tokens, source, source_type.as_mode());
 
     assert_eq!(module_lalrpop.is_ok(), module_new.is_ok());
 

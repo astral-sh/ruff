@@ -112,7 +112,7 @@
 pub use error::{FStringErrorType, ParseError, ParseErrorType};
 pub use parser::{
     parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
-    parse_starts_at, parse_suite, parse_tokens, ParsedFile,
+    parse_starts_at, parse_suite, parse_tokens, set_new_parser, ParsedFile,
 };
 use ruff_python_ast::{Mod, PySourceType, Suite};
 pub use token::{StringKind, Tok, TokenKind};

@@ -12,7 +12,7 @@ pub(crate) struct ArgumentList {
 }
 
 // Perform validation of function/lambda arguments in a function definition.
-pub(crate) fn validate_arguments(arguments: &ast::Parameters) -> Result<(), LexicalError> {
+pub(super) fn validate_arguments(arguments: &ast::Parameters) -> Result<(), LexicalError> {
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         arguments.posonlyargs.len()
             + arguments.args.len()
@@ -49,7 +49,7 @@ pub(crate) fn validate_arguments(arguments: &ast::Parameters) -> Result<(), Lexi
     Ok(())
 }
 
-pub(crate) fn validate_pos_params(
+pub(super) fn validate_pos_params(
     args: &(
         Vec<ast::ParameterWithDefault>,
         Vec<ast::ParameterWithDefault>,
@@ -78,7 +78,7 @@ type FunctionArgument = (
 );
 
 // Parse arguments as supplied during a function/lambda *call*.
-pub(crate) fn parse_arguments(
+pub(super) fn parse_arguments(
     function_arguments: Vec<FunctionArgument>,
 ) -> Result<ArgumentList, LexicalError> {
     let mut args = vec![];

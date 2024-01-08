@@ -10,7 +10,7 @@ use crate::{ParseError, ParseErrorType, TokenKind};
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,
 /// recursively sets the `ctx` for their elements.
-pub(crate) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
+pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
     match expr {
         Expr::Name(ast::ExprName { ctx, .. })
         | Expr::Attribute(ast::ExprAttribute { ctx, .. })
@@ -33,7 +33,7 @@ pub(crate) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
 }
 
 /// Sets the `range` for a given expression.
-pub(crate) fn set_expr_range(expr: &mut Expr, range: TextRange) {
+pub(super) fn set_expr_range(expr: &mut Expr, range: TextRange) {
     match expr {
         Expr::Name(node) => node.range = range,
         Expr::Set(node) => node.range = range,
@@ -75,7 +75,7 @@ pub(crate) fn set_expr_range(expr: &mut Expr, range: TextRange) {
 /// valid on the left hand side of an assignment. For example, identifiers,
 /// starred expressions, attribute expressions, subscript expressions,
 /// list and tuple unpacking are valid assignment targets.
-pub(crate) fn is_valid_assignment_target(expr: &Expr) -> bool {
+pub(super) fn is_valid_assignment_target(expr: &Expr) -> bool {
     match expr {
         Expr::Starred(ast::ExprStarred { value, .. }) => is_valid_assignment_target(value),
         Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
@@ -89,7 +89,7 @@ pub(crate) fn is_valid_assignment_target(expr: &Expr) -> bool {
 /// Check if the given expression is itself or contains an expression that is
 /// valid on the left hand side of an augmented assignment. For example, identifiers,
 /// attribute and subscript expressions are valid augmented assignment targets.
-pub(crate) fn is_valid_aug_assignment_target(expr: &Expr) -> bool {
+pub(super) fn is_valid_aug_assignment_target(expr: &Expr) -> bool {
     matches!(
         expr,
         Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_)
@@ -97,7 +97,7 @@ pub(crate) fn is_valid_aug_assignment_target(expr: &Expr) -> bool {
 }
 
 /// Converts a [`TokenKind`] array of size 2 to its correspondent [`CmpOp`].
-pub(crate) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
+pub(super) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
     Ok(match kind {
         [TokenKind::Is, TokenKind::Not] => CmpOp::IsNot,
         [TokenKind::Is, _] => CmpOp::Is,
@@ -114,7 +114,7 @@ pub(crate) fn token_kind_to_cmp_op(kind: [TokenKind; 2]) -> Result<CmpOp, ()> {
 }
 
 // Perform validation of function/lambda parameters in a function definition.
-pub(crate) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), ParseError> {
+pub(super) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), ParseError> {
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         parameters.posonlyargs.len()
             + parameters.args.len()
@@ -151,7 +151,7 @@ pub(crate) fn validate_parameters(parameters: &ast::Parameters) -> Result<(), Pa
     Ok(())
 }
 
-pub(crate) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), ParseError> {
+pub(super) fn validate_arguments(arguments: &ast::Arguments) -> Result<(), ParseError> {
     let mut all_arg_names = FxHashSet::with_capacity_and_hasher(
         arguments.keywords.len(),
         BuildHasherDefault::default(),
