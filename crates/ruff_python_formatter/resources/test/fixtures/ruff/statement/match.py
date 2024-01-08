@@ -109,6 +109,11 @@ match long_lines:
     ):  # another comment
         pass
 
+    case {
+        "long_long_long_key": str(long_long_long_key)
+    } if value := "long long long long long long long long long long long value":
+        pass
+
 
 match pattern_comments:
     case (
