@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::path::Path;
 
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
 use ruff_python_trivia::CommentRanges;
@@ -890,6 +891,25 @@ pub fn resolve_imported_module_path<'a>(
         qualified_path.push_str(module);
     }
     Some(Cow::Owned(qualified_path))
+}
+
+/// A [`Visitor`] to collect all [`Expr::Name`] nodes in an AST.
+#[derive(Debug, Default)]
+pub struct NameFinder<'a> {
+    /// A map from identifier to defining expression.
+    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+}
+
+impl<'a, 'b> Visitor<'b> for NameFinder<'a>
+where
+    'b: 'a,
+{
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(name) = expr {
+            self.names.insert(&name.id, name);
+        }
+        crate::visitor::walk_expr(self, expr);
+    }
 }
 
 /// A [`StatementVisitor`] that collects all `return` statements in a function or method.

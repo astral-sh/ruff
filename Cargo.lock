@@ -2250,6 +2250,7 @@ dependencies = [
  "insta",
  "itertools 0.12.0",
  "once_cell",
+ "rand",
  "ruff_diagnostics",
  "ruff_source_file",
  "ruff_text_size",

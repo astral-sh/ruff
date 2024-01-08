@@ -200,11 +200,11 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::InvalidToken => write!(f, "Got invalid token"),
             ParseErrorType::UnrecognizedToken(ref tok, ref expected) => {
                 if *tok == Tok::Indent {
-                    write!(f, "unexpected indent")
+                    write!(f, "Unexpected indent")
                 } else if expected.as_deref() == Some("Indent") {
-                    write!(f, "expected an indented block")
+                    write!(f, "Expected an indented block")
                 } else {
-                    write!(f, "invalid syntax. Got unexpected token {tok}")
+                    write!(f, "Unexpected token {tok}")
                 }
             }
         }

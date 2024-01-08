@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::Scope;
 use ruff_text_size::Ranged;
@@ -243,11 +244,11 @@ pub(crate) fn unused_private_protocol(
             continue;
         };
 
-        if !class_def
-            .bases()
-            .iter()
-            .any(|base| checker.semantic().match_typing_expr(base, "Protocol"))
-        {
+        if !class_def.bases().iter().any(|base| {
+            checker
+                .semantic()
+                .match_typing_expr(map_subscript(base), "Protocol")
+        }) {
             continue;
         }
 

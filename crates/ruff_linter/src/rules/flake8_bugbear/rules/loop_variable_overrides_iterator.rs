@@ -49,6 +49,31 @@ impl Violation for LoopVariableOverridesIterator {
     }
 }
 
+/// B020
+pub(crate) fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
+    let target_names = {
+        let mut target_finder = NameFinder::default();
+        target_finder.visit_expr(target);
+        target_finder.names
+    };
+    let iter_names = {
+        let mut iter_finder = NameFinder::default();
+        iter_finder.visit_expr(iter);
+        iter_finder.names
+    };
+
+    for (name, expr) in target_names {
+        if iter_names.contains_key(name) {
+            checker.diagnostics.push(Diagnostic::new(
+                LoopVariableOverridesIterator {
+                    name: name.to_string(),
+                },
+                expr.range(),
+            ));
+        }
+    }
+}
+
 #[derive(Default)]
 struct NameFinder<'a> {
     names: FxHashMap<&'a str, &'a Expr>,
@@ -94,31 +119,6 @@ where
                 }
             }
             _ => visitor::walk_expr(self, expr),
-        }
-    }
-}
-
-/// B020
-pub(crate) fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, iter: &Expr) {
-    let target_names = {
-        let mut target_finder = NameFinder::default();
-        target_finder.visit_expr(target);
-        target_finder.names
-    };
-    let iter_names = {
-        let mut iter_finder = NameFinder::default();
-        iter_finder.visit_expr(iter);
-        iter_finder.names
-    };
-
-    for (name, expr) in target_names {
-        if iter_names.contains_key(name) {
-            checker.diagnostics.push(Diagnostic::new(
-                LoopVariableOverridesIterator {
-                    name: name.to_string(),
-                },
-                expr.range(),
-            ));
         }
     }
 }

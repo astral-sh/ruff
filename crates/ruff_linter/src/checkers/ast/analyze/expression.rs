@@ -965,6 +965,12 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::UnnecessaryDunderCall) {
                 pylint::rules::unnecessary_dunder_call(checker, call);
             }
+            if checker.enabled(Rule::SslWithNoVersion) {
+                flake8_bandit::rules::ssl_with_no_version(checker, call);
+            }
+            if checker.enabled(Rule::SslInsecureVersion) {
+                flake8_bandit::rules::ssl_insecure_version(checker, call);
+            }
         }
         Expr::Dict(dict) => {
             if checker.any_enabled(&[
@@ -1390,12 +1396,14 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 refurb::rules::reimplemented_starmap(checker, &comp.into());
             }
         }
-        Expr::DictComp(ast::ExprDictComp {
-            key,
-            value,
-            generators,
-            range: _,
-        }) => {
+        Expr::DictComp(
+            dict_comp @ ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                range: _,
+            },
+        ) => {
             if checker.enabled(Rule::UnnecessaryListIndexLookup) {
                 pylint::rules::unnecessary_list_index_lookup_comprehension(checker, expr);
             }
@@ -1416,7 +1424,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::StaticKeyDictComprehension) {
-                ruff::rules::static_key_dict_comprehension(checker, key);
+                ruff::rules::static_key_dict_comprehension(checker, dict_comp);
             }
         }
         Expr::GeneratorExp(

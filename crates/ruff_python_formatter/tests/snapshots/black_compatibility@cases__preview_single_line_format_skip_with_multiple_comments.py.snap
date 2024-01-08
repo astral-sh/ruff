@@ -21,8 +21,7 @@ skip_will_not_work2 =  "a" +  "b"  # some text; fmt:skip happens to be part of i
 --- Black
 +++ Ruff
 @@ -1,8 +1,8 @@
--foo =  123  # fmt: skip # noqa: E501 # pylint
-+foo = 123  # fmt: skip # noqa: E501 # pylint
+ foo =  123  # fmt: skip # noqa: E501 # pylint
  bar = (
 -    123   ,
 -    (        1      +           5      )  # pylint # fmt:skip
@@ -38,7 +37,7 @@ skip_will_not_work2 =  "a" +  "b"  # some text; fmt:skip happens to be part of i
 ## Ruff Output
 
 ```python
-foo = 123  # fmt: skip # noqa: E501 # pylint
+foo =  123  # fmt: skip # noqa: E501 # pylint
 bar = (
     123,
     (1 + 5),  # pylint # fmt:skip

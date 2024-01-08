@@ -171,24 +171,37 @@ impl SourceComment {
 
     pub(crate) fn suppression_kind(&self, source: &str) -> Option<SuppressionKind> {
         let text = self.slice.text(SourceCode::new(source));
-        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
 
+        // Match against `# fmt: on`, `# fmt: off`, `# yapf: disable`, and `# yapf: enable`, which
+        // must be on their own lines.
+        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
         if let Some(command) = trimmed.strip_prefix("fmt:") {
             match command.trim_whitespace_start() {
-                "off" => Some(SuppressionKind::Off),
-                "on" => Some(SuppressionKind::On),
-                "skip" => Some(SuppressionKind::Skip),
-                _ => None,
+                "off" => return Some(SuppressionKind::Off),
+                "on" => return Some(SuppressionKind::On),
+                "skip" => return Some(SuppressionKind::Skip),
+                _ => {}
             }
         } else if let Some(command) = trimmed.strip_prefix("yapf:") {
             match command.trim_whitespace_start() {
-                "disable" => Some(SuppressionKind::Off),
-                "enable" => Some(SuppressionKind::On),
-                _ => None,
+                "disable" => return Some(SuppressionKind::Off),
+                "enable" => return Some(SuppressionKind::On),
+                _ => {}
             }
-        } else {
-            None
         }
+
+        // Search for `# fmt: skip` comments, which can be interspersed with other comments (e.g.,
+        // `# fmt: skip # noqa: E501`).
+        for segment in text.split('#') {
+            let trimmed = segment.trim_whitespace();
+            if let Some(command) = trimmed.strip_prefix("fmt:") {
+                if command.trim_whitespace_start() == "skip" {
+                    return Some(SuppressionKind::Skip);
+                }
+            }
+        }
+
+        None
     }
 
     /// Returns true if this comment is a `fmt: off` or `yapf: disable` own line suppression comment.
