@@ -518,7 +518,7 @@ where
         let mut range = self.current_range();
         self.add_error(ParseErrorType::OtherError(error_msg.to_string()), range);
 
-        while !self.at(TokenKind::Dedent) {
+        while !self.at(TokenKind::Dedent) && !self.at(TokenKind::EndOfFile) {
             let (stmt, stmt_range) = self.parse_statement();
             stmts.push(stmt);
             range = stmt_range;
