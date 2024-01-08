@@ -367,7 +367,7 @@ pub(crate) fn fix_unnecessary_literal_dict(expr: &Expr, checker: &Checker) -> Re
                 comma,
             } = element
             {
-                if let Some(Element::Simple { value: key, .. }) = tuple.elements.get(0) {
+                if let Some(Element::Simple { value: key, .. }) = tuple.elements.first() {
                     if let Some(Element::Simple { value, .. }) = tuple.elements.get(1) {
                         return Ok(DictElement::Simple {
                             key: key.clone(),

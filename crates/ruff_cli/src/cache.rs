@@ -86,6 +86,7 @@ pub(crate) struct Cache {
     changes: Mutex<Vec<Change>>,
     /// The "current" timestamp used as cache for the updates of
     /// [`FileCache::last_seen`]
+    #[allow(clippy::struct_field_names)]
     last_seen_cache: u64,
 }
 

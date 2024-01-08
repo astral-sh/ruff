@@ -142,7 +142,7 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     else {
         return;
     };
-    let Some(arg) = args.get(0) else {
+    let Some(arg) = args.first() else {
         return;
     };
     let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = arg else {
@@ -249,7 +249,7 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     if attr != "get" {
         return;
     }
-    let Some(key) = args.get(0) else {
+    let Some(key) = args.first() else {
         return;
     };
     if !(key.is_literal_expr() || key.is_name_expr()) {

@@ -216,6 +216,7 @@ pub(crate) struct Args {
     #[arg(long)]
     pub(crate) files_with_errors: Option<u32>,
     #[clap(flatten)]
+    #[allow(clippy::struct_field_names)]
     pub(crate) log_level_args: LogLevelArgs,
 }
 
