@@ -40,11 +40,12 @@ impl Violation for ParenthesizeChainedOperators {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Parenthesize `foo and bar` expressions when chaining `and` and `or` together, to make the precedence clear"
+            "Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear"
         )
     }
 }
 
+/// RUF021
 pub(crate) fn parenthesize_chained_logical_operators(
     checker: &mut Checker,
     expr: &ast::ExprBoolOp,
@@ -56,22 +57,21 @@ pub(crate) fn parenthesize_chained_logical_operators(
             // than in the superexpression:
             // `a or b or c` => `BoolOp(values=[Name('a'), Name('b'), Name('c')], op=Or)`
             // `a or b and c` => `BoolOp(values=[Name('a'), BoolOp(values=[Name('b'), Name('c')], op=And)], op=Or)`
-            ast::Expr::BoolOp(
-                bool_op @ ast::ExprBoolOp {
-                    op: ast::BoolOp::And,
-                    ..
-                },
-            ) => {
+            ast::Expr::BoolOp(bool_op) => {
+                // `and` binds more tightly than `or`, and the AST reflects this:
+                // the BoolOp subexpression *must*, logically, be an `And`
+                // (and the superexpression *must*, logically, be an `Or`)
+                assert!(bool_op.op.is_and());
                 if parenthesized_range(
-                    ast::ExpressionRef::BoolOp(bool_op),
-                    ast::AnyNodeRef::ExprBoolOp(expr),
+                    bool_op.into(),
+                    expr.into(),
                     checker.indexer().comment_ranges(),
                     checker.locator().contents(),
                 )
                 .is_none()
                 {
                     checker.diagnostics.push(Diagnostic::new(
-                        ParenthesizeChainedOperators {},
+                        ParenthesizeChainedOperators,
                         bool_op.range(),
                     ));
                 }
