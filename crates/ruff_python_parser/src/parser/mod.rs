@@ -1,14 +1,8 @@
 use std::fmt::Display;
 
-use ast::{
-    BoolOp, CmpOp, ConversionFlag, ExceptHandler, ExprContext, FStringElement, IpyEscapeKind,
-    Number, Operator, Pattern, Singleton, UnaryOp,
-};
-use bitflags::bitflags;
-
+use self::helpers::token_kind_to_cmp_op;
 use crate::{
     error::FStringErrorType,
-    helpers::{self, token_kind_to_cmp_op},
     lexer::{LexResult, Spanned},
     string::{
         concatenated_strings, parse_fstring_literal_element, parse_string_literal, StringType,
@@ -16,13 +10,18 @@ use crate::{
     token_set::TokenSet,
     Mode, ParseError, ParseErrorType, Tok, TokenKind,
 };
+use ast::{
+    BoolOp, CmpOp, ConversionFlag, ExceptHandler, ExprContext, FStringElement, IpyEscapeKind,
+    Number, Operator, Pattern, Singleton, UnaryOp,
+};
+use bitflags::bitflags;
 use itertools::PeekNth;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 mod functions;
+mod helpers;
 mod tests;
-pub(super) use functions::ParenthesizedExpr;
 pub use functions::{
     parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
     parse_starts_at, parse_suite, parse_tokens,

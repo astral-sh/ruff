@@ -1,6 +1,6 @@
 use ruff_python_ast::{self as ast, Expr, ExprContext};
 
-pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
+pub(super) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
     match expr {
         Expr::Name(ast::ExprName { id, range, .. }) => ast::ExprName { range, id, ctx }.into(),
         Expr::Tuple(ast::ExprTuple { elts, range, .. }) => ast::ExprTuple {

@@ -1,13 +1,13 @@
 // auto-generated: "lalrpop 0.20.0"
-// sha3: 52e64382de1e21f3c91daed0357aca8393fb6527eed65a03431979f289401bc0
+// sha3: 3ff99e36b7208ab5b75a64d84ff1c9c8724160dc04955b8f393442db9321f62f
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use ruff_python_ast::{self as ast, Int, IpyEscapeKind};
 use crate::{
     FStringErrorType,
     Mode,
     lexer::{LexicalError, LexicalErrorType},
-    function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
-    context::set_context,
+    lalrpop::function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
+    lalrpop::context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
     token::{self, StringKind},
     invalid,
@@ -30,8 +30,8 @@ mod __parse__Top {
     FStringErrorType,
     Mode,
     lexer::{LexicalError, LexicalErrorType},
-    function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
-    context::set_context,
+    lalrpop::function::{ArgumentList, parse_arguments, validate_pos_params, validate_arguments},
+    lalrpop::context::set_context,
     string::{StringType, concatenated_strings, parse_fstring_literal_element, parse_string_literal},
     token::{self, StringKind},
     invalid,
