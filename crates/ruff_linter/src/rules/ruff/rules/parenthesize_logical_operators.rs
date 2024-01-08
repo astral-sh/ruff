@@ -50,7 +50,7 @@ pub(crate) fn parenthesize_chained_logical_operators(
 ) {
     for condition in &expr.values {
         match condition {
-            // If we find a BoolOp expressions inside BoolOp expressions,
+            // If we find a BoolOp expression inside a BoolOp expression,
             // it means a different operator is being used for the subexpression
             // than in the superexpression:
             // `a or b or c` => `BoolOp(values=[Name('a'), Name('b'), Name('c')], op=Or)`
