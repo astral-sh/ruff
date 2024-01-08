@@ -236,7 +236,7 @@ impl fmt::Display for EnumerateSubset {
 fn generate_range_len_call(name: &str, generator: Generator) -> String {
     // Construct `name`.
     let var = ast::ExprName {
-        id: name.into(),
+        id: name.to_string(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
@@ -244,7 +244,7 @@ fn generate_range_len_call(name: &str, generator: Generator) -> String {
     let len = ast::ExprCall {
         func: Box::new(
             ast::ExprName {
-                id: "len".into(),
+                id: "len".to_string(),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
             }
@@ -261,7 +261,7 @@ fn generate_range_len_call(name: &str, generator: Generator) -> String {
     let range = ast::ExprCall {
         func: Box::new(
             ast::ExprName {
-                id: "range".into(),
+                id: "range".to_string(),
                 ctx: ast::ExprContext::Load,
                 range: TextRange::default(),
             }

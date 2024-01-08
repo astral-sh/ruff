@@ -131,7 +131,7 @@ fn get_undecorated_methods(
 
                         if let Expr::Name(ast::ExprName { id, .. }) = &arguments.args[0] {
                             if target_name == *id {
-                                explicit_decorator_calls.insert(id.to_string(), stmt.range());
+                                explicit_decorator_calls.insert(id.clone(), stmt.range());
                             }
                         };
                     }

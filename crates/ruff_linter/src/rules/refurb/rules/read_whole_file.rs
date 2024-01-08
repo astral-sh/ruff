@@ -315,7 +315,7 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
         ReadMode::Bytes => "read_bytes",
     };
     let name = ast::ExprName {
-        id: method_name.into(),
+        id: method_name.to_string(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };

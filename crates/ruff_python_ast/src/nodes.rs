@@ -3334,6 +3334,13 @@ impl AsRef<str> for Identifier {
     }
 }
 
+impl AsRef<String> for Identifier {
+    #[inline]
+    fn as_ref(&self) -> &String {
+        &self.id
+    }
+}
+
 impl std::fmt::Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.id, f)
@@ -3343,7 +3350,7 @@ impl std::fmt::Display for Identifier {
 impl From<Identifier> for String {
     #[inline]
     fn from(identifier: Identifier) -> String {
-        identifier.id.to_string()
+        identifier.id
     }
 }
 

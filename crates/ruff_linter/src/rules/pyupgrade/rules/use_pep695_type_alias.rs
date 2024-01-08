@@ -92,12 +92,7 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
 
     // TODO(zanie): We should check for generic type variables used in the value and define them
     //              as type params instead
-    let mut diagnostic = Diagnostic::new(
-        NonPEP695TypeAlias {
-            name: name.to_string(),
-        },
-        stmt.range(),
-    );
+    let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
     let mut visitor = TypeVarReferenceVisitor {
         vars: vec![],
         semantic: checker.semantic(),

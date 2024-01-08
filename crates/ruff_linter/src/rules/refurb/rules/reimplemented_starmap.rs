@@ -315,7 +315,7 @@ fn construct_starmap_call(starmap_binding: String, iter: &Expr, func: &Expr) -> 
 /// Wrap given function call with yet another call.
 fn wrap_with_call_to(call: ast::ExprCall, func_name: &str) -> ast::ExprCall {
     let name = ast::ExprName {
-        id: func_name.into(),
+        id: func_name.to_string(),
         ctx: ast::ExprContext::Load,
         range: TextRange::default(),
     };
