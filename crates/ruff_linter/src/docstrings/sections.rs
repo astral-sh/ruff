@@ -153,13 +153,17 @@ impl<'a> SectionContexts<'a> {
         while let Some(line) = lines.next() {
             if let Some(section_kind) = suspected_as_section(&line, style) {
                 let indent = leading_space(&line);
-                let section_name = leading_words(&line);
+                let indent_size = indent.text_len();
 
-                let section_name_range = TextRange::at(indent.text_len(), section_name.text_len());
+                let section_name = leading_words(&line);
+                let section_name_size = section_name.text_len();
 
                 if is_docstring_section(
                     &line,
-                    section_name_range,
+                    indent_size,
+                    section_name_size,
+                    section_kind,
+                    last.as_ref(),
                     previous_line.as_ref(),
                     lines.peek(),
                 ) {
@@ -170,7 +174,8 @@ impl<'a> SectionContexts<'a> {
 
                     last = Some(SectionContextData {
                         kind: section_kind,
-                        name_range: section_name_range + line.start(),
+                        indent_size: indent.text_len(),
+                        name_range: TextRange::at(line.start() + indent_size, section_name_size),
                         range: TextRange::empty(line.start()),
                         summary_full_end: line.full_end(),
                     });
@@ -204,8 +209,8 @@ impl<'a> SectionContexts<'a> {
 }
 
 impl<'a> IntoIterator for &'a SectionContexts<'a> {
-    type IntoIter = SectionContextsIter<'a>;
     type Item = SectionContext<'a>;
+    type IntoIter = SectionContextsIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -256,6 +261,9 @@ impl ExactSizeIterator for SectionContextsIter<'_> {}
 #[derive(Debug)]
 struct SectionContextData {
     kind: SectionKind,
+
+    /// The size of the indentation of the section name.
+    indent_size: TextSize,
 
     /// Range of the section name, relative to the [`Docstring::body`]
     name_range: TextRange,
@@ -401,12 +409,15 @@ fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> 
 /// Check if the suspected context is really a section header.
 fn is_docstring_section(
     line: &Line,
-    section_name_range: TextRange,
+    indent_size: TextSize,
+    section_name_size: TextSize,
+    section_kind: SectionKind,
+    previous_section: Option<&SectionContextData>,
     previous_line: Option<&Line>,
     next_line: Option<&Line>,
 ) -> bool {
     // Determine whether the current line looks like a section header, e.g., "Args:".
-    let section_name_suffix = line[usize::from(section_name_range.end())..].trim();
+    let section_name_suffix = line[usize::from(indent_size + section_name_size)..].trim();
     let this_looks_like_a_section_name =
         section_name_suffix == ":" || section_name_suffix.is_empty();
     if !this_looks_like_a_section_name {
@@ -437,6 +448,26 @@ fn is_docstring_section(
     });
     if !previous_line_looks_like_end_of_paragraph {
         return false;
+    }
+
+    // Determine if this is a sub-section within another section, like `args` in:
+    // ```python
+    // def func(args: tuple[int]):
+    //     """Toggle the gizmo.
+    //
+    //     Args:
+    //         args: The arguments to the function.
+    //     """
+    // ```
+    // However, if the header is an _exact_ match (like `Returns:`, as opposed to `returns:`), then
+    // continue to treat it as a section header.
+    if let Some(previous_section) = previous_section {
+        if previous_section.indent_size < indent_size {
+            let verbatim = &line[TextRange::at(indent_size, section_name_size)];
+            if section_kind.as_str() != verbatim {
+                return false;
+            }
+        }
     }
 
     true

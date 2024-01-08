@@ -64,4 +64,12 @@ D417.py:108:5: D417 Missing argument description in the docstring for `f`: `*arg
 109 |     """Do something.
     |
 
+D417.py:155:5: D417 Missing argument description in the docstring for `select_data`: `auto_save`
+    |
+155 | def select_data(
+    |     ^^^^^^^^^^^ D417
+156 |     query: str,
+157 |     args: tuple,
+    |
+
 
