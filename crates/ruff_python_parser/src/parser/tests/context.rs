@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::parser::parse_suite;
+    use crate::parse_suite;
 
     #[test]
     fn test_assign_name() {

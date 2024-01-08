@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use crate::lexer::LexicalErrorType;
-    use crate::parser::parse_suite;
+    use crate::parse_suite;
     use crate::ParseErrorType;
 
     macro_rules! function_and_lambda {
@@ -9,7 +9,7 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    let parse_ast = crate::parser::parse_suite($code);
+                    let parse_ast = crate::parse_suite($code);
                     insta::assert_debug_snapshot!(parse_ast);
                 }
             )*

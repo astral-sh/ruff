@@ -435,8 +435,7 @@ pub(crate) fn concatenated_strings(
 #[cfg(test)]
 mod tests {
     use crate::lexer::LexicalErrorType;
-    use crate::parser::parse_suite;
-    use crate::{FStringErrorType, ParseErrorType, Suite};
+    use crate::{parse_suite, FStringErrorType, ParseErrorType, Suite};
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";

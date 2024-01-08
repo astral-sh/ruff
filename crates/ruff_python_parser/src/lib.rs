@@ -109,12 +109,15 @@
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
 
+use std::cell::Cell;
+
 pub use error::{FStringErrorType, ParseError, ParseErrorType};
-pub use parser::{
-    parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
-    parse_starts_at, parse_suite, parse_tokens, set_new_parser, ParsedFile,
-};
-use ruff_python_ast::{Mod, PySourceType, Suite};
+use itertools::Itertools;
+use lexer::{lex, lex_starts_at, Spanned};
+pub use parser::ParsedFile;
+use parser::Parser;
+use ruff_python_ast::{Expr, Mod, ModModule, PySourceType, Suite};
+use ruff_text_size::TextSize;
 pub use token::{StringKind, Tok, TokenKind};
 
 use crate::lexer::LexResult;
@@ -129,6 +132,238 @@ mod string;
 mod token;
 mod token_set;
 pub mod typing;
+
+thread_local! {
+    static NEW_PARSER: Cell<bool> = Cell::new(std::env::var("NEW_PARSER").is_ok());
+}
+
+/// Controls whether the current thread uses the new hand written or the old lalrpop based parser.
+///
+/// Uses the new hand written parser if `use_new_parser` is true.
+///
+/// Defaults to use the new handwritten parser if the environment variable `NEW_PARSER` is set.
+pub fn set_new_parser(use_new_parser: bool) {
+    NEW_PARSER.set(use_new_parser);
+}
+
+/// Parse a full Python program usually consisting of multiple lines.
+///
+/// This is a convenience function that can be used to parse a full Python program without having to
+/// specify the [`Mode`] or the location. It is probably what you want to use most of the time.
+///
+/// # Example
+///
+/// For example, parsing a simple function definition and a call to that function:
+///
+/// ```
+/// use ruff_python_parser as parser;
+/// let source = r#"
+/// def foo():
+///    return 42
+///
+/// print(foo())
+/// "#;
+/// let program = parser::parse_program(source);
+/// assert!(program.is_ok());
+/// ```
+pub fn parse_program(source: &str) -> Result<ModModule, ParseError> {
+    let lexer = lex(source, Mode::Module);
+    match parse_tokens(lexer, source, Mode::Module)? {
+        Mod::Module(m) => Ok(m),
+        Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
+    }
+}
+
+pub fn parse_suite(source: &str) -> Result<Suite, ParseError> {
+    parse_program(source).map(|m| m.body)
+}
+
+/// Parses a single Python expression.
+///
+/// This convenience function can be used to parse a single expression without having to
+/// specify the Mode or the location.
+///
+/// # Example
+///
+/// For example, parsing a single expression denoting the addition of two numbers:
+///
+///  ```
+/// use ruff_python_parser as parser;
+/// let expr = parser::parse_expression("1 + 2");
+///
+/// assert!(expr.is_ok());
+///
+/// ```
+pub fn parse_expression(source: &str) -> Result<Expr, ParseError> {
+    let lexer = lex(source, Mode::Expression);
+    match parse_tokens(lexer, source, Mode::Expression)? {
+        Mod::Expression(expression) => Ok(*expression.body),
+        Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
+    }
+}
+
+/// Parses a Python expression from a given location.
+///
+/// This function allows to specify the location of the expression in the source code, other than
+/// that, it behaves exactly like [`parse_expression`].
+///
+/// # Example
+///
+/// Parsing a single expression denoting the addition of two numbers, but this time specifying a different,
+/// somewhat silly, location:
+///
+/// ```
+/// use ruff_python_parser::{parse_expression_starts_at};
+/// # use ruff_text_size::TextSize;
+///
+/// let expr = parse_expression_starts_at("1 + 2", TextSize::from(400));
+/// assert!(expr.is_ok());
+/// ```
+pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr, ParseError> {
+    let lexer = lex_starts_at(source, Mode::Module, offset);
+    match parse_tokens(lexer, source, Mode::Expression)? {
+        Mod::Expression(expression) => Ok(*expression.body),
+        Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
+    }
+}
+
+/// Parse the given Python source code using the specified [`Mode`].
+///
+/// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
+/// it can be used to parse a single expression, a full Python program, an interactive expression
+/// or a Python program containing IPython escape commands.
+///
+/// # Example
+///
+/// If we want to parse a simple expression, we can use the [`Mode::Expression`] mode during
+/// parsing:
+///
+/// ```
+/// use ruff_python_parser::{Mode, parse};
+///
+/// let expr = parse("1 + 2", Mode::Expression);
+/// assert!(expr.is_ok());
+/// ```
+///
+/// Alternatively, we can parse a full Python program consisting of multiple lines:
+///
+/// ```
+/// use ruff_python_parser::{Mode, parse};
+///
+/// let source = r#"
+/// class Greeter:
+///
+///   def greet(self):
+///    print("Hello, world!")
+/// "#;
+/// let program = parse(source, Mode::Module);
+/// assert!(program.is_ok());
+/// ```
+///
+/// Additionally, we can parse a Python program containing IPython escapes:
+///
+/// ```
+/// use ruff_python_parser::{Mode, parse};
+///
+/// let source = r#"
+/// %timeit 1 + 2
+/// ?str.replace
+/// !ls
+/// "#;
+/// let program = parse(source, Mode::Ipython);
+/// assert!(program.is_ok());
+/// ```
+pub fn parse(source: &str, mode: Mode) -> Result<Mod, ParseError> {
+    parse_starts_at(source, mode, TextSize::default())
+}
+
+/// Parse the given Python source code using the specified [`Mode`] and [`TextSize`].
+///
+/// This function allows to specify the location of the the source code, other than
+/// that, it behaves exactly like [`parse`].
+///
+/// # Example
+///
+/// ```
+/// # use ruff_text_size::TextSize;
+/// use ruff_python_parser::{Mode, parse_starts_at};
+///
+/// let source = r#"
+/// def fib(i):
+///    a, b = 0, 1
+///    for _ in range(i):
+///       a, b = b, a + b
+///    return a
+///
+/// print(fib(42))
+/// "#;
+/// let program = parse_starts_at(source, Mode::Module, TextSize::from(0));
+/// assert!(program.is_ok());
+/// ```
+pub fn parse_starts_at(source: &str, mode: Mode, offset: TextSize) -> Result<Mod, ParseError> {
+    let lxr = lexer::lex_starts_at(source, mode, offset);
+    parse_tokens(lxr, source, mode)
+}
+
+/// Parse an iterator of [`LexResult`]s using the specified [`Mode`].
+///
+/// This could allow you to perform some preprocessing on the tokens before parsing them.
+///
+/// # Example
+///
+/// As an example, instead of parsing a string, we can parse a list of tokens after we generate
+/// them using the [`lexer::lex`] function:
+///
+/// ```
+/// use ruff_python_parser::{lexer::lex, Mode, parse_tokens};
+///
+/// let source = "1 + 2";
+/// let expr = parse_tokens(lex(source, Mode::Expression), source, Mode::Expression);
+/// assert!(expr.is_ok());
+/// ```
+pub fn parse_tokens(
+    lxr: impl IntoIterator<Item = LexResult>,
+    source: &str,
+    mode: Mode,
+) -> Result<Mod, ParseError> {
+    let lxr = lxr.into_iter();
+
+    parse_filtered_tokens(
+        lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline)),
+        source,
+        mode,
+    )
+}
+
+/// Parse tokens into an AST like [`parse_tokens`], but we already know all tokens are valid.
+pub fn parse_ok_tokens(
+    lxr: impl IntoIterator<Item = Spanned>,
+    source: &str,
+    mode: Mode,
+) -> Result<Mod, ParseError> {
+    if NEW_PARSER.get() {
+        crate::parser::parse_ok_tokens(lxr, source, mode)
+    } else {
+        crate::lalrpop::parse_ok_tokens(lxr, source, mode)
+    }
+}
+
+fn parse_filtered_tokens(
+    lxr: impl IntoIterator<Item = LexResult>,
+    source: &str,
+    mode: Mode,
+) -> Result<Mod, ParseError> {
+    if NEW_PARSER.get() {
+        let parsed_file = Parser::new(source, mode, lxr.into_iter()).parse();
+        if parsed_file.parse_errors.is_empty() {
+            Ok(parsed_file.ast)
+        } else {
+            Err(parsed_file.parse_errors.into_iter().next().unwrap())
+        }
+    } else {
+        crate::lalrpop::parse_filtered_tokens(lxr, source, mode)
+    }
+}
 
 /// Collect tokens up to and including the first error.
 pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {

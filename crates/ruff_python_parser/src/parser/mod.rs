@@ -3,7 +3,7 @@ use std::fmt::Display;
 use self::helpers::token_kind_to_cmp_op;
 use crate::{
     error::FStringErrorType,
-    lexer::{LexResult, Spanned},
+    lexer::{LexResult, LexicalError, Spanned},
     string::{
         concatenated_strings, parse_fstring_literal_element, parse_string_literal, StringType,
     },
@@ -11,7 +11,7 @@ use crate::{
     Mode, ParseError, ParseErrorType, Tok, TokenKind,
 };
 use ast::{
-    BoolOp, CmpOp, ConversionFlag, ExceptHandler, ExprContext, FStringElement, IpyEscapeKind,
+    BoolOp, CmpOp, ConversionFlag, ExceptHandler, ExprContext, FStringElement, IpyEscapeKind, Mod,
     Number, Operator, Pattern, Singleton, UnaryOp,
 };
 use bitflags::bitflags;
@@ -19,13 +19,25 @@ use itertools::PeekNth;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-mod functions;
 mod helpers;
 mod tests;
-pub use functions::{
-    parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
-    parse_starts_at, parse_suite, parse_tokens, set_new_parser,
-};
+
+pub(crate) fn parse_ok_tokens(
+    lxr: impl IntoIterator<Item = Spanned>,
+    source: &str,
+    mode: Mode,
+) -> Result<Mod, ParseError> {
+    let lxr = lxr
+        .into_iter()
+        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline))
+        .map(Ok::<(Tok, TextRange), LexicalError>);
+    let parsed_file = Parser::new(source, mode, lxr).parse();
+    if parsed_file.parse_errors.is_empty() {
+        Ok(parsed_file.ast)
+    } else {
+        Err(parsed_file.parse_errors.into_iter().next().unwrap())
+    }
+}
 
 #[derive(Debug)]
 pub struct ParsedFile {
