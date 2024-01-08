@@ -26,10 +26,10 @@ impl FormatNodeRule<ExprNamedExpr> for FormatExprNamedExpr {
         write!(
             f,
             [
-                group(&format_args!(
+                group(&format_args![
                     target.format(),
                     in_parentheses_only_soft_line_break_or_space()
-                )),
+                ]),
                 token(":=")
             ]
         )?;
