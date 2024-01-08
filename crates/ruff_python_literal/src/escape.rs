@@ -260,24 +260,6 @@ impl<'a> Escape for UnicodeEscape<'a> {
     }
 }
 
-#[cfg(test)]
-mod unicode_escape_tests {
-    use super::*;
-
-    #[test]
-    fn changed() {
-        fn test(s: &str) -> bool {
-            UnicodeEscape::new_repr(s).changed()
-        }
-        assert!(!test("hello"));
-        assert!(!test("'hello'"));
-        assert!(!test("\"hello\""));
-
-        assert!(test("'\"hello"));
-        assert!(test("hello\n"));
-    }
-}
-
 pub struct AsciiEscape<'a> {
     source: &'a [u8],
     layout: EscapeLayout,
@@ -451,5 +433,23 @@ impl BytesRepr<'_, '_> {
 impl std::fmt::Display for BytesRepr<'_, '_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.write(formatter)
+    }
+}
+
+#[cfg(test)]
+mod unicode_escape_tests {
+    use super::*;
+
+    #[test]
+    fn changed() {
+        fn test(s: &str) -> bool {
+            UnicodeEscape::new_repr(s).changed()
+        }
+        assert!(!test("hello"));
+        assert!(!test("'hello'"));
+        assert!(!test("\"hello\""));
+
+        assert!(test("'\"hello"));
+        assert!(test("hello\n"));
     }
 }

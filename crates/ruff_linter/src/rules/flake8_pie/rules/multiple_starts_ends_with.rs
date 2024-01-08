@@ -134,7 +134,7 @@ pub(crate) fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                             format!("Indices should only contain `{attr_name}` calls")
                         )
                     };
-                    args.get(0)
+                    args.first()
                         .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
                 })
                 .collect();

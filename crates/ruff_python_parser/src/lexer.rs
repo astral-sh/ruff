@@ -1476,7 +1476,7 @@ impl Radix {
             Radix::Binary => matches!(c, '0'..='1'),
             Radix::Octal => matches!(c, '0'..='7'),
             Radix::Decimal => c.is_ascii_digit(),
-            Radix::Hex => matches!(c, '0'..='9' | 'a'..='f' | 'A'..='F'),
+            Radix::Hex => c.is_ascii_hexdigit(),
         }
     }
 }
