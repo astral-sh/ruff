@@ -47,23 +47,16 @@ pub struct ParsedFile {
 
 bitflags! {
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-    struct ParserCtxFlags: u16 {
+    struct ParserCtxFlags: u8 {
         const TUPLE_EXPR = 1 << 0;
         const PARENTHESIZED_EXPR = 1 << 1;
         const BRACKETSIZED_EXPR = 1 << 2;
         const BRACESIZED_EXPR = 1 << 3;
-        const LAMBDA_EXPR = 1 << 4;
 
-        const IF_STMT = 1 << 5;
-        const FUNC_DEF_STMT = 1 << 6;
-        const CLASS_DEF_STMT = 1 << 7;
-        const WITH_STMT = 1 << 8;
-        const FOR_STMT = 1 << 9;
-        const WHILE_STMT  = 1 << 10;
-        const MATCH_STMT  = 1 << 11;
-
-        const ARGUMENTS = 1 << 12;
-        const FOR_TARGET = 1 << 13;
+        // NOTE: `ARGUMENTS` can be removed once the heuristic in `parse_with_items`
+        // is improved.
+        const ARGUMENTS = 1 << 4;
+        const FOR_TARGET = 1 << 5;
     }
 }
 
@@ -74,6 +67,46 @@ type StmtWithRange = (Stmt, TextRange);
 enum Associativity {
     Left,
     Right,
+}
+
+enum Clause {
+    If,
+    Else,
+    ElIf,
+    For,
+    With,
+    Class,
+    While,
+    FunctionDef,
+    Match,
+    Try,
+    Except,
+    Finally,
+}
+
+impl Display for Clause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Clause::If => write!(f, "`if` statement"),
+            Clause::Else => write!(f, "`else` clause"),
+            Clause::ElIf => write!(f, "`elif` clause"),
+            Clause::For => write!(f, "`for` statement"),
+            Clause::With => write!(f, "`with` statement"),
+            Clause::Class => write!(f, "`class` definition"),
+            Clause::While => write!(f, "`while` statement"),
+            Clause::FunctionDef => write!(f, "function definition"),
+            Clause::Match => write!(f, "`match` statement"),
+            Clause::Try => write!(f, "`try` statement"),
+            Clause::Except => write!(f, "`except` clause"),
+            Clause::Finally => write!(f, "`finally` clause"),
+        }
+    }
+}
+
+#[derive(PartialEq, Copy, Clone)]
+enum FunctionKind {
+    Lambda,
+    FunctionDef,
 }
 
 pub(crate) struct Parser<'src, I>
@@ -546,7 +579,6 @@ where
     }
 
     fn parse_match_stmt(&mut self) -> StmtWithRange {
-        self.set_ctx(ParserCtxFlags::MATCH_STMT);
         let mut range = self.current_range();
 
         self.eat(TokenKind::Match);
@@ -579,7 +611,6 @@ where
 
         self.eat(TokenKind::Dedent);
 
-        self.clear_ctx(ParserCtxFlags::MATCH_STMT);
         (
             Stmt::Match(ast::StmtMatch {
                 subject: Box::new(subject),
@@ -604,7 +635,7 @@ where
         };
 
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
-        let (body, body_range) = self.parse_body();
+        let (body, body_range) = self.parse_body(Clause::Match);
         range = range.cover(body_range);
 
         ast::MatchCase {
@@ -1253,7 +1284,6 @@ where
     }
 
     fn parse_while_stmt(&mut self) -> StmtWithRange {
-        self.set_ctx(ParserCtxFlags::WHILE_STMT);
         let mut range = self.current_range();
         self.eat(TokenKind::While);
 
@@ -1264,20 +1294,19 @@ where
         );
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body();
+        let (body, body_range) = self.parse_body(Clause::While);
         range = range.cover(body_range);
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (else_body, else_body_range) = self.parse_body();
+            let (else_body, else_body_range) = self.parse_body(Clause::Else);
             range = range.cover(else_body_range);
             else_body
         } else {
             vec![]
         };
 
-        self.clear_ctx(ParserCtxFlags::WHILE_STMT);
         (
             Stmt::While(ast::StmtWhile {
                 test: Box::new(test),
@@ -1290,8 +1319,6 @@ where
     }
 
     fn parse_for_stmt(&mut self) -> StmtWithRange {
-        self.set_ctx(ParserCtxFlags::FOR_STMT);
-
         let mut range = self.current_range();
         self.eat(TokenKind::For);
 
@@ -1314,20 +1341,19 @@ where
         );
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body();
+        let (body, body_range) = self.parse_body(Clause::For);
         range = range.cover(body_range);
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (else_body, else_body_range) = self.parse_body();
+            let (else_body, else_body_range) = self.parse_body(Clause::Else);
             range = range.cover(else_body_range);
             else_body
         } else {
             vec![]
         };
 
-        self.clear_ctx(ParserCtxFlags::FOR_STMT);
         (
             Stmt::For(ast::StmtFor {
                 target: Box::new(target),
@@ -1350,7 +1376,7 @@ where
         let mut has_except = false;
         let mut has_finally = false;
 
-        let (try_body, _) = self.parse_body();
+        let (try_body, _) = self.parse_body(Clause::Try);
 
         let mut handlers = vec![];
         loop {
@@ -1388,7 +1414,7 @@ where
 
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (except_body, except_body_range) = self.parse_body();
+            let (except_body, except_body_range) = self.parse_body(Clause::Except);
 
             except_range = except_range.cover(except_body_range);
             range = range.cover(except_range);
@@ -1410,7 +1436,7 @@ where
         let orelse = if self.eat(TokenKind::Else) {
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (else_body, else_body_range) = self.parse_body();
+            let (else_body, else_body_range) = self.parse_body(Clause::Else);
             range = range.cover(else_body_range);
             else_body
         } else {
@@ -1421,7 +1447,7 @@ where
             has_finally = true;
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (finally_body, finally_body_range) = self.parse_body();
+            let (finally_body, finally_body_range) = self.parse_body(Clause::Finally);
             range = range.cover(finally_body_range);
             finally_body
         } else {
@@ -1504,8 +1530,6 @@ where
         decorator_list: Vec<ast::Decorator>,
         func_range: TextRange,
     ) -> StmtWithRange {
-        self.set_ctx(ParserCtxFlags::FUNC_DEF_STMT);
-
         self.eat(TokenKind::Def);
         let name = self.parse_identifier();
         let type_params = if self.at(TokenKind::Lsqb) {
@@ -1524,7 +1548,7 @@ where
             ),
         );
 
-        let mut parameters = self.parse_parameters();
+        let mut parameters = self.parse_parameters(FunctionKind::FunctionDef);
 
         let rpar_range = self.current_range();
 
@@ -1561,10 +1585,8 @@ where
                 .union([TokenKind::Rarrow].as_slice().into()),
         );
 
-        let (body, body_range) = self.parse_body();
+        let (body, body_range) = self.parse_body(Clause::FunctionDef);
         let range = func_range.cover(body_range);
-
-        self.clear_ctx(ParserCtxFlags::FUNC_DEF_STMT);
 
         (
             Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -1586,8 +1608,6 @@ where
         decorator_list: Vec<ast::Decorator>,
         class_range: TextRange,
     ) -> StmtWithRange {
-        self.set_ctx(ParserCtxFlags::CLASS_DEF_STMT);
-
         self.eat(TokenKind::Class);
 
         let name = self.parse_identifier();
@@ -1604,10 +1624,8 @@ where
 
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body();
+        let (body, body_range) = self.parse_body(Clause::Class);
         let range = class_range.cover(body_range);
-
-        self.clear_ctx(ParserCtxFlags::CLASS_DEF_STMT);
 
         (
             Stmt::ClassDef(ast::StmtClassDef {
@@ -1816,7 +1834,6 @@ where
     }
 
     fn parse_with_stmt(&mut self) -> StmtWithRange {
-        self.set_ctx(ParserCtxFlags::WITH_STMT);
         let mut range = self.current_range();
 
         self.eat(TokenKind::With);
@@ -1824,10 +1841,8 @@ where
         let items = self.parse_with_items();
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body();
+        let (body, body_range) = self.parse_body(Clause::With);
         range = range.cover(body_range);
-
-        self.clear_ctx(ParserCtxFlags::WITH_STMT);
 
         (
             Stmt::With(ast::StmtWith {
@@ -2500,7 +2515,6 @@ where
 
     const ELSE_ELIF_SET: TokenSet = TokenSet::new(&[TokenKind::Else, TokenKind::Elif]);
     fn parse_if_stmt(&mut self) -> StmtWithRange {
-        self.set_ctx(ParserCtxFlags::IF_STMT);
         let mut if_range = self.current_range();
         assert!(self.eat(TokenKind::If));
 
@@ -2511,7 +2525,7 @@ where
         );
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body();
+        let (body, body_range) = self.parse_body(Clause::If);
         if_range = if_range.cover(body_range);
 
         let elif_else_clauses = if self.at_ts(Self::ELSE_ELIF_SET) {
@@ -2523,7 +2537,6 @@ where
             vec![]
         };
 
-        self.clear_ctx(ParserCtxFlags::IF_STMT);
         (
             Stmt::If(ast::StmtIf {
                 test: Box::new(test),
@@ -2549,7 +2562,7 @@ where
             );
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (body, body_range) = self.parse_body();
+            let (body, body_range) = self.parse_body(Clause::ElIf);
             range = body_range;
             elif_else_stmts.push(ast::ElifElseClause {
                 test: Some(test),
@@ -2563,7 +2576,7 @@ where
             self.eat(TokenKind::Else);
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (body, body_range) = self.parse_body();
+            let (body, body_range) = self.parse_body(Clause::Else);
             range = body_range;
             elif_else_stmts.push(ast::ElifElseClause {
                 test: None,
@@ -2575,7 +2588,7 @@ where
         (elif_else_stmts, range)
     }
 
-    fn parse_body(&mut self) -> (Vec<Stmt>, TextRange) {
+    fn parse_body(&mut self, parent_clause: Clause) -> (Vec<Stmt>, TextRange) {
         let mut last_stmt_range = TextRange::default();
         let mut stmts = vec![];
 
@@ -2602,24 +2615,13 @@ where
 
             self.eat(TokenKind::Dedent);
         } else {
-            let ctx_str = match self.ctx {
-                ParserCtxFlags::IF_STMT => Some("`if` statement"),
-                ParserCtxFlags::FOR_STMT => Some("`for` statement"),
-                ParserCtxFlags::WITH_STMT => Some("`with` statement"),
-                ParserCtxFlags::WHILE_STMT => Some("`while` statement"),
-                ParserCtxFlags::CLASS_DEF_STMT => Some("`class` definition"),
-                ParserCtxFlags::FUNC_DEF_STMT => Some("function definition"),
-                _ => None,
-            };
-            if let Some(ctx_str) = ctx_str {
-                let range = self.current_range();
-                self.add_error(
-                    ParseErrorType::OtherError(format!(
-                        "expected an indented block after {ctx_str}"
-                    )),
-                    range,
-                );
-            }
+            let range = self.current_range();
+            self.add_error(
+                ParseErrorType::OtherError(format!(
+                    "expected an indented block after {parent_clause}"
+                )),
+                range,
+            );
         }
 
         (stmts, last_stmt_range)
@@ -4202,13 +4204,12 @@ where
     }
 
     fn parse_lambda_expr(&mut self, start_range: TextRange) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::LAMBDA_EXPR);
         let mut lambda_range = start_range;
 
         let parameters: Option<Box<ast::Parameters>> = if self.at(TokenKind::Colon) {
             None
         } else {
-            Some(Box::new(self.parse_parameters()))
+            Some(Box::new(self.parse_parameters(FunctionKind::Lambda)))
         };
 
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
@@ -4245,7 +4246,6 @@ where
         let (body, body_range) = self.parse_expr();
         lambda_range = lambda_range.cover(body_range);
 
-        self.clear_ctx(ParserCtxFlags::LAMBDA_EXPR);
         (
             Expr::Lambda(ast::ExprLambda {
                 body: Box::new(body),
@@ -4256,14 +4256,12 @@ where
         )
     }
 
-    fn parse_parameter(&mut self) -> ast::Parameter {
+    fn parse_parameter(&mut self, function_kind: FunctionKind) -> ast::Parameter {
         let name = self.parse_identifier();
         let mut range = name.range;
         // If we are at a colon and we're currently parsing a `lambda` expression,
         // this is the `lambda`'s body, don't try to parse as an annotation.
-        let annotation = if self.at(TokenKind::Colon)
-            && !self.has_in_curr_or_parent_ctx(ParserCtxFlags::LAMBDA_EXPR)
-        {
+        let annotation = if self.at(TokenKind::Colon) && function_kind != FunctionKind::Lambda {
             self.eat(TokenKind::Colon);
             let (ann, ann_range) = self.parse_expr();
             range = range.cover(ann_range);
@@ -4279,8 +4277,11 @@ where
         }
     }
 
-    fn parse_parameter_with_default(&mut self) -> ast::ParameterWithDefault {
-        let parameter = self.parse_parameter();
+    fn parse_parameter_with_default(
+        &mut self,
+        function_kind: FunctionKind,
+    ) -> ast::ParameterWithDefault {
+        let parameter = self.parse_parameter(function_kind);
         let mut range = parameter.range;
 
         let default = if self.eat(TokenKind::Equal) {
@@ -4298,7 +4299,7 @@ where
         }
     }
 
-    fn parse_parameters(&mut self) -> ast::Parameters {
+    fn parse_parameters(&mut self, function_kind: FunctionKind) -> ast::Parameters {
         let mut args = vec![];
         let mut posonlyargs = vec![];
         let mut kwonlyargs = vec![];
@@ -4309,12 +4310,9 @@ where
         let mut has_seen_vararg = false;
         let mut has_seen_default_param = false;
 
-        let ending = if self.has_ctx(ParserCtxFlags::FUNC_DEF_STMT) {
-            TokenKind::Rpar
-        } else if self.has_ctx(ParserCtxFlags::LAMBDA_EXPR) {
-            TokenKind::Colon
-        } else {
-            TokenKind::Newline
+        let ending = match function_kind {
+            FunctionKind::Lambda => TokenKind::Colon,
+            FunctionKind::FunctionDef => TokenKind::Rpar,
         };
 
         let ending_set = TokenSet::new(&[TokenKind::Rarrow, ending]).union(COMPOUND_STMT_SET);
@@ -4332,13 +4330,13 @@ where
                     if parser.at(TokenKind::Comma) {
                         has_seen_default_param = false;
                     } else if parser.at_expr() {
-                        let param = parser.parse_parameter();
+                        let param = parser.parse_parameter(function_kind);
                         range = param.range;
                         vararg = Some(Box::new(param));
                     }
                 } else if parser.eat(TokenKind::DoubleStar) {
                     has_seen_vararg = true;
-                    let param = parser.parse_parameter();
+                    let param = parser.parse_parameter(function_kind);
                     range = param.range;
                     kwarg = Some(Box::new(param));
                 } else if parser.eat(TokenKind::Slash) {
@@ -4352,7 +4350,7 @@ where
                     }
                     std::mem::swap(&mut args, &mut posonlyargs);
                 } else if parser.at(TokenKind::Name) {
-                    let param = parser.parse_parameter_with_default();
+                    let param = parser.parse_parameter_with_default(function_kind);
                     // Don't allow non-default parameters after default parameters e.g. `a=1, b`,
                     // can't place `b` after `a=1`. Non-default parameters are only allowed after
                     // default parameters if we have a `*` before them, e.g. `a=1, *, b`.
