@@ -1,3 +1,6 @@
+//! Fuzzer harness which double formats the input and access the idempotency or unsteady state of the
+//! ruff's formatter.
+
 #![no_main]
 
 use libfuzzer_sys::{fuzz_target, Corpus};
