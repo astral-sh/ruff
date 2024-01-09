@@ -139,21 +139,35 @@ impl Resolver {
             }
         }
 
+        // Determine whether any of the settings require namespace packages. If not, we can save
+        // a lookup for every file.
+        let has_namespace_packages = self
+            .settings
+            .values()
+            .any(|settings| !settings.linter.namespace_packages.is_empty());
+
         // Search for the package root for each file.
         let mut package_roots: FxHashMap<&Path, Option<&Path>> = FxHashMap::default();
         for file in files {
-            let namespace_packages = &self
-                .resolve(file, pyproject_config)
-                .linter
-                .namespace_packages;
             if let Some(package) = file.parent() {
-                if package_roots.contains_key(package) {
-                    continue;
+                match package_roots.entry(package) {
+                    std::collections::hash_map::Entry::Occupied(_) => continue,
+                    std::collections::hash_map::Entry::Vacant(entry) => {
+                        let namespace_packages = if has_namespace_packages {
+                            self.resolve(file, pyproject_config)
+                                .linter
+                                .namespace_packages
+                                .as_slice()
+                        } else {
+                            &[]
+                        };
+                        entry.insert(detect_package_root_with_cache(
+                            package,
+                            namespace_packages,
+                            &mut package_cache,
+                        ));
+                    }
                 }
-                package_roots.insert(
-                    package,
-                    detect_package_root_with_cache(package, namespace_packages, &mut package_cache),
-                );
             }
         }
 
