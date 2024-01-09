@@ -55,6 +55,7 @@ lalrpop-util = { version = "0.20.0", default-features = false }
 lexical-parse-float = { version = "0.8.0", features = ["format"] }
 libcst = { version = "1.1.0", default-features = false }
 log = { version = "0.4.17" }
+matchit = { version = "0.7.3" }
 memchr = { version = "2.6.4" }
 mimalloc = { version ="0.1.39"}
 natord = { version = "1.0.9" }

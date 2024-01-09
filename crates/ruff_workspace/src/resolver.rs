@@ -83,26 +83,27 @@ pub enum Relativity {
 }
 
 impl Relativity {
-    pub fn resolve(self, path: &Path) -> PathBuf {
+    pub fn resolve(self, path: &Path) -> &Path {
         match self {
             Relativity::Parent => path
                 .parent()
-                .expect("Expected pyproject.toml file to be in parent directory")
-                .to_path_buf(),
-            Relativity::Cwd => path_dedot::CWD.clone(),
+                .expect("Expected `pyproject.toml` file to be in parent directory"),
+            Relativity::Cwd => &path_dedot::CWD,
         }
     }
 }
 
 #[derive(Default)]
 pub struct Resolver {
+    /// All [`Settings`] that have been inserted into this [`Resolver`].
     settings: Vec<Settings>,
+    /// A router from path to index in the [`Settings`] vector.
     router: Router<usize>,
 }
 
 impl Resolver {
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: PathBuf, settings: Settings) -> Result<()> {
+    fn add(&mut self, path: &Path, settings: Settings) -> Result<()> {
         self.settings.push(settings);
         match self.router.insert(
             format!("{}/*filepath", path.to_string_lossy()),
@@ -231,7 +232,7 @@ fn resolve_configuration(
         let options = pyproject::load_options(&path)?;
 
         let project_root = relativity.resolve(&path);
-        let configuration = Configuration::from_options(options, &project_root)?;
+        let configuration = Configuration::from_options(options, project_root)?;
 
         // If extending, continue to collect.
         next = configuration.extend.as_ref().map(|extend| {
@@ -259,14 +260,14 @@ fn resolve_configuration(
 
 /// Extract the project root (scope) and [`Settings`] from a given
 /// `pyproject.toml`.
-fn resolve_scoped_settings(
-    pyproject: &Path,
+fn resolve_scoped_settings<'a>(
+    pyproject: &'a Path,
     relativity: Relativity,
     transformer: &dyn ConfigurationTransformer,
-) -> Result<(PathBuf, Settings)> {
+) -> Result<(&'a Path, Settings)> {
     let configuration = resolve_configuration(pyproject, relativity, transformer)?;
     let project_root = relativity.resolve(pyproject);
-    let settings = configuration.into_settings(&project_root)?;
+    let settings = configuration.into_settings(project_root)?;
     Ok((project_root, settings))
 }
 
