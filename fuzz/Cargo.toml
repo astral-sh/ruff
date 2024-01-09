@@ -21,6 +21,7 @@ ruff_linter = { path = "../crates/ruff_linter" }
 ruff_python_codegen = { path = "../crates/ruff_python_codegen" }
 ruff_python_parser = { path = "../crates/ruff_python_parser" }
 ruff_source_file = { path = "../crates/ruff_source_file" }
+ruff_python_formatter = { path = "../crates/ruff_python_formatter"}
 
 arbitrary = { version = "1.3.0", features = ["derive"] }
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
@@ -41,6 +42,10 @@ path = "fuzz_targets/ruff_fix_validity.rs"
 [[bin]]
 name = "ruff_parse_idempotency"
 path = "fuzz_targets/ruff_parse_idempotency.rs"
+
+[[bin]]
+name = "ruff_formatter_idempotency"
+path = "fuzz_targets/ruff_formatter_idempotency.rs"
 
 [profile.release]
 opt-level = 3
