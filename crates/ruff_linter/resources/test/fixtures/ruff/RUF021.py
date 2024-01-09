@@ -10,8 +10,7 @@
 
 a, b, c = 1, 0, 2
 x = a or b and c  # RUF021: => `a or (b and c)`
-x = a or b and c  # looooooooooooong comment but not long enough to prevent an autofix
-x = a or b and c  # looooooooong comment to prevent an autofix (line would be too long)
+x = a or b and c  # looooooooooooooooooooooooooooooong comment but it won't prevent an autofix
 
 a, b, c = 0, 1, 2
 y = a and b or c  # RUF021: => `(a and b) or c`
@@ -41,6 +40,20 @@ assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
 if (not a) and b or c or d:  # RUF021: => `((not a) and b) or c or d`
     if (not a and b) or c or d:  # OK
         pass
+
+if (
+    some_reasonably_long_condition
+    or some_other_reasonably_long_condition
+    and some_third_reasonably_long_condition
+    or some_fourth_reasonably_long_condition
+    and some_fifth_reasonably_long_condition
+    # a commment
+    and some_sixth_reasonably_long_condition
+    and some_seventh_reasonably_long_condition
+    # another comment
+    or some_eighth_reasonably_long_condition
+):
+    pass
 
 #############################################
 # If they're all the same operator, it's fine

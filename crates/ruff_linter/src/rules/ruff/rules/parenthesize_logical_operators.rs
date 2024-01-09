@@ -1,13 +1,10 @@
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::line_width::LineWidthBuilder;
-use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for chained operators where adding parentheses could improve the
@@ -39,9 +36,7 @@ use crate::settings::LinterSettings;
 #[violation]
 pub struct ParenthesizeChainedOperators;
 
-impl Violation for ParenthesizeChainedOperators {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for ParenthesizeChainedOperators {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -49,10 +44,8 @@ impl Violation for ParenthesizeChainedOperators {
         )
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some(
-            "Put parentheses around the `and` subexpression inside the `or` expression".to_string(),
-        )
+    fn fix_title(&self) -> String {
+        "Parenthesize the `and` subexpression".to_string()
     }
 }
 
@@ -96,37 +89,15 @@ pub(crate) fn parenthesize_chained_logical_operators(
                 )
                 .is_none()
                 {
-                    let mut diagnostic =
-                        Diagnostic::new(ParenthesizeChainedOperators, source_range);
-                    if is_single_line_expr_with_narrow_width(
-                        locator,
-                        source_range,
-                        checker.settings,
-                    ) {
-                        let new_source = format!("({})", locator.slice(source_range));
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(new_source, source_range),
-                            Applicability::Safe,
-                        ));
-                    }
-                    checker.diagnostics.push(diagnostic);
+                    let new_source = format!("({})", locator.slice(source_range));
+                    let edit = Edit::range_replacement(new_source, source_range);
+                    checker.diagnostics.push(
+                        Diagnostic::new(ParenthesizeChainedOperators, source_range)
+                            .with_fix(Fix::safe_edit(edit)),
+                    );
                 }
             }
             _ => continue,
         };
     }
-}
-
-fn is_single_line_expr_with_narrow_width(
-    locator: &Locator,
-    source_range: TextRange,
-    settings: &LinterSettings,
-) -> bool {
-    if locator.contains_line_break(source_range) {
-        return false;
-    }
-    let width_with_fix = LineWidthBuilder::new(settings.tab_size)
-        .add_str(locator.full_line(source_range.start()).trim_end())
-        .add_str("()");
-    width_with_fix <= settings.line_length
 }
