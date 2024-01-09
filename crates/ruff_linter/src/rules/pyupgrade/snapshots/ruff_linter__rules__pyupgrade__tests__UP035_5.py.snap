@@ -1,0 +1,497 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP035_5.py:2:1: UP035 [*] Import from `collections.abc` instead: `AsyncGenerator`
+  |
+1 | """Members of `typing` that were moved to `collections.abc`."""
+2 | from typing import AsyncGenerator
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+3 | from typing import AsyncIterable
+4 | from typing import AsyncIterator
+  |
+  = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+1 1 | """Members of `typing` that were moved to `collections.abc`."""
+2   |-from typing import AsyncGenerator
+  2 |+from collections.abc import AsyncGenerator
+3 3 | from typing import AsyncIterable
+4 4 | from typing import AsyncIterator
+5 5 | from typing import Awaitable
+
+UP035_5.py:3:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterable`
+  |
+1 | """Members of `typing` that were moved to `collections.abc`."""
+2 | from typing import AsyncGenerator
+3 | from typing import AsyncIterable
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+4 | from typing import AsyncIterator
+5 | from typing import Awaitable
+  |
+  = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+1 1 | """Members of `typing` that were moved to `collections.abc`."""
+2 2 | from typing import AsyncGenerator
+3   |-from typing import AsyncIterable
+  3 |+from collections.abc import AsyncIterable
+4 4 | from typing import AsyncIterator
+5 5 | from typing import Awaitable
+6 6 | from typing import ByteString
+
+UP035_5.py:4:1: UP035 [*] Import from `collections.abc` instead: `AsyncIterator`
+  |
+2 | from typing import AsyncGenerator
+3 | from typing import AsyncIterable
+4 | from typing import AsyncIterator
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+5 | from typing import Awaitable
+6 | from typing import ByteString
+  |
+  = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+1 1 | """Members of `typing` that were moved to `collections.abc`."""
+2 2 | from typing import AsyncGenerator
+3 3 | from typing import AsyncIterable
+4   |-from typing import AsyncIterator
+  4 |+from collections.abc import AsyncIterator
+5 5 | from typing import Awaitable
+6 6 | from typing import ByteString
+7 7 | from typing import Collection
+
+UP035_5.py:5:1: UP035 [*] Import from `collections.abc` instead: `Awaitable`
+  |
+3 | from typing import AsyncIterable
+4 | from typing import AsyncIterator
+5 | from typing import Awaitable
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+6 | from typing import ByteString
+7 | from typing import Collection
+  |
+  = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+2 2 | from typing import AsyncGenerator
+3 3 | from typing import AsyncIterable
+4 4 | from typing import AsyncIterator
+5   |-from typing import Awaitable
+  5 |+from collections.abc import Awaitable
+6 6 | from typing import ByteString
+7 7 | from typing import Collection
+8 8 | from typing import Container
+
+UP035_5.py:6:1: UP035 [*] Import from `collections.abc` instead: `ByteString`
+  |
+4 | from typing import AsyncIterator
+5 | from typing import Awaitable
+6 | from typing import ByteString
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+7 | from typing import Collection
+8 | from typing import Container
+  |
+  = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+3 3 | from typing import AsyncIterable
+4 4 | from typing import AsyncIterator
+5 5 | from typing import Awaitable
+6   |-from typing import ByteString
+  6 |+from collections.abc import ByteString
+7 7 | from typing import Collection
+8 8 | from typing import Container
+9 9 | from typing import Coroutine
+
+UP035_5.py:7:1: UP035 [*] Import from `collections.abc` instead: `Collection`
+  |
+5 | from typing import Awaitable
+6 | from typing import ByteString
+7 | from typing import Collection
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+8 | from typing import Container
+9 | from typing import Coroutine
+  |
+  = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+4 4 | from typing import AsyncIterator
+5 5 | from typing import Awaitable
+6 6 | from typing import ByteString
+7   |-from typing import Collection
+  7 |+from collections.abc import Collection
+8 8 | from typing import Container
+9 9 | from typing import Coroutine
+10 10 | from typing import Generator
+
+UP035_5.py:8:1: UP035 [*] Import from `collections.abc` instead: `Container`
+   |
+ 6 | from typing import ByteString
+ 7 | from typing import Collection
+ 8 | from typing import Container
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+ 9 | from typing import Coroutine
+10 | from typing import Generator
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+5 5 | from typing import Awaitable
+6 6 | from typing import ByteString
+7 7 | from typing import Collection
+8   |-from typing import Container
+  8 |+from collections.abc import Container
+9 9 | from typing import Coroutine
+10 10 | from typing import Generator
+11 11 | from typing import Hashable
+
+UP035_5.py:9:1: UP035 [*] Import from `collections.abc` instead: `Coroutine`
+   |
+ 7 | from typing import Collection
+ 8 | from typing import Container
+ 9 | from typing import Coroutine
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+10 | from typing import Generator
+11 | from typing import Hashable
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+6  6  | from typing import ByteString
+7  7  | from typing import Collection
+8  8  | from typing import Container
+9     |-from typing import Coroutine
+   9  |+from collections.abc import Coroutine
+10 10 | from typing import Generator
+11 11 | from typing import Hashable
+12 12 | from typing import ItemsView
+
+UP035_5.py:10:1: UP035 [*] Import from `collections.abc` instead: `Generator`
+   |
+ 8 | from typing import Container
+ 9 | from typing import Coroutine
+10 | from typing import Generator
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+11 | from typing import Hashable
+12 | from typing import ItemsView
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+7  7  | from typing import Collection
+8  8  | from typing import Container
+9  9  | from typing import Coroutine
+10    |-from typing import Generator
+   10 |+from collections.abc import Generator
+11 11 | from typing import Hashable
+12 12 | from typing import ItemsView
+13 13 | from typing import Iterable
+
+UP035_5.py:11:1: UP035 [*] Import from `collections.abc` instead: `Hashable`
+   |
+ 9 | from typing import Coroutine
+10 | from typing import Generator
+11 | from typing import Hashable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+12 | from typing import ItemsView
+13 | from typing import Iterable
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+8  8  | from typing import Container
+9  9  | from typing import Coroutine
+10 10 | from typing import Generator
+11    |-from typing import Hashable
+   11 |+from collections.abc import Hashable
+12 12 | from typing import ItemsView
+13 13 | from typing import Iterable
+14 14 | from typing import Iterator
+
+UP035_5.py:12:1: UP035 [*] Import from `collections.abc` instead: `ItemsView`
+   |
+10 | from typing import Generator
+11 | from typing import Hashable
+12 | from typing import ItemsView
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 | from typing import Iterable
+14 | from typing import Iterator
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+9  9  | from typing import Coroutine
+10 10 | from typing import Generator
+11 11 | from typing import Hashable
+12    |-from typing import ItemsView
+   12 |+from collections.abc import ItemsView
+13 13 | from typing import Iterable
+14 14 | from typing import Iterator
+15 15 | from typing import KeysView
+
+UP035_5.py:13:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
+   |
+11 | from typing import Hashable
+12 | from typing import ItemsView
+13 | from typing import Iterable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+14 | from typing import Iterator
+15 | from typing import KeysView
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+10 10 | from typing import Generator
+11 11 | from typing import Hashable
+12 12 | from typing import ItemsView
+13    |-from typing import Iterable
+   13 |+from collections.abc import Iterable
+14 14 | from typing import Iterator
+15 15 | from typing import KeysView
+16 16 | from typing import Mapping
+
+UP035_5.py:14:1: UP035 [*] Import from `collections.abc` instead: `Iterator`
+   |
+12 | from typing import ItemsView
+13 | from typing import Iterable
+14 | from typing import Iterator
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+15 | from typing import KeysView
+16 | from typing import Mapping
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+11 11 | from typing import Hashable
+12 12 | from typing import ItemsView
+13 13 | from typing import Iterable
+14    |-from typing import Iterator
+   14 |+from collections.abc import Iterator
+15 15 | from typing import KeysView
+16 16 | from typing import Mapping
+17 17 | from typing import MappingView
+
+UP035_5.py:15:1: UP035 [*] Import from `collections.abc` instead: `KeysView`
+   |
+13 | from typing import Iterable
+14 | from typing import Iterator
+15 | from typing import KeysView
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+16 | from typing import Mapping
+17 | from typing import MappingView
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+12 12 | from typing import ItemsView
+13 13 | from typing import Iterable
+14 14 | from typing import Iterator
+15    |-from typing import KeysView
+   15 |+from collections.abc import KeysView
+16 16 | from typing import Mapping
+17 17 | from typing import MappingView
+18 18 | from typing import MutableMapping
+
+UP035_5.py:16:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+14 | from typing import Iterator
+15 | from typing import KeysView
+16 | from typing import Mapping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+17 | from typing import MappingView
+18 | from typing import MutableMapping
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+13 13 | from typing import Iterable
+14 14 | from typing import Iterator
+15 15 | from typing import KeysView
+16    |-from typing import Mapping
+   16 |+from collections.abc import Mapping
+17 17 | from typing import MappingView
+18 18 | from typing import MutableMapping
+19 19 | from typing import MutableSequence
+
+UP035_5.py:17:1: UP035 [*] Import from `collections.abc` instead: `MappingView`
+   |
+15 | from typing import KeysView
+16 | from typing import Mapping
+17 | from typing import MappingView
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+18 | from typing import MutableMapping
+19 | from typing import MutableSequence
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+14 14 | from typing import Iterator
+15 15 | from typing import KeysView
+16 16 | from typing import Mapping
+17    |-from typing import MappingView
+   17 |+from collections.abc import MappingView
+18 18 | from typing import MutableMapping
+19 19 | from typing import MutableSequence
+20 20 | from typing import MutableSet
+
+UP035_5.py:18:1: UP035 [*] Import from `collections.abc` instead: `MutableMapping`
+   |
+16 | from typing import Mapping
+17 | from typing import MappingView
+18 | from typing import MutableMapping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+19 | from typing import MutableSequence
+20 | from typing import MutableSet
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+15 15 | from typing import KeysView
+16 16 | from typing import Mapping
+17 17 | from typing import MappingView
+18    |-from typing import MutableMapping
+   18 |+from collections.abc import MutableMapping
+19 19 | from typing import MutableSequence
+20 20 | from typing import MutableSet
+21 21 | from typing import Reversible
+
+UP035_5.py:19:1: UP035 [*] Import from `collections.abc` instead: `MutableSequence`
+   |
+17 | from typing import MappingView
+18 | from typing import MutableMapping
+19 | from typing import MutableSequence
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+20 | from typing import MutableSet
+21 | from typing import Reversible
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+16 16 | from typing import Mapping
+17 17 | from typing import MappingView
+18 18 | from typing import MutableMapping
+19    |-from typing import MutableSequence
+   19 |+from collections.abc import MutableSequence
+20 20 | from typing import MutableSet
+21 21 | from typing import Reversible
+22 22 | from typing import Sequence
+
+UP035_5.py:20:1: UP035 [*] Import from `collections.abc` instead: `MutableSet`
+   |
+18 | from typing import MutableMapping
+19 | from typing import MutableSequence
+20 | from typing import MutableSet
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+21 | from typing import Reversible
+22 | from typing import Sequence
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+17 17 | from typing import MappingView
+18 18 | from typing import MutableMapping
+19 19 | from typing import MutableSequence
+20    |-from typing import MutableSet
+   20 |+from collections.abc import MutableSet
+21 21 | from typing import Reversible
+22 22 | from typing import Sequence
+23 23 | from typing import Sized
+
+UP035_5.py:21:1: UP035 [*] Import from `collections.abc` instead: `Reversible`
+   |
+19 | from typing import MutableSequence
+20 | from typing import MutableSet
+21 | from typing import Reversible
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+22 | from typing import Sequence
+23 | from typing import Sized
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+18 18 | from typing import MutableMapping
+19 19 | from typing import MutableSequence
+20 20 | from typing import MutableSet
+21    |-from typing import Reversible
+   21 |+from collections.abc import Reversible
+22 22 | from typing import Sequence
+23 23 | from typing import Sized
+24 24 | from typing import ValuesView
+
+UP035_5.py:22:1: UP035 [*] Import from `collections.abc` instead: `Sequence`
+   |
+20 | from typing import MutableSet
+21 | from typing import Reversible
+22 | from typing import Sequence
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+23 | from typing import Sized
+24 | from typing import ValuesView
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+19 19 | from typing import MutableSequence
+20 20 | from typing import MutableSet
+21 21 | from typing import Reversible
+22    |-from typing import Sequence
+   22 |+from collections.abc import Sequence
+23 23 | from typing import Sized
+24 24 | from typing import ValuesView
+25 25 | 
+
+UP035_5.py:23:1: UP035 [*] Import from `collections.abc` instead: `Sized`
+   |
+21 | from typing import Reversible
+22 | from typing import Sequence
+23 | from typing import Sized
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+24 | from typing import ValuesView
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+20 20 | from typing import MutableSet
+21 21 | from typing import Reversible
+22 22 | from typing import Sequence
+23    |-from typing import Sized
+   23 |+from collections.abc import Sized
+24 24 | from typing import ValuesView
+25 25 | 
+26 26 | from typing import Callable
+
+UP035_5.py:24:1: UP035 [*] Import from `collections.abc` instead: `ValuesView`
+   |
+22 | from typing import Sequence
+23 | from typing import Sized
+24 | from typing import ValuesView
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+25 | 
+26 | from typing import Callable
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+21 21 | from typing import Reversible
+22 22 | from typing import Sequence
+23 23 | from typing import Sized
+24    |-from typing import ValuesView
+   24 |+from collections.abc import ValuesView
+25 25 | 
+26 26 | from typing import Callable
+
+UP035_5.py:26:1: UP035 [*] Import from `collections.abc` instead: `Callable`
+   |
+24 | from typing import ValuesView
+25 | 
+26 | from typing import Callable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+   |
+   = help: Import from `collections.abc`
+
+ℹ Unsafe fix
+23 23 | from typing import Sized
+24 24 | from typing import ValuesView
+25 25 | 
+26    |-from typing import Callable
+   26 |+from collections.abc import Callable
+
+

@@ -1,0 +1,37 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP035_4.py:2:1: UP035 [*] Import from `typing` instead: `NoReturn`
+  |
+1 | """Things moved from `mypy_extensions` to `typing`."""
+2 | from mypy_extensions import NoReturn
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+3 | 
+4 | from mypy_extensions import TypedDict
+  |
+  = help: Import from `typing`
+
+ℹ Unsafe fix
+1 1 | """Things moved from `mypy_extensions` to `typing`."""
+2   |-from mypy_extensions import NoReturn
+  2 |+from typing import NoReturn
+3 3 | 
+4 4 | from mypy_extensions import TypedDict
+
+UP035_4.py:4:1: UP035 [*] Import from `typing` instead: `TypedDict`
+  |
+2 | from mypy_extensions import NoReturn
+3 | 
+4 | from mypy_extensions import TypedDict
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  |
+  = help: Import from `typing`
+
+ℹ Unsafe fix
+1 1 | """Things moved from `mypy_extensions` to `typing`."""
+2 2 | from mypy_extensions import NoReturn
+3 3 | 
+4   |-from mypy_extensions import TypedDict
+  4 |+from typing import TypedDict
+
+

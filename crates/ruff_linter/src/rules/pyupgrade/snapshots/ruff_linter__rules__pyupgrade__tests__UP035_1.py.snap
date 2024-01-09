@@ -1,0 +1,71 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP035_1.py:3:1: UP035 [*] Import from `collections.abc` instead: `AsyncGenerator`, `AsyncIterable`, `AsyncIterator`, `Awaitable`, `ByteString`, `Callable`, `Collection`, `Container`, `Coroutine`, `Generator`, `Hashable`, `ItemsView`, `Iterable`, `Iterator`, `KeysView`, `Mapping`, `MappingView`, `MutableMapping`, `MutableSequence`, `MutableSet`, `Reversible`, `Sequence`, `Set`, `Sized`, `ValuesView`
+   |
+ 1 |   """Things that were moved from `collections` to `collections.abc`."""
+ 2 |   
+ 3 | / from collections import (
+ 4 | |     AsyncGenerator,
+ 5 | |     AsyncIterable,
+ 6 | |     AsyncIterator,
+ 7 | |     Awaitable,
+ 8 | |     ByteString,
+ 9 | |     Callable,
+10 | |     Collection,
+11 | |     Container,
+12 | |     Coroutine,
+13 | |     Generator,
+14 | |     Hashable,
+15 | |     ItemsView,
+16 | |     Iterable,
+17 | |     Iterator,
+18 | |     KeysView,
+19 | |     Mapping,
+20 | |     MappingView,
+21 | |     MutableMapping,
+22 | |     MutableSequence,
+23 | |     MutableSet,
+24 | |     Reversible,
+25 | |     Sequence,
+26 | |     Set,
+27 | |     Sized,
+28 | |     ValuesView,
+29 | | )
+   | |_^ UP035
+   |
+   = help: Import from `collections.abc`
+
+ℹ Safe fix
+1 1 | """Things that were moved from `collections` to `collections.abc`."""
+2 2 | 
+3   |-from collections import (
+4   |-    AsyncGenerator,
+5   |-    AsyncIterable,
+6   |-    AsyncIterator,
+7   |-    Awaitable,
+8   |-    ByteString,
+9   |-    Callable,
+10   |-    Collection,
+11   |-    Container,
+12   |-    Coroutine,
+13   |-    Generator,
+14   |-    Hashable,
+15   |-    ItemsView,
+16   |-    Iterable,
+17   |-    Iterator,
+18   |-    KeysView,
+19   |-    Mapping,
+20   |-    MappingView,
+21   |-    MutableMapping,
+22   |-    MutableSequence,
+23   |-    MutableSet,
+24   |-    Reversible,
+25   |-    Sequence,
+26   |-    Set,
+27   |-    Sized,
+28   |-    ValuesView,
+29   |-)
+  3 |+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator, Awaitable, ByteString, Callable, Collection, Container, Coroutine, Generator, Hashable, ItemsView, Iterable, Iterator, KeysView, Mapping, MappingView, MutableMapping, MutableSequence, MutableSet, Reversible, Sequence, Set, Sized, ValuesView
+
+

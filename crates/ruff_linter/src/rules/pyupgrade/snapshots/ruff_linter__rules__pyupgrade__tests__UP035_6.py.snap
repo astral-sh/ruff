@@ -1,0 +1,54 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP035_6.py:2:1: UP035 [*] Import from `collections` instead: `ChainMap`
+  |
+1 | """Members of `typing` that were moved to `collections`."""
+2 | from typing import ChainMap
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+3 | from typing import Counter
+4 | from typing import OrderedDict
+  |
+  = help: Import from `collections`
+
+ℹ Unsafe fix
+1 1 | """Members of `typing` that were moved to `collections`."""
+2   |-from typing import ChainMap
+  2 |+from collections import ChainMap
+3 3 | from typing import Counter
+4 4 | from typing import OrderedDict
+
+UP035_6.py:3:1: UP035 [*] Import from `collections` instead: `Counter`
+  |
+1 | """Members of `typing` that were moved to `collections`."""
+2 | from typing import ChainMap
+3 | from typing import Counter
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+4 | from typing import OrderedDict
+  |
+  = help: Import from `collections`
+
+ℹ Unsafe fix
+1 1 | """Members of `typing` that were moved to `collections`."""
+2 2 | from typing import ChainMap
+3   |-from typing import Counter
+  3 |+from collections import Counter
+4 4 | from typing import OrderedDict
+
+UP035_6.py:4:1: UP035 [*] Import from `collections` instead: `OrderedDict`
+  |
+2 | from typing import ChainMap
+3 | from typing import Counter
+4 | from typing import OrderedDict
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+  |
+  = help: Import from `collections`
+
+ℹ Unsafe fix
+1 1 | """Members of `typing` that were moved to `collections`."""
+2 2 | from typing import ChainMap
+3 3 | from typing import Counter
+4   |-from typing import OrderedDict
+  4 |+from collections import OrderedDict
+
+

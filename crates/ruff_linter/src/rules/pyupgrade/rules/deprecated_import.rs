@@ -111,6 +111,7 @@ fn is_relevant_module(module: &str) -> bool {
 }
 
 // Members of `collections` that were moved to `collections.abc`.
+// These fixes are safe.
 const COLLECTIONS_TO_ABC: &[&str] = &[
     "AsyncGenerator",
     "AsyncIterable",
@@ -140,9 +141,11 @@ const COLLECTIONS_TO_ABC: &[&str] = &[
 ];
 
 // Members of `pipes` that were moved to `shlex`.
+// These fixes are safe.
 const PIPES_TO_SHLEX: &[&str] = &["quote"];
 
 // Members of `typing_extensions` that were moved to `typing`.
+// These fixes are safe.
 const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "AbstractSet",
     "AnyStr",
@@ -198,9 +201,11 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
 // Python 3.7+
 
 // Members of `mypy_extensions` that were moved to `typing`.
+// This fix is unsafe.
 const MYPY_EXTENSIONS_TO_TYPING_37: &[&str] = &["NoReturn"];
 
 // Members of `typing_extensions` that were moved to `typing`.
+// These fixes are safe.
 const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
     "AsyncContextManager",
     "AsyncGenerator",
@@ -214,9 +219,11 @@ const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
 // Python 3.8+
 
 // Members of `mypy_extensions` that were moved to `typing`.
+// This fix is unsafe.
 const MYPY_EXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
 
 // Members of `typing_extensions` that were moved to `typing`.
+// These fixes are safe.
 const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Final",
     "OrderedDict",
@@ -231,6 +238,7 @@ const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
 // Python 3.9+
 
 // Members of `typing` that were moved to `collections.abc`.
+// These fixes are unsafe.
 const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
     "AsyncGenerator",
     "AsyncIterable",
@@ -258,16 +266,20 @@ const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
 ];
 
 // Members of `typing` that were moved to `collections`.
+// These fixes is unsafe.
 const TYPING_TO_COLLECTIONS_39: &[&str] = &["ChainMap", "Counter", "OrderedDict"];
 
 // Members of `typing` that were moved to `typing.re`.
+// These fixes are unsafe.
 const TYPING_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
 // Members of `typing.re` that were moved to `re`.
+// These are fixes are unsafe.
 const TYPING_RE_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
 // Members of `typing_extensions` that were moved to `typing`.
-const TYPING_EXTENSIONS_TO_TYPING_39: &[&str] = &["Annotated", "get_type_hints"];
+const TYPING_EXTENSIONS_TO_TYPING_39_SAFE: &[&str] = &["Annotated"];
+const TYPING_EXTENSIONS_TO_TYPING_39_UNSAFE: &[&str] = &["get_type_hints"];
 
 // Members of `typing` that were moved _and_ renamed (and thus cannot be
 // automatically fixed).
@@ -291,10 +303,11 @@ const TYPING_TO_RENAME_PY39: &[(&str, &str)] = &[
 // Python 3.10+
 
 // Members of `typing` that were moved to `collections.abc`.
+// This fix is unsafe.
 const TYPING_TO_COLLECTIONS_ABC_310: &[&str] = &["Callable"];
 
 // Members of `typing_extensions` that were moved to `typing`.
-const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
+const TYPING_EXTENSIONS_TO_TYPING_310_SAFE: &[&str] = &[
     "Concatenate",
     "Literal",
     "NewType",
@@ -304,12 +317,13 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "TypeGuard",
     "get_args",
     "get_origin",
-    "is_typeddict",
 ];
+const TYPING_EXTENSIONS_TO_TYPING_310_UNSAFE: &[&str] = &["is_typeddict"];
 
 // Python 3.11+
 
 // Members of `typing_extensions` that were moved to `typing`.
+// These fixes are safe.
 const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "Any",
     "LiteralString",
@@ -326,13 +340,14 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "reveal_type",
 ];
 
+// Members of `backports.strenum` that are now in `enum`.
+// This fix is unsafe.
 const BACKPORTS_STR_ENUM_TO_ENUM_311: &[&str] = &["StrEnum"];
 
 // Python 3.12+
 
 // Members of `typing_extensions` that were moved to `typing`.
-const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
-    "NamedTuple",
+const TYPING_EXTENSIONS_TO_TYPING_312_SAFE: &[&str] = &[
     // Introduced in Python 3.8, but `typing_extensions` backports a ton of optimizations that were
     // added in Python 3.12.
     "Protocol",
@@ -342,12 +357,12 @@ const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
     "SupportsFloat",
     "SupportsInt",
     "SupportsRound",
-    "TypedDict",
     "Unpack",
     // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument,
     // which was introduced in Python 3.12.
     "dataclass_transform",
 ];
+const TYPING_EXTENSIONS_TO_TYPING_312_UNSAFE: &[&str] = &["NamedTuple", "TypedDict"];
 
 struct ImportReplacer<'a> {
     stmt: &'a Stmt,
@@ -425,16 +440,50 @@ impl<'a> ImportReplacer<'a> {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_38);
                 }
                 if self.version >= PythonVersion::Py39 {
-                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_39);
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_39_SAFE);
                 }
                 if self.version >= PythonVersion::Py310 {
-                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_310);
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_310_SAFE);
                 }
                 if self.version >= PythonVersion::Py311 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_311);
                 }
                 if self.version >= PythonVersion::Py312 {
-                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_312);
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_312_SAFE);
+                }
+                if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
+                    operations.push(operation);
+                }
+            }
+            "typing" => {
+                // `typing` to `re`
+                let mut typing_to_re = vec![];
+                if self.version >= PythonVersion::Py39 {
+                    typing_to_re.extend(TYPING_TO_RE_39);
+                }
+                if let Some(operation) = self.try_replace(&typing_to_re, "re") {
+                    operations.push(operation);
+                }
+            }
+
+            _ => {}
+        }
+        operations
+    }
+
+    fn without_renames_unsafe(&self) -> Vec<(WithoutRename, Option<String>)> {
+        let mut operations = vec![];
+        match self.module {
+            "typing_extensions" => {
+                let mut typing_extensions_to_typing = vec![];
+                if self.version >= PythonVersion::Py39 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_39_UNSAFE);
+                }
+                if self.version >= PythonVersion::Py310 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_310_UNSAFE);
+                }
+                if self.version >= PythonVersion::Py312 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_312_UNSAFE);
                 }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
                     operations.push(operation);
@@ -466,22 +515,12 @@ impl<'a> ImportReplacer<'a> {
                 {
                     operations.push(operation);
                 }
-
                 // `typing` to `collections`
                 let mut typing_to_collections = vec![];
                 if self.version >= PythonVersion::Py39 {
                     typing_to_collections.extend(TYPING_TO_COLLECTIONS_39);
                 }
                 if let Some(operation) = self.try_replace(&typing_to_collections, "collections") {
-                    operations.push(operation);
-                }
-
-                // `typing` to `re`
-                let mut typing_to_re = vec![];
-                if self.version >= PythonVersion::Py39 {
-                    typing_to_re.extend(TYPING_TO_RE_39);
-                }
-                if let Some(operation) = self.try_replace(&typing_to_re, "re") {
                     operations.push(operation);
                 }
             }
@@ -645,6 +684,22 @@ pub(crate) fn deprecated_import(
         );
         if let Some(content) = fix {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                content,
+                stmt.range(),
+            )));
+        }
+        checker.diagnostics.push(diagnostic);
+    }
+
+    for (operation, fix) in fixer.without_renames_unsafe() {
+        let mut diagnostic = Diagnostic::new(
+            DeprecatedImport {
+                deprecation: Deprecation::WithoutRename(operation),
+            },
+            stmt.range(),
+        );
+        if let Some(content) = fix {
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 content,
                 stmt.range(),
             )));
