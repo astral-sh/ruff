@@ -69,6 +69,7 @@ enum Associativity {
     Right,
 }
 
+#[derive(Copy, Clone)]
 enum Clause {
     If,
     Else,
