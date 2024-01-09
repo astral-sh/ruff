@@ -379,7 +379,8 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 ..
             }) = &values[indices[0]]
             {
-                args.get(0).expect("`isinstance` should have two arguments")
+                args.first()
+                    .expect("`isinstance` should have two arguments")
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };

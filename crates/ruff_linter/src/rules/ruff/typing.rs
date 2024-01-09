@@ -57,6 +57,9 @@ enum TypingTarget<'a> {
     /// A `typing.Annotated` type e.g., `Annotated[int, ...]`.
     Annotated(&'a Expr),
 
+    /// The `typing.Hashable` type.
+    Hashable,
+
     /// Special type used to represent an unknown type (and not a typing target)
     /// which could be a type alias.
     Unknown,
@@ -121,6 +124,10 @@ impl<'a> TypingTarget<'a> {
                         Some(TypingTarget::Any)
                     } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
                         Some(TypingTarget::Object)
+                    } else if semantic.match_typing_call_path(&call_path, "Hashable")
+                        || matches!(call_path.as_slice(), ["collections", "abc", "Hashable"])
+                    {
+                        Some(TypingTarget::Hashable)
                     } else if !is_known_type(&call_path, minor_version) {
                         // If it's not a known type, we assume it's `Any`.
                         Some(TypingTarget::Unknown)
@@ -142,6 +149,7 @@ impl<'a> TypingTarget<'a> {
         match self {
             TypingTarget::None
             | TypingTarget::Optional(_)
+            | TypingTarget::Hashable
             | TypingTarget::Any
             | TypingTarget::Object
             | TypingTarget::Unknown => true,
@@ -191,6 +199,7 @@ impl<'a> TypingTarget<'a> {
             // `Literal` cannot contain `Any` as it's a dynamic value.
             TypingTarget::Literal(_)
             | TypingTarget::None
+            | TypingTarget::Hashable
             | TypingTarget::Object
             | TypingTarget::Known
             | TypingTarget::Unknown => false,

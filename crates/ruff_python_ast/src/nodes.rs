@@ -1162,6 +1162,14 @@ impl<'a> IntoIterator for &'a FStringValue {
     }
 }
 
+impl<'a> IntoIterator for &'a mut FStringValue {
+    type Item = &'a mut FStringPart;
+    type IntoIter = IterMut<'a, FStringPart>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
 /// An internal representation of [`FStringValue`].
 #[derive(Clone, Debug, PartialEq)]
 enum FStringValueInner {
@@ -1356,6 +1364,14 @@ impl<'a> IntoIterator for &'a StringLiteralValue {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut StringLiteralValue {
+    type Item = &'a mut StringLiteral;
+    type IntoIter = IterMut<'a, StringLiteral>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -1579,6 +1595,14 @@ impl<'a> IntoIterator for &'a BytesLiteralValue {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut BytesLiteralValue {
+    type Item = &'a mut BytesLiteral;
+    type IntoIter = IterMut<'a, BytesLiteral>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 

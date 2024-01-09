@@ -71,6 +71,8 @@ foo.is_(True)
 bar.is_not(False)
 next(iter([]), False)
 sa.func.coalesce(tbl.c.valid, False)
+setVisible(True)
+set_visible(True)
 
 
 class Registry:
@@ -114,3 +116,6 @@ from typing import override
 @override
 def func(x: bool):
     pass
+
+
+settings(True)

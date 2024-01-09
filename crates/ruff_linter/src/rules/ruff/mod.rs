@@ -46,6 +46,7 @@ mod tests {
     #[test_case(Rule::AssignmentInAssert, Path::new("RUF018.py"))]
     #[test_case(Rule::UnnecessaryKeyCheck, Path::new("RUF019.py"))]
     #[test_case(Rule::NeverUnion, Path::new("RUF020.py"))]
+    #[test_case(Rule::ParenthesizeChainedOperators, Path::new("RUF021.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

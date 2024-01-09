@@ -724,7 +724,7 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 );
             }
             if checker.enabled(Rule::BooleanPositionalValueInCall) {
-                flake8_boolean_trap::rules::boolean_positional_value_in_call(checker, args, func);
+                flake8_boolean_trap::rules::boolean_positional_value_in_call(checker, call);
             }
             if checker.enabled(Rule::Debugger) {
                 flake8_debugger::rules::debugger_call(checker, expr, func);
@@ -1491,6 +1491,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             }
             if checker.enabled(Rule::UnnecessaryKeyCheck) {
                 ruff::rules::unnecessary_key_check(checker, expr);
+            }
+            if checker.enabled(Rule::ParenthesizeChainedOperators) {
+                ruff::rules::parenthesize_chained_logical_operators(checker, bool_op);
             }
         }
         Expr::NamedExpr(..) => {
