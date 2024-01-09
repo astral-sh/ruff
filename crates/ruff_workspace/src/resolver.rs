@@ -14,6 +14,7 @@ use itertools::Itertools;
 use log::debug;
 use matchit::Router;
 use path_absolutize::path_dedot;
+use radix_trie::{Trie, TrieCommon};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::fs;
@@ -96,15 +97,13 @@ impl Relativity {
 
 #[derive(Default)]
 pub struct Resolver {
-    router: Router<Settings>,
+    router: Trie<PathBuf, Settings>,
 }
 
 impl Resolver {
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: PathBuf, settings: Settings) -> Result<()> {
-        Ok(self
-            .router
-            .insert(format!("{}/*filepath", path.display()), settings)?)
+    fn add(&mut self, path: PathBuf, settings: Settings) -> () {
+        self.router.insert(path, settings);
     }
 
     /// Return the appropriate [`Settings`] for a given [`Path`].
@@ -117,8 +116,9 @@ impl Resolver {
             PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings,
             PyprojectDiscoveryStrategy::Hierarchical => self
                 .router
-                .at(path.to_string_lossy().as_ref())
-                .map_or_else(|_| &pyproject_config.settings, |match_| match_.value),
+                .get_ancestor(path)
+                .and_then(|subtrie| subtrie.value())
+                .unwrap_or(&pyproject_config.settings),
         }
     }
 
