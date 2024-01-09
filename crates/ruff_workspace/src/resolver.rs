@@ -12,9 +12,8 @@ use globset::{Candidate, GlobSet};
 use ignore::{WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
-use matchit::Router;
+use matchit::{InsertError, Router};
 use path_absolutize::path_dedot;
-use radix_trie::{Trie, TrieCommon};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::fs;
@@ -97,13 +96,22 @@ impl Relativity {
 
 #[derive(Default)]
 pub struct Resolver {
-    router: Trie<PathBuf, Settings>,
+    settings: Vec<Settings>,
+    router: Router<usize>,
 }
 
 impl Resolver {
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: PathBuf, settings: Settings) -> () {
-        self.router.insert(path, settings);
+    fn add(&mut self, path: PathBuf, settings: Settings) -> Result<()> {
+        self.settings.push(settings);
+        match self.router.insert(
+            format!("{}/*filepath", path.to_string_lossy()),
+            self.settings.len() - 1,
+        ) {
+            Ok(()) => Ok(()),
+            Err(InsertError::Conflict { .. }) => Ok(()),
+            Err(err) => Err(anyhow!("Failed to insert path into router: {err}")),
+        }
     }
 
     /// Return the appropriate [`Settings`] for a given [`Path`].
@@ -116,8 +124,8 @@ impl Resolver {
             PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings,
             PyprojectDiscoveryStrategy::Hierarchical => self
                 .router
-                .get_ancestor(path)
-                .and_then(|subtrie| subtrie.value())
+                .at(&path.to_string_lossy())
+                .map(|match_| &self.settings[*match_.value])
                 .unwrap_or(&pyproject_config.settings),
         }
     }
@@ -162,7 +170,7 @@ impl Resolver {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        std::iter::empty()
+        self.settings.iter()
     }
 }
 
@@ -292,7 +300,7 @@ pub fn python_files_in_path(
                     if let Some(pyproject) = settings_toml(ancestor)? {
                         let (root, settings) =
                             resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
-                        resolver.add(root, settings);
+                        resolver.add(root, settings)?;
                         break;
                     }
                 }
@@ -373,7 +381,13 @@ pub fn python_files_in_path(
                                 transformer,
                             ) {
                                 Ok((root, settings)) => {
-                                    resolver.write().unwrap().add(root, settings);
+                                    match resolver.write().unwrap().add(root, settings) {
+                                        Ok(()) => {}
+                                        Err(err) => {
+                                            *error.lock().unwrap() = Err(err);
+                                            return WalkState::Quit;
+                                        }
+                                    }
                                 }
                                 Err(err) => {
                                     *error.lock().unwrap() = Err(err);
@@ -493,7 +507,7 @@ pub fn python_file_at_path(
             if let Some(pyproject) = settings_toml(ancestor)? {
                 let (root, settings) =
                     resolve_scoped_settings(&pyproject, Relativity::Parent, transformer)?;
-                resolver.add(root, settings);
+                resolver.add(root, settings)?;
                 break;
             }
         }
