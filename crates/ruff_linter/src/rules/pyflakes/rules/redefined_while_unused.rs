@@ -22,23 +22,6 @@ use ruff_source_file::SourceRow;
 /// import foo
 /// import bar
 /// ```
-///
-/// ## Fix safety
-/// This rule's fix is marked as unsafe, as removing a redefinition across
-/// branches or scopes may change the behavior of the program in subtle
-/// ways.
-///
-/// For example:
-/// ```python
-/// import module
-///
-/// x = int(input())
-///
-/// if x > 0:
-///     from package import module
-/// ```
-///
-/// Removing the redefinition would change the `module` binding when `x > 0`.
 #[violation]
 pub struct RedefinedWhileUnused {
     pub name: String,

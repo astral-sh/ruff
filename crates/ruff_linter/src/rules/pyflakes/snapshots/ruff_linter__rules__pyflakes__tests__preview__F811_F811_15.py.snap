@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F811_15.py:4:5: F811 Redefinition of unused `fu` from line 1
+  |
+4 | def fu():
+  |     ^^ F811
+5 |     pass
+  |
+  = help: Remove definition: `fu`
+
+
