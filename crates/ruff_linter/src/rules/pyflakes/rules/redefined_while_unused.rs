@@ -1,4 +1,4 @@
-use ruff_diagnostics::Violation;
+use ruff_diagnostics::{FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::SourceRow;
 
@@ -29,9 +29,16 @@ pub struct RedefinedWhileUnused {
 }
 
 impl Violation for RedefinedWhileUnused {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let RedefinedWhileUnused { name, row } = self;
         format!("Redefinition of unused `{name}` from {row}")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let RedefinedWhileUnused { name, .. } = self;
+        Some(format!("Remove definition: `{name}`"))
     }
 }

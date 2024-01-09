@@ -1,10 +1,11 @@
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
+use ruff_python_semantic::{Binding, BindingKind, Imported, ScopeKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
+use crate::fix;
 use crate::rules::{
     flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint, ruff,
 };
@@ -247,9 +248,33 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
                         },
                         binding.range(),
                     );
+
                     if let Some(range) = binding.parent_range(&checker.semantic) {
                         diagnostic.set_parent(range.start());
                     }
+
+                    if checker.settings.preview.is_enabled() {
+                        if let Some(import) = binding.as_any_import() {
+                            if let Some(source) = binding.source {
+                                diagnostic.try_set_fix(|| {
+                                    let statement = checker.semantic().statement(source);
+                                    let parent = checker.semantic().parent_statement(source);
+                                    let edit = fix::edits::remove_unused_imports(
+                                        std::iter::once(import.member_name().as_ref()),
+                                        statement,
+                                        parent,
+                                        checker.locator(),
+                                        checker.stylist(),
+                                        checker.indexer(),
+                                    )?;
+                                    Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
+                                        checker.semantic().parent_statement_id(source),
+                                    )))
+                                });
+                            }
+                        }
+                    }
+
                     diagnostics.push(diagnostic);
                 }
             }
