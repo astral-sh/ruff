@@ -142,6 +142,9 @@ where
     last_ctx: ParserCtxFlags,
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
+    /// Defer the creation of the invalid node for the skipped unexpected tokens.
+    /// Holds the range of the skipped tokens.
+    defer_invalid_node_creation: Option<TextRange>,
 }
 
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new(&[TokenKind::Newline, TokenKind::EndOfFile]);
@@ -242,6 +245,7 @@ where
             ctx: ParserCtxFlags::empty(),
             last_ctx: ParserCtxFlags::empty(),
             lexer: itertools::peek_nth(lexer),
+            defer_invalid_node_creation: None,
         }
     }
 
@@ -270,6 +274,17 @@ where
                 }
                 let (stmt, _) = self.parse_statement();
                 body.push(stmt);
+
+                if let Some(range) = self.defer_invalid_node_creation {
+                    self.defer_invalid_node_creation = None;
+                    body.push(Stmt::Expr(ast::StmtExpr {
+                        value: Box::new(Expr::Invalid(ast::ExprInvalid {
+                            value: self.src_text(range).into(),
+                            range,
+                        })),
+                        range,
+                    }));
+                }
             }
             ast::Mod::Module(ast::ModModule {
                 body,
@@ -398,7 +413,13 @@ where
                 .union(recover_set)
                 .union([expected].as_slice().into());
             // Skip leading unexpected tokens
-            self.skip_until(expected_set);
+            let range = self.skip_until(expected_set);
+            self.defer_invalid_node_creation = Some(range);
+
+            self.add_error(
+                ParseErrorType::OtherError("unexpected tokens".into()),
+                range,
+            );
 
             self.eat(expected);
         }
@@ -411,10 +432,15 @@ where
         });
     }
 
-    fn skip_until(&mut self, token_set: TokenSet) {
+    /// Skip tokens until [`TokenSet`]. Returns the range of the skipped tokens.
+    fn skip_until(&mut self, token_set: TokenSet) -> TextRange {
+        let mut final_range = self.current_range();
         while !self.at_ts(token_set) {
-            self.next_token();
+            let (_, range) = self.next_token();
+            final_range = final_range.cover(range);
         }
+
+        final_range
     }
 
     fn at(&mut self, kind: TokenKind) -> bool {
