@@ -33,6 +33,7 @@ log = { workspace = true }
 matchit = { workspace = true }
 once_cell = { workspace = true }
 path-absolutize = { workspace = true }
+path-slash = { workspace = true }
 pep440_rs = { workspace = true, features = ["serde"] }
 regex = { workspace = true }
 rustc-hash = { workspace = true }

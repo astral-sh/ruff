@@ -14,6 +14,7 @@ use itertools::Itertools;
 use log::debug;
 use matchit::{InsertError, Router};
 use path_absolutize::path_dedot;
+use path_slash::PathExt;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_linter::fs;
@@ -105,8 +106,9 @@ impl Resolver {
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
     fn add(&mut self, path: &Path, settings: Settings) -> Result<()> {
         self.settings.push(settings);
+        println!("path: {:?}", path.to_slash_lossy());
         match self.router.insert(
-            format!("{}/*filepath", path.to_string_lossy()),
+            format!("{}/*filepath", path.to_slash_lossy()),
             self.settings.len() - 1,
         ) {
             Ok(()) => Ok(()),
@@ -125,7 +127,7 @@ impl Resolver {
             PyprojectDiscoveryStrategy::Fixed => &pyproject_config.settings,
             PyprojectDiscoveryStrategy::Hierarchical => self
                 .router
-                .at(&path.to_string_lossy())
+                .at(&path.to_slash_lossy())
                 .map(|match_| &self.settings[*match_.value])
                 .unwrap_or(&pyproject_config.settings),
         }
