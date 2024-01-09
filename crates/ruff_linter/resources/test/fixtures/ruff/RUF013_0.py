@@ -1,5 +1,5 @@
 import typing
-from typing import Annotated, Any, Literal, Optional, Tuple, Union
+from typing import Annotated, Any, Literal, Optional, Tuple, Union, Hashable
 
 
 def f(arg: int):
@@ -256,4 +256,14 @@ from custom_typing import MaybeInt
 
 
 def f(arg: MaybeInt = None):
+    pass
+
+
+# Hashable
+
+def f(arg: Hashable = None):  # OK
+    pass
+
+
+def f(arg: Hashable | int = None):  # OK
     pass
