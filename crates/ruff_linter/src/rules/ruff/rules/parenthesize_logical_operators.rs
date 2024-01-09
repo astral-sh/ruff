@@ -2,9 +2,12 @@ use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Vi
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_text_size::Ranged;
+use ruff_source_file::Locator;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::line_width::LineWidthBuilder;
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for chained operators where adding parentheses could improve the
@@ -95,11 +98,11 @@ pub(crate) fn parenthesize_chained_logical_operators(
                 {
                     let mut diagnostic =
                         Diagnostic::new(ParenthesizeChainedOperators, source_range);
-                    let line_length: u16 = checker.settings.line_length.into();
-                    if !locator.contains_line_break(source_range)
-                        && locator.full_line(source_range.start()).trim_end().len()
-                            <= ((line_length as usize) - 2)
-                    {
+                    if is_single_line_expr_with_narrow_width(
+                        locator,
+                        source_range,
+                        checker.settings,
+                    ) {
                         let new_source = format!("({})", locator.slice(source_range));
                         diagnostic.set_fix(Fix::applicable_edit(
                             Edit::range_replacement(new_source, source_range),
@@ -112,4 +115,18 @@ pub(crate) fn parenthesize_chained_logical_operators(
             _ => continue,
         };
     }
+}
+
+fn is_single_line_expr_with_narrow_width(
+    locator: &Locator,
+    source_range: TextRange,
+    settings: &LinterSettings,
+) -> bool {
+    if locator.contains_line_break(source_range) {
+        return false;
+    }
+    let width_with_fix = LineWidthBuilder::new(settings.tab_size)
+        .add_str(locator.full_line(source_range.start()).trim_end())
+        .add_str("()");
+    width_with_fix <= settings.line_length
 }
