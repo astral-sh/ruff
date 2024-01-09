@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -37,10 +37,18 @@ use crate::checkers::ast::Checker;
 pub struct ParenthesizeChainedOperators;
 
 impl Violation for ParenthesizeChainedOperators {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
             "Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear"
+        )
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(
+            "Put parentheses around the `and` subexpression inside the `or` expression".to_string(),
         )
     }
 }
@@ -75,18 +83,30 @@ pub(crate) fn parenthesize_chained_logical_operators(
                     ..
                 },
             ) => {
+                let locator = checker.locator();
+                let source_range = bool_op.range();
                 if parenthesized_range(
                     bool_op.into(),
                     expr.into(),
                     checker.indexer().comment_ranges(),
-                    checker.locator().contents(),
+                    locator.contents(),
                 )
                 .is_none()
                 {
-                    checker.diagnostics.push(Diagnostic::new(
-                        ParenthesizeChainedOperators,
-                        bool_op.range(),
-                    ));
+                    let mut diagnostic =
+                        Diagnostic::new(ParenthesizeChainedOperators, source_range);
+                    let line_length: u16 = checker.settings.line_length.into();
+                    if !locator.contains_line_break(source_range)
+                        && locator.full_line(source_range.start()).trim_end().len()
+                            <= ((line_length as usize) - 2)
+                    {
+                        let new_source = format!("({})", locator.slice(source_range));
+                        diagnostic.set_fix(Fix::applicable_edit(
+                            Edit::range_replacement(new_source, source_range),
+                            Applicability::Safe,
+                        ));
+                    }
+                    checker.diagnostics.push(diagnostic);
                 }
             }
             _ => continue,

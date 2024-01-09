@@ -10,6 +10,8 @@
 
 a, b, c = 1, 0, 2
 x = a or b and c  # RUF021: => `a or (b and c)`
+x = a or b and c  # looooooooooooong comment but not long enough to prevent an autofix
+x = a or b and c  # looooooooong comment to prevent an autofix (line would be too long)
 
 a, b, c = 0, 1, 2
 y = a and b or c  # RUF021: => `(a and b) or c`
@@ -30,7 +32,8 @@ while a and b or c and d:  # RUF021: => `(and b) or (c and d)`
     pass
 
 b, c, d, e = 2, 3, 0, 4
-z = [a for a in range(5) if a or b or c or d and e]  # RUF021: => `a or b or c or (d and e)`
+# RUF021: => `a or b or c or (d and e)`:
+z = [a for a in range(5) if a or b or c or d and e]
 
 a, b, c, d = 0, 1, 3, 0
 assert not a and b or c or d  # RUF021: => `(not a and b) or c or d`
