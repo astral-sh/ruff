@@ -584,7 +584,7 @@ impl BlankLinesChecker {
 
         // Don't expect blank lines before the first non comment line.
         if self.is_not_first_logical_line {
-                && line.first_token == Tok::Def
+            if line.preceding_blank_lines == 0
                 // Only applies to methods.
             && line.first_token == TokenKind::Def
                 && matches!(self.class_status, Status::Inside(_))
