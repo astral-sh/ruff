@@ -503,7 +503,6 @@ pub(crate) struct BlankLinesChecker {
 
 impl BlankLinesChecker {
     /// E301, E302, E303, E304, E305, E306
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn check_lines(
         &mut self,
         tokens: &[LexResult],
