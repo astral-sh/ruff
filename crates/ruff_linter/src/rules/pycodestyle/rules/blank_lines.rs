@@ -390,18 +390,18 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 continue;
             }
 
-            if !matches!(token, TokenKind::Newline) {
+            if token != TokenKind::Newline {
                 // Ideally, we would like to have a "async def" token since we care about the "def" part.
                 // As a work around, we ignore the first token if it is "async".
-                if first_token.is_none() && !matches!(token, TokenKind::Async) {
+                if first_token.is_none() && token != TokenKind::Async {
                     first_token = Some(token);
                 }
                 if first_token_range.is_none() {
                     first_token_range = Some(*range);
                 }
 
-                if !matches!(token, TokenKind::NonLogicalNewline) {
-                    if !matches!(token, TokenKind::Comment) {
+                if token != TokenKind::NonLogicalNewline {
+                    if token != TokenKind::Comment {
                         line_is_comment_only = false;
                     }
 
@@ -424,13 +424,13 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
                     let last_token_range = *range;
 
-                    if !matches!(first_token, Some(TokenKind::String { .. })) {
+                    if first_token != Some(TokenKind::String) {
                         is_docstring = false;
                     }
 
                     let first_range = first_token_range.unwrap();
 
-                    let range = if matches!(first_token, Some(TokenKind::Indent)) {
+                    let range = if first_token == Some(TokenKind::Indent) {
                         first_range
                     } else {
                         TextRange::new(
@@ -441,7 +441,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     let indent_level = expand_indent(self.locator.slice(range));
 
                     // Empty line
-                    if matches!(first_token, Some(TokenKind::NonLogicalNewline)) {
+                    if first_token == Some(TokenKind::NonLogicalNewline) {
                         self.current_blank_lines += 1;
                         self.current_blank_characters +=
                             range.end().to_usize() - first_range.start().to_usize() + 1;
@@ -686,7 +686,7 @@ impl BlankLinesChecker {
                 // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
                 && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= line.indent_level)
                 // Allow groups of one-liners.
-                && !(matches!(self.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
+                && !(matches!(self.follows, Follows::Def) && line.last_token != TokenKind::Colon)
             {
                 // E306
                 let mut diagnostic = Diagnostic::new(
@@ -736,7 +736,7 @@ impl BlankLinesChecker {
 
             self.last_non_comment_line_end = line.last_token_range.end();
 
-            if line.indent_level == 0 && !matches!(line.first_token, TokenKind::Comment) {
+            if line.indent_level == 0 && line.first_token != TokenKind::Comment {
                 self.previous_unindented_token = Some(line.first_token);
             }
         }
