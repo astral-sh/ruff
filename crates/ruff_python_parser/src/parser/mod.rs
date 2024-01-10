@@ -1930,11 +1930,10 @@ where
             self.add_error(ParseErrorType::AssignmentError, target.range);
         }
 
-        if self.last_ctx.intersects(ParserCtxFlags::TUPLE_EXPR) {
-            // Should we make `target` an `Expr::Invalid` here?
+        if matches!(*target.value, Expr::Tuple(_)) {
             self.add_error(
                 ParseErrorType::OtherError(
-                    "unparenthesized tuple cannot have type annotation".to_string(),
+                    "only single target (not tuple) can be annotated".into(),
                 ),
                 range,
             );
@@ -1944,8 +1943,17 @@ where
 
         let simple = matches!(target.value.as_ref(), Expr::Name(_))
             && !self.last_ctx.intersects(ParserCtxFlags::PARENTHESIZED_EXPR);
-        let (annotation, ann_range) = self.parse_expr();
+        let (annotation, ann_range) = self.parse_exprs();
         range = range.cover(ann_range);
+
+        if matches!(annotation, Expr::Tuple(_))
+            && !self.last_ctx.contains(ParserCtxFlags::PARENTHESIZED_EXPR)
+        {
+            self.add_error(
+                ParseErrorType::OtherError("annotation cannot be unparenthesized".into()),
+                range,
+            );
+        }
 
         let value = if self.eat(TokenKind::Equal) {
             let (value, value_range) = self.parse_exprs();
