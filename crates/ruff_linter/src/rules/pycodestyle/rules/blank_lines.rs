@@ -400,15 +400,16 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     first_token_range = Some(*range);
                 }
 
-                if token != TokenKind::NonLogicalNewline {
-                    if token != TokenKind::Comment {
-                        line_is_comment_only = false;
-                    }
+                if !token.is_trivia() {
+                    line_is_comment_only = false;
+                }
 
-                    // Allow a comment to follow a docstring.
-                    if !matches!(token, TokenKind::String { .. } | TokenKind::Comment) {
-                        is_docstring = false;
-                    }
+                // Allow a comment to follow a docstring.
+                if !matches!(
+                    token,
+                    TokenKind::String { .. } | TokenKind::NonLogicalNewline | TokenKind::Comment
+                ) {
+                    is_docstring = false;
                 }
 
                 last_token = Some(token);
