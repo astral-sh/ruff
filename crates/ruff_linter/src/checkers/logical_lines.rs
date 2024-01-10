@@ -38,7 +38,7 @@ pub(crate) fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
-    let mut non_comment_prev_line = None;
+    let mut prev_line = None;
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
@@ -90,7 +90,7 @@ pub(crate) fn check_logical_lines(
 
         for kind in indentation(
             &line,
-            non_comment_prev_line.as_ref(),
+            prev_line.as_ref(),
             indent_char,
             indent_level,
             prev_indent_level,
@@ -102,7 +102,7 @@ pub(crate) fn check_logical_lines(
         }
 
         if !line.is_comment_only() {
-            non_comment_prev_line = Some(line);
+            prev_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
     }
