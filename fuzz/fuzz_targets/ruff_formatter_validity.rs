@@ -26,7 +26,6 @@ fn do_fuzz(case: &[u8]) -> Corpus {
     // the settings are immutable to test_snippet, so we avoid re-initialising here
     let linter_settings = SETTINGS.get_or_init(LinterSettings::default);
     let format_options = PyFormatOptions::default();
-    ruff_linter::test::set_max_iterations(usize::MAX);
 
     let linter_results = ruff_linter::linter::lint_only(
         "fuzzed-source.py".as_ref(),
@@ -92,10 +91,6 @@ fn do_fuzz(case: &[u8]) -> Corpus {
             }
         }
     }
-
-    // unlike in the test framework, where the number of iterations is well-defined, we are only
-    // looking for situations where a fix is bad; thus, we set the iterations to "infinite"
-    let _ = ruff_linter::test::test_snippet(code, linter_settings);
 
     Corpus::Keep
 }
