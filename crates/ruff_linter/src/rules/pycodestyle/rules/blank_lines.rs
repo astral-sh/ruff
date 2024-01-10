@@ -87,7 +87,9 @@ enum Status {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
 #[violation]
-pub struct BlankLineBetweenMethods(pub u32);
+pub struct BlankLineBetweenMethods {
+    actual_blank_lines: u32
+}
 
 impl AlwaysFixableViolation for BlankLineBetweenMethods {
     #[derive_message_formats]
