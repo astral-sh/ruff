@@ -18,43 +18,10 @@ use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
 
-/// Contains variables used for the linting of blank lines.
-#[derive(Debug, Default)]
-#[allow(clippy::struct_excessive_bools)]
-pub(crate) struct BlankLinesChecker {
-    follows: Follows,
-    fn_status: Status,
-    class_status: Status,
-    /// First line that is not a comment.
-    is_not_first_logical_line: bool,
-    /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
-    /// to the second line instead of the first.
-    last_non_comment_line_end: TextSize,
-    previous_unindented_token: Option<TokenKind>,
-}
-
 /// Number of blank lines around top level classes and functions.
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
 /// Number of blank lines around methods and nested classes and functions.
 const BLANK_LINES_METHOD_LEVEL: u32 = 1;
-
-#[derive(Copy, Clone, Debug, Default)]
-enum Follows {
-    #[default]
-    Other,
-    Decorator,
-    Def,
-    Docstring,
-}
-#[derive(Copy, Clone, Debug, Default)]
-enum Status {
-    /// Stores the indent level where the nesting started.
-    Inside(usize),
-    /// This is used to rectify a Inside switched to a Outside because of a dedented comment.
-    CommentAfter(usize),
-    #[default]
-    Outside,
-}
 
 /// ## What it does
 /// Checks for missing blank lines between methods of a class.
@@ -499,6 +466,40 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
         None
     }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+enum Follows {
+    #[default]
+    Other,
+    Decorator,
+    Def,
+    Docstring,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+enum Status {
+    /// Stores the indent level where the nesting started.
+    Inside(usize),
+    /// This is used to rectify a Inside switched to a Outside because of a dedented comment.
+    CommentAfter(usize),
+    #[default]
+    Outside,
+}
+
+/// Contains variables used for the linting of blank lines.
+#[derive(Debug, Default)]
+#[allow(clippy::struct_excessive_bools)]
+pub(crate) struct BlankLinesChecker {
+    follows: Follows,
+    fn_status: Status,
+    class_status: Status,
+    /// First line that is not a comment.
+    is_not_first_logical_line: bool,
+    /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
+    /// to the second line instead of the first.
+    last_non_comment_line_end: TextSize,
+    previous_unindented_token: Option<TokenKind>,
 }
 
 impl BlankLinesChecker {
