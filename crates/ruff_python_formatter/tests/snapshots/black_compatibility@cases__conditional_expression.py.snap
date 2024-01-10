@@ -72,6 +72,28 @@ def something():
         if flat
         else ValuesListIterable
     )
+
+
+def foo(wait: bool = True):
+    # This comment is two
+    # lines long
+
+    # This is only one
+    time.sleep(1) if wait else None
+    time.sleep(1) if wait else None
+
+    # With newline above
+    time.sleep(1) if wait else None
+    # Without newline above
+    time.sleep(1) if wait else None
+
+
+a = "".join(
+    (
+        "",  # comment
+        "" if True else "",
+    )
+)
 ```
 
 ## Black Differences
@@ -136,7 +158,7 @@ def something():
      for some_boolean_variable in some_iterable
  )
  
-@@ -86,5 +78,7 @@
+@@ -86,7 +78,9 @@
      clone._iterable_class = (
          NamedValuesListIterable
          if named
@@ -145,6 +167,8 @@ def something():
 +        if flat
 +        else ValuesListIterable
      )
+ 
+ 
 ```
 
 ## Ruff Output
@@ -234,6 +258,26 @@ def something():
         if flat
         else ValuesListIterable
     )
+
+
+def foo(wait: bool = True):
+    # This comment is two
+    # lines long
+
+    # This is only one
+    time.sleep(1) if wait else None
+    time.sleep(1) if wait else None
+
+    # With newline above
+    time.sleep(1) if wait else None
+    # Without newline above
+    time.sleep(1) if wait else None
+
+
+a = "".join((
+    "",  # comment
+    "" if True else "",
+))
 ```
 
 ## Black Output
@@ -329,6 +373,26 @@ def something():
         if named
         else FlatValuesListIterable if flat else ValuesListIterable
     )
+
+
+def foo(wait: bool = True):
+    # This comment is two
+    # lines long
+
+    # This is only one
+    time.sleep(1) if wait else None
+    time.sleep(1) if wait else None
+
+    # With newline above
+    time.sleep(1) if wait else None
+    # Without newline above
+    time.sleep(1) if wait else None
+
+
+a = "".join((
+    "",  # comment
+    "" if True else "",
+))
 ```
 
 
