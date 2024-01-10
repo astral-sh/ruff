@@ -425,11 +425,9 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     line_is_comment_only = false;
                 }
 
-                // Allow a comment to follow a docstring.
-                if !matches!(
-                    token,
-                    TokenKind::String { .. } | TokenKind::NonLogicalNewline | TokenKind::Comment
-                ) {
+                // A docstring line is composed only of the docstring (TokenKind::String) and trivia tokens.
+                // (If a comment follows a docstring, we still count the line as a docstring)
+                if token != TokenKind::String && !token.is_trivia() {
                     is_docstring = false;
                 }
 
@@ -446,6 +444,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
                     let last_token_range = *range;
 
+                    // For a line to be a docstring, the first token must be a string (since indents are ignored)
                     if first_token != Some(TokenKind::String) {
                         is_docstring = false;
                     }
