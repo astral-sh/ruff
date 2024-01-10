@@ -8,6 +8,7 @@ def foo(d: dict[str, str]) -> None:
     for k, v in zip(d.keys(), d.values(), struct=True):  # OK
         ...
 
+
 d1 = d2 = {}
 
 for k, v in zip(d1.keys(), d2.values()):  # OK
