@@ -489,7 +489,6 @@ enum Status {
 
 /// Contains variables used for the linting of blank lines.
 #[derive(Debug, Default)]
-#[allow(clippy::struct_excessive_bools)]
 pub(crate) struct BlankLinesChecker {
     follows: Follows,
     fn_status: Status,
