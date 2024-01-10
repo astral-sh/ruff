@@ -322,7 +322,8 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
     }
 }
 
-/// Returns `true` if the token is Async, Class or Def
+/// Returns `true` if the token is a top level token.
+/// It is sufficient to test for Class and Def since the LinePreprocessor ignores Async tokens.
 fn is_top_level_token(token: &Option<Tok>) -> bool {
     matches!(&token, Some(Tok::Class | Tok::Def))
 }
