@@ -771,7 +771,7 @@ impl BlankLinesChecker {
 
             self.last_non_comment_line_end = line.last_token_range.end();
 
-            if line.indent_level == 0 && line.first_token != TokenKind::Comment {
+            if line.indent_level == 0 {
                 self.previous_unindented_token = Some(line.first_token);
             }
         }
