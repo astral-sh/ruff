@@ -431,14 +431,11 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
                     let first_range = first_token_range.unwrap();
 
-                    let range = if first_token == Some(TokenKind::Indent) {
-                        first_range
-                    } else {
-                        TextRange::new(
-                            self.locator.line_start(first_range.start()),
-                            first_range.start(),
-                        )
-                    };
+                    let range = TextRange::new(
+                        self.locator.line_start(first_range.start()),
+                        first_range.start(),
+                    );
+
                     let indent_level = expand_indent(self.locator.slice(range));
 
                     // Empty line
