@@ -48,15 +48,12 @@ pub struct ParsedFile {
 bitflags! {
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
     struct ParserCtxFlags: u8 {
-        const TUPLE_EXPR = 1 << 0;
-        const PARENTHESIZED_EXPR = 1 << 1;
-        const BRACKETSIZED_EXPR = 1 << 2;
-        const BRACESIZED_EXPR = 1 << 3;
+        const PARENTHESIZED_EXPR = 1 << 0;
 
         // NOTE: `ARGUMENTS` can be removed once the heuristic in `parse_with_items`
         // is improved.
-        const ARGUMENTS = 1 << 4;
-        const FOR_TARGET = 1 << 5;
+        const ARGUMENTS = 1 << 1;
+        const FOR_TARGET = 1 << 2;
     }
 }
 
@@ -334,19 +331,6 @@ where
     #[inline]
     fn has_ctx(&self, ctx: ParserCtxFlags) -> bool {
         self.ctx.intersects(ctx)
-    }
-
-    #[inline]
-    fn has_in_curr_or_parent_ctx(&self, ctx: ParserCtxFlags) -> bool {
-        self.has_ctx(ctx) || self.parent_ctx().intersects(ctx)
-    }
-
-    #[inline]
-    fn parent_ctx(&self) -> ParserCtxFlags {
-        self.ctx_stack
-            .last()
-            .copied()
-            .unwrap_or(ParserCtxFlags::empty())
     }
 
     fn next_token(&mut self) -> Spanned {
@@ -1590,7 +1574,7 @@ where
 
         let returns = if self.eat(TokenKind::Rarrow) {
             let (returns, range) = self.parse_exprs();
-            if self.last_ctx.contains(ParserCtxFlags::TUPLE_EXPR)
+            if !self.last_ctx.contains(ParserCtxFlags::PARENTHESIZED_EXPR)
                 && matches!(returns, Expr::Tuple(_))
             {
                 self.add_error(
@@ -2796,9 +2780,7 @@ where
             }
 
             // Don't parse a `CompareExpr` if we are parsing a `Comprehension` or `ForStmt`
-            if op.is_compare_operator()
-                && self.has_in_curr_or_parent_ctx(ParserCtxFlags::FOR_TARGET)
-            {
+            if op.is_compare_operator() && self.has_ctx(ParserCtxFlags::FOR_TARGET) {
                 break;
             }
 
@@ -3659,7 +3641,6 @@ where
     }
 
     fn parse_bracketsized_expr(&mut self, open_bracket_range: TextRange) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::BRACKETSIZED_EXPR);
         // Nice error message when having a unclosed open bracket `[`
         if self.at_ts(NEWLINE_EOF_SET) {
             let range = self.current_range();
@@ -3671,7 +3652,6 @@ where
 
         // Return an empty `ListExpr` when finding a `]` right after the `[`
         if self.at(TokenKind::Rsqb) {
-            self.clear_ctx(ParserCtxFlags::BRACKETSIZED_EXPR);
             let close_bracket_range = self.current_range();
             let range = open_bracket_range.cover(close_bracket_range);
 
@@ -3706,13 +3686,11 @@ where
         if matches!(expr, Expr::List(_) | Expr::ListComp(_)) {
             helpers::set_expr_range(&mut expr, range);
         }
-        self.clear_ctx(ParserCtxFlags::BRACKETSIZED_EXPR);
 
         (expr, range)
     }
 
     fn parse_bracesized_expr(&mut self, lbrace_range: TextRange) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::BRACESIZED_EXPR);
         // Nice error message when having a unclosed open brace `{`
         if self.at_ts(NEWLINE_EOF_SET) {
             let range = self.current_range();
@@ -3724,7 +3702,6 @@ where
 
         // Return an empty `DictExpr` when finding a `}` right after the `{`
         if self.at(TokenKind::Rbrace) {
-            self.clear_ctx(ParserCtxFlags::BRACESIZED_EXPR);
             let close_brace_range = self.current_range();
             let range = lbrace_range.cover(close_brace_range);
 
@@ -3794,7 +3771,6 @@ where
         ) {
             helpers::set_expr_range(&mut expr, range);
         }
-        self.clear_ctx(ParserCtxFlags::BRACESIZED_EXPR);
 
         (expr, range)
     }
@@ -3867,7 +3843,6 @@ where
         first_element_range: TextRange,
         mut parse_func: impl FnMut(&mut Parser<'src, I>) -> ExprWithRange,
     ) -> ExprWithRange {
-        self.set_ctx(ParserCtxFlags::TUPLE_EXPR);
         // In case of the tuple only having one element, we need to cover the
         // range of the comma.
         let mut final_range = first_element_range.cover(self.current_range());
@@ -3886,7 +3861,6 @@ where
             .unwrap_or(final_range),
         );
 
-        self.clear_ctx(ParserCtxFlags::TUPLE_EXPR);
         (
             Expr::Tuple(ast::ExprTuple {
                 elts,
