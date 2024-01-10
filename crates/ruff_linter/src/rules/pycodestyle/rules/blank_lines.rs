@@ -618,7 +618,7 @@ impl BlankLinesChecker {
                 // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
                 && line.indent_level == 0
                 // Only apply to functions or classes.
-            && is_top_level_token_or_decorator(line.first_token)
+                && is_top_level_token_or_decorator(line.first_token)
             {
                 // E302
                 let mut diagnostic = Diagnostic::new(
