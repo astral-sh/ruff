@@ -762,12 +762,12 @@ impl BlankLinesChecker {
             }
         }
 
+        if line.is_docstring {
+            self.follows = Follows::Docstring;
+        }
+
         if !line.is_comment_only {
             self.is_not_first_logical_line = true;
-
-            if line.is_docstring {
-                self.follows = Follows::Docstring;
-            }
 
             self.last_non_comment_line_end = line.last_token_range.end();
 
