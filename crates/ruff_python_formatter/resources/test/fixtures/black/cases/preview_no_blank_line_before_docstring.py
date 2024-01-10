@@ -27,3 +27,7 @@ class MultilineDocstringsAsWell:
 
     and on so many lines...
     """
+
+class SingleQuotedDocstring:
+
+    "I'm a docstring but I don't even get triple quotes."
