@@ -323,7 +323,7 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
 }
 
 /// Returns `true` if the token is a top level token.
-/// It is sufficient to test for Class and Def since the LinePreprocessor ignores Async tokens.
+/// It is sufficient to test for Class and Def since the `LinePreprocessor` ignores Async tokens.
 fn is_top_level_token(token: &Option<Tok>) -> bool {
     matches!(&token, Some(Tok::Class | Tok::Def))
 }
@@ -344,7 +344,7 @@ struct LogicalLineInfo {
     indent_level: usize,
     blank_lines: u32,
     preceding_blank_lines: u32,
-    preceding_blank_characters: TextSize,
+    preceding_blank_characters: usize,
 }
 
 /// Iterator that processes tokens until a full logical line (or comment line) is "built".
@@ -357,7 +357,7 @@ struct LinePreprocessor<'a> {
     /// Number of consecutive blank lines.
     current_blank_lines: u32,
     /// Number of blank characters in the blank lines (\n vs \r\n for example).
-    current_blank_characters: TextSize,
+    current_blank_characters: usize,
 }
 
 impl<'a> LinePreprocessor<'a> {
@@ -367,7 +367,7 @@ impl<'a> LinePreprocessor<'a> {
             locator,
             previous_blank_lines: 0,
             current_blank_lines: 0,
-            current_blank_characters: 0.into(),
+            current_blank_characters: 0,
         }
     }
 }
@@ -442,7 +442,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     if matches!(first_token, Some(Tok::NonLogicalNewline)) {
                         self.current_blank_lines += 1;
                         self.current_blank_characters +=
-                            range.end() - first_range.start() + TextSize::new(1);
+                            range.end().to_usize() - first_range.start().to_usize() + 1;
                         return self.next();
                     }
 
@@ -467,7 +467,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         self.previous_blank_lines = 0;
                     }
                     self.current_blank_lines = 0;
-                    self.current_blank_characters = 0.into();
+                    self.current_blank_characters = 0;
                     return Some(logical_line);
                 }
                 _ => {}
@@ -615,9 +615,13 @@ impl BlankLinesChecker {
                     Diagnostic::new(TooManyBlankLines(line.blank_lines), line.first_token_range);
 
                 let chars_to_remove = if line.indent_level > 0 {
-                    line.preceding_blank_characters.to_u32() - BLANK_LINES_METHOD_LEVEL
+                    u32::try_from(line.preceding_blank_characters)
+                        .expect("Number of blank characters to be small.")
+                        - BLANK_LINES_METHOD_LEVEL
                 } else {
-                    line.preceding_blank_characters.to_u32() - BLANK_LINES_TOP_LEVEL
+                    u32::try_from(line.preceding_blank_characters)
+                        .expect("Number of blank characters to be small.")
+                        - BLANK_LINES_TOP_LEVEL
                 };
                 let end = locator.line_start(line.first_token_range.start());
                 let start = end - TextSize::new(chars_to_remove);
@@ -633,7 +637,12 @@ impl BlankLinesChecker {
 
                 let range = line.first_token_range;
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                    locator.line_start(range.start()) - line.preceding_blank_characters,
+                    locator.line_start(range.start())
+                        - TextSize::new(
+                            line.preceding_blank_characters
+                                .try_into()
+                                .expect("Number of blank characters to be small."),
+                        ),
                     locator.line_start(range.start()),
                 )));
 
