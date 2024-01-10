@@ -2,6 +2,7 @@ use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
+use ruff_python_parser::Tok;
 use std::iter::Flatten;
 use std::slice::Iter;
 
@@ -9,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::lexer::LexicalError;
-use ruff_python_parser::Tok;
+use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
 
 use ruff_text_size::TextRange;
@@ -29,7 +30,7 @@ pub(crate) struct BlankLinesChecker {
     /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
     /// to the second line instead of the first.
     last_non_comment_line_end: TextSize,
-    previous_unindented_token: Option<Tok>,
+    previous_unindented_token: Option<TokenKind>,
 }
 
 /// Number of blank lines around top level classes and functions.
@@ -324,20 +325,20 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
 
 /// Returns `true` if the token is a top level token.
 /// It is sufficient to test for Class and Def since the `LinePreprocessor` ignores Async tokens.
-fn is_top_level_token(token: &Option<Tok>) -> bool {
-    matches!(&token, Some(Tok::Class | Tok::Def))
+fn is_top_level_token(token: &Option<TokenKind>) -> bool {
+    matches!(&token, Some(TokenKind::Class | TokenKind::Def))
 }
 
 /// Returns `true` if the token is At, Async, Class or Def
-fn is_top_level_token_or_decorator(token: &Tok) -> bool {
-    matches!(&token, Tok::Class | Tok::Def | Tok::At)
+fn is_top_level_token_or_decorator(token: &TokenKind) -> bool {
+    matches!(&token, TokenKind::Class | TokenKind::Def | TokenKind::At)
 }
 
 #[derive(Debug)]
 struct LogicalLineInfo {
-    first_token: Tok,
+    first_token: TokenKind,
     first_token_range: TextRange,
-    last_token: Tok,
+    last_token: TokenKind,
     last_token_range: TextRange,
     is_comment_only: bool,
     is_docstring: bool,
@@ -378,57 +379,58 @@ impl<'a> Iterator for LinePreprocessor<'a> {
     fn next(&mut self) -> Option<LogicalLineInfo> {
         let mut line_is_comment_only = true;
         let mut is_docstring = true;
-        let mut first_token: Option<Tok> = None;
+        let mut first_token: Option<TokenKind> = None;
         let mut first_token_range: Option<TextRange> = None;
-        let mut last_token: Option<Tok> = None;
+        let mut last_token: Option<TokenKind> = None;
         let mut parens = 0u32;
 
         while let Some((token, range)) = self.tokens.next() {
-            if matches!(token, Tok::Indent | Tok::Dedent) {
+            let token = TokenKind::from_token(token);
+            if matches!(token, TokenKind::Indent | TokenKind::Dedent) {
                 continue;
             }
 
-            if !matches!(token, Tok::Newline) {
+            if !matches!(token, TokenKind::Newline) {
                 // Ideally, we would like to have a "async def" token since we care about the "def" part.
                 // As a work around, we ignore the first token if it is "async".
-                if first_token.is_none() && !matches!(token, Tok::Async) {
-                    first_token = Some(token.clone());
+                if first_token.is_none() && !matches!(token, TokenKind::Async) {
+                    first_token = Some(token);
                 }
                 if first_token_range.is_none() {
                     first_token_range = Some(*range);
                 }
 
-                if !matches!(token, Tok::NonLogicalNewline) {
-                    if !matches!(token, Tok::Comment(_)) {
+                if !matches!(token, TokenKind::NonLogicalNewline) {
+                    if !matches!(token, TokenKind::Comment) {
                         line_is_comment_only = false;
                     }
 
                     // Allow a comment to follow a docstring.
-                    if !matches!(token, Tok::String { .. } | Tok::Comment(_)) {
+                    if !matches!(token, TokenKind::String { .. } | TokenKind::Comment) {
                         is_docstring = false;
                     }
                 }
 
-                last_token = Some(token.clone());
+                last_token = Some(token);
             }
 
             match token {
-                Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
+                TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
                     parens = parens.saturating_add(1);
                 }
-                Tok::Rbrace | Tok::Rpar | Tok::Rsqb => {
+                TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
                     parens = parens.saturating_sub(1);
                 }
-                Tok::Newline | Tok::NonLogicalNewline if parens == 0 => {
+                TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
                     let last_token_range = *range;
 
-                    if !matches!(first_token, Some(Tok::String { .. })) {
+                    if !matches!(first_token, Some(TokenKind::String { .. })) {
                         is_docstring = false;
                     }
 
                     let first_range = first_token_range.unwrap();
 
-                    let range = if matches!(first_token, Some(Tok::Indent)) {
+                    let range = if matches!(first_token, Some(TokenKind::Indent)) {
                         first_range
                     } else {
                         TextRange::new(
@@ -439,7 +441,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     let indent_level = expand_indent(self.locator.slice(range));
 
                     // Empty line
-                    if matches!(first_token, Some(Tok::NonLogicalNewline)) {
+                    if matches!(first_token, Some(TokenKind::NonLogicalNewline)) {
                         self.current_blank_lines += 1;
                         self.current_blank_characters +=
                             range.end().to_usize() - first_range.start().to_usize() + 1;
@@ -451,7 +453,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     }
 
                     let logical_line = LogicalLineInfo {
-                        first_token: first_token.clone().unwrap(),
+                        first_token: first_token.unwrap(),
                         first_token_range: first_range,
                         last_token: last_token.unwrap(),
                         last_token_range,
@@ -558,7 +560,7 @@ impl BlankLinesChecker {
         if self.is_not_first_logical_line {
             if line.preceding_blank_lines == 0
                 // Only applies to methods.
-            && line.first_token == Tok::Def
+            && line.first_token == TokenKind::Def
                 && matches!(self.class_status, Status::Inside(_))
                 // The class/parent method's docstring can directly precede the def.
                 && !matches!(self.follows, Follows::Docstring)
@@ -584,7 +586,7 @@ impl BlankLinesChecker {
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !matches!(self.follows, Follows::Decorator)
                 // Allow groups of one-liners.
-                && !(matches!(self.follows, Follows::Def) && !matches!(line.last_token, Tok::Colon))
+                && !(matches!(self.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
                 // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
                 && line.indent_level == 0
                 // Only apply to functions or classes.
@@ -684,7 +686,7 @@ impl BlankLinesChecker {
                 // Do not trigger when the def/class follows an "indenting token" (if/while/etc...).
                 && prev_indent_level.is_some_and(|prev_indent_level| prev_indent_level >= line.indent_level)
                 // Allow groups of one-liners.
-                && !(matches!(self.follows, Follows::Def) && !matches!(line.last_token, Tok::Colon))
+                && !(matches!(self.follows, Follows::Def) && !matches!(line.last_token, TokenKind::Colon))
             {
                 // E306
                 let mut diagnostic = Diagnostic::new(
@@ -702,22 +704,22 @@ impl BlankLinesChecker {
         }
 
         match line.first_token {
-            Tok::Class => {
+            TokenKind::Class => {
                 if matches!(self.class_status, Status::Outside) {
                     self.class_status = Status::Inside(line.indent_level + indent_size);
                 }
                 self.follows = Follows::Other;
             }
-            Tok::At => {
+            TokenKind::At => {
                 self.follows = Follows::Decorator;
             }
-            Tok::Def | Tok::Async => {
+            TokenKind::Def | TokenKind::Async => {
                 if matches!(self.fn_status, Status::Outside) {
                     self.fn_status = Status::Inside(line.indent_level + indent_size);
                 }
                 self.follows = Follows::Def;
             }
-            Tok::Comment(_) => {}
+            TokenKind::Comment => {}
             _ => {
                 self.follows = Follows::Other;
             }
@@ -734,8 +736,8 @@ impl BlankLinesChecker {
 
             self.last_non_comment_line_end = line.last_token_range.end();
 
-            if line.indent_level == 0 && !matches!(line.first_token, Tok::Comment(_)) {
-                self.previous_unindented_token = Some(line.first_token.clone());
+            if line.indent_level == 0 && !matches!(line.first_token, TokenKind::Comment) {
+                self.previous_unindented_token = Some(line.first_token);
             }
         }
     }
