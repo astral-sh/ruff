@@ -536,11 +536,9 @@ impl BlankLinesChecker {
         stylist: &Stylist,
         diagnostics: &mut Vec<Diagnostic>,
     ) {
-        let indent_size: usize = 4;
-
         match self.class_status {
             Status::Inside(nesting_indent) => {
-                if line.indent_level < nesting_indent {
+                if line.indent_level <= nesting_indent {
                     if line.is_comment_only {
                         self.class_status = Status::CommentAfter(nesting_indent);
                     } else {
@@ -550,7 +548,7 @@ impl BlankLinesChecker {
             }
             Status::CommentAfter(indent) => {
                 if !line.is_comment_only {
-                    if line.indent_level >= indent {
+                    if line.indent_level > indent {
                         self.class_status = Status::Inside(indent);
                     }
                     self.class_status = Status::Outside;
@@ -562,7 +560,7 @@ impl BlankLinesChecker {
         }
 
         if let Status::Inside(nesting_indent) = self.fn_status {
-            if line.indent_level < nesting_indent {
+            if line.indent_level <= nesting_indent {
                 if line.is_comment_only {
                     self.fn_status = Status::CommentAfter(nesting_indent);
                 } else {
@@ -575,7 +573,7 @@ impl BlankLinesChecker {
         // we need to revert the variables.
         if !line.is_comment_only {
             if let Status::CommentAfter(indent) = self.fn_status {
-                if line.indent_level >= indent {
+                if line.indent_level > indent {
                     self.fn_status = Status::Inside(indent);
                 }
                 self.fn_status = Status::Outside;
@@ -744,7 +742,7 @@ impl BlankLinesChecker {
         match line.first_token {
             TokenKind::Class => {
                 if matches!(self.class_status, Status::Outside) {
-                    self.class_status = Status::Inside(line.indent_level + indent_size);
+                    self.class_status = Status::Inside(line.indent_level);
                 }
                 self.follows = Follows::Other;
             }
@@ -753,7 +751,7 @@ impl BlankLinesChecker {
             }
             TokenKind::Def | TokenKind::Async => {
                 if matches!(self.fn_status, Status::Outside) {
-                    self.fn_status = Status::Inside(line.indent_level + indent_size);
+                    self.fn_status = Status::Inside(line.indent_level);
                 }
                 self.follows = Follows::Def;
             }
