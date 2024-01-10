@@ -19,6 +19,9 @@ use crate::settings::types::PythonVersion;
 
 /// Run lint rules over a [`Stmt`] syntax node.
 pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
+    if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
+        ruff::rules::sort_dunder_all(checker, stmt);
+    }
     match stmt {
         Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
             if checker.enabled(Rule::GlobalAtModuleLevel) {
