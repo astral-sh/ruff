@@ -538,13 +538,26 @@ impl BlankLinesChecker {
     ) {
         let indent_size: usize = 4;
 
-        if let Status::Inside(nesting_indent) = self.class_status {
-            if line.indent_level < nesting_indent {
-                if line.is_comment_only {
-                    self.class_status = Status::CommentAfter(nesting_indent);
-                } else {
+        match self.class_status {
+            Status::Inside(nesting_indent) => {
+                if line.indent_level < nesting_indent {
+                    if line.is_comment_only {
+                        self.class_status = Status::CommentAfter(nesting_indent);
+                    } else {
+                        self.class_status = Status::Outside;
+                    }
+                }
+            }
+            Status::CommentAfter(indent) => {
+                if !line.is_comment_only {
+                    if line.indent_level >= indent {
+                        self.class_status = Status::Inside(indent);
+                    }
                     self.class_status = Status::Outside;
                 }
+            }
+            Status::Outside => {
+                // Nothing to do
             }
         }
 
@@ -566,13 +579,6 @@ impl BlankLinesChecker {
                     self.fn_status = Status::Inside(indent);
                 }
                 self.fn_status = Status::Outside;
-            }
-
-            if let Status::CommentAfter(indent) = self.class_status {
-                if line.indent_level >= indent {
-                    self.class_status = Status::Inside(indent);
-                }
-                self.class_status = Status::Outside;
             }
         }
 
