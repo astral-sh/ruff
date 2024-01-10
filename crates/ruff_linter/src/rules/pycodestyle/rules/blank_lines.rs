@@ -327,7 +327,7 @@ struct LogicalLineInfo {
     first_token: TokenKind,
     first_token_range: TextRange,
     last_token: TokenKind,
-    last_token_range: TextRange,
+    last_token_end: TextSize,
     is_comment_only: bool,
     is_docstring: bool,
     indent_level: usize,
@@ -409,7 +409,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     parens = parens.saturating_sub(1);
                 }
                 TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
-                    let last_token_range = *range;
+                    let last_token_end = range.end();
 
                     // For a line to be a docstring, the first token must be a string (since indents are ignored)
                     if first_token != Some(TokenKind::String) {
@@ -444,7 +444,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         first_token_range: first_range,
                         last_token: last_token
                             .expect("that Newline cannot be the first token of a line (there is at least a NonLogicalNewline token)"),
-                        last_token_range,
+                        last_token_end,
                         is_comment_only: line_is_comment_only,
                         is_docstring,
                         indent_level,
@@ -769,7 +769,7 @@ impl BlankLinesChecker {
         if !line.is_comment_only {
             self.is_not_first_logical_line = true;
 
-            self.last_non_comment_line_end = line.last_token_range.end();
+            self.last_non_comment_line_end = line.last_token_end;
 
             if line.indent_level == 0 {
                 self.previous_unindented_token = Some(line.first_token);
