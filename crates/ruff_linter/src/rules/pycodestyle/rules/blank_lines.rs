@@ -586,7 +586,7 @@ impl BlankLinesChecker {
         if self.is_not_first_logical_line {
             if line.preceding_blank_lines == 0
                 // Only applies to methods.
-            && line.first_token == TokenKind::Def
+                && line.first_token == TokenKind::Def
                 && matches!(self.class_status, Status::Inside(_))
                 // The class/parent method's docstring can directly precede the def.
                 && !matches!(self.follows, Follows::Docstring)
