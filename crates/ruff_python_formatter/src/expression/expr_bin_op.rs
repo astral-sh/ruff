@@ -3,10 +3,10 @@ use ruff_python_ast::ExprBinOp;
 
 use crate::comments::SourceComment;
 use crate::expression::binary_like::BinaryLike;
-use crate::expression::expr_string_literal::is_multiline_string;
 use crate::expression::has_parentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
+use crate::string::AnyString;
 
 #[derive(Default)]
 pub struct FormatExprBinOp;
@@ -35,13 +35,13 @@ impl NeedsParentheses for ExprBinOp {
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
             OptionalParentheses::Always
-        } else if let Some(literal_expr) = self.left.as_literal_expr() {
+        } else if let Some(string) = AnyString::from_expression(&self.left) {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
-            if !literal_expr.is_implicit_concatenated()
-                && is_multiline_string(literal_expr.into(), context.source())
+            if !string.is_implicit_concatenated()
+                && string.is_multiline(context.source())
                 && has_parentheses(&self.right, context).is_some()
                 && !context.comments().has_dangling(self)
-                && !context.comments().has(literal_expr)
+                && !context.comments().has(string)
                 && !context.comments().has(self.right.as_ref())
             {
                 OptionalParentheses::Never
