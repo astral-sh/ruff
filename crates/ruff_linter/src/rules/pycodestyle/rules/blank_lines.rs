@@ -763,9 +763,7 @@ impl BlankLinesChecker {
         }
 
         if !line.is_comment_only {
-            if !self.is_not_first_logical_line {
-                self.is_not_first_logical_line = true;
-            }
+            self.is_not_first_logical_line = true;
 
             if line.is_docstring {
                 self.follows = Follows::Docstring;
