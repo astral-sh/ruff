@@ -1,119 +1,237 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF022.py:1:11: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:5:11: RUF022 [*] `__all__` is not alphabetically sorted
   |
-1 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
-  |           ^^^^^^^^^^^^^^^^^^^^ RUF022
-2 | __all__ += ["foo", "bar", "antipasti"]
-3 | __all__ = ("d", "c", "b", "a")
-  |
-  = help: Sort `__all__` alphabetically
-
-ℹ Safe fix
-1   |-__all__ = ["d", "c", "b", "a"]  # a comment that is untouched
-  1 |+__all__ = ["a", "b", "c", "d"]  # a comment that is untouched
-2 2 | __all__ += ["foo", "bar", "antipasti"]
-3 3 | __all__ = ("d", "c", "b", "a")
-4 4 | 
-
-RUF022.py:2:12: RUF022 [*] `__all__` is not alphabetically sorted
-  |
-1 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
-2 | __all__ += ["foo", "bar", "antipasti"]
-  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
-3 | __all__ = ("d", "c", "b", "a")
-  |
-  = help: Sort `__all__` alphabetically
-
-ℹ Safe fix
-1 1 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
-2   |-__all__ += ["foo", "bar", "antipasti"]
-  2 |+__all__ += ["antipasti", "bar", "foo"]
-3 3 | __all__ = ("d", "c", "b", "a")
-4 4 | 
-5 5 | if bool():
-
-RUF022.py:3:11: RUF022 [*] `__all__` is not alphabetically sorted
-  |
-1 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
-2 | __all__ += ["foo", "bar", "antipasti"]
-3 | __all__ = ("d", "c", "b", "a")
-  |           ^^^^^^^^^^^^^^^^^^^^ RUF022
+3 | ##################################################
 4 | 
-5 | if bool():
+5 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
+  |           ^^^^^^^^^^^^^^^^^^^^ RUF022
+6 | __all__ += ["foo", "bar", "antipasti"]
+7 | __all__ = ("d", "c", "b", "a")
   |
   = help: Sort `__all__` alphabetically
 
 ℹ Safe fix
-1 1 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
-2 2 | __all__ += ["foo", "bar", "antipasti"]
-3   |-__all__ = ("d", "c", "b", "a")
-  3 |+__all__ = ("a", "b", "c", "d")
+2 2 | # Single-line __all__ definitions (nice 'n' easy!)
+3 3 | ##################################################
 4 4 | 
-5 5 | if bool():
-6 6 |     __all__ += ("x", "m", "a", "s")
+5   |-__all__ = ["d", "c", "b", "a"]  # a comment that is untouched
+  5 |+__all__ = ["a", "b", "c", "d"]  # a comment that is untouched
+6 6 | __all__ += ["foo", "bar", "antipasti"]
+7 7 | __all__ = ("d", "c", "b", "a")
+8 8 | 
 
-RUF022.py:6:16: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:6:12: RUF022 [*] `__all__` is not alphabetically sorted
   |
-5 | if bool():
-6 |     __all__ += ("x", "m", "a", "s")
-  |                ^^^^^^^^^^^^^^^^^^^^ RUF022
-7 | else:
-8 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+5 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
+6 | __all__ += ["foo", "bar", "antipasti"]
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
+7 | __all__ = ("d", "c", "b", "a")
   |
   = help: Sort `__all__` alphabetically
 
 ℹ Safe fix
-3 3 | __all__ = ("d", "c", "b", "a")
+3 3 | ##################################################
 4 4 | 
-5 5 | if bool():
-6   |-    __all__ += ("x", "m", "a", "s")
-  6 |+    __all__ += ("a", "m", "s", "x")
-7 7 | else:
-8 8 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-9 9 | 
+5 5 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
+6   |-__all__ += ["foo", "bar", "antipasti"]
+  6 |+__all__ += ["antipasti", "bar", "foo"]
+7 7 | __all__ = ("d", "c", "b", "a")
+8 8 | 
+9 9 | if bool():
 
-RUF022.py:8:16: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:7:11: RUF022 [*] `__all__` is not alphabetically sorted
+  |
+5 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
+6 | __all__ += ["foo", "bar", "antipasti"]
+7 | __all__ = ("d", "c", "b", "a")
+  |           ^^^^^^^^^^^^^^^^^^^^ RUF022
+8 | 
+9 | if bool():
+  |
+  = help: Sort `__all__` alphabetically
+
+ℹ Safe fix
+4 4 | 
+5 5 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
+6 6 | __all__ += ["foo", "bar", "antipasti"]
+7   |-__all__ = ("d", "c", "b", "a")
+  7 |+__all__ = ("a", "b", "c", "d")
+8 8 | 
+9 9 | if bool():
+10 10 |     __all__ += ("x", "m", "a", "s")
+
+RUF022.py:10:16: RUF022 [*] `__all__` is not alphabetically sorted
    |
- 6 |     __all__ += ("x", "m", "a", "s")
- 7 | else:
- 8 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+ 9 | if bool():
+10 |     __all__ += ("x", "m", "a", "s")
+   |                ^^^^^^^^^^^^^^^^^^^^ RUF022
+11 | else:
+12 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Safe fix
+7  7  | __all__ = ("d", "c", "b", "a")
+8  8  | 
+9  9  | if bool():
+10    |-    __all__ += ("x", "m", "a", "s")
+   10 |+    __all__ += ("a", "m", "s", "x")
+11 11 | else:
+12 12 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+13 13 | 
+
+RUF022.py:12:16: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+10 |     __all__ += ("x", "m", "a", "s")
+11 | else:
+12 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    |                ^^^^^^^^^^^^^^^^^^^^^^ RUF022
- 9 | 
-10 | ###################################
+13 | 
+14 | ####################################
    |
    = help: Sort `__all__` alphabetically
 
 ℹ Safe fix
-5 5 | if bool():
-6 6 |     __all__ += ("x", "m", "a", "s")
-7 7 | else:
-8   |-    __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-  8 |+    __all__ += "foo1", "foo2", "foo3"  # NB: an implicit tuple (without parens)
-9 9 | 
-10 10 | ###################################
-11 11 | # These should all not get flagged:
+9  9  | if bool():
+10 10 |     __all__ += ("x", "m", "a", "s")
+11 11 | else:
+12    |-    __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+   12 |+    __all__ += "foo1", "foo2", "foo3"  # NB: an implicit tuple (without parens)
+13 13 | 
+14 14 | ####################################
+15 15 | # Neat multiline __all__ definitions
 
-RUF022.py:26:16: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:18:11: RUF022 [*] `__all__` is not alphabetically sorted
    |
-24 |     __all__ += ("e", "f", "g")
-25 | else:
-26 |     __all__ += ["omega", "alpha"]
+16 |   ####################################
+17 |   
+18 |   __all__ = (
+   |  ___________^
+19 | |     "d",
+20 | |     "c",  # a comment regarding 'c'
+21 | |     "b",
+22 | |     # a comment regarding 'a':
+23 | |     "a"
+24 | | )
+   | |_^ RUF022
+25 |   
+26 |   __all__ = [
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Unsafe fix
+16 16 | ####################################
+17 17 | 
+18 18 | __all__ = (
+   19 |+    # a comment regarding 'a':
+   20 |+    "a",
+   21 |+    "b",
+   22 |+    "c",  # a comment regarding 'c'
+19 23 |     "d",
+20    |-    "c",  # a comment regarding 'c'
+21    |-    "b",
+22    |-    # a comment regarding 'a':
+23    |-    "a"
+24 24 | )
+25 25 | 
+26 26 | __all__ = [
+
+RUF022.py:26:11: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+24 |   )
+25 |   
+26 |   __all__ = [
+   |  ___________^
+27 | |     "d",
+28 | |     "c",  # a comment regarding 'c'
+29 | |     "b",
+30 | |     # a comment regarding 'a':
+31 | |     "a"
+32 | | ]
+   | |_^ RUF022
+33 |   
+34 |   ##########################################
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Unsafe fix
+24 24 | )
+25 25 | 
+26 26 | __all__ = [
+   27 |+    # a comment regarding 'a':
+   28 |+    "a",
+   29 |+    "b",
+   30 |+    "c",  # a comment regarding 'c'
+27 31 |     "d",
+28    |-    "c",  # a comment regarding 'c'
+29    |-    "b",
+30    |-    # a comment regarding 'a':
+31    |-    "a"
+32 32 | ]
+33 33 | 
+34 34 | ##########################################
+
+RUF022.py:39:11: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+38 |   # comment0
+39 |   __all__ = ("d", "a",  # comment1
+   |  ___________^
+40 | |            # comment2
+41 | |            "f", "b",
+42 | |                                         "strangely",  # comment3
+43 | |             # comment4
+44 | |     "formatted",
+45 | |     # comment5
+46 | | )  # comment6
+   | |_^ RUF022
+47 |   # comment7
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Unsafe fix
+36 36 | ##########################################
+37 37 | 
+38 38 | # comment0
+39    |-__all__ = ("d", "a",  # comment1
+40    |-           # comment2
+41    |-           "f", "b",
+42    |-                                        "strangely",  # comment3
+43    |-            # comment4
+   39 |+__all__ = (
+   40 |+    "a",
+   41 |+    "b",
+   42 |+    "d",  # comment1
+   43 |+    # comment2
+   44 |+           "f",
+   45 |+    # comment4
+44 46 |     "formatted",
+45    |-    # comment5
+   47 |+    "strangely",  # comment3
+46 48 | )  # comment6
+47 49 | # comment7
+48 50 | 
+
+RUF022.py:65:16: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+63 |     __all__ += ("e", "f", "g")
+64 | else:
+65 |     __all__ += ["omega", "alpha"]
    |                ^^^^^^^^^^^^^^^^^^ RUF022
-27 | 
-28 | class IntroducesNonModuleScope:
+66 | 
+67 | class IntroducesNonModuleScope:
    |
    = help: Sort `__all__` alphabetically
 
 ℹ Safe fix
-23 23 | if bool():
-24 24 |     __all__ += ("e", "f", "g")
-25 25 | else:
-26    |-    __all__ += ["omega", "alpha"]
-   26 |+    __all__ += ["alpha", "omega"]
-27 27 | 
-28 28 | class IntroducesNonModuleScope:
-29 29 |     __all__ = ("b", "a", "e", "d")
+62 62 | if bool():
+63 63 |     __all__ += ("e", "f", "g")
+64 64 | else:
+65    |-    __all__ += ["omega", "alpha"]
+   65 |+    __all__ += ["alpha", "omega"]
+66 66 | 
+67 67 | class IntroducesNonModuleScope:
+68 68 |     __all__ = ("b", "a", "e", "d")
 
 

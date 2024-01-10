@@ -1,12 +1,17 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use std::cmp::Ordering;
+
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_parser::{lexer, Mode};
+use ruff_python_ast::whitespace::indentation;
+use ruff_python_codegen::Stylist;
+use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
+use itertools::Itertools;
 use strum_macros::EnumIs;
 
 #[violation]
@@ -25,56 +30,311 @@ impl Violation for UnsortedDunderAll {
     }
 }
 
-#[derive(EnumIs)]
+#[derive(EnumIs, Eq, PartialEq)]
 enum DunderAllKind {
     List,
     Tuple { is_parenthesized: bool },
 }
 
+impl DunderAllKind {
+    fn parens(&self, is_multiline: bool) -> (&str, &str) {
+        match (self, is_multiline) {
+            (Self::List, _) => ("[", "]"),
+            (
+                Self::Tuple {
+                    is_parenthesized: false,
+                },
+                false,
+            ) => ("", ""),
+            _ => ("(", ")"),
+        }
+    }
+}
+
+fn tuple_is_parenthesized(tuple: &ast::ExprTuple, locator: &Locator) -> bool {
+    let toks = lexer::lex(locator.slice(tuple).trim(), Mode::Expression).collect::<Vec<_>>();
+    matches!(
+        (toks.first(), toks.get(toks.len() - 2)),
+        (Some(Ok((Tok::Lpar, _))), Some(Ok((Tok::Rpar, _))))
+    )
+}
+
+#[derive(Clone, Debug)]
+struct DunderAllItem {
+    value: String,
+    // Each `AllItem` in any given list should have a unique `original_index`:
+    original_index: u16,
+    // Note that this range might include comments, etc.
+    range: TextRange,
+    additional_comments: Option<TextRange>,
+}
+
+impl Ranged for DunderAllItem {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl PartialEq for DunderAllItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.original_index == other.original_index
+    }
+}
+
+impl Eq for DunderAllItem {}
+
+impl DunderAllItem {
+    fn sort_index(&self) -> (&str, u16) {
+        (&self.value, self.original_index)
+    }
+}
+
+impl Ord for DunderAllItem {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.sort_index().cmp(&other.sort_index())
+    }
+}
+
+impl PartialOrd for DunderAllItem {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
+    let mut all_items = vec![];
+
+    let mut this_range = None;
+    let mut idx = 0;
+    for line in lines {
+        let DunderAllLine { items, comment } = line;
+        match (items.as_slice(), comment) {
+            ([], Some(_)) => {
+                assert!(this_range.is_none());
+                this_range = comment;
+            }
+            ([(first_val, first_range), rest @ ..], _) => {
+                let range = this_range.map_or(*first_range, |r| {
+                    TextRange::new(r.start(), first_range.end())
+                });
+                all_items.push(DunderAllItem {
+                    value: first_val.clone(),
+                    original_index: idx,
+                    range,
+                    additional_comments: comment,
+                });
+                this_range = None;
+                idx += 1;
+                for (value, range) in rest {
+                    all_items.push(DunderAllItem {
+                        value: value.clone(),
+                        original_index: idx,
+                        range: *range,
+                        additional_comments: None,
+                    });
+                    idx += 1;
+                }
+            }
+            _ => unreachable!(
+                "This should be unreachable.
+                Any lines that have neither comments nor items
+                should have been filtered out by this point."
+            ),
+        }
+    }
+
+    all_items
+}
+
+#[derive(Debug)]
+struct DunderAllLine {
+    items: Vec<(String, TextRange)>,
+    comment: Option<TextRange>,
+}
+
+impl DunderAllLine {
+    fn new(items: &[(String, TextRange)], comment: Option<TextRange>, offset: TextSize) -> Self {
+        assert!(comment.is_some() || !items.is_empty());
+        Self {
+            items: items
+                .iter()
+                .map(|(s, r)| (s.to_owned(), r + offset))
+                .collect(),
+            comment: comment.map(|c| c + offset),
+        }
+    }
+}
+
+fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<DunderAllLine>> {
+    let mut parentheses_open = false;
+    let mut lines = vec![];
+
+    let mut items_in_line = vec![];
+    let mut comment_in_line = None;
+    for pair in lexer::lex(locator.slice(range).trim(), Mode::Expression) {
+        let (tok, subrange) = pair.ok()?;
+        match tok {
+            Tok::Lpar | Tok::Lsqb => {
+                if parentheses_open {
+                    return None;
+                }
+                parentheses_open = true;
+            }
+            Tok::Rpar | Tok::Rsqb | Tok::Newline => {
+                if !(items_in_line.is_empty() && comment_in_line.is_none()) {
+                    lines.push(DunderAllLine::new(
+                        &items_in_line,
+                        comment_in_line,
+                        range.start(),
+                    ));
+                }
+                break;
+            }
+            Tok::NonLogicalNewline => {
+                if !(items_in_line.is_empty() && comment_in_line.is_none()) {
+                    lines.push(DunderAllLine::new(
+                        &items_in_line,
+                        comment_in_line,
+                        range.start(),
+                    ));
+                    items_in_line = vec![];
+                    comment_in_line = None;
+                }
+            }
+            Tok::Comment(_) => comment_in_line = Some(subrange),
+            Tok::String { value, .. } => items_in_line.push((value, subrange)),
+            Tok::Comma => continue,
+            _ => return None,
+        }
+    }
+    Some(lines)
+}
+
+#[derive(PartialEq, Eq)]
 struct DunderAllValue<'a> {
     kind: DunderAllKind,
-    items: Vec<&'a ast::ExprStringLiteral>,
+    items: Vec<DunderAllItem>,
     range: &'a TextRange,
     ctx: &'a ast::ExprContext,
+    multiline: bool,
+}
+
+struct SortedDunderAll {
+    was_already_sorted: bool,
+    new_dunder_all: Option<String>,
+}
+
+fn multiline_dunder_all_from_items(
+    sorted_items: &[DunderAllItem],
+    locator: &Locator,
+    parent: &ast::Stmt,
+    stylist: &Stylist,
+    parens: (&str, &str),
+) -> Option<String> {
+    let Some(indent) = indentation(locator, parent) else {
+        return None;
+    };
+    let (opening_paren, closing_paren) = parens;
+    let added_indent = stylist.indentation();
+    let newline = stylist.line_ending().as_str();
+
+    let mut new_dunder_all = String::from(opening_paren);
+    new_dunder_all.push_str(newline);
+    for item in sorted_items {
+        new_dunder_all.push_str(indent);
+        new_dunder_all.push_str(added_indent);
+        new_dunder_all.push_str(locator.slice(item));
+        new_dunder_all.push(',');
+        if let Some(comment) = item.additional_comments {
+            new_dunder_all.push_str("  ");
+            new_dunder_all.push_str(locator.slice(comment));
+        }
+        new_dunder_all.push_str(newline);
+    }
+    new_dunder_all.push_str(indent);
+    new_dunder_all.push_str(closing_paren);
+
+    Some(new_dunder_all)
+}
+
+fn single_line_dunder_all_from_items(
+    sorted_items: &[DunderAllItem],
+    locator: &Locator,
+    parens: (&str, &str),
+) -> String {
+    let joined_items = sorted_items
+        .iter()
+        .map(|item| locator.slice(item))
+        .join(", ");
+    let (opening_paren, closing_paren) = parens;
+    format!("{opening_paren}{joined_items}{closing_paren}")
 }
 
 impl<'a> DunderAllValue<'a> {
     fn from_expr(value: &'a ast::Expr, locator: &Locator) -> Option<DunderAllValue<'a>> {
+        let is_multiline = locator.contains_line_break(value.range());
         let (kind, elts, range, ctx) = match value {
             ast::Expr::List(ast::ExprList { elts, range, ctx }) => {
                 (DunderAllKind::List, elts, range, ctx)
             }
-            ast::Expr::Tuple(ast::ExprTuple { elts, range, ctx }) => {
-                let is_parenthesized =
-                    lexer::lex_starts_at(locator.slice(range), Mode::Expression, range.start())
-                        .next()?
-                        .ok()?
-                        .0
-                        .is_lpar();
+            ast::Expr::Tuple(tuple @ ast::ExprTuple { elts, range, ctx }) => {
+                let is_parenthesized = tuple_is_parenthesized(tuple, locator);
                 (DunderAllKind::Tuple { is_parenthesized }, elts, range, ctx)
             }
             _ => return None,
         };
-        let mut items = vec![];
+        // An `__all__` definition with <2 elements can't be unsorted;
+        // no point in proceeding any further here
+        if elts.len() < 2 {
+            return None;
+        }
         for elt in elts {
+            // Only consider sorting it if __all__ only has strings in it
             let string_literal = elt.as_string_literal_expr()?;
+            // And if any strings are implicitly concatenated, don't bother
             if string_literal.value.is_implicit_concatenated() {
                 return None;
             }
-            items.push(string_literal)
         }
+        let lines = collect_dunder_all_lines(*range, locator)?;
+        let items = collect_dunder_all_items(lines);
         Some(DunderAllValue {
             kind,
             items,
             range,
             ctx,
+            multiline: is_multiline,
         })
     }
 
-    fn sorted_items(&self) -> Vec<&ast::ExprStringLiteral> {
+    fn construct_sorted_all(
+        &self,
+        locator: &Locator,
+        parent: &ast::Stmt,
+        stylist: &Stylist,
+    ) -> SortedDunderAll {
         let mut sorted_items = self.items.clone();
-        sorted_items.sort_by_key(|item| item.value.to_str());
-        sorted_items
+        sorted_items.sort();
+        if sorted_items == self.items {
+            return SortedDunderAll {
+                was_already_sorted: true,
+                new_dunder_all: None,
+            };
+        }
+        let parens = self.kind.parens(self.multiline);
+        let new_dunder_all = if self.multiline {
+            multiline_dunder_all_from_items(&sorted_items, locator, parent, stylist, parens)
+        } else {
+            Some(single_line_dunder_all_from_items(
+                &sorted_items,
+                locator,
+                parens,
+            ))
+        };
+        SortedDunderAll {
+            was_already_sorted: false,
+            new_dunder_all,
+        }
     }
 }
 
@@ -112,50 +372,33 @@ pub(crate) fn sort_dunder_all(checker: &mut Checker, stmt: &ast::Stmt) {
         return;
     }
 
-    let Some(dunder_all_val) = DunderAllValue::from_expr(original_value, checker.locator()) else {
+    let locator = checker.locator();
+
+    let Some(dunder_all_val) = DunderAllValue::from_expr(original_value, locator) else {
         return;
     };
 
-    if dunder_all_val.items.len() < 2 {
-        return;
-    }
+    let sorting_result = dunder_all_val.construct_sorted_all(locator, stmt, checker.stylist());
 
-    let sorted_items = dunder_all_val.sorted_items();
-    if sorted_items == dunder_all_val.items {
+    if sorting_result.was_already_sorted {
         return;
     }
 
     let dunder_all_range = dunder_all_val.range();
     let mut diagnostic = Diagnostic::new(UnsortedDunderAll, dunder_all_range);
 
-    if !checker.locator().contains_line_break(dunder_all_range) {
-        let new_elts = sorted_items
-            .iter()
-            .map(|elt| ast::Expr::StringLiteral(elt.to_owned().clone()))
-            .collect();
-        let new_node = match dunder_all_val.kind {
-            DunderAllKind::List => ast::Expr::List(ast::ExprList {
-                range: dunder_all_range,
-                elts: new_elts,
-                ctx: *dunder_all_val.ctx,
-            }),
-            DunderAllKind::Tuple { .. } => ast::Expr::Tuple(ast::ExprTuple {
-                range: dunder_all_range,
-                elts: new_elts,
-                ctx: *dunder_all_val.ctx,
-            }),
+    if let Some(new_dunder_all) = sorting_result.new_dunder_all {
+        let applicability = {
+            if dunder_all_val.multiline {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            }
         };
-        let mut content = checker.generator().expr(&new_node);
-        if let DunderAllKind::Tuple {
-            is_parenthesized: true,
-        } = dunder_all_val.kind
-        {
-            content = format!("({})", content);
-        }
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            content,
-            dunder_all_range,
-        )));
+        diagnostic.set_fix(Fix::applicable_edit(
+            Edit::range_replacement(new_dunder_all, dunder_all_range),
+            applicability,
+        ));
     }
 
     checker.diagnostics.push(diagnostic);
