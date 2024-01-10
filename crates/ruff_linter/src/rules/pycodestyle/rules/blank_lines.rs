@@ -313,12 +313,12 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
 
 /// Returns `true` if the token is a top level token.
 /// It is sufficient to test for Class and Def since the `LinePreprocessor` ignores Async tokens.
-fn is_top_level_token(token: &Option<TokenKind>) -> bool {
+fn is_top_level_token(token: Option<TokenKind>) -> bool {
     matches!(&token, Some(TokenKind::Class | TokenKind::Def))
 }
 
 /// Returns `true` if the token is At, Async, Class or Def
-fn is_top_level_token_or_decorator(token: &TokenKind) -> bool {
+fn is_top_level_token_or_decorator(token: TokenKind) -> bool {
     matches!(&token, TokenKind::Class | TokenKind::Def | TokenKind::At)
 }
 
@@ -613,7 +613,7 @@ impl BlankLinesChecker {
                 // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
                 && line.indent_level == 0
                 // Only apply to functions or classes.
-            && is_top_level_token_or_decorator(&line.first_token)
+            && is_top_level_token_or_decorator(line.first_token)
             {
                 // E302
                 let mut diagnostic = Diagnostic::new(
@@ -681,10 +681,10 @@ impl BlankLinesChecker {
             }
 
             if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
-                && is_top_level_token(&self.previous_unindented_token)
+                && is_top_level_token(self.previous_unindented_token)
                 && line.indent_level == 0
                 && !line.is_comment_only
-                && !is_top_level_token_or_decorator(&line.first_token)
+                && !is_top_level_token_or_decorator(line.first_token)
             {
                 // E305
                 let mut diagnostic = Diagnostic::new(
@@ -709,7 +709,7 @@ impl BlankLinesChecker {
             if line.preceding_blank_lines == 0
             // Only apply to nested functions.
                 && matches!(self.fn_status, Status::Inside(_))
-                && is_top_level_token_or_decorator(&line.first_token)
+                && is_top_level_token_or_decorator(line.first_token)
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !matches!(self.follows, Follows::Decorator)
                 // The class's docstring can directly precede the first function.
