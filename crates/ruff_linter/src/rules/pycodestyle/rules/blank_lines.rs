@@ -88,13 +88,15 @@ enum Status {
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E301.html)
 #[violation]
 pub struct BlankLineBetweenMethods {
-    actual_blank_lines: u32
+    actual_blank_lines: u32,
 }
 
 impl AlwaysFixableViolation for BlankLineBetweenMethods {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineBetweenMethods(nb_blank_lines) = self;
+        let BlankLineBetweenMethods {
+            actual_blank_lines: nb_blank_lines,
+        } = self;
         format!("Expected {BLANK_LINES_METHOD_LEVEL:?} blank line, found {nb_blank_lines}")
     }
 
@@ -133,12 +135,17 @@ impl AlwaysFixableViolation for BlankLineBetweenMethods {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E302.html)
 #[violation]
-pub struct BlankLinesTopLevel(pub u32);
+pub struct BlankLinesTopLevel {
+    actual_blank_lines: u32,
+}
 
 impl AlwaysFixableViolation for BlankLinesTopLevel {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLinesTopLevel(nb_blank_lines) = self;
+        let BlankLinesTopLevel {
+            actual_blank_lines: nb_blank_lines,
+        } = self;
+
         format!("Expected {BLANK_LINES_TOP_LEVEL:?} blank lines, found {nb_blank_lines}")
     }
 
@@ -180,12 +187,16 @@ impl AlwaysFixableViolation for BlankLinesTopLevel {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E303.html)
 #[violation]
-pub struct TooManyBlankLines(pub u32);
+pub struct TooManyBlankLines {
+    actual_blank_lines: u32,
+}
 
 impl AlwaysFixableViolation for TooManyBlankLines {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyBlankLines(nb_blank_lines) = self;
+        let TooManyBlankLines {
+            actual_blank_lines: nb_blank_lines,
+        } = self;
         format!("Too many blank lines ({nb_blank_lines})")
     }
 
@@ -266,12 +277,16 @@ impl AlwaysFixableViolation for BlankLineAfterDecorator {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E305.html)
 #[violation]
-pub struct BlankLinesAfterFunctionOrClass(pub u32);
+pub struct BlankLinesAfterFunctionOrClass {
+    actual_blank_lines: u32,
+}
 
 impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLinesAfterFunctionOrClass(blank_lines) = self;
+        let BlankLinesAfterFunctionOrClass {
+            actual_blank_lines: blank_lines,
+        } = self;
         format!("expected 2 blank lines after class or function definition, found ({blank_lines})")
     }
 
@@ -311,12 +326,16 @@ impl AlwaysFixableViolation for BlankLinesAfterFunctionOrClass {
 /// - [PEP 8](https://peps.python.org/pep-0008/#blank-lines)
 /// - [Flake 8 rule](https://www.flake8rules.com/rules/E306.html)
 #[violation]
-pub struct BlankLinesBeforeNestedDefinition(pub u32);
+pub struct BlankLinesBeforeNestedDefinition {
+    actual_blank_lines: u32,
+}
 
 impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLinesBeforeNestedDefinition(blank_lines) = self;
+        let BlankLinesBeforeNestedDefinition {
+            actual_blank_lines: blank_lines,
+        } = self;
         format!("Expected 1 blank line before a nested definition, found {blank_lines}")
     }
 
@@ -571,7 +590,9 @@ impl BlankLinesChecker {
             {
                 // E301
                 let mut diagnostic = Diagnostic::new(
-                    BlankLineBetweenMethods(line.preceding_blank_lines),
+                    BlankLineBetweenMethods {
+                        actual_blank_lines: line.preceding_blank_lines,
+                    },
                     line.first_token_range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -594,7 +615,9 @@ impl BlankLinesChecker {
             {
                 // E302
                 let mut diagnostic = Diagnostic::new(
-                    BlankLinesTopLevel(line.preceding_blank_lines),
+                    BlankLinesTopLevel {
+                        actual_blank_lines: line.preceding_blank_lines,
+                    },
                     line.first_token_range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
@@ -613,8 +636,12 @@ impl BlankLinesChecker {
                 || (line.indent_level > 0 && line.blank_lines > BLANK_LINES_METHOD_LEVEL)
             {
                 // E303
-                let mut diagnostic =
-                    Diagnostic::new(TooManyBlankLines(line.blank_lines), line.first_token_range);
+                let mut diagnostic = Diagnostic::new(
+                    TooManyBlankLines {
+                        actual_blank_lines: line.blank_lines,
+                    },
+                    line.first_token_range,
+                );
 
                 let chars_to_remove = if line.indent_level > 0 {
                     u32::try_from(line.preceding_blank_characters)
@@ -659,7 +686,9 @@ impl BlankLinesChecker {
             {
                 // E305
                 let mut diagnostic = Diagnostic::new(
-                    BlankLinesAfterFunctionOrClass(line.blank_lines),
+                    BlankLinesAfterFunctionOrClass {
+                        actual_blank_lines: line.blank_lines,
+                    },
                     line.first_token_range,
                 );
 
@@ -690,7 +719,9 @@ impl BlankLinesChecker {
             {
                 // E306
                 let mut diagnostic = Diagnostic::new(
-                    BlankLinesBeforeNestedDefinition(line.blank_lines),
+                    BlankLinesBeforeNestedDefinition {
+                        actual_blank_lines: line.blank_lines,
+                    },
                     line.first_token_range,
                 );
 
