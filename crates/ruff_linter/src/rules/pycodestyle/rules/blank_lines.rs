@@ -575,8 +575,9 @@ impl BlankLinesChecker {
             if let Status::CommentAfter(indent) = self.fn_status {
                 if line.indent_level > indent {
                     self.fn_status = Status::Inside(indent);
+                } else {
+                    self.fn_status = Status::Outside;
                 }
-                self.fn_status = Status::Outside;
             }
         }
 
