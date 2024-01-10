@@ -750,7 +750,7 @@ impl BlankLinesChecker {
             TokenKind::At => {
                 self.follows = Follows::Decorator;
             }
-            TokenKind::Def | TokenKind::Async => {
+            TokenKind::Def => {
                 if matches!(self.fn_status, Status::Outside) {
                     self.fn_status = Status::Inside(line.indent_level);
                 }
