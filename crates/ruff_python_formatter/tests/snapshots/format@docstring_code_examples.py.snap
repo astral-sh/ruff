@@ -8209,6 +8209,42 @@ def markdown_skipped_rst_directive():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -480,10 +480,8 @@
+     Do cool stuff::
+ 
+      if True:
+-         cool_stuff(
+-             '''
+-     hiya'''
+-         )
++         cool_stuff('''
++     hiya''')
+ 
+     Done.
+     """
+@@ -958,13 +956,11 @@
+     Do cool stuff.
+ 
+     ``````
+-    do_something(
+-        '''
++    do_something('''
+     ```
+     did i trick you?
+     ```
+-    '''
+-    )
++    ''')
+     ``````
+ 
+     Done.
+```
+
+
 ### Output 6
 ```
 indent-style               = space
@@ -9574,6 +9610,42 @@ def markdown_skipped_rst_directive():
   Done.
   """
   pass
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -480,10 +480,8 @@
+   Do cool stuff::
+ 
+    if True:
+-     cool_stuff(
+-       '''
+-   hiya'''
+-     )
++     cool_stuff('''
++   hiya''')
+ 
+   Done.
+   """
+@@ -958,13 +956,11 @@
+   Do cool stuff.
+ 
+   ``````
+-  do_something(
+-    '''
++  do_something('''
+   ```
+   did i trick you?
+   ```
+-  '''
+-  )
++  ''')
+   ``````
+ 
+   Done.
 ```
 
 
@@ -10954,6 +11026,42 @@ def markdown_skipped_rst_directive():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -489,10 +489,8 @@
+ 	Do cool stuff::
+ 
+ 	 if True:
+-	         cool_stuff(
+-	                 '''
+-	 hiya'''
+-	         )
++	         cool_stuff('''
++	 hiya''')
+ 
+ 	Done.
+ 	"""
+@@ -967,13 +965,11 @@
+ 	Do cool stuff.
+ 
+ 	``````
+-	do_something(
+-	        '''
++	do_something('''
+ 	```
+ 	did i trick you?
+ 	```
+-	'''
+-	)
++	''')
+ 	``````
+ 
+ 	Done.
+```
+
+
 ### Output 8
 ```
 indent-style               = tab
@@ -12319,6 +12427,42 @@ def markdown_skipped_rst_directive():
 	Done.
 	"""
 	pass
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -480,10 +480,8 @@
+ 	Do cool stuff::
+ 
+ 	 if True:
+-	     cool_stuff(
+-	         '''
+-	 hiya'''
+-	     )
++	     cool_stuff('''
++	 hiya''')
+ 
+ 	Done.
+ 	"""
+@@ -958,13 +956,11 @@
+ 	Do cool stuff.
+ 
+ 	``````
+-	do_something(
+-	    '''
++	do_something('''
+ 	```
+ 	did i trick you?
+ 	```
+-	'''
+-	)
++	''')
+ 	``````
+ 
+ 	Done.
 ```
 
 
@@ -13699,6 +13843,42 @@ def markdown_skipped_rst_directive():
 ```
 
 
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -489,10 +489,8 @@
+     Do cool stuff::
+ 
+      if True:
+-         cool_stuff(
+-             '''
+-     hiya'''
+-         )
++         cool_stuff('''
++     hiya''')
+ 
+     Done.
+     """
+@@ -967,13 +965,11 @@
+     Do cool stuff.
+ 
+     ``````
+-    do_something(
+-        '''
++    do_something('''
+     ```
+     did i trick you?
+     ```
+-    '''
+-    )
++    ''')
+     ``````
+ 
+     Done.
+```
+
+
 ### Output 10
 ```
 indent-style               = space
@@ -15064,6 +15244,42 @@ def markdown_skipped_rst_directive():
     Done.
     """
     pass
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -480,10 +480,8 @@
+     Do cool stuff::
+ 
+      if True:
+-         cool_stuff(
+-             '''
+-     hiya'''
+-         )
++         cool_stuff('''
++     hiya''')
+ 
+     Done.
+     """
+@@ -958,13 +956,11 @@
+     Do cool stuff.
+ 
+     ``````
+-    do_something(
+-        '''
++    do_something('''
+     ```
+     did i trick you?
+     ```
+-    '''
+-    )
++    ''')
+     ``````
+ 
+     Done.
 ```
 
 

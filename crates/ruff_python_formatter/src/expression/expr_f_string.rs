@@ -1,5 +1,3 @@
-use memchr::memchr2;
-
 use ruff_python_ast::{AnyNodeRef, ExprFString};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
@@ -50,10 +48,10 @@ impl NeedsParentheses for ExprFString {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if memchr2(b'\n', b'\r', context.source()[self.range].as_bytes()).is_none() {
-            OptionalParentheses::BestFit
-        } else {
+        } else if AnyString::FString(self).is_multiline(context.source()) {
             OptionalParentheses::Never
+        } else {
+            OptionalParentheses::BestFit
         }
     }
 }

@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use bitflags::bitflags;
+use memchr::memchr2;
 
 use ruff_formatter::{format_args, write};
 use ruff_python_ast::AnyNodeRef;
@@ -29,7 +30,7 @@ pub(crate) enum Quoting {
 
 /// Represents any kind of string expression. This could be either a string,
 /// bytes or f-string.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum AnyString<'a> {
     String(&'a ExprStringLiteral),
     Bytes(&'a ExprBytesLiteral),
@@ -50,7 +51,7 @@ impl<'a> AnyString<'a> {
     }
 
     /// Returns `true` if the string is implicitly concatenated.
-    pub(crate) fn is_implicit_concatenated(&self) -> bool {
+    pub(crate) fn is_implicit_concatenated(self) -> bool {
         match self {
             Self::String(ExprStringLiteral { value, .. }) => value.is_implicit_concatenated(),
             Self::Bytes(ExprBytesLiteral { value, .. }) => value.is_implicit_concatenated(),
@@ -59,7 +60,7 @@ impl<'a> AnyString<'a> {
     }
 
     /// Returns the quoting to be used for this string.
-    fn quoting(&self, locator: &Locator<'_>) -> Quoting {
+    fn quoting(self, locator: &Locator<'_>) -> Quoting {
         match self {
             Self::String(_) | Self::Bytes(_) => Quoting::CanChange,
             Self::FString(f_string) => f_string_quoting(f_string, locator),
@@ -67,7 +68,7 @@ impl<'a> AnyString<'a> {
     }
 
     /// Returns a vector of all the [`AnyStringPart`] of this string.
-    fn parts(&self, quoting: Quoting) -> Vec<AnyStringPart<'a>> {
+    fn parts(self, quoting: Quoting) -> Vec<AnyStringPart<'a>> {
         match self {
             Self::String(ExprStringLiteral { value, .. }) => value
                 .iter()
@@ -94,6 +95,24 @@ impl<'a> AnyString<'a> {
                 .collect(),
         }
     }
+
+    pub(crate) fn is_multiline(self, source: &str) -> bool {
+        match self {
+            AnyString::String(_) | AnyString::Bytes(_) => {
+                let contents = &source[self.range()];
+                let prefix = StringPrefix::parse(contents);
+                let quotes = StringQuotes::parse(
+                    &contents[TextRange::new(prefix.text_len(), contents.text_len())],
+                );
+
+                quotes.is_some_and(StringQuotes::is_triple)
+                    && memchr2(b'\n', b'\r', contents.as_bytes()).is_some()
+            }
+            AnyString::FString(fstring) => {
+                memchr2(b'\n', b'\r', source[fstring.range].as_bytes()).is_some()
+            }
+        }
+    }
 }
 
 impl Ranged for AnyString<'_> {
@@ -113,6 +132,12 @@ impl<'a> From<&AnyString<'a>> for AnyNodeRef<'a> {
             AnyString::Bytes(expr) => AnyNodeRef::ExprBytesLiteral(expr),
             AnyString::FString(expr) => AnyNodeRef::ExprFString(expr),
         }
+    }
+}
+
+impl<'a> From<AnyString<'a>> for AnyNodeRef<'a> {
+    fn from(value: AnyString<'a>) -> Self {
+        AnyNodeRef::from(&value)
     }
 }
 
