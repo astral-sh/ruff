@@ -449,7 +449,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         is_docstring = false;
                     }
 
-                    let first_range = first_token_range.unwrap();
+                    let first_range = first_token_range
+                        .expect("that Newline cannot be the first token of a line (there is at least a NonLogicalNewline token)");
 
                     let range = TextRange::new(
                         self.locator.line_start(first_range.start()),
@@ -471,9 +472,11 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     }
 
                     let logical_line = LogicalLineInfo {
-                        first_token: first_token.unwrap(),
+                        first_token: first_token
+                            .expect("that Newline cannot be the first token of a line (there is at least a NonLogicalNewline token)"),
                         first_token_range: first_range,
-                        last_token: last_token.unwrap(),
+                        last_token: last_token
+                            .expect("that Newline cannot be the first token of a line (there is at least a NonLogicalNewline token)"),
                         last_token_range,
                         is_comment_only: line_is_comment_only,
                         is_docstring,
