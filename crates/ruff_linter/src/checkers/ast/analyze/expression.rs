@@ -869,6 +869,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
             if checker.enabled(Rule::DictGetWithNoneDefault) {
                 flake8_simplify::rules::dict_get_with_none_default(checker, expr);
             }
+            if checker.enabled(Rule::ZipDictKeysAndValues) {
+                flake8_simplify::rules::zip_dict_keys_and_values(checker, expr);
+            }
             if checker.any_enabled(&[
                 Rule::OsPathAbspath,
                 Rule::OsChmod,
