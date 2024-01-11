@@ -101,3 +101,16 @@ This fuzz harness checks that fixes applied by Ruff do not introduce new errors 
 [`ruff_linter::test::test_snippet`](../crates/ruff_linter/src/test.rs) testing utility.
 It currently is only configured to use default settings, but may be extended in future versions to
 test non-default linter settings.
+
+### `ruff_formatter_idempotency`
+
+This fuzz harness ensures that the formatter is [idempotent](https://en.wikipedia.org/wiki/Idempotence)
+which detects possible unsteady states of Ruff's formatter.
+
+### `ruff_formatter_validity`
+
+This fuzz harness checks that Ruff's formatter does not introduce new linter errors/warnings by
+linting once, counting the number of each error type, then formatting, then linting again and
+ensuring that the number of each error type does not increase across formats. This has the
+beneficial side effect of discovering cases where the linter does not discover a lint error when
+it should have due to a formatting inconsistency.
