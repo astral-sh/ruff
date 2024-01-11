@@ -984,6 +984,11 @@ impl<'a> SemanticModel<'a> {
         scope.parent.map(|scope_id| &self.scopes[scope_id])
     }
 
+    /// Returns the ID of the parent of the given [`ScopeId`], if any.
+    pub fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+        self.scopes[scope_id].parent
+    }
+
     /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`], if any.
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
@@ -992,6 +997,19 @@ impl<'a> SemanticModel<'a> {
                 current_scope = parent;
             } else {
                 return Some(parent);
+            }
+        }
+        None
+    }
+
+    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`], if any.
+    pub fn first_non_type_parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+        let mut current_scope_id = scope_id;
+        while let Some(parent_id) = self.parent_scope_id(current_scope_id) {
+            if self.scopes[parent_id].kind.is_type() {
+                current_scope_id = parent_id;
+            } else {
+                return Some(parent_id);
             }
         }
         None
