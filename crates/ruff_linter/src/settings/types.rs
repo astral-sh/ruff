@@ -571,7 +571,19 @@ impl PerFileIgnores {
 }
 
 impl Display for PerFileIgnores {
-    fn fmt(&self, _: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.is_empty() {
+            write!(f, "{{}}")?;
+        } else {
+            writeln!(f, "{{")?;
+            for (absolute, basename, rules) in &self.ignores {
+                writeln!(
+                    f,
+                    "\t{{ absolute = {absolute:#?}, basename = {basename:#?}, rules = {rules} }},"
+                )?;
+            }
+            write!(f, "}}")?;
+        }
         Ok(())
     }
 }
