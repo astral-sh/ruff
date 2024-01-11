@@ -1,13 +1,14 @@
 use std::borrow::Cow;
+use std::iter::FusedIterator;
 
 use bitflags::bitflags;
 use memchr::memchr2;
 
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{
     self as ast, Expr, ExprBytesLiteral, ExprFString, ExprStringLiteral, ExpressionRef,
 };
+use ruff_python_ast::{AnyNodeRef, StringLiteral};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -68,31 +69,15 @@ impl<'a> AnyString<'a> {
     }
 
     /// Returns a vector of all the [`AnyStringPart`] of this string.
-    fn parts(self, quoting: Quoting) -> Vec<AnyStringPart<'a>> {
+    fn parts(self, quoting: Quoting) -> AnyStringPartsIter<'a> {
         match self {
-            Self::String(ExprStringLiteral { value, .. }) => value
-                .iter()
-                .map(|part| AnyStringPart::String {
-                    part,
-                    layout: StringLiteralKind::String,
-                })
-                .collect(),
-            Self::Bytes(ExprBytesLiteral { value, .. }) => {
-                value.iter().map(AnyStringPart::Bytes).collect()
+            Self::String(ExprStringLiteral { value, .. }) => {
+                AnyStringPartsIter::String(value.iter())
             }
-            Self::FString(ExprFString { value, .. }) => value
-                .iter()
-                .map(|f_string_part| match f_string_part {
-                    ast::FStringPart::Literal(string_literal) => AnyStringPart::String {
-                        part: string_literal,
-                        layout: StringLiteralKind::InImplicitlyConcatenatedFString(quoting),
-                    },
-                    ast::FStringPart::FString(f_string) => AnyStringPart::FString {
-                        part: f_string,
-                        quoting,
-                    },
-                })
-                .collect(),
+            Self::Bytes(ExprBytesLiteral { value, .. }) => AnyStringPartsIter::Bytes(value.iter()),
+            Self::FString(ExprFString { value, .. }) => {
+                AnyStringPartsIter::FString(value.iter(), quoting)
+            }
         }
     }
 
@@ -150,6 +135,46 @@ impl<'a> From<&AnyString<'a>> for ExpressionRef<'a> {
         }
     }
 }
+
+enum AnyStringPartsIter<'a> {
+    String(std::slice::Iter<'a, StringLiteral>),
+    Bytes(std::slice::Iter<'a, ast::BytesLiteral>),
+    FString(std::slice::Iter<'a, ast::FStringPart>, Quoting),
+}
+
+impl<'a> Iterator for AnyStringPartsIter<'a> {
+    type Item = AnyStringPart<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let part = match self {
+            Self::String(inner) => {
+                let part = inner.next()?;
+                AnyStringPart::String {
+                    part,
+                    layout: StringLiteralKind::String,
+                }
+            }
+            Self::Bytes(inner) => AnyStringPart::Bytes(inner.next()?),
+            Self::FString(inner, quoting) => {
+                let part = inner.next()?;
+                match part {
+                    ast::FStringPart::Literal(string_literal) => AnyStringPart::String {
+                        part: string_literal,
+                        layout: StringLiteralKind::InImplicitlyConcatenatedFString(*quoting),
+                    },
+                    ast::FStringPart::FString(f_string) => AnyStringPart::FString {
+                        part: f_string,
+                        quoting: *quoting,
+                    },
+                }
+            }
+        };
+
+        Some(part)
+    }
+}
+
+impl FusedIterator for AnyStringPartsIter<'_> {}
 
 /// Represents any kind of string which is part of an implicitly concatenated
 /// string. This could be either a string, bytes or f-string.
