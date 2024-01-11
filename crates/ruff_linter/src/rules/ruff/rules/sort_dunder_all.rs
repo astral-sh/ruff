@@ -177,7 +177,7 @@ impl<'a> DunderAllValue<'a> {
         //     the comments above the element move with it.
         //   - The same goes for any comments on the same line as an element:
         //     if the element moves, the comment moves with it.
-        let items = collect_dunder_all_items(lines);
+        let items = collect_dunder_all_items(&lines);
 
         Some(DunderAllValue {
             items,
@@ -208,27 +208,23 @@ impl<'a> DunderAllValue<'a> {
         //    element in `__all__` up to and including the closing parenthesis
         //    (if there was one).
         let prelude_end = {
-            if let Some(first_item) = self.items.first() {
-                let first_item_line_offset = locator.line_start(first_item.start());
-                if first_item_line_offset == locator.line_start(self.start()) {
-                    first_item.start()
-                } else {
-                    first_item_line_offset
-                }
+            // Should be safe: we should already have returned by now if there are 0 items
+            let first_item = &self.items[0];
+            let first_item_line_offset = locator.line_start(first_item.start());
+            if first_item_line_offset == locator.line_start(self.start()) {
+                first_item.start()
             } else {
-                self.start() + TextSize::new(1)
+                first_item_line_offset
             }
         };
-        let postlude_start = {
-            if let Some(last_item) = self.items.last() {
-                let last_item_line_offset = locator.line_end(last_item.end());
-                if last_item_line_offset == locator.line_end(self.end()) {
-                    last_item.end()
-                } else {
-                    last_item_line_offset
-                }
+        let (needs_trailing_comma, postlude_start) = {
+            // Should be safe: we should already have returned by now if there are 0 items
+            let last_item = &self.items[self.items.len() - 1];
+            let last_item_line_offset = locator.line_end(last_item.end());
+            if last_item_line_offset == locator.line_end(self.end()) {
+                (false, last_item.end())
             } else {
-                self.end() - TextSize::new(1)
+                (true, last_item_line_offset)
             }
         };
         let mut prelude = locator
@@ -240,7 +236,9 @@ impl<'a> DunderAllValue<'a> {
             let indentation = stylist.indentation();
             let newline = stylist.line_ending().as_str();
             prelude = format!("{}{}", prelude.trim_end(), newline);
-            join_multiline_dunder_all_items(&sorted_items, locator, parent, indentation, newline)
+            join_multiline_dunder_all_items(
+                &sorted_items, locator, parent, indentation, newline, needs_trailing_comma
+            )
         } else {
             Some(join_singleline_dunder_all_items(&sorted_items, locator))
         };
@@ -298,7 +296,7 @@ fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<D
                         comment_in_line,
                         range.start(),
                     ));
-                    items_in_line = vec![];
+                    items_in_line.clear();
                     comment_in_line = None;
                 }
             }
@@ -330,7 +328,7 @@ impl DunderAllLine {
     }
 }
 
-fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
+fn collect_dunder_all_items(lines: &[DunderAllLine]) -> Vec<DunderAllItem> {
     // Given data on each line in `__all__`, group lines together into "items".
     // Each item contains exactly one element,
     // but might contain multiple comments attached to that element
@@ -342,7 +340,7 @@ fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
         let DunderAllLine { items, comment } = line;
         match (items.as_slice(), comment) {
             ([], Some(_)) => {
-                this_range = comment;
+                this_range = *comment;
             }
             ([(first_val, first_range), rest @ ..], _) => {
                 let range = this_range.map_or(*first_range, |r| {
@@ -352,7 +350,7 @@ fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
                     value: first_val.clone(),
                     original_index: idx,
                     range,
-                    additional_comments: comment,
+                    additional_comments: *comment,
                 });
                 this_range = None;
                 idx += 1;
@@ -431,6 +429,7 @@ fn join_multiline_dunder_all_items(
     parent: &ast::Stmt,
     additional_indent: &str,
     newline: &str,
+    needs_trailing_comma: bool,
 ) -> Option<String> {
     let Some(indent) = indentation(locator, parent) else {
         return None;
@@ -440,12 +439,15 @@ fn join_multiline_dunder_all_items(
         new_dunder_all.push_str(indent);
         new_dunder_all.push_str(additional_indent);
         new_dunder_all.push_str(locator.slice(item));
-        new_dunder_all.push(',');
+        let is_final_item = i == (sorted_items.len() - 1);
+        if !is_final_item || needs_trailing_comma {
+            new_dunder_all.push(',');
+        }
         if let Some(comment) = item.additional_comments {
             new_dunder_all.push_str("  ");
             new_dunder_all.push_str(locator.slice(comment));
         }
-        if i < (sorted_items.len() - 1) {
+        if !is_final_item {
             new_dunder_all.push_str(newline);
         }
     }

@@ -332,7 +332,7 @@ RUF022.py:58:11: RUF022 [*] `__all__` is not alphabetically sorted
     99  |+    "register_error",
     100 |+    "replace_errors",
     101 |+    "strict_errors",
-    102 |+    "xmlcharrefreplace_errors",]
+    102 |+    "xmlcharrefreplace_errors"]
 72  103 | 
 73  104 | ###################################
 74  105 | # These should all not get flagged:
