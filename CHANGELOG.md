@@ -44,7 +44,7 @@
 - Use `comment_ranges` for isort directive extraction ([#9414](https://github.com/astral-sh/ruff/pull/9414))
 - Use transformed source code for diagnostic locations ([#9408](https://github.com/astral-sh/ruff/pull/9408))
 - [\`flake8-pyi\`] Exclude `warnings.deprecated` and `typing_extensions.deprecated` arguments ([#9423](https://github.com/astral-sh/ruff/pull/9423))
-- [\`flake8-pyi\`] Fix false negative for `	unused-private-protocol` (`PYI046`) with unused generic protocols ([#9405](https://github.com/astral-sh/ruff/pull/9405))
+- [\`flake8-pyi\`] Fix false negative for `unused-private-protocol` (`PYI046`) with unused generic protocols ([#9405](https://github.com/astral-sh/ruff/pull/9405))
 - [\`pylint\`] Homogenize `PLR0914` message to match other `PLR09XX` rules ([#9399](https://github.com/astral-sh/ruff/pull/9399))
 
 ### Documentation
