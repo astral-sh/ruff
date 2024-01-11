@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::hash::BuildHasherDefault;
@@ -384,16 +383,14 @@ impl KnownModules {
 impl fmt::Display for KnownModules {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.known.is_empty() {
-            write!(f, "[]")
+            write!(f, "{{}}")?;
         } else {
-            write!(
-                f,
-                "{{\n\t{}\n}}",
-                self.known
-                    .iter()
-                    .map(|(pattern, import_section)| format!("{pattern} => {import_section:?}"))
-                    .join(", \n\t")
-            )
+            writeln!(f, "{{")?;
+            for (pattern, import_section) in &self.known {
+                writeln!(f, "\t{pattern} => {import_section:?},")?;
+            }
+            write!(f, "}}")?;
         }
+        Ok(())
     }
 }

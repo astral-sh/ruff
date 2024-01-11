@@ -119,7 +119,7 @@ impl Display for Settings {
                 self.case_sensitive,
                 self.force_wrap_aliases,
                 self.force_to_top | debug,
-                self.known_modules | debug, // TODO(jane): remove debug
+                self.known_modules,
                 self.order_by_type,
                 self.relative_imports_order,
                 self.single_line_exclusions | debug,
