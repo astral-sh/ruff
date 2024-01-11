@@ -143,8 +143,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent
             SortedDunderAll::Sorted(value) => value,
         };
 
-    let dunder_all_range = dunder_all_val.range();
-    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, dunder_all_range);
+    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, dunder_all_val.range());
 
     if let Some(new_dunder_all) = new_dunder_all {
         let applicability = {
@@ -157,7 +156,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent
             }
         };
         diagnostic.set_fix(Fix::applicable_edit(
-            Edit::range_replacement(new_dunder_all, dunder_all_range),
+            Edit::range_replacement(new_dunder_all, dunder_all_val.range()),
             applicability,
         ));
     }
