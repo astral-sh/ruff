@@ -29,7 +29,7 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_gettext",
             fields = [
-                self.functions_names | debug
+                self.functions_names | array
             ]
         }
         Ok(())

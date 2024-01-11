@@ -65,6 +65,29 @@ macro_rules! display_settings {
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | nested) => {
         write!($fmt, "{}", $settings.$field)?;
     };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | optional) => {
+        {
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            match &$settings.$field {
+                Some(value) => writeln!($fmt, "{}", value)?,
+                None        => writeln!($fmt, "nil")?
+            };
+        }
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | array) => {
+        {
+            write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
+            if $settings.$field.is_empty() {
+                writeln!($fmt, "[]")?;
+            } else {
+                writeln!($fmt, "[")?;
+                for elem in &$settings.$field {
+                    writeln!($fmt, "\t{elem},")?;
+                }
+                writeln!($fmt, "]")?;
+            }
+        }
+    };
     (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident) => {
         writeln!($fmt, "{}{} = {}", $prefix, stringify!($field), $settings.$field)?;
     };
@@ -140,22 +163,22 @@ impl Display for LinterSettings {
                 self.fix_safety | nested,
 
                 self.target_version | debug,
-                self.preview | debug,
+                self.preview,
                 self.explicit_preview_rules,
-                self.extension | debug,
+                self.extension | nested,
 
-                self.allowed_confusables | debug,
-                self.builtins | debug,
+                self.allowed_confusables | array,
+                self.builtins | array,
                 self.dummy_variable_rgx,
-                self.external | debug,
+                self.external | array,
                 self.ignore_init_module_imports,
-                self.logger_objects | debug,
+                self.logger_objects | array,
                 self.namespace_packages | debug,
                 self.src | debug,
                 self.tab_size,
                 self.line_length,
-                self.task_tags | debug,
-                self.typing_modules | debug,
+                self.task_tags | array,
+                self.typing_modules | array,
 
                 self.flake8_annotations | nested,
                 self.flake8_bandit | nested,

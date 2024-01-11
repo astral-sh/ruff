@@ -18,9 +18,9 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
 
-use crate::fs;
 use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
+use crate::{display_settings, fs};
 
 #[derive(
     Clone,
@@ -118,6 +118,15 @@ impl From<bool> for PreviewMode {
             PreviewMode::Enabled
         } else {
             PreviewMode::Disabled
+        }
+    }
+}
+
+impl Display for PreviewMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disabled => write!(f, "disabled"),
+            Self::Enabled => write!(f, "enabled"),
         }
     }
 }
@@ -443,6 +452,19 @@ impl ExtensionMapping {
     /// Return the [`Language`] for the given extension.
     pub fn get(&self, extension: &str) -> Option<Language> {
         self.mapping.get(extension).copied()
+    }
+}
+
+impl Display for ExtensionMapping {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.extension",
+            fields = [
+                self.mapping | debug
+            ]
+        }
+        Ok(())
     }
 }
 

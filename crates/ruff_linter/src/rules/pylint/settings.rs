@@ -36,6 +36,18 @@ impl ConstantType {
     }
 }
 
+impl fmt::Display for ConstantType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Bytes => write!(f, "bytes"),
+            Self::Complex => write!(f, "complex"),
+            Self::Float => write!(f, "float"),
+            Self::Int => write!(f, "int"),
+            Self::Str => write!(f, "str"),
+        }
+    }
+}
+
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
@@ -73,8 +85,8 @@ impl fmt::Display for Settings {
             formatter = f,
             namespace = "linter.pylint",
             fields = [
-                self.allow_magic_value_types | debug,
-                self.allow_dunder_method_names | debug,
+                self.allow_magic_value_types | array,
+                self.allow_dunder_method_names | array,
                 self.max_args,
                 self.max_positional_args,
                 self.max_returns,

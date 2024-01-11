@@ -32,9 +32,9 @@ impl Display for Settings {
             namespace = "linter.flake8_type_checking",
             fields = [
                 self.strict,
-                self.exempt_modules | debug,
-                self.runtime_required_base_classes | debug,
-                self.runtime_required_decorators | debug,
+                self.exempt_modules | array,
+                self.runtime_required_base_classes | array,
+                self.runtime_required_decorators | array,
                 self.quote_annotations
             ]
         }

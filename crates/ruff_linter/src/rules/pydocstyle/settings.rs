@@ -73,6 +73,16 @@ impl Convention {
     }
 }
 
+impl fmt::Display for Convention {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Google => write!(f, "google"),
+            Self::Numpy => write!(f, "numpy"),
+            Self::Pep257 => write!(f, "pep257"),
+        }
+    }
+}
+
 #[derive(Debug, Default, CacheKey)]
 pub struct Settings {
     pub convention: Option<Convention>,
@@ -86,7 +96,7 @@ impl fmt::Display for Settings {
             formatter = f,
             namespace = "linter.pydocstyle",
             fields = [
-                self.convention | debug,
+                self.convention | optional,
                 self.ignore_decorators | debug,
                 self.property_decorators | debug
             ]

@@ -52,9 +52,9 @@ impl fmt::Display for Settings {
             formatter = f,
             namespace = "linter.pep8_naming",
             fields = [
-                self.ignore_names | debug,
-                self.classmethod_decorators | debug,
-                self.staticmethod_decorators | debug
+                self.ignore_names | array,
+                self.classmethod_decorators | array,
+                self.staticmethod_decorators | array
             ]
         }
         Ok(())

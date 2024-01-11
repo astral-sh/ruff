@@ -276,7 +276,7 @@ impl Display for RuleSet {
         } else {
             writeln!(f, "[")?;
             for rule in self {
-                writeln!(f, "\t\"{rule:?}\",")?;
+                writeln!(f, "\t{rule:?},")?;
             }
             write!(f, "]")?;
         }

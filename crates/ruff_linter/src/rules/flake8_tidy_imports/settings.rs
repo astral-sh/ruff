@@ -48,7 +48,7 @@ impl Display for Settings {
             fields = [
                 self.ban_relative_imports,
                 self.banned_api | debug,
-                self.banned_module_level_imports | debug,
+                self.banned_module_level_imports | array,
             ]
         }
         Ok(())

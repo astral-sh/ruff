@@ -15,7 +15,7 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_bugbear",
             fields = [
-                self.extend_immutable_calls | debug
+                self.extend_immutable_calls | array
             ]
         }
         Ok(())

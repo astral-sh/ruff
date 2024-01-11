@@ -20,7 +20,7 @@ impl fmt::Display for Settings {
             namespace = "linter.pycodestyle",
             fields = [
                 self.max_line_length,
-                self.max_doc_length | debug,
+                self.max_doc_length | optional,
                 self.ignore_overlong_task_comments,
             ]
         }

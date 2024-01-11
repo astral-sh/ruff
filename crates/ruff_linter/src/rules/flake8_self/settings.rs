@@ -36,7 +36,7 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_self",
             fields = [
-                self.ignore_names | debug
+                self.ignore_names | array
             ]
         }
         Ok(())

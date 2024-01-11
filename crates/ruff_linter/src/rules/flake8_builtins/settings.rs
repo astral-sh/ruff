@@ -15,7 +15,7 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_builtins",
             fields = [
-                self.builtins_ignorelist | debug
+                self.builtins_ignorelist | array
             ]
         }
         Ok(())

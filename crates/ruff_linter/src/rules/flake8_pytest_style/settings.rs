@@ -59,8 +59,8 @@ impl fmt::Display for Settings {
                 self.parametrize_names_type,
                 self.parametrize_values_type,
                 self.parametrize_values_row_type,
-                self.raises_require_match_for | debug,
-                self.raises_extend_require_match_for | debug,
+                self.raises_require_match_for | array,
+                self.raises_extend_require_match_for | array,
                 self.mark_parentheses
             ]
         }

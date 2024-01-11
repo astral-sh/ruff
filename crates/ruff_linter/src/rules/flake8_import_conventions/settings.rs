@@ -55,7 +55,7 @@ impl Display for Settings {
             fields = [
                 self.aliases | debug,
                 self.banned_aliases | debug,
-                self.banned_from | debug,
+                self.banned_from | array,
             ]
         }
         Ok(())

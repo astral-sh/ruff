@@ -34,8 +34,7 @@ impl Display for Settings {
             namespace = "linter.flake8_copyright",
             fields = [
                 self.notice_rgx,
-                // TODO(jane): remove debug
-                self.author | debug,
+                self.author | optional,
                 self.min_file_size,
             ]
         }

@@ -31,7 +31,7 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_bandit",
             fields = [
-                self.hardcoded_tmp_directory | debug,
+                self.hardcoded_tmp_directory | array,
                 self.check_typed_exception
             ]
         }
