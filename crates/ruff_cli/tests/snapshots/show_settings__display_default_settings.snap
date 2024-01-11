@@ -357,6 +357,5 @@ formatter.magic_trailing_comma = respect
 formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
 
-
 ----- stderr -----
 
