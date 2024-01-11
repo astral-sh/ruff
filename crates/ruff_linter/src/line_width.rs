@@ -42,7 +42,7 @@ impl Default for LineLength {
 
 impl fmt::Display for LineLength {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        fmt::Display::fmt(&self.0, f)
     }
 }
 
@@ -257,7 +257,7 @@ impl Default for IndentWidth {
 
 impl fmt::Display for IndentWidth {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        fmt::Display::fmt(&self.0, f)
     }
 }
 

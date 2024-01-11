@@ -114,9 +114,9 @@ impl Default for IndentWidth {
     }
 }
 
-impl fmt::Display for IndentWidth {
+impl Display for IndentWidth {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::write!(f, "{}", self.0)
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -155,7 +155,7 @@ impl Default for LineWidth {
 
 impl Display for LineWidth {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        std::write!(f, "{}", self.0)
+        Display::fmt(&self.0, f)
     }
 }
 
