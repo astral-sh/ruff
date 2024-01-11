@@ -43,7 +43,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `flake8-self.ignore-names`
+/// - `lint.flake8-self.ignore-names`
 ///
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)

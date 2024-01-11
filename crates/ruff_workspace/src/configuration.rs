@@ -396,11 +396,11 @@ impl Configuration {
 
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         let lint = if let Some(mut lint) = options.lint {
-            lint.common = lint.common.combine(options.lint_top_level);
+            lint.common = lint.common.combine(options.lint_top_level.common);
             lint
         } else {
             LintOptions {
-                common: options.lint_top_level,
+                common: options.lint_top_level.common,
                 ..LintOptions::default()
             }
         };

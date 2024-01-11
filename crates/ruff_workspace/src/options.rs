@@ -3,9 +3,10 @@ use std::hash::BuildHasherDefault;
 
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use strum::IntoEnumIterator;
 
+use crate::options_base::{OptionsMetadata, Visit};
 use ruff_formatter::IndentStyle;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -420,21 +421,21 @@ pub struct Options {
     )]
     pub tab_size: Option<IndentWidth>,
 
+    #[option_group]
     pub lint: Option<LintOptions>,
 
     /// The lint sections specified at the top level.
     #[serde(flatten)]
-    pub lint_top_level: LintCommonOptions,
+    pub lint_top_level: DeprecatedTopLevelLintOptions,
 
     /// Options to configure code formatting.
     #[option_group]
     pub format: Option<FormatOptions>,
 }
 
-/// Experimental section to configure Ruff's linting. This new section will eventually
-/// replace the top-level linting options.
+/// Configures how ruff checks your code.
 ///
-/// Options specified in the `lint` section take precedence over the top-level settings.
+/// Options specified in the `lint` section take precedence over the deprecated top-level settings.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, PartialEq, Eq, Default, OptionsMetadata, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -477,9 +478,82 @@ pub struct LintOptions {
     pub preview: Option<bool>,
 }
 
+/// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
+#[derive(Debug, PartialEq, Eq, Default)]
+pub struct DeprecatedTopLevelLintOptions {
+    pub common: LintCommonOptions,
+}
+
+impl OptionsMetadata for DeprecatedTopLevelLintOptions {
+    fn record(_visit: &mut dyn Visit) {
+        // Intentionally empty. Omit all fields from the documentation and instead promote the options under the `lint.` section.
+        // This doesn't create an empty 'common' option  because the field in the `Options` struct is marked with `#[serde(flatten)]`.
+        // Meaning, the code here flattens no-properties into the parent, which is what we want.
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
+    fn schema_name() -> std::string::String {
+        "DeprecatedTopLevelLintOptions".to_owned()
+    }
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed(std::concat!(
+            std::module_path!(),
+            "::",
+            "DeprecatedTopLevelLintOptions"
+        ))
+    }
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        use schemars::schema::Schema;
+
+        let common_schema = LintCommonOptions::json_schema(gen);
+        let mut schema_obj = common_schema.into_object();
+
+        if let Some(object) = schema_obj.object.as_mut() {
+            for property in object.properties.values_mut() {
+                if let Schema::Object(property_object) = property {
+                    if let Some(metadata) = &mut property_object.metadata {
+                        metadata.deprecated = true;
+                    } else {
+                        property_object.metadata = Some(Box::new(schemars::schema::Metadata {
+                            deprecated: true,
+                            ..schemars::schema::Metadata::default()
+                        }));
+                    }
+                }
+            }
+        }
+
+        Schema::Object(schema_obj)
+    }
+}
+
+/// Pass-through serialization because nested `#[serde(flatten)]` didn't seem to work.
+impl serde::Serialize for DeprecatedTopLevelLintOptions {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        LintCommonOptions::serialize(&self.common, serializer)
+    }
+}
+
+/// Pass-through deserialization because nested `#[serde(flatten)]` didn't seem to work.
+
+impl<'de> serde::Deserialize<'de> for DeprecatedTopLevelLintOptions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self {
+            common: LintCommonOptions::deserialize(deserializer)?,
+        })
+    }
+}
+
 // Note: This struct should be inlined into [`LintOptions`] once support for the top-level lint settings
 // is removed.
-
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(
     Debug, PartialEq, Eq, Default, OptionsMetadata, CombineOptions, Serialize, Deserialize,
@@ -2816,9 +2890,7 @@ impl PyUpgradeOptions {
     }
 }
 
-/// Experimental: Configures how `ruff format` formats your code.
-///
-/// Please provide feedback in [this discussion](https://github.com/astral-sh/ruff/discussions/7310).
+/// Configures the way ruff formats your code.
 #[derive(
     Debug, PartialEq, Eq, Default, Deserialize, Serialize, OptionsMetadata, CombineOptions,
 )]

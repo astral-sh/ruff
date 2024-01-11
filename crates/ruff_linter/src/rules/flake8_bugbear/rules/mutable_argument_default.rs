@@ -28,7 +28,7 @@ use crate::checkers::ast::Checker;
 ///
 /// Arguments with immutable type annotations will be ignored by this rule.
 /// Types outside of the standard library can be marked as immutable with the
-/// [`flake8-bugbear.extend-immutable-calls`] configuration option.
+/// [`lint.flake8-bugbear.extend-immutable-calls`] configuration option.
 ///
 /// ## Known problems
 /// Mutable argument defaults can be used intentionally to cache computation
@@ -61,7 +61,7 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - `flake8-bugbear.extend-immutable-calls`
+/// - `lint.flake8-bugbear.extend-immutable-calls`
 ///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
