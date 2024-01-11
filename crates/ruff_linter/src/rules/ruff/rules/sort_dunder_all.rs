@@ -223,9 +223,17 @@ impl<'a> DunderAllValue<'a> {
     ) -> SortedDunderAll {
         let mut sorted_items = self.items.clone();
         sorted_items.sort();
+
+        // As well as saving us unnecessary work,
+        // returning early here also means that we can rely on the invariant
+        // throughout the rest of this function that both `items` and `sorted_items`
+        // have length of at least two. If there are fewer than two items in `__all__`,
+        // it is impossible for them *not* to compare equal here:
         if sorted_items == self.items {
             return SortedDunderAll::AlreadySorted;
         }
+        assert!(self.items.len() >= 2);
+
         // As well as the "items" in the `__all__` definition,
         // there is also a "prelude" and a "postlude":
         //  - Prelude == the region of source code from the opening parenthesis
@@ -234,8 +242,12 @@ impl<'a> DunderAllValue<'a> {
         //    element in `__all__` up to and including the closing parenthesis
         //    (if there was one).
         let prelude_end = {
-            // Should be safe: we should already have returned by now if there are 0 items
-            let first_item = &self.items[0];
+            // We should already have returned by now if there are 0 items:
+            // see earlier comments in this function
+            let first_item = self
+                .items
+                .first()
+                .expect("Expected there to be at least two items in the list");
             let first_item_line_offset = locator.line_start(first_item.start());
             if first_item_line_offset == locator.line_start(self.start()) {
                 first_item.start()
@@ -244,8 +256,12 @@ impl<'a> DunderAllValue<'a> {
             }
         };
         let (needs_trailing_comma, postlude_start) = {
-            // Should be safe: we should already have returned by now if there are 0 items
-            let last_item = &self.items[self.items.len() - 1];
+            // We should already have returned by now if there are 0 items:
+            // see earlier comments in this function
+            let last_item = self
+                .items
+                .last()
+                .expect("Expected there to be at least two items in the list");
             let last_item_line_offset = locator.line_end(last_item.end());
             if last_item_line_offset == locator.line_end(self.end()) {
                 (false, last_item.end())
@@ -394,8 +410,7 @@ fn collect_dunder_all_items(lines: &[DunderAllLine]) -> Vec<DunderAllItem> {
                 }
             }
             _ => unreachable!(
-                "This should be unreachable.
-                Any lines that have neither comments nor items
+                "Any lines that have neither comments nor items
                 should have been filtered out by this point."
             ),
         }
