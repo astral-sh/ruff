@@ -1,5 +1,4 @@
 use crate::registry::Rule;
-use itertools::Itertools;
 use ruff_macros::CacheKey;
 use std::fmt::{Debug, Display, Formatter};
 use std::iter::FusedIterator;
@@ -273,16 +272,15 @@ impl Debug for RuleSet {
 impl Display for RuleSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.is_empty() {
-            write!(f, "[]")
+            write!(f, "[]")?;
         } else {
-            write!(
-                f,
-                "[\n\t{}\n]",
-                self.iter()
-                    .map(|rule| format!("\"{rule:?}\""))
-                    .join(",\n\t")
-            )
+            writeln!(f, "[")?;
+            for rule in self {
+                writeln!(f, "\t\"{rule:?}\",")?;
+            }
+            write!(f, "]")?;
         }
+        Ok(())
     }
 }
 

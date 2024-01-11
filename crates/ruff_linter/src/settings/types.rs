@@ -7,7 +7,6 @@ use std::string::ToString;
 
 use anyhow::{bail, Result};
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
-use itertools::Itertools;
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -257,17 +256,15 @@ impl FilePatternSet {
 impl Display for FilePatternSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self._set_internals.is_empty() {
-            write!(f, "[]")
+            write!(f, "[]")?;
         } else {
-            write!(
-                f,
-                "[\n\t{}\n]",
-                self._set_internals
-                    .iter()
-                    .map(|pattern| format!("{pattern}"))
-                    .join(", \n\t")
-            )
+            writeln!(f, "[")?;
+            for pattern in &self._set_internals {
+                writeln!(f, "\t{pattern},")?;
+            }
+            write!(f, "]")?;
         }
+        Ok(())
     }
 }
 
