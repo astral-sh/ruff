@@ -165,14 +165,14 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent
     checker.diagnostics.push(diagnostic);
 }
 
-struct DunderAllValue<'a> {
+struct DunderAllValue {
     items: Vec<DunderAllItem>,
-    range: &'a TextRange,
+    range: TextRange,
     multiline: bool,
 }
 
-impl<'a> DunderAllValue<'a> {
-    fn from_expr(value: &'a ast::Expr, locator: &Locator) -> Option<DunderAllValue<'a>> {
+impl DunderAllValue {
+    fn from_expr(value: &ast::Expr, locator: &Locator) -> Option<DunderAllValue> {
         // Step (1): inspect the AST to check that we're looking at something vaguely sane:
         let is_multiline = locator.contains_line_break(value.range());
         let (elts, range) = match value {
@@ -210,7 +210,7 @@ impl<'a> DunderAllValue<'a> {
 
         Some(DunderAllValue {
             items,
-            range,
+            range: *range,
             multiline: is_multiline,
         })
     }
@@ -295,9 +295,9 @@ impl<'a> DunderAllValue<'a> {
     }
 }
 
-impl Ranged for DunderAllValue<'_> {
+impl Ranged for DunderAllValue {
     fn range(&self) -> TextRange {
-        *self.range
+        self.range
     }
 }
 
@@ -381,8 +381,7 @@ fn collect_dunder_all_items(lines: &[DunderAllLine]) -> Vec<DunderAllItem> {
     let mut all_items = vec![];
     let mut this_range = None;
     let mut idx = 0;
-    for line in lines {
-        let DunderAllLine { items, comment } = line;
+    for DunderAllLine { items, comment } in lines {
         match (items.as_slice(), comment) {
             ([], Some(_)) => {
                 this_range = *comment;
@@ -475,9 +474,7 @@ fn join_multiline_dunder_all_items(
     newline: &str,
     needs_trailing_comma: bool,
 ) -> Option<String> {
-    let Some(indent) = indentation(locator, parent) else {
-        return None;
-    };
+    let indent = indentation(locator, parent)?;
     let mut new_dunder_all = String::new();
     for (i, item) in sorted_items.iter().enumerate() {
         new_dunder_all.push_str(indent);
