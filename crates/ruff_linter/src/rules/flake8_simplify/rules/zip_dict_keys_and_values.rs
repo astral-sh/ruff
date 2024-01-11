@@ -84,13 +84,13 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &Expr) {
     let Some((var1, attr1)) = get_var_attr(arg1) else {
         return;
     };
-    let Some((val2, attr2)) = get_var_attr(arg2) else {
+    let Some((var2, attr2)) = get_var_attr(arg2) else {
         return;
     };
-    if var1.id != val2.id || attr1 != "keys" || attr2 != "values" {
+    if var1.id != var2.id || attr1 != "keys" || attr2 != "values" {
         return;
     }
-    for arg_name in [var1, val2] {
+    for arg_name in [var1, var2] {
         let Some(binding) = checker
             .semantic()
             .only_binding(arg_name)
