@@ -3,11 +3,12 @@ use std::fmt::Display;
 use self::helpers::token_kind_to_cmp_op;
 use crate::{
     error::FStringErrorType,
-    lexer::{LexResult, LexicalError, Spanned},
+    lexer::{LexResult, Spanned},
     string::{
         concatenated_strings, parse_fstring_literal_element, parse_string_literal, StringType,
     },
     token_set::TokenSet,
+    token_source::TokenSource,
     Mode, ParseError, ParseErrorType, Tok, TokenKind,
 };
 use ast::{
@@ -22,16 +23,12 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 mod helpers;
 mod tests;
 
-pub(crate) fn parse_ok_tokens(
-    lxr: impl IntoIterator<Item = Spanned>,
+pub(crate) fn parse_tokens(
+    tokens: Vec<LexResult>,
     source: &str,
     mode: Mode,
 ) -> Result<Mod, ParseError> {
-    let lxr = lxr
-        .into_iter()
-        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline))
-        .map(Ok::<(Tok, TextRange), LexicalError>);
-    let parsed_file = Parser::new(source, mode, lxr).parse();
+    let parsed_file = Parser::new(source, mode, TokenSource::new(tokens)).parse();
     if parsed_file.parse_errors.is_empty() {
         Ok(parsed_file.ast)
     } else {

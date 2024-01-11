@@ -138,8 +138,7 @@ For the full list of supported settings, see [_Settings_](settings.md#format). F
 configuring Ruff via `pyproject.toml`, see [_Configuring Ruff_](configuration.md).
 
 Given the focus on Black compatibility (and unlike formatters like [YAPF](https://github.com/google/yapf)),
-Ruff does not currently expose any configuration options to modify core formatting behavior outside
-of these trivia-related settings.
+Ruff does not currently expose any other configuration options.
 
 ## Docstring formatting
 

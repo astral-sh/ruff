@@ -85,7 +85,7 @@
 //!    return bool(i & 1)
 //! "#;
 //! let tokens = lex(python_source, Mode::Module);
-//! let ast = parse_tokens(tokens, python_source, Mode::Module);
+//! let ast = parse_tokens(tokens.collect(), python_source, Mode::Module);
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -112,10 +112,8 @@
 use std::cell::Cell;
 
 pub use error::{FStringErrorType, ParseError, ParseErrorType};
-use itertools::Itertools;
-use lexer::{lex, lex_starts_at, Spanned};
+use lexer::{lex, lex_starts_at};
 pub use parser::ParsedFile;
-use parser::Parser;
 use ruff_python_ast::{Expr, Mod, ModModule, PySourceType, Suite};
 use ruff_text_size::TextSize;
 pub use token::{StringKind, Tok, TokenKind};
@@ -131,6 +129,7 @@ mod soft_keywords;
 mod string;
 mod token;
 mod token_set;
+mod token_source;
 pub mod typing;
 
 thread_local! {
@@ -168,7 +167,7 @@ pub fn set_new_parser(use_new_parser: bool) {
 /// ```
 pub fn parse_program(source: &str) -> Result<ModModule, ParseError> {
     let lexer = lex(source, Mode::Module);
-    match parse_tokens(lexer, source, Mode::Module)? {
+    match parse_tokens(lexer.collect(), source, Mode::Module)? {
         Mod::Module(m) => Ok(m),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
@@ -195,7 +194,7 @@ pub fn parse_suite(source: &str) -> Result<Suite, ParseError> {
 ///
 /// ```
 pub fn parse_expression(source: &str) -> Result<Expr, ParseError> {
-    let lexer = lex(source, Mode::Expression);
+    let lexer = lex(source, Mode::Expression).collect();
     match parse_tokens(lexer, source, Mode::Expression)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
@@ -220,7 +219,7 @@ pub fn parse_expression(source: &str) -> Result<Expr, ParseError> {
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr, ParseError> {
-    let lexer = lex_starts_at(source, Mode::Module, offset);
+    let lexer = lex_starts_at(source, Mode::Module, offset).collect();
     match parse_tokens(lexer, source, Mode::Expression)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
@@ -302,7 +301,7 @@ pub fn parse(source: &str, mode: Mode) -> Result<Mod, ParseError> {
 /// ```
 pub fn parse_starts_at(source: &str, mode: Mode, offset: TextSize) -> Result<Mod, ParseError> {
     let lxr = lexer::lex_starts_at(source, mode, offset);
-    parse_tokens(lxr, source, mode)
+    parse_tokens(lxr.collect(), source, mode)
 }
 
 /// Parse an iterator of [`LexResult`]s using the specified [`Mode`].
@@ -318,50 +317,14 @@ pub fn parse_starts_at(source: &str, mode: Mode, offset: TextSize) -> Result<Mod
 /// use ruff_python_parser::{lexer::lex, Mode, parse_tokens};
 ///
 /// let source = "1 + 2";
-/// let expr = parse_tokens(lex(source, Mode::Expression), source, Mode::Expression);
+/// let expr = parse_tokens(lex(source, Mode::Expression).collect(), source, Mode::Expression);
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_tokens(
-    lxr: impl IntoIterator<Item = LexResult>,
-    source: &str,
-    mode: Mode,
-) -> Result<Mod, ParseError> {
-    let lxr = lxr.into_iter();
-
-    parse_filtered_tokens(
-        lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline)),
-        source,
-        mode,
-    )
-}
-
-/// Parse tokens into an AST like [`parse_tokens`], but we already know all tokens are valid.
-pub fn parse_ok_tokens(
-    lxr: impl IntoIterator<Item = Spanned>,
-    source: &str,
-    mode: Mode,
-) -> Result<Mod, ParseError> {
+pub fn parse_tokens(tokens: Vec<LexResult>, source: &str, mode: Mode) -> Result<Mod, ParseError> {
     if NEW_PARSER.get() {
-        crate::parser::parse_ok_tokens(lxr, source, mode)
+        crate::parser::parse_tokens(tokens, source, mode)
     } else {
-        crate::lalrpop::parse_ok_tokens(lxr, source, mode)
-    }
-}
-
-fn parse_filtered_tokens(
-    lxr: impl IntoIterator<Item = LexResult>,
-    source: &str,
-    mode: Mode,
-) -> Result<Mod, ParseError> {
-    if NEW_PARSER.get() {
-        let parsed_file = Parser::new(source, mode, lxr.into_iter()).parse();
-        if parsed_file.parse_errors.is_empty() {
-            Ok(parsed_file.ast)
-        } else {
-            Err(parsed_file.parse_errors.into_iter().next().unwrap())
-        }
-    } else {
-        crate::lalrpop::parse_filtered_tokens(lxr, source, mode)
+        crate::lalrpop::parse_tokens(tokens, source, mode)
     }
 }
 
@@ -380,7 +343,7 @@ pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
 
 /// Parse a full Python program from its tokens.
 pub fn parse_program_tokens(
-    lxr: Vec<LexResult>,
+    tokens: Vec<LexResult>,
     source: &str,
     is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
@@ -389,7 +352,7 @@ pub fn parse_program_tokens(
     } else {
         Mode::Module
     };
-    match parse_tokens(lxr, source, mode)? {
+    match parse_tokens(tokens, source, mode)? {
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }

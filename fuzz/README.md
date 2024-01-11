@@ -109,3 +109,16 @@ equivalent to the one which is automatically generated from a grammar.
 This ensures that optimisations applied to the handwritten parser are indeed valid.
 It is implemented by executing both the lalrpop-generated and the new parsers, then comparing
 their output.
+
+### `ruff_formatter_idempotency`
+
+This fuzz harness ensures that the formatter is [idempotent](https://en.wikipedia.org/wiki/Idempotence)
+which detects possible unsteady states of Ruff's formatter.
+
+### `ruff_formatter_validity`
+
+This fuzz harness checks that Ruff's formatter does not introduce new linter errors/warnings by
+linting once, counting the number of each error type, then formatting, then linting again and
+ensuring that the number of each error type does not increase across formats. This has the
+beneficial side effect of discovering cases where the linter does not discover a lint error when
+it should have due to a formatting inconsistency.

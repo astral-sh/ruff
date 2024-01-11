@@ -870,7 +870,7 @@ a = 1
     "
         .trim();
         let lxr = lexer::lex_starts_at(source, Mode::Ipython, TextSize::default());
-        let parse_err = parse_tokens(lxr, source, Mode::Module).unwrap_err();
+        let parse_err = parse_tokens(lxr.collect(), source, Mode::Module).unwrap_err();
         assert_eq!(
             parse_err.to_string(),
             "IPython escape commands are only allowed in `Mode::Ipython` at byte range 6..20"

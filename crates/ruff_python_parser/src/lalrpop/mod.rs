@@ -1,5 +1,4 @@
 //! The LALRPOP based parser implementation.
-use std::iter;
 
 use itertools::Itertools;
 use lalrpop_util::ParseError as LalrpopError;
@@ -14,7 +13,8 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::lexer::{LexResult, LexicalError, LexicalErrorType, Spanned};
+use crate::lexer::{LexResult, LexicalError, LexicalErrorType};
+use crate::token_source::TokenSource;
 use crate::{Mode, ParseError, ParseErrorType, Tok};
 
 mod context;
@@ -45,30 +45,13 @@ mod python {
     include!("python.rs");
 }
 
-pub(crate) fn parse_ok_tokens(
-    lxr: impl IntoIterator<Item = Spanned>,
-    source: &str,
-    mode: Mode,
-) -> Result<Mod, ParseError> {
-    let lxr = lxr
-        .into_iter()
-        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-    let marker_token = (Tok::start_marker(mode), TextRange::default());
-    let lexer = iter::once(marker_token)
-        .chain(lxr)
-        .map(|(t, range)| (range.start(), t, range.end()));
-    python::TopParser::new()
-        .parse(source, mode, lexer)
-        .map_err(parse_error_from_lalrpop)
-}
-
-pub(crate) fn parse_filtered_tokens(
-    lxr: impl IntoIterator<Item = LexResult>,
+pub(crate) fn parse_tokens(
+    tokens: Vec<LexResult>,
     source: &str,
     mode: Mode,
 ) -> Result<Mod, ParseError> {
     let marker_token = (Tok::start_marker(mode), TextRange::default());
-    let lexer = iter::once(Ok(marker_token)).chain(lxr);
+    let lexer = std::iter::once(Ok(marker_token)).chain(TokenSource::new(tokens));
     python::TopParser::new()
         .parse(
             source,
