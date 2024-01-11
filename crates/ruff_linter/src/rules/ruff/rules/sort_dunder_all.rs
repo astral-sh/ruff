@@ -70,46 +70,78 @@ impl Violation for UnsortedDunderAll {
     }
 }
 
-/// RUF022
-pub(crate) fn sort_dunder_all(checker: &mut Checker, stmt: &ast::Stmt) {
+pub(crate) fn sort_dunder_all_assign(
+    checker: &mut Checker,
+    node: &ast::StmtAssign,
+    parent: &ast::Stmt,
+) {
+    let ast::StmtAssign { value, targets, .. } = node;
+    let [ast::Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
+        return;
+    };
+    sort_dunder_all(checker, id, value, parent);
+}
+
+pub(crate) fn sort_dunder_all_augassign(
+    checker: &mut Checker,
+    node: &ast::StmtAugAssign,
+    parent: &ast::Stmt,
+) {
+    let ast::StmtAugAssign {
+        value,
+        target,
+        op: ast::Operator::Add,
+        ..
+    } = node
+    else {
+        return;
+    };
+    let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+        return;
+    };
+    sort_dunder_all(checker, id, value, parent);
+}
+
+pub(crate) fn sort_dunder_all_annassign(
+    checker: &mut Checker,
+    node: &ast::StmtAnnAssign,
+    parent: &ast::Stmt,
+) {
+    let ast::StmtAnnAssign {
+        target,
+        value: Some(val),
+        ..
+    } = node
+    else {
+        return;
+    };
+    let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+        return;
+    };
+    sort_dunder_all(checker, id, val, parent);
+}
+
+fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent: &ast::Stmt) {
+    if target != "__all__" {
+        return;
+    }
+
     // We're only interested in `__all__` in the global scope
     if !checker.semantic().current_scope().kind.is_module() {
         return;
     }
 
-    // We're only interested in `__all__ = ...` and `__all__ += ...`
-    let (target, original_value) = match stmt {
-        ast::Stmt::Assign(ast::StmtAssign { value, targets, .. }) => match targets.as_slice() {
-            [ast::Expr::Name(ast::ExprName { id, .. })] => (id, value.as_ref()),
-            _ => return,
-        },
-        ast::Stmt::AugAssign(ast::StmtAugAssign {
-            value,
-            target,
-            op: ast::Operator::Add,
-            ..
-        }) => match target.as_ref() {
-            ast::Expr::Name(ast::ExprName { id, .. }) => (id, value.as_ref()),
-            _ => return,
-        },
-        _ => return,
-    };
-
-    if target != "__all__" {
-        return;
-    }
-
     let locator = checker.locator();
 
-    let Some(dunder_all_val) = DunderAllValue::from_expr(original_value, locator) else {
+    let Some(dunder_all_val) = DunderAllValue::from_expr(node, locator) else {
         return;
     };
 
-    let new_dunder_all = match dunder_all_val.construct_sorted_all(locator, stmt, checker.stylist())
-    {
-        SortedDunderAll::AlreadySorted => return,
-        SortedDunderAll::Sorted(value) => value,
-    };
+    let new_dunder_all =
+        match dunder_all_val.construct_sorted_all(locator, parent, checker.stylist()) {
+            SortedDunderAll::AlreadySorted => return,
+            SortedDunderAll::Sorted(value) => value,
+        };
 
     let dunder_all_range = dunder_all_val.range();
     let mut diagnostic = Diagnostic::new(UnsortedDunderAll, dunder_all_range);
@@ -117,10 +149,7 @@ pub(crate) fn sort_dunder_all(checker: &mut Checker, stmt: &ast::Stmt) {
     if let Some(new_dunder_all) = new_dunder_all {
         let applicability = {
             if dunder_all_val.multiline
-                && checker
-                    .indexer()
-                    .comment_ranges()
-                    .intersects(original_value.range())
+                && checker.indexer().comment_ranges().intersects(node.range())
             {
                 Applicability::Unsafe
             } else {

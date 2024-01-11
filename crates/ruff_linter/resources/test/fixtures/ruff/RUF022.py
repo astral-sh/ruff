@@ -11,6 +11,8 @@ if bool():
 else:
     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 
+__all__: list[str] = ["the", "three", "little", "pigs"]
+
 ####################################
 # Neat multiline __all__ definitions
 ####################################

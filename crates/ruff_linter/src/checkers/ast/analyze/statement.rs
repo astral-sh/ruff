@@ -19,9 +19,6 @@ use crate::settings::types::PythonVersion;
 
 /// Run lint rules over a [`Stmt`] syntax node.
 pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
-    if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
-        ruff::rules::sort_dunder_all(checker, stmt);
-    }
     match stmt {
         Stmt::Global(ast::StmtGlobal { names, range: _ }) => {
             if checker.enabled(Rule::GlobalAtModuleLevel) {
@@ -1068,11 +1065,14 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::misplaced_bare_raise(checker, raise);
             }
         }
-        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+        Stmt::AugAssign(augassign @ ast::StmtAugAssign { target, .. }) => {
             if checker.enabled(Rule::GlobalStatement) {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     pylint::rules::global_statement(checker, id);
                 }
+            }
+            if checker.enabled(Rule::UnsortedDunderAll) {
+                ruff::rules::sort_dunder_all_augassign(checker, augassign, stmt);
             }
         }
         Stmt::If(
@@ -1460,6 +1460,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.settings.rules.enabled(Rule::TypeBivariance) {
                 pylint::rules::type_bivariance(checker, value);
             }
+            if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
+                ruff::rules::sort_dunder_all_assign(checker, assign, stmt);
+            }
             if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
                     Rule::UnprefixedTypeParam,
@@ -1529,6 +1532,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::NonPEP695TypeAlias) {
                 pyupgrade::rules::non_pep695_type_alias(checker, assign_stmt);
+            }
+            if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
+                ruff::rules::sort_dunder_all_annassign(checker, assign_stmt, stmt);
             }
             if checker.source_type.is_stub() {
                 if let Some(value) = value {

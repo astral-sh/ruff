@@ -89,7 +89,7 @@ RUF022.py:12:16: RUF022 [*] `__all__` is not alphabetically sorted
 12 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    |                ^^^^^^^^^^^^^^^^^^^^^^ RUF022
 13 | 
-14 | ####################################
+14 | __all__: list[str] = ["the", "three", "little", "pigs"]
    |
    = help: Sort `__all__` alphabetically
 
@@ -100,241 +100,262 @@ RUF022.py:12:16: RUF022 [*] `__all__` is not alphabetically sorted
 12    |-    __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    12 |+    __all__ += "foo1", "foo2", "foo3"  # NB: an implicit tuple (without parens)
 13 13 | 
-14 14 | ####################################
-15 15 | # Neat multiline __all__ definitions
+14 14 | __all__: list[str] = ["the", "three", "little", "pigs"]
+15 15 | 
 
-RUF022.py:18:11: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:14:22: RUF022 [*] `__all__` is not alphabetically sorted
    |
-16 |   ####################################
-17 |   
-18 |   __all__ = (
-   |  ___________^
-19 | |     "d0",
-20 | |     "c0",  # a comment regarding 'c0'
-21 | |     "b0",
-22 | |     # a comment regarding 'a0':
-23 | |     "a0"
-24 | | )
-   | |_^ RUF022
-25 |   
-26 |   __all__ = [
-   |
-   = help: Sort `__all__` alphabetically
-
-ℹ Unsafe fix
-16 16 | ####################################
-17 17 | 
-18 18 | __all__ = (
-   19 |+    # a comment regarding 'a0':
-   20 |+    "a0",
-   21 |+    "b0",
-   22 |+    "c0",  # a comment regarding 'c0'
-19 23 |     "d0",
-20    |-    "c0",  # a comment regarding 'c0'
-21    |-    "b0",
-22    |-    # a comment regarding 'a0':
-23    |-    "a0"
-24 24 | )
-25 25 | 
-26 26 | __all__ = [
-
-RUF022.py:26:11: RUF022 [*] `__all__` is not alphabetically sorted
-   |
-24 |   )
-25 |   
-26 |   __all__ = [
-   |  ___________^
-27 | |     "d",
-28 | |     "c",  # a comment regarding 'c'
-29 | |     "b",
-30 | |     # a comment regarding 'a':
-31 | |     "a"
-32 | | ]
-   | |_^ RUF022
-33 |   
-34 |   ##########################################
-   |
-   = help: Sort `__all__` alphabetically
-
-ℹ Unsafe fix
-24 24 | )
-25 25 | 
-26 26 | __all__ = [
-   27 |+    # a comment regarding 'a':
-   28 |+    "a",
-   29 |+    "b",
-   30 |+    "c",  # a comment regarding 'c'
-27 31 |     "d",
-28    |-    "c",  # a comment regarding 'c'
-29    |-    "b",
-30    |-    # a comment regarding 'a':
-31    |-    "a"
-32 32 | ]
-33 33 | 
-34 34 | ##########################################
-
-RUF022.py:39:11: RUF022 [*] `__all__` is not alphabetically sorted
-   |
-38 |   # comment0
-39 |   __all__ = ("d", "a",  # comment1
-   |  ___________^
-40 | |            # comment2
-41 | |            "f", "b",
-42 | |                                         "strangely",  # comment3
-43 | |             # comment4
-44 | |     "formatted",
-45 | |     # comment5
-46 | | )  # comment6
-   | |_^ RUF022
-47 |   # comment7
-   |
-   = help: Sort `__all__` alphabetically
-
-ℹ Unsafe fix
-36 36 | ##########################################
-37 37 | 
-38 38 | # comment0
-39    |-__all__ = ("d", "a",  # comment1
-40    |-           # comment2
-41    |-           "f", "b",
-42    |-                                        "strangely",  # comment3
-43    |-            # comment4
-   39 |+__all__ = (
-   40 |+    "a",
-   41 |+    "b",
-   42 |+    "d",  # comment1
-   43 |+    # comment2
-   44 |+           "f",
-   45 |+    # comment4
-44 46 |     "formatted",
-   47 |+    "strangely",  # comment3
-45 48 |     # comment5
-46 49 | )  # comment6
-47 50 | # comment7
-
-RUF022.py:49:11: RUF022 [*] `__all__` is not alphabetically sorted
-   |
-47 |   # comment7
-48 |   
-49 |   __all__ = [  # comment0
-   |  ___________^
-50 | |     # comment1
-51 | |     # comment2
-52 | |     "dx", "cx", "bx", "ax"  # comment3
-53 | |     # comment4
-54 | |     # comment5
-55 | |     # comment6
-56 | | ]  # comment7
-   | |_^ RUF022
-57 |   
-58 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
-   |
-   = help: Sort `__all__` alphabetically
-
-ℹ Unsafe fix
-48 48 | 
-49 49 | __all__ = [  # comment0
-50 50 |     # comment1
-   51 |+    "ax",
-   52 |+    "bx",
-   53 |+    "cx",
-51 54 |     # comment2
-52    |-    "dx", "cx", "bx", "ax"  # comment3
-   55 |+    "dx",  # comment3
-53 56 |     # comment4
-54 57 |     # comment5
-55 58 |     # comment6
-
-RUF022.py:58:11: RUF022 [*] `__all__` is not alphabetically sorted
-   |
-56 |   ]  # comment7
-57 |   
-58 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
-   |  ___________^
-59 | |            "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
-60 | |            "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
-61 | |            "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
-62 | |            "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
-63 | |            "StreamReader", "StreamWriter",
-64 | |            "StreamReaderWriter", "StreamRecoder",
-65 | |            "getencoder", "getdecoder", "getincrementalencoder",
-66 | |            "getincrementaldecoder", "getreader", "getwriter",
-67 | |            "encode", "decode", "iterencode", "iterdecode",
-68 | |            "strict_errors", "ignore_errors", "replace_errors",
-69 | |            "xmlcharrefreplace_errors",
-70 | |            "backslashreplace_errors", "namereplace_errors",
-71 | |            "register_error", "lookup_error"]
-   | |____________________________________________^ RUF022
-72 |   
-73 |   ###################################
+12 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+13 | 
+14 | __all__: list[str] = ["the", "three", "little", "pigs"]
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
+15 | 
+16 | ####################################
    |
    = help: Sort `__all__` alphabetically
 
 ℹ Safe fix
-55  55  |     # comment6
-56  56  | ]  # comment7
-57  57  | 
-58      |-__all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
-59      |-           "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
-60      |-           "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
-61      |-           "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
-62      |-           "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
-63      |-           "StreamReader", "StreamWriter",
-64      |-           "StreamReaderWriter", "StreamRecoder",
-65      |-           "getencoder", "getdecoder", "getincrementalencoder",
-66      |-           "getincrementaldecoder", "getreader", "getwriter",
-67      |-           "encode", "decode", "iterencode", "iterdecode",
-68      |-           "strict_errors", "ignore_errors", "replace_errors",
-69      |-           "xmlcharrefreplace_errors",
-70      |-           "backslashreplace_errors", "namereplace_errors",
-71      |-           "register_error", "lookup_error"]
-    58  |+__all__ = [
-    59  |+    "BOM",
-    60  |+    "BOM32_BE",
-    61  |+    "BOM32_LE",
-    62  |+    "BOM64_BE",
-    63  |+    "BOM64_LE",
-    64  |+    "BOM_BE",
-    65  |+    "BOM_LE",
-    66  |+    "BOM_UTF16",
-    67  |+    "BOM_UTF16_BE",
-    68  |+    "BOM_UTF16_LE",
-    69  |+    "BOM_UTF32",
-    70  |+    "BOM_UTF32_BE",
-    71  |+    "BOM_UTF32_LE",
-    72  |+    "BOM_UTF8",
-    73  |+    "Codec",
-    74  |+    "CodecInfo",
-    75  |+    "EncodedFile",
-    76  |+    "IncrementalDecoder",
-    77  |+    "IncrementalEncoder",
-    78  |+    "StreamReader",
-    79  |+    "StreamReaderWriter",
-    80  |+    "StreamRecoder",
-    81  |+    "StreamWriter",
-    82  |+    "backslashreplace_errors",
-    83  |+    "decode",
-    84  |+    "encode",
-    85  |+    "getdecoder",
-    86  |+    "getencoder",
-    87  |+    "getincrementaldecoder",
-    88  |+    "getincrementalencoder",
-    89  |+    "getreader",
-    90  |+    "getwriter",
-    91  |+    "ignore_errors",
-    92  |+    "iterdecode",
-    93  |+    "iterencode",
-    94  |+    "lookup",
-    95  |+    "lookup_error",
-    96  |+    "namereplace_errors",
-    97  |+    "open",
-    98  |+    "register",
-    99  |+    "register_error",
-    100 |+    "replace_errors",
-    101 |+    "strict_errors",
-    102 |+    "xmlcharrefreplace_errors"]
-72  103 | 
-73  104 | ###################################
-74  105 | # These should all not get flagged:
+11 11 | else:
+12 12 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+13 13 | 
+14    |-__all__: list[str] = ["the", "three", "little", "pigs"]
+   14 |+__all__: list[str] = ["little", "pigs", "the", "three"]
+15 15 | 
+16 16 | ####################################
+17 17 | # Neat multiline __all__ definitions
+
+RUF022.py:20:11: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+18 |   ####################################
+19 |   
+20 |   __all__ = (
+   |  ___________^
+21 | |     "d0",
+22 | |     "c0",  # a comment regarding 'c0'
+23 | |     "b0",
+24 | |     # a comment regarding 'a0':
+25 | |     "a0"
+26 | | )
+   | |_^ RUF022
+27 |   
+28 |   __all__ = [
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Unsafe fix
+18 18 | ####################################
+19 19 | 
+20 20 | __all__ = (
+   21 |+    # a comment regarding 'a0':
+   22 |+    "a0",
+   23 |+    "b0",
+   24 |+    "c0",  # a comment regarding 'c0'
+21 25 |     "d0",
+22    |-    "c0",  # a comment regarding 'c0'
+23    |-    "b0",
+24    |-    # a comment regarding 'a0':
+25    |-    "a0"
+26 26 | )
+27 27 | 
+28 28 | __all__ = [
+
+RUF022.py:28:11: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+26 |   )
+27 |   
+28 |   __all__ = [
+   |  ___________^
+29 | |     "d",
+30 | |     "c",  # a comment regarding 'c'
+31 | |     "b",
+32 | |     # a comment regarding 'a':
+33 | |     "a"
+34 | | ]
+   | |_^ RUF022
+35 |   
+36 |   ##########################################
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Unsafe fix
+26 26 | )
+27 27 | 
+28 28 | __all__ = [
+   29 |+    # a comment regarding 'a':
+   30 |+    "a",
+   31 |+    "b",
+   32 |+    "c",  # a comment regarding 'c'
+29 33 |     "d",
+30    |-    "c",  # a comment regarding 'c'
+31    |-    "b",
+32    |-    # a comment regarding 'a':
+33    |-    "a"
+34 34 | ]
+35 35 | 
+36 36 | ##########################################
+
+RUF022.py:41:11: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+40 |   # comment0
+41 |   __all__ = ("d", "a",  # comment1
+   |  ___________^
+42 | |            # comment2
+43 | |            "f", "b",
+44 | |                                         "strangely",  # comment3
+45 | |             # comment4
+46 | |     "formatted",
+47 | |     # comment5
+48 | | )  # comment6
+   | |_^ RUF022
+49 |   # comment7
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Unsafe fix
+38 38 | ##########################################
+39 39 | 
+40 40 | # comment0
+41    |-__all__ = ("d", "a",  # comment1
+42    |-           # comment2
+43    |-           "f", "b",
+44    |-                                        "strangely",  # comment3
+45    |-            # comment4
+   41 |+__all__ = (
+   42 |+    "a",
+   43 |+    "b",
+   44 |+    "d",  # comment1
+   45 |+    # comment2
+   46 |+           "f",
+   47 |+    # comment4
+46 48 |     "formatted",
+   49 |+    "strangely",  # comment3
+47 50 |     # comment5
+48 51 | )  # comment6
+49 52 | # comment7
+
+RUF022.py:51:11: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+49 |   # comment7
+50 |   
+51 |   __all__ = [  # comment0
+   |  ___________^
+52 | |     # comment1
+53 | |     # comment2
+54 | |     "dx", "cx", "bx", "ax"  # comment3
+55 | |     # comment4
+56 | |     # comment5
+57 | |     # comment6
+58 | | ]  # comment7
+   | |_^ RUF022
+59 |   
+60 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Unsafe fix
+50 50 | 
+51 51 | __all__ = [  # comment0
+52 52 |     # comment1
+   53 |+    "ax",
+   54 |+    "bx",
+   55 |+    "cx",
+53 56 |     # comment2
+54    |-    "dx", "cx", "bx", "ax"  # comment3
+   57 |+    "dx",  # comment3
+55 58 |     # comment4
+56 59 |     # comment5
+57 60 |     # comment6
+
+RUF022.py:60:11: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+58 |   ]  # comment7
+59 |   
+60 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
+   |  ___________^
+61 | |            "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
+62 | |            "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
+63 | |            "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
+64 | |            "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
+65 | |            "StreamReader", "StreamWriter",
+66 | |            "StreamReaderWriter", "StreamRecoder",
+67 | |            "getencoder", "getdecoder", "getincrementalencoder",
+68 | |            "getincrementaldecoder", "getreader", "getwriter",
+69 | |            "encode", "decode", "iterencode", "iterdecode",
+70 | |            "strict_errors", "ignore_errors", "replace_errors",
+71 | |            "xmlcharrefreplace_errors",
+72 | |            "backslashreplace_errors", "namereplace_errors",
+73 | |            "register_error", "lookup_error"]
+   | |____________________________________________^ RUF022
+74 |   
+75 |   ###################################
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Safe fix
+57  57  |     # comment6
+58  58  | ]  # comment7
+59  59  | 
+60      |-__all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
+61      |-           "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
+62      |-           "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
+63      |-           "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
+64      |-           "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
+65      |-           "StreamReader", "StreamWriter",
+66      |-           "StreamReaderWriter", "StreamRecoder",
+67      |-           "getencoder", "getdecoder", "getincrementalencoder",
+68      |-           "getincrementaldecoder", "getreader", "getwriter",
+69      |-           "encode", "decode", "iterencode", "iterdecode",
+70      |-           "strict_errors", "ignore_errors", "replace_errors",
+71      |-           "xmlcharrefreplace_errors",
+72      |-           "backslashreplace_errors", "namereplace_errors",
+73      |-           "register_error", "lookup_error"]
+    60  |+__all__ = [
+    61  |+    "BOM",
+    62  |+    "BOM32_BE",
+    63  |+    "BOM32_LE",
+    64  |+    "BOM64_BE",
+    65  |+    "BOM64_LE",
+    66  |+    "BOM_BE",
+    67  |+    "BOM_LE",
+    68  |+    "BOM_UTF16",
+    69  |+    "BOM_UTF16_BE",
+    70  |+    "BOM_UTF16_LE",
+    71  |+    "BOM_UTF32",
+    72  |+    "BOM_UTF32_BE",
+    73  |+    "BOM_UTF32_LE",
+    74  |+    "BOM_UTF8",
+    75  |+    "Codec",
+    76  |+    "CodecInfo",
+    77  |+    "EncodedFile",
+    78  |+    "IncrementalDecoder",
+    79  |+    "IncrementalEncoder",
+    80  |+    "StreamReader",
+    81  |+    "StreamReaderWriter",
+    82  |+    "StreamRecoder",
+    83  |+    "StreamWriter",
+    84  |+    "backslashreplace_errors",
+    85  |+    "decode",
+    86  |+    "encode",
+    87  |+    "getdecoder",
+    88  |+    "getencoder",
+    89  |+    "getincrementaldecoder",
+    90  |+    "getincrementalencoder",
+    91  |+    "getreader",
+    92  |+    "getwriter",
+    93  |+    "ignore_errors",
+    94  |+    "iterdecode",
+    95  |+    "iterencode",
+    96  |+    "lookup",
+    97  |+    "lookup_error",
+    98  |+    "namereplace_errors",
+    99  |+    "open",
+    100 |+    "register",
+    101 |+    "register_error",
+    102 |+    "replace_errors",
+    103 |+    "strict_errors",
+    104 |+    "xmlcharrefreplace_errors"]
+74  105 | 
+75  106 | ###################################
+76  107 | # These should all not get flagged:
 
 
