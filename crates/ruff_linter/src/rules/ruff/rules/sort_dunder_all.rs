@@ -36,21 +36,6 @@ enum DunderAllKind {
     Tuple { is_parenthesized: bool },
 }
 
-impl DunderAllKind {
-    fn parens(&self, is_multiline: bool) -> (&str, &str) {
-        match (self, is_multiline) {
-            (Self::List, _) => ("[", "]"),
-            (
-                Self::Tuple {
-                    is_parenthesized: false,
-                },
-                false,
-            ) => ("", ""),
-            _ => ("(", ")"),
-        }
-    }
-}
-
 fn tuple_is_parenthesized(tuple: &ast::ExprTuple, locator: &Locator) -> bool {
     let toks = lexer::lex(locator.slice(tuple).trim(), Mode::Expression).collect::<Vec<_>>();
     matches!(
@@ -110,7 +95,6 @@ fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
         let DunderAllLine { items, comment } = line;
         match (items.as_slice(), comment) {
             ([], Some(_)) => {
-                assert!(this_range.is_none());
                 this_range = comment;
             }
             ([(first_val, first_range), rest @ ..], _) => {
@@ -224,50 +208,40 @@ struct SortedDunderAll {
     new_dunder_all: Option<String>,
 }
 
-fn multiline_dunder_all_from_items(
+fn join_multiline_dunder_all_items(
     sorted_items: &[DunderAllItem],
     locator: &Locator,
     parent: &ast::Stmt,
-    stylist: &Stylist,
-    parens: (&str, &str),
+    additional_indent: &str,
+    newline: &str,
 ) -> Option<String> {
     let Some(indent) = indentation(locator, parent) else {
         return None;
     };
-    let (opening_paren, closing_paren) = parens;
-    let added_indent = stylist.indentation();
-    let newline = stylist.line_ending().as_str();
 
-    let mut new_dunder_all = String::from(opening_paren);
-    new_dunder_all.push_str(newline);
-    for item in sorted_items {
+    let mut new_dunder_all = String::new();
+    for (i, item) in sorted_items.iter().enumerate() {
         new_dunder_all.push_str(indent);
-        new_dunder_all.push_str(added_indent);
+        new_dunder_all.push_str(additional_indent);
         new_dunder_all.push_str(locator.slice(item));
         new_dunder_all.push(',');
         if let Some(comment) = item.additional_comments {
             new_dunder_all.push_str("  ");
             new_dunder_all.push_str(locator.slice(comment));
         }
-        new_dunder_all.push_str(newline);
+        if i < (sorted_items.len() - 1) {
+            new_dunder_all.push_str(newline);
+        }
     }
-    new_dunder_all.push_str(indent);
-    new_dunder_all.push_str(closing_paren);
 
     Some(new_dunder_all)
 }
 
-fn single_line_dunder_all_from_items(
-    sorted_items: &[DunderAllItem],
-    locator: &Locator,
-    parens: (&str, &str),
-) -> String {
-    let joined_items = sorted_items
+fn join_singleline_dunder_all_items(sorted_items: &[DunderAllItem], locator: &Locator) -> String {
+    sorted_items
         .iter()
         .map(|item| locator.slice(item))
-        .join(", ");
-    let (opening_paren, closing_paren) = parens;
-    format!("{opening_paren}{joined_items}{closing_paren}")
+        .join(", ")
 }
 
 impl<'a> DunderAllValue<'a> {
@@ -321,16 +295,45 @@ impl<'a> DunderAllValue<'a> {
                 new_dunder_all: None,
             };
         }
-        let parens = self.kind.parens(self.multiline);
-        let new_dunder_all = if self.multiline {
-            multiline_dunder_all_from_items(&sorted_items, locator, parent, stylist, parens)
-        } else {
-            Some(single_line_dunder_all_from_items(
-                &sorted_items,
-                locator,
-                parens,
-            ))
+        let prelude_end = {
+            if let Some(first_item) = self.items.first() {
+                let first_item_line_offset = locator.line_start(first_item.start());
+                if first_item_line_offset == locator.line_start(self.start()) {
+                    first_item.start()
+                } else {
+                    first_item_line_offset
+                }
+            } else {
+                self.start() + TextSize::new(1)
+            }
         };
+        let postlude_start = {
+            if let Some(last_item) = self.items.last() {
+                let last_item_line_offset = locator.line_end(last_item.end());
+                if last_item_line_offset == locator.line_end(self.end()) {
+                    last_item.end()
+                } else {
+                    last_item_line_offset
+                }
+            } else {
+                self.end() - TextSize::new(1)
+            }
+        };
+        let mut prelude = locator
+            .slice(TextRange::new(self.start(), prelude_end))
+            .to_string();
+        let postlude = locator.slice(TextRange::new(postlude_start, self.end()));
+
+        let joined_items = if self.multiline {
+            let indentation = stylist.indentation();
+            let newline = stylist.line_ending().as_str();
+            prelude = format!("{}{}", prelude.trim_end(), newline);
+            join_multiline_dunder_all_items(&sorted_items, locator, parent, indentation, newline)
+        } else {
+            Some(join_singleline_dunder_all_items(&sorted_items, locator))
+        };
+
+        let new_dunder_all = joined_items.map(|items| format!("{prelude}{items}{postlude}"));
         SortedDunderAll {
             was_already_sorted: false,
             new_dunder_all,

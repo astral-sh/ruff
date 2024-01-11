@@ -109,11 +109,11 @@ RUF022.py:18:11: RUF022 [*] `__all__` is not alphabetically sorted
 17 |   
 18 |   __all__ = (
    |  ___________^
-19 | |     "d",
-20 | |     "c",  # a comment regarding 'c'
-21 | |     "b",
-22 | |     # a comment regarding 'a':
-23 | |     "a"
+19 | |     "d0",
+20 | |     "c0",  # a comment regarding 'c0'
+21 | |     "b0",
+22 | |     # a comment regarding 'a0':
+23 | |     "a0"
 24 | | )
    | |_^ RUF022
 25 |   
@@ -125,15 +125,15 @@ RUF022.py:18:11: RUF022 [*] `__all__` is not alphabetically sorted
 16 16 | ####################################
 17 17 | 
 18 18 | __all__ = (
-   19 |+    # a comment regarding 'a':
-   20 |+    "a",
-   21 |+    "b",
-   22 |+    "c",  # a comment regarding 'c'
-19 23 |     "d",
-20    |-    "c",  # a comment regarding 'c'
-21    |-    "b",
-22    |-    # a comment regarding 'a':
-23    |-    "a"
+   19 |+    # a comment regarding 'a0':
+   20 |+    "a0",
+   21 |+    "b0",
+   22 |+    "c0",  # a comment regarding 'c0'
+19 23 |     "d0",
+20    |-    "c0",  # a comment regarding 'c0'
+21    |-    "b0",
+22    |-    # a comment regarding 'a0':
+23    |-    "a0"
 24 24 | )
 25 25 | 
 26 26 | __all__ = [
@@ -207,31 +207,134 @@ RUF022.py:39:11: RUF022 [*] `__all__` is not alphabetically sorted
    44 |+           "f",
    45 |+    # comment4
 44 46 |     "formatted",
-45    |-    # comment5
    47 |+    "strangely",  # comment3
-46 48 | )  # comment6
-47 49 | # comment7
-48 50 | 
+45 48 |     # comment5
+46 49 | )  # comment6
+47 50 | # comment7
 
-RUF022.py:65:16: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:49:11: RUF022 [*] `__all__` is not alphabetically sorted
    |
-63 |     __all__ += ("e", "f", "g")
-64 | else:
-65 |     __all__ += ["omega", "alpha"]
-   |                ^^^^^^^^^^^^^^^^^^ RUF022
-66 | 
-67 | class IntroducesNonModuleScope:
+47 |   # comment7
+48 |   
+49 |   __all__ = [  # comment0
+   |  ___________^
+50 | |     # comment1
+51 | |     # comment2
+52 | |     "dx", "cx", "bx", "ax"  # comment3
+53 | |     # comment4
+54 | |     # comment5
+55 | |     # comment6
+56 | | ]  # comment7
+   | |_^ RUF022
+57 |   
+58 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
    |
    = help: Sort `__all__` alphabetically
 
-ℹ Safe fix
-62 62 | if bool():
-63 63 |     __all__ += ("e", "f", "g")
-64 64 | else:
-65    |-    __all__ += ["omega", "alpha"]
-   65 |+    __all__ += ["alpha", "omega"]
-66 66 | 
-67 67 | class IntroducesNonModuleScope:
-68 68 |     __all__ = ("b", "a", "e", "d")
+ℹ Unsafe fix
+48 48 | 
+49 49 | __all__ = [  # comment0
+50 50 |     # comment1
+   51 |+    "ax",
+   52 |+    "bx",
+   53 |+    "cx",
+51 54 |     # comment2
+52    |-    "dx", "cx", "bx", "ax"  # comment3
+   55 |+    "dx",  # comment3
+53 56 |     # comment4
+54 57 |     # comment5
+55 58 |     # comment6
+
+RUF022.py:58:11: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+56 |   ]  # comment7
+57 |   
+58 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
+   |  ___________^
+59 | |            "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
+60 | |            "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
+61 | |            "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
+62 | |            "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
+63 | |            "StreamReader", "StreamWriter",
+64 | |            "StreamReaderWriter", "StreamRecoder",
+65 | |            "getencoder", "getdecoder", "getincrementalencoder",
+66 | |            "getincrementaldecoder", "getreader", "getwriter",
+67 | |            "encode", "decode", "iterencode", "iterdecode",
+68 | |            "strict_errors", "ignore_errors", "replace_errors",
+69 | |            "xmlcharrefreplace_errors",
+70 | |            "backslashreplace_errors", "namereplace_errors",
+71 | |            "register_error", "lookup_error"]
+   | |____________________________________________^ RUF022
+72 |   
+73 |   ###################################
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Unsafe fix
+55  55  |     # comment6
+56  56  | ]  # comment7
+57  57  | 
+58      |-__all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
+59      |-           "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
+60      |-           "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
+61      |-           "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
+62      |-           "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
+63      |-           "StreamReader", "StreamWriter",
+64      |-           "StreamReaderWriter", "StreamRecoder",
+65      |-           "getencoder", "getdecoder", "getincrementalencoder",
+66      |-           "getincrementaldecoder", "getreader", "getwriter",
+67      |-           "encode", "decode", "iterencode", "iterdecode",
+68      |-           "strict_errors", "ignore_errors", "replace_errors",
+69      |-           "xmlcharrefreplace_errors",
+70      |-           "backslashreplace_errors", "namereplace_errors",
+71      |-           "register_error", "lookup_error"]
+    58  |+__all__ = [
+    59  |+    "BOM",
+    60  |+    "BOM32_BE",
+    61  |+    "BOM32_LE",
+    62  |+    "BOM64_BE",
+    63  |+    "BOM64_LE",
+    64  |+    "BOM_BE",
+    65  |+    "BOM_LE",
+    66  |+    "BOM_UTF16",
+    67  |+    "BOM_UTF16_BE",
+    68  |+    "BOM_UTF16_LE",
+    69  |+    "BOM_UTF32",
+    70  |+    "BOM_UTF32_BE",
+    71  |+    "BOM_UTF32_LE",
+    72  |+    "BOM_UTF8",
+    73  |+    "Codec",
+    74  |+    "CodecInfo",
+    75  |+    "EncodedFile",
+    76  |+    "IncrementalDecoder",
+    77  |+    "IncrementalEncoder",
+    78  |+    "StreamReader",
+    79  |+    "StreamReaderWriter",
+    80  |+    "StreamRecoder",
+    81  |+    "StreamWriter",
+    82  |+    "backslashreplace_errors",
+    83  |+    "decode",
+    84  |+    "encode",
+    85  |+    "getdecoder",
+    86  |+    "getencoder",
+    87  |+    "getincrementaldecoder",
+    88  |+    "getincrementalencoder",
+    89  |+    "getreader",
+    90  |+    "getwriter",
+    91  |+    "ignore_errors",
+    92  |+    "iterdecode",
+    93  |+    "iterencode",
+    94  |+    "lookup",
+    95  |+    "lookup_error",
+    96  |+    "namereplace_errors",
+    97  |+    "open",
+    98  |+    "register",
+    99  |+    "register_error",
+    100 |+    "replace_errors",
+    101 |+    "strict_errors",
+    102 |+    "xmlcharrefreplace_errors",]
+72  103 | 
+73  104 | ###################################
+74  105 | # These should all not get flagged:
 
 
