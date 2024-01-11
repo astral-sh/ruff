@@ -16,7 +16,7 @@
 
 ### Rule changes
 
-- [\`flake8-boolean-trap\`] Allow Boolean positionals in setters ([#9429](https://github.com/astral-sh/ruff/pull/9429))
+- [\`flake8-boolean-trap\`] Allow Boolean positional arguments in setters ([#9429](https://github.com/astral-sh/ruff/pull/9429))
 - [\`flake8-bugbear\`] Include subscripts and attributes in static key rule ([#9416](https://github.com/astral-sh/ruff/pull/9416))
 - [\`flake8-bugbear\`] Support variable keys in static dictionary key rule ([#9411](https://github.com/astral-sh/ruff/pull/9411))
 - [\`flake8-builtins\`] Restrict `builtin-attribute-shadowing` (`A003`) to actual shadowed references ([#9462](https://github.com/astral-sh/ruff/pull/9462))
