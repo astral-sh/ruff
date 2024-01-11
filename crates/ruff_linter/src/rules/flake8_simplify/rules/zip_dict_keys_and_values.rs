@@ -1,6 +1,6 @@
 use ast::{ExprAttribute, ExprName, Identifier};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::{checkers::ast::Checker, fix::snippet::SourceCodeSnippet};
@@ -59,15 +59,12 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 }
 
 /// SIM911
-pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &Expr) {
-    let Expr::Call(ast::ExprCall {
+pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &ExprCall) {
+    let ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
         ..
-    }) = expr
-    else {
-        return;
-    };
+    } = expr;
     match &keywords[..] {
         [] => {}
         [ast::Keyword {
