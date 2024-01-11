@@ -85,7 +85,7 @@
 //!    return bool(i & 1)
 //! "#;
 //! let tokens = lex(python_source, Mode::Module);
-//! let ast = parse_tokens(tokens, python_source, Mode::Module);
+//! let ast = parse_tokens(tokens.collect(), python_source, Mode::Module);
 //!
 //! assert!(ast.is_ok());
 //! ```
@@ -110,8 +110,8 @@
 //! [lexer]: crate::lexer
 
 pub use parser::{
-    parse, parse_expression, parse_expression_starts_at, parse_ok_tokens, parse_program,
-    parse_starts_at, parse_suite, parse_tokens, ParseError, ParseErrorType,
+    parse, parse_expression, parse_expression_starts_at, parse_program, parse_starts_at,
+    parse_suite, parse_tokens, ParseError, ParseErrorType,
 };
 use ruff_python_ast::{Mod, PySourceType, Suite};
 pub use string::FStringErrorType;
@@ -128,6 +128,7 @@ mod parser;
 mod soft_keywords;
 mod string;
 mod token;
+mod token_source;
 pub mod typing;
 
 /// Collect tokens up to and including the first error.
@@ -145,7 +146,7 @@ pub fn tokenize(contents: &str, mode: Mode) -> Vec<LexResult> {
 
 /// Parse a full Python program from its tokens.
 pub fn parse_program_tokens(
-    lxr: Vec<LexResult>,
+    tokens: Vec<LexResult>,
     source: &str,
     is_jupyter_notebook: bool,
 ) -> anyhow::Result<Suite, ParseError> {
@@ -154,7 +155,7 @@ pub fn parse_program_tokens(
     } else {
         Mode::Module
     };
-    match parse_tokens(lxr, source, mode)? {
+    match parse_tokens(tokens, source, mode)? {
         Mod::Module(m) => Ok(m.body),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }

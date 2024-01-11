@@ -350,17 +350,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
-            if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
-                if checker.enabled(Rule::BuiltinAttributeShadowing) {
-                    flake8_builtins::rules::builtin_method_shadowing(
-                        checker,
-                        class_def,
-                        name,
-                        decorator_list,
-                        name.range(),
-                    );
-                }
-            } else {
+            if !checker.semantic.current_scope().kind.is_class() {
                 if checker.enabled(Rule::BuiltinVariableShadowing) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }

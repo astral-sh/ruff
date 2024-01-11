@@ -7,7 +7,8 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::rules::{
-    flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint, ruff,
+    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint,
+    ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -27,6 +28,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UndefinedLocal,
         Rule::UnusedAnnotation,
         Rule::UnusedClassMethodArgument,
+        Rule::BuiltinAttributeShadowing,
         Rule::UnusedFunctionArgument,
         Rule::UnusedImport,
         Rule::UnusedLambdaArgument,
@@ -295,6 +297,18 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
         if checker.enabled(Rule::AsyncioDanglingTask) {
             ruff::rules::asyncio_dangling_binding(scope, &checker.semantic, &mut diagnostics);
+        }
+
+        if let Some(class_def) = scope.kind.as_class() {
+            if checker.enabled(Rule::BuiltinAttributeShadowing) {
+                flake8_builtins::rules::builtin_attribute_shadowing(
+                    checker,
+                    scope_id,
+                    scope,
+                    class_def,
+                    &mut diagnostics,
+                );
+            }
         }
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {

@@ -1472,6 +1472,11 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
     }
 
     fn fits_text(&mut self, text: Text, args: PrintElementArgs) -> Fits {
+        fn exceeds_width(fits: &FitsMeasurer, args: PrintElementArgs) -> bool {
+            fits.state.line_width > fits.options().line_width.into()
+                && !args.measure_mode().allows_text_overflow()
+        }
+
         let indent = std::mem::take(&mut self.state.pending_indent);
         self.state.line_width +=
             u32::from(indent.level()) * self.options().indent_width() + u32::from(indent.align());
@@ -1493,7 +1498,13 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                     return Fits::No;
                                 }
                                 match args.measure_mode() {
-                                    MeasureMode::FirstLine => return Fits::Yes,
+                                    MeasureMode::FirstLine => {
+                                        return if exceeds_width(self, args) {
+                                            Fits::No
+                                        } else {
+                                            Fits::Yes
+                                        };
+                                    }
                                     MeasureMode::AllLines
                                     | MeasureMode::AllLinesAllowTextOverflow => {
                                         self.state.line_width = 0;
@@ -1511,9 +1522,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
         }
 
-        if self.state.line_width > self.options().line_width.into()
-            && !args.measure_mode().allows_text_overflow()
-        {
+        if exceeds_width(self, args) {
             return Fits::No;
         }
 

@@ -4,10 +4,10 @@ use ruff_python_ast::{CmpOp, ExprCompare};
 
 use crate::comments::SourceComment;
 use crate::expression::binary_like::BinaryLike;
-use crate::expression::expr_string_literal::is_multiline_string;
 use crate::expression::has_parentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
+use crate::string::AnyString;
 
 #[derive(Default)]
 pub struct FormatExprCompare;
@@ -37,11 +37,11 @@ impl NeedsParentheses for ExprCompare {
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
             OptionalParentheses::Always
-        } else if let Some(literal_expr) = self.left.as_literal_expr() {
+        } else if let Some(string) = AnyString::from_expression(&self.left) {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
-            if !literal_expr.is_implicit_concatenated()
-                && is_multiline_string(literal_expr.into(), context.source())
-                && !context.comments().has(literal_expr)
+            if !string.is_implicit_concatenated()
+                && string.is_multiline(context.source())
+                && !context.comments().has(string)
                 && self.comparators.first().is_some_and(|right| {
                     has_parentheses(right, context).is_some() && !context.comments().has(right)
                 })

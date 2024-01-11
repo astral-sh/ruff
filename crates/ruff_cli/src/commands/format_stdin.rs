@@ -6,7 +6,7 @@ use log::error;
 
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{match_exclusion, python_file_at_path};
+use ruff_workspace::resolver::{match_exclusion, python_file_at_path, Resolver};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
@@ -27,24 +27,23 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
         cli.stdin_filename.as_deref(),
     )?;
 
-    warn_incompatible_formatter_settings(&pyproject_config, None);
+    let mut resolver = Resolver::new(&pyproject_config);
+    warn_incompatible_formatter_settings(&resolver);
 
     let mode = FormatMode::from_cli(cli);
 
-    if pyproject_config.settings.file_resolver.force_exclude {
+    if resolver.force_exclude() {
         if let Some(filename) = cli.stdin_filename.as_deref() {
-            if !python_file_at_path(filename, &pyproject_config, overrides)? {
+            if !python_file_at_path(filename, &mut resolver, overrides)? {
                 if mode.is_write() {
                     parrot_stdin()?;
                 }
                 return Ok(ExitStatus::Success);
             }
 
-            let format_settings = &pyproject_config.settings.formatter;
-            if filename
-                .file_name()
-                .is_some_and(|name| match_exclusion(filename, name, &format_settings.exclude))
-            {
+            if filename.file_name().is_some_and(|name| {
+                match_exclusion(filename, name, &resolver.base_settings().formatter.exclude)
+            }) {
                 if mode.is_write() {
                     parrot_stdin()?;
                 }
@@ -63,12 +62,7 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
     };
 
     // Format the file.
-    match format_source_code(
-        path,
-        &pyproject_config.settings.formatter,
-        source_type,
-        mode,
-    ) {
+    match format_source_code(path, &resolver.base_settings().formatter, source_type, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check | FormatMode::Diff => {

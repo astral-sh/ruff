@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::parenthesize::parenthesized_range;
@@ -36,12 +36,16 @@ use crate::checkers::ast::Checker;
 #[violation]
 pub struct ParenthesizeChainedOperators;
 
-impl Violation for ParenthesizeChainedOperators {
+impl AlwaysFixableViolation for ParenthesizeChainedOperators {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
             "Parenthesize `a and b` expressions when chaining `and` and `or` together, to make the precedence clear"
         )
+    }
+
+    fn fix_title(&self) -> String {
+        "Parenthesize the `and` subexpression".to_string()
     }
 }
 
@@ -75,18 +79,22 @@ pub(crate) fn parenthesize_chained_logical_operators(
                     ..
                 },
             ) => {
+                let locator = checker.locator();
+                let source_range = bool_op.range();
                 if parenthesized_range(
                     bool_op.into(),
                     expr.into(),
                     checker.indexer().comment_ranges(),
-                    checker.locator().contents(),
+                    locator.contents(),
                 )
                 .is_none()
                 {
-                    checker.diagnostics.push(Diagnostic::new(
-                        ParenthesizeChainedOperators,
-                        bool_op.range(),
-                    ));
+                    let new_source = format!("({})", locator.slice(source_range));
+                    let edit = Edit::range_replacement(new_source, source_range);
+                    checker.diagnostics.push(
+                        Diagnostic::new(ParenthesizeChainedOperators, source_range)
+                            .with_fix(Fix::safe_edit(edit)),
+                    );
                 }
             }
             _ => continue,

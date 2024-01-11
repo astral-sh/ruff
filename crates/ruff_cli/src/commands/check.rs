@@ -57,16 +57,11 @@ pub(crate) fn check(
             .flatten()
             .map(ResolvedFile::path)
             .collect::<Vec<_>>(),
-        pyproject_config,
     );
 
     // Load the caches.
     let caches = if bool::from(cache) {
-        Some(PackageCacheMap::init(
-            pyproject_config,
-            &package_roots,
-            &resolver,
-        ))
+        Some(PackageCacheMap::init(&package_roots, &resolver))
     } else {
         None
     };
@@ -81,7 +76,7 @@ pub(crate) fn check(
                     .and_then(|parent| package_roots.get(parent))
                     .and_then(|package| *package);
 
-                let settings = resolver.resolve(path, pyproject_config);
+                let settings = resolver.resolve(path);
 
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
                     && match_exclusion(
@@ -128,7 +123,7 @@ pub(crate) fn check(
 
         Some(result.unwrap_or_else(|(path, message)| {
             if let Some(path) = &path {
-                let settings = resolver.resolve(path, pyproject_config);
+                let settings = resolver.resolve(path);
                 if settings.linter.rules.enabled(Rule::IOError) {
                     let dummy =
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();

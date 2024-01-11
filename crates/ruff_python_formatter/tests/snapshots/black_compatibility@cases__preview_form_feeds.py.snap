@@ -211,7 +211,7 @@ a = [
  pass
  
  
-@@ -68,13 +68,12 @@
+@@ -68,25 +68,23 @@
  def foo():
      pass
  
@@ -226,7 +226,11 @@ a = [
      pass
  
  
-@@ -85,7 +84,7 @@
+ class Baz:
+-
+     def __init__(self):
+         pass
+ 
      def something(self):
          pass
  
@@ -427,6 +431,7 @@ def bar(a=1, b: bool = False):
 
 
 class Baz:
+
     def __init__(self):
         pass
 
