@@ -45,20 +45,28 @@ pub mod types;
 macro_rules! display_settings {
     (formatter = $fmt:ident, namespace = $namespace:literal, fields = [$($settings:ident.$field:ident $(| $modifier:tt)?),* $(,)?]) => {
         {
-            const _NS: &str = $namespace;
+            const _PREFIX: &str = concat!($namespace, ".");
             $(
-                display_settings!(@field $fmt, _NS, $settings.$field $(| $modifier)?);
+                display_settings!(@field $fmt, _PREFIX, $settings.$field $(| $modifier)?);
             )*
         }
     };
-    (@field $fmt:ident, $namespace:ident, $settings:ident.$field:ident | debug) => {
-        writeln!($fmt, "{}{} = {:?}", $namespace, stringify!($field), $settings.$field)?;
+    (formatter = $fmt:ident, fields = [$($settings:ident.$field:ident $(| $modifier:tt)?),* $(,)?]) => {
+        {
+            const _PREFIX: &str = "";
+            $(
+                display_settings!(@field $fmt, _PREFIX, $settings.$field $(| $modifier)?);
+            )*
+        }
     };
-    (@field $fmt:ident, $namespace:ident, $settings:ident.$field:ident | nested) => {
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | debug) => {
+        writeln!($fmt, "{}{} = {:?}", $prefix, stringify!($field), $settings.$field)?;
+    };
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident | nested) => {
         write!($fmt, "{}", $settings.$field)?;
     };
-    (@field $fmt:ident, $namespace:ident, $settings:ident.$field:ident) => {
-        writeln!($fmt, "{}{} = {}", $namespace, stringify!($field), $settings.$field)?;
+    (@field $fmt:ident, $prefix:ident, $settings:ident.$field:ident) => {
+        writeln!($fmt, "{}{} = {}", $prefix, stringify!($field), $settings.$field)?;
     };
 }
 
@@ -122,7 +130,7 @@ impl Display for LinterSettings {
         writeln!(f, "# Linter Settings")?;
         display_settings! {
             formatter = f,
-            namespace = "linter.",
+            namespace = "linter",
             fields = [
                 self.exclude,
                 self.project_root | debug,

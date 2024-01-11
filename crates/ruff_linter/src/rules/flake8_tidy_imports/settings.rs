@@ -44,7 +44,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_tidy_imports.",
+            namespace = "linter.flake8_tidy_imports",
             fields = [
                 self.ban_relative_imports,
                 self.banned_api | debug,

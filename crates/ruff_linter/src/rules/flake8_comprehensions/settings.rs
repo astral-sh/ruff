@@ -13,7 +13,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_comprehensions.",
+            namespace = "linter.flake8_comprehensions",
             fields = [
                 self.allow_dict_calls_with_keyword_arguments
             ]

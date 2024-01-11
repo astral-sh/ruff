@@ -29,7 +29,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_type_checking.",
+            namespace = "linter.flake8_type_checking",
             fields = [
                 self.strict,
                 self.exempt_modules | debug,

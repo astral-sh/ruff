@@ -109,7 +109,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.isort.",
+            namespace = "linter.isort",
             fields = [
                 self.required_imports | debug,
                 self.combine_as_imports,

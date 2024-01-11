@@ -45,7 +45,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_quotes.",
+            namespace = "linter.flake8_quotes",
             fields = [
                 self.inline_quotes,
                 self.multiline_quotes,

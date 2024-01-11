@@ -71,7 +71,7 @@ impl fmt::Display for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.pylint.",
+            namespace = "linter.pylint",
             fields = [
                 self.allow_magic_value_types | debug,
                 self.allow_dunder_method_names | debug,

@@ -100,7 +100,7 @@ impl Display for FixSafetyTable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.safety_table.",
+            namespace = "linter.safety_table",
             fields = [
                 self.forced_safe,
                 self.forced_unsafe

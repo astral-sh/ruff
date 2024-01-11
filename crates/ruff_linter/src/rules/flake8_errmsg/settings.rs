@@ -13,7 +13,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_errmsg.",
+            namespace = "linter.flake8_errmsg",
             fields = [
                 self.max_string_length
             ]

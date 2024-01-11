@@ -67,7 +67,7 @@ impl Display for RuleTable {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.rules.",
+            namespace = "linter.rules",
             fields = [
                 self.enabled,
                 self.should_fix

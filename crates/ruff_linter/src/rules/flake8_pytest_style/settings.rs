@@ -53,7 +53,7 @@ impl fmt::Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_pytest_style.",
+            namespace = "linter.flake8_pytest_style",
             fields = [
                 self.fixture_parentheses,
                 self.parametrize_names_type,

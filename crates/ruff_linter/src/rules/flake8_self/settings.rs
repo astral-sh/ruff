@@ -34,7 +34,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_self.",
+            namespace = "linter.flake8_self",
             fields = [
                 self.ignore_names | debug
             ]

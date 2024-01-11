@@ -13,7 +13,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_unused_arguments.",
+            namespace = "linter.flake8_unused_arguments",
             fields = [
                 self.ignore_variadic_names
             ]

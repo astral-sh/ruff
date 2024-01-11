@@ -21,7 +21,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_implicit_str_concat.",
+            namespace = "linter.flake8_implicit_str_concat",
             fields = [
                 self.allow_multiline
             ]

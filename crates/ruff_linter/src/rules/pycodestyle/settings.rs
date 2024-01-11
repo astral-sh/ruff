@@ -17,7 +17,7 @@ impl fmt::Display for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.pycodestyle.",
+            namespace = "linter.pycodestyle",
             fields = [
                 self.max_line_length,
                 self.max_doc_length | debug,

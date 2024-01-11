@@ -13,7 +13,7 @@ impl fmt::Display for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.pyflakes.",
+            namespace = "linter.pyflakes",
             fields = [
                 self.extend_generics | debug
             ]

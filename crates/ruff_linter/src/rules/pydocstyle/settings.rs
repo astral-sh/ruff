@@ -84,7 +84,7 @@ impl fmt::Display for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.pydocstyle.",
+            namespace = "linter.pydocstyle",
             fields = [
                 self.convention | debug,
                 self.ignore_decorators | debug,

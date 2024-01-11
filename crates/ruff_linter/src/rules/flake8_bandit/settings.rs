@@ -29,7 +29,7 @@ impl Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.flake8_bandit.",
+            namespace = "linter.flake8_bandit",
             fields = [
                 self.hardcoded_tmp_directory | debug,
                 self.check_typed_exception

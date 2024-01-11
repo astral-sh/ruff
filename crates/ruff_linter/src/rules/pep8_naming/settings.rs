@@ -50,7 +50,7 @@ impl fmt::Display for Settings {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "linter.pep8_naming.",
+            namespace = "linter.pep8_naming",
             fields = [
                 self.ignore_names | debug,
                 self.classmethod_decorators | debug,

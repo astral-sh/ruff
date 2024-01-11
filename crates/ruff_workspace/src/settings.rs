@@ -59,7 +59,6 @@ impl fmt::Display for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         display_settings! {
             formatter = f,
-            namespace = "",
             fields = [
                 // We want the quotes and lossy UTF8 conversion for this path, so
                 // using PathBuf's `Debug` formatter suffices.
@@ -95,7 +94,7 @@ impl fmt::Display for FileResolverSettings {
         writeln!(f, "# File Resolver Settings")?;
         display_settings! {
             formatter = f,
-            namespace = "file_resolver.",
+            namespace = "file_resolver",
             fields = [
                 self.exclude,
                 self.extend_exclude,
@@ -242,7 +241,7 @@ impl fmt::Display for FormatterSettings {
         writeln!(f, "# Formatter Settings")?;
         display_settings! {
             formatter = f,
-            namespace = "formatter.",
+            namespace = "formatter",
             fields = [
                 self.exclude,
                 self.target_version | debug,
