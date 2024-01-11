@@ -13,6 +13,47 @@ use crate::checkers::ast::Checker;
 
 use itertools::Itertools;
 
+/// ## What it does
+/// Checks for `__all__` definitions that are not alphabetically sorted.
+///
+/// ## Why is this bad?
+/// Consistency is good. Use a common convention for `__all__` to make your
+/// code more readable and idiomatic.
+///
+/// ## Example
+/// ```python
+/// import sys
+///
+/// __all__ = [
+///     "b",
+///     "c",
+///     "a"
+/// ]
+///
+/// if sys.platform == "win32":
+///     __all__ += ["z", "y"]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import sys
+///
+/// __all__ = [
+///     "a",
+///     "b",
+///     "c"
+/// ]
+///
+/// if sys.platform == "win32":
+///     __all__ += ["y", "z"]
+/// ```
+///
+/// ## Fix safety
+/// This rule's fix should be safe for single-line `__all__` definitions
+/// and for multiline `__all__` definitions without comments.
+/// For multiline `__all__` definitions that include comments,
+/// the fix is marked as unsafe, as it can be hard to tell where the comments
+/// should be moved to when sorting the contents of `__all__`.
 #[violation]
 pub struct UnsortedDunderAll;
 
@@ -74,7 +115,12 @@ pub(crate) fn sort_dunder_all(checker: &mut Checker, stmt: &ast::Stmt) {
 
     if let Some(new_dunder_all) = sorting_result.new_dunder_all {
         let applicability = {
-            if dunder_all_val.multiline {
+            if dunder_all_val.multiline
+                && checker
+                    .indexer()
+                    .comment_ranges()
+                    .intersects(original_value.range())
+            {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe

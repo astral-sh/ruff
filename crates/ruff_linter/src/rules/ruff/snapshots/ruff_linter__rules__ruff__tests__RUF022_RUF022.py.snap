@@ -270,7 +270,7 @@ RUF022.py:58:11: RUF022 [*] `__all__` is not alphabetically sorted
    |
    = help: Sort `__all__` alphabetically
 
-ℹ Unsafe fix
+ℹ Safe fix
 55  55  |     # comment6
 56  56  | ]  # comment7
 57  57  | 
