@@ -70,6 +70,7 @@ impl Violation for UnsortedDunderAll {
     }
 }
 
+/// RUF022
 pub(crate) fn sort_dunder_all(checker: &mut Checker, stmt: &ast::Stmt) {
     // We're only interested in `__all__` in the global scope
     if !checker.semantic().current_scope().kind.is_module() {
@@ -143,6 +144,7 @@ struct DunderAllValue<'a> {
 
 impl<'a> DunderAllValue<'a> {
     fn from_expr(value: &'a ast::Expr, locator: &Locator) -> Option<DunderAllValue<'a>> {
+        // Step (1): inspect the AST to check that we're looking at something vaguely sane:
         let is_multiline = locator.contains_line_break(value.range());
         let (elts, range) = match value {
             ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, range),
@@ -162,8 +164,21 @@ impl<'a> DunderAllValue<'a> {
                 return None;
             }
         }
+        // Step (2): parse the `__all__` definition using the raw tokens.
+        //
+        // (2a). Start by collecting information on each line individually:
         let lines = collect_dunder_all_lines(*range, locator)?;
+
+        // (2b). Group lines together into sortable "items":
+        //   - Any "item" contains a single element of the `__all__` list/tuple
+        //   - "Items" are ordered according to the element they contain
+        //   - Assume that any comments on their own line are meant to be grouped
+        //     with the element immediately below them: if the element moves,
+        //     the comments above the element move with it.
+        //   - The same goes for any comments on the same line as an element:
+        //     if the element moves, the comment moves with it.
         let items = collect_dunder_all_items(lines);
+
         Some(DunderAllValue {
             items,
             range,
@@ -185,6 +200,13 @@ impl<'a> DunderAllValue<'a> {
                 new_dunder_all: None,
             };
         }
+        // As well as the "items" in the `__all__` definition,
+        // there is also a "prelude" and a "postlude":
+        //  - Prelude == the region of source code from the opening parenthesis
+        //    (if there was one), up to the start of the first element in `__all__`.
+        //  - Postlude == the region of source code from the end of the last
+        //    element in `__all__` up to and including the closing parenthesis
+        //    (if there was one).
         let prelude_end = {
             if let Some(first_item) = self.items.first() {
                 let first_item_line_offset = locator.line_start(first_item.start());
@@ -243,9 +265,11 @@ struct SortedDunderAll {
 }
 
 fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<DunderAllLine>> {
+    // Collect data on each line of `__all__`.
+    // Return `None` if `__all__` appears to be invalid,
+    // or if it's an edge case we don't care about.
     let mut parentheses_open = false;
     let mut lines = vec![];
-
     let mut items_in_line = vec![];
     let mut comment_in_line = None;
     for pair in lexer::lex(locator.slice(range).trim(), Mode::Expression) {
@@ -307,8 +331,11 @@ impl DunderAllLine {
 }
 
 fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
+    // Given data on each line in `__all__`, group lines together into "items".
+    // Each item contains exactly one element,
+    // but might contain multiple comments attached to that element
+    // that must move with the element when `__all__` is sorted.
     let mut all_items = vec![];
-
     let mut this_range = None;
     let mut idx = 0;
     for line in lines {
@@ -346,7 +373,6 @@ fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
             ),
         }
     }
-
     all_items
 }
 
@@ -409,7 +435,6 @@ fn join_multiline_dunder_all_items(
     let Some(indent) = indentation(locator, parent) else {
         return None;
     };
-
     let mut new_dunder_all = String::new();
     for (i, item) in sorted_items.iter().enumerate() {
         new_dunder_all.push_str(indent);
@@ -424,6 +449,5 @@ fn join_multiline_dunder_all_items(
             new_dunder_all.push_str(newline);
         }
     }
-
     Some(new_dunder_all)
 }
