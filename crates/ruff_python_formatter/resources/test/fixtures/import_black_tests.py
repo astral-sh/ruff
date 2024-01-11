@@ -96,9 +96,6 @@ IGNORE_LIST = [
 
     # Uses a different output format
     "decorators.py",
-
-    # Ruff fails to parse because of a parser bug
-    "type_aliases.py"  # #8900 #8899
 ]
 
 

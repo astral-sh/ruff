@@ -216,12 +216,7 @@ impl Display for DisplayParseError {
                 colon = ":".cyan(),
             )?;
         } else {
-            write!(
-                f,
-                "{header}{colon}",
-                header = "Failed to parse".bold(),
-                colon = ":".cyan(),
-            )?;
+            write!(f, "{header}", header = "Failed to parse at ".bold())?;
         }
         match &self.location {
             ErrorLocation::File(location) => {

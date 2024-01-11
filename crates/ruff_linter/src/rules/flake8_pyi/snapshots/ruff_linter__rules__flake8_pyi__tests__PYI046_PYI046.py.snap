@@ -15,4 +15,11 @@ PYI046.py:9:7: PYI046 Private protocol `_Bar` is never used
 10 |     bar: int
    |
 
+PYI046.py:16:7: PYI046 Private protocol `_Baz` is never used
+   |
+16 | class _Baz(Protocol[_T]):
+   |       ^^^^ PYI046
+17 |     x: _T
+   |
+
 

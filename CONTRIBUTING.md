@@ -370,7 +370,7 @@ See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/pyt
 We have several ways of benchmarking and profiling Ruff:
 
 - Our main performance benchmark comparing Ruff with other tools on the CPython codebase
-- Microbenchmarks which the linter or the formatter on individual files. There run on pull requests.
+- Microbenchmarks which run the linter or the formatter on individual files. These run on pull requests.
 - Profiling the linter on either the microbenchmarks or entire projects
 
 ### CPython Benchmark

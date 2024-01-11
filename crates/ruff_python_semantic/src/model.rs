@@ -984,6 +984,11 @@ impl<'a> SemanticModel<'a> {
         scope.parent.map(|scope_id| &self.scopes[scope_id])
     }
 
+    /// Returns the ID of the parent of the given [`ScopeId`], if any.
+    pub fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+        self.scopes[scope_id].parent
+    }
+
     /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`], if any.
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
@@ -992,6 +997,19 @@ impl<'a> SemanticModel<'a> {
                 current_scope = parent;
             } else {
                 return Some(parent);
+            }
+        }
+        None
+    }
+
+    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`], if any.
+    pub fn first_non_type_parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+        let mut current_scope_id = scope_id;
+        while let Some(parent_id) = self.parent_scope_id(current_scope_id) {
+            if self.scopes[parent_id].kind.is_type() {
+                current_scope_id = parent_id;
+            } else {
+                return Some(parent_id);
             }
         }
         None
@@ -1163,11 +1181,11 @@ impl<'a> SemanticModel<'a> {
         false
     }
 
-    /// Returns `true` if `left` and `right` are on different branches of an `if`, `match`, or
+    /// Returns `true` if `left` and `right` are in the same branches of an `if`, `match`, or
     /// `try` statement.
     ///
     /// This implementation assumes that the statements are in the same scope.
-    pub fn different_branches(&self, left: NodeId, right: NodeId) -> bool {
+    pub fn same_branch(&self, left: NodeId, right: NodeId) -> bool {
         // Collect the branch path for the left statement.
         let left = self
             .nodes
@@ -1184,10 +1202,7 @@ impl<'a> SemanticModel<'a> {
             .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
             .collect::<Vec<_>>();
 
-        !left
-            .iter()
-            .zip(right.iter())
-            .all(|(left, right)| left == right)
+        left == right
     }
 
     /// Returns `true` if the given expression is an unused variable, or consists solely of

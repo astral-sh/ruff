@@ -1,3 +1,7 @@
+import warnings
+import typing_extensions
+from typing_extensions import deprecated
+
 def f1(x: str = "50 character stringggggggggggggggggggggggggggggggg") -> None: ...  # OK
 def f2(
     x: str = "51 character stringgggggggggggggggggggggggggggggggg",  # Error: PYI053
@@ -38,3 +42,25 @@ class Demo:
 
 def func() -> None:
     """Docstrings are excluded from this rule. Some padding."""  # OK
+
+@warnings.deprecated(
+    "Veeeeeeeeeeeeeeeeeeeeeeery long deprecation message, but that's okay"  # OK
+)
+def deprecated_function() -> None: ...
+
+@typing_extensions.deprecated(
+    "Another loooooooooooooooooooooong deprecation message, it's still okay"  # OK
+)
+def another_deprecated_function() -> None: ...
+
+@deprecated("A third loooooooooooooooooooooooooooooong deprecation message")  # OK
+def a_third_deprecated_function() -> None: ...
+
+def not_warnings_dot_deprecated(
+    msg: str
+) -> Callable[[Callable[[], None]], Callable[[], None]]: ...
+
+@not_warnings_dot_deprecated(
+    "Not warnings.deprecated, so this one *should* lead to PYI053 in a stub!"  # Error: PYI053
+)
+def not_a_deprecated_function() -> None: ...

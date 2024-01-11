@@ -1,6 +1,5 @@
 use ruff_formatter::FormatRuleWithOptions;
 use ruff_python_ast::{AnyNodeRef, ExprStringLiteral};
-use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::SourceComment;
 use crate::expression::parentheses::{
@@ -8,7 +7,7 @@ use crate::expression::parentheses::{
 };
 use crate::other::string_literal::{FormatStringLiteral, StringLiteralKind};
 use crate::prelude::*;
-use crate::string::{AnyString, FormatStringContinuation, StringPrefix, StringQuotes};
+use crate::string::{AnyString, FormatStringContinuation};
 
 #[derive(Default)]
 pub struct FormatExprStringLiteral {
@@ -80,24 +79,10 @@ impl NeedsParentheses for ExprStringLiteral {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if is_multiline_string(self.into(), context.source()) {
+        } else if AnyString::String(self).is_multiline(context.source()) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit
         }
-    }
-}
-
-pub(super) fn is_multiline_string(expr: AnyNodeRef, source: &str) -> bool {
-    if expr.is_expr_string_literal() || expr.is_expr_bytes_literal() {
-        let contents = &source[expr.range()];
-        let prefix = StringPrefix::parse(contents);
-        let quotes =
-            StringQuotes::parse(&contents[TextRange::new(prefix.text_len(), contents.text_len())]);
-
-        quotes.is_some_and(StringQuotes::is_triple)
-            && memchr::memchr2(b'\n', b'\r', contents.as_bytes()).is_some()
-    } else {
-        false
     }
 }

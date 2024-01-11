@@ -10,5 +10,6 @@ F811_8.py:5:12: F811 Redefinition of unused `os` from line 4
 6 | except:
 7 |     pass
   |
+  = help: Remove definition: `os`
 
 

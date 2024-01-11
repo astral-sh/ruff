@@ -107,6 +107,7 @@ impl<'a> StringParser<'a> {
             _ => std::char::from_u32(p).ok_or(unicode_error),
         }
     }
+
     fn parse_octet(&mut self, o: u8) -> char {
         let mut radix_bytes = [o, 0, 0];
         let mut len = 1;
@@ -203,7 +204,7 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_fstring_middle(&mut self) -> Result<ast::FStringElement, LexicalError> {
-        let mut value = String::new();
+        let mut value = String::with_capacity(self.rest.len());
         while let Some(ch) = self.next_char() {
             match ch {
                 // We can encounter a `\` as the last character in a `FStringMiddle`
@@ -246,7 +247,7 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_bytes(&mut self) -> Result<StringType, LexicalError> {
-        let mut content = String::new();
+        let mut content = String::with_capacity(self.rest.len());
         while let Some(ch) = self.next_char() {
             match ch {
                 '\\' if !self.kind.is_raw() => {
@@ -265,7 +266,6 @@ impl<'a> StringParser<'a> {
                 }
             }
         }
-
         Ok(StringType::Bytes(ast::BytesLiteral {
             value: content.chars().map(|c| c as u8).collect::<Vec<u8>>(),
             range: self.range,
@@ -273,8 +273,7 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_string(&mut self) -> Result<StringType, LexicalError> {
-        let mut value = String::new();
-
+        let mut value = String::with_capacity(self.rest.len());
         if self.kind.is_raw() {
             value.push_str(self.skip_bytes(self.rest.len()));
         } else {

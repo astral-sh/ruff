@@ -179,7 +179,7 @@ pub(crate) fn native_literals(
         }
     }
 
-    match args.get(0) {
+    match args.first() {
         None => {
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
 

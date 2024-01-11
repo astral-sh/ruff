@@ -1,0 +1,119 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/class_blank_parentheses.py
+---
+## Input
+
+```python
+class SimpleClassWithBlankParentheses():
+    pass
+class ClassWithSpaceParentheses ( ):
+    first_test_data = 90
+    second_test_data = 100
+    def test_func(self):
+        return None
+class ClassWithEmptyFunc(object):
+
+    def func_with_blank_parentheses():
+        return 5
+
+
+def public_func_with_blank_parentheses():
+    return None
+def class_under_the_func_with_blank_parentheses():
+    class InsideFunc():
+        pass
+class NormalClass (
+):
+    def func_for_testing(self, first, second):
+        sum = first + second
+        return sum
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -11,7 +11,6 @@
+ 
+ 
+ class ClassWithEmptyFunc(object):
+-
+     def func_with_blank_parentheses():
+         return 5
+ 
+```
+
+## Ruff Output
+
+```python
+class SimpleClassWithBlankParentheses:
+    pass
+
+
+class ClassWithSpaceParentheses:
+    first_test_data = 90
+    second_test_data = 100
+
+    def test_func(self):
+        return None
+
+
+class ClassWithEmptyFunc(object):
+    def func_with_blank_parentheses():
+        return 5
+
+
+def public_func_with_blank_parentheses():
+    return None
+
+
+def class_under_the_func_with_blank_parentheses():
+    class InsideFunc:
+        pass
+
+
+class NormalClass:
+    def func_for_testing(self, first, second):
+        sum = first + second
+        return sum
+```
+
+## Black Output
+
+```python
+class SimpleClassWithBlankParentheses:
+    pass
+
+
+class ClassWithSpaceParentheses:
+    first_test_data = 90
+    second_test_data = 100
+
+    def test_func(self):
+        return None
+
+
+class ClassWithEmptyFunc(object):
+
+    def func_with_blank_parentheses():
+        return 5
+
+
+def public_func_with_blank_parentheses():
+    return None
+
+
+def class_under_the_func_with_blank_parentheses():
+    class InsideFunc:
+        pass
+
+
+class NormalClass:
+    def func_for_testing(self, first, second):
+        sum = first + second
+        return sum
+```
+
+

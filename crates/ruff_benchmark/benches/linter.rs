@@ -55,7 +55,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
             &case,
             |b, case| {
                 // Tokenize the source.
-                let tokens = lexer::lex(case.code(), Mode::Module).collect::<Vec<_>>();
+                let tokens: Vec<_> = lexer::lex(case.code(), Mode::Module).collect();
 
                 // Parse the source.
                 let ast = parse_program_tokens(tokens.clone(), case.code(), false).unwrap();

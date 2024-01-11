@@ -1,10 +1,9 @@
-use rustc_hash::FxHashMap;
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast as ast;
+use ruff_python_ast::helpers;
+use ruff_python_ast::helpers::NameFinder;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr};
-use ruff_python_ast::{helpers, visitor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -78,42 +77,16 @@ impl Violation for UnusedLoopControlVariable {
     }
 }
 
-/// Identify all `Expr::Name` nodes in an AST.
-struct NameFinder<'a> {
-    /// A map from identifier to defining expression.
-    names: FxHashMap<&'a str, &'a Expr>,
-}
-
-impl NameFinder<'_> {
-    fn new() -> Self {
-        NameFinder {
-            names: FxHashMap::default(),
-        }
-    }
-}
-
-impl<'a, 'b> Visitor<'b> for NameFinder<'a>
-where
-    'b: 'a,
-{
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        if let Expr::Name(ast::ExprName { id, .. }) = expr {
-            self.names.insert(id, expr);
-        }
-        visitor::walk_expr(self, expr);
-    }
-}
-
 /// B007
 pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast::StmtFor) {
     let control_names = {
-        let mut finder = NameFinder::new();
+        let mut finder = NameFinder::default();
         finder.visit_expr(stmt_for.target.as_ref());
         finder.names
     };
 
     let used_names = {
-        let mut finder = NameFinder::new();
+        let mut finder = NameFinder::default();
         for stmt in &stmt_for.body {
             finder.visit_stmt(stmt);
         }

@@ -24,5 +24,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |     ^^ F811
 6 |     print(os)
   |
+  = help: Remove definition: `os`
 
 

@@ -1,7 +1,5 @@
 use bitflags::bitflags;
 
-use ruff_text_size::TextSize;
-
 bitflags! {
     #[derive(Debug)]
     pub(crate) struct FStringContextFlags: u8 {
@@ -55,15 +53,6 @@ impl FStringContext {
             '"'
         } else {
             '\''
-        }
-    }
-
-    /// Returns the number of quotes for the current f-string.
-    pub(crate) const fn quote_size(&self) -> TextSize {
-        if self.is_triple_quoted() {
-            TextSize::new(3)
-        } else {
-            TextSize::new(1)
         }
     }
 

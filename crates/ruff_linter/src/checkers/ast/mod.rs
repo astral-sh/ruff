@@ -37,7 +37,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
-use ruff_notebook::CellOffsets;
+use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{
     collect_import_from_member, extract_handled_exceptions, to_module_path,
@@ -56,7 +56,7 @@ use ruff_python_semantic::{
     StarImport, SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
-use ruff_source_file::Locator;
+use ruff_source_file::{Locator, OneIndexed, SourceRow};
 
 use crate::checkers::ast::annotation::AnnotationContext;
 use crate::checkers::ast::deferred::Deferred;
@@ -83,6 +83,8 @@ pub(crate) struct Checker<'a> {
     pub(crate) source_type: PySourceType,
     /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
     cell_offsets: Option<&'a CellOffsets>,
+    /// The [`NotebookIndex`] for the current file, if it's a Jupyter notebook.
+    notebook_index: Option<&'a NotebookIndex>,
     /// The [`flags::Noqa`] for the current analysis (i.e., whether to respect suppression
     /// comments).
     noqa: flags::Noqa,
@@ -128,6 +130,7 @@ impl<'a> Checker<'a> {
         importer: Importer<'a>,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
+        notebook_index: Option<&'a NotebookIndex>,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -146,6 +149,7 @@ impl<'a> Checker<'a> {
             diagnostics: Vec::default(),
             flake8_bugbear_seen: Vec::default(),
             cell_offsets,
+            notebook_index,
             last_stmt_end: TextSize::default(),
         }
     }
@@ -195,6 +199,20 @@ impl<'a> Checker<'a> {
             "'" => Some(Quote::Double),
             "\"" => Some(Quote::Single),
             _ => None,
+        }
+    }
+
+    /// Returns the [`SourceRow`] for the given offset.
+    pub(crate) fn compute_source_row(&self, offset: TextSize) -> SourceRow {
+        #[allow(deprecated)]
+        let line = self.locator.compute_line_index(offset);
+
+        if let Some(notebook_index) = self.notebook_index {
+            let cell = notebook_index.cell(line).unwrap_or(OneIndexed::MIN);
+            let line = notebook_index.cell_row(line).unwrap_or(OneIndexed::MIN);
+            SourceRow::Notebook { cell, line }
+        } else {
+            SourceRow::SourceFile { line }
         }
     }
 
@@ -1984,6 +2002,7 @@ pub(crate) fn check_ast(
     package: Option<&Path>,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
+    notebook_index: Option<&NotebookIndex>,
 ) -> Vec<Diagnostic> {
     let module_path = package.and_then(|package| to_module_path(package, path));
     let module = Module {
@@ -2013,6 +2032,7 @@ pub(crate) fn check_ast(
         Importer::new(python_ast, locator, stylist),
         source_type,
         cell_offsets,
+        notebook_index,
     );
     checker.bind_builtins();
 
