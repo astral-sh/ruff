@@ -12,7 +12,7 @@
 - [\`flake8-simplify\`] Implement `zip-dict-keys-and-values` (`SIM911`) ([#9460](https://github.com/astral-sh/ruff/pull/9460))
 - [\`pyflakes\`] Add a fix for `redefined-while-unused` (`F811`) ([#9419](https://github.com/astral-sh/ruff/pull/9419))
 - [\`pylint\`] Implement `unnecessary-dunder-call` (`C2801`) ([#9166](https://github.com/astral-sh/ruff/pull/9166))
-- [\`ruff\`] Add `parenthesize-changed-operators` (`RUF021`) to enforce parentheses in `a or b and c` ([#9440](https://github.com/astral-sh/ruff/pull/9440))
+- [\`ruff\`] Add `parenthesize-chained-operators` (`RUF021`) to enforce parentheses in `a or b and c` ([#9440](https://github.com/astral-sh/ruff/pull/9440))
 
 ### Rule changes
 
