@@ -60,9 +60,6 @@ impl AlwaysFixableViolation for ZipDictKeysAndValues {
 
 /// SIM911
 pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &Expr) {
-    if checker.settings.preview.is_disabled() {
-        return;
-    }
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
