@@ -4,7 +4,7 @@
 
 ### Preview features
 
-- Hug multiline-strings in preview style ([#9243](https://github.com/astral-sh/ruff/pull/9243))
+- Formatter: Hug multiline-strings in preview style ([#9243](https://github.com/astral-sh/ruff/pull/9243))
 - [\`flake8-bandit\`] Add `ssl-with-no-version` (`S504`) ([#9384](https://github.com/astral-sh/ruff/pull/9384))
 - [\`flake8-bandit\`] Implement `ssl-insecure-version` (`S502`) ([#9390](https://github.com/astral-sh/ruff/pull/9390))
 - [\`flake8-bandit\`] Implement `ssl-with-bad-defaults` (`S503`) ([#9391](https://github.com/astral-sh/ruff/pull/9391))
