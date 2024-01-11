@@ -23,7 +23,7 @@
 - [\`flake8-pyi\`] Add fix for `generator-return-from-iter-method` (`PYI058`) ([#9355](https://github.com/astral-sh/ruff/pull/9355))
 - [\`pyflakes\`] Don't flag `redefined-while-unused` (`F811`) in `if` branches ([#9418](https://github.com/astral-sh/ruff/pull/9418))
 - [\`pyupgrade\`] Add some additional Python 3.12 typing members to `deprecated-import` ([#9445](https://github.com/astral-sh/ruff/pull/9445))
-- [\`ruff\`] Add fix for `parenthesize-changed-operators` (`RUF021`) ([#9449](https://github.com/astral-sh/ruff/pull/9449))
+- [\`ruff\`] Add fix for `parenthesize-chained-operators` (`RUF021`) ([#9449](https://github.com/astral-sh/ruff/pull/9449))
 
 ### Formatter
 
