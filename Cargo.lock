@@ -2038,7 +2038,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2165,7 +2165,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "aho-corasick",
  "annotate-snippets 0.9.2",
@@ -2417,7 +2417,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_shrinking"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "anyhow",
  "clap",
