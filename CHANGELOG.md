@@ -34,7 +34,7 @@
 ### Bug fixes
 
 - Add cell indexes to all diagnostics ([#9387](https://github.com/astral-sh/ruff/pull/9387))
-- Allow `Hashable = None` in type annotations ([#9442](https://github.com/astral-sh/ruff/pull/9442))
+- \[`ruff`\] Allow `Hashable = None` in type annotations (`RUF013`) ([#9442](https://github.com/astral-sh/ruff/pull/9442))
 - Avoid infinite loop in constant vs. `None` comparisons ([#9376](https://github.com/astral-sh/ruff/pull/9376))
 - Disambiguate argument descriptors from section headers ([#9427](https://github.com/astral-sh/ruff/pull/9427))
 - Handle raises with implicit alternate branches ([#9377](https://github.com/astral-sh/ruff/pull/9377))
