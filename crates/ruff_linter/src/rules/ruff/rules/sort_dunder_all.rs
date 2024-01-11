@@ -105,16 +105,16 @@ pub(crate) fn sort_dunder_all(checker: &mut Checker, stmt: &ast::Stmt) {
         return;
     };
 
-    let sorting_result = dunder_all_val.construct_sorted_all(locator, stmt, checker.stylist());
-
-    if sorting_result.was_already_sorted {
-        return;
-    }
+    let new_dunder_all = match dunder_all_val.construct_sorted_all(locator, stmt, checker.stylist())
+    {
+        SortedDunderAll::AlreadySorted => return,
+        SortedDunderAll::Sorted(value) => value,
+    };
 
     let dunder_all_range = dunder_all_val.range();
     let mut diagnostic = Diagnostic::new(UnsortedDunderAll, dunder_all_range);
 
-    if let Some(new_dunder_all) = sorting_result.new_dunder_all {
+    if let Some(new_dunder_all) = new_dunder_all {
         let applicability = {
             if dunder_all_val.multiline
                 && checker
@@ -195,10 +195,7 @@ impl<'a> DunderAllValue<'a> {
         let mut sorted_items = self.items.clone();
         sorted_items.sort();
         if sorted_items == self.items {
-            return SortedDunderAll {
-                was_already_sorted: true,
-                new_dunder_all: None,
-            };
+            return SortedDunderAll::AlreadySorted;
         }
         // As well as the "items" in the `__all__` definition,
         // there is also a "prelude" and a "postlude":
@@ -237,17 +234,19 @@ impl<'a> DunderAllValue<'a> {
             let newline = stylist.line_ending().as_str();
             prelude = format!("{}{}", prelude.trim_end(), newline);
             join_multiline_dunder_all_items(
-                &sorted_items, locator, parent, indentation, newline, needs_trailing_comma
+                &sorted_items,
+                locator,
+                parent,
+                indentation,
+                newline,
+                needs_trailing_comma,
             )
         } else {
             Some(join_singleline_dunder_all_items(&sorted_items, locator))
         };
 
         let new_dunder_all = joined_items.map(|items| format!("{prelude}{items}{postlude}"));
-        SortedDunderAll {
-            was_already_sorted: false,
-            new_dunder_all,
-        }
+        SortedDunderAll::Sorted(new_dunder_all)
     }
 }
 
@@ -257,9 +256,10 @@ impl Ranged for DunderAllValue<'_> {
     }
 }
 
-struct SortedDunderAll {
-    was_already_sorted: bool,
-    new_dunder_all: Option<String>,
+#[derive(Debug)]
+enum SortedDunderAll {
+    AlreadySorted,
+    Sorted(Option<String>),
 }
 
 fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<DunderAllLine>> {
