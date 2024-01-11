@@ -6,7 +6,7 @@ use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, Source
 use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::{parse_ok_tokens, AsMode, ParseError, ParseErrorType};
+use ruff_python_parser::{parse_tokens, AsMode, ParseError, ParseErrorType};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
@@ -126,7 +126,7 @@ pub fn format_module_source(
             offset: err.location,
             error: ParseErrorType::Lexical(err.error),
         })?;
-    let module = parse_ok_tokens(tokens, source, source_type.as_mode())?;
+    let module = parse_tokens(tokens, source, source_type.as_mode())?;
     let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
@@ -169,7 +169,7 @@ mod tests {
 
     use ruff_python_ast::PySourceType;
     use ruff_python_index::tokens_and_ranges;
-    use ruff_python_parser::{parse_ok_tokens, AsMode};
+    use ruff_python_parser::{parse_tokens, AsMode};
 
     use crate::{format_module_ast, format_module_source, PyFormatOptions};
 
@@ -213,7 +213,7 @@ def main() -> None:
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let module = parse_ok_tokens(tokens, source, source_type.as_mode()).unwrap();
+        let module = parse_tokens(tokens, source, source_type.as_mode()).unwrap();
         let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&module, &comment_ranges, source, options).unwrap();
 

@@ -1516,7 +1516,7 @@ fn docstring_format_source(
     let source_type = options.source_type();
     let (tokens, comment_ranges) =
         ruff_python_index::tokens_and_ranges(source, source_type).map_err(ParseError::from)?;
-    let module = ruff_python_parser::parse_ok_tokens(tokens, source, source_type.as_mode())?;
+    let module = ruff_python_parser::parse_tokens(tokens, source, source_type.as_mode())?;
     let source_code = ruff_formatter::SourceCode::new(source);
     let comments = crate::Comments::from_ast(&module, source_code, &comment_ranges);
     let locator = Locator::new(source);
