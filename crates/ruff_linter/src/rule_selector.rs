@@ -289,9 +289,6 @@ mod schema {
                                 (!prefix.is_empty()).then(|| prefix.to_string())
                             })),
                     )
-                    // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
-                    // off-by-default
-                    .filter(|prefix| prefix != "RUF014")
                     .sorted()
                     .map(Value::String)
                     .collect(),
@@ -407,40 +404,28 @@ pub mod clap_completion {
                             let prefix = l.common_prefix();
                             (!prefix.is_empty()).then(|| PossibleValue::new(prefix).help(l.name()))
                         })
-                        .chain(
-                            RuleCodePrefix::iter()
-                                // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is
-                                // off-by-default
-                                .filter(|prefix| {
-                                    format!(
-                                        "{}{}",
-                                        prefix.linter().common_prefix(),
-                                        prefix.short_code()
-                                    ) != "RUF014"
-                                })
-                                .filter_map(|prefix| {
-                                    // Ex) `UP`
-                                    if prefix.short_code().is_empty() {
-                                        let code = prefix.linter().common_prefix();
-                                        let name = prefix.linter().name();
-                                        return Some(PossibleValue::new(code).help(name));
-                                    }
+                        .chain(RuleCodePrefix::iter().filter_map(|prefix| {
+                            // Ex) `UP`
+                            if prefix.short_code().is_empty() {
+                                let code = prefix.linter().common_prefix();
+                                let name = prefix.linter().name();
+                                return Some(PossibleValue::new(code).help(name));
+                            }
 
-                                    // Ex) `UP004`
-                                    if is_single_rule_selector(&prefix) {
-                                        let rule = prefix.rules().next()?;
-                                        let code = format!(
-                                            "{}{}",
-                                            prefix.linter().common_prefix(),
-                                            prefix.short_code()
-                                        );
-                                        let name: &'static str = rule.into();
-                                        return Some(PossibleValue::new(code).help(name));
-                                    }
+                            // Ex) `UP004`
+                            if is_single_rule_selector(&prefix) {
+                                let rule = prefix.rules().next()?;
+                                let code = format!(
+                                    "{}{}",
+                                    prefix.linter().common_prefix(),
+                                    prefix.short_code()
+                                );
+                                let name: &'static str = rule.into();
+                                return Some(PossibleValue::new(code).help(name));
+                            }
 
-                                    None
-                                }),
-                        ),
+                            None
+                        })),
                 ),
             ))
         }
