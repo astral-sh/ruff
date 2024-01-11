@@ -13,16 +13,17 @@ const TEST_FILTERS: &[(&str, &str)] = &[
 ];
 #[cfg(target_os = "windows")]
 const TEST_FILTERS: &[(&str, &str)] = &[
-    (r".*\\resources\\test\\fixtures\\", "[BASEPATH]\\"),
-    (r#"[^\*"]*\\pyproject.toml"#, "\"[BASEPATH]\\pyproject.toml"),
-    (r#"".*\\crates"#, "\"[BASEPATH]\\crates"),
-    (r#"".*\\\.ruff_cache"#, "\"[BASEPATH]\\.ruff_cache"),
+    (r#""[^\*"]*\\pyproject.toml"#, "\"[BASEPATH]/pyproject.toml"),
+    (r#"".*\\crates"#, "\"[BASEPATH]/crates"),
+    (r#"".*\\\.ruff_cache"#, "\"[BASEPATH]/.ruff_cache"),
     (r#"".*\\ruff""#, "\"[BASEPATH]\""),
-    (r"\\", "/"),
+    (r#"\\+(\w\w|\s|")"#, "/$1"),
 ];
 
 #[test]
 fn display_default_settings() {
-    insta::with_settings!({ filters => TEST_FILTERS.to_vec() }, { assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--show-settings", "unformatted.py"]).current_dir(Path::new("./resources/test/fixtures"))) } );
+    insta::with_settings!({ filters => TEST_FILTERS.to_vec() }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+            .args(["check", "--show-settings", "unformatted.py"]).current_dir(Path::new("./resources/test/fixtures")));
+    });
 }
