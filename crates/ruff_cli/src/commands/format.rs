@@ -25,9 +25,7 @@ use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError, QuoteStyle};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use ruff_workspace::resolver::{
-    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile, Resolver,
-};
+use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile, Resolver};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
@@ -79,7 +77,7 @@ pub(crate) fn format(
         return Ok(ExitStatus::Success);
     }
 
-    warn_incompatible_formatter_settings(&pyproject_config, Some(&resolver));
+    warn_incompatible_formatter_settings(&resolver);
 
     // Discover the package root for each Python file.
     let package_roots = resolver.package_roots(
@@ -88,7 +86,6 @@ pub(crate) fn format(
             .flatten()
             .map(ResolvedFile::path)
             .collect::<Vec<_>>(),
-        &pyproject_config,
     );
 
     let caches = if cli.no_cache {
@@ -99,11 +96,7 @@ pub(crate) fn format(
         #[cfg(debug_assertions)]
         crate::warn_user!("Detected debug build without --no-cache.");
 
-        Some(PackageCacheMap::init(
-            &pyproject_config,
-            &package_roots,
-            &resolver,
-        ))
+        Some(PackageCacheMap::init(&package_roots, &resolver))
     };
 
     let start = Instant::now();
@@ -118,7 +111,7 @@ pub(crate) fn format(
                         return None;
                     };
 
-                    let settings = resolver.resolve(path, &pyproject_config);
+                    let settings = resolver.resolve(path);
 
                     // Ignore files that are excluded from formatting
                     if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -723,15 +716,10 @@ impl Display for FormatCommandError {
     }
 }
 
-pub(super) fn warn_incompatible_formatter_settings(
-    pyproject_config: &PyprojectConfig,
-    resolver: Option<&Resolver>,
-) {
+pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     // First, collect all rules that are incompatible regardless of the linter-specific settings.
     let mut incompatible_rules = FxHashSet::default();
-    for setting in std::iter::once(&pyproject_config.settings)
-        .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
-    {
+    for setting in resolver.settings() {
         for rule in [
             // The formatter might collapse implicit string concatenation on a single line.
             Rule::SingleLineImplicitStringConcatenation,
@@ -760,9 +748,7 @@ pub(super) fn warn_incompatible_formatter_settings(
     }
 
     // Next, validate settings-specific incompatibilities.
-    for setting in std::iter::once(&pyproject_config.settings)
-        .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
-    {
+    for setting in resolver.settings() {
         // Validate all rules that rely on tab styles.
         if setting.linter.rules.enabled(Rule::TabIndentation)
             && setting.formatter.indent_style.is_tab()

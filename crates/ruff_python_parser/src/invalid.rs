@@ -687,7 +687,7 @@ mod tests {
 
         let src = r"!foo = 42";
         let tokens = crate::lexer::lex(src, Mode::Ipython);
-        let ast = crate::parse_tokens(tokens, src, Mode::Ipython);
+        let ast = crate::parse_tokens(tokens.collect(), src, Mode::Ipython);
         insta::assert_debug_snapshot!(ast);
     }
 
