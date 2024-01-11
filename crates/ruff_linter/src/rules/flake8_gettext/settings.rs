@@ -1,4 +1,6 @@
+use crate::display_settings;
 use ruff_macros::CacheKey;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, CacheKey)]
 pub struct Settings {
@@ -18,5 +20,18 @@ impl Default for Settings {
         Self {
             functions_names: default_func_names(),
         }
+    }
+}
+
+impl Display for Settings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.flake8_gettext.",
+            fields = [
+                self.functions_names | debug
+            ]
+        }
+        Ok(())
     }
 }

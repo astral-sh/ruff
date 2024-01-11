@@ -1,7 +1,9 @@
 //! Settings for the `flake8-pytest-style` plugin.
 use std::error::Error;
 use std::fmt;
+use std::fmt::Formatter;
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 
 use crate::settings::types::IdentifierPattern;
@@ -44,6 +46,25 @@ impl Default for Settings {
             raises_extend_require_match_for: vec![],
             mark_parentheses: true,
         }
+    }
+}
+
+impl fmt::Display for Settings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.flake8_pytest_style.",
+            fields = [
+                self.fixture_parentheses,
+                self.parametrize_names_type,
+                self.parametrize_values_type,
+                self.parametrize_values_row_type,
+                self.raises_require_match_for | debug,
+                self.raises_extend_require_match_for | debug,
+                self.mark_parentheses
+            ]
+        }
+        Ok(())
     }
 }
 

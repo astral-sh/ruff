@@ -3,10 +3,12 @@
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 
 use crate::rules::isort::categorize::KnownModules;
@@ -29,6 +31,15 @@ pub enum RelativeImportsOrder {
 impl Default for RelativeImportsOrder {
     fn default() -> Self {
         Self::FurthestToClosest
+    }
+}
+
+impl Display for RelativeImportsOrder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ClosestToFurthest => write!(f, "closest_to_furthest"),
+            Self::FurthestToClosest => write!(f, "furthest_to_closest"),
+        }
     }
 }
 
@@ -91,6 +102,43 @@ impl Default for Settings {
             length_sort: false,
             length_sort_straight: false,
         }
+    }
+}
+
+impl Display for Settings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.isort.",
+            fields = [
+                self.required_imports | debug,
+                self.combine_as_imports,
+                self.force_single_line,
+                self.force_sort_within_sections,
+                self.detect_same_package,
+                self.case_sensitive,
+                self.force_wrap_aliases,
+                self.force_to_top | debug,
+                self.known_modules | debug, // TODO(jane): remove debug
+                self.order_by_type,
+                self.relative_imports_order,
+                self.single_line_exclusions | debug,
+                self.split_on_trailing_comma,
+                self.classes | debug,
+                self.constants | debug,
+                self.variables | debug,
+                self.no_lines_before | debug,
+                self.lines_after_imports,
+                self.lines_between_types,
+                self.forced_separate | debug,
+                self.section_order | debug,
+                self.no_sections,
+                self.from_first,
+                self.length_sort,
+                self.length_sort_straight
+            ]
+        }
+        Ok(())
     }
 }
 

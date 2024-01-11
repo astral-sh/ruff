@@ -1,6 +1,7 @@
 use crate::registry::Rule;
+use itertools::Itertools;
 use ruff_macros::CacheKey;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::iter::FusedIterator;
 
 const RULESET_SIZE: usize = 13;
@@ -266,6 +267,22 @@ impl RuleSet {
 impl Debug for RuleSet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_set().entries(self.iter()).finish()
+    }
+}
+
+impl Display for RuleSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.is_empty() {
+            write!(f, "[]")
+        } else {
+            write!(
+                f,
+                "[\n\t{}\n]",
+                self.iter()
+                    .map(|rule| format!("\"{rule:?}\""))
+                    .join(",\n\t")
+            )
+        }
     }
 }
 

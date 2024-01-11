@@ -2,10 +2,11 @@
 //! command-line options. Structure is optimized for internal usage, as opposed
 //! to external visibility or parsing.
 
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use globset::{Glob, GlobMatcher};
+use globset::Glob;
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
@@ -15,7 +16,7 @@ use crate::codes::RuleCodePrefix;
 use ruff_macros::CacheKey;
 
 use crate::line_width::LineLength;
-use crate::registry::{Linter, Rule, RuleSet};
+use crate::registry::{Linter, Rule};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_copyright, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
@@ -23,7 +24,9 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{ExtensionMapping, FilePatternSet, PerFileIgnore, PythonVersion};
+use crate::settings::types::{
+    ExtensionMapping, FilePatternSet, PerFileIgnore, PerFileIgnores, PythonVersion,
+};
 use crate::{codes, RuleSelector};
 
 use super::line_width::IndentWidth;
@@ -38,13 +41,34 @@ pub mod flags;
 pub mod rule_table;
 pub mod types;
 
+#[macro_export]
+macro_rules! display_settings {
+    (formatter = $fmt:ident, namespace = $namespace:literal, fields = [$($settings:ident.$field:ident $(| $modifier:tt)?),* $(,)?]) => {
+        {
+            const _NS: &str = $namespace;
+            $(
+                display_settings!(@field $fmt, _NS, $settings.$field $(| $modifier)?);
+            )*
+        }
+    };
+    (@field $fmt:ident, $namespace:ident, $settings:ident.$field:ident | debug) => {
+        writeln!($fmt, "{}{} = {:?}", $namespace, stringify!($field), $settings.$field)?;
+    };
+    (@field $fmt:ident, $namespace:ident, $settings:ident.$field:ident | nested) => {
+        write!($fmt, "{}", $settings.$field)?;
+    };
+    (@field $fmt:ident, $namespace:ident, $settings:ident.$field:ident) => {
+        writeln!($fmt, "{}{} = {}", $namespace, stringify!($field), $settings.$field)?;
+    };
+}
+
 #[derive(Debug, CacheKey)]
 pub struct LinterSettings {
     pub exclude: FilePatternSet,
     pub project_root: PathBuf,
 
     pub rules: RuleTable,
-    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
+    pub per_file_ignores: PerFileIgnores,
     pub fix_safety: FixSafetyTable,
 
     pub target_version: PythonVersion,
@@ -91,6 +115,67 @@ pub struct LinterSettings {
     pub pyflakes: pyflakes::settings::Settings,
     pub pylint: pylint::settings::Settings,
     pub pyupgrade: pyupgrade::settings::Settings,
+}
+
+impl Display for LinterSettings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "# Linter Settings")?;
+        display_settings! {
+            formatter = f,
+            namespace = "linter.",
+            fields = [
+                self.exclude,
+                self.project_root | debug,
+
+                self.rules | nested,
+                self.per_file_ignores,
+                self.fix_safety | nested,
+
+                self.target_version | debug,
+                self.preview | debug,
+                self.explicit_preview_rules,
+                self.extension | debug,
+
+                self.allowed_confusables | debug,
+                self.builtins | debug,
+                self.dummy_variable_rgx,
+                self.external | debug,
+                self.ignore_init_module_imports,
+                self.logger_objects | debug,
+                self.namespace_packages | debug,
+                self.src | debug,
+                self.tab_size,
+                self.line_length,
+                self.task_tags | debug,
+                self.typing_modules | debug,
+
+                self.flake8_annotations | nested,
+                self.flake8_bandit | nested,
+                self.flake8_bugbear | nested,
+                self.flake8_builtins | nested,
+                self.flake8_comprehensions | nested,
+                self.flake8_copyright | nested,
+                self.flake8_errmsg | nested,
+                self.flake8_gettext | nested,
+                self.flake8_implicit_str_concat | nested,
+                self.flake8_import_conventions | nested,
+                self.flake8_pytest_style | nested,
+                self.flake8_quotes | nested,
+                self.flake8_self | nested,
+                self.flake8_tidy_imports | nested,
+                self.flake8_type_checking | nested,
+                self.flake8_unused_arguments | nested,
+                self.isort | nested,
+                self.mccabe | nested,
+                self.pep8_naming | nested,
+                self.pycodestyle | nested,
+                self.pyflakes | nested,
+                self.pylint | nested,
+                self.pyupgrade | nested,
+            ]
+        }
+        Ok(())
+    }
 }
 
 pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
@@ -152,7 +237,7 @@ impl LinterSettings {
             logger_objects: vec![],
             namespace_packages: vec![],
 
-            per_file_ignores: vec![],
+            per_file_ignores: PerFileIgnores::default(),
             fix_safety: FixSafetyTable::default(),
 
             src: vec![path_dedot::CWD.clone()],
@@ -206,10 +291,8 @@ impl Default for LinterSettings {
 }
 
 /// Given a list of patterns, create a `GlobSet`.
-pub fn resolve_per_file_ignores(
-    per_file_ignores: Vec<PerFileIgnore>,
-) -> Result<Vec<(GlobMatcher, GlobMatcher, RuleSet)>> {
-    per_file_ignores
+pub fn resolve_per_file_ignores(per_file_ignores: Vec<PerFileIgnore>) -> Result<PerFileIgnores> {
+    let ignores: Result<Vec<_>> = per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {
             // Construct absolute path matcher.
@@ -221,5 +304,6 @@ pub fn resolve_per_file_ignores(
 
             Ok((absolute, basename, per_file_ignore.rules))
         })
-        .collect()
+        .collect();
+    Ok(PerFileIgnores::new(ignores?))
 }

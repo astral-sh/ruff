@@ -1,9 +1,11 @@
 //! Settings for the `pydocstyle` plugin.
 
 use std::collections::BTreeSet;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 
 use crate::registry::Rule;
@@ -76,4 +78,19 @@ pub struct Settings {
     pub convention: Option<Convention>,
     pub ignore_decorators: BTreeSet<String>,
     pub property_decorators: BTreeSet<String>,
+}
+
+impl fmt::Display for Settings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.pydocstyle.",
+            fields = [
+                self.convention | debug,
+                self.ignore_decorators | debug,
+                self.property_decorators | debug
+            ]
+        }
+        Ok(())
+    }
 }

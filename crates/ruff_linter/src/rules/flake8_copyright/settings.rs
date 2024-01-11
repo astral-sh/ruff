@@ -2,7 +2,9 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::fmt::{Display, Formatter};
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 
 #[derive(Debug, CacheKey)]
@@ -22,5 +24,21 @@ impl Default for Settings {
             author: None,
             min_file_size: 0,
         }
+    }
+}
+
+impl Display for Settings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.flake8_copyright",
+            fields = [
+                self.notice_rgx,
+                // TODO(jane): remove debug
+                self.author | debug,
+                self.min_file_size,
+            ]
+        }
+        Ok(())
     }
 }

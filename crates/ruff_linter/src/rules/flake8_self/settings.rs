@@ -1,6 +1,8 @@
 //! Settings for the `flake8-self` plugin.
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
+use std::fmt::{Display, Formatter};
 
 // By default, ignore the `namedtuple` methods and attributes, as well as the
 // _sunder_ names in Enum, which are underscore-prefixed to prevent conflicts
@@ -25,5 +27,18 @@ impl Default for Settings {
         Self {
             ignore_names: IGNORE_NAMES.map(String::from).to_vec(),
         }
+    }
+}
+
+impl Display for Settings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.flake8_self.",
+            fields = [
+                self.ignore_names | debug
+            ]
+        }
+        Ok(())
     }
 }

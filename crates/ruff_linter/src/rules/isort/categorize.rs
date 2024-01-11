@@ -1,4 +1,6 @@
+use itertools::Itertools;
 use std::collections::BTreeMap;
+use std::fmt;
 use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
@@ -376,5 +378,22 @@ impl KnownModules {
             }
         }
         user_defined
+    }
+}
+
+impl fmt::Display for KnownModules {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.known.is_empty() {
+            write!(f, "[]")
+        } else {
+            write!(
+                f,
+                "{{\n\t{}\n}}",
+                self.known
+                    .iter()
+                    .map(|(pattern, import_section)| format!("{pattern} => {import_section:?}"))
+                    .join(", \n\t")
+            )
+        }
     }
 }

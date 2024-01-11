@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -5,7 +6,8 @@ use std::str::FromStr;
 use std::string::ToString;
 
 use anyhow::{bail, Result};
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
+use itertools::Itertools;
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
 use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -133,6 +135,20 @@ pub enum UnsafeFixes {
     Enabled,
 }
 
+impl Display for UnsafeFixes {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Hint => "hint",
+                Self::Disabled => "disabled",
+                Self::Enabled => "enabled",
+            }
+        )
+    }
+}
+
 impl From<bool> for UnsafeFixes {
     fn from(value: bool) -> Self {
         if value {
@@ -178,6 +194,19 @@ impl FilePattern {
     }
 }
 
+impl Display for FilePattern {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?}",
+            match self {
+                Self::Builtin(pattern) => pattern,
+                Self::User(pattern, _) => pattern.as_str(),
+            }
+        )
+    }
+}
+
 impl FromStr for FilePattern {
     type Err = anyhow::Error;
 
@@ -192,9 +221,14 @@ impl FromStr for FilePattern {
 pub struct FilePatternSet {
     set: GlobSet,
     cache_key: u64,
+    // This field is only for displaying the internals
+    // of `set`.
+    #[allow(clippy::used_underscore_binding)]
+    _set_internals: Vec<FilePattern>,
 }
 
 impl FilePatternSet {
+    #[allow(clippy::used_underscore_binding)]
     pub fn try_from_iter<I>(patterns: I) -> Result<Self, anyhow::Error>
     where
         I: IntoIterator<Item = FilePattern>,
@@ -202,7 +236,10 @@ impl FilePatternSet {
         let mut builder = GlobSetBuilder::new();
         let mut hasher = CacheKeyHasher::new();
 
+        let mut _set_internals = vec![];
+
         for pattern in patterns {
+            _set_internals.push(pattern.clone());
             pattern.cache_key(&mut hasher);
             pattern.add_to(&mut builder)?;
         }
@@ -212,7 +249,25 @@ impl FilePatternSet {
         Ok(FilePatternSet {
             set,
             cache_key: hasher.finish(),
+            _set_internals,
         })
+    }
+}
+
+impl Display for FilePatternSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self._set_internals.is_empty() {
+            write!(f, "[]")
+        } else {
+            write!(
+                f,
+                "[\n\t{}\n]",
+                self._set_internals
+                    .iter()
+                    .map(|pattern| format!("{pattern}"))
+                    .join(", \n\t")
+            )
+        }
     }
 }
 
@@ -428,6 +483,23 @@ pub enum SerializationFormat {
     Sarif,
 }
 
+impl Display for SerializationFormat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text => write!(f, "text"),
+            Self::Json => write!(f, "json"),
+            Self::JsonLines => write!(f, "json_lines"),
+            Self::Junit => write!(f, "junit"),
+            Self::Grouped => write!(f, "grouped"),
+            Self::Github => write!(f, "github"),
+            Self::Gitlab => write!(f, "gitlab"),
+            Self::Pylint => write!(f, "pylint"),
+            Self::Azure => write!(f, "azure"),
+            Self::Sarif => write!(f, "sarif"),
+        }
+    }
+}
+
 impl Default for SerializationFormat {
     fn default() -> Self {
         Self::Text
@@ -467,3 +539,28 @@ impl Deref for Version {
 /// [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) for
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
+
+#[derive(Debug, CacheKey, Default)]
+pub struct PerFileIgnores {
+    ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
+}
+
+impl PerFileIgnores {
+    pub fn new(ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>) -> Self {
+        Self { ignores }
+    }
+}
+
+impl Display for PerFileIgnores {
+    fn fmt(&self, _: &mut Formatter<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
+impl Deref for PerFileIgnores {
+    type Target = Vec<(GlobMatcher, GlobMatcher, RuleSet)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.ignores
+    }
+}
