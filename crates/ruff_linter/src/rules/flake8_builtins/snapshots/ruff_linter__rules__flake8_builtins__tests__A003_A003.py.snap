@@ -1,68 +1,22 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_builtins/mod.rs
 ---
-A003.py:2:5: A003 Class attribute `ImportError` is shadowing a Python builtin
-  |
-1 | class MyClass:
-2 |     ImportError = 4
-  |     ^^^^^^^^^^^ A003
-3 |     id: int
-4 |     dir = "/"
-  |
-
-A003.py:3:5: A003 Class attribute `id` is shadowing a Python builtin
-  |
-1 | class MyClass:
-2 |     ImportError = 4
-3 |     id: int
-  |     ^^ A003
-4 |     dir = "/"
-  |
-
-A003.py:4:5: A003 Class attribute `dir` is shadowing a Python builtin
-  |
-2 |     ImportError = 4
-3 |     id: int
-4 |     dir = "/"
-  |     ^^^ A003
-5 | 
-6 |     def __init__(self):
-  |
-
-A003.py:11:9: A003 Class attribute `str` is shadowing a Python builtin
+A003.py:17:31: A003 Python builtin is shadowed by method `str` from line 14
    |
- 9 |         self.dir = "."
-10 | 
-11 |     def str(self):
-   |         ^^^ A003
-12 |         pass
+15 |         pass
+16 | 
+17 |     def method_usage(self) -> str:
+   |                               ^^^ A003
+18 |         pass
    |
 
-A003.py:29:9: A003 Class attribute `str` is shadowing a Python builtin
+A003.py:20:34: A003 Python builtin is shadowed by class attribute `id` from line 3
    |
-27 |         ...
-28 | 
-29 |     def str(self) -> None:
-   |         ^^^ A003
-30 |         ...
-   |
-
-A003.py:40:9: A003 Class attribute `str` is shadowing a Python builtin
-   |
-38 |         ...
-39 | 
-40 |     def str(self) -> None:
-   |         ^^^ A003
-41 |         ...
-   |
-
-A003.py:52:9: A003 Class attribute `int` is shadowing a Python builtin
-   |
-50 |         pass
-51 | 
-52 |     def int(self):
-   |         ^^^ A003
-53 |         pass
+18 |         pass
+19 | 
+20 |     def attribute_usage(self) -> id:
+   |                                  ^^ A003
+21 |         pass
    |
 
 
