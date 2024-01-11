@@ -27,7 +27,7 @@ use itertools::Itertools;
 /// __all__ = [
 ///     "b",
 ///     "c",
-///     "a"
+///     "a",
 /// ]
 ///
 /// if sys.platform == "win32":
@@ -41,7 +41,7 @@ use itertools::Itertools;
 /// __all__ = [
 ///     "a",
 ///     "b",
-///     "c"
+///     "c",
 /// ]
 ///
 /// if sys.platform == "win32":
