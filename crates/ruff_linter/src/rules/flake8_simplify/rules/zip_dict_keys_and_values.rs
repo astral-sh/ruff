@@ -90,17 +90,16 @@ pub(crate) fn zip_dict_keys_and_values(checker: &mut Checker, expr: &Expr) {
     if var1.id != var2.id || attr1 != "keys" || attr2 != "values" {
         return;
     }
-    for arg_name in [var1, var2] {
-        let Some(binding) = checker
-            .semantic()
-            .only_binding(arg_name)
-            .map(|id| checker.semantic().binding(id))
-        else {
-            return;
-        };
-        if !is_dict(binding, checker.semantic()) {
-            return;
-        }
+
+    let Some(binding) = checker
+        .semantic()
+        .only_binding(var1)
+        .map(|id| checker.semantic().binding(id))
+    else {
+        return;
+    };
+    if !is_dict(binding, checker.semantic()) {
+        return;
     }
 
     let expected = format!("{}.items()", checker.locator().slice(var1));
