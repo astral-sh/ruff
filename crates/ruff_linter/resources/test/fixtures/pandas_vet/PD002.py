@@ -31,3 +31,6 @@ import torch
 torch.m.ReLU(inplace=True)  # safe because this isn't a pandas call
 
 (x.drop(["a"], axis=1, inplace=True))
+
+# This method doesn't take exist in Pandas, so ignore it.
+x.rotate_z(45, inplace=True)
