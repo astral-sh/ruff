@@ -72,7 +72,7 @@ impl Violation for UnsortedDunderAll {
 
 pub(crate) fn sort_dunder_all_assign(
     checker: &mut Checker,
-    ast::StmtAssign {value, targets, ..}: &ast::StmtAssign,
+    ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
     parent: &ast::Stmt,
 ) {
     let [ast::Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
@@ -207,7 +207,7 @@ impl DunderAllValue {
         //     the comments above the element move with it.
         //   - The same goes for any comments on the same line as an element:
         //     if the element moves, the comment moves with it.
-        let items = collect_dunder_all_items(&lines);
+        let items = collect_dunder_all_items(lines);
 
         Some(DunderAllValue {
             items,
@@ -421,7 +421,7 @@ enum DunderAllLine {
     OneOrMoreItems(LineWithItems),
 }
 
-fn collect_dunder_all_items(lines: &[DunderAllLine]) -> Vec<DunderAllItem> {
+fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
     // Given data on each line in `__all__`, group lines together into "items".
     // Each item contains exactly one element,
     // but might contain multiple comments attached to that element
@@ -431,32 +431,31 @@ fn collect_dunder_all_items(lines: &[DunderAllLine]) -> Vec<DunderAllItem> {
     for line in lines {
         match line {
             DunderAllLine::JustAComment(LineWithJustAComment(comment_range)) => {
-                this_range = Some(*comment_range);
+                this_range = Some(comment_range);
             }
             DunderAllLine::OneOrMoreItems(LineWithItems {
                 items,
                 comment_range,
             }) => {
-                let [(first_val, first_range), rest @ ..] = items.as_slice() else {
-                    unreachable!(
-                        "LineWithItems::new() should uphold the invariant that this list is always non-empty"
-                    )
-                };
-                let range = this_range.map_or(*first_range, |r| {
+                let mut owned_items = items.into_iter();
+                let (first_val, first_range) = owned_items
+                    .next()
+                    .expect("LineWithItems::new() should uphold the invariant that this list is always non-empty");
+                let range = this_range.map_or(first_range, |r| {
                     TextRange::new(r.start(), first_range.end())
                 });
                 all_items.push(DunderAllItem {
-                    value: first_val.clone(),
+                    value: first_val,
                     original_index: all_items.len(),
                     range,
-                    additional_comments: *comment_range,
+                    additional_comments: comment_range,
                 });
                 this_range = None;
-                for (value, range) in rest {
+                for (value, range) in owned_items {
                     all_items.push(DunderAllItem {
-                        value: value.clone(),
+                        value: value,
                         original_index: all_items.len(),
-                        range: *range,
+                        range: range,
                         additional_comments: None,
                     });
                 }
