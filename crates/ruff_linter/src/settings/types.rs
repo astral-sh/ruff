@@ -561,6 +561,7 @@ pub type IdentifierPattern = glob::Pattern;
 
 #[derive(Debug, CacheKey, Default)]
 pub struct PerFileIgnores {
+    // Ordered as (absolute path matcher, basename matcher, rules)
     ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 }
 
