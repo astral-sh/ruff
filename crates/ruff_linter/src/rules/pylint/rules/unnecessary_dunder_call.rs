@@ -273,7 +273,7 @@ impl DunderReplacement {
             "__str__" => Some(Self::Builtin("str", "Use `str()` builtin")),
             "__subclasscheck__" => Some(Self::Builtin("issubclass", "Use `issubclass()` builtin")),
 
-            "__aenter__" => Some(Self::MessageOnly("Use `aenter()` builtin")),
+            "__aenter__" => Some(Self::MessageOnly("Invoke context manager directly")),
             "__ceil__" => Some(Self::MessageOnly("Use `math.ceil()` function")),
             "__copy__" => Some(Self::MessageOnly("Use `copy.copy()` function")),
             "__deepcopy__" => Some(Self::MessageOnly("Use `copy.deepcopy()` function")),
