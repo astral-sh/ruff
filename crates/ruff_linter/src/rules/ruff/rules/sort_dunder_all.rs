@@ -78,7 +78,7 @@ pub(crate) fn sort_dunder_all_assign(
     let [ast::Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
         return;
     };
-    sort_dunder_all(checker, id, &value, parent);
+    sort_dunder_all(checker, id, value, parent);
 }
 
 pub(crate) fn sort_dunder_all_aug_assign(
@@ -217,8 +217,10 @@ impl DunderAllValue {
     }
 
     /// Implementation of the unstable [`&[T].is_sorted`] function.
-    /// See  https://github.com/rust-lang/rust/issues/53485
+    /// See <https://github.com/rust-lang/rust/issues/53485>
     fn is_already_sorted(&self) -> bool {
+        // tuple_windows() clones,
+        // but here that's okay: we're only cloning *references*, rather than the items themselves
         for (this, next) in self.items.iter().tuple_windows() {
             if next < this {
                 return false;
@@ -291,7 +293,7 @@ impl DunderAllValue {
             let newline = stylist.line_ending().as_str();
             prelude = format!("{}{}", prelude.trim_end(), newline);
             join_multiline_dunder_all_items(
-                &sorted_items,
+                sorted_items,
                 locator,
                 parent,
                 indentation,
@@ -299,7 +301,7 @@ impl DunderAllValue {
                 needs_trailing_comma,
             )
         } else {
-            Some(join_singleline_dunder_all_items(&sorted_items, locator))
+            Some(join_singleline_dunder_all_items(sorted_items, locator))
         };
 
         let new_dunder_all = joined_items.map(|items| format!("{prelude}{items}{postlude}"));
@@ -327,7 +329,10 @@ fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<D
     let mut lines = vec![];
     let mut items_in_line = vec![];
     let mut comment_in_line = None;
-    for pair in lexer::lex(locator.slice(range).trim(), Mode::Expression) {
+    // lex_starts_at gives us absolute ranges rather than relative ranges,
+    // but (surprisingly) we still need to pass in the slice of code we want it to lex,
+    // rather than the whole source file
+    for pair in lexer::lex_starts_at(locator.slice(range), Mode::Expression, range.start()) {
         let (tok, subrange) = pair.ok()?;
         match tok {
             Tok::Lpar | Tok::Lsqb => {
@@ -339,15 +344,12 @@ fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<D
             Tok::Rpar | Tok::Rsqb | Tok::Newline => {
                 if items_in_line.is_empty() {
                     if let Some(comment) = comment_in_line {
-                        lines.push(DunderAllLine::JustAComment(LineWithJustAComment::new(
-                            comment, range,
-                        )));
+                        lines.push(DunderAllLine::JustAComment(LineWithJustAComment(comment)));
                     }
                 } else {
                     lines.push(DunderAllLine::OneOrMoreItems(LineWithItems::new(
-                        &items_in_line,
+                        items_in_line,
                         comment_in_line,
-                        range,
                     )));
                 }
                 break;
@@ -355,19 +357,15 @@ fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<D
             Tok::NonLogicalNewline => {
                 if items_in_line.is_empty() {
                     if let Some(comment) = comment_in_line {
-                        lines.push(DunderAllLine::JustAComment(LineWithJustAComment::new(
-                            comment, range,
-                        )));
+                        lines.push(DunderAllLine::JustAComment(LineWithJustAComment(comment)));
                         comment_in_line = None;
                     }
                 } else {
                     lines.push(DunderAllLine::OneOrMoreItems(LineWithItems::new(
-                        &items_in_line,
+                        std::mem::take(&mut items_in_line),
                         comment_in_line,
-                        range,
                     )));
                     comment_in_line = None;
-                    items_in_line.clear();
                 }
             }
             Tok::Comment(_) => comment_in_line = Some(subrange),
@@ -382,12 +380,6 @@ fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<D
 #[derive(Debug)]
 struct LineWithJustAComment(TextRange);
 
-impl LineWithJustAComment {
-    fn new(comment_range: TextRange, total_dunder_all_range: TextRange) -> Self {
-        Self(comment_range + total_dunder_all_range.start())
-    }
-}
-
 #[derive(Debug)]
 struct LineWithItems {
     items: Vec<(String, TextRange)>,
@@ -395,22 +387,14 @@ struct LineWithItems {
 }
 
 impl LineWithItems {
-    fn new(
-        items: &[(String, TextRange)],
-        comment_range: Option<TextRange>,
-        total_dunder_all_range: TextRange,
-    ) -> Self {
+    fn new(items: Vec<(String, TextRange)>, comment_range: Option<TextRange>) -> Self {
         assert!(
             !items.is_empty(),
             "Use the 'JustAComment' variant to represent lines with 0 items"
         );
-        let offset = total_dunder_all_range.start();
         Self {
-            items: items
-                .iter()
-                .map(|(s, r)| (s.to_owned(), r + offset))
-                .collect(),
-            comment_range: comment_range.map(|c| c + offset),
+            items,
+            comment_range,
         }
     }
 }
@@ -453,9 +437,9 @@ fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
                 this_range = None;
                 for (value, range) in owned_items {
                     all_items.push(DunderAllItem {
-                        value: value,
+                        value,
                         original_index: all_items.len(),
-                        range: range,
+                        range,
                         additional_comments: None,
                     });
                 }
