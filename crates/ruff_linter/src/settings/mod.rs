@@ -41,6 +41,7 @@ pub mod types;
 #[derive(Debug, CacheKey)]
 pub struct LinterSettings {
     pub exclude: FilePatternSet,
+    pub extension: ExtensionMapping,
     pub project_root: PathBuf,
 
     pub rules: RuleTable,
@@ -50,7 +51,6 @@ pub struct LinterSettings {
     pub target_version: PythonVersion,
     pub preview: PreviewMode,
     pub explicit_preview_rules: bool,
-    pub extension: ExtensionMapping,
 
     // Rule-specific settings
     pub allowed_confusables: FxHashSet<char>,
