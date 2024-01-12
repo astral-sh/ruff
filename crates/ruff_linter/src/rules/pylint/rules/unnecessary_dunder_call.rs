@@ -283,15 +283,15 @@ impl DunderReplacement {
             "__delitem__" => Some(Self::MessageOnly("Use `del` statement")),
             "__divmod__" => Some(Self::MessageOnly("Use `divmod()` builtin")),
             "__format__" => Some(Self::MessageOnly(
-                "Use `format` builtin, format string method, or f-string.",
+                "Use `format` builtin, format string method, or f-string",
             )),
             "__fspath__" => Some(Self::MessageOnly("Use `os.fspath` function")),
             "__get__" => Some(Self::MessageOnly("Use `get` method")),
             "__getattr__" => Some(Self::MessageOnly(
-                "Access attribute directly or use getattr built-in function.",
+                "Access attribute directly or use getattr built-in function",
             )),
             "__getattribute__" => Some(Self::MessageOnly(
-                "Access attribute directly or use getattr built-in function.",
+                "Access attribute directly or use getattr built-in function",
             )),
             "__getitem__" => Some(Self::MessageOnly("Access item via subscript")),
             "__init__" => Some(Self::MessageOnly("Instantiate class directly")),
@@ -304,7 +304,7 @@ impl DunderReplacement {
             "__rpow__" => Some(Self::MessageOnly("Use ** operator or `pow()` builtin")),
             "__set__" => Some(Self::MessageOnly("Use subscript assignment")),
             "__setattr__" => Some(Self::MessageOnly(
-                "Mutate attribute directly or use setattr built-in function.",
+                "Mutate attribute directly or use setattr built-in function",
             )),
             "__setitem__" => Some(Self::MessageOnly("Use subscript assignment")),
             "__truncate__" => Some(Self::MessageOnly("Use `math.trunc()` function")),
