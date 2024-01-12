@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers;
-use ruff_python_ast::helpers::NameFinder;
+use ruff_python_ast::helpers::{NameFinder, StoredNameFinder};
 use ruff_python_ast::visitor::Visitor;
 use ruff_text_size::Ranged;
 
@@ -80,7 +80,7 @@ impl Violation for UnusedLoopControlVariable {
 /// B007
 pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast::StmtFor) {
     let control_names = {
-        let mut finder = NameFinder::default();
+        let mut finder = StoredNameFinder::default();
         finder.visit_expr(stmt_for.target.as_ref());
         finder.names
     };
