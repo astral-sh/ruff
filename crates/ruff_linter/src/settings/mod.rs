@@ -134,7 +134,7 @@ macro_rules! display_settings {
             write!($fmt, "{}{} = ", $prefix, stringify!($field))?;
             match &$settings.$field {
                 Some(value) => writeln!($fmt, "{}", value)?,
-                None        => writeln!($fmt, "nil")?
+                None        => writeln!($fmt, "none")?
             };
         }
     };
