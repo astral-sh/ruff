@@ -209,31 +209,26 @@ impl<'a> ValidateAstVisitor<'a> {
 
 impl<'ast> PreorderVisitor<'ast> for ValidateAstVisitor<'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
-        if node.end() > self.source_length {
-            panic!(
-                "{path}: The range of the node exceeds the length of the source code. Node: {node:#?}",
-                path = self.test_path.display()
-            );
-        }
+        assert!(
+            node.end() <= self.source_length,
+            "{path}: The range of the node exceeds the length of the source code. Node: {node:#?}",
+            path = self.test_path.display()
+        );
 
         if let Some(previous) = self.previous {
-            if previous.range().ordering(node.range()) == Ordering::Greater {
-                panic!(
+            assert_ne!(previous.range().ordering(node.range()),  Ordering::Greater,
                     "{path}: The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.\nPrevious node: {previous:#?}\n\nCurrent node: {node:#?}\n\nRoot: {root:#?}",
                     path = self.test_path.display(),
                     root = self.parents.first()
                 );
-            }
         }
 
         if let Some(parent) = self.parents.last() {
-            if !parent.range().contains_range(node.range()) {
-                panic!(
+            assert!(parent.range().contains_range(node.range()),
                     "{path}: The range of the parent node does not fully enclose the range of the child node.\nParent node: {parent:#?}\n\nChild node: {node:#?}\n\nRoot: {root:#?}",
                     path = self.test_path.display(),
                     root = self.parents.first()
                 );
-            }
         }
 
         self.parents.push(node);
