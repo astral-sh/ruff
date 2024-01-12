@@ -7,7 +7,7 @@ use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -82,7 +82,7 @@ pub(crate) fn sort_dunder_all_assign(
     sort_dunder_all(checker, id, value, parent);
 }
 
-pub(crate) fn sort_dunder_all_augassign(
+pub(crate) fn sort_dunder_all_aug_assign(
     checker: &mut Checker,
     node: &ast::StmtAugAssign,
     parent: &ast::Stmt,
@@ -102,7 +102,7 @@ pub(crate) fn sort_dunder_all_augassign(
     sort_dunder_all(checker, id, value, parent);
 }
 
-pub(crate) fn sort_dunder_all_annassign(
+pub(crate) fn sort_dunder_all_ann_assign(
     checker: &mut Checker,
     node: &ast::StmtAnnAssign,
     parent: &ast::Stmt,
@@ -324,24 +324,37 @@ fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<D
                 parentheses_open = true;
             }
             Tok::Rpar | Tok::Rsqb | Tok::Newline => {
-                if !(items_in_line.is_empty() && comment_in_line.is_none()) {
-                    lines.push(DunderAllLine::new(
+                if items_in_line.is_empty() {
+                    if let Some(comment) = comment_in_line {
+                        lines.push(DunderAllLine::JustAComment(LineWithJustAComment::new(
+                            comment, range,
+                        )));
+                    }
+                } else {
+                    lines.push(DunderAllLine::OneOrMoreItems(LineWithItems::new(
                         &items_in_line,
                         comment_in_line,
-                        range.start(),
-                    ));
+                        range,
+                    )));
                 }
                 break;
             }
             Tok::NonLogicalNewline => {
-                if !(items_in_line.is_empty() && comment_in_line.is_none()) {
-                    lines.push(DunderAllLine::new(
+                if items_in_line.is_empty() {
+                    if let Some(comment) = comment_in_line {
+                        lines.push(DunderAllLine::JustAComment(LineWithJustAComment::new(
+                            comment, range,
+                        )));
+                        comment_in_line = None;
+                    }
+                } else {
+                    lines.push(DunderAllLine::OneOrMoreItems(LineWithItems::new(
                         &items_in_line,
                         comment_in_line,
-                        range.start(),
-                    ));
-                    items_in_line.clear();
+                        range,
+                    )));
                     comment_in_line = None;
+                    items_in_line.clear();
                 }
             }
             Tok::Comment(_) => comment_in_line = Some(subrange),
@@ -354,22 +367,45 @@ fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<D
 }
 
 #[derive(Debug)]
-struct DunderAllLine {
-    items: Vec<(String, TextRange)>,
-    comment: Option<TextRange>,
+struct LineWithJustAComment(TextRange);
+
+impl LineWithJustAComment {
+    fn new(comment_range: TextRange, total_dunder_all_range: TextRange) -> Self {
+        Self(comment_range + total_dunder_all_range.start())
+    }
 }
 
-impl DunderAllLine {
-    fn new(items: &[(String, TextRange)], comment: Option<TextRange>, offset: TextSize) -> Self {
-        assert!(comment.is_some() || !items.is_empty());
+#[derive(Debug)]
+struct LineWithItems {
+    items: Vec<(String, TextRange)>,
+    comment_range: Option<TextRange>,
+}
+
+impl LineWithItems {
+    fn new(
+        items: &[(String, TextRange)],
+        comment_range: Option<TextRange>,
+        total_dunder_all_range: TextRange,
+    ) -> Self {
+        assert!(
+            !items.is_empty(),
+            "Use the 'JustAComment' variant to represent lines with 0 items"
+        );
+        let offset = total_dunder_all_range.start();
         Self {
             items: items
                 .iter()
                 .map(|(s, r)| (s.to_owned(), r + offset))
                 .collect(),
-            comment: comment.map(|c| c + offset),
+            comment_range: comment_range.map(|c| c + offset),
         }
     }
+}
+
+#[derive(Debug)]
+enum DunderAllLine {
+    JustAComment(LineWithJustAComment),
+    OneOrMoreItems(LineWithItems),
 }
 
 fn collect_dunder_all_items(lines: &[DunderAllLine]) -> Vec<DunderAllItem> {
@@ -379,38 +415,39 @@ fn collect_dunder_all_items(lines: &[DunderAllLine]) -> Vec<DunderAllItem> {
     // that must move with the element when `__all__` is sorted.
     let mut all_items = vec![];
     let mut this_range = None;
-    let mut idx = 0;
-    for DunderAllLine { items, comment } in lines {
-        match (items.as_slice(), comment) {
-            ([], Some(_)) => {
-                this_range = *comment;
+    for line in lines {
+        match line {
+            DunderAllLine::JustAComment(LineWithJustAComment(comment_range)) => {
+                this_range = Some(*comment_range);
             }
-            ([(first_val, first_range), rest @ ..], _) => {
+            DunderAllLine::OneOrMoreItems(LineWithItems {
+                items,
+                comment_range,
+            }) => {
+                let [(first_val, first_range), rest @ ..] = items.as_slice() else {
+                    unreachable!(
+                        "LineWithItems::new() should uphold the invariant that this list is always non-empty"
+                    )
+                };
                 let range = this_range.map_or(*first_range, |r| {
                     TextRange::new(r.start(), first_range.end())
                 });
                 all_items.push(DunderAllItem {
                     value: first_val.clone(),
-                    original_index: idx,
+                    original_index: all_items.len(),
                     range,
-                    additional_comments: *comment,
+                    additional_comments: *comment_range,
                 });
                 this_range = None;
-                idx += 1;
                 for (value, range) in rest {
                     all_items.push(DunderAllItem {
                         value: value.clone(),
-                        original_index: idx,
+                        original_index: all_items.len(),
                         range: *range,
                         additional_comments: None,
                     });
-                    idx += 1;
                 }
             }
-            _ => unreachable!(
-                "Any lines that have neither comments nor items
-                should have been filtered out by this point."
-            ),
         }
     }
     all_items
@@ -420,7 +457,7 @@ fn collect_dunder_all_items(lines: &[DunderAllLine]) -> Vec<DunderAllItem> {
 struct DunderAllItem {
     value: String,
     // Each `AllItem` in any given list should have a unique `original_index`:
-    original_index: u16,
+    original_index: usize,
     // Note that this range might include comments, etc.
     range: TextRange,
     additional_comments: Option<TextRange>,
@@ -441,7 +478,7 @@ impl PartialEq for DunderAllItem {
 impl Eq for DunderAllItem {}
 
 impl DunderAllItem {
-    fn sort_index(&self) -> (&str, u16) {
+    fn sort_index(&self) -> (&str, usize) {
         (&self.value, self.original_index)
     }
 }
