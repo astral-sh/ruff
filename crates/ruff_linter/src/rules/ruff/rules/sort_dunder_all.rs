@@ -246,7 +246,9 @@ impl DunderAllValue {
         if self.is_already_sorted() {
             return SortedDunderAll::AlreadySorted;
         }
-        assert!(self.items.len() >= 2);
+        let [first_item, .., last_item] = self.items.as_slice() else {
+            panic!("Expected to have already returned if the list had < 2 items")
+        };
 
         // As well as the "items" in the `__all__` definition,
         // there is also a "prelude" and a "postlude":
@@ -256,12 +258,6 @@ impl DunderAllValue {
         //    element in `__all__` up to and including the closing parenthesis
         //    (if there was one).
         let prelude_end = {
-            // We should already have returned by now if there are 0 items:
-            // see earlier comments in this function
-            let first_item = self
-                .items
-                .first()
-                .expect("Expected there to be at least two items in the list");
             let first_item_line_offset = locator.line_start(first_item.start());
             if first_item_line_offset == locator.line_start(self.start()) {
                 first_item.start()
@@ -270,12 +266,6 @@ impl DunderAllValue {
             }
         };
         let (needs_trailing_comma, postlude_start) = {
-            // We should already have returned by now if there are 0 items:
-            // see earlier comments in this function
-            let last_item = self
-                .items
-                .last()
-                .expect("Expected there to be at least two items in the list");
             let last_item_line_offset = locator.line_end(last_item.end());
             if last_item_line_offset == locator.line_end(self.end()) {
                 (false, last_item.end())
