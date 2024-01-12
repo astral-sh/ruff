@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nx: int\n(y): 1 + 2\nvar: tuple[int] | int = 1,\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..46,

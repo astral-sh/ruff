@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\ntry:\n    ...\nexcept:\n    ...\n\ntry:\n    ...\nexcept Exception1 as e:\n    ...\nexcept Exception2 as e:\n    ...\n\ntry:\n    ...\nexcept Exception as e:\n    ...\nexcept:\n    ...\nfinally:\n    ...\n\ntry:\n    ...\nexcept:\n    ...\nelse:\n    ...\n\ntry:\n    ...\nexcept:\n    ...\nelse:\n    ...\nfinally:\n    ...\n\ntry:\n    ...\nfinally:\n    ...\n\ntry:\n    ...\nelse:\n    ...\nfinally:\n    ...\n\ntry:\n    ...\nexcept* a as A:\n    ...\nexcept* b:\n    ...\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..424,

@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nclass T:\n    ...\nclass Test():\n        def __init__(self):\n            pass\nclass T(a=1, *A, **k):\n    ...\nclass T:\n    def f():\n        a, b = l\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..147,

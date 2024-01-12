@@ -14,18 +14,12 @@ impl TokenSource {
         }
     }
 
-    pub(crate) fn current(&self) -> Option<&LexResult> {
-        let mut iter = self.tokens.as_slice().iter();
-
-        loop {
-            let next = iter.next()?;
-
-            if is_trivia(next) {
-                continue;
-            }
-
-            break Some(next);
+    pub(crate) fn current(&mut self) -> Option<&LexResult> {
+        while self.tokens.as_slice().first().is_some_and(is_trivia) {
+            self.tokens.next();
         }
+
+        self.tokens.as_slice().first()
     }
 
     pub(crate) fn peek_nth(&self, mut n: usize) -> Option<&LexResult> {

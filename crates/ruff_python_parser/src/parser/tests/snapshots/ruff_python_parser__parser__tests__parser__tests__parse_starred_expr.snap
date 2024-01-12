@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\n*a\n*(a + 1)\n*x.attr\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..21,

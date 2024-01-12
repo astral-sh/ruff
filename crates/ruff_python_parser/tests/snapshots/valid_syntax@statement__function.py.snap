@@ -1,0 +1,829 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/function.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..627,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..25,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "no_parameters",
+                        range: 4..17,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 17..19,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 21..25,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 27..67,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "positional_parameters",
+                        range: 31..52,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 52..61,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 53..54,
+                                parameter: Parameter {
+                                    range: 53..54,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 53..54,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 56..57,
+                                parameter: Parameter {
+                                    range: 56..57,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 56..57,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 59..60,
+                                parameter: Parameter {
+                                    range: 59..60,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 59..60,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 63..67,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 69..135,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "positional_parameters_with_default_values",
+                        range: 73..114,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 114..129,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 115..116,
+                                parameter: Parameter {
+                                    range: 115..116,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 115..116,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 118..122,
+                                parameter: Parameter {
+                                    range: 118..119,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 118..119,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 120..122,
+                                            value: Int(
+                                                20,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                            ParameterWithDefault {
+                                range: 124..128,
+                                parameter: Parameter {
+                                    range: 124..125,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 124..125,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 126..128,
+                                            value: Int(
+                                                30,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 131..135,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 137..182,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "keyword_only_parameters",
+                        range: 141..164,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 164..176,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 168..169,
+                                parameter: Parameter {
+                                    range: 168..169,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 168..169,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 171..172,
+                                parameter: Parameter {
+                                    range: 171..172,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 171..172,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 174..175,
+                                parameter: Parameter {
+                                    range: 174..175,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 174..175,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 178..182,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 184..249,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "keyword_only_parameters_with_defaults",
+                        range: 188..225,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 225..243,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 229..230,
+                                parameter: Parameter {
+                                    range: 229..230,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 229..230,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 232..236,
+                                parameter: Parameter {
+                                    range: 232..233,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 232..233,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 234..236,
+                                            value: Int(
+                                                20,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                            ParameterWithDefault {
+                                range: 238..242,
+                                parameter: Parameter {
+                                    range: 238..239,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 238..239,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 240..242,
+                                            value: Int(
+                                                30,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 245..249,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 251..315,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "positional_and_keyword_parameters",
+                        range: 255..288,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 288..309,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 289..290,
+                                parameter: Parameter {
+                                    range: 289..290,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 289..290,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 292..293,
+                                parameter: Parameter {
+                                    range: 292..293,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 292..293,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 295..296,
+                                parameter: Parameter {
+                                    range: 295..296,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 295..296,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 301..302,
+                                parameter: Parameter {
+                                    range: 301..302,
+                                    name: Identifier {
+                                        id: "d",
+                                        range: 301..302,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 304..305,
+                                parameter: Parameter {
+                                    range: 304..305,
+                                    name: Identifier {
+                                        id: "e",
+                                        range: 304..305,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 307..308,
+                                parameter: Parameter {
+                                    range: 307..308,
+                                    name: Identifier {
+                                        id: "f",
+                                        range: 307..308,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 311..315,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 317..401,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "positional_and_keyword_parameters_with_defaults",
+                        range: 321..368,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 368..395,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 369..370,
+                                parameter: Parameter {
+                                    range: 369..370,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 369..370,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 372..373,
+                                parameter: Parameter {
+                                    range: 372..373,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 372..373,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 375..376,
+                                parameter: Parameter {
+                                    range: 375..376,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 375..376,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 381..382,
+                                parameter: Parameter {
+                                    range: 381..382,
+                                    name: Identifier {
+                                        id: "d",
+                                        range: 381..382,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 384..388,
+                                parameter: Parameter {
+                                    range: 384..385,
+                                    name: Identifier {
+                                        id: "e",
+                                        range: 384..385,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 386..388,
+                                            value: Int(
+                                                20,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                            ParameterWithDefault {
+                                range: 390..394,
+                                parameter: Parameter {
+                                    range: 390..391,
+                                    name: Identifier {
+                                        id: "f",
+                                        range: 390..391,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 392..394,
+                                            value: Int(
+                                                30,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 397..401,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 403..503,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "positional_and_keyword_parameters_with_defaults_and_varargs",
+                        range: 407..466,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 466..497,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 467..468,
+                                parameter: Parameter {
+                                    range: 467..468,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 467..468,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 470..471,
+                                parameter: Parameter {
+                                    range: 470..471,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 470..471,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 473..474,
+                                parameter: Parameter {
+                                    range: 473..474,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 473..474,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: Some(
+                            Parameter {
+                                range: 477..481,
+                                name: Identifier {
+                                    id: "args",
+                                    range: 477..481,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 483..484,
+                                parameter: Parameter {
+                                    range: 483..484,
+                                    name: Identifier {
+                                        id: "d",
+                                        range: 483..484,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 486..490,
+                                parameter: Parameter {
+                                    range: 486..487,
+                                    name: Identifier {
+                                        id: "e",
+                                        range: 486..487,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 488..490,
+                                            value: Int(
+                                                20,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                            ParameterWithDefault {
+                                range: 492..496,
+                                parameter: Parameter {
+                                    range: 492..493,
+                                    name: Identifier {
+                                        id: "f",
+                                        range: 492..493,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 494..496,
+                                            value: Int(
+                                                30,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 499..503,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 505..626,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: "positional_and_keyword_parameters_with_defaults_and_varargs_and_kwargs",
+                        range: 509..579,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 579..620,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 580..581,
+                                parameter: Parameter {
+                                    range: 580..581,
+                                    name: Identifier {
+                                        id: "a",
+                                        range: 580..581,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 583..584,
+                                parameter: Parameter {
+                                    range: 583..584,
+                                    name: Identifier {
+                                        id: "b",
+                                        range: 583..584,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 586..587,
+                                parameter: Parameter {
+                                    range: 586..587,
+                                    name: Identifier {
+                                        id: "c",
+                                        range: 586..587,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: Some(
+                            Parameter {
+                                range: 590..594,
+                                name: Identifier {
+                                    id: "args",
+                                    range: 590..594,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [
+                            ParameterWithDefault {
+                                range: 596..597,
+                                parameter: Parameter {
+                                    range: 596..597,
+                                    name: Identifier {
+                                        id: "d",
+                                        range: 596..597,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 599..603,
+                                parameter: Parameter {
+                                    range: 599..600,
+                                    name: Identifier {
+                                        id: "e",
+                                        range: 599..600,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 601..603,
+                                            value: Int(
+                                                20,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                            ParameterWithDefault {
+                                range: 605..609,
+                                parameter: Parameter {
+                                    range: 605..606,
+                                    name: Identifier {
+                                        id: "f",
+                                        range: 605..606,
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 607..609,
+                                            value: Int(
+                                                30,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        kwarg: Some(
+                            Parameter {
+                                range: 613..619,
+                                name: Identifier {
+                                    id: "kwargs",
+                                    range: 613..619,
+                                },
+                                annotation: None,
+                            },
+                        ),
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 622..626,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+

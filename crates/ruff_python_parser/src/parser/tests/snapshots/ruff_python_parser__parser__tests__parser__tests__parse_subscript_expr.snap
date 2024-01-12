@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nl[0]\nl[1:]\nl[1:2]\nl[:2]\nl[:2:]\nl[:2:3]\nl[1:2:3]\nl[:]\nl[::]\nl[0][0]\nl[0,1]\nl[0:,]\nl[0:,1]\nl[0:1, 2]\nl[0:1:2, 3, i:i + 1]\nx[a := b]\na[:, :11]\nl[1,2,3]\nx[~flag]\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..159,

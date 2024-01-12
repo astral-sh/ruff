@@ -29,7 +29,10 @@ rustc-hash = { workspace = true }
 static_assertions = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true }
+ruff_source_file = { path = "../ruff_source_file" }
+
+annotate-snippets = { workspace = true }
+insta = { workspace = true, features = ["glob"] }
 
 [build-dependencies]
 anyhow = { workspace = true }

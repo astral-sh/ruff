@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nvalue.attr\nvalue.attr()\nvalue().attr\nvalue().attr().foo\nvalue.attr.foo\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..72,

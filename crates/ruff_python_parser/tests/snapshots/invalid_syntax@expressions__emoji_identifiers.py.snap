@@ -1,0 +1,90 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/emoji_identifiers.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..64,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..30,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 0..1,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Invalid(
+                        ExprInvalid {
+                            value: "🐶",
+                            range: 5..9,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 32..63,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 32..33,
+                                id: "a",
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: UnaryOp(
+                        ExprUnaryOp {
+                            range: 42..62,
+                            op: UAdd,
+                            operand: Invalid(
+                                ExprInvalid {
+                                    value: "🐶",
+                                    range: 58..62,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | a = (🐶
+  |      ^^ Syntax Error: Got unexpected token 🐶
+2 |     # comment 🐶
+3 | )
+  |
+
+
+  |
+3 | )
+4 | 
+5 | a = (🐶 +
+  |      ^^ Syntax Error: Got unexpected token 🐶
+6 |     # comment
+7 | 🐶)
+  |
+
+
+  |
+5 | a = (🐶 +
+6 |     # comment
+7 | 🐶)
+  | ^^ Syntax Error: Got unexpected token 🐶
+  |
+
+
+

@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nl()\nx(1, 2)\nx(1, 2, x=3, y=4)\nf(*l)\nf(**a)\nf(*a, b, **l)\nf(*a, *b)\nf(\n    [\n        [a]\n        for d in f\n    ],\n)\nf(\n    {\n        [a]\n        for d in f\n    },\n)\nf(\n    {\n        A: [a]\n        for d in f\n    },\n)\ncall(\n    a=1 if True else None,\n    x=0,\n)\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..262,

@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\na += 1\na *= b\na -= 1\na /= a + 1\na //= (a + b) - c ** 2\na @= [1,2]\na %= x\na |= 1\na <<= 2\na >>= 2\na ^= ...\na **= 42\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..115,

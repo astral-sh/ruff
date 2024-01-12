@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\n{1: 2 for i in a}\n{x + 1: 'x' for i in range(5)}\n{b: c * 2 for c in d if x in w if y and yy if z}\n{a: a ** 2 for b in c if d and e for f in j if k > h}\n{a: b for b in c if d and e async for f in j if k > h}\n{a: a for b, c in d}\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..229,

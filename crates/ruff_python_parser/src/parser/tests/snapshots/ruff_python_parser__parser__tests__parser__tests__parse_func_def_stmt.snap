@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\ndef f():\n    ...\ndef x() -> int:\n    f()\n    pass\n    ...\ndef mul(x, y) -> 'str':\n    x * y\ndef f1(*a): ...\ndef f2(*a, z, x=0): ...\ndef f3(**kwargs): f()\ndef f4(*args, **kwargs): f() + 1\ndef f5(*args, a, b=1, **kwargs): f() + 1\ndef f6(a, /): ...\ndef f7(a, /, b): ...\ndef f8(a=1, /,): ...\ndef f9(a, b, /, *, c): ...\ndef f10(kw=1, *, a): ...\ndef f11(x: int, y: 'str', z: 1 + 2): pass\ndef f12(self, a=1, b=2, c=3): ...\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..417,

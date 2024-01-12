@@ -1,0 +1,81 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/valid/statement/delete.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..23,
+        body: [
+            Delete(
+                StmtDelete {
+                    range: 0..5,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 4..5,
+                                id: "x",
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 6..13,
+                    targets: [
+                        Attribute(
+                            ExprAttribute {
+                                range: 10..13,
+                                value: Name(
+                                    ExprName {
+                                        range: 10..11,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                attr: Identifier {
+                                    id: "y",
+                                    range: 12..13,
+                                },
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 14..22,
+                    targets: [
+                        Subscript(
+                            ExprSubscript {
+                                range: 18..22,
+                                value: Name(
+                                    ExprName {
+                                        range: 18..19,
+                                        id: "x",
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Name(
+                                    ExprName {
+                                        range: 20..21,
+                                        id: "y",
+                                        ctx: Load,
+                                    },
+                                ),
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+

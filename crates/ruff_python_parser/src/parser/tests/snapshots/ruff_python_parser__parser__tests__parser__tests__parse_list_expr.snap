@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\n[1 + i, [1, 2, 3, 4], (a, i + x, y), {a, b, c}, {a: 1}]\n[1, 2, 3]\n[]\n[1]\n[f(g(attr.H()) for c in l)]\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..102,

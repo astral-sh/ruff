@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\n1 + 2\n1 + 2 - 3\n1 + 2 - 3 + 4\n2 * 2\n1 + 2 * 2\n3 ** 2\n3 ** 2 * 5\n1 + (2 + 3)\n1 << 2\n1 >> 2\n1 | 2\n1 ^ 2\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..103,

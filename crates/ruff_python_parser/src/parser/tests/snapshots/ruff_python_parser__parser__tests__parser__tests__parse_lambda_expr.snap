@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nlambda: a\nlambda x: 1\nlambda x, y: ...\nlambda y, z=1: z * y\nlambda *a: a\nlambda *a, z, x=0: ...\nlambda **kwargs: f()\nlambda *args, **kwargs: f() + 1\nlambda *args, a, b=1, **kwargs: f() + 1\nlambda a, /: ...\nlambda a, /, b: ...\nlambda a=1, /,: ...\nlambda a, b, /, *, c: ...\nlambda kw=1, *, a: ...\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..296,

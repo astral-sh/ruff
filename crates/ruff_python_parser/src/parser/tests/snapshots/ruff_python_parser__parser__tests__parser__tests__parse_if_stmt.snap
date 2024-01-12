@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nif True:\n    1\n    ...\nif x < 1:\n    ...\nelse:\n    pass\n\nif a:\n    pass\nelif b:\n    ...\n\nif a and b:\n    ...\nelif True:\n    ...\nelif c:\n    ...\nelif d:\n    ...\nelse:\n    f()\nif a:=b: ...\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..188,

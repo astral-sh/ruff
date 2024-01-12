@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nif x: ...\nif True: pass\n1; 2; pass\n1; ...; a if b else c\n\ncontinue\n\nbreak\n\ndel a\ndel a, b, 1, 1 + 2,\ndel a, (b, c), d\n\nassert 1 < 2\nassert f()\nassert a and b\nassert x, 'error'\n\nglobal a\nglobal a, b, c\n\nreturn\nreturn a and b\nreturn 1 < 2\nreturn None\nreturn 1, 2,\nreturn x\nreturn f()\nreturn a.f()\n\nnonlocal a\nnonlocal a, b, c\n\nraise\nraise a\nraise 1 < 2\nraise a and b\nraise a from b\n\nimport a\nimport a.b.c\nimport a.b.c as d\nimport a, b, c\nimport foo.bar as a, a.b.c.d as abcd\n\nfrom a import b # comment\nfrom . import a\nfrom foo.bar import baz as b, FooBar as fb\nfrom .a import b\nfrom ... import c\nfrom .......................... import d\nfrom ..........................a.b.c import d\nfrom module import (a, b as B, c,)\nfrom a import *\n\nif c: B; del A\nelse: C\nif x: yield x;\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..772,

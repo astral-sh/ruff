@@ -1,18 +1,21 @@
 #[cfg(test)]
 mod tests {
-    
+
     use crate::{
         lexer::lex,
-        parser::{ParsedFile, Parser},
+        parser::{Parser, Program},
         Mode,
     };
     use insta::assert_debug_snapshot;
 
-    fn parse(src: &str) -> ParsedFile {
+    fn parse(src: &str) -> Program {
         let mode = Mode::Module;
         let lexer = lex(src, mode);
         let parser = Parser::new(src, mode, lexer.collect());
-        parser.parse()
+        let program = parser.parse();
+
+        assert_eq!(&program.parse_errors, &[]);
+        program
     }
 
     #[test]

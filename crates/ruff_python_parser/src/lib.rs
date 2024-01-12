@@ -113,7 +113,7 @@ use std::cell::Cell;
 
 pub use error::{FStringErrorType, ParseError, ParseErrorType};
 use lexer::{lex, lex_starts_at};
-pub use parser::ParsedFile;
+pub use parser::Program;
 use ruff_python_ast::{Expr, Mod, ModModule, PySourceType, Suite};
 use ruff_text_size::TextSize;
 pub use token::{StringKind, Tok, TokenKind};

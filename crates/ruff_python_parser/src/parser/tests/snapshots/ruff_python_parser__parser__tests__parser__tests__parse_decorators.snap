@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\n@a\ndef f(): ...\n\n@a.b.c\ndef f(): ...\n\n@a\n@a.b.c\ndef f(): ...\n\n@a\n@1 | 2\n@a.b.c\nclass T: ...\n\n@named_expr := abc\ndef f():\n    ...\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..130,

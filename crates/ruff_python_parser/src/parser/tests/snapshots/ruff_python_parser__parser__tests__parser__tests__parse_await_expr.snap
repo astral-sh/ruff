@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nawait x\nawait x + 1\nawait a and b\nawait f()\nawait [1, 2]\nawait {3, 4}\nawait {i: 5}\nawait 7, 8\nawait (9, 10)\nawait 1 == 1\nawait x if True else None\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..148,

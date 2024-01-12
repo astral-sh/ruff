@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nyield from x\nyield from x + 1\nyield from a and b\nyield from f()\nyield from [1, 2]\nyield from {3, 4}\nyield from {i: 5}\nyield from (9, 10)\nyield from 1 == 1\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..156,

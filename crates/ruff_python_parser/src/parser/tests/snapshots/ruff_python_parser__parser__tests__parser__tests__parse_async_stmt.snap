@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nasync def f():\n    ...\n\nasync for i in iter:\n    ...\n\nasync with x:\n    ...\n\n@a\nasync def x():\n    ...\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..104,

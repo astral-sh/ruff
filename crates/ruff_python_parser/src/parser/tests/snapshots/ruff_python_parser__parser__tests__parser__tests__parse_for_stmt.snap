@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nfor i in x:\n    ...\nfor x.attr in f():\n    pass\nfor 1 + 2 in x.attr:\n    ...\nfor i in x <= y:\n    pass\nfor i in a and b:\n    pass\nfor a,b,c, in iter:\n    ...\nfor (a, b) in iter:\n    ...\nfor i in *x.attr:\n    ...\nfor -i in [1, 2]:\n    ...\nfor *l in a, b, c,:\n   ...\nelse:\n    pass\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..281,

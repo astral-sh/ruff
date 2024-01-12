@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\n{}\n{1:2, a:1, b:'hello'}\n{a:b, **d}\n{'foo': 'bar', **{'nested': 'dict'}}\n{x + 1: y * 2, **call()}\n{l: [1, 2, 3], t: (1,2,3), d: {1:2, 3:4}, s: {1, 2}}\n{**d}\n{1: 2, **{'nested': 'dict'}}\n{a: c}\n{i: tuple(j for j in t if i != j)\n           for t in L\n           for i in t}\n{\n    'A': lambda p: None,\n    'B': C,\n}\n{**a, **b}\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..325,

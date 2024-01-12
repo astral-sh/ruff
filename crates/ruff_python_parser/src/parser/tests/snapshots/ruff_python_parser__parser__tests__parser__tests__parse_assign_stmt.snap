@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nx = 1\n[] = *l\n() = *t\na, b = ab\n*a = 1 + 2\na = b = c\nfoo.bar = False\nbaz[0] = 42\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..82,

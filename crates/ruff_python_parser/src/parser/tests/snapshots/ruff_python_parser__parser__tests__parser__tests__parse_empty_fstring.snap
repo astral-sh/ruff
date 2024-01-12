@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(r#\"\nf\"\"\nF\"\"\nf''\nf\"\"\"\"\"\"\nf''''''\n\"#)"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..29,

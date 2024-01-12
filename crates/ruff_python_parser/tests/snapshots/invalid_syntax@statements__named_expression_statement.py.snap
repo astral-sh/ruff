@@ -1,0 +1,52 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/statements/named_expression_statement.py
+---
+## AST
+
+ ```
+Module(
+    ModModule {
+        range: 0..129,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 120..128,
+                    value: NamedExpr(
+                        ExprNamedExpr {
+                            range: 121..127,
+                            target: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 121..122,
+                                    value: Int(
+                                        5,
+                                    ),
+                                },
+                            ),
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 126..127,
+                                    value: Int(
+                                        3,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # This test previously passed before the assignment operator checking
+2 | # above, but we include it here for good measure.
+3 | (5 := 3)
+  |  ^ Syntax Error: invalid assignment target
+  |
+
+
+

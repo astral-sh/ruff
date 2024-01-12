@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\ntype Point = tuple[float, float]\ntype Point[T] = tuple[T, T]\ntype IntFunc[**P] = Callable[P, int]  # ParamSpec\ntype LabeledTuple[*Ts] = tuple[str, *Ts]  # TypeVarTuple\ntype HashableSequence[T: Hashable] = Sequence[T]  # TypeVar with bound\ntype IntOrStrSequence[T: (int, str)] = Sequence[T]  # TypeVar with constraints\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..319,

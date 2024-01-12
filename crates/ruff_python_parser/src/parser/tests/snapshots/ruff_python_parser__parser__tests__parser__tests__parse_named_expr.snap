@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\n(x:=1)\n{ x := 1 }\n[x := 1]\n(x := 1 + 1)\n(x,y := a and b)\n{ x,y := a < b }\n[x,y := ...]\nf(a:=b, c:=d)\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..102,

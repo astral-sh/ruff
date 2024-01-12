@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nwith x:\n    ...\nwith x, y:\n    ...\nwith open() as f:\n    ...\nwith f() as x.attr:\n    pass\nwith x as X, y as Y, z as Z:\n    ...\nwith (x, z as Y, y,):\n    ...\nwith (a) as f:\n    ...\nwith ((a) as f, 1):\n    ...\nwith a:\n    yield a, b\nwith (yield 1):\n    ...\nwith (yield from 1):\n    ...\nwith (a := 1):\n    ...\nwith (open('bla.txt')), (open('bla.txt')):\n    pass\nwith (a := 1, x):\n    ...\nwith (p / 'new_file').open('wb'): ...\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..424,

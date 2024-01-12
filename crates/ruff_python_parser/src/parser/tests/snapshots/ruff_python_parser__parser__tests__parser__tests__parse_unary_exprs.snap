@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\n-1\n+1\n~1\n-1 + 2\n---1\nnot x\n    \")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..32,

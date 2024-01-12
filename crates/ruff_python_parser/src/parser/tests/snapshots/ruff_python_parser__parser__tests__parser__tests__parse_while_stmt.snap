@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\nwhile x:\n    ...\nwhile (x > 1) and y:\n    pass\nelse:\n    ...\nwhile x and y:\n    ...\n    print('Hello World!')\n\nelse:\n    print('Olá, Mundo!')\n    ...\nwhile a := b: ...\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..170,

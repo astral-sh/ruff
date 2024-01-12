@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(r#\"\nf\"normal {foo} {{another}} {bar} {{{three}}}\"\nf\"normal {foo!a} {bar!s} {baz!r} {foobar}\"\nf\"normal {x:y + 2}\"\nf\"{x:{{1}.pop()}}\"\nf\"{(lambda x:{x})}\"\nf\"{x =}\"\nf\"{    x = }\"\nf\"{x=!a}\"\nf\"{x:.3f!r =}\"\nf\"{x = !r :.3f}\"\nf\"{x:.3f=!r}\"\n\"hello\" f\"{x}\"\nf\"{x}\" f\"{y}\"\nf\"{x}\" \"world\"\nf\"Invalid args in command: {command, *args}\"\n\"foo\" f\"{x}\" \"bar\"\n(\n    f\"a\"\n    F\"b\"\n    \"c\"\n    rf\"d\"\n    fr\"e\"\n)\n\"#)"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..386,

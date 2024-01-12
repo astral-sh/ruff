@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\na == b\nb < a\nb > a\na >= b\na <= b\na != b\na is c\na in b\na not in c\na is not b\na < b == c > d is e not in f is not g <= h >= i != j\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..130,

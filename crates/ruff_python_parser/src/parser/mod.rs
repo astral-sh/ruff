@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use self::helpers::token_kind_to_cmp_op;
+use crate::lexer::lex;
 use crate::{
     error::FStringErrorType,
     lexer::{LexResult, Spanned},
@@ -20,6 +21,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 mod helpers;
+#[cfg(test)]
 mod tests;
 
 pub(crate) fn parse_tokens(
@@ -27,18 +29,29 @@ pub(crate) fn parse_tokens(
     source: &str,
     mode: Mode,
 ) -> Result<Mod, ParseError> {
-    let parsed_file = Parser::new(source, mode, TokenSource::new(tokens)).parse();
-    if parsed_file.parse_errors.is_empty() {
-        Ok(parsed_file.ast)
+    let program = Parser::new(source, mode, TokenSource::new(tokens)).parse();
+    if program.parse_errors.is_empty() {
+        Ok(program.ast)
     } else {
-        Err(parsed_file.parse_errors.into_iter().next().unwrap())
+        Err(program.parse_errors.into_iter().next().unwrap())
     }
 }
 
 #[derive(Debug)]
-pub struct ParsedFile {
+pub struct Program {
     pub ast: ast::Mod,
     pub parse_errors: Vec<ParseError>,
+}
+
+impl Program {
+    pub fn parse_str(source: &str, mode: Mode) -> Program {
+        let tokens = lex(source, mode);
+        Self::parse_tokens(source, tokens.collect(), mode)
+    }
+
+    pub fn parse_tokens(source: &str, tokens: Vec<LexResult>, mode: Mode) -> Program {
+        Parser::new(source, mode, TokenSource::new(tokens)).parse()
+    }
 }
 
 bitflags! {
@@ -233,7 +246,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub(crate) fn parse(mut self) -> ParsedFile {
+    pub(crate) fn parse(mut self) -> Program {
         let mut body = vec![];
 
         let ast = if self.mode == Mode::Expression {
@@ -290,10 +303,10 @@ impl<'src> Parser<'src> {
 
         // After parsing, the `ctx` and `ctx_stack` should be empty.
         // If it's not, you probably forgot to call `clear_ctx` somewhere.
-        assert!(self.ctx.is_empty());
+        assert_eq!(self.ctx, ParserCtxFlags::empty());
         assert_eq!(&self.ctx_stack, &[]);
 
-        ParsedFile {
+        Program {
             ast,
             parse_errors: self.errors,
         }

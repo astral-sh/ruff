@@ -2,7 +2,7 @@
 source: crates/ruff_python_parser/src/parser/tests/parser.rs
 expression: "parse(\"\n[x for i in range(5)]\n[b for c in d if x in w if y and yy if z]\n[a for b in c if d and e for f in j if k > h]\n[a for b in c if d and e async for f in j if k > h]\n[1 for i in x in a]\n[a for a, b in G]\n[\n    await x for a, b in C\n]\n[i for i in await x if entity is not None]\n[x for x in (l if True else L) if T]\n[i for i in (await x if True else X) if F]\n[i for i in await (x if True else X) if F]\n[f for f in c(x if True else [])]\n\")"
 ---
-ParsedFile {
+Program {
     ast: Module(
         ModModule {
             range: 0..431,
