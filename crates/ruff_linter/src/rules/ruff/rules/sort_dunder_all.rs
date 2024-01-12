@@ -179,11 +179,13 @@ impl DunderAllValue {
             ast::Expr::Tuple(ast::ExprTuple { elts, range, .. }) => (elts, range),
             _ => return None,
         };
+        
         // An `__all__` definition with <2 elements can't be unsorted;
         // no point in proceeding any further here
         if elts.len() < 2 {
             return None;
         }
+
         for elt in elts {
             // Only consider sorting it if __all__ only has strings in it
             let string_literal = elt.as_string_literal_expr()?;
@@ -192,6 +194,7 @@ impl DunderAllValue {
                 return None;
             }
         }
+        
         // Step (2): parse the `__all__` definition using the raw tokens.
         //
         // (2a). Start by collecting information on each line individually:
