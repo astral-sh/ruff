@@ -471,10 +471,16 @@ fn collect_dunder_all_items(
     for line in lines {
         match line {
             DunderAllLine::JustAComment(LineWithJustAComment(comment_range)) => {
+                // Comments on the same line as the opening paren and before any elements
+                // count as part of the "prelude"; these are not grouped into any item...
                 if first_item_encountered
                     || locator.line_start(comment_range.start())
                         != locator.line_start(dunder_all_range.start())
                 {
+                    // ...but for all other comments that precede an element,
+                    // group them with that element into an "item",
+                    // so that those comments move as one with the element
+                    // when the `__all__` list/tuple is sorted
                     this_range = Some(this_range.map_or(comment_range, |range| {
                         TextRange::new(range.start(), comment_range.end())
                     }));
