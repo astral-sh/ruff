@@ -6,6 +6,9 @@ __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
 __all__ += ["foo", "bar", "antipasti"]
 __all__ = ("d", "c", "b", "a")
 
+__all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
+__all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
+
 if bool():
     __all__ += ("x", "m", "a", "s")
 else:
@@ -82,12 +85,14 @@ __all__: tuple[str, ...] = (  # a comment about the opening paren
 )
 
 # we use natural sort for `__all__`,
-# not alphabetical sort:
+# not alphabetical sort.
+# Also, this doesn't end with a trailing comma,
+# so the autofix shouldn't introduce one:
 __all__ = (
     "aadvark237",
     "aadvark10092",
     "aadvark174",
-    "aadvark532",
+    "aadvark532"
 )
 
 ###################################
@@ -97,7 +102,14 @@ __all__ = (
 __all__ = ()
 __all__ = []
 __all__ = ("single_item",)
+__all__ = (
+    "single_item_multiline",
+)
 __all__ = ["single_item",]
+__all__ = ["single_item_no_trailing_comma"]
+__all__ = [
+    "single_item_multiline_no_trailing_comma"
+]
 __all__ = ("not_a_tuple_just_a_string")
 __all__ = ["a", "b", "c", "d"]
 __all__ += ["e", "f", "g"]

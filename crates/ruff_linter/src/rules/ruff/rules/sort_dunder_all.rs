@@ -172,6 +172,7 @@ struct DunderAllValue {
     items: Vec<DunderAllItem>,
     range: TextRange,
     multiline: bool,
+    ends_with_trailing_comma: bool,
 }
 
 impl DunderAllValue {
@@ -202,7 +203,7 @@ impl DunderAllValue {
         // Step (2): parse the `__all__` definition using the raw tokens.
         //
         // (2a). Start by collecting information on each line individually:
-        let lines = collect_dunder_all_lines(*range, locator)?;
+        let (lines, ends_with_trailing_comma) = collect_dunder_all_lines(*range, locator)?;
 
         // (2b). Group lines together into sortable "items":
         //   - Any "item" contains a single element of the `__all__` list/tuple
@@ -218,6 +219,7 @@ impl DunderAllValue {
             items,
             range: *range,
             multiline: is_multiline,
+            ends_with_trailing_comma,
         })
     }
 
@@ -296,12 +298,12 @@ impl DunderAllValue {
                 first_item_line_offset
             }
         };
-        let (needs_trailing_comma, postlude_start) = {
+        let postlude_start = {
             let last_item_line_offset = locator.line_end(last_item.end());
             if last_item_line_offset == locator.line_end(self.end()) {
-                (false, last_item.end())
+                last_item.end()
             } else {
-                (true, last_item_line_offset)
+                last_item_line_offset
             }
         };
         let mut prelude = locator
@@ -322,7 +324,7 @@ impl DunderAllValue {
                 parent,
                 indentation,
                 newline,
-                needs_trailing_comma,
+                self.ends_with_trailing_comma,
             )
         } else {
             Some(join_singleline_dunder_all_items(&sorted_items, locator))
@@ -345,7 +347,10 @@ enum SortedDunderAll {
     Sorted(Option<String>),
 }
 
-fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<DunderAllLine>> {
+fn collect_dunder_all_lines(
+    range: TextRange,
+    locator: &Locator,
+) -> Option<(Vec<DunderAllLine>, bool)> {
     // Collect data on each line of `__all__`.
     // Return `None` if `__all__` appears to be invalid,
     // or if it's an edge case we don't care about.
@@ -353,6 +358,7 @@ fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<D
     let mut lines = vec![];
     let mut items_in_line = vec![];
     let mut comment_in_line = None;
+    let mut ends_with_trailing_comma = false;
     // lex_starts_at gives us absolute ranges rather than relative ranges,
     // but (surprisingly) we still need to pass in the slice of code we want it to lex,
     // rather than the whole source file
@@ -393,12 +399,15 @@ fn collect_dunder_all_lines(range: TextRange, locator: &Locator) -> Option<Vec<D
                 }
             }
             Tok::Comment(_) => comment_in_line = Some(subrange),
-            Tok::String { value, .. } => items_in_line.push((value, subrange)),
-            Tok::Comma => continue,
+            Tok::String { value, .. } => {
+                items_in_line.push((value, subrange));
+                ends_with_trailing_comma = false;
+            }
+            Tok::Comma => ends_with_trailing_comma = true,
             _ => return None,
         }
     }
-    Some(lines)
+    Some((lines, ends_with_trailing_comma))
 }
 
 #[derive(Debug)]
