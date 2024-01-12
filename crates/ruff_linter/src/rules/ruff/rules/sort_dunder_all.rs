@@ -410,7 +410,10 @@ fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
     // Each item contains exactly one element,
     // but might contain multiple comments attached to that element
     // that must move with the element when `__all__` is sorted.
-    let mut all_items = vec![];
+    let mut all_items = Vec::with_capacity(match lines.as_slice() {
+        [DunderAllLine::OneOrMoreItems(single)] => single.items.len(),
+        _ => lines.len(),
+    });
     let mut this_range = None;
     for line in lines {
         match line {
