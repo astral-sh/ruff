@@ -106,12 +106,18 @@ pub(crate) fn format(
             match entry {
                 Ok(resolved_file) => {
                     let path = resolved_file.path();
-                    let SourceType::Python(source_type) = SourceType::from(&path) else {
-                        // Ignore any non-Python files.
-                        return None;
-                    };
-
                     let settings = resolver.resolve(path);
+
+                    let source_type = match settings.formatter.extension.get(path) {
+                        None => match SourceType::from(path) {
+                            SourceType::Python(source_type) => source_type,
+                            SourceType::Toml(_) => {
+                                // Ignore any non-Python files.
+                                return None;
+                            }
+                        },
+                        Some(language) => PySourceType::from(language),
+                    };
 
                     // Ignore files that are excluded from formatting
                     if (settings.file_resolver.force_exclude || !resolved_file.is_root())

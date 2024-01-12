@@ -436,3 +436,75 @@ ignore = ["D203", "D212"]
     "###);
     Ok(())
 }
+
+#[test]
+fn extension() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+include = ["*.ipy"]
+"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("main.ipy"),
+        r#"
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ad6f36d9-4b7d-4562-8d00-f15a0f1fbb6d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .arg("check")
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--extension", "ipy:ipynb"])
+        .arg("."), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.ipy:cell 1:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    "###);
+    Ok(())
+}

@@ -528,6 +528,8 @@ Options:
           Enable preview mode; checks will include unstable rules and fixes. Use `--no-preview` to disable
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --extension <EXTENSION>
+          List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`
       --statistics
           Show counts for every rule with at least one violation
       --add-noqa
@@ -604,6 +606,8 @@ Options:
           Avoid writing any formatted files back; instead, exit with a non-zero status code and the difference between the current file and how the formatted file would look like
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --extension <EXTENSION>
+          List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
       --preview
