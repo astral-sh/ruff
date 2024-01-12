@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.13
+
+### Bug fixes
+
+- Include base pyproject when initializing cache settings ([#9480](https://github.com/astral-sh/ruff/pull/9480))
+- \[`flake8-simplify`\] Account for possibly-empty f-string values in truthiness logic ([#9484](https://github.com/astral-sh/ruff/pull/9484))
+- \[`pylint`\] Add the missing period in `unnecessary-dunder-call` ([#9485](https://github.com/astral-sh/ruff/pull/9485))
+- \[`pylint`\] Fix `__aenter__` message in `unnecessary-dunder-call` ([#9492](https://github.com/astral-sh/ruff/pull/9492))
+
 ## 0.1.12
 
 ### Preview features
