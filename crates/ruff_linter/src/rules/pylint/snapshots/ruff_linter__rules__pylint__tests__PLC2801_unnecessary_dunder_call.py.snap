@@ -321,4 +321,12 @@ unnecessary_dunder_call.py:19:7: PLC2801 Unnecessary dunder call to `__neg__`. M
    |
    = help: Multiply by -1 instead
 
+unnecessary_dunder_call.py:31:16: PLC2801 Unnecessary dunder call to `__getattribute__`. Access attribute directly or use getattr built-in function.
+   |
+30 |     def do_thing(self, item):
+31 |         return object.__getattribute__(self, item)  # PLC2801
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC2801
+   |
+   = help: Access attribute directly or use getattr built-in function
+
 
