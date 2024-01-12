@@ -12,6 +12,7 @@ exit_code: 0
 ----- stdout -----
 Resolved settings for: "[BASEPATH]/crates/ruff_cli/resources/test/fixtures/unformatted.py"
 Settings path: "[BASEPATH]/pyproject.toml"
+
 # General Settings
 cache_dir = "[BASEPATH]/.ruff_cache"
 fix = false
@@ -20,6 +21,7 @@ output_format = text
 show_fixes = false
 show_source = false
 unsafe_fixes = hint
+
 # File Resolver Settings
 file_resolver.exclude = [
 	".bzr",
@@ -62,6 +64,7 @@ file_resolver.include = [
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
 file_resolver.project_root = "[BASEPATH]"
+
 # Linter Settings
 linter.exclude = []
 linter.project_root = "[BASEPATH]"
@@ -345,6 +348,7 @@ linter.pylint.max_statements = 50
 linter.pylint.max_public_methods = 20
 linter.pylint.max_locals = 15
 linter.pyupgrade.keep_runtime_typing = false
+
 # Formatter Settings
 formatter.exclude = []
 formatter.target_version = Py37

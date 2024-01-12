@@ -57,7 +57,7 @@ impl Default for Settings {
 
 impl fmt::Display for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "# General Settings")?;
+        writeln!(f, "\n# General Settings")?;
         display_settings! {
             formatter = f,
             fields = [
@@ -92,7 +92,7 @@ pub struct FileResolverSettings {
 
 impl fmt::Display for FileResolverSettings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "# File Resolver Settings")?;
+        writeln!(f, "\n# File Resolver Settings")?;
         display_settings! {
             formatter = f,
             namespace = "file_resolver",
@@ -239,7 +239,7 @@ impl Default for FormatterSettings {
 
 impl fmt::Display for FormatterSettings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "# Formatter Settings")?;
+        writeln!(f, "\n# Formatter Settings")?;
         display_settings! {
             formatter = f,
             namespace = "formatter",

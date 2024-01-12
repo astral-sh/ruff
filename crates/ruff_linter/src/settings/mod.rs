@@ -214,7 +214,7 @@ pub struct LinterSettings {
 
 impl Display for LinterSettings {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "# Linter Settings")?;
+        writeln!(f, "\n# Linter Settings")?;
         display_settings! {
             formatter = f,
             namespace = "linter",
