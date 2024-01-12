@@ -443,8 +443,8 @@ RUF022.py:91:11: RUF022 [*] `__all__` is not sorted
    |  ___________^
 92 | |     "aadvark237",
 93 | |     "aadvark10092",
-94 | |     "aadvark174",
-95 | |     "aadvark532"
+94 | |     "aadvark174",         # the very long whitespace span before this comment is retained
+95 | |     "aadvark532"                       # the even longer whitespace span before this comment is retained
 96 | | )
    | |_^ RUF022
 97 |   
@@ -452,16 +452,16 @@ RUF022.py:91:11: RUF022 [*] `__all__` is not sorted
    |
    = help: Sort `__all__` according to a natural sort
 
-ℹ Safe fix
+ℹ Unsafe fix
 89 89 | # Also, this doesn't end with a trailing comma,
 90 90 | # so the autofix shouldn't introduce one:
 91 91 | __all__ = (
-   92 |+    "aadvark174",
+   92 |+    "aadvark174",         # the very long whitespace span before this comment is retained
 92 93 |     "aadvark237",
 93    |-    "aadvark10092",
-94    |-    "aadvark174",
-95    |-    "aadvark532"
-   94 |+    "aadvark532",
+94    |-    "aadvark174",         # the very long whitespace span before this comment is retained
+95    |-    "aadvark532"                       # the even longer whitespace span before this comment is retained
+   94 |+    "aadvark532",                       # the even longer whitespace span before this comment is retained
    95 |+    "aadvark10092"
 96 96 | )
 97 97 | 

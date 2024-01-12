@@ -91,8 +91,8 @@ __all__: tuple[str, ...] = (  # a comment about the opening paren
 __all__ = (
     "aadvark237",
     "aadvark10092",
-    "aadvark174",
-    "aadvark532"
+    "aadvark174",         # the very long whitespace span before this comment is retained
+    "aadvark532"                       # the even longer whitespace span before this comment is retained
 )
 
 ###################################

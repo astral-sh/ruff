@@ -357,6 +357,7 @@ fn collect_dunder_all_lines(
     let mut parentheses_open = false;
     let mut lines = vec![];
     let mut items_in_line = vec![];
+    let mut comment_range_start = None;
     let mut comment_in_line = None;
     let mut ends_with_trailing_comma = false;
     // lex_starts_at gives us absolute ranges rather than relative ranges,
@@ -389,6 +390,7 @@ fn collect_dunder_all_lines(
                     if let Some(comment) = comment_in_line {
                         lines.push(DunderAllLine::JustAComment(LineWithJustAComment(comment)));
                         comment_in_line = None;
+                        comment_range_start = None;
                     }
                 } else {
                     lines.push(DunderAllLine::OneOrMoreItems(LineWithItems::new(
@@ -396,14 +398,27 @@ fn collect_dunder_all_lines(
                         comment_in_line,
                     )));
                     comment_in_line = None;
+                    comment_range_start = None;
                 }
             }
-            Tok::Comment(_) => comment_in_line = Some(subrange),
+            Tok::Comment(_) => {
+                comment_in_line = {
+                    if let Some(range_start) = comment_range_start {
+                        Some(TextRange::new(range_start, subrange.end()))
+                    } else {
+                        Some(subrange)
+                    }
+                }
+            }
             Tok::String { value, .. } => {
                 items_in_line.push((value, subrange));
                 ends_with_trailing_comma = false;
+                comment_range_start = Some(subrange.end());
             }
-            Tok::Comma => ends_with_trailing_comma = true,
+            Tok::Comma => {
+                comment_range_start = Some(subrange.end());
+                ends_with_trailing_comma = true;
+            }
             _ => return None,
         }
     }
@@ -561,7 +576,6 @@ fn join_multiline_dunder_all_items(
             new_dunder_all.push(',');
         }
         if let Some(comment) = item.additional_comments {
-            new_dunder_all.push_str("  ");
             new_dunder_all.push_str(locator.slice(comment));
         }
         if !is_final_item {
