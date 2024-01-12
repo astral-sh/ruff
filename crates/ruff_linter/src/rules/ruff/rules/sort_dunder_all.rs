@@ -190,7 +190,6 @@ impl DunderAllValue {
     /// tuple/list after all.
     fn from_expr(value: &ast::Expr, locator: &Locator) -> Option<DunderAllValue> {
         // Step (1): inspect the AST to check that we're looking at something vaguely sane:
-        let is_multiline = locator.contains_line_break(value.range());
         let (elts, range) = match value {
             ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, range),
             ast::Expr::Tuple(ast::ExprTuple { elts, range, .. }) => (elts, range),
@@ -238,7 +237,7 @@ impl DunderAllValue {
         Some(DunderAllValue {
             items,
             range: *range,
-            multiline: is_multiline,
+            multiline: locator.contains_line_break(value.range()),
             ends_with_trailing_comma,
         })
     }
