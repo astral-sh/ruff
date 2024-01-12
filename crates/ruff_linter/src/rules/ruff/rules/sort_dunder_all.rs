@@ -132,30 +132,33 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent
 
     let locator = checker.locator();
 
-    let Some(mut dunder_all_val) = DunderAllValue::from_expr(node, locator) else {
+    let Some(
+        dunder_all_val @ DunderAllValue {
+            range, multiline, ..
+        },
+    ) = DunderAllValue::from_expr(node, locator)
+    else {
         return;
     };
 
     let new_dunder_all =
-        match dunder_all_val.construct_sorted_all(locator, parent, checker.stylist()) {
+        match dunder_all_val.into_sorted_source_code(locator, parent, checker.stylist()) {
             SortedDunderAll::AlreadySorted => return,
             SortedDunderAll::Sorted(value) => value,
         };
 
-    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, dunder_all_val.range());
+    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
 
     if let Some(new_dunder_all) = new_dunder_all {
         let applicability = {
-            if dunder_all_val.multiline
-                && checker.indexer().comment_ranges().intersects(node.range())
-            {
+            if multiline && checker.indexer().comment_ranges().intersects(node.range()) {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe
             }
         };
         diagnostic.set_fix(Fix::applicable_edit(
-            Edit::range_replacement(new_dunder_all, dunder_all_val.range()),
+            Edit::range_replacement(new_dunder_all, range),
             applicability,
         ));
     }
@@ -229,8 +232,8 @@ impl DunderAllValue {
         true
     }
 
-    fn construct_sorted_all(
-        &mut self,
+    fn into_sorted_source_code(
+        self,
         locator: &Locator,
         parent: &ast::Stmt,
         stylist: &Stylist,
@@ -285,7 +288,7 @@ impl DunderAllValue {
             .to_string();
         let postlude = locator.slice(TextRange::new(postlude_start, self.end()));
 
-        let sorted_items = &mut self.items;
+        let mut sorted_items = self.items;
         sorted_items.sort();
 
         let joined_items = if self.multiline {
@@ -293,7 +296,7 @@ impl DunderAllValue {
             let newline = stylist.line_ending().as_str();
             prelude = format!("{}{}", prelude.trim_end(), newline);
             join_multiline_dunder_all_items(
-                sorted_items,
+                &sorted_items,
                 locator,
                 parent,
                 indentation,
@@ -301,7 +304,7 @@ impl DunderAllValue {
                 needs_trailing_comma,
             )
         } else {
-            Some(join_singleline_dunder_all_items(sorted_items, locator))
+            Some(join_singleline_dunder_all_items(&sorted_items, locator))
         };
 
         let new_dunder_all = joined_items.map(|items| format!("{prelude}{items}{postlude}"));
