@@ -72,6 +72,15 @@ __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
            "backslashreplace_errors", "namereplace_errors",
            "register_error", "lookup_error"]
 
+__all__: tuple[str, ...] = (  # a comment about the opening paren
+    # multiline comment about "bbb" part 1
+    # multiline comment about "bbb" part 2
+    "bbb",
+    # multiline comment about "aaa" part 1
+    # multiline comment about "aaa" part 2
+    "aaa",
+)
+
 ###################################
 # These should all not get flagged:
 ###################################

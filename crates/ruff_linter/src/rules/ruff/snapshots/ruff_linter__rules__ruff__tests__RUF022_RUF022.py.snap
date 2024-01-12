@@ -253,12 +253,13 @@ RUF022.py:51:11: RUF022 [*] `__all__` is not alphabetically sorted
    = help: Sort `__all__` alphabetically
 
 ℹ Unsafe fix
+49 49 | # comment7
 50 50 | 
 51 51 | __all__ = [  # comment0
-52 52 |     # comment1
-   53 |+    "ax",
-   54 |+    "bx",
-   55 |+    "cx",
+   52 |+    "ax",
+   53 |+    "bx",
+   54 |+    "cx",
+52 55 |     # comment1
 53 56 |     # comment2
 54    |-    "dx", "cx", "bx", "ax"  # comment3
    57 |+    "dx",  # comment3
@@ -287,7 +288,7 @@ RUF022.py:60:11: RUF022 [*] `__all__` is not alphabetically sorted
 73 | |            "register_error", "lookup_error"]
    | |____________________________________________^ RUF022
 74 |   
-75 |   ###################################
+75 |   __all__: tuple[str, ...] = (  # a comment about the opening paren
    |
    = help: Sort `__all__` alphabetically
 
@@ -355,7 +356,43 @@ RUF022.py:60:11: RUF022 [*] `__all__` is not alphabetically sorted
     103 |+    "strict_errors",
     104 |+    "xmlcharrefreplace_errors"]
 74  105 | 
-75  106 | ###################################
-76  107 | # These should all not get flagged:
+75  106 | __all__: tuple[str, ...] = (  # a comment about the opening paren
+76  107 |     # multiline comment about "bbb" part 1
+
+RUF022.py:75:28: RUF022 [*] `__all__` is not alphabetically sorted
+   |
+73 |              "register_error", "lookup_error"]
+74 |   
+75 |   __all__: tuple[str, ...] = (  # a comment about the opening paren
+   |  ____________________________^
+76 | |     # multiline comment about "bbb" part 1
+77 | |     # multiline comment about "bbb" part 2
+78 | |     "bbb",
+79 | |     # multiline comment about "aaa" part 1
+80 | |     # multiline comment about "aaa" part 2
+81 | |     "aaa",
+82 | | )
+   | |_^ RUF022
+83 |   
+84 |   ###################################
+   |
+   = help: Sort `__all__` alphabetically
+
+ℹ Unsafe fix
+73 73 |            "register_error", "lookup_error"]
+74 74 | 
+75 75 | __all__: tuple[str, ...] = (  # a comment about the opening paren
+   76 |+    # multiline comment about "aaa" part 1
+   77 |+    # multiline comment about "aaa" part 2
+   78 |+    "aaa",
+76 79 |     # multiline comment about "bbb" part 1
+77 80 |     # multiline comment about "bbb" part 2
+78 81 |     "bbb",
+79    |-    # multiline comment about "aaa" part 1
+80    |-    # multiline comment about "aaa" part 2
+81    |-    "aaa",
+82 82 | )
+83 83 | 
+84 84 | ###################################
 
 

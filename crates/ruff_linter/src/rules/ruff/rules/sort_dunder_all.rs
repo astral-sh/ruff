@@ -210,7 +210,7 @@ impl DunderAllValue {
         //     the comments above the element move with it.
         //   - The same goes for any comments on the same line as an element:
         //     if the element moves, the comment moves with it.
-        let items = collect_dunder_all_items(lines);
+        let items = collect_dunder_all_items(lines, *range, locator);
 
         Some(DunderAllValue {
             items,
@@ -398,7 +398,11 @@ enum DunderAllLine {
     OneOrMoreItems(LineWithItems),
 }
 
-fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
+fn collect_dunder_all_items(
+    lines: Vec<DunderAllLine>,
+    dunder_all_range: TextRange,
+    locator: &Locator,
+) -> Vec<DunderAllItem> {
     // Given data on each line in `__all__`, group lines together into "items".
     // Each item contains exactly one element,
     // but might contain multiple comments attached to that element
@@ -407,16 +411,25 @@ fn collect_dunder_all_items(lines: Vec<DunderAllLine>) -> Vec<DunderAllItem> {
         [DunderAllLine::OneOrMoreItems(single)] => single.items.len(),
         _ => lines.len(),
     });
-    let mut this_range = None;
+    let mut first_item_encountered = false;
+    let mut this_range: Option<TextRange> = None;
     for line in lines {
         match line {
             DunderAllLine::JustAComment(LineWithJustAComment(comment_range)) => {
-                this_range = Some(comment_range);
+                if first_item_encountered
+                    || locator.line_start(comment_range.start())
+                        != locator.line_start(dunder_all_range.start())
+                {
+                    this_range = Some(this_range.map_or(comment_range, |range| {
+                        TextRange::new(range.start(), comment_range.end())
+                    }));
+                }
             }
             DunderAllLine::OneOrMoreItems(LineWithItems {
                 items,
                 comment_range,
             }) => {
+                first_item_encountered = true;
                 let mut owned_items = items.into_iter();
                 let (first_val, first_range) = owned_items
                     .next()
