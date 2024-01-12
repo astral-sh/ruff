@@ -180,7 +180,7 @@ impl DunderAllValue {
             _ => return None,
         };
         
-        // An `__all__` definition with <2 elements can't be unsorted;
+        // An `__all__` definition with < 2 elements can't be unsorted;
         // no point in proceeding any further here
         if elts.len() < 2 {
             return None;
