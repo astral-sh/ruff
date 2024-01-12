@@ -84,7 +84,7 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
-                            range: 25..32,
+                            range: 24..33,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
@@ -327,7 +327,7 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
-                            range: 101..108,
+                            range: 100..109,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
@@ -491,7 +491,7 @@ Module(
                     ],
                     value: Tuple(
                         ExprTuple {
-                            range: 306..313,
+                            range: 305..314,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
