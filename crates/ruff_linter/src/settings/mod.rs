@@ -5,8 +5,6 @@
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
-use globset::Glob;
 use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
@@ -24,9 +22,7 @@ use crate::rules::{
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
     pycodestyle, pydocstyle, pyflakes, pylint, pyupgrade,
 };
-use crate::settings::types::{
-    ExtensionMapping, FilePatternSet, PerFileIgnore, PerFileIgnores, PythonVersion,
-};
+use crate::settings::types::{ExtensionMapping, FilePatternSet, PerFileIgnores, PythonVersion};
 use crate::{codes, RuleSelector};
 
 use super::line_width::IndentWidth;
@@ -387,22 +383,4 @@ impl Default for LinterSettings {
     fn default() -> Self {
         Self::new(path_dedot::CWD.as_path())
     }
-}
-
-/// Given a list of patterns, create a `GlobSet`.
-pub fn resolve_per_file_ignores(per_file_ignores: Vec<PerFileIgnore>) -> Result<PerFileIgnores> {
-    let ignores: Result<Vec<_>> = per_file_ignores
-        .into_iter()
-        .map(|per_file_ignore| {
-            // Construct absolute path matcher.
-            let absolute =
-                Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
-
-            // Construct basename matcher.
-            let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
-
-            Ok((absolute, basename, per_file_ignore.rules))
-        })
-        .collect();
-    Ok(PerFileIgnores::new(ignores?))
 }

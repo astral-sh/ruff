@@ -565,8 +565,22 @@ pub struct PerFileIgnores {
 }
 
 impl PerFileIgnores {
-    pub fn new(ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>) -> Self {
-        Self { ignores }
+    /// Given a list of patterns, create a `GlobSet`.
+    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
+        let ignores: Result<Vec<_>> = per_file_ignores
+            .into_iter()
+            .map(|per_file_ignore| {
+                // Construct absolute path matcher.
+                let absolute =
+                    Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
+
+                // Construct basename matcher.
+                let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
+
+                Ok((absolute, basename, per_file_ignore.rules))
+            })
+            .collect();
+        Ok(Self { ignores: ignores? })
     }
 }
 
