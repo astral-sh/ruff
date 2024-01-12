@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 
 use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
@@ -6,6 +6,7 @@ use rustc_hash::FxHashMap;
 use strum::IntoEnumIterator;
 
 use crate::{
+    display_settings,
     registry::{Rule, RuleSet},
     rule_selector::{PreviewOptions, Specificity},
     RuleSelector,
@@ -92,6 +93,20 @@ impl FixSafetyTable {
                 })
                 .collect(),
         }
+    }
+}
+
+impl Display for FixSafetyTable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.safety_table",
+            fields = [
+                self.forced_safe,
+                self.forced_unsafe
+            ]
+        }
+        Ok(())
     }
 }
 
