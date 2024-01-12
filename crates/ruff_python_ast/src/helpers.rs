@@ -914,6 +914,27 @@ where
     }
 }
 
+/// A [`Visitor`] to collect all stored [`Expr::Name`] nodes in an AST.
+#[derive(Debug, Default)]
+pub struct StoredNameFinder<'a> {
+    /// A map from identifier to defining expression.
+    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+}
+
+impl<'a, 'b> Visitor<'b> for StoredNameFinder<'a>
+where
+    'b: 'a,
+{
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(name) = expr {
+            if name.ctx.is_store() {
+                self.names.insert(&name.id, name);
+            }
+        }
+        crate::visitor::walk_expr(self, expr);
+    }
+}
+
 /// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
