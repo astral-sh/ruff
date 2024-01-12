@@ -93,15 +93,15 @@ pub(crate) fn sort_dunder_all_aug_assign(
     parent: &ast::Stmt,
 ) {
     let ast::StmtAugAssign {
-        value,
-        target,
+        ref value,
+        ref target,
         op: ast::Operator::Add,
         ..
-    } = node
+    } = *node
     else {
         return;
     };
-    let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+    let ast::Expr::Name(ast::ExprName { ref id, .. }) = **target else {
         return;
     };
     sort_dunder_all(checker, id, value, parent);
@@ -115,14 +115,14 @@ pub(crate) fn sort_dunder_all_ann_assign(
     parent: &ast::Stmt,
 ) {
     let ast::StmtAnnAssign {
-        target,
-        value: Some(val),
+        ref target,
+        value: Some(ref val),
         ..
     } = node
     else {
         return;
     };
-    let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+    let ast::Expr::Name(ast::ExprName { ref id, .. }) = **target else {
         return;
     };
     sort_dunder_all(checker, id, val, parent);
