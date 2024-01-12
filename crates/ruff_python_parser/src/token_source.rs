@@ -13,6 +13,38 @@ impl TokenSource {
             tokens: tokens.into_iter(),
         }
     }
+
+    pub(crate) fn current(&self) -> Option<&LexResult> {
+        let mut iter = self.tokens.as_slice().iter();
+
+        loop {
+            let next = iter.next()?;
+
+            if is_trivia(next) {
+                continue;
+            }
+
+            break Some(next);
+        }
+    }
+
+    pub(crate) fn peek_nth(&self, mut n: usize) -> Option<&LexResult> {
+        let mut iter = self.tokens.as_slice().iter();
+
+        loop {
+            let next = iter.next()?;
+
+            if is_trivia(next) {
+                continue;
+            }
+
+            if n == 0 {
+                break Some(next);
+            }
+
+            n -= 1;
+        }
+    }
 }
 
 impl FromIterator<LexResult> for TokenSource {

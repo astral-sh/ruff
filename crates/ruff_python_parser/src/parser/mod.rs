@@ -16,7 +16,6 @@ use ast::{
     Number, Operator, Pattern, Singleton, UnaryOp,
 };
 use bitflags::bitflags;
-use itertools::PeekNth;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -104,12 +103,9 @@ enum FunctionKind {
     FunctionDef,
 }
 
-pub(crate) struct Parser<'src, I>
-where
-    I: Iterator<Item = LexResult>,
-{
+pub(crate) struct Parser<'src> {
     source: &'src str,
-    lexer: PeekNth<I>,
+    tokens: TokenSource,
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
     /// This tracks the current expression or statement being parsed. For example,
@@ -223,15 +219,8 @@ const SIMPLE_STMT_SET: TokenSet = TokenSet::new(&[
 /// Tokens that represent simple statements, including expressions.
 const SIMPLE_STMT_SET2: TokenSet = SIMPLE_STMT_SET.union(EXPR_SET);
 
-impl<'src, I> Parser<'src, I>
-where
-    I: Iterator<Item = LexResult>,
-{
-    pub(crate) fn new(
-        source: &'src str,
-        mode: Mode,
-        lexer: I,
-    ) -> Parser<'src, impl Iterator<Item = LexResult>> {
+impl<'src> Parser<'src> {
+    pub(crate) fn new(source: &'src str, mode: Mode, tokens: TokenSource) -> Parser<'src> {
         Parser {
             mode,
             source,
@@ -239,7 +228,7 @@ where
             ctx_stack: Vec::new(),
             ctx: ParserCtxFlags::empty(),
             last_ctx: ParserCtxFlags::empty(),
-            lexer: itertools::peek_nth(lexer),
+            tokens,
             defer_invalid_node_creation: None,
         }
     }
@@ -331,7 +320,7 @@ where
     }
 
     fn next_token(&mut self) -> Spanned {
-        self.lexer
+        self.tokens
             .next()
             .map(|result| match result {
                 Ok(token) => token,
@@ -345,8 +334,22 @@ where
             .unwrap_or((Tok::EndOfFile, TextRange::empty(self.source.text_len())))
     }
 
-    fn lookahead(&mut self, offset: usize) -> (TokenKind, TextRange) {
-        self.lexer.peek_nth(offset).map_or(
+    fn current(&mut self) -> (TokenKind, TextRange) {
+        self.tokens.current().map_or(
+            (
+                TokenKind::EndOfFile,
+                TextRange::empty(self.source.text_len()),
+            ),
+            |result| match result {
+                Ok((tok, range)) => (tok.into(), *range),
+                // Return a `Invalid` token when encountering an error
+                Err(err) => (TokenKind::Invalid, err.location),
+            },
+        )
+    }
+
+    fn peek_nth(&mut self, offset: usize) -> (TokenKind, TextRange) {
+        self.tokens.peek_nth(offset).map_or(
             (
                 TokenKind::EndOfFile,
                 TextRange::empty(self.source.text_len()),
@@ -361,12 +364,12 @@ where
 
     #[inline]
     fn current_token(&mut self) -> (TokenKind, TextRange) {
-        self.lookahead(0)
+        self.peek_nth(0)
     }
 
     #[inline]
     fn current_kind(&mut self) -> TokenKind {
-        self.lookahead(0).0
+        self.current().0
     }
 
     fn eat(&mut self, kind: TokenKind) -> bool {
@@ -467,7 +470,7 @@ where
     }
 
     fn current_range(&mut self) -> TextRange {
-        self.lookahead(0).1
+        self.current().1
     }
 
     /// Parses elements enclosed within a delimiter pair, such as parentheses, brackets,
@@ -480,7 +483,7 @@ where
         opening: TokenKind,
         delim: TokenKind,
         closing: TokenKind,
-        mut func: impl FnMut(&mut Parser<'src, I>),
+        mut func: impl FnMut(&mut Parser<'src>),
     ) -> TextRange {
         let start_range = self.current_range();
         assert!(self.eat(opening));
@@ -514,7 +517,7 @@ where
         allow_trailing_delim: bool,
         delim: TokenKind,
         ending_set: impl Into<TokenSet>,
-        mut func: impl FnMut(&mut Parser<'src, I>) -> TextRange,
+        mut func: impl FnMut(&mut Parser<'src>) -> TextRange,
     ) -> Option<TextRange> {
         let ending_set = NEWLINE_EOF_SET.union(ending_set.into());
         let mut final_range = None;
@@ -523,7 +526,7 @@ where
             final_range = Some(func(self));
 
             // exit the loop if a trailing `delim` is not allowed
-            if !allow_trailing_delim && ending_set.contains(self.lookahead(1).0) {
+            if !allow_trailing_delim && ending_set.contains(self.peek_nth(1).0) {
                 break;
             }
 
@@ -1505,7 +1508,7 @@ where
         match kind {
             TokenKind::Def => self.parse_func_def_stmt(decorators, range),
             TokenKind::Class => self.parse_class_def_stmt(decorators, range),
-            TokenKind::Async if self.lookahead(1).0 == TokenKind::Def => {
+            TokenKind::Async if self.peek_nth(1).0 == TokenKind::Def => {
                 let mut async_range = self.current_range();
                 self.eat(TokenKind::Async);
 
@@ -1746,7 +1749,7 @@ where
             let mut has_seen_star = false;
             let mut prev_token = self.current_kind();
             loop {
-                let (kind, _) = self.lookahead(index);
+                let (kind, _) = self.peek_nth(index);
                 match kind {
                     TokenKind::Lpar => {
                         paren_nesting += 1;
@@ -2705,7 +2708,7 @@ where
     /// to the list of errors and returns an `Expr::Invalid`.
     fn parse_expr_with_recovery(
         &mut self,
-        mut parse_func: impl FnMut(&mut Parser<'src, I>) -> ExprWithRange,
+        mut parse_func: impl FnMut(&mut Parser<'src>) -> ExprWithRange,
         recover_set: impl Into<TokenSet>,
         error_msg: impl Display,
     ) -> ExprWithRange {
@@ -2737,9 +2740,7 @@ where
         match kind {
             TokenKind::Or => (4, kind, Associativity::Left),
             TokenKind::And => (5, kind, Associativity::Left),
-            TokenKind::Not if self.lookahead(1).0 == TokenKind::In => {
-                (7, kind, Associativity::Left)
-            }
+            TokenKind::Not if self.peek_nth(1).0 == TokenKind::In => (7, kind, Associativity::Left),
             TokenKind::Is
             | TokenKind::In
             | TokenKind::EqEqual
@@ -3291,7 +3292,7 @@ where
             lhs_range = lhs_range.cover(expr_range);
             comparators.push(expr);
 
-            if let Ok(op) = token_kind_to_cmp_op([self.current_kind(), self.lookahead(1).0]) {
+            if let Ok(op) = token_kind_to_cmp_op([self.current_kind(), self.peek_nth(1).0]) {
                 if matches!(op, CmpOp::IsNot | CmpOp::NotIn) {
                     self.next_token();
                 }
@@ -3838,7 +3839,7 @@ where
         &mut self,
         first_element: Expr,
         first_element_range: TextRange,
-        mut parse_func: impl FnMut(&mut Parser<'src, I>) -> ExprWithRange,
+        mut parse_func: impl FnMut(&mut Parser<'src>) -> ExprWithRange,
     ) -> ExprWithRange {
         // In case of the tuple only having one element, we need to cover the
         // range of the comma.

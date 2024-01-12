@@ -1,18 +1,17 @@
 #[cfg(test)]
 mod tests {
+    
     use crate::{
         lexer::lex,
         parser::{ParsedFile, Parser},
-        Mode, Tok,
+        Mode,
     };
     use insta::assert_debug_snapshot;
-    use itertools::Itertools;
 
     fn parse(src: &str) -> ParsedFile {
         let mode = Mode::Module;
-        let lexer = lex(src, mode)
-            .filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-        let parser = Parser::new(src, mode, lexer);
+        let lexer = lex(src, mode);
+        let parser = Parser::new(src, mode, lexer.collect());
         parser.parse()
     }
 
