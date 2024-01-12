@@ -442,14 +442,12 @@ fn collect_dunder_all_items(lines: &[DunderAllLine]) -> Vec<DunderAllItem> {
                     additional_comments: *comment_range,
                 });
                 this_range = None;
-                for (value, range) in rest {
-                    all_items.push(DunderAllItem {
-                        value: value.clone(),
-                        original_index: all_items.len(),
-                        range: *range,
-                        additional_comments: None,
-                    });
-                }
+                all_items.extend(rest.map(|(value, range)| DunderAllItem {
+                    value,
+                    original_index: all_items.len(),
+                    range,
+                    additional_comments: None,
+                }));
             }
         }
     }
