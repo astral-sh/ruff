@@ -253,10 +253,39 @@ impl DunderAllValue {
         // As well as the "items" in the `__all__` definition,
         // there is also a "prelude" and a "postlude":
         //  - Prelude == the region of source code from the opening parenthesis
-        //    (if there was one), up to the start of the first element in `__all__`.
+        //    (if there was one), up to the start of the first item in `__all__`.
         //  - Postlude == the region of source code from the end of the last
-        //    element in `__all__` up to and including the closing parenthesis
+        //    item in `__all__` up to and including the closing parenthesis
         //    (if there was one).
+        //
+        // For example:
+        //
+        // ```python
+        // __all__ = [  # comment0
+        //   # comment1
+        //   "first item",
+        //   "last item"  # comment2
+        //   # comment3
+        // ]  # comment4
+        //                                   <-- Tokenizer emits a LogicalNewline here
+        // ```
+        //
+        // - The prelude in the above example is the source code region
+        //   starting at the opening `[` and ending just before `# comment1`.
+        //   `comment0` here counts as part of the prelude because it is on
+        //   the same line as the opening paren, and because we haven't encountered
+        //   any elements of `__all__` yet, but `comment1` counts as part of the first item,
+        //   as it's on its own line, and all comments on their own line are grouped
+        //   with the next element below them to make "items",
+        //   (an "item" being a region of source code that all moves as one unit
+        //   when `__all__` is sorted).
+        // - The postlude in the above example is the source code region starting
+        //   just after `# comment2` and ending just before the lgoical newline
+        //   that follows the closing paren. `# comment2` is part of the last item,
+        //   as it's an inline comment on the same line as an element,
+        //   but `# comment3` becomes part of the postlude because there are no items
+        //   below it.
+        //
         let prelude_end = {
             let first_item_line_offset = locator.line_start(first_item.start());
             if first_item_line_offset == locator.line_start(self.start()) {
