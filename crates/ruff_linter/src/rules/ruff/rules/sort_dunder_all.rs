@@ -72,7 +72,7 @@ impl Violation for UnsortedDunderAll {
     }
 }
 
-/// Sort an `__all__` definition represented by a  `StmtAssign` node.
+/// Sort an `__all__` definition represented by a `StmtAssign` AST node.
 /// For example: `__all__ = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_assign(
     checker: &mut Checker,
@@ -85,7 +85,7 @@ pub(crate) fn sort_dunder_all_assign(
     sort_dunder_all(checker, id, value, parent);
 }
 
-/// Sort an `__all__` mutation represented by a  `StmtAugAssign` node.
+/// Sort an `__all__` mutation represented by a `StmtAugAssign` AST node.
 /// For example: `__all__ += ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_aug_assign(
     checker: &mut Checker,
@@ -107,7 +107,7 @@ pub(crate) fn sort_dunder_all_aug_assign(
     sort_dunder_all(checker, id, value, parent);
 }
 
-/// Sort an `__all__` mutation represented by a `StmtAnnAssign` node.
+/// Sort an `__all__` definition represented by a `StmtAnnAssign` AST node.
 /// For example: `__all__: list[str] = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_ann_assign(
     checker: &mut Checker,
@@ -174,8 +174,9 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent
     checker.diagnostics.push(diagnostic);
 }
 
-/// Struct encapsulating an analysis of a Python tuple/list
-/// that represents an `__all__` definition or augmentation.
+/// An instance of this struct encapsulates an analysis
+/// of a Python tuple/list that represents an `__all__`
+/// definition or augmentation.
 struct DunderAllValue {
     items: Vec<DunderAllItem>,
     range: TextRange,
@@ -184,8 +185,8 @@ struct DunderAllValue {
 }
 
 impl DunderAllValue {
-    /// Analyses an AST node for a Python tuple/list that represents an `__all__`
-    /// definition or augmentation. Returns `None` if the analysis fails
+    /// Analyse an AST node for a Python tuple/list that represents an `__all__`
+    /// definition or augmentation. Return `None` if the analysis fails
     /// for whatever reason, or if it looks like we're not actually looking at a
     /// tuple/list after all.
     fn from_expr(value: &ast::Expr, locator: &Locator) -> Option<DunderAllValue> {
@@ -220,6 +221,8 @@ impl DunderAllValue {
         }
 
         // Step (2): parse the `__all__` definition using the raw tokens.
+        // See the docs for `collect_dunder_all_lines()` for why we have to
+        // use the raw tokens, rather than just the AST, to do this parsing.
         //
         // (2a). Start by collecting information on each line individually:
         let (lines, ends_with_trailing_comma) = collect_dunder_all_lines(*range, locator)?;
@@ -258,8 +261,7 @@ impl DunderAllValue {
     /// Determine whether `__all__` is already sorted.
     /// If it is not already sorted, attempt to sort `__all__`,
     /// and return a string with the sorted `__all__ definition/augmentation`
-    /// that can be inserted into the source
-    /// code as a range replacement.
+    /// that can be inserted into the source code as a range replacement.
     fn into_sorted_source_code(
         self,
         locator: &Locator,
@@ -313,6 +315,14 @@ impl DunderAllValue {
         //   as it's an inline comment on the same line as an element,
         //   but `# comment3` becomes part of the postlude because there are no items
         //   below it.
+        //
+        // "Prelude" and "postlude" could both possibly be empty strings, for example
+        // in a situation like this, where there is neither an opening parenthesis
+        // nor a closing parenthesis:
+        //
+        // ```python
+        // __all__ = "foo", "bar", "baz"
+        // ```
         //
         let prelude_end = {
             let first_item_line_offset = locator.line_start(first_item.start());
@@ -407,13 +417,13 @@ fn collect_dunder_all_lines(
     let mut comment_range_start = None;
     let mut comment_in_line = None;
     let mut ends_with_trailing_comma = false;
-    // lex_starts_at gives us absolute ranges rather than relative ranges,
+    // `lex_starts_at()` gives us absolute ranges rather than relative ranges,
     // but (surprisingly) we still need to pass in the slice of code we want it to lex,
-    // rather than the whole source file
+    // rather than the whole source file:
     for pair in lexer::lex_starts_at(locator.slice(range), Mode::Expression, range.start()) {
         let (tok, subrange) = pair.ok()?;
         match tok {
-            // If exactly one `Lpar`` or `Lsqb`` is encountered, that's fine
+            // If exactly one `Lpar` or `Lsqb` is encountered, that's fine
             // -- a valid __all__ definition has to be a list or tuple,
             // and most (though not all) lists/tuples start with either a `(` or a `[`.
             //
@@ -487,7 +497,7 @@ fn collect_dunder_all_lines(
 
 /// Instances of this struct represent source-code lines in the middle
 /// of multiline `__all__` tuples/lists where the line contains
-/// 0 elements of the tuple/list, but does have a comment in it.
+/// 0 elements of the tuple/list, but the line does have a comment in it.
 #[derive(Debug)]
 struct LineWithJustAComment(TextRange);
 
@@ -553,8 +563,8 @@ fn collect_dunder_all_items(
                         != locator.line_start(dunder_all_range.start())
                 {
                     // ...but for all other comments that precede an element,
-                    // group them with that element into an "item",
-                    // so that those comments move as one with the element
+                    // group the comment with the element following that comment
+                    // into an "item", so that the comment moves as one with the element
                     // when the `__all__` list/tuple is sorted
                     preceding_comment_range =
                         Some(preceding_comment_range.map_or(comment_range, |range| {
