@@ -467,7 +467,7 @@ fn collect_dunder_all_items(
         _ => lines.len(),
     });
     let mut first_item_encountered = false;
-    let mut this_range: Option<TextRange> = None;
+    let mut preceding_comment_range: Option<TextRange> = None;
     for line in lines {
         match line {
             DunderAllLine::JustAComment(LineWithJustAComment(comment_range)) => {
@@ -481,9 +481,10 @@ fn collect_dunder_all_items(
                     // group them with that element into an "item",
                     // so that those comments move as one with the element
                     // when the `__all__` list/tuple is sorted
-                    this_range = Some(this_range.map_or(comment_range, |range| {
-                        TextRange::new(range.start(), comment_range.end())
-                    }));
+                    preceding_comment_range =
+                        Some(preceding_comment_range.map_or(comment_range, |range| {
+                            TextRange::new(range.start(), comment_range.end())
+                        }));
                 }
             }
             DunderAllLine::OneOrMoreItems(LineWithItems {
@@ -495,7 +496,7 @@ fn collect_dunder_all_items(
                 let (first_val, first_range) = owned_items
                     .next()
                     .expect("LineWithItems::new() should uphold the invariant that this list is always non-empty");
-                let range = this_range.map_or(first_range, |r| {
+                let range = preceding_comment_range.map_or(first_range, |r| {
                     TextRange::new(r.start(), first_range.end())
                 });
                 all_items.push(DunderAllItem {
@@ -504,7 +505,7 @@ fn collect_dunder_all_items(
                     range,
                     end_of_line_comments: comment_range,
                 });
-                this_range = None;
+                preceding_comment_range = None;
                 for (value, range) in owned_items {
                     all_items.push(DunderAllItem {
                         value,
