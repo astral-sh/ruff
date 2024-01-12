@@ -72,14 +72,13 @@ impl Violation for UnsortedDunderAll {
 
 pub(crate) fn sort_dunder_all_assign(
     checker: &mut Checker,
-    node: &ast::StmtAssign,
+    ast::StmtAssign {value, targets, ..}: &ast::StmtAssign,
     parent: &ast::Stmt,
 ) {
-    let ast::StmtAssign { value, targets, .. } = node;
     let [ast::Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
         return;
     };
-    sort_dunder_all(checker, id, value, parent);
+    sort_dunder_all(checker, id, &value, parent);
 }
 
 pub(crate) fn sort_dunder_all_aug_assign(
@@ -133,7 +132,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent
 
     let locator = checker.locator();
 
-    let Some(dunder_all_val) = DunderAllValue::from_expr(node, locator) else {
+    let Some(mut dunder_all_val) = DunderAllValue::from_expr(node, locator) else {
         return;
     };
 
@@ -179,7 +178,7 @@ impl DunderAllValue {
             ast::Expr::Tuple(ast::ExprTuple { elts, range, .. }) => (elts, range),
             _ => return None,
         };
-        
+
         // An `__all__` definition with < 2 elements can't be unsorted;
         // no point in proceeding any further here
         if elts.len() < 2 {
@@ -194,7 +193,7 @@ impl DunderAllValue {
                 return None;
             }
         }
-        
+
         // Step (2): parse the `__all__` definition using the raw tokens.
         //
         // (2a). Start by collecting information on each line individually:
@@ -217,21 +216,29 @@ impl DunderAllValue {
         })
     }
 
+    /// Implementation of the unstable [`&[T].is_sorted`] function.
+    /// See  https://github.com/rust-lang/rust/issues/53485
+    fn is_already_sorted(&self) -> bool {
+        for (this, next) in self.items.iter().tuple_windows() {
+            if next < this {
+                return false;
+            }
+        }
+        true
+    }
+
     fn construct_sorted_all(
-        &self,
+        &mut self,
         locator: &Locator,
         parent: &ast::Stmt,
         stylist: &Stylist,
     ) -> SortedDunderAll {
-        let mut sorted_items = self.items.clone();
-        sorted_items.sort();
-
         // As well as saving us unnecessary work,
         // returning early here also means that we can rely on the invariant
         // throughout the rest of this function that both `items` and `sorted_items`
         // have length of at least two. If there are fewer than two items in `__all__`,
         // it is impossible for them *not* to compare equal here:
-        if sorted_items == self.items {
+        if self.is_already_sorted() {
             return SortedDunderAll::AlreadySorted;
         }
         assert!(self.items.len() >= 2);
@@ -275,6 +282,9 @@ impl DunderAllValue {
             .slice(TextRange::new(self.start(), prelude_end))
             .to_string();
         let postlude = locator.slice(TextRange::new(postlude_start, self.end()));
+
+        let sorted_items = &mut self.items;
+        sorted_items.sort();
 
         let joined_items = if self.multiline {
             let indentation = stylist.indentation();
