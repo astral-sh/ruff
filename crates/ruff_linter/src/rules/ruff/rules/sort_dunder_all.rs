@@ -72,6 +72,8 @@ impl Violation for UnsortedDunderAll {
     }
 }
 
+/// Sort an `__all__` definition represented by a  `StmtAssign` node.
+/// For example: `__all__ = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_assign(
     checker: &mut Checker,
     ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
@@ -83,6 +85,8 @@ pub(crate) fn sort_dunder_all_assign(
     sort_dunder_all(checker, id, value, parent);
 }
 
+/// Sort an `__all__` mutation represented by a  `StmtAugAssign` node.
+/// For example: `__all__ += ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_aug_assign(
     checker: &mut Checker,
     node: &ast::StmtAugAssign,
@@ -103,6 +107,8 @@ pub(crate) fn sort_dunder_all_aug_assign(
     sort_dunder_all(checker, id, value, parent);
 }
 
+/// Sort an `__all__` mutation represented by a `StmtAnnAssign` node.
+/// For example: `__all__: list[str] = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_ann_assign(
     checker: &mut Checker,
     node: &ast::StmtAnnAssign,
@@ -168,6 +174,8 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent
     checker.diagnostics.push(diagnostic);
 }
 
+/// Struct encapsulating an analysis of a Python tuple/list
+/// that represents an `__all__` definition or augmentation.
 struct DunderAllValue {
     items: Vec<DunderAllItem>,
     range: TextRange,
@@ -176,6 +184,10 @@ struct DunderAllValue {
 }
 
 impl DunderAllValue {
+    /// Analyses an AST node for a Python tuple/list that represents an `__all__`
+    /// definition or augmentation. Returns `None` if the analysis fails
+    /// for whatever reason, or if it looks like we're not actually looking at a
+    /// tuple/list after all.
     fn from_expr(value: &ast::Expr, locator: &Locator) -> Option<DunderAllValue> {
         // Step (1): inspect the AST to check that we're looking at something vaguely sane:
         let is_multiline = locator.contains_line_break(value.range());
@@ -186,7 +198,15 @@ impl DunderAllValue {
         };
 
         // An `__all__` definition with < 2 elements can't be unsorted;
-        // no point in proceeding any further here
+        // no point in proceeding any further here.
+        //
+        // N.B. Here, this is just an optimisation
+        // (and to avoid us rewriting code when we don't have to).
+        //
+        // While other parts of this file *do* depend on there being a
+        // minimum of 2 elements in `__all__`, that invariant
+        // is maintained elsewhere. (For example, see comments at the
+        // start of `into_sorted_source_code()`.)
         if elts.len() < 2 {
             return None;
         }
@@ -236,6 +256,11 @@ impl DunderAllValue {
         true
     }
 
+    /// Determine whether `__all__` is already sorted.
+    /// If it is not already sorted, attempt to sort `__all__`,
+    /// and return a string with the sorted `__all__ definition/augmentation`
+    /// that can be inserted into the source
+    /// code as a range replacement.
     fn into_sorted_source_code(
         self,
         locator: &Locator,
@@ -341,19 +366,42 @@ impl Ranged for DunderAllValue {
     }
 }
 
+/// Variants of this enum are returned by `into_sorted_source_code()`.
+///
+/// There are three possible states represented here:
+/// (1) `__all__` was already sorted
+/// (2) `__all__` was not already sorted,
+///     but we couldn't figure out how to sort it safely
+/// (3) `__all__` was not already sorted;
+///     here's the source code to replace it with,
+///     so that it becomes sorted!
 #[derive(Debug)]
 enum SortedDunderAll {
     AlreadySorted,
     Sorted(Option<String>),
 }
 
+/// Collect data on each line of `__all__`.
+/// Return `None` if `__all__` appears to be invalid,
+/// or if it's an edge case we don't care about.
+///
+/// Why do we need to do this using the raw tokens,
+/// when we already have the AST? The AST strips out
+/// crucial information that we need to track here, such as:
+/// - The value of comments
+/// - The amount of whitespace between the end of a line
+///   and an inline comment
+/// - Whether or not the final item in the tuple/list has a
+///   trailing comma
+///
+/// All of this information is necessary to have at a later
+/// stage if we're to sort items without doing unnecessary
+/// brutality to the comments and pre-existing style choices
+/// in the original source code.
 fn collect_dunder_all_lines(
     range: TextRange,
     locator: &Locator,
 ) -> Option<(Vec<DunderAllLine>, bool)> {
-    // Collect data on each line of `__all__`.
-    // Return `None` if `__all__` appears to be invalid,
-    // or if it's an edge case we don't care about.
     let mut parentheses_open = false;
     let mut lines = vec![];
     let mut items_in_line = vec![];
@@ -366,6 +414,19 @@ fn collect_dunder_all_lines(
     for pair in lexer::lex_starts_at(locator.slice(range), Mode::Expression, range.start()) {
         let (tok, subrange) = pair.ok()?;
         match tok {
+            // If exactly one `Lpar`` or `Lsqb`` is encountered, that's fine
+            // -- a valid __all__ definition has to be a list or tuple,
+            // and most (though not all) lists/tuples start with either a `(` or a `[`.
+            //
+            // Any more than one `(` or `[` in an `__all__` definition, however,
+            // indicates that we've got something here that's just too complex
+            // for us to handle. Maybe a string element in `__all__` is parenthesized;
+            // maybe the `__all__` definition is in fact invalid syntax;
+            // maybe there's some other thing going on that we haven't anticipated.
+            //
+            // Whatever the case -- if we encounter more than one `(` or `[`,
+            // we evidently don't know what to do here. So just return `None` to
+            // signal failure.
             Tok::Lpar | Tok::Lsqb => {
                 if parentheses_open {
                     return None;
@@ -425,12 +486,23 @@ fn collect_dunder_all_lines(
     Some((lines, ends_with_trailing_comma))
 }
 
+/// Instances of this struct represent source-code lines in the middle
+/// of multiline `__all__` tuples/lists where the line contains
+/// 0 elements of the tuple/list, but does have a comment in it.
 #[derive(Debug)]
 struct LineWithJustAComment(TextRange);
 
+/// Instances of this struct represent source-code lines in single-line
+/// or multiline `__all__` tuples/lists where the line contains at least
+/// 1 element of the tuple/list. The line may contain > 1 element of the
+/// tuple/list, and may also have a trailing comment after the element(s).
 #[derive(Debug)]
 struct LineWithItems {
+    // For elements in the list, we keep track of the value of the
+    // value of the element as well as the source-code range of the element.
+    // (We need to know the actual value so that we can sort the items.)
     items: Vec<(String, TextRange)>,
+    // For comments, we only need to keep track of the source-code range.
     comment_range: Option<TextRange>,
 }
 
@@ -453,15 +525,19 @@ enum DunderAllLine {
     OneOrMoreItems(LineWithItems),
 }
 
+/// Given data on each line in `__all__`, group lines together into "items".
+/// Each item contains exactly one string element,
+/// but might contain multiple comments attached to that element
+/// that must move with the element when `__all__` is sorted.
+///
+/// Note that any comments following the last item are discarded here,
+/// but that doesn't matter: we add them back in `into_sorted_source_code()`
+/// as part of the `postlude` (see comments in that function)
 fn collect_dunder_all_items(
     lines: Vec<DunderAllLine>,
     dunder_all_range: TextRange,
     locator: &Locator,
 ) -> Vec<DunderAllItem> {
-    // Given data on each line in `__all__`, group lines together into "items".
-    // Each item contains exactly one element,
-    // but might contain multiple comments attached to that element
-    // that must move with the element when `__all__` is sorted.
     let mut all_items = Vec::with_capacity(match lines.as_slice() {
         [DunderAllLine::OneOrMoreItems(single)] => single.items.len(),
         _ => lines.len(),
@@ -520,6 +596,41 @@ fn collect_dunder_all_items(
     all_items
 }
 
+/// An instance of this struct represents a single element
+/// from the original tuple/list, *and* any comments that
+/// are "attached" to it. The comments "attached" to the element
+/// will move with the element when the `__all__` tuple/list is sorted.
+///
+/// Comments on their own line immediately preceding the element will
+/// always form a contiguous range with the range of the element itself;
+/// however, inline comments won't necessary form a contiguous range.
+/// Consider the following scenario, where both `# comment0` and `# comment1`
+/// will move with the "a" element when the list is sorted:
+///
+/// ```python
+/// __all__ = [
+///     "b",
+///     # comment0
+///     "a", "c",  # comment1
+/// ]
+/// ```
+///
+/// The desired outcome here is:
+///
+/// ```python
+/// __all__ = [
+///     # comment0
+///     "a",  # comment1
+///     "b",
+///     "c",
+/// ]
+/// ```
+///
+/// To achieve this, both `# comment0` and `# comment1`
+/// are grouped into the `DunderAllItem` instance
+/// where the value is `"a"`, even though the source-code range
+/// of `# comment1` does not form a contiguous range with the
+/// source-code range of `"a"`.
 #[derive(Clone, Debug)]
 struct DunderAllItem {
     value: String,
