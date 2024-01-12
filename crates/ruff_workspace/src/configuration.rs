@@ -1213,8 +1213,6 @@ mod tests {
         }
         .as_rule_table(preview.map(|preview| preview.mode).unwrap_or_default())
         .iter_enabled()
-        // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is off-by-default
-        .filter(|rule| rule.noqa_code() != "RUF014")
         .collect()
     }
 
