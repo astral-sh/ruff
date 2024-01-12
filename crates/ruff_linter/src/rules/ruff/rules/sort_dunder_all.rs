@@ -496,7 +496,7 @@ fn collect_dunder_all_items(
                     value: first_val,
                     original_index: all_items.len(),
                     range,
-                    additional_comments: comment_range,
+                    end_of_line_comments: comment_range,
                 });
                 this_range = None;
                 for (value, range) in owned_items {
@@ -504,7 +504,7 @@ fn collect_dunder_all_items(
                         value,
                         original_index: all_items.len(),
                         range,
-                        additional_comments: None,
+                        end_of_line_comments: None,
                     });
                 }
             }
@@ -520,7 +520,7 @@ struct DunderAllItem {
     original_index: usize,
     // Note that this range might include comments, etc.
     range: TextRange,
-    additional_comments: Option<TextRange>,
+    end_of_line_comments: Option<TextRange>,
 }
 
 impl Ranged for DunderAllItem {
@@ -575,8 +575,8 @@ fn join_multiline_dunder_all_items(
         if !is_final_item || needs_trailing_comma {
             new_dunder_all.push(',');
         }
-        if let Some(comment) = item.additional_comments {
-            new_dunder_all.push_str(locator.slice(comment));
+        if let Some(trailing_comments) = item.end_of_line_comments {
+            new_dunder_all.push_str(locator.slice(trailing_comments));
         }
         if !is_final_item {
             new_dunder_all.push_str(newline);
