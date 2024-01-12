@@ -11,7 +11,7 @@ use anyhow::Result;
 use anyhow::{anyhow, bail};
 use globset::{Candidate, GlobSet};
 use ignore::{WalkBuilder, WalkState};
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -204,12 +204,7 @@ impl<'a> Resolver<'a> {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        match self.pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => {
-                Either::Left(std::iter::once(&self.pyproject_config.settings))
-            }
-            PyprojectDiscoveryStrategy::Hierarchical => Either::Right(self.settings.values()),
-        }
+        std::iter::once(&self.pyproject_config.settings).chain(self.settings.values())
     }
 }
 

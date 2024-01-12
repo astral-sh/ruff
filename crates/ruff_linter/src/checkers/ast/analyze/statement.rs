@@ -355,12 +355,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
                 flake8_trio::rules::async_function_with_timeout(checker, function_def);
             }
-            #[cfg(feature = "unreachable-code")]
-            if checker.enabled(Rule::UnreachableCode) {
-                checker
-                    .diagnostics
-                    .extend(ruff::rules::unreachable::in_function(name, body));
-            }
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());
             }
