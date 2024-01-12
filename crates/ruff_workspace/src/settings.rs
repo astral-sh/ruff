@@ -1,7 +1,10 @@
 use path_absolutize::path_dedot;
 use ruff_cache::cache_dir;
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
-use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFormat, UnsafeFixes};
+use ruff_linter::display_settings;
+use ruff_linter::settings::types::{
+    ExtensionMapping, FilePattern, FilePatternSet, SerializationFormat, UnsafeFixes,
+};
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
@@ -10,6 +13,7 @@ use ruff_python_formatter::{
     QuoteStyle,
 };
 use ruff_source_file::find_newline;
+use std::fmt;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, CacheKey)]
@@ -53,6 +57,30 @@ impl Default for Settings {
     }
 }
 
+impl fmt::Display for Settings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "\n# General Settings")?;
+        display_settings! {
+            formatter = f,
+            fields = [
+                // We want the quotes and lossy UTF8 conversion for this path, so
+                // using PathBuf's `Debug` formatter suffices.
+                self.cache_dir     | debug,
+                self.fix,
+                self.fix_only,
+                self.output_format,
+                self.show_fixes,
+                self.show_source,
+                self.unsafe_fixes,
+                self.file_resolver | nested,
+                self.linter        | nested,
+                self.formatter     | nested
+            ]
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, CacheKey)]
 pub struct FileResolverSettings {
     pub exclude: FilePatternSet,
@@ -62,6 +90,26 @@ pub struct FileResolverSettings {
     pub extend_include: FilePatternSet,
     pub respect_gitignore: bool,
     pub project_root: PathBuf,
+}
+
+impl fmt::Display for FileResolverSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "\n# File Resolver Settings")?;
+        display_settings! {
+            formatter = f,
+            namespace = "file_resolver",
+            fields = [
+                self.exclude,
+                self.extend_exclude,
+                self.force_exclude,
+                self.include,
+                self.extend_include,
+                self.respect_gitignore,
+                self.project_root | debug,
+            ]
+        }
+        Ok(())
+    }
 }
 
 pub(crate) static EXCLUDE: &[FilePattern] = &[
@@ -116,6 +164,7 @@ impl FileResolverSettings {
 #[derive(CacheKey, Clone, Debug)]
 pub struct FormatterSettings {
     pub exclude: FilePatternSet,
+    pub extension: ExtensionMapping,
     pub preview: PreviewMode,
     pub target_version: ruff_python_formatter::PythonVersion,
 
@@ -177,6 +226,7 @@ impl Default for FormatterSettings {
 
         Self {
             exclude: FilePatternSet::default(),
+            extension: ExtensionMapping::default(),
             target_version: default_options.target_version(),
             preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),
@@ -188,6 +238,30 @@ impl Default for FormatterSettings {
             docstring_code_format: default_options.docstring_code(),
             docstring_code_line_width: default_options.docstring_code_line_width(),
         }
+    }
+}
+
+impl fmt::Display for FormatterSettings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "\n# Formatter Settings")?;
+        display_settings! {
+            formatter = f,
+            namespace = "formatter",
+            fields = [
+                self.exclude,
+                self.target_version | debug,
+                self.preview,
+                self.line_width,
+                self.line_ending,
+                self.indent_style,
+                self.indent_width,
+                self.quote_style,
+                self.magic_trailing_comma,
+                self.docstring_code_format,
+                self.docstring_code_line_width,
+            ]
+        }
+        Ok(())
     }
 }
 
@@ -211,4 +285,15 @@ pub enum LineEnding {
 
     /// Line endings will be converted to `\n` on Unix and `\r\n` on Windows.
     Native,
+}
+
+impl fmt::Display for LineEnding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Auto => write!(f, "auto"),
+            Self::Lf => write!(f, "lf"),
+            Self::CrLf => write!(f, "crlf"),
+            Self::Native => write!(f, "native"),
+        }
+    }
 }

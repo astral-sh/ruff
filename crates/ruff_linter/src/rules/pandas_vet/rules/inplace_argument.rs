@@ -61,6 +61,15 @@ pub(crate) fn inplace_argument(checker: &mut Checker, call: &ast::ExprCall) {
         return;
     }
 
+    // If the function doesn't take an `inplace` argument, abort.
+    if !call
+        .func
+        .as_attribute_expr()
+        .is_some_and(|func| accepts_inplace_argument(&func.attr))
+    {
+        return;
+    }
+
     let mut seen_star = false;
     for keyword in call.arguments.keywords.iter().rev() {
         let Some(arg) = &keyword.arg else {
@@ -133,4 +142,36 @@ fn convert_inplace_argument_to_assignment(
     .ok()?;
 
     Some(Fix::unsafe_edits(insert_assignment, [remove_argument]))
+}
+
+/// Returns `true` if the given method accepts an `inplace` argument when used on a Pandas
+/// `DataFrame`, `Series`, or `Index`.
+///
+/// See: <https://pandas.pydata.org/docs/reference/frame.html>
+fn accepts_inplace_argument(method: &str) -> bool {
+    matches!(
+        method,
+        "where"
+            | "mask"
+            | "query"
+            | "clip"
+            | "eval"
+            | "backfill"
+            | "bfill"
+            | "ffill"
+            | "fillna"
+            | "interpolate"
+            | "dropna"
+            | "pad"
+            | "replace"
+            | "drop"
+            | "drop_duplicates"
+            | "rename"
+            | "rename_axis"
+            | "reset_index"
+            | "set_index"
+            | "sort_values"
+            | "sort_index"
+            | "set_names"
+    )
 }

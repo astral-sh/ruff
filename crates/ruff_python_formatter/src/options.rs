@@ -2,6 +2,7 @@ use ruff_formatter::printer::{LineEnding, PrinterOptions, SourceMapGeneration};
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
+use std::fmt;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -241,6 +242,16 @@ pub enum QuoteStyle {
     Preserve,
 }
 
+impl fmt::Display for QuoteStyle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Single => write!(f, "single"),
+            Self::Double => write!(f, "double"),
+            Self::Preserve => write!(f, "preserve"),
+        }
+    }
+}
+
 impl FromStr for QuoteStyle {
     type Err = &'static str;
 
@@ -277,6 +288,15 @@ impl MagicTrailingComma {
     }
 }
 
+impl fmt::Display for MagicTrailingComma {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Respect => write!(f, "respect"),
+            Self::Ignore => write!(f, "ignore"),
+        }
+    }
+}
+
 impl FromStr for MagicTrailingComma {
     type Err = &'static str;
 
@@ -306,6 +326,15 @@ impl PreviewMode {
     }
 }
 
+impl fmt::Display for PreviewMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Disabled => write!(f, "disabled"),
+            Self::Enabled => write!(f, "enabled"),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
@@ -320,6 +349,15 @@ pub enum DocstringCode {
 impl DocstringCode {
     pub const fn is_enabled(self) -> bool {
         matches!(self, DocstringCode::Enabled)
+    }
+}
+
+impl fmt::Display for DocstringCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Disabled => write!(f, "disabled"),
+            Self::Enabled => write!(f, "enabled"),
+        }
     }
 }
 
@@ -338,11 +376,20 @@ pub enum DocstringCodeLineWidth {
     Dynamic,
 }
 
-impl std::fmt::Debug for DocstringCodeLineWidth {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Debug for DocstringCodeLineWidth {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             DocstringCodeLineWidth::Fixed(v) => v.value().fmt(f),
             DocstringCodeLineWidth::Dynamic => "dynamic".fmt(f),
+        }
+    }
+}
+
+impl fmt::Display for DocstringCodeLineWidth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Fixed(width) => width.fmt(f),
+            Self::Dynamic => write!(f, "dynamic"),
         }
     }
 }

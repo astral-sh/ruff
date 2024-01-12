@@ -1,5 +1,6 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 
 use crate::registry::{Rule, RuleSet, RuleSetIterator};
@@ -59,6 +60,20 @@ impl RuleTable {
     pub fn disable(&mut self, rule: Rule) {
         self.enabled.remove(rule);
         self.should_fix.remove(rule);
+    }
+}
+
+impl Display for RuleTable {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.rules",
+            fields = [
+                self.enabled,
+                self.should_fix
+            ]
+        }
+        Ok(())
     }
 }
 

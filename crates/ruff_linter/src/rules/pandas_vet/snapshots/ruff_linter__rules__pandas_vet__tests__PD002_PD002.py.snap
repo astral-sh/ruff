@@ -164,6 +164,8 @@ PD002.py:33:24: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
 32 | 
 33 | (x.drop(["a"], axis=1, inplace=True))
    |                        ^^^^^^^^^^^^ PD002
+34 | 
+35 | # This method doesn't take exist in Pandas, so ignore it.
    |
    = help: Assign to variable; remove `inplace` arg
 
@@ -173,5 +175,8 @@ PD002.py:33:24: PD002 [*] `inplace=True` should be avoided; it has inconsistent 
 32 32 | 
 33    |-(x.drop(["a"], axis=1, inplace=True))
    33 |+x = (x.drop(["a"], axis=1))
+34 34 | 
+35 35 | # This method doesn't take exist in Pandas, so ignore it.
+36 36 | x.rotate_z(45, inplace=True)
 
 

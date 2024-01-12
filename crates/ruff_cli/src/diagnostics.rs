@@ -17,7 +17,7 @@ use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::types::{ExtensionMapping, UnsafeFixes};
+use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
@@ -179,11 +179,6 @@ impl AddAssign for FixMap {
     }
 }
 
-fn override_source_type(path: Option<&Path>, extension: &ExtensionMapping) -> Option<PySourceType> {
-    let ext = path?.extension()?.to_str()?;
-    extension.get(ext).map(PySourceType::from)
-}
-
 /// Lint the source code at the given `Path`.
 pub(crate) fn lint_path(
     path: &Path,
@@ -228,7 +223,7 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    let source_type = match override_source_type(Some(path), &settings.extension) {
+    let source_type = match settings.extension.get(path).map(PySourceType::from) {
         Some(source_type) => source_type,
         None => match SourceType::from(path) {
             SourceType::Toml(TomlSourceType::Pyproject) => {
@@ -398,15 +393,14 @@ pub(crate) fn lint_stdin(
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
-    let source_type = if let Some(source_type) =
-        override_source_type(path, &settings.linter.extension)
-    {
-        source_type
-    } else {
-        let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
-            return Ok(Diagnostics::default());
-        };
-        source_type
+    let source_type = match path.and_then(|path| settings.linter.extension.get(path)) {
+        None => match path.map(SourceType::from).unwrap_or_default() {
+            SourceType::Python(source_type) => source_type,
+            SourceType::Toml(_) => {
+                return Ok(Diagnostics::default());
+            }
+        },
+        Some(language) => PySourceType::from(language),
     };
 
     // Extract the sources from the file.

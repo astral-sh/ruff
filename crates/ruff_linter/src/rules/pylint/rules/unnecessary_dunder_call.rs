@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -80,8 +80,14 @@ pub(crate) fn unnecessary_dunder_call(checker: &mut Checker, call: &ast::ExprCal
         return;
     }
 
-    // Ignore certain dunder methods used in lambda expressions.
+    // Ignore certain dunder method calls in lambda expressions. These methods would require
+    // rewriting as a statement, which is not possible in a lambda expression.
     if allow_nested_expression(attr, checker.semantic()) {
+        return;
+    }
+
+    // Ignore dunder method calls within dunder methods definitions.
+    if in_dunder_method_definition(checker.semantic()) {
         return;
     }
 
@@ -273,7 +279,7 @@ impl DunderReplacement {
             "__str__" => Some(Self::Builtin("str", "Use `str()` builtin")),
             "__subclasscheck__" => Some(Self::Builtin("issubclass", "Use `issubclass()` builtin")),
 
-            "__aenter__" => Some(Self::MessageOnly("Use `aenter()` builtin")),
+            "__aenter__" => Some(Self::MessageOnly("Invoke context manager directly")),
             "__ceil__" => Some(Self::MessageOnly("Use `math.ceil()` function")),
             "__copy__" => Some(Self::MessageOnly("Use `copy.copy()` function")),
             "__deepcopy__" => Some(Self::MessageOnly("Use `copy.deepcopy()` function")),
@@ -283,15 +289,15 @@ impl DunderReplacement {
             "__delitem__" => Some(Self::MessageOnly("Use `del` statement")),
             "__divmod__" => Some(Self::MessageOnly("Use `divmod()` builtin")),
             "__format__" => Some(Self::MessageOnly(
-                "Use `format` builtin, format string method, or f-string.",
+                "Use `format` builtin, format string method, or f-string",
             )),
             "__fspath__" => Some(Self::MessageOnly("Use `os.fspath` function")),
             "__get__" => Some(Self::MessageOnly("Use `get` method")),
             "__getattr__" => Some(Self::MessageOnly(
-                "Access attribute directly or use getattr built-in function.",
+                "Access attribute directly or use getattr built-in function",
             )),
             "__getattribute__" => Some(Self::MessageOnly(
-                "Access attribute directly or use getattr built-in function.",
+                "Access attribute directly or use getattr built-in function",
             )),
             "__getitem__" => Some(Self::MessageOnly("Access item via subscript")),
             "__init__" => Some(Self::MessageOnly("Instantiate class directly")),
@@ -304,7 +310,7 @@ impl DunderReplacement {
             "__rpow__" => Some(Self::MessageOnly("Use ** operator or `pow()` builtin")),
             "__set__" => Some(Self::MessageOnly("Use subscript assignment")),
             "__setattr__" => Some(Self::MessageOnly(
-                "Mutate attribute directly or use setattr built-in function.",
+                "Mutate attribute directly or use setattr built-in function",
             )),
             "__setitem__" => Some(Self::MessageOnly("Use subscript assignment")),
             "__truncate__" => Some(Self::MessageOnly("Use `math.trunc()` function")),
@@ -343,4 +349,14 @@ fn allow_nested_expression(dunder_name: &str, semantic: &SemanticModel) -> bool 
                 | "__ixor__"
                 | "__ior__"
         )
+}
+
+/// Returns `true` if the [`SemanticModel`] is currently in a dunder method definition.
+fn in_dunder_method_definition(semantic: &SemanticModel) -> bool {
+    semantic.current_statements().any(|statement| {
+        let Stmt::FunctionDef(func_def) = statement else {
+            return false;
+        };
+        func_def.name.starts_with("__") && func_def.name.ends_with("__")
+    })
 }

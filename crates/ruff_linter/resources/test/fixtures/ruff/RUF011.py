@@ -10,6 +10,8 @@ constant = 5
 {value.attribute: value.upper() for value in data for constant in data}
 {constant[value]: value.upper() for value in data for constant in data}
 {value[constant]: value.upper() for value in data for constant in data}
+{local_id: token for token in tokens if (local_id := _extract_local_id(token)) is not None}
+{key: kwargs.get(key) for key in kwargs.keys() if not params.get(key)}
 
 # Errors
 {"key": value.upper() for value in data}
@@ -20,3 +22,5 @@ constant = 5
 {constant + constant: value.upper() for value in data}
 {constant.attribute: value.upper() for value in data}
 {constant[0]: value.upper() for value in data}
+{tokens: token for token in tokens}
+

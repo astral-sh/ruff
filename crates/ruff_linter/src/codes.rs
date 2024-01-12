@@ -914,9 +914,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "011") => (RuleGroup::Stable, rules::ruff::rules::StaticKeyDictComprehension),
         (Ruff, "012") => (RuleGroup::Stable, rules::ruff::rules::MutableClassDefault),
         (Ruff, "013") => (RuleGroup::Stable, rules::ruff::rules::ImplicitOptional),
-        #[cfg(feature = "unreachable-code")] // When removing this feature gate, also update rules_selector.rs
-        #[allow(deprecated)]
-        (Ruff, "014") => (RuleGroup::Nursery, rules::ruff::rules::UnreachableCode),
         (Ruff, "015") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryIterableAllocationForFirstElement),
         (Ruff, "016") => (RuleGroup::Stable, rules::ruff::rules::InvalidIndexType),
         #[allow(deprecated)]
