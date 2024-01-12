@@ -12,9 +12,11 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 
 use itertools::Itertools;
+use natord;
 
 /// ## What it does
-/// Checks for `__all__` definitions that are not alphabetically sorted.
+/// Checks for `__all__` definitions that are not ordered
+/// according to a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order).
 ///
 /// ## Why is this bad?
 /// Consistency is good. Use a common convention for `__all__` to make your
@@ -62,11 +64,11 @@ impl Violation for UnsortedDunderAll {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`__all__` is not alphabetically sorted")
+        format!("`__all__` is not sorted")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Sort `__all__` alphabetically".to_string())
+        Some("Sort `__all__` according to a natural sort".to_string())
     }
 }
 
@@ -511,15 +513,10 @@ impl PartialEq for DunderAllItem {
 
 impl Eq for DunderAllItem {}
 
-impl DunderAllItem {
-    fn sort_index(&self) -> (&str, usize) {
-        (&self.value, self.original_index)
-    }
-}
-
 impl Ord for DunderAllItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.sort_index().cmp(&other.sort_index())
+        natord::compare(&self.value, &other.value)
+            .then_with(|| self.original_index.cmp(&other.original_index))
     }
 }
 

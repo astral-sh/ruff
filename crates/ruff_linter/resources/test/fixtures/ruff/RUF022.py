@@ -81,6 +81,15 @@ __all__: tuple[str, ...] = (  # a comment about the opening paren
     "aaa",
 )
 
+# we use natural sort for `__all__`,
+# not alphabetical sort:
+__all__ = (
+    "aadvark237",
+    "aadvark10092",
+    "aadvark174",
+    "aadvark532",
+)
+
 ###################################
 # These should all not get flagged:
 ###################################

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF022.py:5:11: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:5:11: RUF022 [*] `__all__` is not sorted
   |
 3 | ##################################################
 4 | 
@@ -10,7 +10,7 @@ RUF022.py:5:11: RUF022 [*] `__all__` is not alphabetically sorted
 6 | __all__ += ["foo", "bar", "antipasti"]
 7 | __all__ = ("d", "c", "b", "a")
   |
-  = help: Sort `__all__` alphabetically
+  = help: Sort `__all__` according to a natural sort
 
 ℹ Safe fix
 2 2 | # Single-line __all__ definitions (nice 'n' easy!)
@@ -22,14 +22,14 @@ RUF022.py:5:11: RUF022 [*] `__all__` is not alphabetically sorted
 7 7 | __all__ = ("d", "c", "b", "a")
 8 8 | 
 
-RUF022.py:6:12: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:6:12: RUF022 [*] `__all__` is not sorted
   |
 5 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
 6 | __all__ += ["foo", "bar", "antipasti"]
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
 7 | __all__ = ("d", "c", "b", "a")
   |
-  = help: Sort `__all__` alphabetically
+  = help: Sort `__all__` according to a natural sort
 
 ℹ Safe fix
 3 3 | ##################################################
@@ -41,7 +41,7 @@ RUF022.py:6:12: RUF022 [*] `__all__` is not alphabetically sorted
 8 8 | 
 9 9 | if bool():
 
-RUF022.py:7:11: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:7:11: RUF022 [*] `__all__` is not sorted
   |
 5 | __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
 6 | __all__ += ["foo", "bar", "antipasti"]
@@ -50,7 +50,7 @@ RUF022.py:7:11: RUF022 [*] `__all__` is not alphabetically sorted
 8 | 
 9 | if bool():
   |
-  = help: Sort `__all__` alphabetically
+  = help: Sort `__all__` according to a natural sort
 
 ℹ Safe fix
 4 4 | 
@@ -62,7 +62,7 @@ RUF022.py:7:11: RUF022 [*] `__all__` is not alphabetically sorted
 9 9 | if bool():
 10 10 |     __all__ += ("x", "m", "a", "s")
 
-RUF022.py:10:16: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:10:16: RUF022 [*] `__all__` is not sorted
    |
  9 | if bool():
 10 |     __all__ += ("x", "m", "a", "s")
@@ -70,7 +70,7 @@ RUF022.py:10:16: RUF022 [*] `__all__` is not alphabetically sorted
 11 | else:
 12 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    |
-   = help: Sort `__all__` alphabetically
+   = help: Sort `__all__` according to a natural sort
 
 ℹ Safe fix
 7  7  | __all__ = ("d", "c", "b", "a")
@@ -82,7 +82,7 @@ RUF022.py:10:16: RUF022 [*] `__all__` is not alphabetically sorted
 12 12 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 13 13 | 
 
-RUF022.py:12:16: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:12:16: RUF022 [*] `__all__` is not sorted
    |
 10 |     __all__ += ("x", "m", "a", "s")
 11 | else:
@@ -91,7 +91,7 @@ RUF022.py:12:16: RUF022 [*] `__all__` is not alphabetically sorted
 13 | 
 14 | __all__: list[str] = ["the", "three", "little", "pigs"]
    |
-   = help: Sort `__all__` alphabetically
+   = help: Sort `__all__` according to a natural sort
 
 ℹ Safe fix
 9  9  | if bool():
@@ -103,7 +103,7 @@ RUF022.py:12:16: RUF022 [*] `__all__` is not alphabetically sorted
 14 14 | __all__: list[str] = ["the", "three", "little", "pigs"]
 15 15 | 
 
-RUF022.py:14:22: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:14:22: RUF022 [*] `__all__` is not sorted
    |
 12 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 13 | 
@@ -112,7 +112,7 @@ RUF022.py:14:22: RUF022 [*] `__all__` is not alphabetically sorted
 15 | 
 16 | ####################################
    |
-   = help: Sort `__all__` alphabetically
+   = help: Sort `__all__` according to a natural sort
 
 ℹ Safe fix
 11 11 | else:
@@ -124,7 +124,7 @@ RUF022.py:14:22: RUF022 [*] `__all__` is not alphabetically sorted
 16 16 | ####################################
 17 17 | # Neat multiline __all__ definitions
 
-RUF022.py:20:11: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:20:11: RUF022 [*] `__all__` is not sorted
    |
 18 |   ####################################
 19 |   
@@ -140,7 +140,7 @@ RUF022.py:20:11: RUF022 [*] `__all__` is not alphabetically sorted
 27 |   
 28 |   __all__ = [
    |
-   = help: Sort `__all__` alphabetically
+   = help: Sort `__all__` according to a natural sort
 
 ℹ Unsafe fix
 18 18 | ####################################
@@ -159,7 +159,7 @@ RUF022.py:20:11: RUF022 [*] `__all__` is not alphabetically sorted
 27 27 | 
 28 28 | __all__ = [
 
-RUF022.py:28:11: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:28:11: RUF022 [*] `__all__` is not sorted
    |
 26 |   )
 27 |   
@@ -175,7 +175,7 @@ RUF022.py:28:11: RUF022 [*] `__all__` is not alphabetically sorted
 35 |   
 36 |   ##########################################
    |
-   = help: Sort `__all__` alphabetically
+   = help: Sort `__all__` according to a natural sort
 
 ℹ Unsafe fix
 26 26 | )
@@ -194,7 +194,7 @@ RUF022.py:28:11: RUF022 [*] `__all__` is not alphabetically sorted
 35 35 | 
 36 36 | ##########################################
 
-RUF022.py:41:11: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:41:11: RUF022 [*] `__all__` is not sorted
    |
 40 |   # comment0
 41 |   __all__ = ("d", "a",  # comment1
@@ -209,7 +209,7 @@ RUF022.py:41:11: RUF022 [*] `__all__` is not alphabetically sorted
    | |_^ RUF022
 49 |   # comment7
    |
-   = help: Sort `__all__` alphabetically
+   = help: Sort `__all__` according to a natural sort
 
 ℹ Unsafe fix
 38 38 | ##########################################
@@ -233,7 +233,7 @@ RUF022.py:41:11: RUF022 [*] `__all__` is not alphabetically sorted
 48 51 | )  # comment6
 49 52 | # comment7
 
-RUF022.py:51:11: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:51:11: RUF022 [*] `__all__` is not sorted
    |
 49 |   # comment7
 50 |   
@@ -250,7 +250,7 @@ RUF022.py:51:11: RUF022 [*] `__all__` is not alphabetically sorted
 59 |   
 60 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
    |
-   = help: Sort `__all__` alphabetically
+   = help: Sort `__all__` according to a natural sort
 
 ℹ Unsafe fix
 49 49 | # comment7
@@ -267,7 +267,7 @@ RUF022.py:51:11: RUF022 [*] `__all__` is not alphabetically sorted
 56 59 |     # comment5
 57 60 |     # comment6
 
-RUF022.py:60:11: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:60:11: RUF022 [*] `__all__` is not sorted
    |
 58 |   ]  # comment7
 59 |   
@@ -290,7 +290,7 @@ RUF022.py:60:11: RUF022 [*] `__all__` is not alphabetically sorted
 74 |   
 75 |   __all__: tuple[str, ...] = (  # a comment about the opening paren
    |
-   = help: Sort `__all__` alphabetically
+   = help: Sort `__all__` according to a natural sort
 
 ℹ Safe fix
 57  57  |     # comment6
@@ -318,13 +318,13 @@ RUF022.py:60:11: RUF022 [*] `__all__` is not alphabetically sorted
     65  |+    "BOM64_LE",
     66  |+    "BOM_BE",
     67  |+    "BOM_LE",
-    68  |+    "BOM_UTF16",
-    69  |+    "BOM_UTF16_BE",
-    70  |+    "BOM_UTF16_LE",
-    71  |+    "BOM_UTF32",
-    72  |+    "BOM_UTF32_BE",
-    73  |+    "BOM_UTF32_LE",
-    74  |+    "BOM_UTF8",
+    68  |+    "BOM_UTF8",
+    69  |+    "BOM_UTF16",
+    70  |+    "BOM_UTF16_BE",
+    71  |+    "BOM_UTF16_LE",
+    72  |+    "BOM_UTF32",
+    73  |+    "BOM_UTF32_BE",
+    74  |+    "BOM_UTF32_LE",
     75  |+    "Codec",
     76  |+    "CodecInfo",
     77  |+    "EncodedFile",
@@ -359,7 +359,7 @@ RUF022.py:60:11: RUF022 [*] `__all__` is not alphabetically sorted
 75  106 | __all__: tuple[str, ...] = (  # a comment about the opening paren
 76  107 |     # multiline comment about "bbb" part 1
 
-RUF022.py:75:28: RUF022 [*] `__all__` is not alphabetically sorted
+RUF022.py:75:28: RUF022 [*] `__all__` is not sorted
    |
 73 |              "register_error", "lookup_error"]
 74 |   
@@ -374,9 +374,9 @@ RUF022.py:75:28: RUF022 [*] `__all__` is not alphabetically sorted
 82 | | )
    | |_^ RUF022
 83 |   
-84 |   ###################################
+84 |   # we use natural sort for `__all__`,
    |
-   = help: Sort `__all__` alphabetically
+   = help: Sort `__all__` according to a natural sort
 
 ℹ Unsafe fix
 73 73 |            "register_error", "lookup_error"]
@@ -393,6 +393,37 @@ RUF022.py:75:28: RUF022 [*] `__all__` is not alphabetically sorted
 81    |-    "aaa",
 82 82 | )
 83 83 | 
-84 84 | ###################################
+84 84 | # we use natural sort for `__all__`,
+
+RUF022.py:86:11: RUF022 [*] `__all__` is not sorted
+   |
+84 |   # we use natural sort for `__all__`,
+85 |   # not alphabetical sort:
+86 |   __all__ = (
+   |  ___________^
+87 | |     "aadvark237",
+88 | |     "aadvark10092",
+89 | |     "aadvark174",
+90 | |     "aadvark532",
+91 | | )
+   | |_^ RUF022
+92 |   
+93 |   ###################################
+   |
+   = help: Sort `__all__` according to a natural sort
+
+ℹ Safe fix
+84 84 | # we use natural sort for `__all__`,
+85 85 | # not alphabetical sort:
+86 86 | __all__ = (
+   87 |+    "aadvark174",
+87 88 |     "aadvark237",
+   89 |+    "aadvark532",
+88 90 |     "aadvark10092",
+89    |-    "aadvark174",
+90    |-    "aadvark532",
+91 91 | )
+92 92 | 
+93 93 | ###################################
 
 
