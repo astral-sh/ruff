@@ -243,7 +243,13 @@ impl Display for LinterSettings {
                 self.line_length,
                 self.task_tags | array,
                 self.typing_modules | array,
-
+            ]
+        }
+        writeln!(f, "\n# Linter Plugins")?;
+        display_settings! {
+            formatter = f,
+            namespace = "linter",
+            fields = [
                 self.flake8_annotations | nested,
                 self.flake8_bandit | nested,
                 self.flake8_bugbear | nested,
