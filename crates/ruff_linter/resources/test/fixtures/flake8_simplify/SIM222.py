@@ -160,3 +160,10 @@ def secondToTime(s0: int) -> (int, int, int) or str:
 
 def secondToTime(s0: int) -> ((int, int, int) or str):
     m, s = divmod(s0, 60)
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/9479
+print(f"{a}{b}" or "bar")
+print(f"{a}{''}" or "bar")
+print(f"{''}{''}" or "bar")
+print(f"{1}{''}" or "bar")

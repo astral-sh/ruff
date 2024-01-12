@@ -32,7 +32,7 @@ use crate::checkers::ast::Checker;
 ///
 /// d, e, f = 0, 1, 2
 /// y = (d and e) or f
-/// ````
+/// ```
 #[violation]
 pub struct ParenthesizeChainedOperators;
 

@@ -308,10 +308,13 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
     }
 }
 
-pub fn any_over_f_string_element(element: &FStringElement, func: &dyn Fn(&Expr) -> bool) -> bool {
+pub fn any_over_f_string_element(
+    element: &ast::FStringElement,
+    func: &dyn Fn(&Expr) -> bool,
+) -> bool {
     match element {
-        FStringElement::Literal(_) => false,
-        FStringElement::Expression(ast::FStringExpressionElement {
+        ast::FStringElement::Literal(_) => false,
+        ast::FStringElement::Expression(ast::FStringExpressionElement {
             expression,
             format_spec,
             ..
@@ -1171,21 +1174,10 @@ impl Truthiness {
             }
             Expr::NoneLiteral(_) => Self::Falsey,
             Expr::EllipsisLiteral(_) => Self::Truthy,
-            Expr::FString(ast::ExprFString { value, .. }) => {
-                if value.iter().all(|part| match part {
-                    ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
-                    ast::FStringPart::FString(f_string) => f_string.elements.is_empty(),
-                }) {
+            Expr::FString(f_string) => {
+                if is_empty_f_string(f_string) {
                     Self::Falsey
-                } else if value
-                    .elements()
-                    .any(|f_string_element| match f_string_element {
-                        ast::FStringElement::Literal(ast::FStringLiteralElement {
-                            value, ..
-                        }) => !value.is_empty(),
-                        ast::FStringElement::Expression(_) => true,
-                    })
-                {
+                } else if is_non_empty_f_string(f_string) {
                     Self::Truthy
                 } else {
                     Self::Unknown
@@ -1241,6 +1233,99 @@ impl Truthiness {
             Self::Unknown => None,
         }
     }
+}
+
+/// Returns `true` if the expression definitely resolves to a non-empty string, when used as an
+/// f-string expression, or `false` if the expression may resolve to an empty string.
+fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
+    fn inner(expr: &Expr) -> bool {
+        match expr {
+            // When stringified, these expressions are always non-empty.
+            Expr::Lambda(_) => true,
+            Expr::Dict(_) => true,
+            Expr::Set(_) => true,
+            Expr::ListComp(_) => true,
+            Expr::SetComp(_) => true,
+            Expr::DictComp(_) => true,
+            Expr::Compare(_) => true,
+            Expr::NumberLiteral(_) => true,
+            Expr::BooleanLiteral(_) => true,
+            Expr::NoneLiteral(_) => true,
+            Expr::EllipsisLiteral(_) => true,
+            Expr::List(_) => true,
+            Expr::Tuple(_) => true,
+
+            // These expressions must resolve to the inner expression.
+            Expr::IfExp(ast::ExprIfExp { body, orelse, .. }) => inner(body) && inner(orelse),
+            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => inner(value),
+
+            // These expressions are complex. We can't determine whether they're empty or not.
+            Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
+            Expr::BinOp(ast::ExprBinOp { .. }) => false,
+            Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
+            Expr::GeneratorExp(_) => false,
+            Expr::Await(_) => false,
+            Expr::Yield(_) => false,
+            Expr::YieldFrom(_) => false,
+            Expr::Call(_) => false,
+            Expr::Attribute(_) => false,
+            Expr::Subscript(_) => false,
+            Expr::Starred(_) => false,
+            Expr::Name(_) => false,
+            Expr::Slice(_) => false,
+            Expr::IpyEscapeCommand(_) => false,
+
+            // These literals may or may not be empty.
+            Expr::FString(f_string) => is_non_empty_f_string(f_string),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+        }
+    }
+
+    expr.value.iter().any(|part| match part {
+        ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
+        ast::FStringPart::FString(f_string) => {
+            f_string.elements.iter().all(|element| match element {
+                FStringElement::Literal(string_literal) => !string_literal.is_empty(),
+                FStringElement::Expression(f_string) => inner(&f_string.expression),
+            })
+        }
+    })
+}
+
+/// Returns `true` if the expression definitely resolves to the empty string, when used as an f-string
+/// expression.
+fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
+    fn inner(expr: &Expr) -> bool {
+        match expr {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                value
+                    .elements()
+                    .all(|f_string_element| match f_string_element {
+                        FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
+                            value.is_empty()
+                        }
+                        FStringElement::Expression(ast::FStringExpressionElement {
+                            expression,
+                            ..
+                        }) => inner(expression),
+                    })
+            }
+            _ => false,
+        }
+    }
+
+    expr.value.iter().all(|part| match part {
+        ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
+        ast::FStringPart::FString(f_string) => {
+            f_string.elements.iter().all(|element| match element {
+                FStringElement::Literal(string_literal) => string_literal.is_empty(),
+                FStringElement::Expression(f_string) => inner(&f_string.expression),
+            })
+        }
+    })
 }
 
 pub fn generate_comparison(

@@ -2,7 +2,9 @@ use path_absolutize::path_dedot;
 use ruff_cache::cache_dir;
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_linter::display_settings;
-use ruff_linter::settings::types::{FilePattern, FilePatternSet, SerializationFormat, UnsafeFixes};
+use ruff_linter::settings::types::{
+    ExtensionMapping, FilePattern, FilePatternSet, SerializationFormat, UnsafeFixes,
+};
 use ruff_linter::settings::LinterSettings;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PySourceType;
@@ -162,6 +164,7 @@ impl FileResolverSettings {
 #[derive(CacheKey, Clone, Debug)]
 pub struct FormatterSettings {
     pub exclude: FilePatternSet,
+    pub extension: ExtensionMapping,
     pub preview: PreviewMode,
     pub target_version: ruff_python_formatter::PythonVersion,
 
@@ -223,6 +226,7 @@ impl Default for FormatterSettings {
 
         Self {
             exclude: FilePatternSet::default(),
+            extension: ExtensionMapping::default(),
             target_version: default_options.target_version(),
             preview: PreviewMode::Disabled,
             line_width: default_options.line_width(),

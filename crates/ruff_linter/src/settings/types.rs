@@ -449,9 +449,10 @@ pub struct ExtensionMapping {
 }
 
 impl ExtensionMapping {
-    /// Return the [`Language`] for the given extension.
-    pub fn get(&self, extension: &str) -> Option<Language> {
-        self.mapping.get(extension).copied()
+    /// Return the [`Language`] for the given file.
+    pub fn get(&self, path: &Path) -> Option<Language> {
+        let ext = path.extension()?.to_str()?;
+        self.mapping.get(ext).copied()
     }
 }
 

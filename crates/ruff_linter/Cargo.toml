@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.1.11"
+version = "0.1.13"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -85,8 +85,6 @@ tempfile = { workspace = true }
 [features]
 default = []
 schemars = ["dep:schemars"]
-# Enables the UnreachableCode rule
-unreachable-code = []
 
 [lints]
 workspace = true
