@@ -12,6 +12,7 @@ exit_code: 0
 ----- stdout -----
 Resolved settings for: "[BASEPATH]/crates/ruff_cli/resources/test/fixtures/unformatted.py"
 Settings path: "[BASEPATH]/pyproject.toml"
+# General Settings
 cache_dir = "[BASEPATH]/.ruff_cache"
 fix = false
 fix_only = false

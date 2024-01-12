@@ -57,6 +57,7 @@ impl Default for Settings {
 
 impl fmt::Display for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "# General Settings")?;
         display_settings! {
             formatter = f,
             fields = [
