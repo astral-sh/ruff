@@ -349,7 +349,7 @@ struct LinePreprocessor<'a> {
     /// Maximum number of consecutive blank lines between the current line and the previous non-comment logical line.
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
     /// It is also used to match the results of pydocstyle.
-    previous_blank_lines: u32,
+    preceding_blank_lines: u32,
 }
 
 impl<'a> LinePreprocessor<'a> {
@@ -357,7 +357,7 @@ impl<'a> LinePreprocessor<'a> {
         LinePreprocessor {
             tokens: tokens.iter().flatten(),
             locator,
-            previous_blank_lines: 0,
+            preceding_blank_lines: 0,
         }
     }
 }
@@ -444,8 +444,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
                     let indent_length = expand_indent(self.locator.slice(range));
 
-                    if self.previous_blank_lines < current_blank_lines {
-                        self.previous_blank_lines = current_blank_lines;
+                    if self.preceding_blank_lines < current_blank_lines {
+                        self.preceding_blank_lines = current_blank_lines;
                     }
 
                     let logical_line = LogicalLineInfo {
@@ -459,12 +459,12 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         is_docstring,
                         indent_length,
                         blank_lines: current_blank_lines,
-                        preceding_blank_lines: self.previous_blank_lines,
+                        preceding_blank_lines: self.preceding_blank_lines,
                         preceding_blank_characters: current_blank_characters,
                     };
 
                     if !line_is_comment_only {
-                        self.previous_blank_lines = 0;
+                        self.preceding_blank_lines = 0;
                     }
                     return Some(logical_line);
                 }
