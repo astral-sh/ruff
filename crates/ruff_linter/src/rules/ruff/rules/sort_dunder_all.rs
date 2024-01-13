@@ -711,7 +711,7 @@ impl InferredMemberType {
 /// where the value is `"a"`, even though the source-code range
 /// of `# comment1` does not form a contiguous range with the
 /// source-code range of `"a"`.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct DunderAllItem {
     value: String,
     category: InferredMemberType,
