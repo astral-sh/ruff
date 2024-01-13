@@ -107,6 +107,7 @@ fn stdin_success() {
     success: true
     exit_code: 0
     ----- stdout -----
+    Found 0 errors in 1 file
 
     ----- stderr -----
     "###);
@@ -228,6 +229,7 @@ fn stdin_source_type_pyi() {
     success: true
     exit_code: 0
     ----- stdout -----
+    Found 0 errors in 1 file
 
     ----- stderr -----
     "###);
@@ -596,6 +598,7 @@ fn stdin_fix_when_no_issues_should_still_print_contents() {
     print(sys.version)
 
     ----- stderr -----
+    Found 0 errors in 1 file
     "###);
 }
 
@@ -959,6 +962,7 @@ fn preview_disabled_direct() {
     success: true
     exit_code: 0
     ----- stdout -----
+    Found 0 errors in 1 file
 
     ----- stderr -----
     warning: Selection `FURB145` has no effect because the `--preview` flag was not included.
@@ -974,6 +978,7 @@ fn preview_disabled_prefix_empty() {
     success: true
     exit_code: 0
     ----- stdout -----
+    Found 0 errors in 1 file
 
     ----- stderr -----
     warning: Selection `CPY` has no effect because the `--preview` flag was not included.
@@ -1100,6 +1105,7 @@ fn unreadable_dir() -> Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
+    Found 0 errors in 1 file
 
     ----- stderr -----
     warning: Encountered error: Permission denied (os error 13)
@@ -1633,6 +1639,7 @@ def log(x, base) -> float:
     success: true
     exit_code: 0
     ----- stdout -----
+    Found 0 errors in 1 file
 
     ----- stderr -----
     "###

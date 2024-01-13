@@ -344,7 +344,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::check::check(
+        let (diagnostics, _) = commands::check::check(
             &files,
             &pyproject_config,
             &overrides,
@@ -353,7 +353,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             fix_mode,
             unsafe_fixes,
         )?;
-        printer.write_continuously(&mut writer, &messages)?;
+        printer.write_continuously(&mut writer, &diagnostics)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
@@ -377,7 +377,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     Printer::clear_screen()?;
                     printer.write_to_user("File change detected...\n");
 
-                    let messages = commands::check::check(
+                    let (diagnostics, _) = commands::check::check(
                         &files,
                         &pyproject_config,
                         &overrides,
@@ -386,21 +386,24 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                         fix_mode,
                         unsafe_fixes,
                     )?;
-                    printer.write_continuously(&mut writer, &messages)?;
+                    printer.write_continuously(&mut writer, &diagnostics)?;
                 }
                 Err(err) => return Err(err.into()),
             }
         }
     } else {
         // Generate lint violations.
-        let diagnostics = if is_stdin {
-            commands::check_stdin::check_stdin(
-                cli.stdin_filename.map(fs::normalize_path).as_deref(),
-                &pyproject_config,
-                &overrides,
-                noqa.into(),
-                fix_mode,
-            )?
+        let (diagnostics, checked_files) = if is_stdin {
+            (
+                commands::check_stdin::check_stdin(
+                    cli.stdin_filename.map(fs::normalize_path).as_deref(),
+                    &pyproject_config,
+                    &overrides,
+                    noqa.into(),
+                    fix_mode,
+                )?,
+                1,
+            )
         } else {
             commands::check::check(
                 &files,
@@ -425,6 +428,11 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             printer.write_statistics(&diagnostics, &mut summary_writer)?;
         } else {
             printer.write_once(&diagnostics, &mut summary_writer)?;
+        }
+
+        if checked_files > 0 && diagnostics.fixed.is_empty() && diagnostics.messages.is_empty() {
+            let s = if checked_files == 1 { "" } else { "s" };
+            writeln!(summary_writer, "Found 0 errors in {checked_files} file{s}")?;
         }
 
         if !cli.exit_zero {

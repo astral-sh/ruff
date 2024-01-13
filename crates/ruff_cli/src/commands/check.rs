@@ -39,7 +39,7 @@ pub(crate) fn check(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
     unsafe_fixes: UnsafeFixes,
-) -> Result<Diagnostics> {
+) -> Result<(Diagnostics, u64)> {
     // Collect all the Python files to check.
     let start = Instant::now();
     let (paths, resolver) = python_files_in_path(files, pyproject_config, overrides)?;
@@ -47,7 +47,7 @@ pub(crate) fn check(
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
-        return Ok(Diagnostics::default());
+        return Ok((Diagnostics::default(), 0));
     }
 
     // Discover the package root for each Python file.
@@ -175,7 +175,7 @@ pub(crate) fn check(
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", checked_files, duration);
 
-    Ok(all_diagnostics)
+    Ok((all_diagnostics, checked_files))
 }
 
 /// Wraps [`lint_path`](crate::diagnostics::lint_path) in a [`catch_unwind`](std::panic::catch_unwind) and emits
@@ -268,7 +268,7 @@ mod test {
             PyprojectConfig::new(PyprojectDiscoveryStrategy::Fixed, settings, None);
 
         // Run
-        let diagnostics = check(
+        let (diagnostics, _) = check(
             // Notebooks are not included by default
             &[tempdir.path().to_path_buf(), notebook],
             &pyproject_config,
