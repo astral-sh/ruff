@@ -144,6 +144,12 @@ __all__ = ["Awaitable", "Coroutine",
            "AsyncIterable", "AsyncIterator", "AsyncGenerator",
            ]
 
+__all__ = [
+    "foo",
+    "bar",
+    "baz",
+    ]
+
 ###################################
 # These should all not get flagged:
 ###################################

@@ -649,7 +649,7 @@ RUF022.py:138:11: RUF022 [*] `__all__` is not sorted
 141 | | ]
     | |_^ RUF022
 142 |   
-143 |   ###################################
+143 |   __all__ = ["Awaitable", "Coroutine",
     |
     = help: Sort `__all__` according to a natural sort
 
@@ -668,6 +668,66 @@ RUF022.py:138:11: RUF022 [*] `__all__` is not sorted
     143 |+    "Treeview",
 141 144 | ]
 142 145 | 
-143 146 | ###################################
+143 146 | __all__ = ["Awaitable", "Coroutine",
+
+RUF022.py:143:11: RUF022 [*] `__all__` is not sorted
+    |
+141 |   ]
+142 |   
+143 |   __all__ = ["Awaitable", "Coroutine",
+    |  ___________^
+144 | |            "AsyncIterable", "AsyncIterator", "AsyncGenerator",
+145 | |            ]
+    | |____________^ RUF022
+146 |   
+147 |   __all__ = [
+    |
+    = help: Sort `__all__` according to a natural sort
+
+ℹ Safe fix
+140 140 |            "LabeledScale", "OptionMenu",
+141 141 | ]
+142 142 | 
+143     |-__all__ = ["Awaitable", "Coroutine",
+144     |-           "AsyncIterable", "AsyncIterator", "AsyncGenerator",
+145     |-           ]
+    143 |+__all__ = [
+    144 |+    "AsyncGenerator",
+    145 |+    "AsyncIterable",
+    146 |+    "AsyncIterator",
+    147 |+    "Awaitable",
+    148 |+    "Coroutine",
+    149 |+]
+146 150 | 
+147 151 | __all__ = [
+148 152 |     "foo",
+
+RUF022.py:147:11: RUF022 [*] `__all__` is not sorted
+    |
+145 |              ]
+146 |   
+147 |   __all__ = [
+    |  ___________^
+148 | |     "foo",
+149 | |     "bar",
+150 | |     "baz",
+151 | |     ]
+    | |_____^ RUF022
+152 |   
+153 |   ###################################
+    |
+    = help: Sort `__all__` according to a natural sort
+
+ℹ Safe fix
+145 145 |            ]
+146 146 | 
+147 147 | __all__ = [
+148     |-    "foo",
+149 148 |     "bar",
+150 149 |     "baz",
+    150 |+    "foo",
+151 151 |     ]
+152 152 | 
+153 153 | ###################################
 
 

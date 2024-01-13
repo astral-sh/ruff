@@ -8,7 +8,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
@@ -365,12 +365,7 @@ impl DunderAllValue {
             let item_indent = format!("{}{}", leading_indent, stylist.indentation().as_str());
             let newline = stylist.line_ending().as_str();
             prelude = Cow::Owned(format!("{}{}", prelude.trim_end(), newline));
-            if postlude.starts_with(newline) {
-                let trimmed_postlude = postlude.trim_start();
-                if trimmed_postlude.starts_with(']') || trimmed_postlude.starts_with(')') {
-                    postlude = Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
-                }
-            }
+            postlude = fixup_postlude(postlude, newline, leading_indent, &item_indent);
             join_multiline_dunder_all_items(
                 &sorted_items,
                 locator,
@@ -384,6 +379,32 @@ impl DunderAllValue {
 
         SortedDunderAll::Sorted(format!("{prelude}{joined_items}{postlude}"))
     }
+}
+
+/// Fixup the postlude for a multiline `__all__` definition.
+///
+/// Without the fixup, closing `)` or `]` characters
+/// at the end of sorted `__all__` definitions can sometimes
+/// have strange indentations.
+fn fixup_postlude<'a>(
+    postlude: Cow<'a, str>,
+    newline: &str,
+    leading_indent: &str,
+    item_indent: &str,
+) -> Cow<'a, str> {
+    if !postlude.starts_with(newline) {
+        return postlude;
+    }
+    if TextSize::of(leading_indentation(postlude.trim_start_matches(newline)))
+        <= TextSize::of(item_indent)
+    {
+        return postlude;
+    }
+    let trimmed_postlude = postlude.trim_start();
+    if trimmed_postlude.starts_with(']') || trimmed_postlude.starts_with(')') {
+        return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
+    }
+    postlude
 }
 
 impl Ranged for DunderAllValue {
