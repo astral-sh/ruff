@@ -22,7 +22,7 @@ use natord;
 ///
 /// An isort-style sort sorts items first according to their casing:
 /// SCREAMING_SNAKE_CASE names (conventionally used for global constants)
-/// come first, followed by CamelCase names (conventionally) used for
+/// come first, followed by CamelCase names (conventionally used for
 /// classes), followed by anything else. Within each category,
 /// a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order)
 /// is used to order the elements.
@@ -557,18 +557,18 @@ struct LineWithItems {
     // (We need to know the actual value so that we can sort the items.)
     items: Vec<(String, TextRange)>,
     // For comments, we only need to keep track of the source-code range.
-    comment_range: Option<TextRange>,
+    trailing_comment_range: Option<TextRange>,
 }
 
 impl LineWithItems {
-    fn new(items: Vec<(String, TextRange)>, comment_range: Option<TextRange>) -> Self {
+    fn new(items: Vec<(String, TextRange)>, trailing_comment_range: Option<TextRange>) -> Self {
         assert!(
             !items.is_empty(),
             "Use the 'JustAComment' variant to represent lines with 0 items"
         );
         Self {
             items,
-            comment_range,
+            trailing_comment_range,
         }
     }
 }
@@ -597,7 +597,7 @@ fn collect_dunder_all_items(
         _ => lines.len(),
     });
     let mut first_item_encountered = false;
-    let mut preceding_comment_range: Option<TextRange> = None;
+    let mut preceding_comment_ranges = vec![];
     for line in lines {
         match line {
             DunderAllLine::JustAComment(LineWithJustAComment(comment_range)) => {
@@ -611,33 +611,31 @@ fn collect_dunder_all_items(
                     // group the comment with the element following that comment
                     // into an "item", so that the comment moves as one with the element
                     // when the `__all__` list/tuple is sorted
-                    preceding_comment_range =
-                        Some(preceding_comment_range.map_or(comment_range, |range| {
-                            TextRange::new(range.start(), comment_range.end())
-                        }));
+                    preceding_comment_ranges.push(comment_range);
                 }
             }
             DunderAllLine::OneOrMoreItems(LineWithItems {
                 items,
-                comment_range,
+                trailing_comment_range: comment_range,
             }) => {
                 first_item_encountered = true;
                 let mut owned_items = items.into_iter();
                 let (first_val, first_range) = owned_items
                     .next()
                     .expect("LineWithItems::new() should uphold the invariant that this list is always non-empty");
-                let range = preceding_comment_range.map_or(first_range, |r| {
-                    TextRange::new(r.start(), first_range.end())
-                });
                 all_items.push(DunderAllItem::new(
                     first_val,
                     all_items.len(),
-                    range,
+                    std::mem::take(&mut preceding_comment_ranges),
+                    first_range,
                     comment_range,
                 ));
-                preceding_comment_range = None;
                 for (value, range) in owned_items {
-                    all_items.push(DunderAllItem::new(value, all_items.len(), range, None));
+                    all_items.push(DunderAllItem::with_no_comments(
+                        value,
+                        all_items.len(),
+                        range,
+                    ));
                 }
             }
         }
@@ -717,8 +715,12 @@ struct DunderAllItem {
     category: InferredMemberType,
     // Each `AllItem` in any given list should have a unique `original_index`:
     original_index: usize,
-    // Note that this range might include comments, etc.
-    range: TextRange,
+    preceding_comment_ranges: Vec<TextRange>,
+    element_range: TextRange,
+    // total_range incorporates the ranges of preceding comments
+    // (which must be contiguous with the element),
+    // but doesn't incorporate any trailing comments
+    total_range: TextRange,
     end_of_line_comments: Option<TextRange>,
 }
 
@@ -726,23 +728,37 @@ impl DunderAllItem {
     fn new(
         value: String,
         original_index: usize,
-        range: TextRange,
+        preceding_comment_ranges: Vec<TextRange>,
+        element_range: TextRange,
         end_of_line_comments: Option<TextRange>,
     ) -> Self {
         let category = InferredMemberType::of(value.as_str());
+        let total_range = {
+            if let Some(first_comment_range) = preceding_comment_ranges.first() {
+                TextRange::new(first_comment_range.start(), element_range.end())
+            } else {
+                element_range
+            }
+        };
         Self {
             value,
             category,
             original_index,
-            range,
+            preceding_comment_ranges,
+            element_range,
+            total_range,
             end_of_line_comments,
         }
+    }
+
+    fn with_no_comments(value: String, original_index: usize, element_range: TextRange) -> Self {
+        Self::new(value, original_index, vec![], element_range, None)
     }
 }
 
 impl Ranged for DunderAllItem {
     fn range(&self) -> TextRange {
-        self.range
+        self.total_range
     }
 }
 
@@ -788,30 +804,13 @@ fn join_multiline_dunder_all_items(
     let mut new_dunder_all = String::new();
     for (i, item) in sorted_items.iter().enumerate() {
         let is_final_item = i == max_index;
-
-        // Separate out the item into source lines again.
-        //
-        // The final line of any item must have exactly 1 element in it,
-        // but there could be any number of comments on their own line
-        // preceding that element that also count as part of this item.
-        // Separating them out again means we can ensure that all elements in
-        // `__all__` have consistent indentation.
-        let original_source = locator.slice(item);
-        let lines = original_source.split(newline).map(str::trim).collect_vec();
-        let [preceding_comments @ .., element] = lines.as_slice() else {
-            unreachable!(
-                "It should be impossible for an item in `__all__`
-                to have the empty string as its source code"
-            )
-        };
-
-        for comment_line in preceding_comments {
+        for comment_range in &item.preceding_comment_ranges {
             new_dunder_all.push_str(item_indent);
-            new_dunder_all.push_str(comment_line);
+            new_dunder_all.push_str(locator.slice(comment_range));
             new_dunder_all.push_str(newline);
         }
         new_dunder_all.push_str(item_indent);
-        new_dunder_all.push_str(element);
+        new_dunder_all.push_str(locator.slice(item.element_range));
         if !is_final_item || needs_trailing_comma {
             new_dunder_all.push(',');
         }
