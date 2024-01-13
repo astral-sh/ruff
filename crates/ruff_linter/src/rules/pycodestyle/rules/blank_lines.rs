@@ -335,6 +335,8 @@ struct LogicalLineInfo {
     blank_lines: u32,
     /// `preceding_blank_lines` is the maximum number of consecutive blank lines between the current line
     /// and the previous non-comment logical line.
+    /// One of its main uses is to allow a comment to directly precede a class/function definition.
+    /// It is also used to match the results of pydocstyle.
     preceding_blank_lines: u32,
     preceding_blank_characters: usize,
 }
@@ -344,7 +346,9 @@ struct LogicalLineInfo {
 struct LinePreprocessor<'a> {
     tokens: Flatten<Iter<'a, Result<(Tok, TextRange), LexicalError>>>,
     locator: &'a Locator<'a>,
-    /// Number of previous consecutive blank lines.
+    /// Maximum number of consecutive blank lines between the current line and the previous non-comment logical line.
+    /// One of its main uses is to allow a comment to directly precede a class/function definition.
+    /// It is also used to match the results of pydocstyle.
     previous_blank_lines: u32,
 }
 
