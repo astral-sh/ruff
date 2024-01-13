@@ -124,7 +124,7 @@ fn extract_name_dot_extend_was_called_on(node: &ast::Expr) -> Option<&str> {
     let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = node else {
         return None;
     };
-    if attr.as_str() != "extend" {
+    if attr != "extend" {
         return None;
     }
     let ast::Expr::Name(ast::ExprName { ref id, .. }) = **value else {
@@ -185,6 +185,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr) {
     };
 
     let edit = Edit::range_replacement(new_dunder_all, range);
+
     checker.diagnostics.push(
         Diagnostic::new(UnsortedDunderAll, range)
             .with_fix(Fix::applicable_edit(edit, applicability)),
@@ -289,7 +290,7 @@ impl DunderAllValue {
             return SortedDunderAll::AlreadySorted;
         }
         let [first_item, .., last_item] = self.items.as_slice() else {
-            panic!("Expected to have already returned if the list had < 2 items")
+            unreachable!("Expected to have already returned if the list had < 2 items")
         };
 
         // As well as the "items" in the `__all__` definition,
