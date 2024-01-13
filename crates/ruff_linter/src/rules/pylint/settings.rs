@@ -2,7 +2,9 @@
 
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number};
 
@@ -30,6 +32,18 @@ impl ConstantType {
             LiteralExpressionRef::BooleanLiteral(_)
             | LiteralExpressionRef::NoneLiteral(_)
             | LiteralExpressionRef::EllipsisLiteral(_) => None,
+        }
+    }
+}
+
+impl fmt::Display for ConstantType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Bytes => write!(f, "bytes"),
+            Self::Complex => write!(f, "complex"),
+            Self::Float => write!(f, "float"),
+            Self::Int => write!(f, "int"),
+            Self::Str => write!(f, "str"),
         }
     }
 }
@@ -62,5 +76,27 @@ impl Default for Settings {
             max_public_methods: 20,
             max_locals: 15,
         }
+    }
+}
+
+impl fmt::Display for Settings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.pylint",
+            fields = [
+                self.allow_magic_value_types | array,
+                self.allow_dunder_method_names | array,
+                self.max_args,
+                self.max_positional_args,
+                self.max_returns,
+                self.max_bool_expr,
+                self.max_branches,
+                self.max_statements,
+                self.max_public_methods,
+                self.max_locals
+            ]
+        }
+        Ok(())
     }
 }

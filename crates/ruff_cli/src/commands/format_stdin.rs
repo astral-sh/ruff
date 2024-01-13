@@ -53,16 +53,23 @@ pub(crate) fn format_stdin(cli: &FormatArguments, overrides: &CliOverrides) -> R
     }
 
     let path = cli.stdin_filename.as_deref();
+    let settings = &resolver.base_settings().formatter;
 
-    let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
-        if mode.is_write() {
-            parrot_stdin()?;
-        }
-        return Ok(ExitStatus::Success);
+    let source_type = match path.and_then(|path| settings.extension.get(path)) {
+        None => match path.map(SourceType::from).unwrap_or_default() {
+            SourceType::Python(source_type) => source_type,
+            SourceType::Toml(_) => {
+                if mode.is_write() {
+                    parrot_stdin()?;
+                }
+                return Ok(ExitStatus::Success);
+            }
+        },
+        Some(language) => PySourceType::from(language),
     };
 
     // Format the file.
-    match format_source_code(path, &resolver.base_settings().formatter, source_type, mode) {
+    match format_source_code(path, settings, source_type, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check | FormatMode::Diff => {

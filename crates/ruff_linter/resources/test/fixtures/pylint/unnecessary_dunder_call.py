@@ -24,6 +24,12 @@ class Thing:
         super().__init__()  # OK
         super().__class__(stuff=(1, 2, 3))  # OK
 
+    def __getattribute__(self, item):
+        return object.__getattribute__(self, item)  # OK
+
+    def do_thing(self, item):
+        return object.__getattribute__(self, item)  # PLC2801
+
 
 blah = lambda: {"a": 1}.__delitem__("a")  # OK
 
