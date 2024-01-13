@@ -1,14 +1,14 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::whitespace::indentation;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
@@ -60,16 +60,14 @@ use natord;
 #[violation]
 pub struct UnsortedDunderAll;
 
-impl Violation for UnsortedDunderAll {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for UnsortedDunderAll {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`__all__` is not sorted")
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Sort `__all__` according to a natural sort".to_string())
+    fn fix_title(&self) -> String {
+        "Sort `__all__` according to a natural sort".to_string()
     }
 }
 
@@ -78,21 +76,16 @@ impl Violation for UnsortedDunderAll {
 pub(crate) fn sort_dunder_all_assign(
     checker: &mut Checker,
     ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
-    parent: &ast::Stmt,
 ) {
     let [ast::Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
         return;
     };
-    sort_dunder_all(checker, id, value, parent.range());
+    sort_dunder_all(checker, id, value);
 }
 
 /// Sort an `__all__` mutation represented by a `StmtAugAssign` AST node.
 /// For example: `__all__ += ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_aug_assign(
-    checker: &mut Checker,
-    node: &ast::StmtAugAssign,
-    parent: &ast::Stmt,
-) {
+pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::StmtAugAssign) {
     let ast::StmtAugAssign {
         ref value,
         ref target,
@@ -105,13 +98,13 @@ pub(crate) fn sort_dunder_all_aug_assign(
     let ast::Expr::Name(ast::ExprName { ref id, .. }) = **target else {
         return;
     };
-    sort_dunder_all(checker, id, value, parent.range());
+    sort_dunder_all(checker, id, value);
 }
 
 /// Sort an `__all__` mutation from a call to `.extend()`.
 pub(crate) fn sort_dunder_all_extend_call(
     checker: &mut Checker,
-    call @ ast::ExprCall {
+    ast::ExprCall {
         ref func,
         arguments: ast::Arguments { args, keywords, .. },
         ..
@@ -121,15 +114,7 @@ pub(crate) fn sort_dunder_all_extend_call(
         return;
     };
     if let Some(name) = extract_name_dot_extend_was_called_on(func) {
-        let locator = checker.locator();
-        let call_line = locator.line_start(call.start());
-        let arg_line = locator.line_start(value_passed.start());
-        let parent_range = if arg_line > call_line {
-            value_passed.range()
-        } else {
-            call.range()
-        };
-        sort_dunder_all(checker, name, value_passed, parent_range);
+        sort_dunder_all(checker, name, value_passed);
     }
 }
 
@@ -150,11 +135,7 @@ fn extract_name_dot_extend_was_called_on(node: &ast::Expr) -> Option<&str> {
 
 /// Sort an `__all__` definition represented by a `StmtAnnAssign` AST node.
 /// For example: `__all__: list[str] = ["b", "c", "a"]`.
-pub(crate) fn sort_dunder_all_ann_assign(
-    checker: &mut Checker,
-    node: &ast::StmtAnnAssign,
-    parent: &ast::Stmt,
-) {
+pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::StmtAnnAssign) {
     let ast::StmtAnnAssign {
         ref target,
         value: Some(ref val),
@@ -166,10 +147,10 @@ pub(crate) fn sort_dunder_all_ann_assign(
     let ast::Expr::Name(ast::ExprName { ref id, .. }) = **target else {
         return;
     };
-    sort_dunder_all(checker, id, val, parent.range());
+    sort_dunder_all(checker, id, val);
 }
 
-fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent_range: TextRange) {
+fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr) {
     if target != "__all__" {
         return;
     }
@@ -190,29 +171,24 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent
         return;
     };
 
-    let new_dunder_all =
-        match dunder_all_val.into_sorted_source_code(locator, parent_range, checker.stylist()) {
-            SortedDunderAll::AlreadySorted => return,
-            SortedDunderAll::Sorted(value) => value,
-        };
+    let new_dunder_all = match dunder_all_val.into_sorted_source_code(locator, checker.stylist()) {
+        SortedDunderAll::AlreadySorted => return,
+        SortedDunderAll::Sorted(value) => value,
+    };
 
-    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
+    let applicability = {
+        if multiline && checker.indexer().comment_ranges().intersects(node.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        }
+    };
 
-    if let Some(new_dunder_all) = new_dunder_all {
-        let applicability = {
-            if multiline && checker.indexer().comment_ranges().intersects(node.range()) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            }
-        };
-        diagnostic.set_fix(Fix::applicable_edit(
-            Edit::range_replacement(new_dunder_all, range),
-            applicability,
-        ));
-    }
-
-    checker.diagnostics.push(diagnostic);
+    let edit = Edit::range_replacement(new_dunder_all, range);
+    checker.diagnostics.push(
+        Diagnostic::new(UnsortedDunderAll, range)
+            .with_fix(Fix::applicable_edit(edit, applicability)),
+    );
 }
 
 /// An instance of this struct encapsulates an analysis
@@ -303,12 +279,7 @@ impl DunderAllValue {
     /// If it is not already sorted, attempt to sort `__all__`,
     /// and return a string with the sorted `__all__ definition/augmentation`
     /// that can be inserted into the source code as a range replacement.
-    fn into_sorted_source_code(
-        self,
-        locator: &Locator,
-        parent_range: TextRange,
-        stylist: &Stylist,
-    ) -> SortedDunderAll {
+    fn into_sorted_source_code(self, locator: &Locator, stylist: &Stylist) -> SortedDunderAll {
         // As well as saving us unnecessary work,
         // returning early here also means that we can rely on the invariant
         // throughout the rest of this function that both `items` and `sorted_items`
@@ -384,6 +355,7 @@ impl DunderAllValue {
         let mut prelude = Cow::Borrowed(locator.slice(TextRange::new(self.start(), prelude_end)));
         let postlude = locator.slice(TextRange::new(postlude_start, self.end()));
 
+        let start_offset = self.start();
         let mut sorted_items = self.items;
         sorted_items.sort();
 
@@ -394,17 +366,16 @@ impl DunderAllValue {
             join_multiline_dunder_all_items(
                 &sorted_items,
                 locator,
-                parent_range,
+                start_offset,
                 indentation,
                 newline,
                 self.ends_with_trailing_comma,
             )
         } else {
-            Some(join_singleline_dunder_all_items(&sorted_items, locator))
+            join_singleline_dunder_all_items(&sorted_items, locator)
         };
 
-        let new_dunder_all = joined_items.map(|items| format!("{prelude}{items}{postlude}"));
-        SortedDunderAll::Sorted(new_dunder_all)
+        SortedDunderAll::Sorted(format!("{prelude}{joined_items}{postlude}"))
     }
 }
 
@@ -416,17 +387,16 @@ impl Ranged for DunderAllValue {
 
 /// Variants of this enum are returned by `into_sorted_source_code()`.
 ///
-/// There are three possible states represented here:
-/// (1) `__all__` was already sorted
-/// (2) `__all__` was not already sorted,
-///     but we couldn't figure out how to sort it safely
-/// (3) `__all__` was not already sorted;
-///     here's the source code to replace it with,
-///     so that it becomes sorted!
+/// - `SortedDunderAll::AlreadySorted` is returned if `__all__` was
+///   already sorted; this means no code rewriting is required.
+/// - `SortedDunderAll::Sorted` is returned if `__all__` was not already
+///   sorted. The string data attached to this variant is the source
+///   code of the sorted `__all__`, that can be inserted into the source
+///   code as a `range_replacement` autofix.
 #[derive(Debug)]
 enum SortedDunderAll {
     AlreadySorted,
-    Sorted(Option<String>),
+    Sorted(String),
 }
 
 /// Collect data on each line of `__all__`.
@@ -726,12 +696,12 @@ fn join_singleline_dunder_all_items(sorted_items: &[DunderAllItem], locator: &Lo
 fn join_multiline_dunder_all_items(
     sorted_items: &[DunderAllItem],
     locator: &Locator,
-    parent_range: TextRange,
+    start_offset: TextSize,
     additional_indent: &str,
     newline: &str,
     needs_trailing_comma: bool,
-) -> Option<String> {
-    let indent = indentation(locator, &parent_range)?;
+) -> String {
+    let indent = leading_indentation(locator.full_line(start_offset));
     let mut new_dunder_all = String::new();
     for (i, item) in sorted_items.iter().enumerate() {
         new_dunder_all.push_str(indent);
@@ -748,5 +718,5 @@ fn join_multiline_dunder_all_items(
             new_dunder_all.push_str(newline);
         }
     }
-    Some(new_dunder_all)
+    new_dunder_all
 }

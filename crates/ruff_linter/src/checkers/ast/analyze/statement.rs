@@ -1066,7 +1066,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
             }
             if checker.enabled(Rule::UnsortedDunderAll) {
-                ruff::rules::sort_dunder_all_aug_assign(checker, aug_assign, stmt);
+                ruff::rules::sort_dunder_all_aug_assign(checker, aug_assign);
             }
         }
         Stmt::If(
@@ -1455,7 +1455,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pylint::rules::type_bivariance(checker, value);
             }
             if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
-                ruff::rules::sort_dunder_all_assign(checker, assign, stmt);
+                ruff::rules::sort_dunder_all_assign(checker, assign);
             }
             if checker.source_type.is_stub() {
                 if checker.any_enabled(&[
@@ -1528,7 +1528,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 pyupgrade::rules::non_pep695_type_alias(checker, assign_stmt);
             }
             if checker.settings.rules.enabled(Rule::UnsortedDunderAll) {
-                ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt, stmt);
+                ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt);
             }
             if checker.source_type.is_stub() {
                 if let Some(value) = value {
