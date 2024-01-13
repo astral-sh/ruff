@@ -6,6 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok};
+use ruff_python_stdlib::str::is_cased_uppercase;
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -17,7 +18,14 @@ use natord;
 
 /// ## What it does
 /// Checks for `__all__` definitions that are not ordered
-/// according to a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order).
+/// according to an "isort-style" sort.
+///
+/// An isort-style sort sorts items first according to their casing:
+/// SCREAMING_SNAKE_CASE names (conventionally used for global constants)
+/// come first, followed by CamelCase names (conventionally) used for
+/// classes), followed by anything else. Within each category,
+/// a [natural sort](https://en.wikipedia.org/wiki/Natural_sort_order)
+/// is used to order the elements.
 ///
 /// ## Why is this bad?
 /// Consistency is good. Use a common convention for `__all__` to make your
@@ -67,7 +75,7 @@ impl AlwaysFixableViolation for UnsortedDunderAll {
     }
 
     fn fix_title(&self) -> String {
-        "Sort `__all__` according to a natural sort".to_string()
+        "Sort `__all__` according to an isort-style sort".to_string()
     }
 }
 
@@ -621,25 +629,51 @@ fn collect_dunder_all_items(
                 let range = preceding_comment_range.map_or(first_range, |r| {
                     TextRange::new(r.start(), first_range.end())
                 });
-                all_items.push(DunderAllItem {
-                    value: first_val,
-                    original_index: all_items.len(),
+                all_items.push(DunderAllItem::new(
+                    first_val,
+                    all_items.len(),
                     range,
-                    end_of_line_comments: comment_range,
-                });
+                    comment_range,
+                ));
                 preceding_comment_range = None;
                 for (value, range) in owned_items {
-                    all_items.push(DunderAllItem {
-                        value,
-                        original_index: all_items.len(),
-                        range,
-                        end_of_line_comments: None,
-                    });
+                    all_items.push(DunderAllItem::new(value, all_items.len(), range, None));
                 }
             }
         }
     }
     all_items
+}
+
+/// Classification for an element in `__all__`.
+///
+/// This is necessary to achieve an "isort-style" sort,
+/// where elements are sorted first by category,
+/// then, within categories, are sorted according
+/// to a natural sort.
+///
+/// You'll notice that a very similar enum exists
+/// in ruff's reimplementation of isort.
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone)]
+enum InferredMemberType {
+    Constant,
+    Class,
+    Other,
+}
+
+impl InferredMemberType {
+    fn of(value: &str) -> Self {
+        // E.g. `CONSTANT`
+        if value.len() > 1 && is_cased_uppercase(value) {
+            Self::Constant
+        // E.g. `Class`
+        } else if value.chars().next().is_some_and(char::is_uppercase) {
+            Self::Class
+        // E.g. `some_variable` or `some_function`
+        } else {
+            Self::Other
+        }
+    }
 }
 
 /// An instance of this struct represents a single element
@@ -680,11 +714,30 @@ fn collect_dunder_all_items(
 #[derive(Clone, Debug)]
 struct DunderAllItem {
     value: String,
+    category: InferredMemberType,
     // Each `AllItem` in any given list should have a unique `original_index`:
     original_index: usize,
     // Note that this range might include comments, etc.
     range: TextRange,
     end_of_line_comments: Option<TextRange>,
+}
+
+impl DunderAllItem {
+    fn new(
+        value: String,
+        original_index: usize,
+        range: TextRange,
+        end_of_line_comments: Option<TextRange>,
+    ) -> Self {
+        let category = InferredMemberType::of(value.as_str());
+        Self {
+            value,
+            category,
+            original_index,
+            range,
+            end_of_line_comments,
+        }
+    }
 }
 
 impl Ranged for DunderAllItem {
@@ -703,7 +756,9 @@ impl Eq for DunderAllItem {}
 
 impl Ord for DunderAllItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        natord::compare(&self.value, &other.value)
+        self.category
+            .cmp(&other.category)
+            .then_with(|| natord::compare(&self.value, &other.value))
             .then_with(|| self.original_index.cmp(&other.original_index))
     }
 }

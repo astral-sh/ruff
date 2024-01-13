@@ -150,6 +150,44 @@ __all__ = [
     "baz",
     ]
 
+# we implement an "isort-style sort":
+# SCEAMING_CASE constants first,
+# then CamelCase classes,
+# then anything thats lowercase_snake_case.
+# This (which is currently alphabetically sorted)
+# should get reordered accordingly:
+__all__ = [
+    "APRIL",
+    "AUGUST",
+    "Calendar",
+    "DECEMBER",
+    "Day",
+    "FEBRUARY",
+    "FRIDAY",
+    "HTMLCalendar",
+    "IllegalMonthError",
+    "JANUARY",
+    "JULY",
+    "JUNE",
+    "LocaleHTMLCalendar",
+    "MARCH",
+    "MAY",
+    "MONDAY",
+    "Month",
+    "NOVEMBER",
+    "OCTOBER",
+    "SATURDAY",
+    "SEPTEMBER",
+    "SUNDAY",
+    "THURSDAY",
+    "TUESDAY",
+    "TextCalendar",
+    "WEDNESDAY",
+    "calendar",
+    "timegm",
+    "weekday",
+    "weekheader"]
+
 ###################################
 # These should all not get flagged:
 ###################################

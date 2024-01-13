@@ -10,7 +10,7 @@ RUF022.py:5:11: RUF022 [*] `__all__` is not sorted
 6 | __all__ += ["foo", "bar", "antipasti"]
 7 | __all__ = ("d", "c", "b", "a")
   |
-  = help: Sort `__all__` according to a natural sort
+  = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 2 2 | # Single-line __all__ definitions (nice 'n' easy!)
@@ -29,7 +29,7 @@ RUF022.py:6:12: RUF022 [*] `__all__` is not sorted
   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
 7 | __all__ = ("d", "c", "b", "a")
   |
-  = help: Sort `__all__` according to a natural sort
+  = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 3 3 | ##################################################
@@ -50,7 +50,7 @@ RUF022.py:7:11: RUF022 [*] `__all__` is not sorted
 8 | 
 9 | __all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
   |
-  = help: Sort `__all__` according to a natural sort
+  = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 4 4 | 
@@ -70,7 +70,7 @@ RUF022.py:9:17: RUF022 [*] `__all__` is not sorted
    |                 ^^^^^^^^^^^^^^^^ RUF022
 10 | __all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 6  6  | __all__ += ["foo", "bar", "antipasti"]
@@ -90,7 +90,7 @@ RUF022.py:10:18: RUF022 [*] `__all__` is not sorted
 11 | 
 12 | if bool():
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 7  7  | __all__ = ("d", "c", "b", "a")
@@ -110,7 +110,7 @@ RUF022.py:13:16: RUF022 [*] `__all__` is not sorted
 14 | else:
 15 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 10 10 | __all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
@@ -131,7 +131,7 @@ RUF022.py:15:16: RUF022 [*] `__all__` is not sorted
 16 | 
 17 | __all__: list[str] = ["the", "three", "little", "pigs"]
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 12 12 | if bool():
@@ -152,7 +152,7 @@ RUF022.py:17:22: RUF022 [*] `__all__` is not sorted
 18 | 
 19 | ####################################
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 14 14 | else:
@@ -180,7 +180,7 @@ RUF022.py:23:11: RUF022 [*] `__all__` is not sorted
 30 |   
 31 |   __all__ = [
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 21 21 | ####################################
@@ -215,7 +215,7 @@ RUF022.py:31:11: RUF022 [*] `__all__` is not sorted
 38 |   
 39 |   ##########################################
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 29 29 | )
@@ -249,7 +249,7 @@ RUF022.py:44:11: RUF022 [*] `__all__` is not sorted
    | |_^ RUF022
 52 |   # comment7
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 41 41 | ##########################################
@@ -290,7 +290,7 @@ RUF022.py:54:11: RUF022 [*] `__all__` is not sorted
 62 |   
 63 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 52 52 | # comment7
@@ -330,7 +330,7 @@ RUF022.py:63:11: RUF022 [*] `__all__` is not sorted
 77 |   
 78 |   __all__: tuple[str, ...] = (  # a comment about the opening paren
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 60  60  |     # comment6
@@ -416,7 +416,7 @@ RUF022.py:78:28: RUF022 [*] `__all__` is not sorted
 86 |   
 87 |   # we use natural sort for `__all__`,
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 76 76 |            "register_error", "lookup_error"]
@@ -450,7 +450,7 @@ RUF022.py:91:11: RUF022 [*] `__all__` is not sorted
 97 |   
 98 |   __all__.extend(["foo", "bar"])
    |
-   = help: Sort `__all__` according to a natural sort
+   = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 89 89 | # Also, this doesn't end with a trailing comma,
@@ -476,7 +476,7 @@ RUF022.py:98:16: RUF022 [*] `__all__` is not sorted
  99 | __all__.extend(("foo", "bar"))
 100 | __all__.extend((  # comment0
     |
-    = help: Sort `__all__` according to a natural sort
+    = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 95 95 |     "aadvark532"                       # the even longer whitespace span before this comment is retained
@@ -496,7 +496,7 @@ RUF022.py:99:16: RUF022 [*] `__all__` is not sorted
 100 | __all__.extend((  # comment0
 101 |     # comment about foo
     |
-    = help: Sort `__all__` according to a natural sort
+    = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 96  96  | )
@@ -524,7 +524,7 @@ RUF022.py:100:16: RUF022 [*] `__all__` is not sorted
 107 |   
 108 |   __all__.extend(  # comment0
     |
-    = help: Sort `__all__` according to a natural sort
+    = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 98  98  | __all__.extend(["foo", "bar"])
@@ -556,7 +556,7 @@ RUF022.py:110:5: RUF022 [*] `__all__` is not sorted
     | |_____^ RUF022
 117 |   )  # comment2
     |
-    = help: Sort `__all__` according to a natural sort
+    = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 108 108 | __all__.extend(  # comment0
@@ -589,7 +589,7 @@ RUF022.py:119:16: RUF022 [*] `__all__` is not sorted
 126 |   
 127 |   __all__.extend(  # comment0
     |
-    = help: Sort `__all__` according to a natural sort
+    = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 117 117 | )  # comment2
@@ -621,7 +621,7 @@ RUF022.py:129:5: RUF022 [*] `__all__` is not sorted
     | |_____^ RUF022
 136 |   )  # comment2
     |
-    = help: Sort `__all__` according to a natural sort
+    = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 127 127 | __all__.extend(  # comment0
@@ -651,7 +651,7 @@ RUF022.py:138:11: RUF022 [*] `__all__` is not sorted
 142 |   
 143 |   __all__ = ["Awaitable", "Coroutine",
     |
-    = help: Sort `__all__` according to a natural sort
+    = help: Sort `__all__` according to an isort-style sort
 
 ℹ Unsafe fix
 135 135 |     ]  # comment4
@@ -682,7 +682,7 @@ RUF022.py:143:11: RUF022 [*] `__all__` is not sorted
 146 |   
 147 |   __all__ = [
     |
-    = help: Sort `__all__` according to a natural sort
+    = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 140 140 |            "LabeledScale", "OptionMenu",
@@ -714,9 +714,9 @@ RUF022.py:147:11: RUF022 [*] `__all__` is not sorted
 151 | |     ]
     | |_____^ RUF022
 152 |   
-153 |   ###################################
+153 |   # we implement an "isort-style sort":
     |
-    = help: Sort `__all__` according to a natural sort
+    = help: Sort `__all__` according to an isort-style sort
 
 ℹ Safe fix
 145 145 |            ]
@@ -728,6 +728,87 @@ RUF022.py:147:11: RUF022 [*] `__all__` is not sorted
     150 |+    "foo",
 151 151 |     ]
 152 152 | 
-153 153 | ###################################
+153 153 | # we implement an "isort-style sort":
+
+RUF022.py:159:11: RUF022 [*] `__all__` is not sorted
+    |
+157 |   # This (which is currently alphabetically sorted)
+158 |   # should get reordered accordingly:
+159 |   __all__ = [
+    |  ___________^
+160 | |     "APRIL",
+161 | |     "AUGUST",
+162 | |     "Calendar",
+163 | |     "DECEMBER",
+164 | |     "Day",
+165 | |     "FEBRUARY",
+166 | |     "FRIDAY",
+167 | |     "HTMLCalendar",
+168 | |     "IllegalMonthError",
+169 | |     "JANUARY",
+170 | |     "JULY",
+171 | |     "JUNE",
+172 | |     "LocaleHTMLCalendar",
+173 | |     "MARCH",
+174 | |     "MAY",
+175 | |     "MONDAY",
+176 | |     "Month",
+177 | |     "NOVEMBER",
+178 | |     "OCTOBER",
+179 | |     "SATURDAY",
+180 | |     "SEPTEMBER",
+181 | |     "SUNDAY",
+182 | |     "THURSDAY",
+183 | |     "TUESDAY",
+184 | |     "TextCalendar",
+185 | |     "WEDNESDAY",
+186 | |     "calendar",
+187 | |     "timegm",
+188 | |     "weekday",
+189 | |     "weekheader"]
+    | |_________________^ RUF022
+190 |   
+191 |   ###################################
+    |
+    = help: Sort `__all__` according to an isort-style sort
+
+ℹ Safe fix
+159 159 | __all__ = [
+160 160 |     "APRIL",
+161 161 |     "AUGUST",
+162     |-    "Calendar",
+163 162 |     "DECEMBER",
+164     |-    "Day",
+165 163 |     "FEBRUARY",
+166 164 |     "FRIDAY",
+167     |-    "HTMLCalendar",
+168     |-    "IllegalMonthError",
+169 165 |     "JANUARY",
+170 166 |     "JULY",
+171 167 |     "JUNE",
+172     |-    "LocaleHTMLCalendar",
+173 168 |     "MARCH",
+174 169 |     "MAY",
+175 170 |     "MONDAY",
+176     |-    "Month",
+177 171 |     "NOVEMBER",
+178 172 |     "OCTOBER",
+179 173 |     "SATURDAY",
+--------------------------------------------------------------------------------
+181 175 |     "SUNDAY",
+182 176 |     "THURSDAY",
+183 177 |     "TUESDAY",
+    178 |+    "WEDNESDAY",
+    179 |+    "Calendar",
+    180 |+    "Day",
+    181 |+    "HTMLCalendar",
+    182 |+    "IllegalMonthError",
+    183 |+    "LocaleHTMLCalendar",
+    184 |+    "Month",
+184 185 |     "TextCalendar",
+185     |-    "WEDNESDAY",
+186 186 |     "calendar",
+187 187 |     "timegm",
+188 188 |     "weekday",
 
 
