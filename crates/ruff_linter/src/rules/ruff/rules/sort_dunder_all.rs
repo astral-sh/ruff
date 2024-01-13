@@ -75,7 +75,7 @@ impl AlwaysFixableViolation for UnsortedDunderAll {
     }
 
     fn fix_title(&self) -> String {
-        "Sort `__all__` according to an isort-style sort".to_string()
+        "Apply an isort-style sorting to `__all__`".to_string()
     }
 }
 
