@@ -799,7 +799,10 @@ fn join_multiline_dunder_all_items(
         let original_source = locator.slice(item);
         let lines = original_source.split(newline).map(str::trim).collect_vec();
         let [preceding_comments @ .., element] = lines.as_slice() else {
-            panic!("Cannot pass an empty list as `sorted_items` to this function")
+            unreachable!(
+                "It should be impossible for an item in `__all__`
+                to have the empty string as its source code"
+            )
         };
 
         for comment_line in preceding_comments {
