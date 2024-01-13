@@ -135,6 +135,11 @@ __all__.extend(  # comment0
     ]  # comment4
 )  # comment2
 
+__all__ = ["Style", "Treeview",
+           # Extensions
+           "LabeledScale", "OptionMenu",
+]
+
 ###################################
 # These should all not get flagged:
 ###################################

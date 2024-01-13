@@ -702,13 +702,37 @@ fn join_multiline_dunder_all_items(
     newline: &str,
     needs_trailing_comma: bool,
 ) -> String {
-    let indent = leading_indentation(locator.full_line(start_offset));
+    let indent = format!(
+        "{}{}",
+        leading_indentation(locator.full_line(start_offset)),
+        additional_indent
+    );
+    let max_index = sorted_items.len() - 1;
+
     let mut new_dunder_all = String::new();
     for (i, item) in sorted_items.iter().enumerate() {
-        new_dunder_all.push_str(indent);
-        new_dunder_all.push_str(additional_indent);
-        new_dunder_all.push_str(locator.slice(item));
-        let is_final_item = i == (sorted_items.len() - 1);
+        let is_final_item = i == max_index;
+
+        // Separate out the item into source lines again.
+        //
+        // The final line of any item must have exactly 1 element in it,
+        // but there could be any number of comments on their own line
+        // preceding that element that also count as part of this item.
+        // Separating them out again means we can ensure that all elements in
+        // `__all__` have consistent indentation.
+        let original_source = locator.slice(item);
+        let lines = original_source.split(newline).map(str::trim).collect_vec();
+        let [preceding_comments @ .., element] = lines.as_slice() else {
+            panic!("Cannot pass an empty list as `sorted_items` to this function")
+        };
+
+        for comment_line in preceding_comments {
+            new_dunder_all.push_str(&indent);
+            new_dunder_all.push_str(comment_line);
+            new_dunder_all.push_str(newline);
+        }
+        new_dunder_all.push_str(&indent);
+        new_dunder_all.push_str(element);
         if !is_final_item || needs_trailing_comma {
             new_dunder_all.push(',');
         }

@@ -265,7 +265,7 @@ RUF022.py:44:11: RUF022 [*] `__all__` is not sorted
    46 |+    "b",
    47 |+    "d",  # comment1
    48 |+    # comment2
-   49 |+           "f",
+   49 |+    "f",
    50 |+    # comment4
 49 51 |     "formatted",
    52 |+    "strangely",  # comment3
@@ -637,5 +637,37 @@ RUF022.py:129:5: RUF022 [*] `__all__` is not sorted
 134 134 |         # comment3
 135 135 |     ]  # comment4
 136 136 | )  # comment2
+
+RUF022.py:138:11: RUF022 [*] `__all__` is not sorted
+    |
+136 |   )  # comment2
+137 |   
+138 |   __all__ = ["Style", "Treeview",
+    |  ___________^
+139 | |            # Extensions
+140 | |            "LabeledScale", "OptionMenu",
+141 | | ]
+    | |_^ RUF022
+142 |   
+143 |   ###################################
+    |
+    = help: Sort `__all__` according to a natural sort
+
+ℹ Unsafe fix
+135 135 |     ]  # comment4
+136 136 | )  # comment2
+137 137 | 
+138     |-__all__ = ["Style", "Treeview",
+139     |-           # Extensions
+140     |-           "LabeledScale", "OptionMenu",
+    138 |+__all__ = [
+    139 |+    # Extensions
+    140 |+    "LabeledScale",
+    141 |+    "OptionMenu",
+    142 |+    "Style",
+    143 |+    "Treeview",
+141 144 | ]
+142 145 | 
+143 146 | ###################################
 
 
