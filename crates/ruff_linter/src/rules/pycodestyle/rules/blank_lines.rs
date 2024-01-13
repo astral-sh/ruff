@@ -343,10 +343,6 @@ struct LinePreprocessor<'a> {
     locator: &'a Locator<'a>,
     /// Number of previous consecutive blank lines.
     previous_blank_lines: u32,
-    /// Number of consecutive blank lines.
-    current_blank_lines: u32,
-    /// Number of blank characters in the blank lines (\n vs \r\n for example).
-    current_blank_characters: usize,
 }
 
 impl<'a> LinePreprocessor<'a> {
@@ -355,8 +351,6 @@ impl<'a> LinePreprocessor<'a> {
             tokens: tokens.iter().flatten(),
             locator,
             previous_blank_lines: 0,
-            current_blank_lines: 0,
-            current_blank_characters: 0,
         }
     }
 }
@@ -367,41 +361,58 @@ impl<'a> Iterator for LinePreprocessor<'a> {
     fn next(&mut self) -> Option<LogicalLineInfo> {
         let mut line_is_comment_only = true;
         let mut is_docstring = true;
+        // Number of consecutive blank lines.
+        let mut current_blank_lines = 0u32;
+        // Number of blank characters in the blank lines (\n vs \r\n for example).
+        let mut current_blank_characters: usize = 0;
         let mut first_token: Option<TokenKind> = None;
         let mut first_token_range: Option<TextRange> = None;
         let mut last_token: Option<TokenKind> = None;
         let mut parens = 0u32;
 
         while let Some((token, range)) = self.tokens.next() {
-            let token = TokenKind::from_token(token);
-            if matches!(token, TokenKind::Indent | TokenKind::Dedent) {
+            let token_kind = TokenKind::from_token(token);
+
+            if matches!(token_kind, TokenKind::Indent | TokenKind::Dedent) {
                 continue;
             }
 
-            if token != TokenKind::Newline {
-                // Ideally, we would like to have a "async def" token since we care about the "def" part.
-                // As a work around, we ignore the first token if it is "async".
-                if first_token.is_none() && token != TokenKind::Async {
-                    first_token = Some(token);
-                }
-                if first_token_range.is_none() {
-                    first_token_range = Some(*range);
+            // At the start of the line...
+            if first_token.is_none() {
+                // An empty line
+                if token_kind == TokenKind::NonLogicalNewline {
+                    current_blank_lines += 1;
+                    current_blank_characters += range.len().to_usize();
+                    // self.current_blank_characters +=
+                    //     range.end().to_usize() - first_range.start().to_usize() + 1;
+
+                    continue;
                 }
 
-                if !token.is_trivia() {
-                    line_is_comment_only = false;
-                }
+                if !token_kind.is_newline() {
+                    // Ideally, we would like to have a "async def" token since we care about the "def" part.
+                    // As a work around, we ignore the first token if it is "async".
+                    if token_kind != TokenKind::Async {
+                        first_token = Some(token_kind.clone());
+                    }
 
-                // A docstring line is composed only of the docstring (TokenKind::String) and trivia tokens.
-                // (If a comment follows a docstring, we still count the line as a docstring)
-                if token != TokenKind::String && !token.is_trivia() {
-                    is_docstring = false;
+                    if first_token_range.is_none() {
+                        first_token_range = Some(*range);
+                    }
                 }
-
-                last_token = Some(token);
             }
 
-            match token {
+            if !token_kind.is_trivia() {
+                line_is_comment_only = false;
+            }
+
+            // A docstring line is composed only of the docstring (TokenKind::String) and trivia tokens.
+            // (If a comment follows a docstring, we still count the line as a docstring)
+            if token_kind != TokenKind::String && !token_kind.is_trivia() {
+                is_docstring = false;
+            }
+
+            match token_kind {
                 TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
                     parens = parens.saturating_add(1);
                 }
@@ -426,16 +437,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
                     let indent_length = expand_indent(self.locator.slice(range));
 
-                    // Empty line
-                    if first_token == Some(TokenKind::NonLogicalNewline) {
-                        self.current_blank_lines += 1;
-                        self.current_blank_characters +=
-                            range.end().to_usize() - first_range.start().to_usize() + 1;
-                        return self.next();
-                    }
-
-                    if self.previous_blank_lines < self.current_blank_lines {
-                        self.previous_blank_lines = self.current_blank_lines;
+                    if self.previous_blank_lines < current_blank_lines {
+                        self.previous_blank_lines = current_blank_lines;
                     }
 
                     let logical_line = LogicalLineInfo {
@@ -448,20 +451,19 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         is_comment_only: line_is_comment_only,
                         is_docstring,
                         indent_length,
-                        blank_lines: self.current_blank_lines,
+                        blank_lines: current_blank_lines,
                         preceding_blank_lines: self.previous_blank_lines,
-                        preceding_blank_characters: self.current_blank_characters,
+                        preceding_blank_characters: current_blank_characters,
                     };
 
                     if !line_is_comment_only {
                         self.previous_blank_lines = 0;
                     }
-                    self.current_blank_lines = 0;
-                    self.current_blank_characters = 0;
                     return Some(logical_line);
                 }
                 _ => {}
             }
+            last_token = Some(token_kind);
         }
 
         None
