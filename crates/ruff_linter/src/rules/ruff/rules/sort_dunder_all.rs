@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -380,9 +381,7 @@ impl DunderAllValue {
                 last_item_line_offset
             }
         };
-        let mut prelude = locator
-            .slice(TextRange::new(self.start(), prelude_end))
-            .to_string();
+        let mut prelude = Cow::Borrowed(locator.slice(TextRange::new(self.start(), prelude_end)));
         let postlude = locator.slice(TextRange::new(postlude_start, self.end()));
 
         let mut sorted_items = self.items;
@@ -391,7 +390,7 @@ impl DunderAllValue {
         let joined_items = if self.multiline {
             let indentation = stylist.indentation();
             let newline = stylist.line_ending().as_str();
-            prelude = format!("{}{}", prelude.trim_end(), newline);
+            prelude = Cow::Owned(format!("{}{}", prelude.trim_end(), newline));
             join_multiline_dunder_all_items(
                 &sorted_items,
                 locator,
