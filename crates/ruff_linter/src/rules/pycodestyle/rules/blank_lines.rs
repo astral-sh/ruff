@@ -331,7 +331,10 @@ struct LogicalLineInfo {
     is_comment_only: bool,
     is_docstring: bool,
     indent_length: usize,
+    /// `blank_lines` is the straightforward amount of blank lines preceding the current line.
     blank_lines: u32,
+    /// `preceding_blank_lines` is the maximum number of consecutive blank lines between the current line
+    /// and the previous non-comment logical line.
     preceding_blank_lines: u32,
     preceding_blank_characters: usize,
 }
