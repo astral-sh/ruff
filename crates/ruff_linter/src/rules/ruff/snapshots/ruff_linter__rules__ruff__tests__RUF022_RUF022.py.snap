@@ -448,7 +448,7 @@ RUF022.py:91:11: RUF022 [*] `__all__` is not sorted
 96 | | )
    | |_^ RUF022
 97 |   
-98 |   ###################################
+98 |   __all__.extend(["foo", "bar"])
    |
    = help: Sort `__all__` according to a natural sort
 
@@ -465,6 +465,177 @@ RUF022.py:91:11: RUF022 [*] `__all__` is not sorted
    95 |+    "aadvark10092"
 96 96 | )
 97 97 | 
-98 98 | ###################################
+98 98 | __all__.extend(["foo", "bar"])
+
+RUF022.py:98:16: RUF022 [*] `__all__` is not sorted
+    |
+ 96 | )
+ 97 | 
+ 98 | __all__.extend(["foo", "bar"])
+    |                ^^^^^^^^^^^^^^ RUF022
+ 99 | __all__.extend(("foo", "bar"))
+100 | __all__.extend((  # comment0
+    |
+    = help: Sort `__all__` according to a natural sort
+
+ℹ Safe fix
+95 95 |     "aadvark532"                       # the even longer whitespace span before this comment is retained
+96 96 | )
+97 97 | 
+98    |-__all__.extend(["foo", "bar"])
+   98 |+__all__.extend(["bar", "foo"])
+99 99 | __all__.extend(("foo", "bar"))
+100 100 | __all__.extend((  # comment0
+101 101 |     # comment about foo
+
+RUF022.py:99:16: RUF022 [*] `__all__` is not sorted
+    |
+ 98 | __all__.extend(["foo", "bar"])
+ 99 | __all__.extend(("foo", "bar"))
+    |                ^^^^^^^^^^^^^^ RUF022
+100 | __all__.extend((  # comment0
+101 |     # comment about foo
+    |
+    = help: Sort `__all__` according to a natural sort
+
+ℹ Safe fix
+96  96  | )
+97  97  | 
+98  98  | __all__.extend(["foo", "bar"])
+99      |-__all__.extend(("foo", "bar"))
+    99  |+__all__.extend(("bar", "foo"))
+100 100 | __all__.extend((  # comment0
+101 101 |     # comment about foo
+102 102 |     "foo",  # comment about foo
+
+RUF022.py:100:16: RUF022 [*] `__all__` is not sorted
+    |
+ 98 |   __all__.extend(["foo", "bar"])
+ 99 |   __all__.extend(("foo", "bar"))
+100 |   __all__.extend((  # comment0
+    |  ________________^
+101 | |     # comment about foo
+102 | |     "foo",  # comment about foo
+103 | |     # comment about bar
+104 | |     "bar"  # comment about bar
+105 | |     # comment1
+106 | | ))  # comment2
+    | |_^ RUF022
+107 |   
+108 |   __all__.extend(  # comment0
+    |
+    = help: Sort `__all__` according to a natural sort
+
+ℹ Unsafe fix
+98  98  | __all__.extend(["foo", "bar"])
+99  99  | __all__.extend(("foo", "bar"))
+100 100 | __all__.extend((  # comment0
+    101 |+    # comment about bar
+    102 |+    "bar",  # comment about bar
+101 103 |     # comment about foo
+102     |-    "foo",  # comment about foo
+103     |-    # comment about bar
+104     |-    "bar"  # comment about bar
+    104 |+    "foo"  # comment about foo
+105 105 |     # comment1
+106 106 | ))  # comment2
+107 107 | 
+
+RUF022.py:110:5: RUF022 [*] `__all__` is not sorted
+    |
+108 |   __all__.extend(  # comment0
+109 |       # comment1
+110 |       (  # comment2
+    |  _____^
+111 | |         # comment about foo
+112 | |         "foo",  # comment about foo
+113 | |         # comment about bar
+114 | |         "bar"  # comment about bar
+115 | |         # comment3
+116 | |     )  # comment4
+    | |_____^ RUF022
+117 |   )  # comment2
+    |
+    = help: Sort `__all__` according to a natural sort
+
+ℹ Unsafe fix
+108 108 | __all__.extend(  # comment0
+109 109 |     # comment1
+110 110 |     (  # comment2
+    111 |+        # comment about bar
+    112 |+        "bar",  # comment about bar
+111 113 |         # comment about foo
+112     |-        "foo",  # comment about foo
+113     |-        # comment about bar
+114     |-        "bar"  # comment about bar
+    114 |+        "foo"  # comment about foo
+115 115 |         # comment3
+116 116 |     )  # comment4
+117 117 | )  # comment2
+
+RUF022.py:119:16: RUF022 [*] `__all__` is not sorted
+    |
+117 |   )  # comment2
+118 |   
+119 |   __all__.extend([  # comment0
+    |  ________________^
+120 | |     # comment about foo
+121 | |     "foo",  # comment about foo
+122 | |     # comment about bar
+123 | |     "bar"  # comment about bar
+124 | |     # comment1
+125 | | ])  # comment2
+    | |_^ RUF022
+126 |   
+127 |   __all__.extend(  # comment0
+    |
+    = help: Sort `__all__` according to a natural sort
+
+ℹ Unsafe fix
+117 117 | )  # comment2
+118 118 | 
+119 119 | __all__.extend([  # comment0
+    120 |+    # comment about bar
+    121 |+    "bar",  # comment about bar
+120 122 |     # comment about foo
+121     |-    "foo",  # comment about foo
+122     |-    # comment about bar
+123     |-    "bar"  # comment about bar
+    123 |+    "foo"  # comment about foo
+124 124 |     # comment1
+125 125 | ])  # comment2
+126 126 | 
+
+RUF022.py:129:5: RUF022 [*] `__all__` is not sorted
+    |
+127 |   __all__.extend(  # comment0
+128 |       # comment1
+129 |       [  # comment2
+    |  _____^
+130 | |         # comment about foo
+131 | |         "foo",  # comment about foo
+132 | |         # comment about bar
+133 | |         "bar"  # comment about bar
+134 | |         # comment3
+135 | |     ]  # comment4
+    | |_____^ RUF022
+136 |   )  # comment2
+    |
+    = help: Sort `__all__` according to a natural sort
+
+ℹ Unsafe fix
+127 127 | __all__.extend(  # comment0
+128 128 |     # comment1
+129 129 |     [  # comment2
+    130 |+        # comment about bar
+    131 |+        "bar",  # comment about bar
+130 132 |         # comment about foo
+131     |-        "foo",  # comment about foo
+132     |-        # comment about bar
+133     |-        "bar"  # comment about bar
+    133 |+        "foo"  # comment about foo
+134 134 |         # comment3
+135 135 |     ]  # comment4
+136 136 | )  # comment2
 
 

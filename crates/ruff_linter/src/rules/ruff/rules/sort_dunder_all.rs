@@ -82,7 +82,7 @@ pub(crate) fn sort_dunder_all_assign(
     let [ast::Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
         return;
     };
-    sort_dunder_all(checker, id, value, parent);
+    sort_dunder_all(checker, id, value, parent.range());
 }
 
 /// Sort an `__all__` mutation represented by a `StmtAugAssign` AST node.
@@ -104,7 +104,47 @@ pub(crate) fn sort_dunder_all_aug_assign(
     let ast::Expr::Name(ast::ExprName { ref id, .. }) = **target else {
         return;
     };
-    sort_dunder_all(checker, id, value, parent);
+    sort_dunder_all(checker, id, value, parent.range());
+}
+
+/// Sort an `__all__` mutation from a call to `.extend()`.
+pub(crate) fn sort_dunder_all_extend_call(
+    checker: &mut Checker,
+    call @ ast::ExprCall {
+        ref func,
+        arguments: ast::Arguments { args, keywords, .. },
+        ..
+    }: &ast::ExprCall,
+) {
+    let ([value_passed], []) = (args.as_slice(), keywords.as_slice()) else {
+        return;
+    };
+    if let Some(name) = extract_name_dot_extend_was_called_on(func) {
+        let locator = checker.locator();
+        let call_line = locator.line_start(call.start());
+        let arg_line = locator.line_start(value_passed.start());
+        let parent_range = if arg_line > call_line {
+            value_passed.range()
+        } else {
+            call.range()
+        };
+        sort_dunder_all(checker, name, value_passed, parent_range);
+    }
+}
+
+/// Given a Python call `x.extend()`, return `Some("x")`.
+/// Return `None` if this wasn't actually a `.extend()` call after all.
+fn extract_name_dot_extend_was_called_on(node: &ast::Expr) -> Option<&str> {
+    let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = node else {
+        return None;
+    };
+    if attr.as_str() != "extend" {
+        return None;
+    }
+    let ast::Expr::Name(ast::ExprName { ref id, .. }) = **value else {
+        return None;
+    };
+    Some(id)
 }
 
 /// Sort an `__all__` definition represented by a `StmtAnnAssign` AST node.
@@ -125,10 +165,10 @@ pub(crate) fn sort_dunder_all_ann_assign(
     let ast::Expr::Name(ast::ExprName { ref id, .. }) = **target else {
         return;
     };
-    sort_dunder_all(checker, id, val, parent);
+    sort_dunder_all(checker, id, val, parent.range());
 }
 
-fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent: &ast::Stmt) {
+fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent_range: TextRange) {
     if target != "__all__" {
         return;
     }
@@ -150,7 +190,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr, parent
     };
 
     let new_dunder_all =
-        match dunder_all_val.into_sorted_source_code(locator, parent, checker.stylist()) {
+        match dunder_all_val.into_sorted_source_code(locator, parent_range, checker.stylist()) {
             SortedDunderAll::AlreadySorted => return,
             SortedDunderAll::Sorted(value) => value,
         };
@@ -265,7 +305,7 @@ impl DunderAllValue {
     fn into_sorted_source_code(
         self,
         locator: &Locator,
-        parent: &ast::Stmt,
+        parent_range: TextRange,
         stylist: &Stylist,
     ) -> SortedDunderAll {
         // As well as saving us unnecessary work,
@@ -355,7 +395,7 @@ impl DunderAllValue {
             join_multiline_dunder_all_items(
                 &sorted_items,
                 locator,
-                parent,
+                parent_range,
                 indentation,
                 newline,
                 self.ends_with_trailing_comma,
@@ -687,12 +727,12 @@ fn join_singleline_dunder_all_items(sorted_items: &[DunderAllItem], locator: &Lo
 fn join_multiline_dunder_all_items(
     sorted_items: &[DunderAllItem],
     locator: &Locator,
-    parent: &ast::Stmt,
+    parent_range: TextRange,
     additional_indent: &str,
     newline: &str,
     needs_trailing_comma: bool,
 ) -> Option<String> {
-    let indent = indentation(locator, parent)?;
+    let indent = indentation(locator, &parent_range)?;
     let mut new_dunder_all = String::new();
     for (i, item) in sorted_items.iter().enumerate() {
         new_dunder_all.push_str(indent);

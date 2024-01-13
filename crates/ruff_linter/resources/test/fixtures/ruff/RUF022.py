@@ -95,6 +95,46 @@ __all__ = (
     "aadvark532"                       # the even longer whitespace span before this comment is retained
 )
 
+__all__.extend(["foo", "bar"])
+__all__.extend(("foo", "bar"))
+__all__.extend((  # comment0
+    # comment about foo
+    "foo",  # comment about foo
+    # comment about bar
+    "bar"  # comment about bar
+    # comment1
+))  # comment2
+
+__all__.extend(  # comment0
+    # comment1
+    (  # comment2
+        # comment about foo
+        "foo",  # comment about foo
+        # comment about bar
+        "bar"  # comment about bar
+        # comment3
+    )  # comment4
+)  # comment2
+
+__all__.extend([  # comment0
+    # comment about foo
+    "foo",  # comment about foo
+    # comment about bar
+    "bar"  # comment about bar
+    # comment1
+])  # comment2
+
+__all__.extend(  # comment0
+    # comment1
+    [  # comment2
+        # comment about foo
+        "foo",  # comment about foo
+        # comment about bar
+        "bar"  # comment about bar
+        # comment3
+    ]  # comment4
+)  # comment2
+
 ###################################
 # These should all not get flagged:
 ###################################
@@ -143,3 +183,17 @@ __all__ = (  # This is just an empty tuple,
     # it's very well
 )  # documented
 
+__all__.append("foo")
+__all__.extend(["bar", "foo"])
+__all__.extend((((["bar", "foo"]))))
+__all__.extend([
+    "bar",  # comment0
+    "foo"  # comment1
+])
+__all__.extend(("bar", "foo"))
+__all__.extend(
+    (
+        "bar",
+        "foo"
+    )
+)
