@@ -140,6 +140,10 @@ __all__ = ["Style", "Treeview",
            "LabeledScale", "OptionMenu",
 ]
 
+__all__ = ["Awaitable", "Coroutine",
+           "AsyncIterable", "AsyncIterator", "AsyncGenerator",
+           ]
+
 ###################################
 # These should all not get flagged:
 ###################################

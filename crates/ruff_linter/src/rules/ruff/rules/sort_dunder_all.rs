@@ -8,7 +8,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Locator;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -323,7 +323,7 @@ impl DunderAllValue {
         //   (an "item" being a region of source code that all moves as one unit
         //   when `__all__` is sorted).
         // - The postlude in the above example is the source code region starting
-        //   just after `# comment2` and ending just before the lgoical newline
+        //   just after `# comment2` and ending just before the logical newline
         //   that follows the closing paren. `# comment2` is part of the last item,
         //   as it's an inline comment on the same line as an element,
         //   but `# comment3` becomes part of the postlude because there are no items
@@ -354,21 +354,27 @@ impl DunderAllValue {
             }
         };
         let mut prelude = Cow::Borrowed(locator.slice(TextRange::new(self.start(), prelude_end)));
-        let postlude = locator.slice(TextRange::new(postlude_start, self.end()));
+        let mut postlude = Cow::Borrowed(locator.slice(TextRange::new(postlude_start, self.end())));
 
         let start_offset = self.start();
         let mut sorted_items = self.items;
         sorted_items.sort();
 
         let joined_items = if self.multiline {
-            let indentation = stylist.indentation();
+            let leading_indent = leading_indentation(locator.full_line(start_offset));
+            let item_indent = format!("{}{}", leading_indent, stylist.indentation().as_str());
             let newline = stylist.line_ending().as_str();
             prelude = Cow::Owned(format!("{}{}", prelude.trim_end(), newline));
+            if postlude.starts_with(newline) {
+                let trimmed_postlude = postlude.trim_start();
+                if trimmed_postlude.starts_with(']') || trimmed_postlude.starts_with(')') {
+                    postlude = Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
+                }
+            }
             join_multiline_dunder_all_items(
                 &sorted_items,
                 locator,
-                start_offset,
-                indentation,
+                &item_indent,
                 newline,
                 self.ends_with_trailing_comma,
             )
@@ -697,16 +703,10 @@ fn join_singleline_dunder_all_items(sorted_items: &[DunderAllItem], locator: &Lo
 fn join_multiline_dunder_all_items(
     sorted_items: &[DunderAllItem],
     locator: &Locator,
-    start_offset: TextSize,
-    additional_indent: &str,
+    item_indent: &str,
     newline: &str,
     needs_trailing_comma: bool,
 ) -> String {
-    let indent = format!(
-        "{}{}",
-        leading_indentation(locator.full_line(start_offset)),
-        additional_indent
-    );
     let max_index = sorted_items.len() - 1;
 
     let mut new_dunder_all = String::new();
@@ -727,11 +727,11 @@ fn join_multiline_dunder_all_items(
         };
 
         for comment_line in preceding_comments {
-            new_dunder_all.push_str(&indent);
+            new_dunder_all.push_str(item_indent);
             new_dunder_all.push_str(comment_line);
             new_dunder_all.push_str(newline);
         }
-        new_dunder_all.push_str(&indent);
+        new_dunder_all.push_str(item_indent);
         new_dunder_all.push_str(element);
         if !is_final_item || needs_trailing_comma {
             new_dunder_all.push(',');
