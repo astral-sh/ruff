@@ -980,9 +980,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pie::rules::unnecessary_spread(checker, dict);
             }
         }
-        Expr::Set(ast::ExprSet { elts, range }) => {
+        Expr::Set(_) => {
             if checker.enabled(Rule::DuplicateValue) {
-                flake8_bugbear::rules::duplicate_value(checker, elts, *range);
+                flake8_bugbear::rules::duplicate_value(checker, expr);
             }
         }
         Expr::Yield(_) => {
