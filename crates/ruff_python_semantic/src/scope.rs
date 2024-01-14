@@ -129,6 +129,11 @@ impl<'a> Scope<'a> {
         self.shadowed_bindings.get(&id).copied()
     }
 
+    /// Returns an iterator over all bindings that the given binding shadows, including itself.
+    pub fn shadowed_bindings(&self, id: BindingId) -> impl Iterator<Item = BindingId> + '_ {
+        std::iter::successors(Some(id), |id| self.shadowed_bindings.get(id).copied())
+    }
+
     /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.
     pub fn add_star_import(&mut self, import: StarImport<'a>) {
         self.star_imports.push(import);
