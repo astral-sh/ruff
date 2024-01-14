@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_simplify/mod.rs
 ---
-SIM113.py:4:5: SIM113 Use enumereate() for index variable `idx` in for loop
+SIM113.py:4:5: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
   |
 2 |   def f():
 3 |       # SIM113
@@ -14,7 +14,7 @@ SIM113.py:4:5: SIM113 Use enumereate() for index variable `idx` in for loop
   | |____________^ SIM113
   |
 
-SIM113.py:14:5: SIM113 Use enumereate() for index variable `idx` in for loop
+SIM113.py:14:5: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
    |
 12 |       # SIM113
 13 |       sum = 0
@@ -28,7 +28,7 @@ SIM113.py:14:5: SIM113 Use enumereate() for index variable `idx` in for loop
    | |________________________^ SIM113
    |
 
-SIM113.py:24:5: SIM113 Use enumereate() for index variable `idx` in for loop
+SIM113.py:24:5: SIM113 Use `enumerate()` for index variable `idx` in `for` loop
    |
 22 |   def f():
 23 |       # SIM113

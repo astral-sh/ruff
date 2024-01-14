@@ -8,40 +8,42 @@ use crate::checkers::ast::Checker;
 use crate::rules::flake8_simplify::rules::ast_bool_op::is_same_expr;
 
 /// ## What it does
-/// Checks for loops which has explicit loop-index variables that can be simplified by using `enumerate()`.
+/// Checks for `for` loops with explicit loop-index variables that can be replaced
+/// with `enumerate()`.
 ///
 /// ## Why this is bad?
-/// Using `enumerate()` is more readable and concise. It could lead to more efficient
-/// and less error-prone code.
+/// When iterating over a sequence, it's often desirable to keep track of the
+/// index of each element alongside the element itself. Prefer the `enumerate`
+/// builtin over manually incrementing a counter variable within the loop, as
+/// `enumerate` is more concise and idiomatic.
 ///
 /// ## Example
 /// ```python
-/// sum = 0
-/// idx = 0
-/// for item in items:
-///    sum += func(item, idx)
-///   idx += 1
+/// fruits = ["apple", "banana", "cherry"]
+/// for fruit in fruits:
+///     print(f"{i + 1}. {fruit}")
+///     i += 1
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// sum = 0
-/// for idx, item in enumerate(items):
-///    sum += func(item, idx)
+/// fruits = ["apple", "banana", "cherry"]
+/// for i, fruit in enumerate(fruits):
+///     print(f"{i + 1}. {fruit}")
 /// ```
 ///
 /// ## References
-/// - [Python documentation: enumerate()](https://docs.python.org/3/library/functions.html#enumerate)
+/// - [Python documentation: `enumerate`](https://docs.python.org/3/library/functions.html#enumerate)
 #[violation]
 pub struct EnumerateForLoop {
-    index_var: String,
+    index: String,
 }
 
 impl Violation for EnumerateForLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let EnumerateForLoop { index_var } = self;
-        format!("Use enumereate() for index variable `{index_var}` in for loop")
+        let EnumerateForLoop { index } = self;
+        format!("Use `enumerate()` for index variable `{index}` in `for` loop")
     }
 }
 
@@ -54,29 +56,30 @@ pub(crate) fn use_enumerate_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
         return;
     };
 
-    // Check if loop body contains a continue statement
-    if loop_possibly_continues(body) {
-        return;
-    };
-    // Check if index variable is initialized to zero prior to loop
-    let Some((prev_stmt, index_var)) = get_candidate_loop_index(checker, stmt) else {
+    // Check if loop body contains a continue statement.
+    if has_continue(body) {
         return;
     };
 
-    // Check if loop body contains an index increment statement matching `index_var
-    if body.iter().any(|stmt| is_index_increment(stmt, index_var)) {
-        let diagonastic = Diagnostic::new(
+    // Check if index variable is initialized to zero prior to loop.
+    let Some((prev_stmt, index)) = get_candidate_loop_index(checker, stmt) else {
+        return;
+    };
+
+    // Check if loop body contains an index increment statement matching `index`.
+    if body.iter().any(|stmt| is_index_increment(stmt, index)) {
+        let diagnostic = Diagnostic::new(
             EnumerateForLoop {
-                index_var: checker.generator().expr(index_var),
+                index: checker.generator().expr(index),
             },
             TextRange::new(prev_stmt.start(), stmt.end()),
         );
-        checker.diagnostics.push(diagonastic);
+        checker.diagnostics.push(diagnostic);
     }
 }
 
 /// Recursively check if the `for` loop body contains a `continue` statement
-fn loop_possibly_continues(body: &[Stmt]) -> bool {
+fn has_continue(body: &[Stmt]) -> bool {
     body.iter().any(|stmt| match stmt {
         Stmt::Continue(_) => true,
         Stmt::If(ast::StmtIf {
@@ -84,15 +87,15 @@ fn loop_possibly_continues(body: &[Stmt]) -> bool {
             elif_else_clauses,
             ..
         }) => {
-            loop_possibly_continues(body)
+            has_continue(body)
                 || elif_else_clauses
                     .iter()
-                    .any(|clause| loop_possibly_continues(&clause.body))
+                    .any(|clause| has_continue(&clause.body))
         }
-        Stmt::With(ast::StmtWith { body, .. }) => loop_possibly_continues(body),
+        Stmt::With(ast::StmtWith { body, .. }) => has_continue(body),
         Stmt::Match(ast::StmtMatch { cases, .. }) => cases
             .iter()
-            .any(|MatchCase { body, .. }| loop_possibly_continues(body)),
+            .any(|MatchCase { body, .. }| has_continue(body)),
         Stmt::Try(ast::StmtTry {
             body,
             handlers,
@@ -100,13 +103,13 @@ fn loop_possibly_continues(body: &[Stmt]) -> bool {
             finalbody,
             ..
         }) => {
-            loop_possibly_continues(body)
-                || loop_possibly_continues(orelse)
-                || loop_possibly_continues(finalbody)
+            has_continue(body)
+                || has_continue(orelse)
+                || has_continue(finalbody)
                 || handlers.iter().any(|handler| match handler {
                     ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
-                    }) => loop_possibly_continues(body),
+                    }) => has_continue(body),
                 })
         }
 
