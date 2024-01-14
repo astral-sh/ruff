@@ -388,6 +388,12 @@ impl DunderAllValue {
     }
 }
 
+impl Ranged for DunderAllValue {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// Fixup the postlude for a multiline `__all__` definition.
 ///
 /// Without the fixup, closing `)` or `]` characters
@@ -412,12 +418,6 @@ fn fixup_postlude<'a>(
         return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
     }
     postlude
-}
-
-impl Ranged for DunderAllValue {
-    fn range(&self) -> TextRange {
-        self.range
-    }
 }
 
 /// Variants of this enum are returned by `into_sorted_source_code()`.
