@@ -1,0 +1,169 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B033.py:4:35: B033 [*] Sets should not contain duplicate item `"value1"`
+  |
+2 | # Errors.
+3 | ###
+4 | incorrect_set = {"value1", 23, 5, "value1"}
+  |                                   ^^^^^^^^ B033
+5 | incorrect_set = {1, 1, 2}
+6 | incorrect_set_multiline = {
+  |
+  = help: Remove duplicate item
+
+ℹ Safe fix
+1 1 | ###
+2 2 | # Errors.
+3 3 | ###
+4   |-incorrect_set = {"value1", 23, 5, "value1"}
+  4 |+incorrect_set = {"value1", 23, 5}
+5 5 | incorrect_set = {1, 1, 2}
+6 6 | incorrect_set_multiline = {
+7 7 |     "value1",
+
+B033.py:5:21: B033 [*] Sets should not contain duplicate item `1`
+  |
+3 | ###
+4 | incorrect_set = {"value1", 23, 5, "value1"}
+5 | incorrect_set = {1, 1, 2}
+  |                     ^ B033
+6 | incorrect_set_multiline = {
+7 |     "value1",
+  |
+  = help: Remove duplicate item
+
+ℹ Safe fix
+2 2 | # Errors.
+3 3 | ###
+4 4 | incorrect_set = {"value1", 23, 5, "value1"}
+5   |-incorrect_set = {1, 1, 2}
+  5 |+incorrect_set = {1, 2}
+6 6 | incorrect_set_multiline = {
+7 7 |     "value1",
+8 8 |     23,
+
+B033.py:10:5: B033 [*] Sets should not contain duplicate item `"value1"`
+   |
+ 8 |     23,
+ 9 |     5,
+10 |     "value1",
+   |     ^^^^^^^^ B033
+11 |     # B033
+12 | }
+   |
+   = help: Remove duplicate item
+
+ℹ Safe fix
+7  7  |     "value1",
+8  8  |     23,
+9  9  |     5,
+10    |-    "value1",
+11 10 |     # B033
+12 11 | }
+13 12 | incorrect_set = {1, 1}
+
+B033.py:13:21: B033 [*] Sets should not contain duplicate item `1`
+   |
+11 |     # B033
+12 | }
+13 | incorrect_set = {1, 1}
+   |                     ^ B033
+14 | incorrect_set = {1, 1,}
+15 | incorrect_set = {0, 1, 1,}
+   |
+   = help: Remove duplicate item
+
+ℹ Safe fix
+10 10 |     "value1",
+11 11 |     # B033
+12 12 | }
+13    |-incorrect_set = {1, 1}
+   13 |+incorrect_set = {1}
+14 14 | incorrect_set = {1, 1,}
+15 15 | incorrect_set = {0, 1, 1,}
+16 16 | incorrect_set = {0, 1, 1}
+
+B033.py:14:21: B033 [*] Sets should not contain duplicate item `1`
+   |
+12 | }
+13 | incorrect_set = {1, 1}
+14 | incorrect_set = {1, 1,}
+   |                     ^ B033
+15 | incorrect_set = {0, 1, 1,}
+16 | incorrect_set = {0, 1, 1}
+   |
+   = help: Remove duplicate item
+
+ℹ Safe fix
+11 11 |     # B033
+12 12 | }
+13 13 | incorrect_set = {1, 1}
+14    |-incorrect_set = {1, 1,}
+   14 |+incorrect_set = {1,}
+15 15 | incorrect_set = {0, 1, 1,}
+16 16 | incorrect_set = {0, 1, 1}
+17 17 | incorrect_set = {
+
+B033.py:15:24: B033 [*] Sets should not contain duplicate item `1`
+   |
+13 | incorrect_set = {1, 1}
+14 | incorrect_set = {1, 1,}
+15 | incorrect_set = {0, 1, 1,}
+   |                        ^ B033
+16 | incorrect_set = {0, 1, 1}
+17 | incorrect_set = {
+   |
+   = help: Remove duplicate item
+
+ℹ Safe fix
+12 12 | }
+13 13 | incorrect_set = {1, 1}
+14 14 | incorrect_set = {1, 1,}
+15    |-incorrect_set = {0, 1, 1,}
+   15 |+incorrect_set = {0, 1,}
+16 16 | incorrect_set = {0, 1, 1}
+17 17 | incorrect_set = {
+18 18 |     0,
+
+B033.py:16:24: B033 [*] Sets should not contain duplicate item `1`
+   |
+14 | incorrect_set = {1, 1,}
+15 | incorrect_set = {0, 1, 1,}
+16 | incorrect_set = {0, 1, 1}
+   |                        ^ B033
+17 | incorrect_set = {
+18 |     0,
+   |
+   = help: Remove duplicate item
+
+ℹ Safe fix
+13 13 | incorrect_set = {1, 1}
+14 14 | incorrect_set = {1, 1,}
+15 15 | incorrect_set = {0, 1, 1,}
+16    |-incorrect_set = {0, 1, 1}
+   16 |+incorrect_set = {0, 1}
+17 17 | incorrect_set = {
+18 18 |     0,
+19 19 |     1,
+
+B033.py:20:5: B033 [*] Sets should not contain duplicate item `1`
+   |
+18 |     0,
+19 |     1,
+20 |     1,
+   |     ^ B033
+21 | }
+   |
+   = help: Remove duplicate item
+
+ℹ Safe fix
+17 17 | incorrect_set = {
+18 18 |     0,
+19 19 |     1,
+20    |-    1,
+21 20 | }
+22 21 | 
+23 22 | ###
+
+

@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
@@ -32,15 +32,17 @@ pub struct DuplicateValue {
     value: String,
 }
 
-impl AlwaysFixableViolation for DuplicateValue {
+impl Violation for DuplicateValue {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let DuplicateValue { value } = self;
         format!("Sets should not contain duplicate item `{value}`")
     }
 
-    fn fix_title(&self) -> String {
-        format!("Remove duplicate item")
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Remove duplicate item"))
     }
 }
 
@@ -59,9 +61,11 @@ pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
                     elt.range(),
                 );
 
-                diagnostic.try_set_fix(|| {
-                    remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
-                });
+                if checker.settings.preview.is_enabled() {
+                    diagnostic.try_set_fix(|| {
+                        remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
+                    });
+                }
 
                 checker.diagnostics.push(diagnostic);
             }
