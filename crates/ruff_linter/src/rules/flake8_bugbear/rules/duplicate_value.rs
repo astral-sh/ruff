@@ -1,10 +1,10 @@
-use ruff_python_ast::Expr;
+use ruff_python_ast::{Expr, ExprSet};
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 
@@ -30,28 +30,46 @@ pub struct DuplicateValue {
     value: String,
 }
 
-impl Violation for DuplicateValue {
+impl AlwaysFixableViolation for DuplicateValue {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DuplicateValue { value } = self;
         format!("Sets should not contain duplicate item `{value}`")
     }
+
+    fn fix_title(&self) -> String {
+        let DuplicateValue { value } = self;
+        format!("Remove duplicate item `{value}`")
+    }
 }
 
 /// B033
-pub(crate) fn duplicate_value(checker: &mut Checker, elts: &Vec<Expr>) {
+pub(crate) fn duplicate_value(checker: &mut Checker, elts: &[Expr], range: TextRange) {
     let mut seen_values: FxHashSet<ComparableExpr> = FxHashSet::default();
-    for elt in elts {
+    for (index, elt) in elts.iter().enumerate() {
         if elt.is_literal_expr() {
             let comparable_value: ComparableExpr = elt.into();
 
             if !seen_values.insert(comparable_value) {
-                checker.diagnostics.push(Diagnostic::new(
+                let mut diagnostic = Diagnostic::new(
                     DuplicateValue {
                         value: checker.generator().expr(elt),
                     },
                     elt.range(),
-                ));
+                );
+
+                let mut elts_without_duplicate = elts.to_owned();
+                elts_without_duplicate.remove(index);
+
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    checker.generator().expr(&Expr::Set(ExprSet {
+                        elts: elts_without_duplicate,
+                        range,
+                    })),
+                    range,
+                )));
+
+                checker.diagnostics.push(diagnostic);
             }
         };
     }
