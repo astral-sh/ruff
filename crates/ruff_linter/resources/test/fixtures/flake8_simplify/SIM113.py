@@ -147,3 +147,22 @@ def func():
         if idx > 10:
             idx *= 2
         h(x)
+
+
+def func():
+    # OK (index used after loop)
+    idx = 0
+    for x in range(5):
+        g(x, idx)
+        idx += 1
+        h(x)
+    print(idx)
+
+
+def func():
+    # OK (index within nested loop)
+    idx = 0
+    for x in range(5):
+        for y in range(5):
+            g(x, idx)
+            idx += 1

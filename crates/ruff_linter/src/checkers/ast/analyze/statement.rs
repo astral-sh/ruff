@@ -1258,9 +1258,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             },
         ) => {
             if checker.any_enabled(&[
-                Rule::UnusedLoopControlVariable,
+                Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
                 Rule::UnnecessaryEnumerate,
+                Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
             ]) {
                 checker.deferred.for_loops.push(checker.semantic.snapshot());
@@ -1310,9 +1311,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 }
                 if checker.enabled(Rule::TryExceptInLoop) {
                     perflint::rules::try_except_in_loop(checker, body);
-                }
-                if checker.enabled(Rule::EnumerateForLoop) {
-                    flake8_simplify::rules::enumerate_for_loop(checker, for_stmt);
                 }
             }
         }

@@ -56,10 +56,10 @@ pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor)
         return;
     }
 
-    // If the loop contains an increment statement (e.g., `i += 1`)...
     for stmt in &for_stmt.body {
+        // Find the augmented assignment expression (e.g., `i += 1`).
         if let Some(index) = match_index_increment(stmt) {
-            // Find the binding corresponding to the augmented assignment (e.g., `i += 1`).
+            // Find the binding corresponding to the initialization (e.g., `i = 1`).
             let Some(id) = checker.semantic().resolve_name(index) else {
                 continue;
             };
@@ -67,6 +67,11 @@ pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor)
             // If it's not an assignment (e.g., it's a function argument), ignore it.
             let binding = checker.semantic().binding(id);
             if !binding.kind.is_assignment() {
+                continue;
+            }
+
+            // If the variable is global or nonlocal, ignore it.
+            if binding.is_global() || binding.is_nonlocal() {
                 continue;
             }
 
@@ -93,20 +98,41 @@ pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor)
             let Some(assignment_id) = binding.source else {
                 continue;
             };
-            if !checker.semantic().same_branch(for_loop_id, assignment_id) {
+            if checker.semantic().parent_statement_id(for_loop_id)
+                != checker.semantic().parent_statement_id(assignment_id)
+            {
                 continue;
             }
 
-            // If there are multiple assignments to this variable _within_ the loop, ignore it.
-            if checker
-                .semantic()
-                .current_scope()
-                .get_all(&index.id)
-                .map(|id| checker.semantic().binding(id))
-                .filter(|binding| for_stmt.range().contains_range(binding.range()))
-                .count()
-                > 1
-            {
+            // Identify the binding created by the augmented assignment.
+            // TODO(charlie): There should be a way to go from `ExprName` to `BindingId` (like
+            // `resolve_name`, but for bindings rather than references).
+            let binding = {
+                let mut bindings = checker
+                    .semantic()
+                    .current_scope()
+                    .get_all(&index.id)
+                    .map(|id| checker.semantic().binding(id))
+                    .filter(|binding| for_stmt.range().contains_range(binding.range()));
+
+                let Some(binding) = bindings.next() else {
+                    continue;
+                };
+
+                // If there are multiple assignments to this variable _within_ the loop, ignore it.
+                if bindings.next().is_some() {
+                    continue;
+                }
+
+                binding
+            };
+
+            // If the variable is used _after_ the loop, ignore it.
+            // Find the binding for the augmented assignment.
+            if binding.references.iter().any(|id| {
+                let reference = checker.semantic().reference(*id);
+                reference.start() > for_stmt.end()
+            }) {
                 continue;
             }
 
