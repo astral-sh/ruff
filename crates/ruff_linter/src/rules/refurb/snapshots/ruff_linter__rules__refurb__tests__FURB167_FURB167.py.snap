@@ -1,0 +1,23 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB167.py:4:38: FURB167 [*] Use of shorthand `re.I`
+  |
+3 | # BAD:
+4 | if re.match("^hello", "hello world", re.I):
+  |                                      ^^^^ FURB167
+5 |     pass
+  |
+  = help: Replace with `re.IGNORECASE`
+
+ℹ Safe fix
+1 1 | import re
+2 2 | 
+3 3 | # BAD:
+4   |-if re.match("^hello", "hello world", re.I):
+  4 |+if re.match("^hello", "hello world", re.IGNORECASE):
+5 5 |     pass
+6 6 | 
+7 7 | 
+
+

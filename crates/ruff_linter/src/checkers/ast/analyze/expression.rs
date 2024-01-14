@@ -293,6 +293,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.enabled(Rule::LongRegexFlag) {
+                refurb::rules::long_regex_flag(checker, expr);
+            }
             if checker.enabled(Rule::DatetimeTimezoneUTC) {
                 if checker.settings.target_version >= PythonVersion::Py311 {
                     pyupgrade::rules::datetime_utc_alias(checker, expr);

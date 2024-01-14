@@ -987,6 +987,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "152") => (RuleGroup::Preview, rules::refurb::rules::MathConstant),
         (Refurb, "161") => (RuleGroup::Preview, rules::refurb::rules::BitCount),
         (Refurb, "163") => (RuleGroup::Preview, rules::refurb::rules::RedundantLogBase),
+        (Refurb, "167") => (RuleGroup::Preview, rules::refurb::rules::LongRegexFlag),
         (Refurb, "168") => (RuleGroup::Preview, rules::refurb::rules::IsinstanceTypeNone),
         (Refurb, "169") => (RuleGroup::Preview, rules::refurb::rules::TypeNoneComparison),
         (Refurb, "171") => (RuleGroup::Preview, rules::refurb::rules::SingleItemMembershipTest),
