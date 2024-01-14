@@ -129,15 +129,11 @@ pub(crate) fn sort_dunder_all_extend_call(
 /// Given a Python call `x.extend()`, return `Some("x")`.
 /// Return `None` if this wasn't actually a `.extend()` call after all.
 fn extract_name_dot_extend_was_called_on(node: &ast::Expr) -> Option<&str> {
-    let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = node else {
-        return None;
-    };
+    let ast::ExprAttribute { value, attr, .. } = node.as_attribute_expr()?;
     if attr != "extend" {
         return None;
     }
-    let ast::Expr::Name(ast::ExprName { ref id, .. }) = **value else {
-        return None;
-    };
+    let ast::ExprName { id, .. } = value.as_name_expr()?;
     Some(id)
 }
 
