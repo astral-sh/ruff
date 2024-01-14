@@ -1,12 +1,11 @@
 use anyhow::{Context, Result};
-
-use ruff_python_ast::{Expr, ExprSet};
-use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast as ast;
 use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -41,64 +40,42 @@ impl AlwaysFixableViolation for DuplicateValue {
     }
 
     fn fix_title(&self) -> String {
-        let DuplicateValue { value } = self;
-        format!("Remove duplicate item `{value}`")
+        format!("Remove duplicate item")
     }
 }
 
 /// B033
-pub(crate) fn duplicate_value(checker: &mut Checker, expr: &Expr) {
-    let Expr::Set(ExprSet { elts, .. }) = expr else {
-        return;
-    };
-
+pub(crate) fn duplicate_value(checker: &mut Checker, set: &ast::ExprSet) {
     let mut seen_values: FxHashSet<ComparableExpr> = FxHashSet::default();
-    let mut duplicate_indices: Vec<usize> = Vec::new();
-    let mut unique_indices: Vec<usize> = Vec::new();
-
-    for (index, elt) in elts.iter().enumerate() {
+    for (index, elt) in set.elts.iter().enumerate() {
         if elt.is_literal_expr() {
             let comparable_value: ComparableExpr = elt.into();
 
-            if seen_values.insert(comparable_value) {
-                unique_indices.push(index);
-            } else {
-                duplicate_indices.push(index);
+            if !seen_values.insert(comparable_value) {
+                let mut diagnostic = Diagnostic::new(
+                    DuplicateValue {
+                        value: checker.generator().expr(elt),
+                    },
+                    elt.range(),
+                );
+
+                diagnostic.try_set_fix(|| {
+                    remove_member(set, index, checker.locator().contents()).map(Fix::safe_edit)
+                });
+
+                checker.diagnostics.push(diagnostic);
             }
-        } else {
-            unique_indices.push(index);
-        }
-    }
-
-    for index in duplicate_indices {
-        let elt = &elts[index];
-
-        let mut diagnostic = Diagnostic::new(
-            DuplicateValue {
-                value: checker.generator().expr(elt),
-            },
-            elt.range(),
-        );
-
-        diagnostic.try_set_fix(|| {
-            remove_member(elt, elts, checker.locator().contents()).map(Fix::safe_edit)
-        });
-
-        checker.diagnostics.push(diagnostic);
+        };
     }
 }
 
-fn remove_member(expr: &Expr, elts: &[Expr], source: &str) -> Result<Edit> {
-    let (before, after): (Vec<_>, Vec<_>) = elts
-        .iter()
-        .map(Ranged::range)
-        .filter(|range| expr.range() != *range)
-        .partition(|range| range.start() < expr.start());
-
-    if !after.is_empty() {
-        // Case 1: expr is _not_ the last node, so delete from the start of the
-        // expr to the end of the subsequent comma.
-        let mut tokenizer = SimpleTokenizer::starts_at(expr.end(), source);
+/// Remove the member at the given index from the [`ast::ExprSet`].
+fn remove_member(set: &ast::ExprSet, index: usize, source: &str) -> Result<Edit> {
+    if index < set.elts.len() - 1 {
+        // Case 1: the expression is _not_ the last node, so delete from the start of the
+        // expression to the end of the subsequent comma.
+        // Ex) Delete `"a"` in `{"a", "b", "c"}`.
+        let mut tokenizer = SimpleTokenizer::starts_at(set.elts[index].end(), source);
 
         // Find the trailing comma.
         tokenizer
@@ -112,20 +89,22 @@ fn remove_member(expr: &Expr, elts: &[Expr], source: &str) -> Result<Edit> {
             })
             .context("Unable to find next token")?;
 
-        Ok(Edit::deletion(expr.start(), next.start()))
-    } else if let Some(previous) = before.iter().map(Ranged::end).max() {
-        // Case 2: expr is the last node, so delete from the start of the
-        // previous comma to the end of the expr.
-        let mut tokenizer = SimpleTokenizer::starts_at(previous, source);
+        Ok(Edit::deletion(set.elts[index].start(), next.start()))
+    } else if index > 0 {
+        // Case 2: the expression is the last node, but not the _only_ node, so delete from the
+        // start of the previous comma to the end of the expression.
+        // Ex) Delete `"c"` in `{"a", "b", "c"}`.
+        let mut tokenizer = SimpleTokenizer::starts_at(set.elts[index - 1].end(), source);
 
         // Find the trailing comma.
         let comma = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
-        Ok(Edit::deletion(comma.start(), expr.end()))
+        Ok(Edit::deletion(comma.start(), set.elts[index].end()))
     } else {
-        // Case 3: expr is the only node, so delete it
-        Ok(Edit::range_deletion(expr.range()))
+        // Case 3: expression is the only node, so delete it.
+        // Ex) Delete `"a"` in `{"a"}`.
+        Ok(Edit::range_deletion(set.elts[index].range()))
     }
 }

@@ -12,6 +12,13 @@ incorrect_set_multiline = {
 }
 incorrect_set = {1, 1}
 incorrect_set = {1, 1,}
+incorrect_set = {0, 1, 1,}
+incorrect_set = {0, 1, 1}
+incorrect_set = {
+    0,
+    1,
+    1,
+}
 
 ###
 # Non-errors.
