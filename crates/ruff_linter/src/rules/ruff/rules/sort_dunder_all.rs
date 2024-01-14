@@ -94,11 +94,11 @@ pub(crate) fn sort_dunder_all_assign(
 /// For example: `__all__ += ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::StmtAugAssign) {
     if let ast::StmtAugAssign {
-        ref value,
-        ref target,
+        value,
+        target,
         op: ast::Operator::Add,
         ..
-    } = *node
+    } = node
     {
         sort_dunder_all(checker, target, value);
     }
@@ -108,7 +108,7 @@ pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::Stmt
 pub(crate) fn sort_dunder_all_extend_call(
     checker: &mut Checker,
     ast::ExprCall {
-        ref func,
+        func,
         arguments: ast::Arguments { args, keywords, .. },
         ..
     }: &ast::ExprCall,
@@ -133,8 +133,8 @@ pub(crate) fn sort_dunder_all_extend_call(
 /// For example: `__all__: list[str] = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::StmtAnnAssign) {
     if let ast::StmtAnnAssign {
-        ref target,
-        value: Some(ref val),
+        target,
+        value: Some(val),
         ..
     } = node
     {
