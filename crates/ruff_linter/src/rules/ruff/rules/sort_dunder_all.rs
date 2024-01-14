@@ -292,14 +292,13 @@ impl DunderAllValue {
         // As well as saving us unnecessary work,
         // returning early here also means that we can rely on the invariant
         // throughout the rest of this function that both `items` and `sorted_items`
-        // have length of at least two. If there are fewer than two items in `__all__`,
-        // it is impossible for them *not* to compare equal here:
+        // have length of at least two.
+        let [first_item, .., last_item] = self.items.as_slice() else {
+            return SortedDunderAll::AlreadySorted;
+        };
         if self.is_already_sorted() {
             return SortedDunderAll::AlreadySorted;
         }
-        let [first_item, .., last_item] = self.items.as_slice() else {
-            unreachable!("Expected to have already returned if the list had < 2 items")
-        };
 
         // As well as the "items" in the `__all__` definition,
         // there is also a "prelude" and a "postlude":
@@ -458,7 +457,8 @@ fn collect_dunder_all_lines(
 ) -> Option<(Vec<DunderAllLine>, bool)> {
     let mut parentheses_open = false;
     let mut lines = vec![];
-    let mut items_in_line = vec![];
+    let mut first_item_in_line = None;
+    let mut following_items_in_line = vec![];
     let mut comment_range_start = None;
     let mut comment_in_line = None;
     let mut ends_with_trailing_comma = false;
@@ -488,32 +488,35 @@ fn collect_dunder_all_lines(
                 parentheses_open = true;
             }
             Tok::Rpar | Tok::Rsqb | Tok::Newline => {
-                if items_in_line.is_empty() {
+                if let Some(first_item) = first_item_in_line {
+                    lines.push(DunderAllLine::OneOrMoreItems(LineWithItems {
+                        first_item,
+                        following_items: std::mem::take(&mut following_items_in_line),
+                        trailing_comment_range: comment_in_line,
+                    }));
+                } else {
                     if let Some(comment) = comment_in_line {
                         lines.push(DunderAllLine::JustAComment(LineWithJustAComment(comment)));
                     }
-                } else {
-                    lines.push(DunderAllLine::OneOrMoreItems(LineWithItems::new(
-                        items_in_line,
-                        comment_in_line,
-                    )));
                 }
                 break;
             }
             Tok::NonLogicalNewline => {
-                if items_in_line.is_empty() {
+                if let Some(first_item) = first_item_in_line {
+                    lines.push(DunderAllLine::OneOrMoreItems(LineWithItems {
+                        first_item,
+                        following_items: std::mem::take(&mut following_items_in_line),
+                        trailing_comment_range: comment_in_line,
+                    }));
+                    first_item_in_line = None;
+                    comment_in_line = None;
+                    comment_range_start = None;
+                } else {
                     if let Some(comment) = comment_in_line {
                         lines.push(DunderAllLine::JustAComment(LineWithJustAComment(comment)));
                         comment_in_line = None;
                         comment_range_start = None;
                     }
-                } else {
-                    lines.push(DunderAllLine::OneOrMoreItems(LineWithItems::new(
-                        std::mem::take(&mut items_in_line),
-                        comment_in_line,
-                    )));
-                    comment_in_line = None;
-                    comment_range_start = None;
                 }
             }
             Tok::Comment(_) => {
@@ -526,7 +529,11 @@ fn collect_dunder_all_lines(
                 }
             }
             Tok::String { value, .. } => {
-                items_in_line.push((value, subrange));
+                if first_item_in_line.is_none() {
+                    first_item_in_line = Some((value, subrange));
+                } else {
+                    following_items_in_line.push((value, subrange));
+                }
                 ends_with_trailing_comma = false;
                 comment_range_start = Some(subrange.end());
             }
@@ -555,22 +562,10 @@ struct LineWithItems {
     // For elements in the list, we keep track of the value of the
     // value of the element as well as the source-code range of the element.
     // (We need to know the actual value so that we can sort the items.)
-    items: Vec<(String, TextRange)>,
+    first_item: (String, TextRange),
+    following_items: Vec<(String, TextRange)>,
     // For comments, we only need to keep track of the source-code range.
     trailing_comment_range: Option<TextRange>,
-}
-
-impl LineWithItems {
-    fn new(items: Vec<(String, TextRange)>, trailing_comment_range: Option<TextRange>) -> Self {
-        assert!(
-            !items.is_empty(),
-            "Use the 'JustAComment' variant to represent lines with 0 items"
-        );
-        Self {
-            items,
-            trailing_comment_range,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -593,7 +588,9 @@ fn collect_dunder_all_items(
     locator: &Locator,
 ) -> Vec<DunderAllItem> {
     let mut all_items = Vec::with_capacity(match lines.as_slice() {
-        [DunderAllLine::OneOrMoreItems(single)] => single.items.len(),
+        [DunderAllLine::OneOrMoreItems(LineWithItems {
+            following_items, ..
+        })] => following_items.len() + 1,
         _ => lines.len(),
     });
     let mut first_item_encountered = false;
@@ -615,14 +612,11 @@ fn collect_dunder_all_items(
                 }
             }
             DunderAllLine::OneOrMoreItems(LineWithItems {
-                items,
+                first_item: (first_val, first_range),
+                following_items,
                 trailing_comment_range: comment_range,
             }) => {
                 first_item_encountered = true;
-                let mut owned_items = items.into_iter();
-                let (first_val, first_range) = owned_items
-                    .next()
-                    .expect("LineWithItems::new() should uphold the invariant that this list is always non-empty");
                 all_items.push(DunderAllItem::new(
                     first_val,
                     all_items.len(),
@@ -630,7 +624,7 @@ fn collect_dunder_all_items(
                     first_range,
                     comment_range,
                 ));
-                for (value, range) in owned_items {
+                for (value, range) in following_items {
                     all_items.push(DunderAllItem::with_no_comments(
                         value,
                         all_items.len(),

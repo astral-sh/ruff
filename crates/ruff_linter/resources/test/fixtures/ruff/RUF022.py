@@ -217,6 +217,7 @@ class IntroducesNonModuleScope:
     __all__ = ("b", "a", "e", "d")
     __all__ = ["b", "a", "e", "d"]
     __all__ += ["foo", "bar", "antipasti"]
+    __all__.extend(["zebra", "giraffe", "antelope"])
 
 __all__ = {"look", "a", "set"}
 __all__ = {"very": "strange", "not": "sorted", "we don't": "care"}
