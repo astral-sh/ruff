@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, ExprCall, Int};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
 use ruff_python_semantic::analyze::typing::find_assigned_value;
 use ruff_text_size::Ranged;
 
@@ -65,8 +65,7 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
 
     match arg {
         Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
-            let Some(int) = value.as_int() else { return };
-            if *int != Int::ZERO {
+            if !matches!(value, Number::Int(Int::ZERO)) {
                 return;
             }
         }
@@ -74,11 +73,13 @@ pub(crate) fn zero_sleep_call(checker: &mut Checker, call: &ExprCall) {
             let Some(value) = find_assigned_value(id, checker.semantic()) else {
                 return;
             };
-            let Expr::NumberLiteral(ast::ExprNumberLiteral { value: num, .. }) = value else {
-                return;
-            };
-            let Some(int) = num.as_int() else { return };
-            if *int != Int::ZERO {
+            if !matches!(
+                value,
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Int(Int::ZERO),
+                    ..
+                })
+            ) {
                 return;
             }
         }
