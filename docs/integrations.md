@@ -334,9 +334,10 @@ Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA
 (add-hook 'python-mode-hook #'flymake-ruff-load)
 ```
 
-Ruff can be used as a formatter in Emacs using [emacs-ruff-format](https://github.com/scop/emacs-ruff-format), by installing the package and setting this configuration
+Ruff is also available as [`emacs-ruff-format`](https://github.com/scop/emacs-ruff-format):
 
 ```elisp
+(require 'ruff-format)
 (add-hook 'python-mode-hook 'ruff-format-on-save-mode)
 ```
 
