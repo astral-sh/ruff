@@ -1,0 +1,45 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB167.py:13:42: FURB167 [*] Use of regular expression alias `re.I`
+   |
+12 |     # FURB167
+13 |     if re.match("^hello", "hello world", re.I):
+   |                                          ^^^^ FURB167
+14 |         pass
+   |
+   = help: Replace with `re.IGNORECASE`
+
+ℹ Safe fix
+10 10 |     import re
+11 11 | 
+12 12 |     # FURB167
+13    |-    if re.match("^hello", "hello world", re.I):
+   13 |+    if re.match("^hello", "hello world", re.IGNORECASE):
+14 14 |         pass
+15 15 | 
+16 16 | 
+
+FURB167.py:21:39: FURB167 [*] Use of regular expression alias `re.I`
+   |
+20 |     # FURB167
+21 |     if match("^hello", "hello world", I):
+   |                                       ^ FURB167
+22 |         pass
+   |
+   = help: Replace with `re.IGNORECASE`
+
+ℹ Safe fix
+   1  |+import re
+1  2  | def func():
+2  3  |     import re
+3  4  | 
+--------------------------------------------------------------------------------
+18 19 |     from re import match, I
+19 20 | 
+20 21 |     # FURB167
+21    |-    if match("^hello", "hello world", I):
+   22 |+    if match("^hello", "hello world", re.IGNORECASE):
+22 23 |         pass
+
+
