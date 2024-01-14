@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Int, MatchCase, Number, Operator, Stmt};
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
+use ruff_python_ast::{self as ast, Expr, Int, Number, Operator, Stmt};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -49,9 +50,11 @@ impl Violation for EnumerateForLoop {
 /// SIM113
 pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor) {
     // If the loop contains a `continue`, abort.
-    if has_continue(&for_stmt.body) {
+    let mut visitor = LoopControlFlowVisitor::default();
+    visitor.visit_body(&for_stmt.body);
+    if visitor.has_continue {
         return;
-    };
+    }
 
     // If the loop contains an increment statement (e.g., `i += 1`)...
     for stmt in &for_stmt.body {
@@ -60,9 +63,9 @@ pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor)
             let Some(id) = checker.semantic().resolve_name(index) else {
                 continue;
             };
-            let binding = checker.semantic().binding(id);
 
             // If it's not an assignment (e.g., it's a function argument), ignore it.
+            let binding = checker.semantic().binding(id);
             if !binding.kind.is_assignment() {
                 continue;
             }
@@ -72,13 +75,13 @@ pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor)
             else {
                 continue;
             };
-            let Expr::NumberLiteral(ast::ExprNumberLiteral { value: num, .. }) = value else {
-                continue;
-            };
-            let Some(int) = num.as_int() else {
-                continue;
-            };
-            if *int != Int::ZERO {
+            if !matches!(
+                value,
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Int(Int::ZERO),
+                    ..
+                })
+            ) {
                 continue;
             }
 
@@ -118,45 +121,6 @@ pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor)
     }
 }
 
-/// Recursively check if the `for` loop body contains a `continue` statement
-fn has_continue(body: &[Stmt]) -> bool {
-    body.iter().any(|stmt| match stmt {
-        Stmt::Continue(_) => true,
-        Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => {
-            has_continue(body)
-                || elif_else_clauses
-                    .iter()
-                    .any(|clause| has_continue(&clause.body))
-        }
-        Stmt::With(ast::StmtWith { body, .. }) => has_continue(body),
-        Stmt::Match(ast::StmtMatch { cases, .. }) => cases
-            .iter()
-            .any(|MatchCase { body, .. }| has_continue(body)),
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
-            has_continue(body)
-                || has_continue(orelse)
-                || has_continue(finalbody)
-                || handlers.iter().any(|handler| match handler {
-                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                        body, ..
-                    }) => has_continue(body),
-                })
-        }
-
-        _ => false,
-    })
-}
-
 /// If the statement is an index increment statement (e.g., `i += 1`), return
 /// the name of the index variable.
 fn match_index_increment(stmt: &Stmt) -> Option<&ast::ExprName> {
@@ -172,15 +136,32 @@ fn match_index_increment(stmt: &Stmt) -> Option<&ast::ExprName> {
 
     let name = target.as_name_expr()?;
 
-    if let Expr::NumberLiteral(ast::ExprNumberLiteral {
-        value: Number::Int(value),
-        ..
-    }) = value.as_ref()
-    {
-        if matches!(*value, Int::ONE) {
-            return Some(name);
-        }
+    if matches!(
+        value.as_ref(),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: Number::Int(Int::ONE),
+            ..
+        })
+    ) {
+        return Some(name);
     }
 
     None
+}
+
+#[derive(Debug, Default)]
+struct LoopControlFlowVisitor {
+    has_continue: bool,
+}
+
+impl StatementVisitor<'_> for LoopControlFlowVisitor {
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::Continue(_) => self.has_continue = true,
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
+                // Don't recurse.
+            }
+            _ => walk_stmt(self, stmt),
+        }
+    }
 }

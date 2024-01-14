@@ -645,7 +645,7 @@ pub fn resolve_assignment<'a>(
 pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
     let binding_id = semantic.lookup_symbol(symbol)?;
     let binding = semantic.binding(binding_id);
-    find_binding_value(symbol, &binding, semantic)
+    find_binding_value(symbol, binding, semantic)
 }
 
 /// Find the assigned [`Expr`] for a given [`Binding`], if any.
