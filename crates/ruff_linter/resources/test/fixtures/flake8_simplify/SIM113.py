@@ -166,3 +166,30 @@ def func():
         for y in range(5):
             g(x, idx)
             idx += 1
+
+
+def func():
+    # OK (index used within inner)
+    idx = 0
+
+    def inner():
+        print(idx)
+
+    for x in range(5):
+        for y in range(5):
+            g(x, idx)
+            idx += 1
+
+
+def func():
+    # OK (index used as nonlocal inner)
+    idx = 0
+
+    def inner():
+        nonlocal idx
+        idx = 3
+
+    for x in range(5):
+        for y in range(5):
+            g(x, idx)
+            idx += 1
