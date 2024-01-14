@@ -14,14 +14,15 @@ use crate::rules::pycodestyle::rules::logical_lines::{
 };
 use crate::settings::LinterSettings;
 
-/// Return the amount of indentation, expanding tabs to the next multiple of 8.
-fn expand_indent(line: &str) -> usize {
+/// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
+fn expand_indent(line: &str, settings: &LinterSettings) -> usize {
     let line = line.trim_end_matches(['\n', '\r']);
 
     let mut indent = 0;
+    let tab_size = settings.tab_size.as_usize();
     for c in line.bytes() {
         match c {
-            b'\t' => indent = (indent / 8) * 8 + 8,
+            b'\t' => indent = (indent / tab_size) * tab_size + tab_size,
             b' ' => indent += 1,
             _ => break,
         }
@@ -84,7 +85,7 @@ pub(crate) fn check_logical_lines(
             TextRange::new(locator.line_start(first_token.start()), first_token.start())
         };
 
-        let indent_level = expand_indent(locator.slice(range));
+        let indent_level = expand_indent(locator.slice(range), settings);
 
         let indent_size = 4;
 
