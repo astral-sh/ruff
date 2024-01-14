@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 /// Checks for `for` loops with explicit loop-index variables that can be replaced
 /// with `enumerate()`.
 ///
-/// ## Why this is bad?
+/// ## Why is this bad?
 /// When iterating over a sequence, it's often desirable to keep track of the
 /// index of each element alongside the element itself. Prefer the `enumerate`
 /// builtin over manually incrementing a counter variable within the loop, as
