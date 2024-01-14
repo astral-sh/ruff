@@ -170,6 +170,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::CollectionsNamedTuple) {
                         flake8_pyi::rules::collections_named_tuple(checker, expr);
                     }
+                    if checker.enabled(Rule::RegexFlagAlias) {
+                        refurb::rules::regex_flag_alias(checker, expr);
+                    }
 
                     // Ex) List[...]
                     if checker.any_enabled(&[
@@ -293,8 +296,8 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     }
                 }
             }
-            if checker.enabled(Rule::LongRegexFlag) {
-                refurb::rules::long_regex_flag(checker, expr);
+            if checker.enabled(Rule::RegexFlagAlias) {
+                refurb::rules::regex_flag_alias(checker, expr);
             }
             if checker.enabled(Rule::DatetimeTimezoneUTC) {
                 if checker.settings.target_version >= PythonVersion::Py311 {
