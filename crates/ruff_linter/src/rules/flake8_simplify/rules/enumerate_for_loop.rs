@@ -127,11 +127,10 @@ pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor)
                 binding
             };
 
-            // If the variable is used _after_ the loop, ignore it.
-            // Find the binding for the augmented assignment.
+            // If the variable is used outside the loop, ignore it.
             if binding.references.iter().any(|id| {
                 let reference = checker.semantic().reference(*id);
-                reference.start() > for_stmt.end()
+                !for_stmt.range().contains_range(reference.range())
             }) {
                 continue;
             }
