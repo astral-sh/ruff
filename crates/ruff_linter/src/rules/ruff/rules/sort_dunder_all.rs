@@ -85,28 +85,23 @@ pub(crate) fn sort_dunder_all_assign(
     checker: &mut Checker,
     ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
 ) {
-    let [ast::Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
-        return;
-    };
-    sort_dunder_all(checker, id, value);
+    if let [expr] = targets.as_slice() {
+        sort_dunder_all(checker, expr, value);
+    }
 }
 
 /// Sort an `__all__` mutation represented by a `StmtAugAssign` AST node.
 /// For example: `__all__ += ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::StmtAugAssign) {
-    let ast::StmtAugAssign {
+    if let ast::StmtAugAssign {
         ref value,
         ref target,
         op: ast::Operator::Add,
         ..
     } = *node
-    else {
-        return;
-    };
-    let ast::Expr::Name(ast::ExprName { ref id, .. }) = **target else {
-        return;
-    };
-    sort_dunder_all(checker, id, value);
+    {
+        sort_dunder_all(checker, target, value);
+    }
 }
 
 /// Sort an `__all__` mutation from a call to `.extend()`.
@@ -121,41 +116,38 @@ pub(crate) fn sort_dunder_all_extend_call(
     let ([value_passed], []) = (args.as_slice(), keywords.as_slice()) else {
         return;
     };
-    if let Some(name) = extract_name_dot_extend_was_called_on(func) {
-        sort_dunder_all(checker, name, value_passed);
+    let ast::Expr::Attribute(ast::ExprAttribute {
+        ref value,
+        ref attr,
+        ..
+    }) = **func
+    else {
+        return;
+    };
+    if attr == "extend" {
+        sort_dunder_all(checker, value, value_passed);
     }
-}
-
-/// Given a Python call `x.extend()`, return `Some("x")`.
-/// Return `None` if this wasn't actually a `.extend()` call after all.
-fn extract_name_dot_extend_was_called_on(node: &ast::Expr) -> Option<&str> {
-    let ast::ExprAttribute { value, attr, .. } = node.as_attribute_expr()?;
-    if attr != "extend" {
-        return None;
-    }
-    let ast::ExprName { id, .. } = value.as_name_expr()?;
-    Some(id)
 }
 
 /// Sort an `__all__` definition represented by a `StmtAnnAssign` AST node.
 /// For example: `__all__: list[str] = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::StmtAnnAssign) {
-    let ast::StmtAnnAssign {
+    if let ast::StmtAnnAssign {
         ref target,
         value: Some(ref val),
         ..
     } = node
-    else {
-        return;
-    };
-    let ast::Expr::Name(ast::ExprName { ref id, .. }) = **target else {
-        return;
-    };
-    sort_dunder_all(checker, id, val);
+    {
+        sort_dunder_all(checker, target, val);
+    }
 }
 
-fn sort_dunder_all(checker: &mut Checker, target: &str, node: &ast::Expr) {
-    if target != "__all__" {
+fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) {
+    let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
+        return;
+    };
+
+    if id != "__all__" {
         return;
     }
 
