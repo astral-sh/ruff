@@ -1,3 +1,5 @@
+obj = {}
+
 key in obj.keys()  # SIM118
 
 key not in obj.keys()  # SIM118

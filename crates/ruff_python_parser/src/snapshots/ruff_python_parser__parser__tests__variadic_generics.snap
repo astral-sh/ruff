@@ -76,10 +76,9 @@ expression: parse_ast
                 Expr(
                     StmtExpr {
                         range: 46..49,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 46..49,
-                                value: Ellipsis,
                             },
                         ),
                     },

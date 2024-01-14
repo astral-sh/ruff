@@ -10,7 +10,7 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
   |
   = help: Remove unused import: `os`
 
-ℹ Fix
+ℹ Safe fix
 1 1 | 
 2   |-import os
 3 2 | 
@@ -25,5 +25,6 @@ source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 6 | 
 7 |     # Despite this `del`, `import os` in `f` should still be flagged as shadowing an unused
   |
+  = help: Remove definition: `os`
 
 

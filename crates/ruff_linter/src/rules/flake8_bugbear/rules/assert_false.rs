@@ -6,7 +6,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_false;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `assert False`.
@@ -27,6 +26,11 @@ use crate::registry::AsRule;
 /// ```python
 /// raise AssertionError
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as changing an `assert` to a
+/// `raise` will change the behavior of your program when running in
+/// optimized mode (`python -O`).
 ///
 /// ## References
 /// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
@@ -75,11 +79,9 @@ pub(crate) fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
     }
 
     let mut diagnostic = Diagnostic::new(AssertFalse, test.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().stmt(&assertion_error(msg)),
-            stmt.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().stmt(&assertion_error(msg)),
+        stmt.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

@@ -1,171 +1,184 @@
-/// See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
-use std::cmp::Ordering;
-use std::collections::BTreeSet;
+//! See: <https://github.com/PyCQA/isort/blob/12cc5fbd67eebf92eb2213b03c07b138ae1fb448/isort/sorting.py#L13>
+
+use std::{borrow::Cow, cmp::Ordering, cmp::Reverse};
+
+use natord;
+use unicode_width::UnicodeWidthStr;
 
 use ruff_python_stdlib::str;
 
 use super::settings::{RelativeImportsOrder, Settings};
-use super::types::EitherImport::{Import, ImportFrom};
-use super::types::{AliasData, EitherImport, ImportFromData, Importable};
 
-#[derive(PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
-pub(crate) enum Prefix {
-    Constants,
-    Classes,
-    Variables,
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
+pub(crate) enum MemberType {
+    Constant,
+    Class,
+    Variable,
 }
 
-fn prefix(name: &str, settings: &Settings) -> Prefix {
+fn member_type(name: &str, settings: &Settings) -> MemberType {
     if settings.constants.contains(name) {
         // Ex) `CONSTANT`
-        Prefix::Constants
+        MemberType::Constant
     } else if settings.classes.contains(name) {
         // Ex) `CLASS`
-        Prefix::Classes
+        MemberType::Class
     } else if settings.variables.contains(name) {
         // Ex) `variable`
-        Prefix::Variables
+        MemberType::Variable
     } else if name.len() > 1 && str::is_cased_uppercase(name) {
         // Ex) `CONSTANT`
-        Prefix::Constants
+        MemberType::Constant
     } else if name.chars().next().is_some_and(char::is_uppercase) {
         // Ex) `Class`
-        Prefix::Classes
+        MemberType::Class
     } else {
         // Ex) `variable`
-        Prefix::Variables
+        MemberType::Variable
     }
 }
 
-/// Compare two module names' by their `force-to-top`ness.
-fn cmp_force_to_top(name1: &str, name2: &str, force_to_top: &BTreeSet<String>) -> Ordering {
-    let force_to_top1 = force_to_top.contains(name1);
-    let force_to_top2 = force_to_top.contains(name2);
-    force_to_top1.cmp(&force_to_top2).reverse()
+#[derive(Eq, PartialEq, Debug)]
+pub(crate) struct NatOrdStr<'a>(Cow<'a, str>);
+
+impl Ord for NatOrdStr<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        natord::compare(&self.0, &other.0)
+    }
 }
 
-/// Compare two top-level modules.
-pub(crate) fn cmp_modules(alias1: &AliasData, alias2: &AliasData, settings: &Settings) -> Ordering {
-    cmp_force_to_top(alias1.name, alias2.name, &settings.force_to_top)
-        .then_with(|| {
-            if settings.case_sensitive {
-                natord::compare(alias1.name, alias2.name)
-            } else {
-                natord::compare_ignore_case(alias1.name, alias2.name)
-                    .then_with(|| natord::compare(alias1.name, alias2.name))
-            }
-        })
-        .then_with(|| match (alias1.asname, alias2.asname) {
-            (None, None) => Ordering::Equal,
-            (None, Some(_)) => Ordering::Less,
-            (Some(_), None) => Ordering::Greater,
-            (Some(asname1), Some(asname2)) => natord::compare(asname1, asname2),
-        })
+impl PartialOrd for NatOrdStr<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
-/// Compare two member imports within `Stmt::ImportFrom` blocks.
-pub(crate) fn cmp_members(alias1: &AliasData, alias2: &AliasData, settings: &Settings) -> Ordering {
-    match (alias1.name == "*", alias2.name == "*") {
-        (true, false) => Ordering::Less,
-        (false, true) => Ordering::Greater,
-        _ => {
-            if settings.order_by_type {
-                prefix(alias1.name, settings)
-                    .cmp(&prefix(alias2.name, settings))
-                    .then_with(|| cmp_modules(alias1, alias2, settings))
-            } else {
-                cmp_modules(alias1, alias2, settings)
-            }
+impl<'a> From<&'a str> for NatOrdStr<'a> {
+    fn from(s: &'a str) -> Self {
+        NatOrdStr(Cow::Borrowed(s))
+    }
+}
+
+impl<'a> From<String> for NatOrdStr<'a> {
+    fn from(s: String) -> Self {
+        NatOrdStr(Cow::Owned(s))
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) enum Distance {
+    Nearest(u32),
+    Furthest(Reverse<u32>),
+}
+
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) enum ImportStyle {
+    // Ex) `import foo`
+    Straight,
+    // Ex) `from foo import bar`
+    From,
+}
+
+/// A comparable key to capture the desired sorting order for an imported module (e.g.,
+/// `foo` in `from foo import bar`).
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) struct ModuleKey<'a> {
+    force_to_top: bool,
+    maybe_length: Option<usize>,
+    distance: Distance,
+    maybe_lowercase_name: Option<NatOrdStr<'a>>,
+    module_name: Option<NatOrdStr<'a>>,
+    first_alias: Option<MemberKey<'a>>,
+    asname: Option<NatOrdStr<'a>>,
+}
+
+impl<'a> ModuleKey<'a> {
+    pub(crate) fn from_module(
+        name: Option<&'a str>,
+        asname: Option<&'a str>,
+        level: Option<u32>,
+        first_alias: Option<(&'a str, Option<&'a str>)>,
+        style: ImportStyle,
+        settings: &Settings,
+    ) -> Self {
+        let level = level.unwrap_or_default();
+
+        let force_to_top = !name
+            .map(|name| settings.force_to_top.contains(name))
+            .unwrap_or_default(); // `false` < `true` so we get forced to top first
+
+        let maybe_length = (settings.length_sort
+            || (settings.length_sort_straight && style == ImportStyle::Straight))
+            .then_some(name.map(str::width).unwrap_or_default() + level as usize);
+
+        let distance = match settings.relative_imports_order {
+            RelativeImportsOrder::ClosestToFurthest => Distance::Nearest(level),
+            RelativeImportsOrder::FurthestToClosest => Distance::Furthest(Reverse(level)),
+        };
+
+        let maybe_lowercase_name = name.and_then(|name| {
+            (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
+        });
+
+        let module_name = name.map(NatOrdStr::from);
+
+        let asname = asname.map(NatOrdStr::from);
+
+        let first_alias =
+            first_alias.map(|(name, asname)| MemberKey::from_member(name, asname, settings));
+
+        Self {
+            force_to_top,
+            maybe_length,
+            distance,
+            maybe_lowercase_name,
+            module_name,
+            first_alias,
+            asname,
         }
     }
 }
 
-/// Compare two relative import levels.
-pub(crate) fn cmp_levels(
-    level1: Option<u32>,
-    level2: Option<u32>,
-    relative_imports_order: RelativeImportsOrder,
-) -> Ordering {
-    match (level1, level2) {
-        (None, None) => Ordering::Equal,
-        (None, Some(_)) => Ordering::Less,
-        (Some(_), None) => Ordering::Greater,
-        (Some(level1), Some(level2)) => match relative_imports_order {
-            RelativeImportsOrder::ClosestToFurthest => level1.cmp(&level2),
-            RelativeImportsOrder::FurthestToClosest => level2.cmp(&level1),
-        },
+/// A comparable key to capture the desired sorting order for an imported member (e.g., `bar` in
+/// `from foo import bar`).
+#[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+pub(crate) struct MemberKey<'a> {
+    not_star_import: bool,
+    member_type: Option<MemberType>,
+    maybe_length: Option<usize>,
+    maybe_lowercase_name: Option<NatOrdStr<'a>>,
+    module_name: NatOrdStr<'a>,
+    asname: Option<NatOrdStr<'a>>,
+}
+
+impl<'a> MemberKey<'a> {
+    pub(crate) fn from_member(name: &'a str, asname: Option<&'a str>, settings: &Settings) -> Self {
+        let not_star_import = name != "*"; // `false` < `true` so we get star imports first
+        let member_type = settings
+            .order_by_type
+            .then_some(member_type(name, settings));
+        let maybe_length = settings.length_sort.then_some(name.width());
+        let maybe_lowercase_name =
+            (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
+        let module_name = NatOrdStr::from(name);
+        let asname = asname.map(NatOrdStr::from);
+
+        Self {
+            not_star_import,
+            member_type,
+            maybe_length,
+            maybe_lowercase_name,
+            module_name,
+            asname,
+        }
     }
 }
 
-/// Compare two `Stmt::ImportFrom` blocks.
-pub(crate) fn cmp_import_from(
-    import_from1: &ImportFromData,
-    import_from2: &ImportFromData,
-    settings: &Settings,
-) -> Ordering {
-    cmp_levels(
-        import_from1.level,
-        import_from2.level,
-        settings.relative_imports_order,
-    )
-    .then_with(|| {
-        cmp_force_to_top(
-            &import_from1.module_name(),
-            &import_from2.module_name(),
-            &settings.force_to_top,
-        )
-    })
-    .then_with(|| match (&import_from1.module, import_from2.module) {
-        (None, None) => Ordering::Equal,
-        (None, Some(_)) => Ordering::Less,
-        (Some(_), None) => Ordering::Greater,
-        (Some(module1), Some(module2)) => {
-            if settings.case_sensitive {
-                natord::compare(module1, module2)
-            } else {
-                natord::compare_ignore_case(module1, module2)
-            }
-        }
-    })
-}
-
-/// Compare an import to an import-from.
-fn cmp_import_import_from(
-    import: &AliasData,
-    import_from: &ImportFromData,
-    settings: &Settings,
-) -> Ordering {
-    cmp_force_to_top(
-        import.name,
-        &import_from.module_name(),
-        &settings.force_to_top,
-    )
-    .then_with(|| {
-        if settings.case_sensitive {
-            natord::compare(import.name, import_from.module.unwrap_or_default())
-        } else {
-            natord::compare_ignore_case(import.name, import_from.module.unwrap_or_default())
-        }
-    })
-}
-
-/// Compare two [`EitherImport`] enums which may be [`Import`] or [`ImportFrom`]
-/// structs.
-pub(crate) fn cmp_either_import(
-    a: &EitherImport,
-    b: &EitherImport,
-    settings: &Settings,
-) -> Ordering {
-    match (a, b) {
-        (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2, settings),
-        (ImportFrom((import_from, ..)), Import((alias, _))) => {
-            cmp_import_import_from(alias, import_from, settings).reverse()
-        }
-        (Import((alias, _)), ImportFrom((import_from, ..))) => {
-            cmp_import_import_from(alias, import_from, settings)
-        }
-        (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => {
-            cmp_import_from(import_from1, import_from2, settings)
-        }
+/// Lowercase the given string, if it contains any uppercase characters.
+fn maybe_lowercase(name: &str) -> Cow<'_, str> {
+    if name.chars().all(char::is_lowercase) {
+        Cow::Borrowed(name)
+    } else {
+        Cow::Owned(name.to_lowercase())
     }
 }

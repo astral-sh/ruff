@@ -1,13 +1,12 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_text_size::Ranged;
 
 use crate::fix::snippet::SourceCodeSnippet;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Check for environment variables that are not capitalized.
@@ -64,26 +63,32 @@ impl Violation for UncapitalizedEnvironmentVariables {
 }
 
 /// ## What it does
-/// Check for `dict.get()` calls that pass `None` as the default value.
+/// Checks for `dict.get()` calls that pass `None` as the default value.
 ///
 /// ## Why is this bad?
 /// `None` is the default value for `dict.get()`, so it is redundant to pass it
 /// explicitly.
 ///
+/// In [preview], this rule applies to variables that are inferred to be
+/// dictionaries; in stable, it's limited to dictionary literals (e.g.,
+/// `{"foo": 1}.get("foo", None)`).
+///
 /// ## Example
 /// ```python
 /// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
-/// age = ages.get("Cat", None)  # None
+/// age = ages.get("Cat", None)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// ages = {"Tom": 23, "Maria": 23, "Dog": 11}
-/// age = ages.get("Cat")  # None
+/// age = ages.get("Cat")
 /// ```
 ///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
@@ -111,6 +116,15 @@ impl AlwaysFixableViolation for DictGetWithNoneDefault {
     }
 }
 
+/// Returns whether the given environment variable is allowed to be lowercase.
+///
+/// References:
+/// - <https://unix.stackexchange.com/a/212972/>
+/// - <https://about.gitlab.com/blog/2021/01/27/we-need-to-talk-no-proxy/#http_proxy-and-https_proxy/>
+fn is_lowercase_allowed(env_var: &str) -> bool {
+    matches!(env_var, "https_proxy" | "http_proxy" | "no_proxy")
+}
+
 /// SIM112
 pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     // Ex) `os.environ['foo']`
@@ -128,14 +142,10 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
     else {
         return;
     };
-    let Some(arg) = args.get(0) else {
+    let Some(arg) = args.first() else {
         return;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(ast::StringConstant { value: env_var, .. }),
-        ..
-    }) = arg
-    else {
+    let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = arg else {
         return;
     };
     if !checker
@@ -151,15 +161,19 @@ pub(crate) fn use_capital_environment_variables(checker: &mut Checker, expr: &Ex
         return;
     }
 
-    let capital_env_var = env_var.to_ascii_uppercase();
-    if &capital_env_var == env_var {
+    if is_lowercase_allowed(env_var.to_str()) {
+        return;
+    }
+
+    let capital_env_var = env_var.to_str().to_ascii_uppercase();
+    if capital_env_var == env_var.to_str() {
         return;
     }
 
     checker.diagnostics.push(Diagnostic::new(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var),
-            actual: SourceCodeSnippet::new(env_var.clone()),
+            actual: SourceCodeSnippet::new(env_var.to_string()),
         },
         arg.range(),
     ));
@@ -183,45 +197,36 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     if id != "os" || attr != "environ" {
         return;
     }
-    let Expr::Constant(ast::ExprConstant {
-        value:
-            Constant::Str(ast::StringConstant {
-                value: env_var,
-                unicode,
-                ..
-            }),
-        range: _,
-    }) = slice.as_ref()
-    else {
+    let Expr::StringLiteral(ast::ExprStringLiteral { value: env_var, .. }) = slice.as_ref() else {
         return;
     };
-    let capital_env_var = env_var.to_ascii_uppercase();
-    if &capital_env_var == env_var {
+
+    if is_lowercase_allowed(env_var.to_str()) {
+        return;
+    }
+
+    let capital_env_var = env_var.to_str().to_ascii_uppercase();
+    if capital_env_var == env_var.to_str() {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(
         UncapitalizedEnvironmentVariables {
             expected: SourceCodeSnippet::new(capital_env_var.clone()),
-            actual: SourceCodeSnippet::new(env_var.clone()),
+            actual: SourceCodeSnippet::new(env_var.to_string()),
         },
         slice.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        let node = ast::ExprConstant {
-            value: ast::Constant::Str(ast::StringConstant {
-                value: capital_env_var,
-                unicode: *unicode,
-                implicit_concatenated: false,
-            }),
-            range: TextRange::default(),
-        };
-        let new_env_var = node.into();
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            checker.generator().expr(&new_env_var),
-            slice.range(),
-        )));
-    }
+    let node = ast::StringLiteral {
+        value: capital_env_var,
+        unicode: env_var.is_unicode(),
+        ..ast::StringLiteral::default()
+    };
+    let new_env_var = node.into();
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        checker.generator().expr(&new_env_var),
+        slice.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -241,23 +246,42 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() else {
         return;
     };
-    if !value.is_dict_expr() {
-        return;
-    }
     if attr != "get" {
         return;
     }
-    let Some(key) = args.get(0) else {
+    let Some(key) = args.first() else {
         return;
     };
-    if !matches!(key, Expr::Constant(_) | Expr::Name(_)) {
+    if !(key.is_literal_expr() || key.is_name_expr()) {
         return;
     }
     let Some(default) = args.get(1) else {
         return;
     };
-    if !is_const_none(default) {
+    if !default.is_none_literal_expr() {
         return;
+    }
+
+    // Check if the value is a dictionary.
+    match value.as_ref() {
+        Expr::Dict(_) | Expr::DictComp(_) => {}
+        Expr::Name(name) => {
+            if checker.settings.preview.is_disabled() {
+                return;
+            }
+
+            let Some(binding) = checker
+                .semantic()
+                .only_binding(name)
+                .map(|id| checker.semantic().binding(id))
+            else {
+                return;
+            };
+            if !is_dict(binding, checker.semantic()) {
+                return;
+            }
+        }
+        _ => return,
     }
 
     let expected = format!(
@@ -274,12 +298,9 @@ pub(crate) fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
         },
         expr.range(),
     );
-
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            expected,
-            expr.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        expected,
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

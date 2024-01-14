@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.0.292"
-description = "An extremely fast Python linter, written in Rust."
+version = "0.1.13"
+description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
 requires-python = ">=3.7"
@@ -40,7 +40,7 @@ classifiers = [
 [project.urls]
 Repository = "https://github.com/astral-sh/ruff"
 Documentation = "https://docs.astral.sh/ruff/"
-Changelog = "https://github.com/astral-sh/ruff/releases"
+Changelog = "https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md"
 
 [tool.maturin]
 bindings = "bin"
@@ -51,6 +51,9 @@ strip = true
 exclude = [
   "crates/ruff_linter/resources/test/fixtures/**/*",
   "crates/ruff_linter/src/rules/*/snapshots/**/*"
+]
+include = [
+  "rust-toolchain.toml"
 ]
 
 [tool.ruff]
@@ -66,3 +69,32 @@ force-exclude = '''
   | crates/ruff_python_formatter/resources
 )/
 '''
+
+[tool.rooster]
+major_labels = []  # Ruff never uses the major version number
+minor_labels = ["breaking"]   # Bump the minor version on breaking changes
+
+changelog_ignore_labels = ["internal", "ci"]
+
+changelog_sections.breaking = "Breaking changes"
+changelog_sections.preview = "Preview features"
+changelog_sections.rule = "Rule changes"
+changelog_sections.formatter = "Formatter"
+changelog_sections.cli = "CLI"
+changelog_sections.configuration = "Configuration"
+changelog_sections.bug = "Bug fixes"
+changelog_sections.documentation = "Documentation"
+changelog_sections.__unknown__ = "Other changes"
+
+# We exclude contributors from the CHANGELOG file
+# Generate separately with `rooster contributors` for the GitHub release page
+changelog_contributors = false
+
+version_files = [
+  "README.md",
+  "docs/integrations.md",
+  "crates/ruff_cli/Cargo.toml",
+  "crates/ruff_linter/Cargo.toml",
+  "crates/ruff_shrinking/Cargo.toml",
+  "scripts/benchmarks/pyproject.toml",
+]

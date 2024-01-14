@@ -1,0 +1,47 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/power_op_newline.py
+---
+## Input
+
+```python
+importA;()<<0**0#
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -2,5 +2,5 @@
+ (
+     ()
+     << 0
+-    ** 0
++    **0
+ )  #
+```
+
+## Ruff Output
+
+```python
+importA
+(
+    ()
+    << 0
+    **0
+)  #
+```
+
+## Black Output
+
+```python
+importA
+(
+    ()
+    << 0
+    ** 0
+)  #
+```
+
+

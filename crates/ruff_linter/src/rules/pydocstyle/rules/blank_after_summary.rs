@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for docstring summary lines that are not separated from the docstring
@@ -91,35 +90,33 @@ pub(crate) fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) 
             },
             docstring.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            if blanks_count > 1 {
-                let mut lines = UniversalNewlineIterator::with_offset(&body, body.start());
-                let mut summary_end = body.start();
+        if blanks_count > 1 {
+            let mut lines = UniversalNewlineIterator::with_offset(&body, body.start());
+            let mut summary_end = body.start();
 
-                // Find the "summary" line (defined as the first non-blank line).
-                for line in lines.by_ref() {
-                    if !line.trim().is_empty() {
-                        summary_end = line.full_end();
-                        break;
-                    }
+            // Find the "summary" line (defined as the first non-blank line).
+            for line in lines.by_ref() {
+                if !line.trim().is_empty() {
+                    summary_end = line.full_end();
+                    break;
                 }
-
-                // Find the last blank line
-                let mut blank_end = summary_end;
-                for line in lines {
-                    if !line.trim().is_empty() {
-                        blank_end = line.start();
-                        break;
-                    }
-                }
-
-                // Insert one blank line after the summary (replacing any existing lines).
-                diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                    checker.stylist().line_ending().to_string(),
-                    summary_end,
-                    blank_end,
-                )));
             }
+
+            // Find the last blank line
+            let mut blank_end = summary_end;
+            for line in lines {
+                if !line.trim().is_empty() {
+                    blank_end = line.start();
+                    break;
+                }
+            }
+
+            // Insert one blank line after the summary (replacing any existing lines).
+            diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                checker.stylist().line_ending().to_string(),
+                summary_end,
+                blank_end,
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

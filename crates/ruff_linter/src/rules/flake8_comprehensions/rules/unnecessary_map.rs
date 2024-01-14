@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Parameters, Stm
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -22,6 +22,16 @@ use super::helpers;
 /// using a generator expression or a comprehension, as the latter approach
 /// avoids the function call overhead, in addition to being more readable.
 ///
+/// This rule also applies to `map` calls within `list`, `set`, and `dict`
+/// calls. For example:
+///
+/// - Instead of `list(map(lambda num: num * 2, nums))`, use
+///   `[num * 2 for num in nums]`.
+/// - Instead of `set(map(lambda num: num % 2 == 0, nums))`, use
+///   `{num % 2 == 0 for num in nums}`.
+/// - Instead of `dict(map(lambda v: (v, v ** 2), values))`, use
+///   `{v: v ** 2 for v in values}`.
+///
 /// ## Examples
 /// ```python
 /// map(lambda x: x + 1, iterable)
@@ -32,15 +42,9 @@ use super::helpers;
 /// (x + 1 for x in iterable)
 /// ```
 ///
-/// This rule also applies to `map` calls within `list`, `set`, and `dict`
-/// calls. For example:
-///
-/// - Instead of `list(map(lambda num: num * 2, nums))`, use
-///   `[num * 2 for num in nums]`.
-/// - Instead of `set(map(lambda num: num % 2 == 0, nums))`, use
-///   `{num % 2 == 0 for num in nums}`.
-/// - Instead of `dict(map(lambda v: (v, v ** 2), values))`, use
-///   `{v: v ** 2 for v in values}`.
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryMap {
     object_type: ObjectType,
@@ -221,18 +225,16 @@ pub(crate) fn unnecessary_map(
     };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryMap { object_type }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_map(
-                expr,
-                parent,
-                object_type,
-                checker.locator(),
-                checker.stylist(),
-            )
-            .map(Fix::unsafe_edit)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_map(
+            expr,
+            parent,
+            object_type,
+            checker.locator(),
+            checker.stylist(),
+        )
+        .map(Fix::unsafe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }
 

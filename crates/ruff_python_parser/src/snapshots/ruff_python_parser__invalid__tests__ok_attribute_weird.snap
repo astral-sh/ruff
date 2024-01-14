@@ -1,0 +1,47 @@
+---
+source: crates/ruff_python_parser/src/invalid.rs
+expression: ast
+---
+Ok(
+    [
+        Assign(
+            StmtAssign {
+                range: 0..12,
+                targets: [
+                    Attribute(
+                        ExprAttribute {
+                            range: 0..7,
+                            value: StringLiteral(
+                                ExprStringLiteral {
+                                    range: 0..5,
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 0..5,
+                                                value: "foo",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
+                                },
+                            ),
+                            attr: Identifier {
+                                id: "y",
+                                range: 6..7,
+                            },
+                            ctx: Store,
+                        },
+                    ),
+                ],
+                value: NumberLiteral(
+                    ExprNumberLiteral {
+                        range: 10..12,
+                        value: Int(
+                            42,
+                        ),
+                    },
+                ),
+            },
+        ),
+    ],
+)

@@ -34,3 +34,30 @@ pub(super) fn generate_method_call(name: &str, method: &str, generator: Generato
     };
     generator.stmt(&stmt.into())
 }
+
+/// Format a code snippet comparing `name` to `None` (e.g., `name is None`).
+pub(super) fn generate_none_identity_comparison(
+    name: &str,
+    negate: bool,
+    generator: Generator,
+) -> String {
+    // Construct `name`.
+    let var = ast::ExprName {
+        id: name.to_string(),
+        ctx: ast::ExprContext::Load,
+        range: TextRange::default(),
+    };
+    // Construct `name is None` or `name is not None`.
+    let op = if negate {
+        ast::CmpOp::IsNot
+    } else {
+        ast::CmpOp::Is
+    };
+    let compare = ast::ExprCompare {
+        left: Box::new(var.into()),
+        ops: vec![op],
+        comparators: vec![ast::Expr::NoneLiteral(ast::ExprNoneLiteral::default())],
+        range: TextRange::default(),
+    };
+    generator.expr(&compare.into())
+}

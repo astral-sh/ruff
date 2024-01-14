@@ -16,6 +16,7 @@ pub(crate) use reimplemented_builtin::*;
 pub(crate) use return_in_try_except_finally::*;
 pub(crate) use suppressible_exception::*;
 pub(crate) use yoda_conditions::*;
+pub(crate) use zip_dict_keys_and_values::*;
 
 mod ast_bool_op;
 mod ast_expr;
@@ -36,3 +37,4 @@ mod reimplemented_builtin;
 mod return_in_try_except_finally;
 mod suppressible_exception;
 mod yoda_conditions;
+mod zip_dict_keys_and_values;

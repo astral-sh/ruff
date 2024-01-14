@@ -12,7 +12,7 @@ strict.py:27:21: TCH002 [*] Move third-party import `pkg.A` into a type-checking
    |
    = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -41,7 +41,7 @@ strict.py:35:21: TCH002 [*] Move third-party import `pkg.A` into a type-checking
    |
    = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -71,7 +71,7 @@ strict.py:54:25: TCH002 [*] Move third-party import `pkg.bar.A` into a type-chec
    |
    = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -99,7 +99,7 @@ strict.py:62:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
    |
    = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -127,7 +127,7 @@ strict.py:71:23: TCH002 [*] Move third-party import `pkg.foo` into a type-checki
    |
    = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -155,7 +155,7 @@ strict.py:80:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
    |
    = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -183,7 +183,7 @@ strict.py:91:12: TCH002 [*] Move third-party import `pkg` into a type-checking b
    |
    = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1  1  | from __future__ import annotations
    2  |+from typing import TYPE_CHECKING
    3  |+
@@ -212,7 +212,7 @@ strict.py:101:23: TCH002 [*] Move third-party import `pkg.foo` into a type-check
     |
     = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1   1   | from __future__ import annotations
     2   |+from typing import TYPE_CHECKING
     3   |+

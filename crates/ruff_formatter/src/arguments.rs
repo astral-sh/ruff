@@ -1,23 +1,9 @@
 use super::{Buffer, Format, Formatter};
 use crate::FormatResult;
-use std::ffi::c_void;
-use std::marker::PhantomData;
 
-/// Mono-morphed type to format an object. Used by the [`crate::format`!], [`crate::format_args`!], and
-/// [`crate::write`!] macros.
-///
-/// This struct is similar to a dynamic dispatch (using `dyn Format`) because it stores a pointer to the value.
-/// However, it doesn't store the pointer to `dyn Format`'s vtable, instead it statically resolves the function
-/// pointer of `Format::format` and stores it in `formatter`.
+/// A convenience wrapper for representing a formattable argument.
 pub struct Argument<'fmt, Context> {
-    /// The value to format stored as a raw pointer where `lifetime` stores the value's lifetime.
-    value: *const c_void,
-
-    /// Stores the lifetime of the value. To get the most out of our dear borrow checker.
-    lifetime: PhantomData<&'fmt ()>,
-
-    /// The function pointer to `value`'s `Format::format` method
-    formatter: fn(*const c_void, &mut Formatter<'_, Context>) -> FormatResult<()>,
+    value: &'fmt dyn Format<Context>,
 }
 
 impl<Context> Clone for Argument<'_, Context> {
@@ -28,32 +14,19 @@ impl<Context> Clone for Argument<'_, Context> {
 impl<Context> Copy for Argument<'_, Context> {}
 
 impl<'fmt, Context> Argument<'fmt, Context> {
-    /// Called by the [ruff_formatter::format_args] macro. Creates a mono-morphed value for formatting
-    /// an object.
+    /// Called by the [ruff_formatter::format_args] macro.
     #[doc(hidden)]
     #[inline]
     pub fn new<F: Format<Context>>(value: &'fmt F) -> Self {
-        #[inline]
-        fn formatter<F: Format<Context>, Context>(
-            ptr: *const c_void,
-            fmt: &mut Formatter<Context>,
-        ) -> FormatResult<()> {
-            // SAFETY: Safe because the 'fmt lifetime is captured by the 'lifetime' field.
-            #[allow(unsafe_code)]
-            F::fmt(unsafe { &*ptr.cast::<F>() }, fmt)
-        }
-
-        Self {
-            value: (value as *const F).cast::<std::ffi::c_void>(),
-            lifetime: PhantomData,
-            formatter: formatter::<F, Context>,
-        }
+        Self { value }
     }
 
     /// Formats the value stored by this argument using the given formatter.
     #[inline]
+    // Seems to only be triggered on wasm32 and looks like a false positive?
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub(super) fn format(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        (self.formatter)(self.value, f)
+        self.value.fmt(f)
     }
 }
 

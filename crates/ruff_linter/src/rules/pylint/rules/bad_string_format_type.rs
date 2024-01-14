@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_literal::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use ruff_python_parser::{lexer, AsMode};
 use ruff_text_size::{Ranged, TextRange};
@@ -119,12 +119,23 @@ fn collect_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 
 /// Return `true` if the format string is equivalent to the constant type
 fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
-    let format = FormatType::from(format.format_char);
+    let format_type = FormatType::from(format.format_char);
     match ResolvedPythonType::from(value) {
-        ResolvedPythonType::Atom(atom) => format.is_compatible_with(atom),
-        ResolvedPythonType::Union(atoms) => {
-            atoms.iter().all(|atom| format.is_compatible_with(*atom))
+        ResolvedPythonType::Atom(atom) => {
+            // Special case where `%c` allows single character strings to be formatted
+            if format.format_char == 'c' {
+                if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = value {
+                    let mut chars = value.chars();
+                    if chars.next().is_some() && chars.next().is_none() {
+                        return true;
+                    }
+                }
+            }
+            format_type.is_compatible_with(atom)
         }
+        ResolvedPythonType::Union(atoms) => atoms
+            .iter()
+            .all(|atom| format_type.is_compatible_with(*atom)),
         ResolvedPythonType::Unknown => true,
         ResolvedPythonType::TypeError => true,
     }
@@ -186,15 +197,11 @@ fn is_valid_dict(
         let Some(key) = key else {
             return true;
         };
-        if let Expr::Constant(ast::ExprConstant {
-            value:
-                Constant::Str(ast::StringConstant {
-                    value: mapping_key, ..
-                }),
-            ..
+        if let Expr::StringLiteral(ast::ExprStringLiteral {
+            value: mapping_key, ..
         }) = key
         {
-            let Some(format) = formats_hash.get(mapping_key.as_str()) else {
+            let Some(format) = formats_hash.get(mapping_key.to_str()) else {
                 return true;
             };
             if !equivalent(format, value) {

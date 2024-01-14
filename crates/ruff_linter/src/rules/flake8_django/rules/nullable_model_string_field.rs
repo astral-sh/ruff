@@ -1,8 +1,9 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_true;
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,7 +49,7 @@ impl Violation for DjangoNullableModelStringField {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DjangoNullableModelStringField { field_name } = self;
-        format!("Avoid using `null=True` on string-based fields such as {field_name}")
+        format!("Avoid using `null=True` on string-based fields such as `{field_name}`")
     }
 }
 
@@ -58,7 +59,7 @@ pub(crate) fn nullable_model_string_field(checker: &mut Checker, body: &[Stmt]) 
         let Stmt::Assign(ast::StmtAssign { value, .. }) = statement else {
             continue;
         };
-        if let Some(field_name) = is_nullable_field(checker, value) {
+        if let Some(field_name) = is_nullable_field(value, checker.semantic()) {
             checker.diagnostics.push(Diagnostic::new(
                 DjangoNullableModelStringField {
                     field_name: field_name.to_string(),
@@ -69,22 +70,12 @@ pub(crate) fn nullable_model_string_field(checker: &mut Checker, body: &[Stmt]) 
     }
 }
 
-fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
-    let Expr::Call(ast::ExprCall {
-        func,
-        arguments: Arguments { keywords, .. },
-        ..
-    }) = value
-    else {
-        return None;
-    };
+fn is_nullable_field<'a>(value: &'a Expr, semantic: &'a SemanticModel) -> Option<&'a str> {
+    let call = value.as_call_expr()?;
 
-    let Some(valid_field_name) = helpers::get_model_field_name(func, checker.semantic()) else {
-        return None;
-    };
-
+    let field_name = helpers::get_model_field_name(&call.func, semantic)?;
     if !matches!(
-        valid_field_name,
+        field_name,
         "CharField" | "TextField" | "SlugField" | "EmailField" | "FilePathField" | "URLField"
     ) {
         return None;
@@ -93,7 +84,7 @@ fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a st
     let mut null_key = false;
     let mut blank_key = false;
     let mut unique_key = false;
-    for keyword in keywords {
+    for keyword in &call.arguments.keywords {
         let Some(argument) = &keyword.arg else {
             continue;
         };
@@ -113,5 +104,6 @@ fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a st
     if !null_key {
         return None;
     }
-    Some(valid_field_name)
+
+    Some(field_name)
 }

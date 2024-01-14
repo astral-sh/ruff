@@ -51,3 +51,5 @@ if (True) == TrueElement or x == TrueElement:
 assert (not foo) in bar
 assert {"x": not foo} in bar
 assert [42, not foo] in bar
+
+assert x in c > 0 == None

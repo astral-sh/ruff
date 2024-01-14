@@ -1,6 +1,6 @@
 use ruff_formatter::prelude::tag::Condition;
 use ruff_formatter::{format_args, write, Argument, Arguments};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExpressionRef;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{
@@ -14,6 +14,7 @@ use crate::comments::{
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::prelude::*;
 
+/// From the perspective of the expression, under which circumstances does it need parentheses
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum OptionalParentheses {
     /// Add parentheses if the expression expands over multiple lines
@@ -41,7 +42,8 @@ pub(crate) trait NeedsParentheses {
     ) -> OptionalParentheses;
 }
 
-/// Configures if the expression should be parenthesized.
+/// From the perspective of the parent statement or expression, when should the child expression
+/// get parentheses?
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Parenthesize {
     /// Parenthesizes the expression if it doesn't fit on a line OR if the expression is parenthesized in the source code.
@@ -82,6 +84,7 @@ pub enum Parentheses {
     Never,
 }
 
+/// Returns `true` if the [`ExpressionRef`] is enclosed by parentheses in the source code.
 pub(crate) fn is_expression_parenthesized(
     expr: ExpressionRef,
     comment_ranges: &CommentRanges,
@@ -123,6 +126,7 @@ where
     FormatParenthesized {
         left,
         comments: &[],
+        hug: None,
         content: Argument::new(content),
         right,
     }
@@ -131,6 +135,7 @@ where
 pub(crate) struct FormatParenthesized<'content, 'ast> {
     left: &'static str,
     comments: &'content [SourceComment],
+    hug: Option<HuggingStyle>,
     content: Argument<'content, PyFormatContext<'ast>>,
     right: &'static str,
 }
@@ -151,18 +156,55 @@ impl<'content, 'ast> FormatParenthesized<'content, 'ast> {
     ) -> FormatParenthesized<'content, 'ast> {
         FormatParenthesized { comments, ..self }
     }
+
+    /// Whether to indent the content within the parentheses.
+    pub(crate) fn with_hugging(
+        self,
+        hug: Option<HuggingStyle>,
+    ) -> FormatParenthesized<'content, 'ast> {
+        FormatParenthesized { hug, ..self }
+    }
 }
 
 impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         let current_level = f.context().node_level();
 
-        let content = format_with(|f| {
-            group(&format_args![
-                dangling_open_parenthesis_comments(self.comments),
-                soft_block_indent(&Arguments::from(&self.content))
-            ])
-            .fmt(f)
+        let indented = format_with(|f| {
+            let content = Arguments::from(&self.content);
+            if self.comments.is_empty() {
+                match self.hug {
+                    None => group(&soft_block_indent(&content)).fmt(f),
+                    Some(HuggingStyle::Always) => content.fmt(f),
+                    Some(HuggingStyle::IfFirstLineFits) => {
+                        // It's not immediately obvious how the below IR works to only indent the content if the first line exceeds the configured line width.
+                        // The trick is the first group that doesn't wrap `self.content`.
+                        // * The group doesn't wrap `self.content` because we need to assume that `self.content`
+                        //   contains a hard line break and hard-line-breaks always expand the enclosing group.
+                        // * The printer decides that a group fits if its content (in this case a `soft_line_break` that has a width of 0 and is guaranteed to fit)
+                        //   and the content coming after the group in expanded mode (`self.content`) fits on the line.
+                        //   The content coming after fits if the content up to the first soft or hard line break (or the end of the document) fits.
+                        //
+                        // This happens to be right what we want. The first group should add an indent and a soft line break if the content of `self.content`
+                        // up to the first line break exceeds the configured line length, but not otherwise.
+                        let indented = f.group_id("indented_content");
+                        write!(
+                            f,
+                            [
+                                group(&indent(&soft_line_break())).with_group_id(Some(indented)),
+                                indent_if_group_breaks(&content, indented),
+                                if_group_breaks(&soft_line_break()).with_group_id(Some(indented))
+                            ]
+                        )
+                    }
+                }
+            } else {
+                group(&format_args![
+                    dangling_open_parenthesis_comments(self.comments),
+                    soft_block_indent(&content),
+                ])
+                .fmt(f)
+            }
         });
 
         let inner = format_with(|f| {
@@ -171,12 +213,12 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
                 // This ensures that expanding this parenthesized expression does not expand the optional parentheses group.
                 write!(
                     f,
-                    [fits_expanded(&content)
+                    [fits_expanded(&indented)
                         .with_condition(Some(Condition::if_group_fits_on_line(group_id)))]
                 )
             } else {
                 // It's not necessary to wrap the content if it is not inside of an optional_parentheses group.
-                content.fmt(f)
+                indented.fmt(f)
             }
         });
 
@@ -184,6 +226,20 @@ impl<'ast> Format<PyFormatContext<'ast>> for FormatParenthesized<'_, 'ast> {
 
         write!(f, [token(self.left), inner, token(self.right)])
     }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(crate) enum HuggingStyle {
+    /// Always hug the content (never indent).
+    Always,
+
+    /// Hug the content if the content up to the first line break fits into the configured line length. Otherwise indent the content.
+    ///
+    /// This is different from [`HuggingStyle::Always`] in that it doesn't indent if the content contains a hard line break, and the content up to that hard line break fits into the configured line length.
+    ///
+    /// This style is used for formatting multiline strings that, by definition, always break. The idea is to
+    /// only hug a multiline string if its content up to the first line breaks exceeds the configured line length.
+    IfFirstLineFits,
 }
 
 /// Wraps an expression in parentheses only if it still does not fit after expanding all expressions that start or end with
@@ -252,7 +308,7 @@ pub(crate) enum InParenthesesOnlyLineBreak {
 impl<'ast> Format<PyFormatContext<'ast>> for InParenthesesOnlyLineBreak {
     fn fmt(&self, f: &mut Formatter<PyFormatContext<'ast>>) -> FormatResult<()> {
         match f.context().node_level() {
-            NodeLevel::TopLevel | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+            NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
                 match self {
                     InParenthesesOnlyLineBreak::SoftLineBreak => Ok(()),
                     InParenthesesOnlyLineBreak::SoftLineBreakOrSpace => space().fmt(f),
@@ -319,7 +375,7 @@ pub(super) fn write_in_parentheses_only_group_start_tag(f: &mut PyFormatter) {
             // Unconditionally group the content if it is not enclosed by an optional parentheses group.
             f.write_element(FormatElement::Tag(tag::Tag::StartGroup(tag::Group::new())));
         }
-        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+        NodeLevel::Expression(None) | NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement => {
             // No group
         }
     }
@@ -334,10 +390,30 @@ pub(super) fn write_in_parentheses_only_group_end_tag(f: &mut PyFormatter) {
             // Unconditionally group the content if it is not enclosed by an optional parentheses group.
             f.write_element(FormatElement::Tag(tag::Tag::EndGroup));
         }
-        NodeLevel::Expression(None) | NodeLevel::TopLevel | NodeLevel::CompoundStatement => {
+        NodeLevel::Expression(None) | NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement => {
             // No group
         }
     }
+}
+
+/// Shows prints `content` only if the expression is enclosed by (optional) parentheses (`()`, `[]`, or `{}`)
+/// and splits across multiple lines.
+pub(super) fn in_parentheses_only_if_group_breaks<'a, T>(
+    content: T,
+) -> impl Format<PyFormatContext<'a>>
+where
+    T: Format<PyFormatContext<'a>>,
+{
+    format_with(move |f: &mut PyFormatter| match f.context().node_level() {
+        NodeLevel::TopLevel(_) | NodeLevel::CompoundStatement | NodeLevel::Expression(None) => {
+            // no-op, not parenthesized
+            Ok(())
+        }
+        NodeLevel::Expression(Some(parentheses_id)) => if_group_breaks(&content)
+            .with_group_id(Some(parentheses_id))
+            .fmt(f),
+        NodeLevel::ParenthesizedExpression => if_group_breaks(&content).fmt(f),
+    })
 }
 
 /// Format comments inside empty parentheses, brackets or curly braces.
@@ -412,7 +488,7 @@ mod tests {
     #[test]
     fn test_has_parentheses() {
         let expression = r#"(b().c("")).d()"#;
-        let expr = parse_expression(expression, "<filename>").unwrap();
+        let expr = parse_expression(expression).unwrap();
         assert!(!is_expression_parenthesized(
             ExpressionRef::from(&expr),
             &CommentRanges::default(),

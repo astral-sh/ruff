@@ -1,8 +1,8 @@
 use std::usize;
 
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::Parameters;
+use ruff_python_ast::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -102,7 +102,15 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             dangling.split_at(parenthesis_comments_end);
 
         let format_inner = format_with(|f: &mut PyFormatter| {
-            let separator = format_with(|f| write!(f, [token(","), soft_line_break_or_space()]));
+            let separator = format_with(|f: &mut PyFormatter| {
+                token(",").fmt(f)?;
+
+                if f.context().node_level().is_parenthesized() {
+                    soft_line_break_or_space().fmt(f)
+                } else {
+                    space().fmt(f)
+                }
+            });
             let mut joiner = f.join_with(separator);
             let mut last_node: Option<AnyNodeRef> = None;
 
@@ -232,8 +240,6 @@ impl FormatNodeRule<Parameters> for FormatParameters {
             Ok(())
         });
 
-        let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
-
         let num_parameters = posonlyargs.len()
             + args.len()
             + usize::from(vararg.is_some())
@@ -243,12 +249,27 @@ impl FormatNodeRule<Parameters> for FormatParameters {
         if self.parentheses == ParametersParentheses::Never {
             write!(f, [group(&format_inner), dangling_comments(dangling)])
         } else if num_parameters == 0 {
+            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
             // No parameters, format any dangling comments between `()`
             write!(f, [empty_parenthesized("(", dangling, ")")])
+        } else if num_parameters == 1 && posonlyargs.is_empty() && kwonlyargs.is_empty() {
+            // If we have a single argument, avoid the inner group, to ensure that we insert a
+            // trailing comma if the outer group breaks.
+            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
+            write!(
+                f,
+                [
+                    token("("),
+                    dangling_open_parenthesis_comments(parenthesis_dangling),
+                    soft_block_indent(&format_inner),
+                    token(")")
+                ]
+            )
         } else {
             // Intentionally avoid `parenthesized`, which groups the entire formatted contents.
             // We want parameters to be grouped alongside return types, one level up, so we
             // format them "inline" here.
+            let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
             write!(
                 f,
                 [

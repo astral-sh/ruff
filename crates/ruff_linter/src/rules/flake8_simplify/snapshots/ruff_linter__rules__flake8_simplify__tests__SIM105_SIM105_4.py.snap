@@ -11,7 +11,7 @@ SIM105_4.py:2:1: SIM105 [*] Use `contextlib.suppress(ImportError)` instead of `t
   |
   = help: Replace with `contextlib.suppress(ImportError)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | ﻿#!/usr/bin/env python
 2   |-try:
   2 |+import contextlib

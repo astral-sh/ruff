@@ -9,7 +9,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `set.remove` that can be replaced with `set.discard`.
@@ -98,9 +97,9 @@ pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::St
     // Check if what we assume is set is indeed a set.
     if !checker
         .semantic()
-        .resolve_name(check_set)
-        .map(|binding_id| checker.semantic().binding(binding_id))
-        .map_or(false, |binding| is_set(binding, checker.semantic()))
+        .only_binding(check_set)
+        .map(|id| checker.semantic().binding(id))
+        .is_some_and(|binding| is_set(binding, checker.semantic()))
     {
         return;
     };
@@ -112,13 +111,11 @@ pub(crate) fn check_and_remove_from_set(checker: &mut Checker, if_stmt: &ast::St
         },
         if_stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
-            make_suggestion(check_set, check_element, checker.generator()),
-            if_stmt.start(),
-            if_stmt.end(),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
+        make_suggestion(check_set, check_element, checker.generator()),
+        if_stmt.start(),
+        if_stmt.end(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

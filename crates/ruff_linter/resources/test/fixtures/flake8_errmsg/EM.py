@@ -27,7 +27,7 @@ def f_ok():
     raise RuntimeError(msg)
 
 
-def f_unfixable():
+def f_msg_defined():
     msg = "hello"
     raise RuntimeError("This is an example exception")
 
@@ -58,3 +58,33 @@ def f_fix_indentation_check(foo):
 # Report these, but don't fix them
 if foo: raise RuntimeError("This is an example exception")
 if foo: x = 1; raise RuntimeError("This is an example exception")
+
+
+def f_triple_quoted_string():
+    raise RuntimeError(f"""This is an {"example"} exception""")
+
+
+def f_multi_line_string():
+    raise RuntimeError(
+        "first"
+        "second"
+    )
+
+
+def f_multi_line_string2():
+    raise RuntimeError(
+        "This is an {example} exception".format(
+            example="example"
+        )
+    )
+
+
+def f_multi_line_string2():
+    raise RuntimeError(
+        (
+            "This is an "
+            "{example} exception"
+        ).format(
+            example="example"
+        )
+    )

@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -25,6 +25,10 @@ use super::helpers;
 /// ```python
 /// {x: f(x) for x in foo}
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryListComprehensionDict;
 
@@ -65,10 +69,8 @@ pub(crate) fn unnecessary_list_comprehension_dict(
         return;
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_list_comprehension_dict(expr, checker).map(Fix::unsafe_edit)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_list_comprehension_dict(expr, checker).map(Fix::unsafe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }

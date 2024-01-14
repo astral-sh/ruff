@@ -91,3 +91,17 @@ field27 = list[str]
 field28 = builtins.str
 field29 = str
 field30 = str | bytes | None
+
+# We shouldn't emit Y052 for `enum` subclasses.
+from enum import Enum
+
+class Foo(Enum):
+    FOO = 0
+    BAR = 1
+
+class Bar(Foo):
+    BAZ = 2
+    BOP = 3
+
+class Bop:
+    WIZ = 4

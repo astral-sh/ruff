@@ -9,3 +9,4 @@ pub(crate) mod linter;
 pub(crate) mod rule;
 pub(crate) mod show_files;
 pub(crate) mod show_settings;
+pub(crate) mod version;

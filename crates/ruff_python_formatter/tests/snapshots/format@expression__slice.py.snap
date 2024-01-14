@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/slice.py
 ---
 ## Input
-```py
+```python
 # Handle comments both when lower and upper exist and when they don't
 a1 = "a"[
     # a
@@ -71,7 +71,7 @@ d3 = "d"[
 
 # Spacing around the colon(s)
 def a():
-    ...
+    pass
 
 e00 = "e"[:]
 e01 = "e"[:1]
@@ -119,7 +119,7 @@ self.assertEqual(
 ```
 
 ## Output
-```py
+```python
 # Handle comments both when lower and upper exist and when they don't
 a1 = "a"[
     # a
@@ -184,7 +184,7 @@ d3 = "d"[
 
 # Spacing around the colon(s)
 def a():
-    ...
+    pass
 
 
 e00 = "e"[:]

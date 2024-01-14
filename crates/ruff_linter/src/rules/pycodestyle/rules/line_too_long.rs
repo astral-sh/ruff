@@ -45,10 +45,24 @@ use crate::settings::LinterSettings;
 /// )
 /// ```
 ///
+/// ## Error suppression
+/// Hint: when suppressing `E501` errors within multi-line strings (like
+/// docstrings), the `noqa` directive should come at the end of the string
+/// (after the closing triple quote), and will apply to the entire string, like
+/// so:
+///
+/// ```python
+/// """Lorem ipsum dolor sit amet.
+///
+/// Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
+/// """  # noqa: E501
+/// ```
+///
 /// ## Options
 /// - `line-length`
 /// - `task-tags`
 /// - `pycodestyle.ignore-overlong-task-comments`
+/// - `pycodestyle.max-line-length`
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[violation]
@@ -58,7 +72,7 @@ impl Violation for LineTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {
         let LineTooLong(width, limit) = self;
-        format!("Line too long ({width} > {limit} characters)")
+        format!("Line too long ({width} > {limit})")
     }
 }
 
@@ -68,7 +82,7 @@ pub(crate) fn line_too_long(
     indexer: &Indexer,
     settings: &LinterSettings,
 ) -> Option<Diagnostic> {
-    let limit = settings.line_length;
+    let limit = settings.pycodestyle.max_line_length;
 
     Overlong::try_from_line(
         line,

@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ruff-ecosystem"
+version = "0.0.0"
+dependencies = ["unidiff==0.7.5", "tomli_w==1.0.0", "tomli==2.0.1"]
+
+[project.scripts]
+ruff-ecosystem = "ruff_ecosystem.cli:entrypoint"
+
+[tool.ruff.lint]
+extend-select = ["I"]
+preview = true

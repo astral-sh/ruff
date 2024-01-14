@@ -4,8 +4,9 @@
 use std::borrow::Cow;
 use std::cmp;
 
+use ruff_source_file::UniversalNewlines;
+
 use crate::PythonWhitespace;
-use ruff_source_file::newlines::UniversalNewlines;
 
 /// Indent each line by the given prefix.
 ///
@@ -337,10 +338,10 @@ mod tests {
 
     #[test]
     fn dedent_non_python_whitespace() {
-        let text = r#"        C = int(f.rea1,0],[-1,0,1]],
+        let text = r"        C = int(f.rea1,0],[-1,0,1]],
               [[-1,-1,1],[1,1,-1],[0,-1,0]],
               [[-1,-1,-1],[1,1,0],[1,0,1]]
-             ]"#;
+             ]";
         assert_eq!(dedent(text), text);
     }
 }

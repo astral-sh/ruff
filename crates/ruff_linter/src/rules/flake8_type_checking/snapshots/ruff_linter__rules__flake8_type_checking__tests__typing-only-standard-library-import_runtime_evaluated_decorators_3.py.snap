@@ -7,25 +7,54 @@ runtime_evaluated_decorators_3.py:6:18: TCH003 [*] Move standard library import 
 5 | from dataclasses import dataclass
 6 | from uuid import UUID  # TCH003
   |                  ^^^^ TCH003
-7 | 
-8 | import attrs
+7 | from collections.abc import Sequence
+8 | from pydantic import validate_call
   |
   = help: Move into type-checking block
 
-ℹ Suggested fix
+ℹ Unsafe fix
 3  3  | import datetime
 4  4  | from array import array
 5  5  | from dataclasses import dataclass
 6     |-from uuid import UUID  # TCH003
-7  6  | 
-8  7  | import attrs
-9  8  | from attrs import frozen
-   9  |+from typing import TYPE_CHECKING
-   10 |+
-   11 |+if TYPE_CHECKING:
-   12 |+    from uuid import UUID
-10 13 | 
-11 14 | 
-12 15 | @attrs.define(auto_attribs=True)
+7  6  | from collections.abc import Sequence
+8  7  | from pydantic import validate_call
+9  8  | 
+10 9  | import attrs
+11 10 | from attrs import frozen
+   11 |+from typing import TYPE_CHECKING
+   12 |+
+   13 |+if TYPE_CHECKING:
+   14 |+    from uuid import UUID
+12 15 | 
+13 16 | 
+14 17 | @attrs.define(auto_attribs=True)
+
+runtime_evaluated_decorators_3.py:7:29: TCH003 [*] Move standard library import `collections.abc.Sequence` into a type-checking block
+  |
+5 | from dataclasses import dataclass
+6 | from uuid import UUID  # TCH003
+7 | from collections.abc import Sequence
+  |                             ^^^^^^^^ TCH003
+8 | from pydantic import validate_call
+  |
+  = help: Move into type-checking block
+
+ℹ Unsafe fix
+4  4  | from array import array
+5  5  | from dataclasses import dataclass
+6  6  | from uuid import UUID  # TCH003
+7     |-from collections.abc import Sequence
+8  7  | from pydantic import validate_call
+9  8  | 
+10 9  | import attrs
+11 10 | from attrs import frozen
+   11 |+from typing import TYPE_CHECKING
+   12 |+
+   13 |+if TYPE_CHECKING:
+   14 |+    from collections.abc import Sequence
+12 15 | 
+13 16 | 
+14 17 | @attrs.define(auto_attribs=True)
 
 

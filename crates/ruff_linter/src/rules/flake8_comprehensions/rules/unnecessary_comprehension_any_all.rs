@@ -7,7 +7,7 @@ use ruff_python_ast::helpers::any_over_expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
@@ -40,6 +40,11 @@ use crate::rules::flake8_comprehensions::fixes;
 /// any(x.id for x in bar)
 /// all(x.id for x in bar)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the comprehension. In most cases, though, comments will be
+/// preserved.
 #[violation]
 pub struct UnnecessaryComprehensionAnyAll;
 
@@ -48,7 +53,7 @@ impl Violation for UnnecessaryComprehensionAnyAll {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unnecessary list comprehension.")
+        format!("Unnecessary list comprehension")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -89,11 +94,9 @@ pub(crate) fn unnecessary_comprehension_any_all(
     }
 
     let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, arg.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_comprehension_any_all(expr, checker.locator(), checker.stylist())
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_comprehension_any_all(expr, checker.locator(), checker.stylist())
+    });
     checker.diagnostics.push(diagnostic);
 }
 

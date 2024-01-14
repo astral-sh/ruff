@@ -539,11 +539,11 @@ struct PartIndex(NonZeroU32);
 impl PartIndex {
     fn from_len(value: usize) -> Self {
         assert!(value < u32::MAX as usize);
-        // SAFETY:
+        // OK because:
         // * The `value < u32::MAX` guarantees that the add doesn't overflow.
         // * The `+ 1` guarantees that the index is not zero
-        #[allow(unsafe_code, clippy::cast_possible_truncation)]
-        Self(unsafe { std::num::NonZeroU32::new_unchecked((value as u32) + 1) })
+        #[allow(clippy::cast_possible_truncation)]
+        Self(std::num::NonZeroU32::new((value as u32) + 1).expect("valid value"))
     }
 
     fn value(self) -> usize {

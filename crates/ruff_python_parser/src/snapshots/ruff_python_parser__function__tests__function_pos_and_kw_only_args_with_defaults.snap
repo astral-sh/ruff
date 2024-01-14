@@ -80,8 +80,8 @@ Ok(
                                 annotation: None,
                             },
                             default: Some(
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 23..25,
                                         value: Int(
                                             20,
@@ -101,8 +101,8 @@ Ok(
                                 annotation: None,
                             },
                             default: Some(
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 29..31,
                                         value: Int(
                                             30,

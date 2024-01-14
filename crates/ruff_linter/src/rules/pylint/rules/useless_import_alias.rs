@@ -5,7 +5,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for import aliases that do not rename the original package.
@@ -49,11 +48,9 @@ pub(crate) fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
     }
 
     let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            asname.to_string(),
-            alias.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        asname.to_string(),
+        alias.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

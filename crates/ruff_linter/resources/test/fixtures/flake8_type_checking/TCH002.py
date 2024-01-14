@@ -172,3 +172,14 @@ def f():
     from module import Member
 
     x: Member = 1
+
+
+def f():
+    from typing_extensions import TYPE_CHECKING
+
+    from pandas import y
+
+    if TYPE_CHECKING:
+        _type = x
+    elif True:
+        _type = y

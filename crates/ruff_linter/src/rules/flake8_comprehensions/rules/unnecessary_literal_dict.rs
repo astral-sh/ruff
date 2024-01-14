@@ -4,7 +4,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -29,6 +29,10 @@ use super::helpers;
 /// {1: 2, 3: 4}
 /// {}
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryLiteralDict {
     obj_type: String,
@@ -80,10 +84,7 @@ pub(crate) fn unnecessary_literal_dict(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::unsafe_edit)
-        });
-    }
+    diagnostic
+        .try_set_fix(|| fixes::fix_unnecessary_literal_dict(expr, checker).map(Fix::unsafe_edit));
     checker.diagnostics.push(diagnostic);
 }

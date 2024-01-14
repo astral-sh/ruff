@@ -5,7 +5,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of the `+` operator to concatenate collections.
@@ -198,15 +197,13 @@ pub(crate) fn collection_literal_concatenation(checker: &mut Checker, expr: &Exp
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if !checker.indexer().has_comments(expr, checker.locator()) {
-            // This suggestion could be unsafe if the non-literal expression in the
-            // expression has overridden the `__add__` (or `__radd__`) magic methods.
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                contents,
-                expr.range(),
-            )));
-        }
+    if !checker.indexer().has_comments(expr, checker.locator()) {
+        // This suggestion could be unsafe if the non-literal expression in the
+        // expression has overridden the `__add__` (or `__radd__`) magic methods.
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            contents,
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

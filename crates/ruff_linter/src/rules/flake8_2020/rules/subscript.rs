@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -177,8 +177,8 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 step: None,
                 range: _,
             }) => {
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(i),
+                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(i),
                     ..
                 }) = upper.as_ref()
                 {
@@ -194,8 +194,8 @@ pub(crate) fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 }
             }
 
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(i),
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(i),
                 ..
             }) => {
                 if *i == 2 && checker.enabled(Rule::SysVersion2) {

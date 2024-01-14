@@ -2,6 +2,8 @@
 
 use std::path::Path;
 
+use ruff_notebook::CellOffsets;
+use ruff_python_ast::PySourceType;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::Tok;
 
@@ -25,7 +27,8 @@ pub(crate) fn check_tokens(
     locator: &Locator,
     indexer: &Indexer,
     settings: &LinterSettings,
-    is_stub: bool,
+    source_type: PySourceType,
+    cell_offsets: Option<&CellOffsets>,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -35,6 +38,10 @@ pub(crate) fn check_tokens(
 
     if settings.rules.enabled(Rule::BlanketTypeIgnore) {
         pygrep_hooks::rules::blanket_type_ignore(&mut diagnostics, indexer, locator);
+    }
+
+    if settings.rules.enabled(Rule::EmptyComment) {
+        pylint::rules::empty_comments(&mut diagnostics, indexer, locator);
     }
 
     if settings.rules.any_enabled(&[
@@ -72,7 +79,7 @@ pub(crate) fn check_tokens(
     }
 
     if settings.rules.enabled(Rule::UTF8EncodingDeclaration) {
-        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer, settings);
+        pyupgrade::rules::unnecessary_coding_comment(&mut diagnostics, locator, indexer);
     }
 
     if settings.rules.enabled(Rule::InvalidEscapeSequence) {
@@ -83,7 +90,6 @@ pub(crate) fn check_tokens(
                 indexer,
                 tok,
                 *range,
-                settings.rules.should_fix(Rule::InvalidEscapeSequence),
             );
         }
     }
@@ -114,12 +120,17 @@ pub(crate) fn check_tokens(
             tokens,
             locator,
             indexer,
-            settings,
+            source_type,
+            cell_offsets,
         );
     }
 
     if settings.rules.enabled(Rule::AvoidableEscapedQuote) && settings.flake8_quotes.avoid_escape {
         flake8_quotes::rules::avoidable_escaped_quote(&mut diagnostics, tokens, locator, settings);
+    }
+
+    if settings.rules.enabled(Rule::UnnecessaryEscapedQuote) {
+        flake8_quotes::rules::unnecessary_escaped_quote(&mut diagnostics, tokens, locator);
     }
 
     if settings.rules.any_enabled(&[
@@ -137,7 +148,7 @@ pub(crate) fn check_tokens(
         flake8_implicit_str_concat::rules::implicit(
             &mut diagnostics,
             tokens,
-            &settings.flake8_implicit_str_concat,
+            settings,
             locator,
             indexer,
         );
@@ -148,14 +159,14 @@ pub(crate) fn check_tokens(
         Rule::TrailingCommaOnBareTuple,
         Rule::ProhibitedTrailingComma,
     ]) {
-        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator, settings);
+        flake8_commas::rules::trailing_commas(&mut diagnostics, tokens, locator, indexer);
     }
 
     if settings.rules.enabled(Rule::ExtraneousParentheses) {
-        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator, settings);
+        pyupgrade::rules::extraneous_parentheses(&mut diagnostics, tokens, locator);
     }
 
-    if is_stub && settings.rules.enabled(Rule::TypeCommentInStub) {
+    if source_type.is_stub() && settings.rules.enabled(Rule::TypeCommentInStub) {
         flake8_pyi::rules::type_comment_in_stub(&mut diagnostics, locator, indexer);
     }
 
@@ -166,7 +177,7 @@ pub(crate) fn check_tokens(
         Rule::ShebangNotFirstLine,
         Rule::ShebangMissingPython,
     ]) {
-        flake8_executable::rules::from_tokens(tokens, path, locator, settings, &mut diagnostics);
+        flake8_executable::rules::from_tokens(&mut diagnostics, path, locator, indexer);
     }
 
     if settings.rules.any_enabled(&[
@@ -191,7 +202,7 @@ pub(crate) fn check_tokens(
                 TodoComment::from_comment(comment, *comment_range, i)
             })
             .collect();
-        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer, settings);
+        flake8_todos::rules::todos(&mut diagnostics, &todo_comments, locator, indexer);
         flake8_fixme::rules::todos(&mut diagnostics, &todo_comments);
     }
 

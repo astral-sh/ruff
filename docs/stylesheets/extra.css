@@ -36,7 +36,7 @@
   --md-default-fg-color--lighter: var(--white);
   --md-primary-fg-color: var(--space);
   --md-primary-bg-color: var(--white);
-  --md-accent-fg-color: var(--radiate);
+  --md-accent-fg-color: var(--cosmic);
 
   --md-typeset-color: var(--white);
   --md-typeset-a-color: var(--radiate);
@@ -91,4 +91,15 @@
 }
 .md-typeset table:not([class]) {
   display: table;
+}
+
+/* See: https://github.com/astral-sh/ruff/issues/8519 */
+[data-md-color-scheme="astral-dark"] details summary a {
+  color: var(--flare);
+}
+
+/* See: https://github.com/astral-sh/ruff/issues/9046 */
+[data-md-color-scheme="astral-dark"] div.admonition {
+  color: var(--md-code-fg-color);
+  background-color: var(--md-code-bg-color);
 }

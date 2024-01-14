@@ -3,16 +3,13 @@ use log::debug;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, ExprContext, Identifier, Keyword, Stmt,
-};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Identifier, Keyword, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `NamedTuple` declarations that use functional syntax.
@@ -114,17 +111,15 @@ pub(crate) fn convert_named_tuple_functional_to_class(
         },
         stmt.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-        if checker.locator().is_at_start_of_line(stmt.start()) {
-            diagnostic.set_fix(convert_to_class(
-                stmt,
-                typename,
-                fields,
-                base_class,
-                checker.generator(),
-            ));
-        }
+    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+    if checker.locator().is_at_start_of_line(stmt.start()) {
+        diagnostic.set_fix(convert_to_class(
+            stmt,
+            typename,
+            fields,
+            base_class,
+            checker.generator(),
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -186,17 +181,17 @@ fn create_fields_from_fields_arg(fields: &Expr) -> Option<Vec<Stmt>> {
                 let [field, annotation] = elts.as_slice() else {
                     return None;
                 };
-                let field = field.as_constant_expr()?;
-                let Constant::Str(ast::StringConstant { value: field, .. }) = &field.value else {
-                    return None;
-                };
-                if !is_identifier(field) {
+                if annotation.is_starred_expr() {
                     return None;
                 }
-                if is_dunder(field) {
+                let ast::ExprStringLiteral { value: field, .. } = field.as_string_literal_expr()?;
+                if !is_identifier(field.to_str()) {
                     return None;
                 }
-                Some(create_field_assignment_stmt(field, annotation))
+                if is_dunder(field.to_str()) {
+                    return None;
+                }
+                Some(create_field_assignment_stmt(field.to_str(), annotation))
             })
             .collect()
     }
@@ -241,7 +236,7 @@ fn convert_to_class(
     base_class: &Expr,
     generator: Generator,
 ) -> Fix {
-    Fix::unsafe_edit(Edit::range_replacement(
+    Fix::safe_edit(Edit::range_replacement(
         generator.stmt(&create_class_def_stmt(typename, body, base_class)),
         stmt.range(),
     ))

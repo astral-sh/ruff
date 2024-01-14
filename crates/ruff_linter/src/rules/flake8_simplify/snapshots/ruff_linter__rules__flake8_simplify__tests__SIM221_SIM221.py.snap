@@ -9,7 +9,7 @@ SIM221.py:1:4: SIM221 [*] Use `True` instead of `a or not a`
   |
   = help: Replace with `True`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1   |-if a or not a:
   1 |+if True:
 2 2 |     pass
@@ -26,7 +26,7 @@ SIM221.py:4:5: SIM221 [*] Use `True` instead of `a or not a`
   |
   = help: Replace with `True`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | if a or not a:
 2 2 |     pass
 3 3 | 
@@ -46,7 +46,7 @@ SIM221.py:7:5: SIM221 [*] Use `True` instead of `a or not a`
   |
   = help: Replace with `True`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 4 4 | if (a or not a) or b:
 5 5 |     pass
 6 6 | 

@@ -13,7 +13,7 @@ RET503.py:20:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 19 19 | def x(y):
 20 20 |     if not y:
 21 21 |         return 1
@@ -33,7 +33,7 @@ RET503.py:27:9: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 25 25 | def x(y):
 26 26 |     if not y:
 27 27 |         print()  # error
@@ -51,7 +51,7 @@ RET503.py:36:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 34 34 |         return 1
 35 35 | 
 36 36 |     print()  # error
@@ -73,7 +73,7 @@ RET503.py:41:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 41 41 |     for i in range(10):
 42 42 |         if i > 10:
 43 43 |             return i
@@ -91,7 +91,7 @@ RET503.py:52:9: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 50 50 |             return i
 51 51 |     else:
 52 52 |         print()  # error
@@ -109,7 +109,7 @@ RET503.py:59:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 57 57 |     if x > 0:
 58 58 |         return False
 59 59 |     no_such_function()  # error
@@ -127,7 +127,7 @@ RET503.py:66:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 64 64 |     if x > 0:
 65 65 |         return False
 66 66 |     print("", end="")  # error
@@ -149,7 +149,7 @@ RET503.py:82:5: RET503 [*] Missing explicit `return` at the end of function able
    |
    = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 83 83 |         if y > 0:
 84 84 |             return 1
 85 85 |         y += 1
@@ -171,7 +171,7 @@ RET503.py:113:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 114 114 |         if i > y:
 115 115 |             break
 116 116 |         return z
@@ -195,7 +195,7 @@ RET503.py:120:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 124 124 |         else:
 125 125 |             return z
 126 126 |         return None
@@ -216,7 +216,7 @@ RET503.py:130:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 131 131 |         if i < y:
 132 132 |             continue
 133 133 |         return z
@@ -240,7 +240,7 @@ RET503.py:137:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 141 141 |         else:
 142 142 |             return z
 143 143 |         return None
@@ -260,7 +260,7 @@ RET503.py:274:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 273 273 | 
 274 274 |     for value in values:
 275 275 |         print(value)
@@ -278,7 +278,7 @@ RET503.py:291:13: RET503 [*] Missing explicit `return` at the end of function ab
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 289 289 |             return 1
 290 290 |         case 1:
 291 291 |             print()  # error
@@ -298,7 +298,7 @@ RET503.py:300:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 299 299 |     def example():
 300 300 |         if True:
 301 301 |             return ""
@@ -317,7 +317,7 @@ RET503.py:305:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 304 304 |     def example():
 305 305 |         if True:
 306 306 |             return ""
@@ -336,7 +336,7 @@ RET503.py:310:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 309 309 |     def example():
 310 310 |         if True:
 311 311 |             return ""  # type: ignore
@@ -355,7 +355,7 @@ RET503.py:315:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 314 314 |     def example():
 315 315 |         if True:
 316 316 |             return ""  ;
@@ -375,7 +375,7 @@ RET503.py:320:9: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 320 320 |         if True:
 321 321 |             return "" \
 322 322 |                 ;  # type: ignore
@@ -393,7 +393,7 @@ RET503.py:328:5: RET503 [*] Missing explicit `return` at the end of function abl
     |
     = help: Add explicit `return` statement
 
-ℹ Suggested fix
+ℹ Unsafe fix
 326 326 |     if False:
 327 327 |         return 1
 328 328 |     x = 2 \

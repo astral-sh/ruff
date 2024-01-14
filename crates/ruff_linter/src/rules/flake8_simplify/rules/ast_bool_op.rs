@@ -15,7 +15,6 @@ use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for multiple `isinstance` calls on the same target.
@@ -380,7 +379,8 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 ..
             }) = &values[indices[0]]
             {
-                args.get(0).expect("`isinstance` should have two arguments")
+                args.first()
+                    .expect("`isinstance` should have two arguments")
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
@@ -394,78 +394,76 @@ pub(crate) fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 },
                 expr.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                if !contains_effect(target, |id| checker.semantic().is_builtin(id)) {
-                    // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
-                    // in `isinstance(obj, int) or isinstance(obj, str)`).
-                    let types: Vec<&Expr> = indices
+            if !contains_effect(target, |id| checker.semantic().is_builtin(id)) {
+                // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
+                // in `isinstance(obj, int) or isinstance(obj, str)`).
+                let types: Vec<&Expr> = indices
+                    .iter()
+                    .map(|index| &values[*index])
+                    .map(|expr| {
+                        let Expr::Call(ast::ExprCall {
+                            arguments: Arguments { args, .. },
+                            ..
+                        }) = expr
+                        else {
+                            unreachable!("Indices should only contain `isinstance` calls")
+                        };
+                        args.get(1).expect("`isinstance` should have two arguments")
+                    })
+                    .collect();
+
+                // Generate a single `isinstance` call.
+                let node = ast::ExprTuple {
+                    // Flatten all the types used across the `isinstance` calls.
+                    elts: types
                         .iter()
-                        .map(|index| &values[*index])
-                        .map(|expr| {
-                            let Expr::Call(ast::ExprCall {
-                                arguments: Arguments { args, .. },
-                                ..
-                            }) = expr
-                            else {
-                                unreachable!("Indices should only contain `isinstance` calls")
-                            };
-                            args.get(1).expect("`isinstance` should have two arguments")
+                        .flat_map(|value| {
+                            if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
+                                Left(elts.iter())
+                            } else {
+                                Right(iter::once(*value))
+                            }
                         })
-                        .collect();
+                        .map(Clone::clone)
+                        .collect(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                };
+                let node1 = ast::ExprName {
+                    id: "isinstance".into(),
+                    ctx: ExprContext::Load,
+                    range: TextRange::default(),
+                };
+                let node2 = ast::ExprCall {
+                    func: Box::new(node1.into()),
+                    arguments: Arguments {
+                        args: vec![target.clone(), node.into()],
+                        keywords: vec![],
+                        range: TextRange::default(),
+                    },
+                    range: TextRange::default(),
+                };
+                let call = node2.into();
 
-                    // Generate a single `isinstance` call.
-                    let node = ast::ExprTuple {
-                        // Flatten all the types used across the `isinstance` calls.
-                        elts: types
-                            .iter()
-                            .flat_map(|value| {
-                                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value {
-                                    Left(elts.iter())
-                                } else {
-                                    Right(iter::once(*value))
-                                }
-                            })
-                            .map(Clone::clone)
-                            .collect(),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                    };
-                    let node1 = ast::ExprName {
-                        id: "isinstance".into(),
-                        ctx: ExprContext::Load,
-                        range: TextRange::default(),
-                    };
-                    let node2 = ast::ExprCall {
-                        func: Box::new(node1.into()),
-                        arguments: Arguments {
-                            args: vec![target.clone(), node.into()],
-                            keywords: vec![],
-                            range: TextRange::default(),
-                        },
-                        range: TextRange::default(),
-                    };
-                    let call = node2.into();
+                // Generate the combined `BoolOp`.
+                let [first, .., last] = indices.as_slice() else {
+                    unreachable!("Indices should have at least two elements")
+                };
+                let before = values.iter().take(*first).cloned();
+                let after = values.iter().skip(last + 1).cloned();
+                let node = ast::ExprBoolOp {
+                    op: BoolOp::Or,
+                    values: before.chain(iter::once(call)).chain(after).collect(),
+                    range: TextRange::default(),
+                };
+                let bool_op = node.into();
 
-                    // Generate the combined `BoolOp`.
-                    let [first, .., last] = indices.as_slice() else {
-                        unreachable!("Indices should have at least two elements")
-                    };
-                    let before = values.iter().take(*first).cloned();
-                    let after = values.iter().skip(last + 1).cloned();
-                    let node = ast::ExprBoolOp {
-                        op: BoolOp::Or,
-                        values: before.chain(iter::once(call)).chain(after).collect(),
-                        range: TextRange::default(),
-                    };
-                    let bool_op = node.into();
-
-                    // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
-                    // multiple duplicates, the fixes will conflict.
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        checker.generator().expr(&bool_op),
-                        expr.range(),
-                    )));
-                }
+                // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
+                // multiple duplicates, the fixes will conflict.
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    checker.generator().expr(&bool_op),
+                    expr.range(),
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -564,29 +562,27 @@ pub(crate) fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            let unmatched: Vec<Expr> = values
-                .iter()
-                .enumerate()
-                .filter(|(index, _)| !indices.contains(index))
-                .map(|(_, elt)| elt.clone())
-                .collect();
-            let in_expr = if unmatched.is_empty() {
-                in_expr
-            } else {
-                // Wrap in a `x in (a, b) or ...` boolean operation.
-                let node = ast::ExprBoolOp {
-                    op: BoolOp::Or,
-                    values: iter::once(in_expr).chain(unmatched).collect(),
-                    range: TextRange::default(),
-                };
-                node.into()
+        let unmatched: Vec<Expr> = values
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !indices.contains(index))
+            .map(|(_, elt)| elt.clone())
+            .collect();
+        let in_expr = if unmatched.is_empty() {
+            in_expr
+        } else {
+            // Wrap in a `x in (a, b) or ...` boolean operation.
+            let node = ast::ExprBoolOp {
+                op: BoolOp::Or,
+                values: iter::once(in_expr).chain(unmatched).collect(),
+                range: TextRange::default(),
             };
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().expr(&in_expr),
-                expr.range(),
-            )));
-        }
+            node.into()
+        };
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            checker.generator().expr(&in_expr),
+            expr.range(),
+        )));
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -638,12 +634,10 @@ pub(crate) fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     },
                     expr.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        "False".to_string(),
-                        expr.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    "False".to_string(),
+                    expr.range(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -697,12 +691,10 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     },
                     expr.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        "True".to_string(),
-                        expr.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    "True".to_string(),
+                    expr.range(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -712,17 +704,15 @@ pub(crate) fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
 fn get_short_circuit_edit(
     expr: &Expr,
     range: TextRange,
-    truthiness: Truthiness,
+    truthiness: bool,
     in_boolean_test: bool,
     generator: Generator,
 ) -> Edit {
     let content = if in_boolean_test {
-        match truthiness {
-            Truthiness::Truthy => "True".to_string(),
-            Truthiness::Falsey => "False".to_string(),
-            Truthiness::Unknown => {
-                unreachable!("short_circuit_truthiness should be Truthy or Falsey")
-            }
+        if truthiness {
+            "True".to_string()
+        } else {
+            "False".to_string()
         }
     } else {
         generator.expr(expr)
@@ -755,8 +745,8 @@ fn is_short_circuit(
         return None;
     }
     let short_circuit_truthiness = match op {
-        BoolOp::And => Truthiness::Falsey,
-        BoolOp::Or => Truthiness::Truthy,
+        BoolOp::And => false,
+        BoolOp::Or => true,
     };
 
     let mut furthest = expr;
@@ -782,7 +772,7 @@ fn is_short_circuit(
         // we can return the location of the expression. This should only trigger if the
         // short-circuit expression is the first expression in the list; otherwise, we'll see it
         // as `next_value` before we see it as `value`.
-        if value_truthiness == short_circuit_truthiness {
+        if value_truthiness.into_bool() == Some(short_circuit_truthiness) {
             remove = Some(ContentAround::After);
 
             edit = Some(get_short_circuit_edit(
@@ -807,7 +797,7 @@ fn is_short_circuit(
 
         // If the next expression is a constant, and it matches the short-circuit value, then
         // we can return the location of the expression.
-        if next_value_truthiness == short_circuit_truthiness {
+        if next_value_truthiness.into_bool() == Some(short_circuit_truthiness) {
             remove = Some(if index + 1 == values.len() - 1 {
                 ContentAround::Before
             } else {
@@ -850,9 +840,7 @@ pub(crate) fn expr_or_true(checker: &mut Checker, expr: &Expr) {
             },
             edit.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::unsafe_edit(edit));
-        }
+        diagnostic.set_fix(Fix::unsafe_edit(edit));
         checker.diagnostics.push(diagnostic);
     }
 }
@@ -867,9 +855,7 @@ pub(crate) fn expr_and_false(checker: &mut Checker, expr: &Expr) {
             },
             edit.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::unsafe_edit(edit));
-        }
+        diagnostic.set_fix(Fix::unsafe_edit(edit));
         checker.diagnostics.push(diagnostic);
     }
 }

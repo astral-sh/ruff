@@ -44,7 +44,7 @@ F602.py:13:5: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 10 10 |     a: 1,
 11 11 |     a: 2,
 12 12 |     a: 3,
@@ -86,7 +86,7 @@ F602.py:20:5: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 17 17 |     a: 1,
 18 18 |     a: 2,
 19 19 |     a: 3,
@@ -116,7 +116,7 @@ F602.py:26:5: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 23 23 | 
 24 24 | x = {
 25 25 |     a: 1,
@@ -168,7 +168,7 @@ F602.py:35:5: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 32 32 | x = {
 33 33 |     a: 1,
 34 34 |     "a": 1,
@@ -219,7 +219,7 @@ F602.py:44:12: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 41 41 |     a: 4,
 42 42 | }
 43 43 | 
@@ -235,7 +235,7 @@ F602.py:45:18: F602 [*] Dictionary key `a` repeated
    |
    = help: Remove repeated key `a`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 42 42 | }
 43 43 | 
 44 44 | x = {a: 1, a: 1}

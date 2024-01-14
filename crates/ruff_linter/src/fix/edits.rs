@@ -3,18 +3,20 @@
 use anyhow::{Context, Result};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::parenthesize::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Stmt};
+use ruff_python_ast::{AnyNodeRef, ArgOrKeyword};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::{
-    has_leading_content, is_python_whitespace, PythonWhitespace, SimpleTokenKind, SimpleTokenizer,
+    has_leading_content, is_python_whitespace, CommentRanges, PythonWhitespace, SimpleTokenKind,
+    SimpleTokenizer,
 };
 use ruff_source_file::{Locator, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::fix::codemods;
-use crate::line_width::{LineLength, LineWidthBuilder, TabSize};
+use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
 
 /// Return the `Fix` to use when deleting a `Stmt`.
 ///
@@ -135,6 +137,32 @@ pub(crate) fn remove_argument<T: Ranged>(
             Parentheses::Remove => Edit::range_deletion(arguments.range()),
             Parentheses::Preserve => Edit::range_replacement("()".to_string(), arguments.range()),
         })
+    }
+}
+
+/// Generic function to add arguments or keyword arguments to function calls.
+pub(crate) fn add_argument(
+    argument: &str,
+    arguments: &Arguments,
+    comment_ranges: &CommentRanges,
+    source: &str,
+) -> Edit {
+    if let Some(last) = arguments.arguments_source_order().last() {
+        // Case 1: existing arguments, so append after the last argument.
+        let last = parenthesized_range(
+            match last {
+                ArgOrKeyword::Arg(arg) => arg.into(),
+                ArgOrKeyword::Keyword(keyword) => (&keyword.value).into(),
+            },
+            arguments.into(),
+            comment_ranges,
+            source,
+        )
+        .unwrap_or(last.range());
+        Edit::insertion(format!(", {argument}"), last.end())
+    } else {
+        // Case 2: no arguments. Add argument, without any trailing comma.
+        Edit::insertion(argument.to_string(), arguments.start() + TextSize::from(1))
     }
 }
 
@@ -293,7 +321,7 @@ pub(crate) fn fits(
     node: AnyNodeRef,
     locator: &Locator,
     line_length: LineLength,
-    tab_size: TabSize,
+    tab_size: IndentWidth,
 ) -> bool {
     all_lines_fit(fix, node, locator, line_length.value() as usize, tab_size)
 }
@@ -305,7 +333,7 @@ pub(crate) fn fits_or_shrinks(
     node: AnyNodeRef,
     locator: &Locator,
     line_length: LineLength,
-    tab_size: TabSize,
+    tab_size: IndentWidth,
 ) -> bool {
     // Use the larger of the line length limit, or the longest line in the existing AST node.
     let line_length = std::iter::once(line_length.value() as usize)
@@ -327,7 +355,7 @@ fn all_lines_fit(
     node: AnyNodeRef,
     locator: &Locator,
     line_length: usize,
-    tab_size: TabSize,
+    tab_size: IndentWidth,
 ) -> bool {
     let prefix = locator.slice(TextRange::new(
         locator.line_start(node.start()),
@@ -369,13 +397,13 @@ mod tests {
     #[test]
     fn find_semicolon() -> Result<()> {
         let contents = "x = 1";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt.end(), &locator), None);
 
         let contents = "x = 1; y = 1";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -384,7 +412,7 @@ mod tests {
         );
 
         let contents = "x = 1 ; y = 1";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -397,7 +425,7 @@ x = 1 \
   ; y = 1
 "
         .trim();
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(

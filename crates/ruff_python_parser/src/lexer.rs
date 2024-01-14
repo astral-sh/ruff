@@ -407,7 +407,9 @@ impl<'source> Lexer<'source> {
         #[cfg(debug_assertions)]
         debug_assert_eq!(self.cursor.previous(), '#');
 
-        self.cursor.eat_while(|c| !matches!(c, '\n' | '\r'));
+        let bytes = self.cursor.rest().as_bytes();
+        let offset = memchr::memchr2(b'\n', b'\r', bytes).unwrap_or(bytes.len());
+        self.cursor.skip_bytes(offset);
 
         Tok::Comment(self.token_text().to_string())
     }
@@ -698,7 +700,7 @@ impl<'source> Lexer<'source> {
                 }
                 Some('\r' | '\n') if !triple_quoted => {
                     if let Some(fstring) = self.fstrings.current() {
-                        // When we are in an f-string, check whether does the initial quote
+                        // When we are in an f-string, check whether the initial quote
                         // matches with f-strings quotes and if it is, then this must be a
                         // missing '}' token so raise the proper error.
                         if fstring.quote_char() == quote && !fstring.is_triple_quoted() {
@@ -706,7 +708,7 @@ impl<'source> Lexer<'source> {
                                 error: LexicalErrorType::FStringError(
                                     FStringErrorType::UnclosedLbrace,
                                 ),
-                                location: self.offset() - fstring.quote_size(),
+                                location: self.offset() - TextSize::new(1),
                             });
                         }
                     }
@@ -730,7 +732,7 @@ impl<'source> Lexer<'source> {
                 Some(_) => {}
                 None => {
                     if let Some(fstring) = self.fstrings.current() {
-                        // When we are in an f-string, check whether does the initial quote
+                        // When we are in an f-string, check whether the initial quote
                         // matches with f-strings quotes and if it is, then this must be a
                         // missing '}' token so raise the proper error.
                         if fstring.quote_char() == quote
@@ -740,7 +742,7 @@ impl<'source> Lexer<'source> {
                                 error: LexicalErrorType::FStringError(
                                     FStringErrorType::UnclosedLbrace,
                                 ),
-                                location: self.offset() - fstring.quote_size(),
+                                location: self.offset(),
                             });
                         }
                     }
@@ -1291,7 +1293,7 @@ impl FusedIterator for Lexer<'_> {}
 /// [lexer] implementation.
 ///
 /// [lexer]: crate::lexer
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LexicalError {
     /// The type of error that occurred.
     pub error: LexicalErrorType,
@@ -1306,8 +1308,33 @@ impl LexicalError {
     }
 }
 
+impl std::ops::Deref for LexicalError {
+    type Target = LexicalErrorType;
+
+    fn deref(&self) -> &Self::Target {
+        &self.error
+    }
+}
+
+impl std::error::Error for LexicalError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.error)
+    }
+}
+
+impl std::fmt::Display for LexicalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{} at byte offset {}",
+            &self.error,
+            u32::from(self.location)
+        )
+    }
+}
+
 /// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LexicalErrorType {
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.
@@ -1342,9 +1369,13 @@ pub enum LexicalErrorType {
     LineContinuationError,
     /// An unexpected end of file was encountered.
     Eof,
+    /// Occurs when a syntactically invalid assignment was encountered.
+    AssignmentError,
     /// An unexpected error occurred.
     OtherError(String),
 }
+
+impl std::error::Error for LexicalErrorType {}
 
 impl std::fmt::Display for LexicalErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -1387,6 +1418,7 @@ impl std::fmt::Display for LexicalErrorType {
                 write!(f, "unexpected character after line continuation character")
             }
             LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
+            LexicalErrorType::AssignmentError => write!(f, "invalid assignment target"),
             LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
         }
     }
@@ -1444,7 +1476,7 @@ impl Radix {
             Radix::Binary => matches!(c, '0'..='1'),
             Radix::Octal => matches!(c, '0'..='7'),
             Radix::Decimal => c.is_ascii_digit(),
-            Radix::Hex => matches!(c, '0'..='9' | 'a'..='f' | 'A'..='F'),
+            Radix::Hex => c.is_ascii_hexdigit(),
         }
     }
 }
@@ -1968,9 +2000,9 @@ def f(arg=%timeit a = b):
     #[test]
     fn tet_too_low_dedent() {
         let tokens: Vec<_> = lex(
-            r#"if True:
+            "if True:
     pass
-  pass"#,
+  pass",
             Mode::Module,
         )
         .collect();
@@ -2155,13 +2187,25 @@ f"{(lambda x:{x})}"
         assert_debug_snapshot!(lex_source(source));
     }
 
+    #[test]
+    fn test_match_softkeyword_in_notebook() {
+        let source = r"match foo:
+    case bar:
+        pass";
+        assert_debug_snapshot!(lex_jupyter_source(source));
+    }
+
+    fn lex_error(source: &str) -> LexicalError {
+        match lex(source, Mode::Module).find_map(Result::err) {
+            Some(err) => err,
+            _ => panic!("Expected at least one error"),
+        }
+    }
+
     fn lex_fstring_error(source: &str) -> FStringErrorType {
-        match lex(source, Mode::Module).find_map(std::result::Result::err) {
-            Some(err) => match err.error {
-                LexicalErrorType::FStringError(error) => error,
-                _ => panic!("Expected FStringError: {err:?}"),
-            },
-            _ => panic!("Expected atleast one FStringError"),
+        match lex_error(source).error {
+            LexicalErrorType::FStringError(error) => error,
+            err => panic!("Expected FStringError: {err:?}"),
         }
     }
 
@@ -2193,10 +2237,10 @@ f"{(lambda x:{x})}"
         assert_eq!(lex_fstring_error(r#"f"""{""""#), UnclosedLbrace);
 
         assert_eq!(lex_fstring_error(r#"f""#), UnterminatedString);
-        assert_eq!(lex_fstring_error(r#"f'"#), UnterminatedString);
+        assert_eq!(lex_fstring_error(r"f'"), UnterminatedString);
 
         assert_eq!(lex_fstring_error(r#"f""""#), UnterminatedTripleQuotedString);
-        assert_eq!(lex_fstring_error(r#"f'''"#), UnterminatedTripleQuotedString);
+        assert_eq!(lex_fstring_error(r"f'''"), UnterminatedTripleQuotedString);
         assert_eq!(
             lex_fstring_error(r#"f"""""#),
             UnterminatedTripleQuotedString
@@ -2205,5 +2249,26 @@ f"{(lambda x:{x})}"
             lex_fstring_error(r#"f""""""#),
             UnterminatedTripleQuotedString
         );
+    }
+
+    #[test]
+    fn test_fstring_error_location() {
+        assert_debug_snapshot!(lex_error("f'{'"), @r###"
+        LexicalError {
+            error: FStringError(
+                UnclosedLbrace,
+            ),
+            location: 4,
+        }
+        "###);
+
+        assert_debug_snapshot!(lex_error("f'{'α"), @r###"
+        LexicalError {
+            error: FStringError(
+                UnclosedLbrace,
+            ),
+            location: 6,
+        }
+        "###);
     }
 }

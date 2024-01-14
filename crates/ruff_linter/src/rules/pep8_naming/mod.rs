@@ -96,6 +96,26 @@ mod tests {
                     classmethod_decorators: vec![
                         "classmethod".to_string(),
                         "pydantic.validator".to_string(),
+                        "expression".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn staticmethod_decorators() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pep8_naming").join("N805.py").as_path(),
+            &settings::LinterSettings {
+                pep8_naming: pep8_naming::settings::Settings {
+                    staticmethod_decorators: vec![
+                        "staticmethod".to_string(),
+                        "thisisstatic".to_string(),
                     ],
                     ..Default::default()
                 },

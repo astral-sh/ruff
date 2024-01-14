@@ -19,7 +19,7 @@ expression: comments.debug(test_case.source_code)
         "trailing": [],
     },
     Node {
-        kind: ExprConstant,
+        kind: ExprNumberLiteral,
         range: 12..13,
         source: `5`,
     }: {
@@ -34,7 +34,7 @@ expression: comments.debug(test_case.source_code)
         ],
     },
     Node {
-        kind: ExprConstant,
+        kind: ExprNumberLiteral,
         range: 125..126,
         source: `3`,
     }: {

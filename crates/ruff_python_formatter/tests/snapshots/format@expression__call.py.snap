@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/call.py
 ---
 ## Input
-```py
+```python
 from unittest.mock import MagicMock
 
 
@@ -282,7 +282,7 @@ result = (object[complicate_caller])("argument").a["b"].test(argument)
 ```
 
 ## Output
-```py
+```python
 from unittest.mock import MagicMock
 
 
@@ -458,8 +458,9 @@ func(
 )
 
 func(
-    # outer comment
-    (  # inner comment
+    (
+        # outer comment
+        # inner comment
         []
     )
 )

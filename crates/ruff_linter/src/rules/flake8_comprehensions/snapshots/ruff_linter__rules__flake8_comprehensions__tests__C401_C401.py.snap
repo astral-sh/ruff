@@ -10,7 +10,7 @@ C401.py:1:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
   = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1   |-x = set(x for x in range(3))
   1 |+x = {x for x in range(3)}
 2 2 | x = set(x for x in range(3))
@@ -27,7 +27,7 @@ C401.py:2:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
   = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | x = set(x for x in range(3))
 2   |-x = set(x for x in range(3))
   2 |+x = {x for x in range(3)}
@@ -46,7 +46,7 @@ C401.py:3:8: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
   = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | x = set(x for x in range(3))
 2 2 | x = set(x for x in range(3))
 3   |-y = f"{set(a if a < 6 else 0  for a in range(3))}"
@@ -65,7 +65,7 @@ C401.py:4:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
   = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | x = set(x for x in range(3))
 2 2 | x = set(x for x in range(3))
 3 3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
@@ -84,7 +84,7 @@ C401.py:5:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
   = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 2 2 | x = set(x for x in range(3))
 3 3 | y = f"{set(a if a < 6 else 0  for a in range(3))}"
 4 4 | _ = "{}".format(set(a if a < 6 else 0 for a in range(3)))
@@ -103,7 +103,7 @@ C401.py:12:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
    = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 9  9  |     return x
 10 10 | 
 11 11 | 
@@ -123,7 +123,7 @@ C401.py:13:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
    = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 10 10 | 
 11 11 | 
 12 12 | print(f'Hello {set(a for a in "abc")} World')
@@ -144,7 +144,7 @@ C401.py:14:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
    = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 | 
 12 12 | print(f'Hello {set(a for a in "abc")} World')
 13 13 | print(f"Hello {set(a for a in 'abc')} World")
@@ -164,7 +164,7 @@ C401.py:15:10: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
    = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 12 12 | print(f'Hello {set(a for a in "abc")} World')
 13 13 | print(f"Hello {set(a for a in 'abc')} World")
 14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
@@ -184,7 +184,7 @@ C401.py:15:34: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
    = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 12 12 | print(f'Hello {set(a for a in "abc")} World')
 13 13 | print(f"Hello {set(a for a in 'abc')} World")
 14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
@@ -205,7 +205,7 @@ C401.py:16:11: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
    = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 13 13 | print(f"Hello {set(a for a in 'abc')} World")
 14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
 15 15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
@@ -226,7 +226,7 @@ C401.py:16:35: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
    = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 13 13 | print(f"Hello {set(a for a in 'abc')} World")
 14 14 | print(f"Hello {set(f(a) for a in 'abc')} World")
 15 15 | print(f"{set(a for a in 'abc') - set(a for a in 'ab')}")
@@ -245,7 +245,7 @@ C401.py:20:12: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
    = help: Rewrite as a `set` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 17 17 | 
 18 18 | # The fix generated for this diagnostic is incorrect, as we add additional space
 19 19 | # around the set comprehension.

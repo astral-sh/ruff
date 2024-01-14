@@ -87,6 +87,12 @@ impl<'a> Binding<'a> {
         self.flags.intersects(BindingFlags::INVALID_ALL_OBJECT)
     }
 
+    /// Return `true` if this [`Binding`] represents an unpacked assignment (e.g., `x` in
+    /// `(x, y) = 1, 2`).
+    pub const fn is_unpacked_assignment(&self) -> bool {
+        self.flags.intersects(BindingFlags::UNPACKED_ASSIGNMENT)
+    }
+
     /// Return `true` if this [`Binding`] represents an unbound variable
     /// (e.g., `x` in `x = 1; del x`).
     pub const fn is_unbound(&self) -> bool {
@@ -212,7 +218,7 @@ impl<'a> Binding<'a> {
 bitflags! {
     /// Flags on a [`Binding`].
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-    pub struct BindingFlags: u8 {
+    pub struct BindingFlags: u16 {
         /// The binding represents an explicit re-export.
         ///
         /// For example, the binding could be `FastAPI` in:
@@ -284,6 +290,14 @@ bitflags! {
         /// _T = "This is a private variable"
         /// ```
         const PRIVATE_DECLARATION = 1 << 7;
+
+        /// The binding represents an unpacked assignment.
+        ///
+        /// For example, the binding could be `x` in:
+        /// ```python
+        /// (x, y) = 1, 2
+        /// ```
+        const UNPACKED_ASSIGNMENT = 1 << 8;
     }
 }
 
@@ -393,12 +407,6 @@ pub enum BindingKind<'a> {
     /// ```
     NamedExprAssignment,
 
-    /// A binding for a unpacking-based assignment, like `x` in:
-    /// ```python
-    /// x, y = (1, 2)
-    /// ```
-    UnpackedAssignment,
-
     /// A binding for a "standard" assignment, like `x` in:
     /// ```python
     /// x = 1
@@ -423,6 +431,13 @@ pub enum BindingKind<'a> {
     ///     ...
     /// ```
     LoopVar,
+
+    /// A binding for a with statement variable, like `x` in:
+    /// ```python
+    /// with open('foo.py') as x:
+    ///     ...
+    /// ```
+    WithItemVar,
 
     /// A binding for a global variable, like `x` in:
     /// ```python

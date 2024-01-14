@@ -19,16 +19,18 @@ expression: parse_ast
                     arguments: Arguments {
                         range: 7..32,
                         args: [
-                            Constant(
-                                ExprConstant {
+                            StringLiteral(
+                                ExprStringLiteral {
                                     range: 8..20,
-                                    value: Str(
-                                        StringConstant {
-                                            value: "positional",
-                                            unicode: false,
-                                            implicit_concatenated: false,
-                                        },
-                                    ),
+                                    value: StringLiteralValue {
+                                        inner: Single(
+                                            StringLiteral {
+                                                range: 8..20,
+                                                value: "positional",
+                                                unicode: false,
+                                            },
+                                        ),
+                                    },
                                 },
                             ),
                         ],
@@ -41,8 +43,8 @@ expression: parse_ast
                                         range: 22..29,
                                     },
                                 ),
-                                value: Constant(
-                                    ExprConstant {
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 30..31,
                                         value: Int(
                                             2,

@@ -89,3 +89,61 @@ x = [  #
 f"{ {'a': 1} }"
 f"{[ { {'a': 1} } ]}"
 f"normal { {f"{ { [1, 2] } }" } } normal"
+
+#: Okay
+ham[lower + offset : upper + offset]
+
+#: Okay
+ham[(lower + offset) : upper + offset]
+
+#: E203:1:19
+ham{lower + offset : upper + offset}
+
+#: E203:1:19
+ham[lower + offset  : upper + offset]
+
+#: Okay
+release_lines = history_file_lines[history_file_lines.index('## Unreleased') + 1: -1]
+
+#: Okay
+release_lines = history_file_lines[history_file_lines.index('## Unreleased') + 1 : -1]
+
+#: Okay
+ham[1:9], ham[1:9:3], ham[:9:3], ham[1::3], ham[1:9:]
+ham[lower:upper], ham[lower:upper:], ham[lower::step]
+ham[lower+offset : upper+offset]
+ham[: upper_fn(x) : step_fn(x)], ham[:: step_fn(x)]
+ham[lower + offset : upper + offset]
+
+#: E201:1:5
+ham[ : upper]
+
+#: Okay
+ham[lower + offset :: upper + offset]
+
+#: Okay
+ham[(lower + offset) :: upper + offset]
+
+#: Okay
+ham[lower + offset::upper + offset]
+
+#: E203:1:21
+ham[lower + offset : : upper + offset]
+
+#: E203:1:20
+ham[lower + offset: :upper + offset]
+
+#: E203:1:20
+ham[{lower + offset : upper + offset} : upper + offset]
+
+#: Okay
+ham[upper:]
+
+#: Okay
+ham[upper :]
+
+#: E202:1:12
+ham[upper : ]
+
+#: E203:1:10
+ham[upper  :]

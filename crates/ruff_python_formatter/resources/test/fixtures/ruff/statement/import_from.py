@@ -35,3 +35,5 @@ from a import \
     (  # comment
     bar,
 )
+
+from tqdm .  auto import tqdm

@@ -6,7 +6,6 @@ use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for needless exception names in `raise` statements.
@@ -32,6 +31,10 @@ use crate::registry::AsRule;
 ///     except ValueError:
 ///         raise
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it doesn't properly handle bound
+/// exceptions that are shadowed between the `except` and `raise` statements.
 #[violation]
 pub struct VerboseRaise;
 
@@ -96,12 +99,10 @@ pub(crate) fn verbose_raise(checker: &mut Checker, handlers: &[ExceptHandler]) {
                     if let Expr::Name(ast::ExprName { id, .. }) = exc.as_ref() {
                         if id == exception_name.as_str() {
                             let mut diagnostic = Diagnostic::new(VerboseRaise, exc.range());
-                            if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                    "raise".to_string(),
-                                    raise.range(),
-                                )));
-                            }
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                                "raise".to_string(),
+                                raise.range(),
+                            )));
                             checker.diagnostics.push(diagnostic);
                         }
                     }

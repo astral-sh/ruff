@@ -4,14 +4,14 @@ use anyhow::Result;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::{self as ast, Constant, Expr, Operator, ParameterWithDefault, Parameters};
+
+use ruff_python_ast::{self as ast, Expr, Operator, ParameterWithDefault, Parameters};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
+
 use crate::settings::types::PythonVersion;
 
 use super::super::typing::type_hint_explicitly_allows_none;
@@ -127,10 +127,7 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             let new_expr = Expr::BinOp(ast::ExprBinOp {
                 left: Box::new(expr.clone()),
                 op: Operator::BitOr,
-                right: Box::new(Expr::Constant(ast::ExprConstant {
-                    value: Constant::None,
-                    range: TextRange::default(),
-                })),
+                right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
                 range: TextRange::default(),
             });
             let content = checker.generator().expr(&new_expr);
@@ -177,21 +174,17 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
         .chain(&parameters.kwonlyargs)
     {
         let Some(default) = default else { continue };
-        if !is_const_none(default) {
+        if !default.is_none_literal_expr() {
             continue;
         }
         let Some(annotation) = &parameter.annotation else {
             continue;
         };
 
-        if let Expr::Constant(ast::ExprConstant {
-            range,
-            value: Constant::Str(string),
-        }) = annotation.as_ref()
-        {
+        if let Expr::StringLiteral(ast::ExprStringLiteral { range, value }) = annotation.as_ref() {
             // Quoted annotation.
             if let Ok((annotation, kind)) =
-                parse_type_annotation(string, *range, checker.locator().contents())
+                parse_type_annotation(value.to_str(), *range, checker.locator().contents())
             {
                 let Some(expr) = type_hint_explicitly_allows_none(
                     &annotation,
@@ -205,10 +198,8 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    if kind.is_simple() {
-                        diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-                    }
+                if kind.is_simple() {
+                    diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -226,9 +217,7 @@ pub(crate) fn implicit_optional(checker: &mut Checker, parameters: &Parameters) 
 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
-            }
+            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
             checker.diagnostics.push(diagnostic);
         }
     }

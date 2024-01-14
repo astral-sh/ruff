@@ -93,6 +93,56 @@ def docstring_that_ends_with_quote_and_a_line_break3():
     """
 
 
+class ByteDocstring:
+    b"""   has leading whitespace"""
+    first_statement = 1
+
+class CommentAfterDocstring1:
+    """Browse module classes and functions in IDLE."""
+    # This class is also the base class for pathbrowser.PathBrowser.
+
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring2:
+    """Browse module classes and functions in IDLE."""
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring3:
+    """Browse module classes and functions in IDLE."""
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring4:
+    """Browse module classes and functions in IDLE."""
+
+
+    # This class is also the base class for pathbrowser.PathBrowser.
+    def __init__(self):
+        pass
+
+
+class CommentAfterDocstring5:
+    """Browse module classes and functions in IDLE."""
+    # This class is also the base class for pathbrowser.PathBrowser.
+
+
+def f():
+    """Browse module classes and functions in IDLE."""
+    # ^ Do not insert a newline above here
+
+    pass
+
+
 class TabbedIndent:
 	def tabbed_indent(self):
 		"""check for correct tabbed formatting
@@ -100,3 +150,8 @@ class TabbedIndent:
 		Normal indented line
 		  	- autor
 		"""
+
+
+def single_quoted():
+    ' content\     '
+    return

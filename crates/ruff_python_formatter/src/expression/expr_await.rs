@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprAwait;
 
 use crate::expression::maybe_parenthesize_expression;
@@ -39,6 +39,7 @@ impl NeedsParentheses for ExprAwait {
             context.comments().ranges(),
             context.source(),
         ) {
+            // Prefer splitting the value if it is parenthesized.
             OptionalParentheses::Never
         } else {
             self.value.needs_parentheses(self.into(), context)

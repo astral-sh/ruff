@@ -1,0 +1,90 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+misplaced_bare_raise.py:30:5: PLE0704 Bare `raise` statement is not inside an exception handler
+   |
+29 | try:
+30 |     raise # [misplaced-bare-raise]
+   |     ^^^^^ PLE0704
+31 | except Exception:
+32 |     pass
+   |
+
+misplaced_bare_raise.py:36:9: PLE0704 Bare `raise` statement is not inside an exception handler
+   |
+34 | def f():
+35 |     try:
+36 |         raise # [misplaced-bare-raise]
+   |         ^^^^^ PLE0704
+37 |     except Exception:
+38 |         pass
+   |
+
+misplaced_bare_raise.py:41:5: PLE0704 Bare `raise` statement is not inside an exception handler
+   |
+40 | def g():
+41 |     raise # [misplaced-bare-raise]
+   |     ^^^^^ PLE0704
+42 | 
+43 | def h():
+   |
+
+misplaced_bare_raise.py:47:17: PLE0704 Bare `raise` statement is not inside an exception handler
+   |
+45 |         if True:
+46 |             def i():
+47 |                 raise # [misplaced-bare-raise]
+   |                 ^^^^^ PLE0704
+48 |     except Exception:
+49 |         pass
+   |
+
+misplaced_bare_raise.py:50:5: PLE0704 Bare `raise` statement is not inside an exception handler
+   |
+48 |     except Exception:
+49 |         pass
+50 |     raise # [misplaced-bare-raise]
+   |     ^^^^^ PLE0704
+51 | 
+52 | raise # [misplaced-bare-raise]
+   |
+
+misplaced_bare_raise.py:52:1: PLE0704 Bare `raise` statement is not inside an exception handler
+   |
+50 |     raise # [misplaced-bare-raise]
+51 | 
+52 | raise # [misplaced-bare-raise]
+   | ^^^^^ PLE0704
+53 | 
+54 | try:
+   |
+
+misplaced_bare_raise.py:58:9: PLE0704 Bare `raise` statement is not inside an exception handler
+   |
+56 | except:
+57 |     def i():
+58 |         raise # [misplaced-bare-raise]
+   |         ^^^^^ PLE0704
+59 | 
+60 | try:
+   |
+
+misplaced_bare_raise.py:64:9: PLE0704 Bare `raise` statement is not inside an exception handler
+   |
+62 | except:
+63 |     class C:
+64 |         raise # [misplaced-bare-raise]
+   |         ^^^^^ PLE0704
+65 | 
+66 | try:
+   |
+
+misplaced_bare_raise.py:71:5: PLE0704 Bare `raise` statement is not inside an exception handler
+   |
+69 |     pass
+70 | finally:
+71 |     raise # [misplaced-bare-raise]
+   |     ^^^^^ PLE0704
+   |
+
+

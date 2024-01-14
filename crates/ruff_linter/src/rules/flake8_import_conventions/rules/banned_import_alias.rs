@@ -27,6 +27,9 @@ use ruff_text_size::Ranged;
 ///
 /// tf.keras.backend
 /// ```
+///
+/// ## Options
+/// - `flake8-import-conventions.banned-aliases`
 #[violation]
 pub struct BannedImportAlias {
     name: String,

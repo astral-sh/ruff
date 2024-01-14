@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -122,7 +122,7 @@ impl fmt::Display for RemovalKind {
 
 /// Return `true` if a string contains duplicate characters, taking into account
 /// escapes.
-fn has_duplicates(s: &str) -> bool {
+fn has_duplicates(s: &ast::StringLiteralValue) -> bool {
     let mut escaped = false;
     let mut seen = FxHashSet::default();
     for ch in s.chars() {
@@ -146,18 +146,11 @@ pub(crate) fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Exp
     if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func {
         if matches!(
             value.as_ref(),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_) | Constant::Bytes(_),
-                ..
-            })
+            Expr::StringLiteral(_) | Expr::BytesLiteral(_)
         ) {
             if let Some(strip) = StripKind::from_str(attr.as_str()) {
-                if let Some(arg) = args.get(0) {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(value),
-                        ..
-                    }) = &arg
-                    {
+                if let Some(arg) = args.first() {
+                    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &arg {
                         if has_duplicates(value) {
                             let removal = if checker.settings.target_version >= PythonVersion::Py39
                             {

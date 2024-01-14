@@ -11,7 +11,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::importer::Importer;
-use crate::registry::Rule;
+
 use crate::settings::LinterSettings;
 
 /// ## What it does
@@ -90,7 +90,6 @@ fn add_required_import(
     python_ast: &Suite,
     locator: &Locator,
     stylist: &Stylist,
-    settings: &LinterSettings,
     source_type: PySourceType,
 ) -> Option<Diagnostic> {
     // Don't add imports to semantically-empty files.
@@ -116,12 +115,10 @@ fn add_required_import(
         MissingRequiredImport(required_import.to_string()),
         TextRange::default(),
     );
-    if settings.rules.should_fix(Rule::MissingRequiredImport) {
-        diagnostic.set_fix(Fix::safe_edit(
-            Importer::new(python_ast, locator, stylist)
-                .add_import(required_import, TextSize::default()),
-        ));
-    }
+    diagnostic.set_fix(Fix::safe_edit(
+        Importer::new(python_ast, locator, stylist)
+            .add_import(required_import, TextSize::default()),
+    ));
     Some(diagnostic)
 }
 
@@ -138,7 +135,7 @@ pub(crate) fn add_required_imports(
         .required_imports
         .iter()
         .flat_map(|required_import| {
-            let Ok(body) = parse_suite(required_import, "<filename>") else {
+            let Ok(body) = parse_suite(required_import) else {
                 error!("Failed to parse required import: `{}`", required_import);
                 return vec![];
             };
@@ -171,7 +168,6 @@ pub(crate) fn add_required_imports(
                             python_ast,
                             locator,
                             stylist,
-                            settings,
                             source_type,
                         )
                     })
@@ -189,7 +185,6 @@ pub(crate) fn add_required_imports(
                             python_ast,
                             locator,
                             stylist,
-                            settings,
                             source_type,
                         )
                     })

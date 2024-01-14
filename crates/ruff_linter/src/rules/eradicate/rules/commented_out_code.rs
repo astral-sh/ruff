@@ -3,7 +3,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 
-use crate::registry::Rule;
 use crate::settings::LinterSettings;
 
 use super::super::detection::comment_contains_code;
@@ -67,11 +66,9 @@ pub(crate) fn commented_out_code(
         if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
             let mut diagnostic = Diagnostic::new(CommentedOutCode, *range);
 
-            if settings.rules.should_fix(Rule::CommentedOutCode) {
-                diagnostic.set_fix(Fix::display_edit(Edit::range_deletion(
-                    locator.full_lines_range(*range),
-                )));
-            }
+            diagnostic.set_fix(Fix::display_only_edit(Edit::range_deletion(
+                locator.full_lines_range(*range),
+            )));
             diagnostics.push(diagnostic);
         }
     }

@@ -1,6 +1,6 @@
 use ruff_formatter::{write, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{Constant, Expr, ExprAttribute, ExprConstant};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{Expr, ExprAttribute, ExprNumberLiteral, Number};
 use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -38,14 +38,13 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
 
         let format_inner = format_with(|f: &mut PyFormatter| {
             let parenthesize_value =
-                // If the value is an integer, we need to parenthesize it to avoid a syntax error.
-                matches!(
-                    value.as_ref(),
-                    Expr::Constant(ExprConstant {
-                        value: Constant::Int(_) | Constant::Float(_),
-                        ..
-                    })
-                ) || is_expression_parenthesized(value.into(), f.context().comments().ranges(), f.context().source());
+                is_base_ten_number_literal(value.as_ref(), f.context().source()) || {
+                    is_expression_parenthesized(
+                        value.into(),
+                        f.context().comments().ranges(),
+                        f.context().source(),
+                    )
+                };
 
             if call_chain_layout == CallChainLayout::Fluent {
                 if parenthesize_value {
@@ -151,8 +150,6 @@ impl NeedsParentheses for ExprAttribute {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
-        } else if self.value.is_name_expr() {
-            OptionalParentheses::BestFit
         } else if is_expression_parenthesized(
             self.value.as_ref().into(),
             context.comments().ranges(),
@@ -162,5 +159,25 @@ impl NeedsParentheses for ExprAttribute {
         } else {
             self.value.needs_parentheses(self.into(), context)
         }
+    }
+}
+
+// Non Hex, octal or binary number literals need parentheses to disambiguate the attribute `.` from
+// a decimal point. Floating point numbers don't strictly need parentheses but it reads better (rather than 0.0.test()).
+fn is_base_ten_number_literal(expr: &Expr, source: &str) -> bool {
+    if let Some(ExprNumberLiteral { value, range }) = expr.as_number_literal_expr() {
+        match value {
+            Number::Float(_) => true,
+            Number::Int(_) => {
+                let text = &source[*range];
+                !matches!(
+                    text.as_bytes().get(0..2),
+                    Some([b'0', b'x' | b'X' | b'o' | b'O' | b'b' | b'B'])
+                )
+            }
+            Number::Complex { .. } => false,
+        }
+    } else {
+        false
     }
 }

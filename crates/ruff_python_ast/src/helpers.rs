@@ -1,20 +1,22 @@
 use std::borrow::Cow;
 use std::path::Path;
 
-use ruff_python_trivia::CommentRanges;
-use ruff_source_file::Locator;
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
+use ruff_python_trivia::CommentRanges;
+use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::call_path::CallPath;
-use crate::node::AnyNodeRef;
 use crate::parenthesize::parenthesized_range;
-use crate::statement_visitor::{walk_body, walk_stmt, StatementVisitor};
+use crate::statement_visitor::StatementVisitor;
+use crate::visitor::Visitor;
 use crate::{
-    self as ast, Arguments, CmpOp, Constant, ExceptHandler, Expr, MatchCase, Pattern, Stmt,
-    TypeParam,
+    self as ast, Arguments, CmpOp, ExceptHandler, Expr, FStringElement, MatchCase, Operator,
+    Pattern, Stmt, TypeParam,
 };
+use crate::{AnyNodeRef, ExprContext};
 
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
 pub const fn is_compound_statement(stmt: &Stmt) -> bool {
@@ -69,7 +71,12 @@ where
         if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = expr {
             if !matches!(
                 left.as_ref(),
-                Expr::Constant(_)
+                Expr::StringLiteral(_)
+                    | Expr::BytesLiteral(_)
+                    | Expr::NumberLiteral(_)
+                    | Expr::BooleanLiteral(_)
+                    | Expr::NoneLiteral(_)
+                    | Expr::EllipsisLiteral(_)
                     | Expr::FString(_)
                     | Expr::List(_)
                     | Expr::Tuple(_)
@@ -83,7 +90,12 @@ where
             }
             if !matches!(
                 right.as_ref(),
-                Expr::Constant(_)
+                Expr::StringLiteral(_)
+                    | Expr::BytesLiteral(_)
+                    | Expr::NumberLiteral(_)
+                    | Expr::BooleanLiteral(_)
+                    | Expr::NoneLiteral(_)
+                    | Expr::EllipsisLiteral(_)
                     | Expr::FString(_)
                     | Expr::List(_)
                     | Expr::Tuple(_)
@@ -122,10 +134,12 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
         return true;
     }
     match expr {
-        Expr::BoolOp(ast::ExprBoolOp { values, .. })
-        | Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
             values.iter().any(|expr| any_over_expr(expr, func))
         }
+        Expr::FString(ast::ExprFString { value, .. }) => value
+            .elements()
+            .any(|expr| any_over_f_string_element(expr, func)),
         Expr::NamedExpr(ast::ExprNamedExpr {
             target,
             value,
@@ -218,14 +232,6 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
                     .iter()
                     .any(|keyword| any_over_expr(&keyword.value, func))
         }
-        Expr::FormattedValue(ast::ExprFormattedValue {
-            value, format_spec, ..
-        }) => {
-            any_over_expr(value, func)
-                || format_spec
-                    .as_ref()
-                    .is_some_and(|value| any_over_expr(value, func))
-        }
         Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
             any_over_expr(value, func) || any_over_expr(slice, func)
         }
@@ -245,8 +251,14 @@ pub fn any_over_expr(expr: &Expr, func: &dyn Fn(&Expr) -> bool) -> bool {
                     .as_ref()
                     .is_some_and(|value| any_over_expr(value, func))
         }
-        Expr::Name(_) | Expr::Constant(_) => false,
-        Expr::IpyEscapeCommand(_) => false,
+        Expr::Name(_)
+        | Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
+        | Expr::IpyEscapeCommand(_) => false,
     }
 }
 
@@ -293,6 +305,27 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
         Pattern::MatchOr(ast::PatternMatchOr { patterns, range: _ }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, func)),
+    }
+}
+
+pub fn any_over_f_string_element(
+    element: &ast::FStringElement,
+    func: &dyn Fn(&Expr) -> bool,
+) -> bool {
+    match element {
+        ast::FStringElement::Literal(_) => false,
+        ast::FStringElement::Expression(ast::FStringExpressionElement {
+            expression,
+            format_spec,
+            ..
+        }) => {
+            any_over_expr(expression, func)
+                || format_spec.as_ref().is_some_and(|spec| {
+                    spec.elements
+                        .iter()
+                        .any(|spec_element| any_over_f_string_element(spec_element, func))
+                })
+        }
     }
 }
 
@@ -557,19 +590,16 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
 pub const fn is_singleton(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::None | Constant::Bool(_) | Constant::Ellipsis,
-            ..
-        })
+        Expr::NoneLiteral(_) | Expr::BooleanLiteral(_) | Expr::EllipsisLiteral(_)
     )
 }
 
-/// Return `true` if the [`Expr`] is a constant or tuple of constants.
+/// Return `true` if the [`Expr`] is a literal or tuple of literals.
 pub fn is_constant(expr: &Expr) -> bool {
-    match expr {
-        Expr::Constant(_) => true,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant),
-        _ => false,
+    if let Expr::Tuple(ast::ExprTuple { elts, .. }) = expr {
+        elts.iter().all(is_constant)
+    } else {
+        expr.is_literal_expr()
     }
 }
 
@@ -578,36 +608,32 @@ pub fn is_constant_non_singleton(expr: &Expr) -> bool {
     is_constant(expr) && !is_singleton(expr)
 }
 
-/// Return `true` if an [`Expr`] is `None`.
-pub const fn is_const_none(expr: &Expr) -> bool {
-    matches!(
-        expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            ..
-        }),
-    )
-}
-
-/// Return `true` if an [`Expr`] is `True`.
+/// Return `true` if an [`Expr`] is a literal `True`.
 pub const fn is_const_true(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bool(true),
-            ..
-        }),
+        Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. }),
     )
 }
 
-/// Return `true` if an [`Expr`] is `False`.
+/// Return `true` if an [`Expr`] is a literal `False`.
 pub const fn is_const_false(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bool(false),
-            ..
-        }),
+        Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: false, .. }),
+    )
+}
+
+/// Return `true` if the [`Expr`] is a mutable iterable initializer, like `{}` or `[]`.
+pub const fn is_mutable_iterable_initializer(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Set(_)
+            | Expr::SetComp(_)
+            | Expr::List(_)
+            | Expr::ListComp(_)
+            | Expr::Dict(_)
+            | Expr::DictComp(_)
     )
 }
 
@@ -869,13 +895,54 @@ pub fn resolve_imported_module_path<'a>(
     Some(Cow::Owned(qualified_path))
 }
 
+/// A [`Visitor`] to collect all [`Expr::Name`] nodes in an AST.
+#[derive(Debug, Default)]
+pub struct NameFinder<'a> {
+    /// A map from identifier to defining expression.
+    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+}
+
+impl<'a, 'b> Visitor<'b> for NameFinder<'a>
+where
+    'b: 'a,
+{
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(name) = expr {
+            self.names.insert(&name.id, name);
+        }
+        crate::visitor::walk_expr(self, expr);
+    }
+}
+
+/// A [`Visitor`] to collect all stored [`Expr::Name`] nodes in an AST.
+#[derive(Debug, Default)]
+pub struct StoredNameFinder<'a> {
+    /// A map from identifier to defining expression.
+    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+}
+
+impl<'a, 'b> Visitor<'b> for StoredNameFinder<'a>
+where
+    'b: 'a,
+{
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(name) = expr {
+            if name.ctx.is_store() {
+                self.names.insert(&name.id, name);
+            }
+        }
+        crate::visitor::walk_expr(self, expr);
+    }
+}
+
 /// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<&'a ast::StmtReturn>,
+    pub is_generator: bool,
 }
 
-impl<'a, 'b> StatementVisitor<'b> for ReturnStatementVisitor<'a>
+impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
 where
     'b: 'a,
 {
@@ -885,7 +952,15 @@ where
                 // Don't recurse.
             }
             Stmt::Return(stmt) => self.returns.push(stmt),
-            _ => walk_stmt(self, stmt),
+            _ => crate::visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'b Expr) {
+        if let Expr::Yield(_) | Expr::YieldFrom(_) = expr {
+            self.is_generator = true;
+        } else {
+            crate::visitor::walk_expr(self, expr);
         }
     }
 }
@@ -916,7 +991,7 @@ where
                 elif_else_clauses,
                 ..
             }) => {
-                walk_body(self, body);
+                crate::statement_visitor::walk_body(self, body);
                 for clause in elif_else_clauses {
                     self.visit_elif_else_clause(clause);
                 }
@@ -924,11 +999,11 @@ where
             Stmt::While(ast::StmtWhile { body, .. })
             | Stmt::With(ast::StmtWith { body, .. })
             | Stmt::For(ast::StmtFor { body, .. }) => {
-                walk_body(self, body);
+                crate::statement_visitor::walk_body(self, body);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
-                    walk_body(self, &case.body);
+                    crate::statement_visitor::walk_body(self, &case.body);
                 }
             }
             _ => {}
@@ -936,16 +1011,33 @@ where
     }
 }
 
+/// A [`Visitor`] that detects the presence of `await` expressions in the current scope.
+#[derive(Debug, Default)]
+pub struct AwaitVisitor {
+    pub seen_await: bool,
+}
+
+impl Visitor<'_> for AwaitVisitor {
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        match stmt {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
+            _ => crate::visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &Expr) {
+        if let Expr::Await(ast::ExprAwait { .. }) = expr {
+            self.seen_await = true;
+        } else {
+            crate::visitor::walk_expr(self, expr);
+        }
+    }
+}
+
 /// Return `true` if a `Stmt` is a docstring.
 pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
     if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
-        matches!(
-            value.as_ref(),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str { .. },
-                ..
-            })
-        )
+        value.is_string_literal_expr()
     } else {
         false
     }
@@ -1038,73 +1130,96 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
 
 #[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Truthiness {
-    // An expression evaluates to `False`.
+    /// The expression is `True`.
+    True,
+    /// The expression is `False`.
+    False,
+    /// The expression evaluates to a `False`-like value (e.g., `None`, `0`, `[]`, `""`).
     Falsey,
-    // An expression evaluates to `True`.
+    /// The expression evaluates to a `True`-like value (e.g., `1`, `"foo"`).
     Truthy,
-    // An expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
+    /// The expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
     Unknown,
 }
 
-impl From<Option<bool>> for Truthiness {
-    fn from(value: Option<bool>) -> Self {
-        match value {
-            Some(true) => Truthiness::Truthy,
-            Some(false) => Truthiness::Falsey,
-            None => Truthiness::Unknown,
-        }
-    }
-}
-
-impl From<Truthiness> for Option<bool> {
-    fn from(truthiness: Truthiness) -> Self {
-        match truthiness {
-            Truthiness::Truthy => Some(true),
-            Truthiness::Falsey => Some(false),
-            Truthiness::Unknown => None,
-        }
-    }
-}
-
 impl Truthiness {
+    /// Return the truthiness of an expression.
     pub fn from_expr<F>(expr: &Expr, is_builtin: F) -> Self
     where
         F: Fn(&str) -> bool,
     {
         match expr {
-            Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                Constant::Bool(value) => Some(*value),
-                Constant::None => Some(false),
-                Constant::Str(ast::StringConstant { value, .. }) => Some(!value.is_empty()),
-                Constant::Bytes(bytes) => Some(!bytes.is_empty()),
-                Constant::Int(int) => Some(*int != 0),
-                Constant::Float(float) => Some(*float != 0.0),
-                Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
-                Constant::Ellipsis => Some(true),
-            },
-            Expr::FString(ast::ExprFString { values, .. }) => {
-                if values.is_empty() {
-                    Some(false)
-                } else if values.iter().any(|value| {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(ast::StringConstant { value, .. }),
-                        ..
-                    }) = &value
-                    {
-                        !value.is_empty()
-                    } else {
-                        false
-                    }
-                }) {
-                    Some(true)
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+                if value.is_empty() {
+                    Self::Falsey
                 } else {
-                    None
+                    Self::Truthy
+                }
+            }
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+                if value.is_empty() {
+                    Self::Falsey
+                } else {
+                    Self::Truthy
+                }
+            }
+            Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+                ast::Number::Int(int) => {
+                    if *int == 0 {
+                        Self::Falsey
+                    } else {
+                        Self::Truthy
+                    }
+                }
+                ast::Number::Float(float) => {
+                    if *float == 0.0 {
+                        Self::Falsey
+                    } else {
+                        Self::Truthy
+                    }
+                }
+                ast::Number::Complex { real, imag, .. } => {
+                    if *real == 0.0 && *imag == 0.0 {
+                        Self::Falsey
+                    } else {
+                        Self::Truthy
+                    }
+                }
+            },
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                if *value {
+                    Self::True
+                } else {
+                    Self::False
+                }
+            }
+            Expr::NoneLiteral(_) => Self::Falsey,
+            Expr::EllipsisLiteral(_) => Self::Truthy,
+            Expr::FString(f_string) => {
+                if is_empty_f_string(f_string) {
+                    Self::Falsey
+                } else if is_non_empty_f_string(f_string) {
+                    Self::Truthy
+                } else {
+                    Self::Unknown
                 }
             }
             Expr::List(ast::ExprList { elts, .. })
             | Expr::Set(ast::ExprSet { elts, .. })
-            | Expr::Tuple(ast::ExprTuple { elts, .. }) => Some(!elts.is_empty()),
-            Expr::Dict(ast::ExprDict { keys, .. }) => Some(!keys.is_empty()),
+            | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                if elts.is_empty() {
+                    Self::Falsey
+                } else {
+                    Self::Truthy
+                }
+            }
+            Expr::Dict(ast::ExprDict { keys, .. }) => {
+                if keys.is_empty() {
+                    Self::Falsey
+                } else {
+                    Self::Truthy
+                }
+            }
             Expr::Call(ast::ExprCall {
                 func,
                 arguments: Arguments { args, keywords, .. },
@@ -1114,24 +1229,124 @@ impl Truthiness {
                     if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         if args.is_empty() && keywords.is_empty() {
                             // Ex) `list()`
-                            Some(false)
+                            Self::Falsey
                         } else if args.len() == 1 && keywords.is_empty() {
                             // Ex) `list([1, 2, 3])`
-                            Self::from_expr(&args[0], is_builtin).into()
+                            Self::from_expr(&args[0], is_builtin)
                         } else {
-                            None
+                            Self::Unknown
                         }
                     } else {
-                        None
+                        Self::Unknown
                     }
                 } else {
-                    None
+                    Self::Unknown
                 }
             }
-            _ => None,
+            _ => Self::Unknown,
         }
-        .into()
     }
+
+    pub fn into_bool(self) -> Option<bool> {
+        match self {
+            Self::True | Self::Truthy => Some(true),
+            Self::False | Self::Falsey => Some(false),
+            Self::Unknown => None,
+        }
+    }
+}
+
+/// Returns `true` if the expression definitely resolves to a non-empty string, when used as an
+/// f-string expression, or `false` if the expression may resolve to an empty string.
+fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
+    fn inner(expr: &Expr) -> bool {
+        match expr {
+            // When stringified, these expressions are always non-empty.
+            Expr::Lambda(_) => true,
+            Expr::Dict(_) => true,
+            Expr::Set(_) => true,
+            Expr::ListComp(_) => true,
+            Expr::SetComp(_) => true,
+            Expr::DictComp(_) => true,
+            Expr::Compare(_) => true,
+            Expr::NumberLiteral(_) => true,
+            Expr::BooleanLiteral(_) => true,
+            Expr::NoneLiteral(_) => true,
+            Expr::EllipsisLiteral(_) => true,
+            Expr::List(_) => true,
+            Expr::Tuple(_) => true,
+
+            // These expressions must resolve to the inner expression.
+            Expr::IfExp(ast::ExprIfExp { body, orelse, .. }) => inner(body) && inner(orelse),
+            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => inner(value),
+
+            // These expressions are complex. We can't determine whether they're empty or not.
+            Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
+            Expr::BinOp(ast::ExprBinOp { .. }) => false,
+            Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
+            Expr::GeneratorExp(_) => false,
+            Expr::Await(_) => false,
+            Expr::Yield(_) => false,
+            Expr::YieldFrom(_) => false,
+            Expr::Call(_) => false,
+            Expr::Attribute(_) => false,
+            Expr::Subscript(_) => false,
+            Expr::Starred(_) => false,
+            Expr::Name(_) => false,
+            Expr::Slice(_) => false,
+            Expr::IpyEscapeCommand(_) => false,
+
+            // These literals may or may not be empty.
+            Expr::FString(f_string) => is_non_empty_f_string(f_string),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+        }
+    }
+
+    expr.value.iter().any(|part| match part {
+        ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
+        ast::FStringPart::FString(f_string) => {
+            f_string.elements.iter().all(|element| match element {
+                FStringElement::Literal(string_literal) => !string_literal.is_empty(),
+                FStringElement::Expression(f_string) => inner(&f_string.expression),
+            })
+        }
+    })
+}
+
+/// Returns `true` if the expression definitely resolves to the empty string, when used as an f-string
+/// expression.
+fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
+    fn inner(expr: &Expr) -> bool {
+        match expr {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                value
+                    .elements()
+                    .all(|f_string_element| match f_string_element {
+                        FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
+                            value.is_empty()
+                        }
+                        FStringElement::Expression(ast::FStringExpressionElement {
+                            expression,
+                            ..
+                        }) => inner(expression),
+                    })
+            }
+            _ => false,
+        }
+    }
+
+    expr.value.iter().all(|part| match part {
+        ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
+        ast::FStringPart::FString(f_string) => {
+            f_string.elements.iter().all(|element| match element {
+                FStringElement::Literal(string_literal) => string_literal.is_empty(),
+                FStringElement::Expression(f_string) => inner(&f_string.expression),
+            })
+        }
+    })
 }
 
 pub fn generate_comparison(
@@ -1186,6 +1401,82 @@ pub fn generate_comparison(
     contents
 }
 
+/// Format the expression as a PEP 604-style optional.
+pub fn pep_604_optional(expr: &Expr) -> Expr {
+    ast::ExprBinOp {
+        left: Box::new(expr.clone()),
+        op: Operator::BitOr,
+        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
+        range: TextRange::default(),
+    }
+    .into()
+}
+
+/// Format the expressions as a PEP 604-style union.
+pub fn pep_604_union(elts: &[Expr]) -> Expr {
+    match elts {
+        [] => Expr::Tuple(ast::ExprTuple {
+            elts: vec![],
+            ctx: ExprContext::Load,
+            range: TextRange::default(),
+        }),
+        [Expr::Tuple(ast::ExprTuple { elts, .. })] => pep_604_union(elts),
+        [elt] => elt.clone(),
+        [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+            left: Box::new(pep_604_union(rest)),
+            op: Operator::BitOr,
+            right: Box::new(pep_604_union(&[elt.clone()])),
+            range: TextRange::default(),
+        }),
+    }
+}
+
+/// Format the expression as a `typing.Optional`-style optional.
+pub fn typing_optional(elt: Expr, binding: String) -> Expr {
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding,
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(elt),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
+}
+
+/// Format the expressions as a `typing.Union`-style union.
+pub fn typing_union(elts: &[Expr], binding: String) -> Expr {
+    fn tuple(elts: &[Expr], binding: String) -> Expr {
+        match elts {
+            [] => Expr::Tuple(ast::ExprTuple {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            }),
+            [Expr::Tuple(ast::ExprTuple { elts, .. })] => typing_union(elts, binding),
+            [elt] => elt.clone(),
+            [rest @ .., elt] => Expr::BinOp(ast::ExprBinOp {
+                left: Box::new(tuple(rest, binding)),
+                op: Operator::BitOr,
+                right: Box::new(elt.clone()),
+                range: TextRange::default(),
+            }),
+        }
+    }
+
+    Expr::Subscript(ast::ExprSubscript {
+        value: Box::new(Expr::Name(ast::ExprName {
+            id: binding.clone(),
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+        })),
+        slice: Box::new(tuple(elts, binding)),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -1196,8 +1487,9 @@ mod tests {
 
     use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
     use crate::{
-        Constant, Expr, ExprConstant, ExprContext, ExprName, Identifier, Int, Stmt, StmtTypeAlias,
-        TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
+        Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number, Stmt,
+        StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+        TypeParams,
     };
 
     #[test]
@@ -1245,16 +1537,16 @@ mod tests {
             range: TextRange::default(),
             ctx: ExprContext::Load,
         });
-        let constant_one = Expr::Constant(ExprConstant {
-            value: Constant::Int(1.into()),
+        let constant_one = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(1.into()),
             range: TextRange::default(),
         });
-        let constant_two = Expr::Constant(ExprConstant {
-            value: Constant::Int(2.into()),
+        let constant_two = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(2.into()),
             range: TextRange::default(),
         });
-        let constant_three = Expr::Constant(ExprConstant {
-            value: Constant::Int(3.into()),
+        let constant_three = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(3.into()),
             range: TextRange::default(),
         });
         let type_var_one = TypeParam::TypeVar(TypeParamTypeVar {
@@ -1295,8 +1587,8 @@ mod tests {
         });
         assert!(!any_over_type_param(&type_var_no_bound, &|_expr| true));
 
-        let bound = Expr::Constant(ExprConstant {
-            value: Constant::Int(Int::ONE),
+        let bound = Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(Int::ONE),
             range: TextRange::default(),
         });
 

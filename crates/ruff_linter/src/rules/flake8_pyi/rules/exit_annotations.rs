@@ -8,12 +8,11 @@ use smallvec::SmallVec;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for incorrect function signatures on `__exit__` and `__aexit__`
@@ -175,13 +174,11 @@ fn check_short_args_list(checker: &mut Checker, parameters: &Parameters, func_ki
                 annotation.range(),
             );
 
-            if checker.patch(diagnostic.kind.rule()) {
-                if checker.semantic().is_builtin("object") {
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                        "object".to_string(),
-                        annotation.range(),
-                    )));
-                }
+            if checker.semantic().is_builtin("object") {
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "object".to_string(),
+                    annotation.range(),
+                )));
             }
 
             checker.diagnostics.push(diagnostic);
@@ -247,15 +244,23 @@ fn non_none_annotation_element<'a>(
 ) -> Option<&'a Expr> {
     // E.g., `typing.Union` or `typing.Optional`
     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = annotation {
-        if semantic.match_typing_expr(value, "Optional") {
-            return if is_const_none(slice) {
+        let call_path = semantic.resolve_call_path(value);
+
+        if call_path
+            .as_ref()
+            .is_some_and(|value| semantic.match_typing_call_path(value, "Optional"))
+        {
+            return if slice.is_none_literal_expr() {
                 None
             } else {
                 Some(slice)
             };
         }
 
-        if !semantic.match_typing_expr(value, "Union") {
+        if !call_path
+            .as_ref()
+            .is_some_and(|value| semantic.match_typing_call_path(value, "Union"))
+        {
             return None;
         }
 
@@ -267,7 +272,7 @@ fn non_none_annotation_element<'a>(
             return None;
         };
 
-        return match (is_const_none(left), is_const_none(right)) {
+        return match (left.is_none_literal_expr(), right.is_none_literal_expr()) {
             (false, true) => Some(left),
             (true, false) => Some(right),
             (true, true) => None,
@@ -283,11 +288,11 @@ fn non_none_annotation_element<'a>(
         ..
     }) = annotation
     {
-        if !is_const_none(left) {
+        if !left.is_none_literal_expr() {
             return Some(left);
         }
 
-        if !is_const_none(right) {
+        if !right.is_none_literal_expr() {
             return Some(right);
         }
 

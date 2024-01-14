@@ -17,7 +17,7 @@ class Test:
 c = 30
 
 while a == 10:
-    ...
+    print(a)
 
     # trailing comment with one line before
 
@@ -26,7 +26,7 @@ while a == 10:
 d = 40
 
 while b == 20:
-    ...
+    print(b)
     # no empty line before
 
 e = 50  # one empty line before

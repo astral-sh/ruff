@@ -154,7 +154,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope, diagnostics: &mut 
             exceptions.intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
         let multiple = imports.len() > 1;
 
-        let fix = if !in_init && !in_except_handler && checker.patch(Rule::UnusedImport) {
+        let fix = if !in_init && !in_except_handler {
             fix_imports(checker, node_id, &imports).ok()
         } else {
             None

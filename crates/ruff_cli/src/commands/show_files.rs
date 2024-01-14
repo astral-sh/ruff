@@ -5,7 +5,7 @@ use anyhow::Result;
 use itertools::Itertools;
 
 use ruff_linter::warn_user_once;
-use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile};
 
 use crate::args::CliOverrides;
 
@@ -25,12 +25,13 @@ pub(crate) fn show_files(
     }
 
     // Print the list of files.
-    for entry in paths
-        .iter()
+    for path in paths
+        .into_iter()
         .flatten()
-        .sorted_by(|a, b| a.path().cmp(b.path()))
+        .map(ResolvedFile::into_path)
+        .sorted_unstable()
     {
-        writeln!(writer, "{}", entry.path().to_string_lossy())?;
+        writeln!(writer, "{}", path.to_string_lossy())?;
     }
 
     Ok(())

@@ -260,24 +260,6 @@ impl<'a> Escape for UnicodeEscape<'a> {
     }
 }
 
-#[cfg(test)]
-mod unicode_escape_tests {
-    use super::*;
-
-    #[test]
-    fn changed() {
-        fn test(s: &str) -> bool {
-            UnicodeEscape::new_repr(s).changed()
-        }
-        assert!(!test("hello"));
-        assert!(!test("'hello'"));
-        assert!(!test("\"hello\""));
-
-        assert!(test("'\"hello"));
-        assert!(test("hello\n"));
-    }
-}
-
 pub struct AsciiEscape<'a> {
     source: &'a [u8],
     layout: EscapeLayout,
@@ -415,12 +397,10 @@ impl<'a> Escape for AsciiEscape<'a> {
     fn layout(&self) -> &EscapeLayout {
         &self.layout
     }
-    #[allow(unsafe_code)]
     fn write_source(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        formatter.write_str(unsafe {
-            // SAFETY: this function must be called only when source is printable ascii characters
-            std::str::from_utf8_unchecked(self.source)
-        })
+        // OK because function must be called only when source is printable ascii characters.
+        let string = std::str::from_utf8(self.source).expect("ASCII bytes");
+        formatter.write_str(string)
     }
 
     #[cold]
@@ -453,5 +433,23 @@ impl BytesRepr<'_, '_> {
 impl std::fmt::Display for BytesRepr<'_, '_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.write(formatter)
+    }
+}
+
+#[cfg(test)]
+mod unicode_escape_tests {
+    use super::*;
+
+    #[test]
+    fn changed() {
+        fn test(s: &str) -> bool {
+            UnicodeEscape::new_repr(s).changed()
+        }
+        assert!(!test("hello"));
+        assert!(!test("'hello'"));
+        assert!(!test("\"hello\""));
+
+        assert!(test("'\"hello"));
+        assert!(test("hello\n"));
     }
 }

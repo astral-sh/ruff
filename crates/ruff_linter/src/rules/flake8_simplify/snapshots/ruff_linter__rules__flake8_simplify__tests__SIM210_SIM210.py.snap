@@ -10,7 +10,7 @@ SIM210.py:1:5: SIM210 [*] Use `bool(...)` instead of `True if ... else False`
   |
   = help: Replace with `bool(...)
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1   |-a = True if b else False  # SIM210
   1 |+a = bool(b)  # SIM210
 2 2 | 
@@ -28,7 +28,7 @@ SIM210.py:3:5: SIM210 [*] Remove unnecessary `True if ... else False`
   |
   = help: Remove unnecessary `True if ... else False`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | a = True if b else False  # SIM210
 2 2 | 
 3   |-a = True if b != c else False  # SIM210
@@ -48,7 +48,7 @@ SIM210.py:5:5: SIM210 [*] Use `bool(...)` instead of `True if ... else False`
   |
   = help: Replace with `bool(...)
 
-ℹ Suggested fix
+ℹ Unsafe fix
 2 2 | 
 3 3 | a = True if b != c else False  # SIM210
 4 4 | 
@@ -77,7 +77,7 @@ SIM210.py:19:11: SIM210 [*] Remove unnecessary `True if ... else False`
    |
    = help: Remove unnecessary `True if ... else False`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 16 16 | 
 17 17 | 
 18 18 | # Regression test for: https://github.com/astral-sh/ruff/issues/7076

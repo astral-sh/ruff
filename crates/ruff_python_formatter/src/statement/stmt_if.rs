@@ -1,5 +1,5 @@
 use ruff_formatter::{format_args, write};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{ElifElseClause, StmtIf};
 
 use crate::comments::SourceComment;

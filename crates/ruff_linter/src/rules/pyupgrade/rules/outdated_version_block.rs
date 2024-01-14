@@ -3,14 +3,15 @@ use std::cmp::Ordering;
 use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::stmt_if::{if_elif_branches, BranchKind, IfElifBranch};
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, CmpOp, Constant, ElifElseClause, Expr, Int, StmtIf};
+use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Int, StmtIf};
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::delete_stmt;
-use crate::registry::AsRule;
+
 use crate::rules::pyupgrade::fixes::adjust_indentation;
 use crate::settings::types::PythonVersion;
 
@@ -94,9 +95,10 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
             continue;
         };
 
+        // Detect `sys.version_info`, along with slices (like `sys.version_info[:2]`).
         if !checker
             .semantic()
-            .resolve_call_path(left)
+            .resolve_call_path(map_subscript(left))
             .is_some_and(|call_path| matches!(call_path.as_slice(), ["sys", "version_info"]))
         {
             continue;
@@ -104,12 +106,18 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
 
         match comparison {
             Expr::Tuple(ast::ExprTuple { elts, .. }) => match op {
-                CmpOp::Lt | CmpOp::LtE => {
+                CmpOp::Lt | CmpOp::LtE | CmpOp::Gt | CmpOp::GtE => {
                     let Some(version) = extract_version(elts) else {
                         return;
                     };
                     let target = checker.settings.target_version;
-                    match compare_version(&version, target, op == &CmpOp::LtE) {
+                    match version_always_less_than(
+                        &version,
+                        target,
+                        // `x <= y` and `x > y` are cases where `x == y` will not stop the comparison
+                        // from always evaluating to true or false respectively
+                        op.is_lt_e() || op.is_gt(),
+                    ) {
                         Ok(false) => {}
                         Ok(true) => {
                             let mut diagnostic = Diagnostic::new(
@@ -118,44 +126,12 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                                 },
                                 branch.test.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                if let Some(fix) =
-                                    fix_always_false_branch(checker, stmt_if, &branch)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
-                            }
-                            checker.diagnostics.push(diagnostic);
-                        }
-                        Err(_) => {
-                            checker.diagnostics.push(Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Invalid,
-                                },
-                                comparison.range(),
-                            ));
-                        }
-                    }
-                }
-                CmpOp::Gt | CmpOp::GtE => {
-                    let Some(version) = extract_version(elts) else {
-                        return;
-                    };
-                    let target = checker.settings.target_version;
-                    match compare_version(&version, target, op == &CmpOp::GtE) {
-                        Ok(false) => {}
-                        Ok(true) => {
-                            let mut diagnostic = Diagnostic::new(
-                                OutdatedVersionBlock {
-                                    reason: Reason::Outdated,
-                                },
-                                branch.test.range(),
-                            );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
+                            if let Some(fix) = if op.is_lt() || op.is_lt_e() {
+                                fix_always_false_branch(checker, stmt_if, &branch)
+                            } else {
+                                fix_always_true_branch(checker, stmt_if, &branch)
+                            } {
+                                diagnostic.set_fix(fix);
                             }
                             checker.diagnostics.push(diagnostic);
                         }
@@ -171,8 +147,8 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                 }
                 _ => {}
             },
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(int),
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(int),
                 ..
             }) => {
                 if op == &CmpOp::Eq {
@@ -184,12 +160,8 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                                 },
                                 branch.test.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                if let Some(fix) =
-                                    fix_always_false_branch(checker, stmt_if, &branch)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
+                            if let Some(fix) = fix_always_false_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
                             }
                             checker.diagnostics.push(diagnostic);
                         }
@@ -200,11 +172,8 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
                                 },
                                 branch.test.range(),
                             );
-                            if checker.patch(diagnostic.kind.rule()) {
-                                if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch)
-                                {
-                                    diagnostic.set_fix(fix);
-                                }
+                            if let Some(fix) = fix_always_true_branch(checker, stmt_if, &branch) {
+                                diagnostic.set_fix(fix);
                             }
                             checker.diagnostics.push(diagnostic);
                         }
@@ -225,15 +194,15 @@ pub(crate) fn outdated_version_block(checker: &mut Checker, stmt_if: &StmtIf) {
     }
 }
 
-/// Returns true if the `target_version` is always less than the [`PythonVersion`].
-fn compare_version(
-    target_version: &[Int],
+/// Returns true if the `check_version` is always less than the [`PythonVersion`].
+fn version_always_less_than(
+    check_version: &[Int],
     py_version: PythonVersion,
     or_equal: bool,
 ) -> Result<bool> {
-    let mut target_version_iter = target_version.iter();
+    let mut check_version_iter = check_version.iter();
 
-    let Some(if_major) = target_version_iter.next() else {
+    let Some(if_major) = check_version_iter.next() else {
         return Ok(false);
     };
     let Some(if_major) = if_major.as_u8() else {
@@ -246,7 +215,7 @@ fn compare_version(
         Ordering::Less => Ok(true),
         Ordering::Greater => Ok(false),
         Ordering::Equal => {
-            let Some(if_minor) = target_version_iter.next() else {
+            let Some(if_minor) = check_version_iter.next() else {
                 return Ok(true);
             };
             let Some(if_minor) = if_minor.as_u8() else {
@@ -440,8 +409,8 @@ fn fix_always_true_branch(
 fn extract_version(elts: &[Expr]) -> Option<Vec<Int>> {
     let mut version: Vec<Int> = vec![];
     for elt in elts {
-        let Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(int),
+        let Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(int),
             ..
         }) = &elt
         else {
@@ -476,7 +445,7 @@ mod tests {
         expected: bool,
     ) -> Result<()> {
         let target_versions: Vec<_> = target_versions.iter().map(|int| Int::from(*int)).collect();
-        let actual = compare_version(&target_versions, version, or_equal)?;
+        let actual = version_always_less_than(&target_versions, version, or_equal)?;
         assert_eq!(actual, expected);
         Ok(())
     }

@@ -3,7 +3,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -38,18 +38,22 @@ use crate::{
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[violation]
 pub struct SubprocessPopenWithShellEqualsTrue {
-    seems_safe: bool,
+    safety: Safety,
+    is_exact: bool,
 }
 
 impl Violation for SubprocessPopenWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        if self.seems_safe {
-            format!(
+        match (self.safety, self.is_exact) {
+            (Safety::SeemsSafe, true) => format!(
                 "`subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`"
-            )
-        } else {
-            format!("`subprocess` call with `shell=True` identified, security issue")
+            ),
+            (Safety::Unknown, true) => format!("`subprocess` call with `shell=True` identified, security issue"),
+            (Safety::SeemsSafe, false) => format!(
+                "`subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`"
+            ),
+            (Safety::Unknown, false) => format!("`subprocess` call with truthy `shell` identified, security issue"),
         }
     }
 }
@@ -89,16 +93,18 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 }
 
 /// ## What it does
-/// Checks for method calls that set the `shell` parameter to `true` when
-/// invoking a subprocess.
+/// Checks for method calls that set the `shell` parameter to `true` or another
+/// truthy value when invoking a subprocess.
 ///
 /// ## Why is this bad?
-/// Setting the `shell` parameter to `true` when invoking a subprocess can
-/// introduce security vulnerabilities, as it allows shell metacharacters and
-/// whitespace to be passed to child processes, potentially leading to shell
-/// injection attacks. It is recommended to avoid using `shell=True` unless
-/// absolutely necessary, and when used, to ensure that all inputs are properly
-/// sanitized and quoted to prevent such vulnerabilities.
+/// Setting the `shell` parameter to `true` or another truthy value when
+/// invoking a subprocess can introduce security vulnerabilities, as it allows
+/// shell metacharacters and whitespace to be passed to child processes,
+/// potentially leading to shell injection attacks.
+///
+/// It is recommended to avoid using `shell=True` unless absolutely necessary
+/// and, when used, to ensure that all inputs are properly sanitized and quoted
+/// to prevent such vulnerabilities.
 ///
 /// ## Known problems
 /// Prone to false positives as it is triggered on any function call with a
@@ -115,12 +121,18 @@ impl Violation for SubprocessWithoutShellEqualsTrue {
 /// ## References
 /// - [Python documentation: Security Considerations](https://docs.python.org/3/library/subprocess.html#security-considerations)
 #[violation]
-pub struct CallWithShellEqualsTrue;
+pub struct CallWithShellEqualsTrue {
+    is_exact: bool,
+}
 
 impl Violation for CallWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Function call with `shell=True` parameter identified, security issue")
+        if self.is_exact {
+            format!("Function call with `shell=True` parameter identified, security issue")
+        } else {
+            format!("Function call with truthy `shell` parameter identified, security issue")
+        }
     }
 }
 
@@ -162,16 +174,15 @@ impl Violation for CallWithShellEqualsTrue {
 /// - [Python documentation: `subprocess`](https://docs.python.org/3/library/subprocess.html)
 #[violation]
 pub struct StartProcessWithAShell {
-    seems_safe: bool,
+    safety: Safety,
 }
 
 impl Violation for StartProcessWithAShell {
     #[derive_message_formats]
     fn message(&self) -> String {
-        if self.seems_safe {
-            format!("Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`")
-        } else {
-            format!("Starting a process with a shell, possible injection detected")
+        match self.safety {
+            Safety::SeemsSafe => format!("Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`"),
+            Safety::Unknown => format!("Starting a process with a shell, possible injection detected"),
         }
     }
 }
@@ -284,13 +295,14 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
             match shell_keyword {
                 // S602
                 Some(ShellKeyword {
-                    truthiness: Truthiness::Truthy,
+                    truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
                     keyword,
                 }) => {
                     if checker.enabled(Rule::SubprocessPopenWithShellEqualsTrue) {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessPopenWithShellEqualsTrue {
-                                seems_safe: shell_call_seems_safe(arg),
+                                safety: Safety::from(arg),
+                                is_exact: matches!(truthiness, Truthiness::True),
                             },
                             keyword.range(),
                         ));
@@ -298,7 +310,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 Some(ShellKeyword {
-                    truthiness: Truthiness::Falsey | Truthiness::Unknown,
+                    truthiness: Truthiness::False | Truthiness::Falsey | Truthiness::Unknown,
                     keyword,
                 }) => {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
@@ -320,15 +332,18 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
             }
         }
     } else if let Some(ShellKeyword {
-        truthiness: Truthiness::Truthy,
+        truthiness: truthiness @ (Truthiness::True | Truthiness::Truthy),
         keyword,
     }) = shell_keyword
     {
         // S604
         if checker.enabled(Rule::CallWithShellEqualsTrue) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(CallWithShellEqualsTrue, keyword.range()));
+            checker.diagnostics.push(Diagnostic::new(
+                CallWithShellEqualsTrue {
+                    is_exact: matches!(truthiness, Truthiness::True),
+                },
+                keyword.range(),
+            ));
         }
     }
 
@@ -338,7 +353,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
             if let Some(arg) = call.arguments.args.first() {
                 checker.diagnostics.push(Diagnostic::new(
                     StartProcessWithAShell {
-                        seems_safe: shell_call_seems_safe(arg),
+                        safety: Safety::from(arg),
                     },
                     arg.range(),
                 ));
@@ -376,7 +391,7 @@ pub(crate) fn shell_injection(checker: &mut Checker, call: &ast::ExprCall) {
                 (
                     Some(CallKind::Subprocess),
                     Some(ShellKeyword {
-                        truthiness: Truthiness::Truthy,
+                        truthiness: Truthiness::True | Truthiness::Truthy,
                         keyword: _,
                     })
                 )
@@ -453,16 +468,22 @@ fn find_shell_keyword<'a>(
     })
 }
 
-/// Return `true` if the value provided to the `shell` call seems safe. This is based on Bandit's
-/// definition: string literals are considered okay, but dynamically-computed values are not.
-fn shell_call_seems_safe(arg: &Expr) -> bool {
-    matches!(
-        arg,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(_),
-            ..
-        })
-    )
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum Safety {
+    SeemsSafe,
+    Unknown,
+}
+
+impl From<&Expr> for Safety {
+    /// Return the [`Safety`] level for the [`Expr`]. This is based on Bandit's definition: string
+    /// literals are considered okay, but dynamically-computed values are not.
+    fn from(expr: &Expr) -> Self {
+        if expr.is_string_literal_expr() {
+            Self::SeemsSafe
+        } else {
+            Self::Unknown
+        }
+    }
 }
 
 /// Return `true` if the string appears to be a full file path.

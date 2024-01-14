@@ -62,13 +62,22 @@ impl Indexer {
             comment_ranges_builder.visit_token(tok, *range);
             fstring_ranges_builder.visit_token(tok, *range);
 
-            if matches!(tok, Tok::Newline | Tok::NonLogicalNewline) {
-                line_start = range.end();
+            match tok {
+                Tok::Newline | Tok::NonLogicalNewline => {
+                    line_start = range.end();
+                }
+                Tok::String { .. } => {
+                    // If the previous token was a string, find the start of the line that contains
+                    // the closing delimiter, since the token itself can span multiple lines.
+                    line_start = locator.line_start(range.end());
+                }
+                _ => {}
             }
 
             prev_token = Some(tok);
             prev_end = range.end();
         }
+
         Self {
             comment_ranges: comment_ranges_builder.finish(),
             continuation_lines,
@@ -238,18 +247,18 @@ mod tests {
 
     #[test]
     fn continuation() {
-        let contents = r#"x = 1"#;
+        let contents = r"x = 1";
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
         assert_eq!(indexer.continuation_line_starts(), &[]);
 
-        let contents = r#"
+        let contents = r"
         # Hello, world!
 
 x = 1
 
 y = 2
-        "#
+        "
         .trim();
 
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();

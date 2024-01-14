@@ -9,5 +9,5 @@ expression: trace
   - TypeParamTypeVarTuple
   - TypeParamParamSpec
   - StmtExpr
-    - ExprConstant
+    - ExprEllipsisLiteral
 

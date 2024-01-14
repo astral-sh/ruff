@@ -150,3 +150,21 @@ class Test:
         Args:
             arg1: some description of arg
         """
+
+
+def select_data(
+    query: str,
+    args: tuple,
+    database: str,
+    auto_save: bool,
+) -> None:
+    """This function has an argument `args`, which shouldn't be mistaken for a section.
+
+    Args:
+        query:
+            Query template.
+        args:
+            A list of arguments.
+        database:
+            Which database to connect to ("origin" or "destination").
+    """

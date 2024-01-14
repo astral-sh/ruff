@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{Alias, Stmt};
+use ruff_python_ast::{Alias, PySourceType, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -34,11 +34,16 @@ impl Violation for MultipleImportsOnOneLine {
 }
 
 /// ## What it does
-/// Checks for imports that are not at the top of the file.
+/// Checks for imports that are not at the top of the file. For Jupyter notebooks, this
+/// checks for imports that are not at the top of the cell.
 ///
 /// ## Why is this bad?
 /// According to [PEP 8], "imports are always put at the top of the file, just after any
 /// module comments and docstrings, and before module globals and constants."
+///
+/// In [preview], this rule makes an exception for `sys.path` modifications,
+/// allowing for `sys.path.insert`, `sys.path.append`, and similar
+/// modifications between import statements.
 ///
 /// ## Example
 /// ```python
@@ -60,13 +65,20 @@ impl Violation for MultipleImportsOnOneLine {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
-pub struct ModuleImportNotAtTopOfFile;
+pub struct ModuleImportNotAtTopOfFile {
+    source_type: PySourceType,
+}
 
 impl Violation for ModuleImportNotAtTopOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Module level import not at top of file")
+        if self.source_type.is_ipynb() {
+            format!("Module level import not at top of cell")
+        } else {
+            format!("Module level import not at top of file")
+        }
     }
 }
 
@@ -82,8 +94,11 @@ pub(crate) fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, n
 /// E402
 pub(crate) fn module_import_not_at_top_of_file(checker: &mut Checker, stmt: &Stmt) {
     if checker.semantic().seen_import_boundary() && checker.semantic().at_top_level() {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(ModuleImportNotAtTopOfFile, stmt.range()));
+        checker.diagnostics.push(Diagnostic::new(
+            ModuleImportNotAtTopOfFile {
+                source_type: checker.source_type,
+            },
+            stmt.range(),
+        ));
     }
 }

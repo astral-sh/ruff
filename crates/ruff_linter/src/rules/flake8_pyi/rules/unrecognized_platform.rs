@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, CmpOp, Constant, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -123,18 +123,14 @@ pub(crate) fn unrecognized_platform(checker: &mut Checker, test: &Expr) {
         return;
     }
 
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(ast::StringConstant { value, .. }),
-        ..
-    }) = right
-    {
+    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = right {
         // Other values are possible but we don't need them right now.
         // This protects against typos.
         if checker.enabled(Rule::UnrecognizedPlatformName) {
-            if !matches!(value.as_str(), "linux" | "win32" | "cygwin" | "darwin") {
+            if !matches!(value.to_str(), "linux" | "win32" | "cygwin" | "darwin") {
                 checker.diagnostics.push(Diagnostic::new(
                     UnrecognizedPlatformName {
-                        platform: value.clone(),
+                        platform: value.to_string(),
                     },
                     right.range(),
                 ));

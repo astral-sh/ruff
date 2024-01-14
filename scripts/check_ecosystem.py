@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Check two versions of ruff against a corpus of open-source code.
+"""
+**DEPRECATED** This script is being replaced by the ruff-ecosystem package.
+
+
+Check two versions of ruff against a corpus of open-source code.
 
 Example usage:
 
@@ -124,6 +128,7 @@ REPOSITORIES: list[Repository] = [
     Repository("docker", "docker-py", "main"),
     Repository("freedomofpress", "securedrop", "develop"),
     Repository("fronzbot", "blinkpy", "dev"),
+    Repository("binary-husky", "gpt_academic", "master"),
     Repository("ibis-project", "ibis", "master"),
     Repository("ing-bank", "probatus", "main"),
     Repository("jrnl-org", "jrnl", "develop"),

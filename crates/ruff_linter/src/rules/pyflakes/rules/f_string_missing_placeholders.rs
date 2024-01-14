@@ -1,12 +1,10 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, PySourceType};
-use ruff_python_parser::{lexer, AsMode, Tok};
+use ruff_python_ast as ast;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for f-strings that do not contain any placeholder expressions.
@@ -47,76 +45,37 @@ impl AlwaysFixableViolation for FStringMissingPlaceholders {
     }
 }
 
-/// Return an iterator containing a two-element tuple for each f-string part
-/// in the given [`ExprFString`] expression.
-///
-/// The first element of the tuple is the f-string prefix range, and the second
-/// element is the entire f-string range. It returns an iterator because of the
-/// possibility of multiple f-strings implicitly concatenated together.
-///
-/// For example,
-///
-/// ```python
-///   f"first" rf"second"
-/// # ^         ^            (prefix range)
-/// # ^^^^^^^^ ^^^^^^^^^^    (token range)
-/// ```
-///
-/// would return `[(0..1, 0..8), (10..11, 9..19)]`.
-///
-/// This function assumes that the given f-string expression is without any
-/// placeholder expressions.
-///
-/// [`ExprFString`]: `ruff_python_ast::ExprFString`
-fn fstring_prefix_and_tok_range<'a>(
-    fstring: &'a ast::ExprFString,
-    locator: &'a Locator,
-    source_type: PySourceType,
-) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
-    let contents = locator.slice(fstring);
-    let mut current_f_string_start = fstring.start();
-    lexer::lex_starts_at(contents, source_type.as_mode(), fstring.start())
-        .flatten()
-        .filter_map(move |(tok, range)| match tok {
-            Tok::FStringStart => {
-                current_f_string_start = range.start();
-                None
-            }
-            Tok::FStringEnd => {
-                let first_char =
-                    locator.slice(TextRange::at(current_f_string_start, TextSize::from(1)));
-                // f"..."  => f_position = 0
-                // fr"..." => f_position = 0
-                // rf"..." => f_position = 1
-                let f_position = u32::from(!(first_char == "f" || first_char == "F"));
-                Some((
-                    TextRange::at(
-                        current_f_string_start + TextSize::from(f_position),
-                        TextSize::from(1),
-                    ),
-                    TextRange::new(current_f_string_start, range.end()),
-                ))
-            }
-            _ => None,
-        })
-}
-
 /// F541
-pub(crate) fn f_string_missing_placeholders(fstring: &ast::ExprFString, checker: &mut Checker) {
-    if !fstring.values.iter().any(Expr::is_formatted_value_expr) {
-        for (prefix_range, tok_range) in
-            fstring_prefix_and_tok_range(fstring, checker.locator(), checker.source_type)
-        {
-            let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(convert_f_string_to_regular_string(
-                    prefix_range,
-                    tok_range,
-                    checker.locator(),
-                ));
-            }
-            checker.diagnostics.push(diagnostic);
-        }
+pub(crate) fn f_string_missing_placeholders(checker: &mut Checker, expr: &ast::ExprFString) {
+    if expr.value.f_strings().any(|f_string| {
+        f_string
+            .elements
+            .iter()
+            .any(ast::FStringElement::is_expression)
+    }) {
+        return;
+    }
+
+    for f_string in expr.value.f_strings() {
+        let first_char = checker
+            .locator()
+            .slice(TextRange::at(f_string.start(), TextSize::new(1)));
+        // f"..."  => f_position = 0
+        // fr"..." => f_position = 0
+        // rf"..." => f_position = 1
+        let f_position = u32::from(!(first_char == "f" || first_char == "F"));
+        let prefix_range = TextRange::at(
+            f_string.start() + TextSize::new(f_position),
+            TextSize::new(1),
+        );
+
+        let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, f_string.range());
+        diagnostic.set_fix(convert_f_string_to_regular_string(
+            prefix_range,
+            f_string.range(),
+            checker.locator(),
+        ));
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -132,12 +91,12 @@ fn unescape_f_string(content: &str) -> String {
 /// Generate a [`Fix`] to rewrite an f-string as a regular string.
 fn convert_f_string_to_regular_string(
     prefix_range: TextRange,
-    tok_range: TextRange,
+    node_range: TextRange,
     locator: &Locator,
 ) -> Fix {
     // Extract the f-string body.
     let mut content =
-        unescape_f_string(locator.slice(TextRange::new(prefix_range.end(), tok_range.end())));
+        unescape_f_string(locator.slice(TextRange::new(prefix_range.end(), node_range.end())));
 
     // If the preceding character is equivalent to the quote character, insert a space to avoid a
     // syntax error. For example, when removing the `f` prefix in `""f""`, rewrite to `"" ""`
@@ -154,6 +113,6 @@ fn convert_f_string_to_regular_string(
     Fix::safe_edit(Edit::replacement(
         content,
         prefix_range.start(),
-        tok_range.end(),
+        node_range.end(),
     ))
 }

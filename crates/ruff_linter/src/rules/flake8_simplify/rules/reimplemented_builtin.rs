@@ -3,7 +3,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::traversal;
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Comprehension, Constant, Expr, ExprContext, Stmt, UnaryOp,
+    self as ast, Arguments, CmpOp, Comprehension, Expr, ExprContext, Stmt, UnaryOp,
 };
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
@@ -11,7 +11,6 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
 use crate::line_width::LineWidthBuilder;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced with a builtin function, like
@@ -102,7 +101,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 &contents,
                 stmt.into(),
                 checker.locator(),
-                checker.settings.line_length,
+                checker.settings.pycodestyle.max_line_length,
                 checker.settings.tab_size,
             ) {
                 return;
@@ -114,7 +113,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
-            if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("any") {
+            if checker.semantic().is_builtin("any") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),
@@ -189,7 +188,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                         .slice(TextRange::new(line_start, stmt.start())),
                 )
                 .add_str(&contents)
-                > checker.settings.line_length
+                > checker.settings.pycodestyle.max_line_length
             {
                 return;
             }
@@ -200,7 +199,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt) {
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
-            if checker.patch(diagnostic.kind.rule()) && checker.semantic().is_builtin("all") {
+            if checker.semantic().is_builtin("all") {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     contents,
                     stmt.start(),
@@ -281,11 +280,7 @@ fn match_loop(stmt: &Stmt) -> Option<Loop> {
     let Some(value) = value else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Bool(value),
-        ..
-    }) = value.as_ref()
-    else {
+    let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = value.as_ref() else {
         return None;
     };
 
@@ -320,9 +315,8 @@ fn match_else_return(stmt: &Stmt) -> Option<Terminal> {
     else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Bool(next_value),
-        ..
+    let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+        value: next_value, ..
     }) = next_value.as_ref()
     else {
         return None;
@@ -363,9 +357,8 @@ fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Termina
     else {
         return None;
     };
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Bool(next_value),
-        ..
+    let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+        value: next_value, ..
     }) = next_value.as_ref()
     else {
         return None;

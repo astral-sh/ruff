@@ -23,3 +23,7 @@ unicode-ident = { workspace = true }
 insta = { workspace = true }
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_parser = { path = "../ruff_python_parser" }
+ruff_python_index = { path = "../ruff_python_index" }
+
+[lints]
+workspace = true

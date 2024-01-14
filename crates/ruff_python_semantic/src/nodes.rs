@@ -74,11 +74,11 @@ impl<'a> Index<NodeId> for Nodes<'a> {
     }
 }
 
-/// A reference to an AST node. Like [`ruff_python_ast::node::AnyNodeRef`], but wraps the node
+/// A reference to an AST node. Like [`ruff_python_ast::AnyNodeRef`], but wraps the node
 /// itself (like [`Stmt`]) rather than the narrowed type (like [`ruff_python_ast::StmtAssign`]).
 ///
-/// TODO(charlie): Replace with [`ruff_python_ast::node::AnyNodeRef`]. This requires migrating
-/// the rest of the codebase to use [`ruff_python_ast::node::AnyNodeRef`] and related abstractions,
+/// TODO(charlie): Replace with [`ruff_python_ast::AnyNodeRef`]. This requires migrating
+/// the rest of the codebase to use [`ruff_python_ast::AnyNodeRef`] and related abstractions,
 /// like [`ruff_python_ast::ExpressionRef`] instead of [`Expr`].
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum NodeRef<'a> {

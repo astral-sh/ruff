@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -5,19 +6,21 @@ use std::str::FromStr;
 use std::string::ToString;
 
 use anyhow::{bail, Result};
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
-use ruff_diagnostics::Applicability;
+use rustc_hash::FxHashMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_diagnostics::Applicability;
 use ruff_macros::CacheKey;
+use ruff_python_ast::PySourceType;
 
-use crate::fs;
 use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
+use crate::{display_settings, fs};
 
 #[derive(
     Clone,
@@ -38,6 +41,8 @@ use crate::rule_selector::RuleSelector;
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PythonVersion {
     Py37,
+    // Make sure to also change the default for `ruff_python_formatter::PythonVersion`
+    // when changing the default here.
     #[default]
     Py38,
     Py39,
@@ -117,16 +122,44 @@ impl From<bool> for PreviewMode {
     }
 }
 
+impl Display for PreviewMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disabled => write!(f, "disabled"),
+            Self::Enabled => write!(f, "enabled"),
+        }
+    }
+}
+
+/// Toggle for unsafe fixes.
+/// `Hint` will not apply unsafe fixes but a message will be shown when they are available.
+/// `Disabled` will not apply unsafe fixes or show a message.
+/// `Enabled` will apply unsafe fixes.
 #[derive(Debug, Copy, Clone, CacheKey, Default, PartialEq, Eq, is_macro::Is)]
 pub enum UnsafeFixes {
     #[default]
+    Hint,
     Disabled,
     Enabled,
 }
 
+impl Display for UnsafeFixes {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Hint => "hint",
+                Self::Disabled => "disabled",
+                Self::Enabled => "enabled",
+            }
+        )
+    }
+}
+
 impl From<bool> for UnsafeFixes {
-    fn from(version: bool) -> Self {
-        if version {
+    fn from(value: bool) -> Self {
+        if value {
             UnsafeFixes::Enabled
         } else {
             UnsafeFixes::Disabled
@@ -138,7 +171,7 @@ impl UnsafeFixes {
     pub fn required_applicability(&self) -> Applicability {
         match self {
             Self::Enabled => Applicability::Unsafe,
-            Self::Disabled => Applicability::Safe,
+            Self::Disabled | Self::Hint => Applicability::Safe,
         }
     }
 }
@@ -161,11 +194,24 @@ impl FilePattern {
 
                 // Add basename path.
                 if !pattern.contains(std::path::MAIN_SEPARATOR) {
-                    builder.add(Glob::from_str(&pattern)?);
+                    builder.add(Glob::new(&pattern)?);
                 }
             }
         }
         Ok(())
+    }
+}
+
+impl Display for FilePattern {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:?}",
+            match self {
+                Self::Builtin(pattern) => pattern,
+                Self::User(pattern, _) => pattern.as_str(),
+            }
+        )
     }
 }
 
@@ -183,9 +229,14 @@ impl FromStr for FilePattern {
 pub struct FilePatternSet {
     set: GlobSet,
     cache_key: u64,
+    // This field is only for displaying the internals
+    // of `set`.
+    #[allow(clippy::used_underscore_binding)]
+    _set_internals: Vec<FilePattern>,
 }
 
 impl FilePatternSet {
+    #[allow(clippy::used_underscore_binding)]
     pub fn try_from_iter<I>(patterns: I) -> Result<Self, anyhow::Error>
     where
         I: IntoIterator<Item = FilePattern>,
@@ -193,7 +244,10 @@ impl FilePatternSet {
         let mut builder = GlobSetBuilder::new();
         let mut hasher = CacheKeyHasher::new();
 
+        let mut _set_internals = vec![];
+
         for pattern in patterns {
+            _set_internals.push(pattern.clone());
             pattern.cache_key(&mut hasher);
             pattern.add_to(&mut builder)?;
         }
@@ -203,7 +257,23 @@ impl FilePatternSet {
         Ok(FilePatternSet {
             set,
             cache_key: hasher.finish(),
+            _set_internals,
         })
+    }
+}
+
+impl Display for FilePatternSet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self._set_internals.is_empty() {
+            write!(f, "[]")?;
+        } else {
+            writeln!(f, "[")?;
+            for pattern in &self._set_internals {
+                writeln!(f, "\t{pattern},")?;
+            }
+            write!(f, "]")?;
+        }
+        Ok(())
     }
 }
 
@@ -289,6 +359,133 @@ impl FromStr for PatternPrefixPair {
     }
 }
 
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Default,
+    Serialize,
+    Deserialize,
+    CacheKey,
+    EnumIter,
+)]
+#[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum Language {
+    #[default]
+    Python,
+    Pyi,
+    Ipynb,
+}
+
+impl FromStr for Language {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "python" => Ok(Self::Python),
+            "pyi" => Ok(Self::Pyi),
+            "ipynb" => Ok(Self::Ipynb),
+            _ => {
+                bail!("Unrecognized language: `{s}`. Expected one of `python`, `pyi`, or `ipynb`.")
+            }
+        }
+    }
+}
+
+impl From<Language> for PySourceType {
+    fn from(value: Language) -> Self {
+        match value {
+            Language::Python => Self::Python,
+            Language::Ipynb => Self::Ipynb,
+            Language::Pyi => Self::Stub,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExtensionPair {
+    pub extension: String,
+    pub language: Language,
+}
+
+impl ExtensionPair {
+    const EXPECTED_PATTERN: &'static str = "<Extension>:<LanguageCode> pattern";
+}
+
+impl FromStr for ExtensionPair {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let (extension_str, language_str) = {
+            let tokens = s.split(':').collect::<Vec<_>>();
+            if tokens.len() != 2 {
+                bail!("Expected {}", Self::EXPECTED_PATTERN);
+            }
+            (tokens[0].trim(), tokens[1].trim())
+        };
+        let extension = extension_str.into();
+        let language = Language::from_str(language_str)?;
+        Ok(Self {
+            extension,
+            language,
+        })
+    }
+}
+
+impl From<ExtensionPair> for (String, Language) {
+    fn from(value: ExtensionPair) -> Self {
+        (value.extension, value.language)
+    }
+}
+#[derive(Debug, Clone, Default, CacheKey)]
+pub struct ExtensionMapping {
+    mapping: FxHashMap<String, Language>,
+}
+
+impl ExtensionMapping {
+    /// Return the [`Language`] for the given file.
+    pub fn get(&self, path: &Path) -> Option<Language> {
+        let ext = path.extension()?.to_str()?;
+        self.mapping.get(ext).copied()
+    }
+}
+
+impl Display for ExtensionMapping {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.extension",
+            fields = [
+                self.mapping | debug
+            ]
+        }
+        Ok(())
+    }
+}
+
+impl From<FxHashMap<String, Language>> for ExtensionMapping {
+    fn from(value: FxHashMap<String, Language>) -> Self {
+        Self { mapping: value }
+    }
+}
+
+impl FromIterator<ExtensionPair> for ExtensionMapping {
+    fn from_iter<T: IntoIterator<Item = ExtensionPair>>(iter: T) -> Self {
+        Self {
+            mapping: iter
+                .into_iter()
+                .map(|pair| (pair.extension, pair.language))
+                .collect(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
@@ -303,6 +500,24 @@ pub enum SerializationFormat {
     Gitlab,
     Pylint,
     Azure,
+    Sarif,
+}
+
+impl Display for SerializationFormat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text => write!(f, "text"),
+            Self::Json => write!(f, "json"),
+            Self::JsonLines => write!(f, "json_lines"),
+            Self::Junit => write!(f, "junit"),
+            Self::Grouped => write!(f, "grouped"),
+            Self::Github => write!(f, "github"),
+            Self::Gitlab => write!(f, "gitlab"),
+            Self::Pylint => write!(f, "pylint"),
+            Self::Azure => write!(f, "azure"),
+            Self::Sarif => write!(f, "sarif"),
+        }
+    }
 }
 
 impl Default for SerializationFormat {
@@ -344,3 +559,55 @@ impl Deref for Version {
 /// [`fnmatch`](https://docs.python.org/3/library/fnmatch.html) for
 /// pattern matching.
 pub type IdentifierPattern = glob::Pattern;
+
+#[derive(Debug, CacheKey, Default)]
+pub struct PerFileIgnores {
+    // Ordered as (absolute path matcher, basename matcher, rules)
+    ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
+}
+
+impl PerFileIgnores {
+    /// Given a list of patterns, create a `GlobSet`.
+    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
+        let ignores: Result<Vec<_>> = per_file_ignores
+            .into_iter()
+            .map(|per_file_ignore| {
+                // Construct absolute path matcher.
+                let absolute =
+                    Glob::new(&per_file_ignore.absolute.to_string_lossy())?.compile_matcher();
+
+                // Construct basename matcher.
+                let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
+
+                Ok((absolute, basename, per_file_ignore.rules))
+            })
+            .collect();
+        Ok(Self { ignores: ignores? })
+    }
+}
+
+impl Display for PerFileIgnores {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.is_empty() {
+            write!(f, "{{}}")?;
+        } else {
+            writeln!(f, "{{")?;
+            for (absolute, basename, rules) in &self.ignores {
+                writeln!(
+                    f,
+                    "\t{{ absolute = {absolute:#?}, basename = {basename:#?}, rules = {rules} }},"
+                )?;
+            }
+            write!(f, "}}")?;
+        }
+        Ok(())
+    }
+}
+
+impl Deref for PerFileIgnores {
+    type Target = Vec<(GlobMatcher, GlobMatcher, RuleSet)>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.ignores
+    }
+}

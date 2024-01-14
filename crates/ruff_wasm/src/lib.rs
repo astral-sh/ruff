@@ -6,11 +6,11 @@ use wasm_bindgen::prelude::*;
 
 use ruff_formatter::{FormatResult, Formatted, IndentStyle};
 use ruff_linter::directives;
-use ruff_linter::line_width::{LineLength, TabSize};
-use ruff_linter::linter::{check_path, LinterResult};
+use ruff_linter::line_width::{IndentWidth, LineLength};
+use ruff_linter::linter::{check_path, LinterResult, TokenSource};
 use ruff_linter::registry::AsRule;
 use ruff_linter::settings::types::PythonVersion;
-use ruff_linter::settings::{flags, DUMMY_VARIABLE_RGX, PREFIXES};
+use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
 use ruff_python_ast::{Mod, PySourceType};
 use ruff_python_codegen::Stylist;
@@ -22,7 +22,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_source_file::{Locator, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::configuration::Configuration;
-use ruff_workspace::options::{FormatOptions, FormatOrOutputFormat, LintOptions, Options};
+use ruff_workspace::options::{FormatOptions, LintCommonOptions, LintOptions, Options};
 use ruff_workspace::Settings;
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -126,25 +126,28 @@ impl Workspace {
 
             line_length: Some(LineLength::default()),
 
-            tab_size: Some(TabSize::default()),
+            indent_width: Some(IndentWidth::default()),
             target_version: Some(PythonVersion::default()),
 
             lint: Some(LintOptions {
-                allowed_confusables: Some(Vec::default()),
-                dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
-                ignore: Some(Vec::default()),
-                select: Some(PREFIXES.to_vec()),
-                extend_fixable: Some(Vec::default()),
-                extend_select: Some(Vec::default()),
-                external: Some(Vec::default()),
+                common: LintCommonOptions {
+                    allowed_confusables: Some(Vec::default()),
+                    dummy_variable_rgx: Some(DUMMY_VARIABLE_RGX.as_str().to_string()),
+                    ignore: Some(Vec::default()),
+                    select: Some(DEFAULT_SELECTORS.to_vec()),
+                    extend_fixable: Some(Vec::default()),
+                    extend_select: Some(Vec::default()),
+                    external: Some(Vec::default()),
+                    ..LintCommonOptions::default()
+                },
 
                 ..LintOptions::default()
             }),
-            format: Some(FormatOrOutputFormat::Format(FormatOptions {
+            format: Some(FormatOptions {
                 indent_style: Some(IndentStyle::Space),
                 quote_style: Some(QuoteStyle::Double),
                 ..FormatOptions::default()
-            })),
+            }),
             ..Options::default()
         })
         .map_err(into_error)
@@ -179,7 +182,6 @@ impl Workspace {
         } = check_path(
             Path::new("<filename>"),
             None,
-            tokens,
             &locator,
             &stylist,
             &indexer,
@@ -188,6 +190,7 @@ impl Workspace {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
+            TokenSource::Tokens(tokens),
         );
 
         let source_code = locator.to_source_code();
@@ -245,7 +248,7 @@ impl Workspace {
 
     /// Parses the content and returns its AST
     pub fn parse(&self, contents: &str) -> Result<String, Error> {
-        let parsed = ruff_python_parser::parse(contents, Mode::Module, ".").map_err(into_error)?;
+        let parsed = ruff_python_parser::parse(contents, Mode::Module).map_err(into_error)?;
 
         Ok(format!("{parsed:#?}"))
     }
@@ -268,20 +271,20 @@ struct ParsedModule<'a> {
 }
 
 impl<'a> ParsedModule<'a> {
-    fn from_source(source: &'a str) -> Result<Self, Error> {
-        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source, Mode::Module).collect();
+    fn from_source(source_code: &'a str) -> Result<Self, Error> {
+        let tokens: Vec<_> = ruff_python_parser::lexer::lex(source_code, Mode::Module).collect();
         let mut comment_ranges = CommentRangesBuilder::default();
 
         for (token, range) in tokens.iter().flatten() {
             comment_ranges.visit_token(token, *range);
         }
         let comment_ranges = comment_ranges.finish();
-        let module = parse_tokens(tokens, source, Mode::Module, ".").map_err(into_error)?;
+        let module = parse_tokens(tokens, source_code, Mode::Module).map_err(into_error)?;
 
         Ok(Self {
-            source_code: source,
-            comment_ranges,
+            source_code,
             module,
+            comment_ranges,
         })
     }
 

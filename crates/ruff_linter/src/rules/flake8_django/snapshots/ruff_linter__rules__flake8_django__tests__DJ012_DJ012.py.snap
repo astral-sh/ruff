@@ -54,4 +54,12 @@ DJ012.py:129:5: DJ012 Order of model's inner classes, methods, and fields does n
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012
     |
 
+DJ012.py:146:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
+    |
+144 |         return "foobar"
+145 | 
+146 |     first_name = models.CharField(max_length=32)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012
+    |
+
 

@@ -1,12 +1,11 @@
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AlwaysFixableViolation, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `range` calls with an unnecessary `start` argument.
@@ -66,8 +65,8 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     };
 
     // Verify that the `start` argument is the literal `0`.
-    let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
+    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: ast::Number::Int(value),
         ..
     }) = start
     else {
@@ -78,16 +77,14 @@ pub(crate) fn unnecessary_range_start(checker: &mut Checker, call: &ast::ExprCal
     };
 
     let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart, start.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            remove_argument(
-                &start,
-                &call.arguments,
-                Parentheses::Preserve,
-                checker.locator().contents(),
-            )
-            .map(Fix::safe_edit)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        remove_argument(
+            &start,
+            &call.arguments,
+            Parentheses::Preserve,
+            checker.locator().contents(),
+        )
+        .map(Fix::safe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
 
 use crate::fix::edits::pad;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -6,7 +6,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 use super::super::types::Primitive;
 
@@ -66,21 +65,16 @@ pub(crate) fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr,
     {
         return;
     }
-    let Expr::Constant(ast::ExprConstant { value, .. }) = &arg else {
-        return;
-    };
-    let Some(primitive) = Primitive::from_constant(value) else {
+    let Some(primitive) = Primitive::from_expr(arg) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let builtin = primitive.builtin();
-        if checker.semantic().is_builtin(&builtin) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                pad(primitive.builtin(), expr.range(), checker.locator()),
-                expr.range(),
-            )));
-        }
+    let builtin = primitive.builtin();
+    if checker.semantic().is_builtin(&builtin) {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(primitive.builtin(), expr.range(), checker.locator()),
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

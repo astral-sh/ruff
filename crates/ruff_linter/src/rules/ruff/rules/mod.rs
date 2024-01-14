@@ -1,4 +1,5 @@
 pub(crate) use ambiguous_unicode_character::*;
+pub(crate) use assignment_in_assert::*;
 pub(crate) use asyncio_dangling_task::*;
 pub(crate) use collection_literal_concatenation::*;
 pub(crate) use explicit_f_string_type_conversion::*;
@@ -8,14 +9,17 @@ pub(crate) use invalid_index_type::*;
 pub(crate) use invalid_pyproject_toml::*;
 pub(crate) use mutable_class_default::*;
 pub(crate) use mutable_dataclass_default::*;
+pub(crate) use never_union::*;
 pub(crate) use pairwise_over_zipped::*;
+pub(crate) use parenthesize_logical_operators::*;
+pub(crate) use quadratic_list_summation::*;
 pub(crate) use static_key_dict_comprehension::*;
 pub(crate) use unnecessary_iterable_allocation_for_first_element::*;
-#[cfg(feature = "unreachable-code")]
-pub(crate) use unreachable::*;
+pub(crate) use unnecessary_key_check::*;
 pub(crate) use unused_noqa::*;
 
 mod ambiguous_unicode_character;
+mod assignment_in_assert;
 mod asyncio_dangling_task;
 mod collection_literal_concatenation;
 mod confusables;
@@ -27,11 +31,12 @@ mod invalid_index_type;
 mod invalid_pyproject_toml;
 mod mutable_class_default;
 mod mutable_dataclass_default;
+mod never_union;
 mod pairwise_over_zipped;
+mod parenthesize_logical_operators;
 mod static_key_dict_comprehension;
 mod unnecessary_iterable_allocation_for_first_element;
-#[cfg(feature = "unreachable-code")]
-pub(crate) mod unreachable;
+mod unnecessary_key_check;
 mod unused_noqa;
 
 #[derive(Clone, Copy)]
@@ -40,6 +45,5 @@ pub(crate) enum Context {
     Docstring,
     Comment,
 }
-pub(crate) use quadratic_list_summation::*;
 
 mod quadratic_list_summation;

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -45,58 +45,60 @@ impl Violation for AssertOnStringLiteral {
 /// PLW0129
 pub(crate) fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
     match test {
-        Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-            Constant::Str(value, ..) => {
-                checker.diagnostics.push(Diagnostic::new(
-                    AssertOnStringLiteral {
-                        kind: if value.is_empty() {
-                            Kind::Empty
-                        } else {
-                            Kind::NonEmpty
-                        },
-                    },
-                    test.range(),
-                ));
-            }
-            Constant::Bytes(value) => {
-                checker.diagnostics.push(Diagnostic::new(
-                    AssertOnStringLiteral {
-                        kind: if value.is_empty() {
-                            Kind::Empty
-                        } else {
-                            Kind::NonEmpty
-                        },
-                    },
-                    test.range(),
-                ));
-            }
-            _ => {}
-        },
-        Expr::FString(ast::ExprFString { values, .. }) => {
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             checker.diagnostics.push(Diagnostic::new(
                 AssertOnStringLiteral {
-                    kind: if values.iter().all(|value| match value {
-                        Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                            Constant::Str(value) => value.is_empty(),
-                            Constant::Bytes(value) => value.is_empty(),
-                            _ => false,
-                        },
-                        _ => false,
-                    }) {
+                    kind: if value.is_empty() {
                         Kind::Empty
-                    } else if values.iter().any(|value| match value {
-                        Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                            Constant::Str(value) => !value.is_empty(),
-                            Constant::Bytes(value) => !value.is_empty(),
-                            _ => false,
-                        },
-                        _ => false,
-                    }) {
-                        Kind::NonEmpty
                     } else {
-                        Kind::Unknown
+                        Kind::NonEmpty
                     },
                 },
+                test.range(),
+            ));
+        }
+        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
+            checker.diagnostics.push(Diagnostic::new(
+                AssertOnStringLiteral {
+                    kind: if value.is_empty() {
+                        Kind::Empty
+                    } else {
+                        Kind::NonEmpty
+                    },
+                },
+                test.range(),
+            ));
+        }
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            let kind = if value.iter().all(|f_string_part| match f_string_part {
+                ast::FStringPart::Literal(literal) => literal.is_empty(),
+                ast::FStringPart::FString(f_string) => {
+                    f_string.elements.iter().all(|element| match element {
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            value, ..
+                        }) => value.is_empty(),
+                        ast::FStringElement::Expression(_) => false,
+                    })
+                }
+            }) {
+                Kind::Empty
+            } else if value.iter().any(|f_string_part| match f_string_part {
+                ast::FStringPart::Literal(literal) => !literal.is_empty(),
+                ast::FStringPart::FString(f_string) => {
+                    f_string.elements.iter().any(|element| match element {
+                        ast::FStringElement::Literal(ast::FStringLiteralElement {
+                            value, ..
+                        }) => !value.is_empty(),
+                        ast::FStringElement::Expression(_) => false,
+                    })
+                }
+            }) {
+                Kind::NonEmpty
+            } else {
+                Kind::Unknown
+            };
+            checker.diagnostics.push(Diagnostic::new(
+                AssertOnStringLiteral { kind },
                 test.range(),
             ));
         }

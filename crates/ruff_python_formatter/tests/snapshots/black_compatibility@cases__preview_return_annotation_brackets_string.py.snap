@@ -1,0 +1,68 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_return_annotation_brackets_string.py
+---
+## Input
+
+```python
+# Long string example
+def frobnicate() -> "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisIsTrulyUnreasonablyExtremelyLongClassName]":
+    pass
+
+# splitting the string breaks if there's any parameters
+def frobnicate(a) -> "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisIsTrulyUnreasonablyExtremelyLongClassName]":
+    pass
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -1,7 +1,6 @@
+ # Long string example
+ def frobnicate() -> (
+-    "ThisIsTrulyUnreasonablyExtremelyLongClassName |"
+-    " list[ThisIsTrulyUnreasonablyExtremelyLongClassName]"
++    "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisIsTrulyUnreasonablyExtremelyLongClassName]"
+ ):
+     pass
+ 
+```
+
+## Ruff Output
+
+```python
+# Long string example
+def frobnicate() -> (
+    "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisIsTrulyUnreasonablyExtremelyLongClassName]"
+):
+    pass
+
+
+# splitting the string breaks if there's any parameters
+def frobnicate(
+    a,
+) -> "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisIsTrulyUnreasonablyExtremelyLongClassName]":
+    pass
+```
+
+## Black Output
+
+```python
+# Long string example
+def frobnicate() -> (
+    "ThisIsTrulyUnreasonablyExtremelyLongClassName |"
+    " list[ThisIsTrulyUnreasonablyExtremelyLongClassName]"
+):
+    pass
+
+
+# splitting the string breaks if there's any parameters
+def frobnicate(
+    a,
+) -> "ThisIsTrulyUnreasonablyExtremelyLongClassName | list[ThisIsTrulyUnreasonablyExtremelyLongClassName]":
+    pass
+```
+
+

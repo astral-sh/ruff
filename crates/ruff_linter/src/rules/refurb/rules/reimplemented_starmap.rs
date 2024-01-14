@@ -7,7 +7,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for generator expressions, list and set comprehensions that can
@@ -136,30 +135,28 @@ pub(crate) fn reimplemented_starmap(checker: &mut Checker, target: &StarmapCandi
     }
 
     let mut diagnostic = Diagnostic::new(ReimplementedStarmap, target.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            // Try importing `starmap` from `itertools`.
-            //
-            // It is not required to be `itertools.starmap`, though. The user might've already
-            // imported it. Maybe even under a different name. So, we should use that name
-            // for fix construction.
-            let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from("itertools", "starmap"),
-                target.start(),
-                checker.semantic(),
-            )?;
-            // The actual fix suggestion depends on what type of expression we were looking at.
-            //
-            // - For generator expressions, we use `starmap` call directly.
-            // - For list and set comprehensions, we'd want to wrap it with `list` and `set`
-            //   correspondingly.
-            let main_edit = Edit::range_replacement(
-                target.try_make_suggestion(starmap_name, &comprehension.iter, func, checker)?,
-                target.range(),
-            );
-            Ok(Fix::unsafe_edits(import_edit, [main_edit]))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        // Try importing `starmap` from `itertools`.
+        //
+        // It is not required to be `itertools.starmap`, though. The user might've already
+        // imported it. Maybe even under a different name. So, we should use that name
+        // for fix construction.
+        let (import_edit, starmap_name) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import_from("itertools", "starmap"),
+            target.start(),
+            checker.semantic(),
+        )?;
+        // The actual fix suggestion depends on what type of expression we were looking at.
+        //
+        // - For generator expressions, we use `starmap` call directly.
+        // - For list and set comprehensions, we'd want to wrap it with `list` and `set`
+        //   correspondingly.
+        let main_edit = Edit::range_replacement(
+            target.try_make_suggestion(starmap_name, &comprehension.iter, func, checker)?,
+            target.range(),
+        );
+        Ok(Fix::safe_edits(import_edit, [main_edit]))
+    });
     checker.diagnostics.push(diagnostic);
 }
 

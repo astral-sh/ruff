@@ -1,17 +1,16 @@
-use ast::{Constant, ExprCall, ExprConstant};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{
     self as ast,
     visitor::{self, Visitor},
-    Expr, ExprName, ExprSubscript, Identifier, Stmt, StmtAnnAssign, StmtAssign, StmtTypeAlias,
-    TypeParam, TypeParamTypeVar,
+    Expr, ExprCall, ExprName, ExprSubscript, Identifier, Stmt, StmtAnnAssign, StmtAssign,
+    StmtTypeAlias, TypeParam, TypeParamTypeVar,
 };
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::{registry::AsRule, settings::types::PythonVersion};
+use crate::settings::types::PythonVersion;
 
 /// ## What it does
 /// Checks for use of `TypeAlias` annotation for declaring type aliases.
@@ -94,64 +93,60 @@ pub(crate) fn non_pep695_type_alias(checker: &mut Checker, stmt: &StmtAnnAssign)
     // TODO(zanie): We should check for generic type variables used in the value and define them
     //              as type params instead
     let mut diagnostic = Diagnostic::new(NonPEP695TypeAlias { name: name.clone() }, stmt.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let mut visitor = TypeVarReferenceVisitor {
-            vars: vec![],
-            semantic: checker.semantic(),
-        };
-        visitor.visit_expr(value);
+    let mut visitor = TypeVarReferenceVisitor {
+        vars: vec![],
+        semantic: checker.semantic(),
+    };
+    visitor.visit_expr(value);
 
-        let type_params = if visitor.vars.is_empty() {
-            None
-        } else {
-            Some(ast::TypeParams {
-                range: TextRange::default(),
-                type_params: visitor
-                    .vars
-                    .into_iter()
-                    .map(|TypeVar { name, restriction }| {
-                        TypeParam::TypeVar(TypeParamTypeVar {
-                            range: TextRange::default(),
-                            name: Identifier::new(name.id.clone(), TextRange::default()),
-                            bound: match restriction {
-                                Some(TypeVarRestriction::Bound(bound)) => {
-                                    Some(Box::new(bound.clone()))
-                                }
-                                Some(TypeVarRestriction::Constraint(constraints)) => {
-                                    Some(Box::new(Expr::Tuple(ast::ExprTuple {
-                                        range: TextRange::default(),
-                                        elts: constraints.into_iter().cloned().collect(),
-                                        ctx: ast::ExprContext::Load,
-                                    })))
-                                }
-                                None => None,
-                            },
-                        })
+    let type_params = if visitor.vars.is_empty() {
+        None
+    } else {
+        Some(ast::TypeParams {
+            range: TextRange::default(),
+            type_params: visitor
+                .vars
+                .into_iter()
+                .map(|TypeVar { name, restriction }| {
+                    TypeParam::TypeVar(TypeParamTypeVar {
+                        range: TextRange::default(),
+                        name: Identifier::new(name.id.clone(), TextRange::default()),
+                        bound: match restriction {
+                            Some(TypeVarRestriction::Bound(bound)) => Some(Box::new(bound.clone())),
+                            Some(TypeVarRestriction::Constraint(constraints)) => {
+                                Some(Box::new(Expr::Tuple(ast::ExprTuple {
+                                    range: TextRange::default(),
+                                    elts: constraints.into_iter().cloned().collect(),
+                                    ctx: ast::ExprContext::Load,
+                                })))
+                            }
+                            None => None,
+                        },
                     })
-                    .collect(),
-            })
-        };
+                })
+                .collect(),
+        })
+    };
 
-        let edit = Edit::range_replacement(
-            checker.generator().stmt(&Stmt::from(StmtTypeAlias {
-                range: TextRange::default(),
-                name: target.clone(),
-                type_params,
-                value: value.clone(),
-            })),
-            stmt.range(),
-        );
+    let edit = Edit::range_replacement(
+        checker.generator().stmt(&Stmt::from(StmtTypeAlias {
+            range: TextRange::default(),
+            name: target.clone(),
+            type_params,
+            value: value.clone(),
+        })),
+        stmt.range(),
+    );
 
-        // The fix is only safe in a type stub because new-style aliases have different runtime  behavior
-        // See https://github.com/astral-sh/ruff/issues/6434
-        let fix = if checker.source_type.is_stub() {
-            Fix::safe_edit(edit)
-        } else {
-            Fix::unsafe_edit(edit)
-        };
+    // The fix is only safe in a type stub because new-style aliases have different runtime behavior
+    // See https://github.com/astral-sh/ruff/issues/6434
+    let fix = if checker.source_type.is_stub() {
+        Fix::safe_edit(edit)
+    } else {
+        Fix::unsafe_edit(edit)
+    };
 
-        diagnostic.set_fix(fix);
-    }
+    diagnostic.set_fix(fix);
     checker.diagnostics.push(diagnostic);
 }
 
@@ -208,15 +203,10 @@ impl<'a> Visitor<'a> for TypeVarReferenceVisitor<'a> {
                         func, arguments, ..
                     }) => {
                         if self.semantic.match_typing_expr(func, "TypeVar")
-                            && arguments.args.first().is_some_and(|arg| {
-                                matches!(
-                                    arg,
-                                    Expr::Constant(ExprConstant {
-                                        value: Constant::Str(_),
-                                        ..
-                                    })
-                                )
-                            })
+                            && arguments
+                                .args
+                                .first()
+                                .is_some_and(Expr::is_string_literal_expr)
                         {
                             let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                                 Some(TypeVarRestriction::Bound(&bound.value))

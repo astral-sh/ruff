@@ -2,11 +2,11 @@ use std::fmt;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr, Operator};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_ast::helpers::pep_604_union;
+use ruff_python_ast::{self as ast, Expr};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum CallKind {
@@ -39,8 +39,12 @@ impl CallKind {
 ///
 /// ## Why is this bad?
 /// Since Python 3.10, `isinstance` and `issubclass` can be passed a
-/// `|`-separated union of types, which is more concise and consistent
+/// `|`-separated union of types, which is consistent
 /// with the union operator introduced in [PEP 604].
+///
+/// Note that this results in slower code. Ignore this rule if the
+/// performance of an `isinstance` or `issubclass` check is a
+/// concern, e.g., in a hot loop.
 ///
 /// ## Example
 /// ```python
@@ -76,19 +80,6 @@ impl AlwaysFixableViolation for NonPEP604Isinstance {
     }
 }
 
-fn union(elts: &[Expr]) -> Expr {
-    if elts.len() == 1 {
-        elts[0].clone()
-    } else {
-        Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(union(&elts[..elts.len() - 1])),
-            op: Operator::BitOr,
-            right: Box::new(elts[elts.len() - 1].clone()),
-            range: TextRange::default(),
-        })
-    }
-}
-
 /// UP038
 pub(crate) fn use_pep604_isinstance(
     checker: &mut Checker,
@@ -116,12 +107,10 @@ pub(crate) fn use_pep604_isinstance(
                 }
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        checker.generator().expr(&union(elts)),
-                        types.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                    checker.generator().expr(&pep_604_union(elts)),
+                    types.range(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }

@@ -627,8 +627,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ctx: Store,
                         },
                     ),
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 492..493,
                             value: Int(
                                 1,
@@ -742,8 +742,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     arguments: Arguments {
                                         range: 546..550,
                                         args: [
-                                            Constant(
-                                                ExprConstant {
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 547..549,
                                                     value: Int(
                                                         12,
@@ -920,8 +920,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 624..625,
                     value: Int(
                         1,
@@ -949,8 +949,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 637..638,
                     value: Int(
                         1,
@@ -978,11 +978,51 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     },
                 ),
             ],
-            value: Constant(
-                ExprConstant {
+            value: NumberLiteral(
+                ExprNumberLiteral {
                     range: 650..651,
                     value: Int(
                         1,
+                    ),
+                },
+            ),
+        },
+    ),
+    Expr(
+        StmtExpr {
+            range: 652..666,
+            value: Lambda(
+                ExprLambda {
+                    range: 652..666,
+                    parameters: Some(
+                        Parameters {
+                            range: 659..660,
+                            posonlyargs: [],
+                            args: [
+                                ParameterWithDefault {
+                                    range: 659..660,
+                                    parameter: Parameter {
+                                        range: 659..660,
+                                        name: Identifier {
+                                            id: "x",
+                                            range: 659..660,
+                                        },
+                                        annotation: None,
+                                    },
+                                    default: None,
+                                },
+                            ],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kwarg: None,
+                        },
+                    ),
+                    body: Name(
+                        ExprName {
+                            range: 662..666,
+                            id: "type",
+                            ctx: Load,
+                        },
                     ),
                 },
             ),

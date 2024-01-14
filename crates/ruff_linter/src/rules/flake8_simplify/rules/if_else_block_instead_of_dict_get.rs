@@ -5,11 +5,11 @@ use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{
     self as ast, Arguments, CmpOp, ElifElseClause, Expr, ExprContext, Identifier, Stmt,
 };
+use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `dict.get` calls.
@@ -20,12 +20,25 @@ use crate::registry::AsRule;
 /// the key is not found. When possible, using `dict.get` is more concise and
 /// more idiomatic.
 ///
+/// Under [preview mode](https://docs.astral.sh/ruff/preview), this rule will
+/// also suggest replacing `if`-`else` _expressions_ with `dict.get` calls.
+///
 /// ## Example
 /// ```python
 /// if "bar" in foo:
 ///     value = foo["bar"]
 /// else:
 ///     value = 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// value = foo.get("bar", 0)
+/// ```
+///
+/// If preview mode is enabled:
+/// ```python
+/// value = foo["bar"] if "bar" in foo else 0
 /// ```
 ///
 /// Use instead:
@@ -56,7 +69,7 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 }
 
 /// SIM401
-pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_else_block_instead_of_dict_get(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     let ast::StmtIf {
         test,
         body,
@@ -137,6 +150,16 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
         return;
     }
 
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
+    if is_sys_version_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
+    if is_type_checking_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
     // Check that the default value is not "complex".
     if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
         return;
@@ -172,7 +195,7 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
         &contents,
         stmt_if.into(),
         checker.locator(),
-        checker.settings.line_length,
+        checker.settings.pycodestyle.max_line_length,
         checker.settings.tab_size,
     ) {
         return;
@@ -184,13 +207,99 @@ pub(crate) fn use_dict_get_with_default(checker: &mut Checker, stmt_if: &ast::St
         },
         stmt_if.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        if !checker.indexer().has_comments(stmt_if, checker.locator()) {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                contents,
-                stmt_if.range(),
-            )));
+    if !checker.indexer().has_comments(stmt_if, checker.locator()) {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            contents,
+            stmt_if.range(),
+        )));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+/// SIM401
+pub(crate) fn if_exp_instead_of_dict_get(
+    checker: &mut Checker,
+    expr: &Expr,
+    test: &Expr,
+    body: &Expr,
+    orelse: &Expr,
+) {
+    if checker.settings.preview.is_disabled() {
+        return;
+    }
+
+    let Expr::Compare(ast::ExprCompare {
+        left: test_key,
+        ops,
+        comparators: test_dict,
+        range: _,
+    }) = test
+    else {
+        return;
+    };
+    let [test_dict] = test_dict.as_slice() else {
+        return;
+    };
+
+    let (body, default_value) = match ops.as_slice() {
+        [CmpOp::In] => (body, orelse),
+        [CmpOp::NotIn] => (orelse, body),
+        _ => {
+            return;
         }
+    };
+
+    let Expr::Subscript(ast::ExprSubscript {
+        value: expected_subscript,
+        slice: expected_slice,
+        ..
+    }) = body
+    else {
+        return;
+    };
+
+    if ComparableExpr::from(expected_slice) != ComparableExpr::from(test_key)
+        || ComparableExpr::from(test_dict) != ComparableExpr::from(expected_subscript)
+    {
+        return;
+    }
+
+    // Check that the default value is not "complex".
+    if contains_effect(default_value, |id| checker.semantic().is_builtin(id)) {
+        return;
+    }
+
+    let default_value_node = default_value.clone();
+    let dict_key_node = *test_key.clone();
+    let dict_get_node = ast::ExprAttribute {
+        value: expected_subscript.clone(),
+        attr: Identifier::new("get".to_string(), TextRange::default()),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+    };
+    let fixed_node = ast::ExprCall {
+        func: Box::new(dict_get_node.into()),
+        arguments: Arguments {
+            args: vec![dict_key_node, default_value_node],
+            keywords: vec![],
+            range: TextRange::default(),
+        },
+        range: TextRange::default(),
+    };
+
+    let contents = checker.generator().expr(&fixed_node.into());
+
+    let mut diagnostic = Diagnostic::new(
+        IfElseBlockInsteadOfDictGet {
+            contents: contents.clone(),
+        },
+        expr.range(),
+    );
+    if !checker.indexer().has_comments(expr, checker.locator()) {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            contents,
+            expr.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

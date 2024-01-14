@@ -1,14 +1,12 @@
-use rustc_hash::FxHashMap;
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast as ast;
+use ruff_python_ast::helpers;
+use ruff_python_ast::helpers::{NameFinder, StoredNameFinder};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, Expr};
-use ruff_python_ast::{helpers, visitor};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, result_like::BoolLike)]
 enum Certainty {
@@ -79,42 +77,16 @@ impl Violation for UnusedLoopControlVariable {
     }
 }
 
-/// Identify all `Expr::Name` nodes in an AST.
-struct NameFinder<'a> {
-    /// A map from identifier to defining expression.
-    names: FxHashMap<&'a str, &'a Expr>,
-}
-
-impl NameFinder<'_> {
-    fn new() -> Self {
-        NameFinder {
-            names: FxHashMap::default(),
-        }
-    }
-}
-
-impl<'a, 'b> Visitor<'b> for NameFinder<'a>
-where
-    'b: 'a,
-{
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        if let Expr::Name(ast::ExprName { id, .. }) = expr {
-            self.names.insert(id, expr);
-        }
-        visitor::walk_expr(self, expr);
-    }
-}
-
 /// B007
 pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast::StmtFor) {
     let control_names = {
-        let mut finder = NameFinder::new();
+        let mut finder = StoredNameFinder::default();
         finder.visit_expr(stmt_for.target.as_ref());
         finder.names
     };
 
     let used_names = {
-        let mut finder = NameFinder::new();
+        let mut finder = NameFinder::default();
         for stmt in &stmt_for.body {
             finder.visit_stmt(stmt);
         }
@@ -156,23 +128,21 @@ pub(crate) fn unused_loop_control_variable(checker: &mut Checker, stmt_for: &ast
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            if let Some(rename) = rename {
-                if certainty.into() {
-                    // Avoid fixing if the variable, or any future bindings to the variable, are
-                    // used _after_ the loop.
-                    let scope = checker.semantic().current_scope();
-                    if scope
-                        .get_all(name)
-                        .map(|binding_id| checker.semantic().binding(binding_id))
-                        .filter(|binding| binding.start() >= expr.start())
-                        .all(|binding| !binding.is_used())
-                    {
-                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                            rename,
-                            expr.range(),
-                        )));
-                    }
+        if let Some(rename) = rename {
+            if certainty.into() {
+                // Avoid fixing if the variable, or any future bindings to the variable, are
+                // used _after_ the loop.
+                let scope = checker.semantic().current_scope();
+                if scope
+                    .get_all(name)
+                    .map(|binding_id| checker.semantic().binding(binding_id))
+                    .filter(|binding| binding.start() >= expr.start())
+                    .all(|binding| !binding.is_used())
+                {
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                        rename,
+                        expr.range(),
+                    )));
                 }
             }
         }

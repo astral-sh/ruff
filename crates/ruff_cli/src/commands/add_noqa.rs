@@ -10,7 +10,7 @@ use ruff_linter::linter::add_noqa_to_path;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
-use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig};
+use ruff_workspace::resolver::{python_files_in_path, PyprojectConfig, ResolvedFile};
 
 use crate::args::CliOverrides;
 
@@ -36,27 +36,27 @@ pub(crate) fn add_noqa(
         &paths
             .iter()
             .flatten()
-            .map(ignore::DirEntry::path)
+            .map(ResolvedFile::path)
             .collect::<Vec<_>>(),
-        pyproject_config,
     );
 
     let start = Instant::now();
     let modifications: usize = paths
         .par_iter()
         .flatten()
-        .filter_map(|entry| {
-            let path = entry.path();
+        .filter_map(|resolved_file| {
             let SourceType::Python(source_type @ (PySourceType::Python | PySourceType::Stub)) =
-                SourceType::from(path)
+                SourceType::from(resolved_file.path())
             else {
                 return None;
             };
-            let package = path
+            let path = resolved_file.path();
+            let package = resolved_file
+                .path()
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
-            let settings = resolver.resolve(path, pyproject_config);
+            let settings = resolver.resolve(path);
             let source_kind = match SourceKind::from_path(path, source_type) {
                 Ok(Some(source_kind)) => source_kind,
                 Ok(None) => return None,

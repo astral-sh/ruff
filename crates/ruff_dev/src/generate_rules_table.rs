@@ -3,6 +3,7 @@
 //! Used for <https://docs.astral.sh/ruff/rules/>.
 
 use itertools::Itertools;
+use std::borrow::Cow;
 use strum::IntoEnumIterator;
 
 use ruff_diagnostics::FixAvailability;
@@ -22,18 +23,30 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     for rule in rules {
         let fix_token = match rule.fixable() {
             FixAvailability::Always | FixAvailability::Sometimes => {
-                format!("<span style='opacity: 1'>{FIX_SYMBOL}</span>")
+                format!("<span title='Automatic fix available'>{FIX_SYMBOL}</span>")
             }
-            FixAvailability::None => format!("<span style='opacity: 0.1'>{FIX_SYMBOL}</span>"),
+            FixAvailability::None => {
+                format!("<span style='opacity: 0.1' aria-hidden='true'>{FIX_SYMBOL}</span>")
+            }
         };
         let preview_token = if rule.is_preview() || rule.is_nursery() {
-            format!("<span style='opacity: 1'>{PREVIEW_SYMBOL}</span>")
+            format!("<span title='Rule is in preview'>{PREVIEW_SYMBOL}</span>")
         } else {
-            format!("<span style='opacity: 0.1'>{PREVIEW_SYMBOL}</span>")
+            format!("<span style='opacity: 0.1' aria-hidden='true'>{PREVIEW_SYMBOL}</span>")
         };
         let status_token = format!("{fix_token} {preview_token}");
 
         let rule_name = rule.as_ref();
+
+        // If the message ends in a bracketed expression (like: "Use {replacement}"), escape the
+        // brackets. Otherwise, it'll be interpreted as an HTML attribute via the `attr_list`
+        // plugin. (Above, we'd convert to "Use {replacement\}".)
+        let message = rule.message_formats()[0];
+        let message = if let Some(prefix) = message.strip_suffix('}') {
+            Cow::Owned(format!("{prefix}\\}}"))
+        } else {
+            Cow::Borrowed(message)
+        };
 
         #[allow(clippy::or_fun_call)]
         table_out.push_str(&format!(
@@ -44,7 +57,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 .is_some()
                 .then_some(format_args!("[{rule_name}](rules/{rule_name}.md)"))
                 .unwrap_or(format_args!("{rule_name}")),
-            rule.message_formats()[0],
+            message,
             status_token,
         ));
         table_out.push('\n');
@@ -62,7 +75,7 @@ pub(crate) fn generate() -> String {
     table_out.push('\n');
 
     table_out.push_str(&format!(
-        "The {PREVIEW_SYMBOL} emoji indicates that a rule in [\"preview\"](faq.md#what-is-preview)."
+        "The {PREVIEW_SYMBOL} emoji indicates that a rule is in [\"preview\"](faq.md#what-is-preview)."
     ));
     table_out.push('\n');
     table_out.push('\n');

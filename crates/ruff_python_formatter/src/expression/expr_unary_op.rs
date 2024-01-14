@@ -1,10 +1,10 @@
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprUnaryOp;
 use ruff_python_ast::UnaryOp;
 
 use crate::comments::{trailing_comments, SourceComment};
 use crate::expression::parentheses::{
-    is_expression_parenthesized, NeedsParentheses, OptionalParentheses,
+    is_expression_parenthesized, NeedsParentheses, OptionalParentheses, Parentheses,
 };
 use crate::prelude::*;
 
@@ -57,7 +57,14 @@ impl FormatNodeRule<ExprUnaryOp> for FormatExprUnaryOp {
             space().fmt(f)?;
         }
 
-        operand.format().fmt(f)
+        if operand
+            .as_bin_op_expr()
+            .is_some_and(|bin_op| bin_op.op.is_pow())
+        {
+            operand.format().with_options(Parentheses::Always).fmt(f)
+        } else {
+            operand.format().fmt(f)
+        }
     }
 
     fn fmt_dangling_comments(

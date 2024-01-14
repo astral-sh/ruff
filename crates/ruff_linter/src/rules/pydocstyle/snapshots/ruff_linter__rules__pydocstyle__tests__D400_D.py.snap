@@ -10,7 +10,7 @@ D.py:355:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 352 352 | @expect("D415: First line should end with a period, question mark, "
 353 353 |         "or exclamation point (not 'y')")
 354 354 | def lwnlkjl():
@@ -29,7 +29,7 @@ D.py:406:25: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 403 403 | @expect("D400: First line should end with a period (not 'r')")
 404 404 | @expect("D415: First line should end with a period, question mark,"
 405 405 |         " or exclamation point (not 'r')")
@@ -49,7 +49,7 @@ D.py:410:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 407 407 | 
 408 408 | 
 409 409 | def ignored_decorator(func):   # noqa: D400,D401,D415
@@ -69,7 +69,7 @@ D.py:416:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 413 413 | 
 414 414 | 
 415 415 | def decorator_for_test(func):   # noqa: D400,D401,D415
@@ -87,7 +87,7 @@ D.py:422:35: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 419 419 | 
 420 420 | 
 421 421 | @ignored_decorator
@@ -106,7 +106,7 @@ D.py:429:49: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 426 426 | @expect("D400: First line should end with a period (not 'r')")
 427 427 | @expect("D415: First line should end with a period, question mark,"
 428 428 |         " or exclamation point (not 'r')")
@@ -126,7 +126,7 @@ D.py:470:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 467 467 | @expect("D415: First line should end with a period, question mark, "
 468 468 |         "or exclamation point (not 'g')")
 469 469 | def docstring_bad():
@@ -145,7 +145,7 @@ D.py:475:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 472 472 | 
 473 473 | 
 474 474 | def docstring_bad_ignore_all():  # noqa
@@ -164,7 +164,7 @@ D.py:480:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 477 477 | 
 478 478 | 
 479 479 | def docstring_bad_ignore_one():  # noqa: D400,D401,D415
@@ -184,7 +184,7 @@ D.py:487:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 484 484 | @expect("D401: First line should be in imperative mood "
 485 485 |         "(perhaps 'Run', not 'Runs')")
 486 486 | def docstring_ignore_some_violations_but_catch_D401():  # noqa: E501,D400,D415
@@ -202,7 +202,7 @@ D.py:514:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 511 511 | 
 512 512 | 
 513 513 | def valid_google_string():  # noqa: D400
@@ -221,7 +221,7 @@ D.py:520:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 517 517 | @expect("D415: First line should end with a period, question mark, "
 518 518 |         "or exclamation point (not 'g')")
 519 519 | def bad_google_string():  # noqa: D400
@@ -240,7 +240,7 @@ D.py:581:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 578 578 | @expect("D415: First line should end with a period, question mark, "
 579 579 |         "or exclamation point (not '\"')")
 580 580 | def endswith_quote():
@@ -262,7 +262,7 @@ D.py:615:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 612 612 |         '(found 3)')
 613 613 | @expect('D212: Multi-line docstring summary should start at the first line')
 614 614 | def one_liner():
@@ -281,7 +281,7 @@ D.py:639:17: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 636 636 |     """ This is a docstring that starts with a space."""  # noqa: D210
 637 637 | 
 638 638 | 
@@ -300,7 +300,7 @@ D.py:641:18: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 638 638 | 
 639 639 | class SameLine: """This is a docstring on the same line"""
 640 640 | 
@@ -320,11 +320,14 @@ D.py:664:5: D400 [*] First line should end with a period
     |
     = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 662 662 | 
 663 663 | def newline_after_closing_quote(self):
 664 664 |     "We enforce a newline after the closing quote for a multi-line docstring \
 665     |-    but continuations shouldn't be considered multi-line"
     665 |+    but continuations shouldn't be considered multi-line."
+666 666 | 
+667 667 | 
+668 668 | 
 
 

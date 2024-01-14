@@ -26,7 +26,6 @@ use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 use super::unittest_assert::UnittestAssert;
 
@@ -34,7 +33,7 @@ use super::unittest_assert::UnittestAssert;
 /// Checks for assertions that combine multiple independent conditions.
 ///
 /// ## Why is this bad?
-/// Composite assertion statements are harder debug upon failure, as the
+/// Composite assertion statements are harder to debug upon failure, as the
 /// failure message will not indicate which condition failed.
 ///
 /// ## Example
@@ -284,25 +283,23 @@ pub(crate) fn unittest_assertion(
                     },
                     func.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // We're converting an expression to a statement, so avoid applying the fix if
-                    // the assertion is part of a larger expression.
-                    if checker.semantic().current_statement().is_expr_stmt()
-                        && checker.semantic().current_expression_parent().is_none()
-                        && !checker.indexer().comment_ranges().intersects(expr.range())
-                    {
-                        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                checker.generator().stmt(&stmt),
-                                parenthesized_range(
-                                    expr.into(),
-                                    checker.semantic().current_statement().into(),
-                                    checker.indexer().comment_ranges(),
-                                    checker.locator().contents(),
-                                )
-                                .unwrap_or(expr.range()),
-                            )));
-                        }
+                // We're converting an expression to a statement, so avoid applying the fix if
+                // the assertion is part of a larger expression.
+                if checker.semantic().current_statement().is_expr_stmt()
+                    && checker.semantic().current_expression_parent().is_none()
+                    && !checker.indexer().comment_ranges().intersects(expr.range())
+                {
+                    if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            checker.generator().stmt(&stmt),
+                            parenthesized_range(
+                                expr.into(),
+                                checker.semantic().current_statement().into(),
+                                checker.indexer().comment_ranges(),
+                                checker.locator().contents(),
+                            )
+                            .unwrap_or(expr.range()),
+                        )));
                     }
                 }
                 Some(diagnostic)
@@ -390,9 +387,7 @@ pub(crate) fn unittest_raises_assertion(
         },
         call.func.range(),
     );
-    if checker.patch(diagnostic.kind.rule())
-        && !checker.indexer().has_comments(call, checker.locator())
-    {
+    if !checker.indexer().has_comments(call, checker.locator()) {
         if let Some(args) = to_pytest_raises_args(checker, attr.as_str(), &call.arguments) {
             diagnostic.try_set_fix(|| {
                 let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -496,7 +491,8 @@ fn to_pytest_raises_args<'a>(
 
 /// PT015
 pub(crate) fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
-    if Truthiness::from_expr(test, |id| checker.semantic().is_builtin(id)).is_falsey() {
+    let truthiness = Truthiness::from_expr(test, |id| checker.semantic().is_builtin(id));
+    if matches!(truthiness, Truthiness::False | Truthiness::Falsey) {
         checker
             .diagnostics
             .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
@@ -746,19 +742,17 @@ pub(crate) fn composite_condition(
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let mut diagnostic = Diagnostic::new(PytestCompositeAssertion, stmt.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if matches!(composite, CompositionKind::Simple)
-                && msg.is_none()
-                && !checker.indexer().comment_ranges().intersects(stmt.range())
-                && !checker
-                    .indexer()
-                    .in_multi_statement_line(stmt, checker.locator())
-            {
-                diagnostic.try_set_fix(|| {
-                    fix_composite_condition(stmt, checker.locator(), checker.stylist())
-                        .map(Fix::unsafe_edit)
-                });
-            }
+        if matches!(composite, CompositionKind::Simple)
+            && msg.is_none()
+            && !checker.indexer().comment_ranges().intersects(stmt.range())
+            && !checker
+                .indexer()
+                .in_multi_statement_line(stmt, checker.locator())
+        {
+            diagnostic.try_set_fix(|| {
+                fix_composite_condition(stmt, checker.locator(), checker.stylist())
+                    .map(Fix::unsafe_edit)
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

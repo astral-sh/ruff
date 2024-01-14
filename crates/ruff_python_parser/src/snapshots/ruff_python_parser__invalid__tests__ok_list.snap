@@ -1,0 +1,76 @@
+---
+source: crates/ruff_python_parser/src/invalid.rs
+expression: ast
+---
+Ok(
+    [
+        Assign(
+            StmtAssign {
+                range: 0..21,
+                targets: [
+                    List(
+                        ExprList {
+                            range: 0..9,
+                            elts: [
+                                Name(
+                                    ExprName {
+                                        range: 1..2,
+                                        id: "x",
+                                        ctx: Store,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 4..5,
+                                        id: "y",
+                                        ctx: Store,
+                                    },
+                                ),
+                                Name(
+                                    ExprName {
+                                        range: 7..8,
+                                        id: "z",
+                                        ctx: Store,
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                        },
+                    ),
+                ],
+                value: List(
+                    ExprList {
+                        range: 12..21,
+                        elts: [
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 13..14,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 16..17,
+                                    value: Int(
+                                        2,
+                                    ),
+                                },
+                            ),
+                            NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 19..20,
+                                    value: Int(
+                                        3,
+                                    ),
+                                },
+                            ),
+                        ],
+                        ctx: Load,
+                    },
+                ),
+            },
+        ),
+    ],
+)

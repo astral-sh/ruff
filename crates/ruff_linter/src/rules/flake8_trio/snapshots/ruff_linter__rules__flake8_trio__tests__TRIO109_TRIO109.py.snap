@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/flake8_trio/mod.rs
+---
+TRIO109.py:8:16: TRIO109 Prefer `trio.fail_after` and `trio.move_on_after` over manual `async` timeout behavior
+  |
+8 | async def func(timeout):
+  |                ^^^^^^^ TRIO109
+9 |     ...
+  |
+
+TRIO109.py:12:16: TRIO109 Prefer `trio.fail_after` and `trio.move_on_after` over manual `async` timeout behavior
+   |
+12 | async def func(timeout=10):
+   |                ^^^^^^^^^^ TRIO109
+13 |     ...
+   |
+
+

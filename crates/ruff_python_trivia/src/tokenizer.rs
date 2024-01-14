@@ -473,7 +473,7 @@ pub enum SimpleTokenKind {
 }
 
 impl SimpleTokenKind {
-    const fn is_trivia(self) -> bool {
+    pub const fn is_trivia(self) -> bool {
         matches!(
             self,
             SimpleTokenKind::Whitespace
@@ -481,6 +481,10 @@ impl SimpleTokenKind {
                 | SimpleTokenKind::Comment
                 | SimpleTokenKind::Continuation
         )
+    }
+
+    pub const fn is_comment(self) -> bool {
+        matches!(self, SimpleTokenKind::Comment)
     }
 }
 
@@ -1180,9 +1184,9 @@ mod tests {
 
     #[test]
     fn tokenize_slash() {
-        let source = r#" # trailing positional comment
+        let source = r" # trailing positional comment
         # Positional arguments only after here
-        ,/"#;
+        ,/";
 
         let test_case = tokenize(source);
 
@@ -1225,8 +1229,8 @@ mod tests {
     #[test]
     fn triple_quoted_multiline_string_containing_comment() {
         let test_case = tokenize(
-            r#"'''This string contains a hash looking like a comment
-# This is not a comment'''"#,
+            r"'''This string contains a hash looking like a comment
+# This is not a comment'''",
         );
 
         assert_debug_snapshot!(test_case.tokenize_reverse());
@@ -1270,7 +1274,7 @@ mod tests {
 
     #[test]
     fn empty_string_literal() {
-        let test_case = tokenize(r#"'' # a comment '"#);
+        let test_case = tokenize(r"'' # a comment '");
 
         assert_debug_snapshot!(test_case.tokenize_reverse());
     }

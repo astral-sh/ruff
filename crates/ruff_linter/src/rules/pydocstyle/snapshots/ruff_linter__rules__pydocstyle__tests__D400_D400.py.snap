@@ -10,7 +10,7 @@ D400.py:2:5: D400 [*] First line should end with a period
   |
   = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | def f():
 2   |-    "Here's a line without a period"
   2 |+    "Here's a line without a period."
@@ -27,7 +27,7 @@ D400.py:7:5: D400 [*] First line should end with a period
   |
   = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 4 4 | 
 5 5 | 
 6 6 | def f():
@@ -50,7 +50,7 @@ D400.py:12:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 11 11 | def f():
 12 12 |     """
 13 13 |     Here's a line without a period,
@@ -69,7 +69,7 @@ D400.py:20:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 17 17 | 
 18 18 | 
 19 19 | def f():
@@ -91,7 +91,7 @@ D400.py:25:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 24 24 | def f():
 25 25 |     """
 26 26 |     Here's a line without a period,
@@ -113,7 +113,7 @@ D400.py:32:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 31 31 | def f():
 32 32 |     """
 33 33 |     Here's a line without a period,
@@ -132,7 +132,7 @@ D400.py:39:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 36 36 | 
 37 37 | 
 38 38 | def f():
@@ -151,7 +151,7 @@ D400.py:44:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 41 41 | 
 42 42 | 
 43 43 | def f():
@@ -174,7 +174,7 @@ D400.py:49:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 48 48 | def f():
 49 49 |     r"""
 50 50 |     Here's a line without a period,
@@ -193,7 +193,7 @@ D400.py:57:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 54 54 | 
 55 55 | 
 56 56 | def f():
@@ -215,7 +215,7 @@ D400.py:62:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 61 61 | def f():
 62 62 |     r"""
 63 63 |     Here's a line without a period,
@@ -237,7 +237,7 @@ D400.py:69:5: D400 [*] First line should end with a period
    |
    = help: Add period
 
-ℹ Suggested fix
+ℹ Unsafe fix
 68 68 | def f():
 69 69 |     r"""
 70 70 |     Here's a line without a period,
@@ -246,5 +246,29 @@ D400.py:69:5: D400 [*] First line should end with a period
 72 72 |     ...
 73 73 | 
 74 74 | 
+
+D400.py:97:5: D400 [*] First line should end with a period
+    |
+ 96 |   def f():
+ 97 |       """
+    |  _____^
+ 98 | |     My example
+ 99 | |     ==========
+100 | | 
+101 | |     My example explanation
+102 | |     """
+    | |_______^ D400
+    |
+    = help: Add period
+
+ℹ Unsafe fix
+95 95 | 
+96 96 | def f():
+97 97 |     """
+98    |-    My example
+   98 |+    My example.
+99 99 |     ==========
+100 100 | 
+101 101 |     My example explanation
 
 

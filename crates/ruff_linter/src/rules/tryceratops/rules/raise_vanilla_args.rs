@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr};
+use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -89,17 +89,29 @@ pub(crate) fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
 /// some whitespace).
 fn contains_message(expr: &Expr) -> bool {
     match expr {
-        Expr::FString(ast::ExprFString { values, .. }) => {
-            for value in values {
-                if contains_message(value) {
-                    return true;
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            for f_string_part in value {
+                match f_string_part {
+                    ast::FStringPart::Literal(literal) => {
+                        if literal.chars().any(char::is_whitespace) {
+                            return true;
+                        }
+                    }
+                    ast::FStringPart::FString(f_string) => {
+                        for literal in f_string
+                            .elements
+                            .iter()
+                            .filter_map(|element| element.as_literal())
+                        {
+                            if literal.chars().any(char::is_whitespace) {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(value),
-            ..
-        }) => {
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
             if value.chars().any(char::is_whitespace) {
                 return true;
             }

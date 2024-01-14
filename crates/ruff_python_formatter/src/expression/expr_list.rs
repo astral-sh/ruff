@@ -1,5 +1,5 @@
 use ruff_formatter::prelude::format_with;
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprList;
 use ruff_text_size::Ranged;
 

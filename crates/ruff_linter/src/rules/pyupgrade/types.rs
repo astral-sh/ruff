@@ -1,4 +1,4 @@
-use ruff_python_ast::Constant;
+use ruff_python_ast::{Expr, ExprNumberLiteral, Number};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -12,14 +12,16 @@ pub(crate) enum Primitive {
 }
 
 impl Primitive {
-    pub(crate) const fn from_constant(constant: &Constant) -> Option<Self> {
-        match constant {
-            Constant::Bool(_) => Some(Self::Bool),
-            Constant::Str(_) => Some(Self::Str),
-            Constant::Bytes(_) => Some(Self::Bytes),
-            Constant::Int(_) => Some(Self::Int),
-            Constant::Float(_) => Some(Self::Float),
-            Constant::Complex { .. } => Some(Self::Complex),
+    pub(crate) const fn from_expr(expr: &Expr) -> Option<Self> {
+        match expr {
+            Expr::BooleanLiteral(_) => Some(Self::Bool),
+            Expr::StringLiteral(_) => Some(Self::Str),
+            Expr::BytesLiteral(_) => Some(Self::Bytes),
+            Expr::NumberLiteral(ExprNumberLiteral { value, .. }) => match value {
+                Number::Int(_) => Some(Self::Int),
+                Number::Float(_) => Some(Self::Float),
+                Number::Complex { .. } => Some(Self::Complex),
+            },
             _ => None,
         }
     }

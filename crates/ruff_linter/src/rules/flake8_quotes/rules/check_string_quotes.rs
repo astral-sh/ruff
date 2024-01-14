@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_source_file::Locator;
 
 use crate::lex::docstring_detection::StateMachine;
-use crate::registry::Rule;
+
 use crate::settings::LinterSettings;
 
 use super::super::settings::Quote;
@@ -32,6 +32,13 @@ use super::super::settings::Quote;
 ///
 /// ## Options
 /// - `flake8-quotes.inline-quotes`
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent quotes for inline strings, making the rule
+/// redundant.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct BadQuotesInlineString {
     preferred_quote: Quote,
@@ -81,6 +88,13 @@ impl AlwaysFixableViolation for BadQuotesInlineString {
 ///
 /// ## Options
 /// - `flake8-quotes.multiline-quotes`
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces double quotes for multiline strings, making the rule
+/// redundant.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct BadQuotesMultilineString {
     preferred_quote: Quote,
@@ -129,6 +143,13 @@ impl AlwaysFixableViolation for BadQuotesMultilineString {
 ///
 /// ## Options
 /// - `flake8-quotes.docstring-quotes`
+///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces double quotes for docstrings, making the rule
+/// redundant.
+///
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct BadQuotesDocstring {
     preferred_quote: Quote,
@@ -230,21 +251,19 @@ fn docstring(locator: &Locator, range: TextRange, settings: &LinterSettings) -> 
         },
         range,
     );
-    if settings.rules.should_fix(Rule::BadQuotesDocstring) {
-        let quote_count = if trivia.is_multiline { 3 } else { 1 };
-        let string_contents = &trivia.raw_text[quote_count..trivia.raw_text.len() - quote_count];
-        let quote = good_docstring(quotes_settings.docstring_quotes).repeat(quote_count);
-        let mut fixed_contents =
-            String::with_capacity(trivia.prefix.len() + string_contents.len() + quote.len() * 2);
-        fixed_contents.push_str(trivia.prefix);
-        fixed_contents.push_str(&quote);
-        fixed_contents.push_str(string_contents);
-        fixed_contents.push_str(&quote);
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            fixed_contents,
-            range,
-        )));
-    }
+    let quote_count = if trivia.is_multiline { 3 } else { 1 };
+    let string_contents = &trivia.raw_text[quote_count..trivia.raw_text.len() - quote_count];
+    let quote = good_docstring(quotes_settings.docstring_quotes).repeat(quote_count);
+    let mut fixed_contents =
+        String::with_capacity(trivia.prefix.len() + string_contents.len() + quote.len() * 2);
+    fixed_contents.push_str(trivia.prefix);
+    fixed_contents.push_str(&quote);
+    fixed_contents.push_str(string_contents);
+    fixed_contents.push_str(&quote);
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        fixed_contents,
+        range,
+    )));
     Some(diagnostic)
 }
 
@@ -307,21 +326,19 @@ fn strings(
                 *range,
             );
 
-            if settings.rules.should_fix(Rule::BadQuotesMultilineString) {
-                let string_contents = &trivia.raw_text[3..trivia.raw_text.len() - 3];
-                let quote = good_multiline(quotes_settings.multiline_quotes);
-                let mut fixed_contents = String::with_capacity(
-                    trivia.prefix.len() + string_contents.len() + quote.len() * 2,
-                );
-                fixed_contents.push_str(trivia.prefix);
-                fixed_contents.push_str(quote);
-                fixed_contents.push_str(string_contents);
-                fixed_contents.push_str(quote);
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    fixed_contents,
-                    *range,
-                )));
-            }
+            let string_contents = &trivia.raw_text[3..trivia.raw_text.len() - 3];
+            let quote = good_multiline(quotes_settings.multiline_quotes);
+            let mut fixed_contents = String::with_capacity(
+                trivia.prefix.len() + string_contents.len() + quote.len() * 2,
+            );
+            fixed_contents.push_str(trivia.prefix);
+            fixed_contents.push_str(quote);
+            fixed_contents.push_str(string_contents);
+            fixed_contents.push_str(quote);
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                fixed_contents,
+                *range,
+            )));
             diagnostics.push(diagnostic);
         } else if trivia.last_quote_char != quotes_settings.inline_quotes.as_char()
             // If we're not using the preferred type, only allow use to avoid escapes.
@@ -333,20 +350,18 @@ fn strings(
                 },
                 *range,
             );
-            if settings.rules.should_fix(Rule::BadQuotesInlineString) {
-                let quote = quotes_settings.inline_quotes.as_char();
-                let string_contents = &trivia.raw_text[1..trivia.raw_text.len() - 1];
-                let mut fixed_contents =
-                    String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);
-                fixed_contents.push_str(trivia.prefix);
-                fixed_contents.push(quote);
-                fixed_contents.push_str(string_contents);
-                fixed_contents.push(quote);
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    fixed_contents,
-                    *range,
-                )));
-            }
+            let quote = quotes_settings.inline_quotes.as_char();
+            let string_contents = &trivia.raw_text[1..trivia.raw_text.len() - 1];
+            let mut fixed_contents =
+                String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);
+            fixed_contents.push_str(trivia.prefix);
+            fixed_contents.push(quote);
+            fixed_contents.push_str(string_contents);
+            fixed_contents.push(quote);
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                fixed_contents,
+                *range,
+            )));
             diagnostics.push(diagnostic);
         }
     }

@@ -4,7 +4,7 @@ use std::iter::FusedIterator;
 use unicode_width::UnicodeWidthStr;
 
 use ruff_formatter::{write, FormatError};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
 use ruff_python_parser::lexer::{lex_starts_at, LexResult};
 use ruff_python_parser::{Mode, Tok};
@@ -17,6 +17,7 @@ use crate::comments::{leading_comments, trailing_comments, SourceComment};
 use crate::prelude::*;
 use crate::statement::clause::ClauseHeader;
 use crate::statement::suite::SuiteChildStatement;
+use crate::statement::trailing_semicolon;
 
 /// Disables formatting for all statements between the `first_suppressed` that has a leading `fmt: off` comment
 /// and the first trailing or leading `fmt: on` comment. The statements are formatted as they appear in the source code.
@@ -327,7 +328,7 @@ fn write_suppressed_statements<'a>(
 
         for range in CommentRangeIter::in_suppression(comments.trailing(statement), source) {
             match range {
-                // All leading comments are suppressed
+                // All trailing comments are suppressed
                 // ```python
                 // statement
                 // # suppressed
@@ -394,10 +395,18 @@ fn write_suppressed_statements<'a>(
             statement = SuiteChildStatement::Other(next_statement);
             leading_node_comments = comments.leading(next_statement);
         } else {
-            let end = comments
-                .trailing(statement)
-                .last()
-                .map_or(statement.end(), Ranged::end);
+            let mut current = AnyNodeRef::from(statement.statement());
+            // Expand the range of the statement to include any trailing comments or semicolons.
+            let end = loop {
+                if let Some(comment) = comments.trailing(current).last() {
+                    break comment.end();
+                } else if let Some(child) = current.last_child_in_body() {
+                    current = child;
+                } else {
+                    break trailing_semicolon(current, source)
+                        .map_or(statement.end(), TextRange::end);
+                }
+            };
 
             FormatVerbatimStatementRange {
                 verbatim_range: TextRange::new(format_off_comment.end(), end),
@@ -898,6 +907,15 @@ impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
             }
         }
 
+        // Some statements may end with a semicolon. Preserve the semicolon
+        let semicolon_range = self
+            .node
+            .is_statement()
+            .then(|| trailing_semicolon(self.node, f.context().source()))
+            .flatten();
+        let verbatim_range = semicolon_range.map_or(self.node.range(), |semicolon| {
+            TextRange::new(self.node.start(), semicolon.end())
+        });
         comments.mark_verbatim_node_comments_formatted(self.node);
 
         // Write the outer comments and format the node as verbatim
@@ -905,7 +923,7 @@ impl Format<PyFormatContext<'_>> for FormatSuppressedNode<'_> {
             f,
             [
                 leading_comments(node_comments.leading),
-                verbatim_text(self.node),
+                verbatim_text(verbatim_range),
                 trailing_comments(node_comments.trailing)
             ]
         )

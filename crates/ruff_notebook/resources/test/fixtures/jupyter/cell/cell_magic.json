@@ -4,5 +4,10 @@
   "id": "1",
   "metadata": {},
   "outputs": [],
-  "source": ["%%timeit\n", "print('hello world')"]
+  "source": [
+    "%%script bash\n",
+    "for i in 1 2 3; do\n",
+    "  echo $i\n",
+    "done"
+  ]
 }

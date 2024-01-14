@@ -1,3 +1,4 @@
+use ast::Expr;
 use log::error;
 
 use ruff_diagnostics::{Diagnostic, Fix};
@@ -9,7 +10,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits;
-use crate::registry::AsRule;
 
 use super::fix_with;
 
@@ -24,6 +24,13 @@ use super::fix_with;
 /// Combining multiple context managers into a single `with` statement
 /// will minimize the indentation depth of the code, making it more
 /// readable.
+///
+/// The following context managers are exempt when used as standalone
+/// statements:
+///
+///  - `anyio`.{`CancelScope`, `fail_after`, `move_on_after`}
+///  - `asyncio`.{`timeout`, `timeout_at`}
+///  - `trio`.{`fail_after`, `fail_at`, `move_on_after`, `move_on_at`}
 ///
 /// ## Example
 /// ```python
@@ -74,6 +81,38 @@ fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
     Some((*is_async, items, body))
 }
 
+/// Check if `with_items` contains a single item which should not necessarily be
+/// grouped with other items.
+///
+/// For example:
+/// ```python
+/// async with asyncio.timeout(1):
+///     with resource1(), resource2():
+///         ...
+/// ```
+fn explicit_with_items(checker: &mut Checker, with_items: &[WithItem]) -> bool {
+    let [with_item] = with_items else {
+        return false;
+    };
+    let Expr::Call(expr_call) = &with_item.context_expr else {
+        return false;
+    };
+    checker
+        .semantic()
+        .resolve_call_path(&expr_call.func)
+        .is_some_and(|call_path| {
+            matches!(
+                call_path.as_slice(),
+                ["asyncio", "timeout" | "timeout_at"]
+                    | ["anyio", "CancelScope" | "fail_after" | "move_on_after"]
+                    | [
+                        "trio",
+                        "fail_after" | "fail_at" | "move_on_after" | "move_on_at"
+                    ]
+            )
+        })
+}
+
 /// SIM117
 pub(crate) fn multiple_with_statements(
     checker: &mut Checker,
@@ -112,6 +151,10 @@ pub(crate) fn multiple_with_statements(
             return;
         }
 
+        if explicit_with_items(checker, &with_stmt.items) || explicit_with_items(checker, items) {
+            return;
+        }
+
         let Some(colon) = items.last().and_then(|item| {
             SimpleTokenizer::starts_at(item.end(), checker.locator().contents())
                 .skip_trivia()
@@ -124,32 +167,30 @@ pub(crate) fn multiple_with_statements(
             MultipleWithStatements,
             TextRange::new(with_stmt.start(), colon.end()),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            if !checker
-                .indexer()
-                .comment_ranges()
-                .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
-            {
-                match fix_with::fix_multiple_with_statements(
-                    checker.locator(),
-                    checker.stylist(),
-                    with_stmt,
-                ) {
-                    Ok(edit) => {
-                        if edit.content().map_or(true, |content| {
-                            fits(
-                                content,
-                                with_stmt.into(),
-                                checker.locator(),
-                                checker.settings.line_length,
-                                checker.settings.tab_size,
-                            )
-                        }) {
-                            diagnostic.set_fix(Fix::unsafe_edit(edit));
-                        }
+        if !checker
+            .indexer()
+            .comment_ranges()
+            .intersects(TextRange::new(with_stmt.start(), with_stmt.body[0].start()))
+        {
+            match fix_with::fix_multiple_with_statements(
+                checker.locator(),
+                checker.stylist(),
+                with_stmt,
+            ) {
+                Ok(edit) => {
+                    if edit.content().map_or(true, |content| {
+                        fits(
+                            content,
+                            with_stmt.into(),
+                            checker.locator(),
+                            checker.settings.pycodestyle.max_line_length,
+                            checker.settings.tab_size,
+                        )
+                    }) {
+                        diagnostic.set_fix(Fix::unsafe_edit(edit));
                     }
-                    Err(err) => error!("Failed to fix nested with: {err}"),
                 }
+                Err(err) => error!("Failed to fix nested with: {err}"),
             }
         }
         checker.diagnostics.push(diagnostic);

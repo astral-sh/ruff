@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{CmpOp, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -63,22 +63,12 @@ pub(crate) fn comparison_of_constant(
         .tuple_windows()
         .zip(ops)
     {
-        if let (
-            Expr::Constant(ast::ExprConstant {
-                value: left_constant,
-                ..
-            }),
-            Expr::Constant(ast::ExprConstant {
-                value: right_constant,
-                ..
-            }),
-        ) = (&left, &right)
-        {
+        if left.is_literal_expr() && right.is_literal_expr() {
             let diagnostic = Diagnostic::new(
                 ComparisonOfConstant {
-                    left_constant: checker.generator().constant(left_constant),
+                    left_constant: checker.generator().expr(left),
                     op: *op,
-                    right_constant: checker.generator().constant(right_constant),
+                    right_constant: checker.generator().expr(right),
                 },
                 left.range(),
             );

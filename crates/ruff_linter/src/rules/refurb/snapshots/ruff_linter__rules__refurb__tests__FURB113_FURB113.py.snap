@@ -11,7 +11,7 @@ FURB113.py:23:1: FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly cal
    |
    = help: Replace with `nums.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 20 20 | 
 21 21 | 
 22 22 | # FURB113
@@ -32,7 +32,7 @@ FURB113.py:29:1: FURB113 [*] Use `nums3.extend((1, 2))` instead of repeatedly ca
    |
    = help: Replace with `nums3.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 26 26 | 
 27 27 | 
 28 28 | # FURB113
@@ -53,7 +53,7 @@ FURB113.py:35:1: FURB113 [*] Use `nums4.extend((1, 2))` instead of repeatedly ca
    |
    = help: Replace with `nums4.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 32 32 | 
 33 33 | 
 34 34 | # FURB113
@@ -118,7 +118,7 @@ FURB113.py:56:1: FURB113 [*] Use `nums4.extend((1, 2))` instead of repeatedly ca
    |
    = help: Replace with `nums4.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 53 53 | nums3.append(1)
 54 54 | nums.append(3)
 55 55 | # FURB113
@@ -139,7 +139,7 @@ FURB113.py:62:1: FURB113 [*] Use `nums.extend((1, 2, 3))` instead of repeatedly 
    |
    = help: Replace with `nums.extend((1, 2, 3))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 59 59 | pass
 60 60 | 
 61 61 | # FURB113
@@ -162,7 +162,7 @@ FURB113.py:69:5: FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly cal
    |
    = help: Replace with `nums.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 66 66 | 
 67 67 | if True:
 68 68 |     # FURB113
@@ -185,7 +185,7 @@ FURB113.py:75:5: FURB113 [*] Use `nums.extend((1, 2))` instead of repeatedly cal
    |
    = help: Replace with `nums.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 72 72 | 
 73 73 | if True:
 74 74 |     # FURB113
@@ -220,7 +220,7 @@ FURB113.py:90:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly callin
    |
    = help: Replace with `x.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 87 87 | 
 88 88 | def yes_one(x: list[int]):
 89 89 |     # FURB113
@@ -242,7 +242,7 @@ FURB113.py:96:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly callin
    |
    = help: Replace with `x.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 93 93 | 
 94 94 | def yes_two(x: List[int]):
 95 95 |     # FURB113
@@ -264,7 +264,7 @@ FURB113.py:102:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calli
     |
     = help: Replace with `x.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 99  99  | 
 100 100 | def yes_three(*, x: list[int]):
 101 101 |     # FURB113
@@ -286,7 +286,7 @@ FURB113.py:108:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calli
     |
     = help: Replace with `x.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 105 105 | 
 106 106 | def yes_four(x: list[int], /):
 107 107 |     # FURB113
@@ -321,7 +321,7 @@ FURB113.py:122:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calli
     |
     = help: Replace with `x.extend((1, 2))`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 119 119 | 
 120 120 | def yes_six(x: list):
 121 121 |     # FURB113
@@ -330,6 +330,20 @@ FURB113.py:122:5: FURB113 [*] Use `x.extend((1, 2))` instead of repeatedly calli
     122 |+    x.extend((1, 2))
 124 123 | 
 125 124 | 
-126 125 | # Non-errors.
+126 125 | if True:
+
+FURB113.py:128:5: FURB113 Use `nums.extend((1, 2, 3))` instead of repeatedly calling `nums.append()`
+    |
+126 |   if True:
+127 |       # FURB113
+128 |       nums.append(1)
+    |  _____^
+129 | |     # comment
+130 | |     nums.append(2)
+131 | |     # comment
+132 | |     nums.append(3)
+    | |__________________^ FURB113
+    |
+    = help: Replace with `nums.extend((1, 2, 3))`
 
 

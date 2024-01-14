@@ -12,7 +12,7 @@ C416.py:6:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
   |
   = help: Rewrite using `list()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 3 3 | z = [(1,), (2,), (3,)]
 4 4 | d = {"a": 1, "b": 2, "c": 3}
 5 5 | 
@@ -32,7 +32,7 @@ C416.py:7:1: C416 [*] Unnecessary `set` comprehension (rewrite using `set()`)
   |
   = help: Rewrite using `set()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 4 4 | d = {"a": 1, "b": 2, "c": 3}
 5 5 | 
 6 6 | [i for i in x]
@@ -53,7 +53,7 @@ C416.py:8:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
    = help: Rewrite using `dict()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 5 5 | 
 6 6 | [i for i in x]
 7 7 | {i for i in x}
@@ -74,7 +74,7 @@ C416.py:9:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
    = help: Rewrite using `dict()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 6  6  | [i for i in x]
 7  7  | {i for i in x}
 8  8  | {k: v for k, v in y}
@@ -94,7 +94,7 @@ C416.py:10:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
    |
    = help: Rewrite using `list()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 7  7  | {i for i in x}
 8  8  | {k: v for k, v in y}
 9  9  | {k: v for k, v in d.items()}
@@ -115,7 +115,7 @@ C416.py:11:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
    |
    = help: Rewrite using `dict()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 8  8  | {k: v for k, v in y}
 9  9  | {k: v for k, v in d.items()}
 10 10 | [(k, v) for k, v in d.items()]
@@ -133,7 +133,7 @@ C416.py:24:70: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`
    |
    = help: Rewrite using `list()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 21 21 | {k: v if v else None for k, v in y}
 22 22 | 
 23 23 | # Regression test for: https://github.com/astral-sh/ruff/issues/7196

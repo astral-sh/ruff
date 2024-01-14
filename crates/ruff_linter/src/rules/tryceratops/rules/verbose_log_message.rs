@@ -30,7 +30,7 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// ```python
 /// try:
 ///     ...
-/// except ValueError as e:
+/// except ValueError:
 ///     logger.exception("Found an error")
 /// ```
 #[violation]
@@ -40,6 +40,51 @@ impl Violation for VerboseLogMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Redundant exception object included in `logging.exception` call")
+    }
+}
+
+/// TRY401
+pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandler]) {
+    for handler in handlers {
+        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { body, .. }) = handler;
+
+        // Find all calls to `logging.exception`.
+        let calls = {
+            let mut visitor =
+                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
+            visitor.visit_body(body);
+            visitor.calls
+        };
+
+        for (expr, logging_level) in calls {
+            if matches!(logging_level, LoggingLevel::Exception) {
+                // Collect all referenced names in the `logging.exception` call.
+                let names: Vec<&ast::ExprName> = {
+                    expr.arguments
+                        .args
+                        .iter()
+                        .flat_map(|arg| {
+                            let mut visitor = NameVisitor::default();
+                            visitor.visit_expr(arg);
+                            visitor.names
+                        })
+                        .collect()
+                };
+
+                // Find any bound exceptions in the call.
+                for expr in names {
+                    let Some(id) = checker.semantic().resolve_name(expr) else {
+                        continue;
+                    };
+                    let binding = checker.semantic().binding(id);
+                    if binding.kind.is_bound_exception() {
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(VerboseLogMessage, expr.range()));
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -54,47 +99,6 @@ impl<'a> Visitor<'a> for NameVisitor<'a> {
             Expr::Name(name) if name.ctx.is_load() => self.names.push(name),
             Expr::Attribute(_) => {}
             _ => visitor::walk_expr(self, expr),
-        }
-    }
-}
-
-/// TRY401
-pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandler]) {
-    for handler in handlers {
-        let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { name, body, .. }) =
-            handler;
-        let Some(target) = name else {
-            continue;
-        };
-
-        // Find all calls to `logging.exception`.
-        let calls = {
-            let mut visitor =
-                LoggerCandidateVisitor::new(checker.semantic(), &checker.settings.logger_objects);
-            visitor.visit_body(body);
-            visitor.calls
-        };
-
-        for (expr, logging_level) in calls {
-            if matches!(logging_level, LoggingLevel::Exception) {
-                // Collect all referenced names in the `logging.exception` call.
-                let names: Vec<&ast::ExprName> = {
-                    let mut names = Vec::new();
-                    for arg in &expr.arguments.args {
-                        let mut visitor = NameVisitor::default();
-                        visitor.visit_expr(arg);
-                        names.extend(visitor.names);
-                    }
-                    names
-                };
-                for expr in names {
-                    if expr.id == target.as_str() {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(VerboseLogMessage, expr.range()));
-                    }
-                }
-            }
         }
     }
 }

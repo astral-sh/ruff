@@ -3,10 +3,12 @@
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
+use std::fmt::{Display, Formatter};
 
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 
 use crate::rules::isort::categorize::KnownModules;
@@ -29,6 +31,15 @@ pub enum RelativeImportsOrder {
 impl Default for RelativeImportsOrder {
     fn default() -> Self {
         Self::FurthestToClosest
+    }
+}
+
+impl Display for RelativeImportsOrder {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ClosestToFurthest => write!(f, "closest_to_furthest"),
+            Self::FurthestToClosest => write!(f, "furthest_to_closest"),
+        }
     }
 }
 
@@ -56,6 +67,10 @@ pub struct Settings {
     pub lines_between_types: usize,
     pub forced_separate: Vec<String>,
     pub section_order: Vec<ImportSection>,
+    pub no_sections: bool,
+    pub from_first: bool,
+    pub length_sort: bool,
+    pub length_sort_straight: bool,
 }
 
 impl Default for Settings {
@@ -82,7 +97,48 @@ impl Default for Settings {
             lines_between_types: 0,
             forced_separate: Vec::new(),
             section_order: ImportType::iter().map(ImportSection::Known).collect(),
+            no_sections: false,
+            from_first: false,
+            length_sort: false,
+            length_sort_straight: false,
         }
+    }
+}
+
+impl Display for Settings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.isort",
+            fields = [
+                self.required_imports | array,
+                self.combine_as_imports,
+                self.force_single_line,
+                self.force_sort_within_sections,
+                self.detect_same_package,
+                self.case_sensitive,
+                self.force_wrap_aliases,
+                self.force_to_top | array,
+                self.known_modules,
+                self.order_by_type,
+                self.relative_imports_order,
+                self.single_line_exclusions | array,
+                self.split_on_trailing_comma,
+                self.classes | array,
+                self.constants | array,
+                self.variables | array,
+                self.no_lines_before | array,
+                self.lines_after_imports,
+                self.lines_between_types,
+                self.forced_separate | array,
+                self.section_order | array,
+                self.no_sections,
+                self.from_first,
+                self.length_sort,
+                self.length_sort_straight
+            ]
+        }
+        Ok(())
     }
 }
 

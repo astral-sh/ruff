@@ -10,7 +10,7 @@ FURB132.py:12:1: FURB132 [*] Use `s.discard("x")` instead of check and `remove`
    |
    = help: Replace with `s.discard("x")`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 9  9  | # these should match
 10 10 | 
 11 11 | # FURB132
@@ -30,7 +30,7 @@ FURB132.py:22:1: FURB132 [*] Use `s3.discard("x")` instead of check and `remove`
    |
    = help: Replace with `s3.discard("x")`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 19 19 | 
 20 20 | 
 21 21 | # FURB132
@@ -51,7 +51,7 @@ FURB132.py:28:1: FURB132 [*] Use `s.discard(var)` instead of check and `remove`
    |
    = help: Replace with `s.discard(var)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 25 25 | 
 26 26 | var = "y"
 27 27 | # FURB132
@@ -70,7 +70,7 @@ FURB132.py:32:1: FURB132 [*] Use `s.discard(f"{var}:{var}")` instead of check an
    |
    = help: Replace with `s.discard(f"{var}:{var}")`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 29 29 |     s.remove(var)
 30 30 | 
 31 31 | 

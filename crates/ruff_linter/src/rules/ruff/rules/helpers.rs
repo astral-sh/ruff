@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Arguments, Expr};
-
 use ruff_python_ast::helpers::{map_callable, map_subscript};
-use ruff_python_semantic::{BindingKind, SemanticModel};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::{analyze, BindingKind, SemanticModel};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
 ///
@@ -57,17 +56,13 @@ pub(super) fn has_default_copy_semantics(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
 ) -> bool {
-    let Some(Arguments { args: bases, .. }) = class_def.arguments.as_deref() else {
-        return false;
-    };
-
-    bases.iter().any(|expr| {
-        semantic.resolve_call_path(expr).is_some_and(|call_path| {
-            matches!(
-                call_path.as_slice(),
-                ["pydantic", "BaseModel" | "BaseSettings"] | ["msgspec", "Struct"]
-            )
-        })
+    analyze::class::any_call_path(class_def, semantic, &|call_path| {
+        matches!(
+            call_path.as_slice(),
+            ["pydantic", "BaseModel" | "BaseSettings"]
+                | ["pydantic_settings", "BaseSettings"]
+                | ["msgspec", "Struct"]
+        )
     })
 }
 

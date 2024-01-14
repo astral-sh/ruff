@@ -21,7 +21,7 @@ use ruff_text_size::Ranged;
 
 use crate::directives;
 use crate::fix::{fix_file, FixResult};
-use crate::linter::{check_path, LinterResult};
+use crate::linter::{check_path, LinterResult, TokenSource};
 use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
@@ -38,12 +38,13 @@ pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
 }
 
-/// Run [`check_path`] on a file in the `resources/test/fixtures` directory.
+/// Run [`check_path`] on a Python file in the `resources/test/fixtures` directory.
 #[cfg(not(fuzzing))]
 pub(crate) fn test_path(path: impl AsRef<Path>, settings: &LinterSettings) -> Result<Vec<Message>> {
     let path = test_resource_path("fixtures").join(path);
-    let contents = std::fs::read_to_string(&path)?;
-    Ok(test_contents(&SourceKind::Python(contents), &path, settings).0)
+    let source_type = PySourceType::from(&path);
+    let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
+    Ok(test_contents(&source_kind, &path, settings).0)
 }
 
 #[cfg(not(fuzzing))]
@@ -54,7 +55,7 @@ pub(crate) struct TestedNotebook {
 }
 
 #[cfg(not(fuzzing))]
-pub(crate) fn test_notebook_path(
+pub(crate) fn assert_notebook_path(
     path: impl AsRef<Path>,
     expected: impl AsRef<Path>,
     settings: &LinterSettings,
@@ -128,7 +129,6 @@ pub(crate) fn test_contents<'a>(
         path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
-        tokens,
         &locator,
         &stylist,
         &indexer,
@@ -137,6 +137,7 @@ pub(crate) fn test_contents<'a>(
         flags::Noqa::Enabled,
         source_kind,
         source_type,
+        TokenSource::Tokens(tokens),
     );
 
     let source_has_errors = error.is_some();
@@ -194,7 +195,6 @@ pub(crate) fn test_contents<'a>(
             } = check_path(
                 path,
                 None,
-                tokens,
                 &locator,
                 &stylist,
                 &indexer,
@@ -203,6 +203,7 @@ pub(crate) fn test_contents<'a>(
                 flags::Noqa::Enabled,
                 &transformed,
                 source_type,
+                TokenSource::Tokens(tokens),
             );
 
             if let Some(fixed_error) = fixed_error {

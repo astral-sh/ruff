@@ -381,20 +381,16 @@ impl Whitespace {
             }
         }
 
-        if has_tabs {
+        if len == content.text_len() {
+            // All whitespace up to the start of the line -> Indent
+            (Self::None, TextSize::default())
+        } else if has_tabs {
             (Self::Tab, len)
         } else {
             match count {
                 0 => (Self::None, TextSize::default()),
                 1 => (Self::Single, len),
-                _ => {
-                    if len == content.text_len() {
-                        // All whitespace up to the start of the line -> Indent
-                        (Self::None, TextSize::default())
-                    } else {
-                        (Self::Many, len)
-                    }
-                }
+                _ => (Self::Many, len),
             }
         }
     }
@@ -432,18 +428,17 @@ impl LogicalLinesBuilder {
         } else if kind.is_operator() {
             line.flags.insert(TokenFlags::OPERATOR);
 
-            line.flags.set(
-                TokenFlags::BRACKET,
-                matches!(
-                    kind,
-                    TokenKind::Lpar
-                        | TokenKind::Lsqb
-                        | TokenKind::Lbrace
-                        | TokenKind::Rpar
-                        | TokenKind::Rsqb
-                        | TokenKind::Rbrace
-                ),
-            );
+            if matches!(
+                kind,
+                TokenKind::Lpar
+                    | TokenKind::Lsqb
+                    | TokenKind::Lbrace
+                    | TokenKind::Rpar
+                    | TokenKind::Rsqb
+                    | TokenKind::Rbrace
+            ) {
+                line.flags.insert(TokenFlags::BRACKET);
+            }
         }
 
         if matches!(kind, TokenKind::Comma | TokenKind::Semi | TokenKind::Colon) {
@@ -452,17 +447,16 @@ impl LogicalLinesBuilder {
             line.flags.insert(TokenFlags::KEYWORD);
         }
 
-        line.flags.set(
-            TokenFlags::NON_TRIVIA,
-            !matches!(
-                kind,
-                TokenKind::Comment
-                    | TokenKind::Newline
-                    | TokenKind::NonLogicalNewline
-                    | TokenKind::Dedent
-                    | TokenKind::Indent
-            ),
-        );
+        if !matches!(
+            kind,
+            TokenKind::Comment
+                | TokenKind::Newline
+                | TokenKind::NonLogicalNewline
+                | TokenKind::Dedent
+                | TokenKind::Indent
+        ) {
+            line.flags.insert(TokenFlags::NON_TRIVIA);
+        }
 
         self.tokens.push(LogicalLineToken { kind, range });
     }
@@ -520,10 +514,10 @@ mod tests {
     #[test]
     fn multi_line() {
         assert_logical_lines(
-            r#"
+            r"
 x = 1
 y = 2
-z = x + 1"#
+z = x + 1"
                 .trim(),
             &["x = 1", "y = 2", "z = x + 1"],
         );
@@ -532,14 +526,14 @@ z = x + 1"#
     #[test]
     fn indented() {
         assert_logical_lines(
-            r#"
+            r"
 x = [
   1,
   2,
   3,
 ]
 y = 2
-z = x + 1"#
+z = x + 1"
                 .trim(),
             &["x = [\n  1,\n  2,\n  3,\n]", "y = 2", "z = x + 1"],
         );
@@ -553,11 +547,11 @@ z = x + 1"#
     #[test]
     fn function_definition() {
         assert_logical_lines(
-            r#"
+            r"
 def f():
   x = 1
-f()"#
-                .trim(),
+f()"
+            .trim(),
             &["def f():", "x = 1", "f()"],
         );
     }
@@ -585,11 +579,11 @@ f()"#
     #[test]
     fn empty_line() {
         assert_logical_lines(
-            r#"
+            r"
 if False:
 
     print()
-"#
+"
             .trim(),
             &["if False:", "print()", ""],
         );

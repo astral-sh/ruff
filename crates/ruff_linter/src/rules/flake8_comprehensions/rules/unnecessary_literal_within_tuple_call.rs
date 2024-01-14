@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -33,6 +33,10 @@ use super::helpers;
 /// (1, 2)
 /// (1, 2)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryLiteralWithinTupleCall {
     literal: String,
@@ -95,15 +99,9 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_literal_within_tuple_call(
-                expr,
-                checker.locator(),
-                checker.stylist(),
-            )
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_literal_within_tuple_call(expr, checker.locator(), checker.stylist())
             .map(Fix::unsafe_edit)
-        });
-    }
+    });
     checker.diagnostics.push(diagnostic);
 }

@@ -2,9 +2,10 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::comparable::ComparableConstant;
+use ruff_python_ast::comparable::ComparableLiteral;
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{self as ast, CmpOp, ElifElseClause, Expr, Stmt};
+use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -39,7 +40,7 @@ impl Violation for IfElseBlockInsteadOfDictLookup {
     }
 }
 /// SIM116
-pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     // Throughout this rule:
     // * Each if or elif statement's test must consist of a constant equality check with the same variable.
     // * Each if or elif statement's body must consist of a single `return`.
@@ -66,15 +67,16 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
     if ops != &[CmpOp::Eq] {
         return;
     }
-    let [Expr::Constant(ast::ExprConstant {
-        value: constant, ..
-    })] = comparators.as_slice()
-    else {
+    let [expr] = comparators.as_slice() else {
+        return;
+    };
+    let Some(literal_expr) = expr.as_literal_expr() else {
         return;
     };
     let [Stmt::Return(ast::StmtReturn { value, range: _ })] = body.as_slice() else {
         return;
     };
+
     if value
         .as_ref()
         .is_some_and(|value| contains_effect(value, |id| checker.semantic().is_builtin(id)))
@@ -82,8 +84,19 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         return;
     }
 
-    let mut constants: FxHashSet<ComparableConstant> = FxHashSet::default();
-    constants.insert(constant.into());
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
+    if is_sys_version_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
+    if is_type_checking_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
+    // The `expr` was checked to be a literal above, so this is safe.
+    let mut literals: FxHashSet<ComparableLiteral> = FxHashSet::default();
+    literals.insert(literal_expr.into());
 
     for clause in elif_else_clauses {
         let ElifElseClause { test, body, .. } = clause;
@@ -117,10 +130,10 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
                 if id != target || ops != &[CmpOp::Eq] {
                     return;
                 }
-                let [Expr::Constant(ast::ExprConstant {
-                    value: constant, ..
-                })] = comparators.as_slice()
-                else {
+                let [expr] = comparators.as_slice() else {
+                    return;
+                };
+                let Some(literal_expr) = expr.as_literal_expr() else {
                     return;
                 };
 
@@ -130,7 +143,8 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
                     return;
                 };
 
-                constants.insert(constant.into());
+                // The `expr` was checked to be a literal above, so this is safe.
+                literals.insert(literal_expr.into());
             }
             // Different `elif`
             _ => {
@@ -139,7 +153,7 @@ pub(crate) fn manual_dict_lookup(checker: &mut Checker, stmt_if: &ast::StmtIf) {
         }
     }
 
-    if constants.len() < 3 {
+    if literals.len() < 3 {
         return;
     }
 

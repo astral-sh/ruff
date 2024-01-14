@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use ruff_formatter::{format_args, write, FormatError, FormatOptions, SourceCode};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::{AnyNodeRef, AstNode};
 use ruff_python_trivia::{
     is_pragma_comment, lines_after, lines_after_ignoring_trivia, lines_before,
 };
@@ -323,7 +323,7 @@ pub(crate) struct FormatEmptyLines {
 impl Format<PyFormatContext<'_>> for FormatEmptyLines {
     fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
         match f.context().node_level() {
-            NodeLevel::TopLevel => match self.lines {
+            NodeLevel::TopLevel(_) => match self.lines {
                 0 | 1 => write!(f, [hard_line_break()]),
                 2 => write!(f, [empty_line()]),
                 _ => match f.options().source_type() {
@@ -507,22 +507,21 @@ fn strip_comment_prefix(comment_text: &str) -> FormatResult<&str> {
 ///
 /// For example, given:
 /// ```python
-/// def func():
+/// class Class:
 ///     ...
 /// # comment
 /// ```
 ///
 /// This builder will insert two empty lines before the comment.
-/// ```
 pub(crate) fn empty_lines_before_trailing_comments<'a>(
     f: &PyFormatter,
     comments: &'a [SourceComment],
 ) -> FormatEmptyLinesBeforeTrailingComments<'a> {
     // Black has different rules for stub vs. non-stub and top level vs. indented
     let empty_lines = match (f.options().source_type(), f.context().node_level()) {
-        (PySourceType::Stub, NodeLevel::TopLevel) => 1,
+        (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
         (PySourceType::Stub, _) => 0,
-        (_, NodeLevel::TopLevel) => 2,
+        (_, NodeLevel::TopLevel(_)) => 2,
         (_, _) => 1,
     };
 
@@ -548,6 +547,72 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLinesBeforeTrailingComments<'_> 
             .find(|comment| comment.line_position().is_own_line())
         {
             let actual = lines_before(comment.start(), f.context().source()).saturating_sub(1);
+            for _ in actual..self.empty_lines {
+                write!(f, [empty_line()])?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Format the empty lines between a node and its leading comments.
+///
+/// For example, given:
+/// ```python
+/// # comment
+///
+/// class Class:
+///     ...
+/// ```
+///
+/// While `leading_comments` will preserve the existing empty line, this builder will insert an
+/// additional empty line before the comment.
+pub(crate) fn empty_lines_after_leading_comments<'a>(
+    f: &PyFormatter,
+    comments: &'a [SourceComment],
+) -> FormatEmptyLinesAfterLeadingComments<'a> {
+    // Black has different rules for stub vs. non-stub and top level vs. indented
+    let empty_lines = match (f.options().source_type(), f.context().node_level()) {
+        (PySourceType::Stub, NodeLevel::TopLevel(_)) => 1,
+        (PySourceType::Stub, _) => 0,
+        (_, NodeLevel::TopLevel(_)) => 2,
+        (_, _) => 1,
+    };
+
+    FormatEmptyLinesAfterLeadingComments {
+        comments,
+        empty_lines,
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct FormatEmptyLinesAfterLeadingComments<'a> {
+    /// The leading comments of the node.
+    comments: &'a [SourceComment],
+    /// The expected number of empty lines after the leading comments.
+    empty_lines: u32,
+}
+
+impl Format<PyFormatContext<'_>> for FormatEmptyLinesAfterLeadingComments<'_> {
+    fn fmt(&self, f: &mut Formatter<PyFormatContext>) -> FormatResult<()> {
+        if let Some(comment) = self
+            .comments
+            .iter()
+            .rev()
+            .find(|comment| comment.line_position().is_own_line())
+        {
+            let actual = lines_after(comment.end(), f.context().source()).saturating_sub(1);
+            // If there are no empty lines, keep the comment tight to the node.
+            if actual == 0 {
+                return Ok(());
+            }
+
+            // If there are more than enough empty lines already, `leading_comments` will
+            // trim them as necessary.
+            if actual >= self.empty_lines {
+                return Ok(());
+            }
+
             for _ in actual..self.empty_lines {
                 write!(f, [empty_line()])?;
             }

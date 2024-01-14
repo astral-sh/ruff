@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/import.py
 ---
 ## Input
-```py
+```python
 from a import aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
 from a import aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa, aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
 from a import aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa as dfgsdfgsd, aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa as sdkjflsdjlahlfd
@@ -14,6 +14,8 @@ import foo\
 
 from foo\
     .bar import baz
+
+import tqdm  . tqdm
 
 # At the top-level, force one empty line after an import, but allow up to two empty
 # lines.
@@ -92,7 +94,7 @@ x = 1
 ```
 
 ## Output
-```py
+```python
 from a import (
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa,
 )
@@ -109,6 +111,8 @@ from a import (
 import foo.bar
 
 from foo.bar import baz
+
+import tqdm.tqdm
 
 # At the top-level, force one empty line after an import, but allow up to two empty
 # lines.

@@ -4,7 +4,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -84,7 +84,15 @@ pub(crate) fn non_unique_enums(checker: &mut Checker, parent: &Stmt, body: &[Stm
             }
         }
 
-        if !seen_targets.insert(ComparableExpr::from(value)) {
+        let comparable = ComparableExpr::from(value);
+
+        if checker.source_type == PySourceType::Stub
+            && comparable == ComparableExpr::EllipsisLiteral
+        {
+            continue;
+        }
+
+        if !seen_targets.insert(comparable) {
             let diagnostic = Diagnostic::new(
                 NonUniqueEnums {
                     value: checker.generator().expr(value),

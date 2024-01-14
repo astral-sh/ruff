@@ -1,5 +1,5 @@
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
-use ruff_python_ast::{Constant, Expr, ExprCall, ExprConstant};
+use ruff_python_ast::{Expr, ExprBooleanLiteral, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -8,7 +8,7 @@ use crate::rules::flake8_use_pathlib::rules::{
     Glob, OsPathGetatime, OsPathGetctime, OsPathGetmtime, OsPathGetsize,
 };
 use crate::rules::flake8_use_pathlib::violations::{
-    BuiltinOpen, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
+    BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsMakedirs, OsMkdir, OsPathAbspath, OsPathBasename,
     OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir, OsPathIsfile,
     OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove, OsRename,
     OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
@@ -60,12 +60,22 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                 ["os", "path", "join"] => Some(
                     OsPathJoin {
                         module: "path".to_string(),
+                        joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                            Joiner::Joinpath
+                        } else {
+                            Joiner::Slash
+                        },
                     }
                     .into(),
                 ),
                 ["os", "sep", "join"] => Some(
                     OsPathJoin {
                         module: "sep".to_string(),
+                        joiner: if call.arguments.args.iter().any(Expr::is_starred_expr) {
+                            Joiner::Joinpath
+                        } else {
+                            Joiner::Slash
+                        },
                     }
                     .into(),
                 ),
@@ -108,24 +118,13 @@ pub(crate) fn replaceable_by_pathlib(checker: &mut Checker, call: &ExprCall) {
                         .is_some_and(|expr| {
                             !matches!(
                                 expr,
-                                Expr::Constant(ExprConstant {
-                                    value: Constant::Bool(true),
-                                    ..
-                                })
+                                Expr::BooleanLiteral(ExprBooleanLiteral { value: true, .. })
                             )
                         })
                         || call
                             .arguments
                             .find_argument("opener", 7)
-                            .is_some_and(|expr| {
-                                !matches!(
-                                    expr,
-                                    Expr::Constant(ExprConstant {
-                                        value: Constant::None,
-                                        ..
-                                    })
-                                )
-                            })
+                            .is_some_and(|expr| !expr.is_none_literal_expr())
                     {
                         return None;
                     }

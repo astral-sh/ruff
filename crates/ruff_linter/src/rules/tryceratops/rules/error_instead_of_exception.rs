@@ -23,7 +23,7 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// import logging
 ///
 ///
-/// def foo():
+/// def func():
 ///     try:
 ///         raise NotImplementedError
 ///     except NotImplementedError:
@@ -35,10 +35,10 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// import logging
 ///
 ///
-/// def foo():
+/// def func():
 ///     try:
 ///         raise NotImplementedError
-///     except NotImplementedError as exc:
+///     except NotImplementedError:
 ///         logging.exception("Exception occurred")
 /// ```
 ///

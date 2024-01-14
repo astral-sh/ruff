@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::whitespace::indentation;
-use ruff_python_ast::{self as ast, Comprehension, Expr, MatchCase, ModModule, Parameters};
+use ruff_python_ast::{
+    self as ast, AnyNodeRef, Comprehension, Expr, MatchCase, ModModule, Parameters,
+};
 use ruff_python_trivia::{
     find_only_token_in_range, indentation_at_offset, BackwardsTokenizer, CommentRanges,
     SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -281,14 +282,14 @@ fn handle_enclosed_comment<'a>(
         AnyNodeRef::StmtImportFrom(import_from) => handle_import_from_comment(comment, import_from),
         AnyNodeRef::StmtWith(with_) => handle_with_comment(comment, with_),
         AnyNodeRef::ExprCall(_) => handle_call_comment(comment),
-        AnyNodeRef::ExprConstant(_) => {
-            if let Some(AnyNodeRef::ExprFString(fstring)) = comment.enclosing_parent() {
+        AnyNodeRef::ExprStringLiteral(_) => {
+            if let Some(AnyNodeRef::FString(fstring)) = comment.enclosing_parent() {
                 CommentPlacement::dangling(fstring, comment)
             } else {
                 CommentPlacement::Default(comment)
             }
         }
-        AnyNodeRef::ExprFString(fstring) => CommentPlacement::dangling(fstring, comment),
+        AnyNodeRef::FString(fstring) => CommentPlacement::dangling(fstring, comment),
         AnyNodeRef::ExprList(_)
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
@@ -347,9 +348,9 @@ fn handle_end_of_line_comment_around_body<'a>(
     // ```
     // The first earlier branch filters out ambiguities e.g. around try-except-finally.
     if let Some(preceding) = comment.preceding_node() {
-        if let Some(last_child) = last_child_in_body(preceding) {
+        if let Some(last_child) = preceding.last_child_in_body() {
             let innermost_child =
-                std::iter::successors(Some(last_child), |parent| last_child_in_body(*parent))
+                std::iter::successors(Some(last_child), AnyNodeRef::last_child_in_body)
                     .last()
                     .unwrap_or(last_child);
             return CommentPlacement::trailing(innermost_child, comment);
@@ -544,6 +545,10 @@ fn handle_own_line_comment_between_statements<'a>(
         return CommentPlacement::Default(comment);
     }
 
+    if comment.line_position().is_end_of_line() {
+        return CommentPlacement::Default(comment);
+    }
+
     // If the comment is directly attached to the following statement; make it a leading
     // comment:
     // ```python
@@ -670,7 +675,7 @@ fn handle_own_line_comment_after_branch<'a>(
     preceding: AnyNodeRef<'a>,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    let Some(last_child) = last_child_in_body(preceding) else {
+    let Some(last_child) = preceding.last_child_in_body() else {
         return CommentPlacement::Default(comment);
     };
 
@@ -734,7 +739,7 @@ fn handle_own_line_comment_after_branch<'a>(
                 return CommentPlacement::trailing(last_child_in_parent, comment);
             }
             Ordering::Greater => {
-                if let Some(nested_child) = last_child_in_body(last_child_in_parent) {
+                if let Some(nested_child) = last_child_in_parent.last_child_in_body() {
                     // The comment belongs to the inner block.
                     parent = Some(last_child_in_parent);
                     last_child_in_parent = nested_child;
@@ -1878,8 +1883,7 @@ fn handle_lambda_comment<'a>(
     CommentPlacement::Default(comment)
 }
 
-/// Attach trailing end-of-line comments on the operator as dangling comments on the enclosing
-/// node.
+/// Move comment between a unary op and its operand before the unary op by marking them as trailing.
 ///
 /// For example, given:
 /// ```python
@@ -1896,26 +1900,27 @@ fn handle_unary_op_comment<'a>(
     unary_op: &'a ast::ExprUnaryOp,
     locator: &Locator,
 ) -> CommentPlacement<'a> {
-    if comment.line_position().is_own_line() {
-        return CommentPlacement::Default(comment);
-    }
-
-    if comment.start() > unary_op.operand.start() {
-        return CommentPlacement::Default(comment);
-    }
-
-    let tokenizer = SimpleTokenizer::new(
+    let mut tokenizer = SimpleTokenizer::new(
         locator.contents(),
-        TextRange::new(comment.start(), unary_op.operand.start()),
-    );
-    if tokenizer
-        .skip_trivia()
-        .any(|token| token.kind == SimpleTokenKind::LParen)
-    {
-        return CommentPlacement::Default(comment);
+        TextRange::new(unary_op.start(), unary_op.operand.start()),
+    )
+    .skip_trivia();
+    let op_token = tokenizer.next();
+    debug_assert!(op_token.is_some_and(|token| matches!(
+        token.kind,
+        SimpleTokenKind::Tilde
+            | SimpleTokenKind::Not
+            | SimpleTokenKind::Plus
+            | SimpleTokenKind::Minus
+    )));
+    let up_to = tokenizer
+        .find(|token| token.kind == SimpleTokenKind::LParen)
+        .map_or(unary_op.operand.start(), |lparen| lparen.start());
+    if comment.end() < up_to {
+        CommentPlacement::leading(unary_op, comment)
+    } else {
+        CommentPlacement::Default(comment)
     }
-
-    CommentPlacement::dangling(comment.enclosing_node(), comment)
 }
 
 /// Attach an end-of-line comment immediately following an open bracket as a dangling comment on
@@ -2176,65 +2181,6 @@ where
     right.is_some_and(|right| left.ptr_eq(right.into()))
 }
 
-/// The last child of the last branch, if the node has multiple branches.
-fn last_child_in_body(node: AnyNodeRef) -> Option<AnyNodeRef> {
-    let body = match node {
-        AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. })
-        | AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. })
-        | AnyNodeRef::StmtWith(ast::StmtWith { body, .. })
-        | AnyNodeRef::MatchCase(MatchCase { body, .. })
-        | AnyNodeRef::ExceptHandlerExceptHandler(ast::ExceptHandlerExceptHandler {
-            body, ..
-        })
-        | AnyNodeRef::ElifElseClause(ast::ElifElseClause { body, .. }) => body,
-        AnyNodeRef::StmtIf(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => elif_else_clauses.last().map_or(body, |clause| &clause.body),
-
-        AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. })
-        | AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => {
-            if orelse.is_empty() {
-                body
-            } else {
-                orelse
-            }
-        }
-
-        AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => {
-            return cases.last().map(AnyNodeRef::from);
-        }
-
-        AnyNodeRef::StmtTry(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
-            if finalbody.is_empty() {
-                if orelse.is_empty() {
-                    if handlers.is_empty() {
-                        body
-                    } else {
-                        return handlers.last().map(AnyNodeRef::from);
-                    }
-                } else {
-                    orelse
-                }
-            } else {
-                finalbody
-            }
-        }
-
-        // Not a node that contains an indented child node.
-        _ => return None,
-    };
-
-    body.last().map(AnyNodeRef::from)
-}
-
 /// Returns `true` if `statement` is the first statement in an alternate `body` (e.g. the else of an if statement)
 fn is_first_statement_in_alternate_body(statement: AnyNodeRef, has_body: AnyNodeRef) -> bool {
     match has_body {
@@ -2335,10 +2281,10 @@ mod tests {
 
         assert_eq!(
             max_empty_lines(
-                r#"# This multiline comments section
+                r"# This multiline comments section
 # should be split from the statement
 # above by two lines.
-"#
+"
             ),
             0
         );

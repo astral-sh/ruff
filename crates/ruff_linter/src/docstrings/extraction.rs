@@ -1,30 +1,23 @@
 //! Extract docstrings from an AST.
 
-use ruff_python_ast::{self as ast, Constant, Expr, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{Definition, DefinitionId, Definitions, Member, MemberKind};
 
 /// Extract a docstring from a function or class body.
-pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
+pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&ast::ExprStringLiteral> {
     let stmt = suite.first()?;
     // Require the docstring to be a standalone expression.
     let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt else {
         return None;
     };
     // Only match strings.
-    if !matches!(
-        value.as_ref(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(_),
-            ..
-        })
-    ) {
-        return None;
-    }
-    Some(value)
+    value.as_string_literal_expr()
 }
 
 /// Extract a docstring from a `Definition`.
-pub(crate) fn extract_docstring<'a>(definition: &'a Definition<'a>) -> Option<&'a Expr> {
+pub(crate) fn extract_docstring<'a>(
+    definition: &'a Definition<'a>,
+) -> Option<&'a ast::ExprStringLiteral> {
     match definition {
         Definition::Module(module) => docstring_from(module.python_ast),
         Definition::Member(member) => docstring_from(member.body()),

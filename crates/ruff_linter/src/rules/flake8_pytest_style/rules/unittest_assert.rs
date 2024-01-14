@@ -2,7 +2,7 @@ use std::hash::BuildHasherDefault;
 
 use anyhow::{anyhow, bail, Result};
 use ruff_python_ast::{
-    self as ast, Arguments, CmpOp, Constant, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
+    self as ast, Arguments, CmpOp, Expr, ExprContext, Identifier, Keyword, Stmt, UnaryOp,
 };
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
@@ -368,8 +368,7 @@ impl UnittestAssert {
                 } else {
                     CmpOp::IsNot
                 };
-                let node = Expr::Constant(ast::ExprConstant {
-                    value: Constant::None,
+                let node = Expr::NoneLiteral(ast::ExprNoneLiteral {
                     range: TextRange::default(),
                 });
                 let expr = compare(expr, cmp_op, &node);

@@ -18,7 +18,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
 use crate::docstrings::Docstring;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
 
 /// ## What it does
@@ -1388,12 +1388,9 @@ fn blanks_and_section_underline(
                         },
                         docstring.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        let range =
-                            TextRange::new(context.following_range().start(), blank_lines_end);
-                        // Delete any blank lines between the header and the underline.
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                    }
+                    let range = TextRange::new(context.following_range().start(), blank_lines_end);
+                    // Delete any blank lines between the header and the underline.
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1412,20 +1409,18 @@ fn blanks_and_section_underline(
                         },
                         docstring.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        // Replace the existing underline with a line of the appropriate length.
-                        let content = format!(
-                            "{}{}{}",
-                            clean_space(docstring.indentation),
-                            "-".repeat(context.section_name().len()),
-                            checker.stylist().line_ending().as_str()
-                        );
-                        diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                            content,
-                            blank_lines_end,
-                            non_blank_line.full_end(),
-                        )));
-                    };
+                    // Replace the existing underline with a line of the appropriate length.
+                    let content = format!(
+                        "{}{}{}",
+                        clean_space(docstring.indentation),
+                        "-".repeat(context.section_name().len()),
+                        checker.stylist().line_ending().as_str()
+                    );
+                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                        content,
+                        blank_lines_end,
+                        non_blank_line.full_end(),
+                    )));
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1439,19 +1434,17 @@ fn blanks_and_section_underline(
                         },
                         docstring.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        // Replace the existing indentation with whitespace of the appropriate length.
-                        let range = TextRange::at(
-                            blank_lines_end,
-                            leading_space.text_len() + TextSize::from(1),
-                        );
-                        let contents = clean_space(docstring.indentation);
-                        diagnostic.set_fix(Fix::safe_edit(if contents.is_empty() {
-                            Edit::range_deletion(range)
-                        } else {
-                            Edit::range_replacement(contents, range)
-                        }));
-                    };
+                    // Replace the existing indentation with whitespace of the appropriate length.
+                    let range = TextRange::at(
+                        blank_lines_end,
+                        leading_space.text_len() + TextSize::from(1),
+                    );
+                    let contents = clean_space(docstring.indentation);
+                    diagnostic.set_fix(Fix::safe_edit(if contents.is_empty() {
+                        Edit::range_deletion(range)
+                    } else {
+                        Edit::range_replacement(contents, range)
+                    }));
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1484,13 +1477,11 @@ fn blanks_and_section_underline(
                             },
                             docstring.range(),
                         );
-                        if checker.patch(diagnostic.kind.rule()) {
-                            // Delete any blank lines between the header and content.
-                            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                                line_after_dashes.start(),
-                                blank_lines_after_dashes_end,
-                            )));
-                        }
+                        // Delete any blank lines between the header and content.
+                        diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                            line_after_dashes.start(),
+                            blank_lines_after_dashes_end,
+                        )));
                         checker.diagnostics.push(diagnostic);
                     }
                 }
@@ -1516,31 +1507,29 @@ fn blanks_and_section_underline(
                     },
                     docstring.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Add a dashed line (of the appropriate length) under the section header.
-                    let content = format!(
-                        "{}{}{}",
-                        checker.stylist().line_ending().as_str(),
-                        clean_space(docstring.indentation),
-                        "-".repeat(context.section_name().len()),
-                    );
-                    if equal_line_found
-                        && non_blank_line.trim_whitespace().len() == context.section_name().len()
-                    {
-                        // If an existing underline is an equal sign line of the appropriate length,
-                        // replace it with a dashed line.
-                        diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-                            content,
-                            context.summary_range().end(),
-                            non_blank_line.end(),
-                        )));
-                    } else {
-                        // Otherwise, insert a dashed line after the section header.
-                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                            content,
-                            context.summary_range().end(),
-                        )));
-                    }
+                // Add a dashed line (of the appropriate length) under the section header.
+                let content = format!(
+                    "{}{}{}",
+                    checker.stylist().line_ending().as_str(),
+                    clean_space(docstring.indentation),
+                    "-".repeat(context.section_name().len()),
+                );
+                if equal_line_found
+                    && non_blank_line.trim_whitespace().len() == context.section_name().len()
+                {
+                    // If an existing underline is an equal sign line of the appropriate length,
+                    // replace it with a dashed line.
+                    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+                        content,
+                        context.summary_range().end(),
+                        non_blank_line.end(),
+                    )));
+                } else {
+                    // Otherwise, insert a dashed line after the section header.
+                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                        content,
+                        context.summary_range().end(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -1552,12 +1541,9 @@ fn blanks_and_section_underline(
                         },
                         docstring.range(),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
-                        let range =
-                            TextRange::new(context.following_range().start(), blank_lines_end);
-                        // Delete any blank lines between the header and content.
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                    }
+                    let range = TextRange::new(context.following_range().start(), blank_lines_end);
+                    // Delete any blank lines between the header and content.
+                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -1572,20 +1558,18 @@ fn blanks_and_section_underline(
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Add a dashed line (of the appropriate length) under the section header.
-                let content = format!(
-                    "{}{}{}",
-                    checker.stylist().line_ending().as_str(),
-                    clean_space(docstring.indentation),
-                    "-".repeat(context.section_name().len()),
-                );
+            // Add a dashed line (of the appropriate length) under the section header.
+            let content = format!(
+                "{}{}{}",
+                checker.stylist().line_ending().as_str(),
+                clean_space(docstring.indentation),
+                "-".repeat(context.section_name().len()),
+            );
 
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    content,
-                    context.summary_range().end(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                content,
+                context.summary_range().end(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
         if checker.enabled(Rule::EmptyDocstringSection) {
@@ -1614,15 +1598,13 @@ fn common_section(
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Replace the section title with the capitalized variant. This requires
-                // locating the start and end of the section name.
-                let section_range = context.section_name_range();
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    capitalized_section_name.to_string(),
-                    section_range,
-                )));
-            }
+            // Replace the section title with the capitalized variant. This requires
+            // locating the start and end of the section name.
+            let section_range = context.section_name_range();
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                capitalized_section_name.to_string(),
+                section_range,
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -1636,17 +1618,15 @@ fn common_section(
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Replace the existing indentation with whitespace of the appropriate length.
-                let content = clean_space(docstring.indentation);
-                let fix_range = TextRange::at(context.start(), leading_space.text_len());
+            // Replace the existing indentation with whitespace of the appropriate length.
+            let content = clean_space(docstring.indentation);
+            let fix_range = TextRange::at(context.start(), leading_space.text_len());
 
-                diagnostic.set_fix(Fix::safe_edit(if content.is_empty() {
-                    Edit::range_deletion(fix_range)
-                } else {
-                    Edit::range_replacement(content, fix_range)
-                }));
-            };
+            diagnostic.set_fix(Fix::safe_edit(if content.is_empty() {
+                Edit::range_deletion(fix_range)
+            } else {
+                Edit::range_replacement(content, fix_range)
+            }));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -1662,13 +1642,11 @@ fn common_section(
                     },
                     docstring.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Add a newline at the beginning of the next section.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        line_end.to_string(),
-                        next.start(),
-                    )));
-                }
+                // Add a newline at the beginning of the next section.
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    line_end.to_string(),
+                    next.start(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         } else {
@@ -1679,13 +1657,11 @@ fn common_section(
                     },
                     docstring.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Add a newline after the section.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        format!("{}{}", line_end, docstring.indentation),
-                        context.end(),
-                    )));
-                }
+                // Add a newline after the section.
+                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                    format!("{}{}", line_end, docstring.indentation),
+                    context.end(),
+                )));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -1702,13 +1678,11 @@ fn common_section(
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Add a blank line before the section.
-                diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    line_end.to_string(),
-                    context.start(),
-                )));
-            }
+            // Add a blank line before the section.
+            diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                line_end.to_string(),
+                context.start(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -1898,13 +1872,11 @@ fn numpy_section(
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                let section_range = context.section_name_range();
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
-                    section_range.end(),
-                    suffix.text_len(),
-                ))));
-            }
+            let section_range = context.section_name_range();
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::at(
+                section_range.end(),
+                suffix.text_len(),
+            ))));
 
             checker.diagnostics.push(diagnostic);
         }
@@ -1934,14 +1906,12 @@ fn google_section(
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Replace the suffix.
-                let section_name_range = context.section_name_range();
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    ":".to_string(),
-                    TextRange::at(section_name_range.end(), suffix.text_len()),
-                )));
-            }
+            // Replace the suffix.
+            let section_name_range = context.section_name_range();
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                ":".to_string(),
+                TextRange::at(section_name_range.end(), suffix.text_len()),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

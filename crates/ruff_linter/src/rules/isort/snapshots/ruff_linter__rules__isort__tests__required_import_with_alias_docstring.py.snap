@@ -8,9 +8,9 @@ docstring.py:1:1: I002 [*] Missing required import: `from __future__ import anno
 2 | 
 3 | x = 1
   |
-  = help: Insert required import: `from future import annotations as _annotations`
+  = help: Insert required import: `from __future__ import annotations as _annotations`
 
-ℹ Fix
+ℹ Safe fix
 1 1 | """Hello, world!"""
   2 |+from __future__ import annotations as _annotations
 2 3 | 

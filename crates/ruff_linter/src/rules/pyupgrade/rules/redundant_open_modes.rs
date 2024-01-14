@@ -4,14 +4,13 @@ use anyhow::{anyhow, Result};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, PySourceType};
+use ruff_python_ast::{self as ast, Expr, PySourceType};
 use ruff_python_parser::{lexer, AsMode};
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for redundant `open` mode parameters.
@@ -72,22 +71,17 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
         None => {
             if !call.arguments.is_empty() {
                 if let Some(keyword) = call.arguments.find_keyword(MODE_KEYWORD_ARGUMENT) {
-                    if let Expr::Constant(ast::ExprConstant {
-                        value:
-                            Constant::Str(ast::StringConstant {
-                                value: mode_param_value,
-                                ..
-                            }),
+                    if let Expr::StringLiteral(ast::ExprStringLiteral {
+                        value: mode_param_value,
                         ..
                     }) = &keyword.value
                     {
-                        if let Ok(mode) = OpenMode::from_str(mode_param_value) {
+                        if let Ok(mode) = OpenMode::from_str(mode_param_value.to_str()) {
                             checker.diagnostics.push(create_check(
                                 call,
                                 &keyword.value,
                                 mode.replacement_value(),
                                 checker.locator(),
-                                checker.patch(Rule::RedundantOpenModes),
                                 checker.source_type,
                             ));
                         }
@@ -96,18 +90,13 @@ pub(crate) fn redundant_open_modes(checker: &mut Checker, call: &ast::ExprCall) 
             }
         }
         Some(mode_param) => {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(value),
-                ..
-            }) = &mode_param
-            {
-                if let Ok(mode) = OpenMode::from_str(value) {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &mode_param {
+                if let Ok(mode) = OpenMode::from_str(value.to_str()) {
                     checker.diagnostics.push(create_check(
                         call,
                         mode_param,
                         mode.replacement_value(),
                         checker.locator(),
-                        checker.patch(Rule::RedundantOpenModes),
                         checker.source_type,
                     ));
                 }
@@ -174,7 +163,6 @@ fn create_check<T: Ranged>(
     mode_param: &Expr,
     replacement_value: Option<&str>,
     locator: &Locator,
-    patch: bool,
     source_type: PySourceType,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
@@ -183,18 +171,18 @@ fn create_check<T: Ranged>(
         },
         expr.range(),
     );
-    if patch {
-        if let Some(content) = replacement_value {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                content.to_string(),
-                mode_param.range(),
-            )));
-        } else {
-            diagnostic.try_set_fix(|| {
-                create_remove_param_fix(locator, expr, mode_param, source_type).map(Fix::safe_edit)
-            });
-        }
+
+    if let Some(content) = replacement_value {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            content.to_string(),
+            mode_param.range(),
+        )));
+    } else {
+        diagnostic.try_set_fix(|| {
+            create_remove_param_fix(locator, expr, mode_param, source_type).map(Fix::safe_edit)
+        });
     }
+
     diagnostic
 }
 

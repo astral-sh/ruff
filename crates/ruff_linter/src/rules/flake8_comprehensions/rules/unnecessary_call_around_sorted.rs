@@ -1,10 +1,10 @@
-use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
@@ -30,6 +30,14 @@ use crate::rules::flake8_comprehensions::fixes;
 /// ```python
 /// sorted(iterable, reverse=True)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as `reversed` and `reverse=True` will
+/// yield different results in the event of custom sort keys or equality
+/// functions. Specifically, `reversed` will reverse the order of the
+/// collection, while `sorted` with `reverse=True` will perform a stable
+/// reverse sort, which will preserve the order of elements that compare as
+/// equal.
 #[violation]
 pub struct UnnecessaryCallAroundSorted {
     func: String,
@@ -82,19 +90,15 @@ pub(crate) fn unnecessary_call_around_sorted(
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let edit = fixes::fix_unnecessary_call_around_sorted(
-                expr,
-                checker.locator(),
-                checker.stylist(),
-            )?;
+    diagnostic.try_set_fix(|| {
+        Ok(Fix::applicable_edit(
+            fixes::fix_unnecessary_call_around_sorted(expr, checker.locator(), checker.stylist())?,
             if outer.id == "reversed" {
-                Ok(Fix::unsafe_edit(edit))
+                Applicability::Unsafe
             } else {
-                Ok(Fix::safe_edit(edit))
-            }
-        });
-    }
+                Applicability::Safe
+            },
+        ))
+    });
     checker.diagnostics.push(diagnostic);
 }

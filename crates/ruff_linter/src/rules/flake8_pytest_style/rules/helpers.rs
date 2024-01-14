@@ -1,22 +1,21 @@
-use ruff_python_ast::{self as ast, Constant, Decorator, Expr, Keyword};
+use ruff_python_ast::{self as ast, Decorator, Expr, Keyword};
 
-use ruff_python_ast::call_path::{collect_call_path, CallPath};
+use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::PythonWhitespace;
 
 pub(super) fn get_mark_decorators(
     decorators: &[Decorator],
-) -> impl Iterator<Item = (&Decorator, CallPath)> {
+) -> impl Iterator<Item = (&Decorator, &str)> {
     decorators.iter().filter_map(|decorator| {
         let Some(call_path) = collect_call_path(map_callable(&decorator.expression)) else {
             return None;
         };
-        if call_path.len() > 2 && call_path.as_slice()[..2] == ["pytest", "mark"] {
-            Some((decorator, call_path))
-        } else {
-            None
-        }
+        let ["pytest", "mark", marker] = call_path.as_slice() else {
+            return None;
+        };
+        Some((decorator, *marker))
     })
 }
 
@@ -45,11 +44,7 @@ pub(super) fn is_pytest_parametrize(decorator: &Decorator, semantic: &SemanticMo
 }
 
 pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(ast::StringConstant { value, .. }),
-        ..
-    }) = &keyword.value
-    {
+    if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &keyword.value {
         value == literal
     } else {
         false
@@ -58,15 +53,27 @@ pub(super) fn keyword_is_literal(keyword: &Keyword, literal: &str) -> bool {
 
 pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
     match expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(string),
-            ..
-        }) => string.is_empty(),
-        Expr::Constant(constant) if constant.value.is_none() => true,
-        Expr::FString(ast::ExprFString { values, .. }) => {
-            values.iter().all(is_empty_or_null_string)
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+        Expr::NoneLiteral(_) => true,
+        Expr::FString(ast::ExprFString { value, .. }) => {
+            value.iter().all(|f_string_part| match f_string_part {
+                ast::FStringPart::Literal(literal) => literal.is_empty(),
+                ast::FStringPart::FString(f_string) => f_string
+                    .elements
+                    .iter()
+                    .all(is_empty_or_null_fstring_element),
+            })
         }
         _ => false,
+    }
+}
+
+fn is_empty_or_null_fstring_element(element: &ast::FStringElement) -> bool {
+    match element {
+        ast::FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => value.is_empty(),
+        ast::FStringElement::Expression(ast::FStringExpressionElement { expression, .. }) => {
+            is_empty_or_null_string(expression)
+        }
     }
 }
 

@@ -1,6 +1,6 @@
-use ruff_formatter::{format_args, write, Buffer, FormatError, FormatResult};
+use ruff_formatter::{format_args, write, Buffer, FormatResult};
 use ruff_python_ast::{Comprehension, Expr};
-use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::{find_only_token_in_range, SimpleTokenKind};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{leading_comments, trailing_comments, SourceComment};
@@ -42,27 +42,14 @@ impl FormatNodeRule<Comprehension> for FormatComprehension {
             dangling_item_comments.partition_point(|comment| comment.end() < target.start()),
         );
 
-        let maybe_in_token = SimpleTokenizer::new(
-            f.context().source(),
+        let in_token = find_only_token_in_range(
             TextRange::new(target.end(), iter.start()),
-        )
-        .skip_trivia()
-        .next();
-
-        let Some(
-            in_keyword @ SimpleToken {
-                kind: SimpleTokenKind::In,
-                ..
-            },
-        ) = maybe_in_token
-        else {
-            return Err(FormatError::syntax_error(
-                "Expected `in` keyword between the `target` and `iter`.",
-            ));
-        };
+            SimpleTokenKind::In,
+            f.context().source(),
+        );
 
         let (before_in_comments, dangling_comments) = dangling_comments.split_at(
-            dangling_comments.partition_point(|comment| comment.end() < in_keyword.start()),
+            dangling_comments.partition_point(|comment| comment.end() < in_token.start()),
         );
 
         let (trailing_in_comments, dangling_if_comments) = dangling_comments

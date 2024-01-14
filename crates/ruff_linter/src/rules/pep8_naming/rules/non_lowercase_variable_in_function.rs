@@ -53,6 +53,15 @@ impl Violation for NonLowercaseVariableInFunction {
 
 /// N806
 pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &Expr, name: &str) {
+    // Ignore globals.
+    if checker
+        .semantic()
+        .lookup_symbol(name)
+        .is_some_and(|id| checker.semantic().binding(id).is_global())
+    {
+        return;
+    }
+
     if checker
         .settings
         .pep8_naming
@@ -72,6 +81,7 @@ pub(crate) fn non_lowercase_variable_in_function(checker: &mut Checker, expr: &E
         || helpers::is_typed_dict_assignment(parent, checker.semantic())
         || helpers::is_type_var_assignment(parent, checker.semantic())
         || helpers::is_type_alias_assignment(parent, checker.semantic())
+        || helpers::is_django_model_import(name, parent, checker.semantic())
     {
         return;
     }

@@ -22,3 +22,7 @@ Snake_case_alias: TypeAlias = int | float  # PYI042, since not camel case
 
 # check that this edge case doesn't crash
 _: TypeAlias = str | int
+
+# PEP 695
+type foo_bar = int | str
+type FooBar = int | str

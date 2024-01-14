@@ -9,7 +9,7 @@ C404.py:1:1: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
   |
   = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1   |-dict([(i, i) for i in range(3)])
   1 |+{i: i for i in range(3)}
 2 2 | dict([(i, i) for i in range(3)], z=4)
@@ -27,7 +27,7 @@ C404.py:7:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
   |
   = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 4 4 | def f(x):
 5 5 |     return x
 6 6 | 
@@ -47,7 +47,7 @@ C404.py:8:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 5 5 |     return x
 6 6 | 
 7 7 | f'{dict([(s,s) for s in "ab"])}'
@@ -67,7 +67,7 @@ C404.py:9:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comp
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 6  6  | 
 7  7  | f'{dict([(s,s) for s in "ab"])}'
 8  8  | f"{dict([(s,s) for s in 'ab'])}"
@@ -88,7 +88,7 @@ C404.py:10:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 7  7  | f'{dict([(s,s) for s in "ab"])}'
 8  8  | f"{dict([(s,s) for s in 'ab'])}"
 9  9  | f"{dict([(s, s) for s in 'ab'])}"
@@ -108,7 +108,7 @@ C404.py:12:4: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 9  9  | f"{dict([(s, s) for s in 'ab'])}"
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
@@ -128,7 +128,7 @@ C404.py:12:34: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 9  9  | f"{dict([(s, s) for s in 'ab'])}"
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
@@ -148,7 +148,7 @@ C404.py:13:5: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` com
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
@@ -168,7 +168,7 @@ C404.py:13:35: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 10 10 | f"{dict([(s,f(s)) for s in 'ab'])}"
 11 11 | 
 12 12 | f'{dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"])}'
@@ -186,7 +186,7 @@ C404.py:16:14: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` co
    |
    = help: Rewrite as a `dict` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 13 13 | f'{ dict([(s,s) for s in "ab"]) | dict([(s,s) for s in "ab"]) }'
 14 14 | 
 15 15 | # Regression test for: https://github.com/astral-sh/ruff/issues/7087

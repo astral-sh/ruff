@@ -43,3 +43,6 @@ if 1 is {1}:
 
 if "a" == "a":
     pass
+
+if 1 in {*[1]}:
+    pass

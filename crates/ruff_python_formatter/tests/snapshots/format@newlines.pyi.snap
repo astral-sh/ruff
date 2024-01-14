@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/newlines.pyi
 ---
 ## Input
-```py
+```python
 ###
 # Blank lines around functions
 ###
@@ -168,7 +168,7 @@ x = 1
 ```
 
 ## Output
-```py
+```python
 ###
 # Blank lines around functions
 ###

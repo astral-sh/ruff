@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::in_dunder_init;
+use crate::rules::pylint::helpers::in_dunder_method;
 
 /// ## What it does
 /// Checks for `__init__` methods that are turned into generators by the
@@ -40,7 +40,7 @@ impl Violation for YieldInInit {
 
 /// PLE0100
 pub(crate) fn yield_in_init(checker: &mut Checker, expr: &Expr) {
-    if in_dunder_init(checker.semantic(), checker.settings) {
+    if in_dunder_method("__init__", checker.semantic(), checker.settings) {
         checker
             .diagnostics
             .push(Diagnostic::new(YieldInInit, expr.range()));

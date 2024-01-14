@@ -19,7 +19,7 @@ expression: comments.debug(test_case.source_code)
         ],
     },
     Node {
-        kind: ExprConstant,
+        kind: ExprNumberLiteral,
         range: 11..12,
         source: `3`,
     }: {

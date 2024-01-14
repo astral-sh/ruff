@@ -1,17 +1,18 @@
+use rustc_hash::FxHashSet;
+
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{
-    self as ast, Arguments, Constant, Expr, Operator, ParameterWithDefault, Parameters, Stmt,
-    UnaryOp,
+    self as ast, Expr, Operator, ParameterWithDefault, Parameters, Stmt, UnaryOp,
 };
-use ruff_python_semantic::{ScopeKind, SemanticModel};
+use ruff_python_semantic::{BindingId, ScopeKind, SemanticModel};
 use ruff_source_file::Locator;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::settings::types::PythonVersion;
 
@@ -282,7 +283,12 @@ fn is_valid_default_value_with_annotation(
     semantic: &SemanticModel,
 ) -> bool {
     match default {
-        Expr::Constant(_) => {
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_) => {
             return true;
         }
         Expr::List(ast::ExprList { elts, .. })
@@ -314,10 +320,7 @@ fn is_valid_default_value_with_annotation(
         }) => {
             match operand.as_ref() {
                 // Ex) `-1`, `-3.14`, `2j`
-                Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(..) | Constant::Float(..) | Constant::Complex { .. },
-                    ..
-                }) => return true,
+                Expr::NumberLiteral(_) => return true,
                 // Ex) `-math.inf`, `-math.pi`, etc.
                 Expr::Attribute(_) => {
                     if semantic
@@ -338,14 +341,14 @@ fn is_valid_default_value_with_annotation(
             range: _,
         }) => {
             // Ex) `1 + 2j`, `1 - 2j`, `-1 - 2j`, `-1 + 2j`
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Complex { .. },
+            if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Complex { .. },
                 ..
             }) = right.as_ref()
             {
                 // Ex) `1 + 2j`, `1 - 2j`
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Int(..) | Constant::Float(..),
+                if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(..) | ast::Number::Float(..),
                     ..
                 }) = left.as_ref()
                 {
@@ -357,8 +360,8 @@ fn is_valid_default_value_with_annotation(
                 }) = left.as_ref()
                 {
                     // Ex) `-1 + 2j`, `-1 - 2j`
-                    if let Expr::Constant(ast::ExprConstant {
-                        value: Constant::Int(..) | Constant::Float(..),
+                    if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(..) | ast::Number::Float(..),
                         ..
                     }) = operand.as_ref()
                     {
@@ -393,13 +396,7 @@ fn is_valid_pep_604_union(annotation: &Expr) -> bool {
                 right,
                 range: _,
             }) => is_valid_pep_604_union_member(left) && is_valid_pep_604_union_member(right),
-            Expr::Name(_)
-            | Expr::Subscript(_)
-            | Expr::Attribute(_)
-            | Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                ..
-            }) => true,
+            Expr::Name(_) | Expr::Subscript(_) | Expr::Attribute(_) | Expr::NoneLiteral(_) => true,
             _ => false,
         }
     }
@@ -427,10 +424,8 @@ fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
             | Expr::Name(_)
             | Expr::Attribute(_)
             | Expr::Subscript(_)
-            | Expr::Constant(ast::ExprConstant {
-                value: Constant::Ellipsis | Constant::None,
-                ..
-            })
+            | Expr::EllipsisLiteral(_)
+            | Expr::NoneLiteral(_)
     ) || is_valid_pep_604_union(default)
 }
 
@@ -476,21 +471,50 @@ fn is_final_assignment(annotation: &Expr, value: &Expr, semantic: &SemanticModel
 }
 
 /// Returns `true` if the a class is an enum, based on its base classes.
-fn is_enum(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
-    let Some(Arguments { args: bases, .. }) = arguments else {
-        return false;
-    };
-    return bases.iter().any(|expr| {
-        semantic.resolve_call_path(expr).is_some_and(|call_path| {
-            matches!(
-                call_path.as_slice(),
-                [
-                    "enum",
-                    "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"
-                ]
-            )
+fn is_enum(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
+    fn inner(
+        class_def: &ast::StmtClassDef,
+        semantic: &SemanticModel,
+        seen: &mut FxHashSet<BindingId>,
+    ) -> bool {
+        class_def.bases().iter().any(|expr| {
+            // If the base class is `enum.Enum`, `enum.Flag`, etc., then this is an enum.
+            if semantic
+                .resolve_call_path(map_subscript(expr))
+                .is_some_and(|call_path| {
+                    matches!(
+                        call_path.as_slice(),
+                        [
+                            "enum",
+                            "Enum" | "Flag" | "IntEnum" | "IntFlag" | "StrEnum" | "ReprEnum"
+                        ]
+                    )
+                })
+            {
+                return true;
+            }
+
+            // If the base class extends `enum.Enum`, `enum.Flag`, etc., then this is an enum.
+            if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
+                if seen.insert(id) {
+                    let binding = semantic.binding(id);
+                    if let Some(base_class) = binding
+                        .kind
+                        .as_class_definition()
+                        .map(|id| &semantic.scopes[*id])
+                        .and_then(|scope| scope.kind.as_class())
+                    {
+                        if inner(base_class, semantic, seen) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
         })
-    });
+    }
+
+    inner(class_def, semantic, &mut FxHashSet::default())
 }
 
 /// Returns `true` if an [`Expr`] is a value that should be annotated with `typing.TypeAlias`.
@@ -499,14 +523,8 @@ fn is_enum(arguments: Option<&Arguments>, semantic: &SemanticModel) -> bool {
 /// valid type alias. In particular, this function checks for uses of `typing.Any`, `None`,
 /// parameterized generics, and PEP 604-style unions.
 fn is_annotatable_type_alias(value: &Expr, semantic: &SemanticModel) -> bool {
-    matches!(
-        value,
-        Expr::Subscript(_)
-            | Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                ..
-            }),
-    ) || is_valid_pep_604_union(value)
+    matches!(value, Expr::Subscript(_) | Expr::NoneLiteral(_))
+        || is_valid_pep_604_union(value)
         || semantic.match_typing_expr(value, "Any")
 }
 
@@ -534,12 +552,10 @@ pub(crate) fn typed_argument_simple_defaults(checker: &mut Checker, parameters: 
             ) {
                 let mut diagnostic = Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        "...".to_string(),
-                        default.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "...".to_string(),
+                    default.range(),
+                )));
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -571,12 +587,10 @@ pub(crate) fn argument_simple_defaults(checker: &mut Checker, parameters: &Param
             ) {
                 let mut diagnostic = Diagnostic::new(ArgumentDefaultInStub, default.range());
 
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        "...".to_string(),
-                        default.range(),
-                    )));
-                }
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                    "...".to_string(),
+                    default.range(),
+                )));
 
                 checker.diagnostics.push(diagnostic);
             }
@@ -606,12 +620,10 @@ pub(crate) fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr]
     }
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            "...".to_string(),
-            value.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "...".to_string(),
+        value.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -642,12 +654,10 @@ pub(crate) fn annotated_assignment_default_in_stub(
     }
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            "...".to_string(),
-            value.range(),
-        )));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        "...".to_string(),
+        value.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -676,10 +686,8 @@ pub(crate) fn unannotated_assignment_in_stub(
         return;
     }
 
-    if let ScopeKind::Class(ast::StmtClassDef { arguments, .. }) =
-        checker.semantic().current_scope().kind
-    {
-        if is_enum(arguments.as_deref(), checker.semantic()) {
+    if let ScopeKind::Class(class_def) = checker.semantic().current_scope().kind {
+        if is_enum(class_def, checker.semantic()) {
             return;
         }
     }
@@ -741,18 +749,16 @@ pub(crate) fn type_alias_without_annotation(checker: &mut Checker, value: &Expr,
         },
         target.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import(module.as_str(), "TypeAlias"),
-                target.start(),
-                checker.semantic(),
-            )?;
-            Ok(Fix::unsafe_edits(
-                Edit::range_replacement(format!("{id}: {binding}"), target.range()),
-                [import_edit],
-            ))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import(module.as_str(), "TypeAlias"),
+            target.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::safe_edits(
+            Edit::range_replacement(format!("{id}: {binding}"), target.range()),
+            [import_edit],
+        ))
+    });
     checker.diagnostics.push(diagnostic);
 }

@@ -10,7 +10,7 @@ C400.py:1:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
   = help: Rewrite as a `list` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1   |-x = list(x for x in range(3))
   1 |+x = [x for x in range(3)]
 2 2 | x = list(
@@ -28,7 +28,7 @@ C400.py:2:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
   = help: Rewrite as a `list` comprehension
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | x = list(x for x in range(3))
 2   |-x = list(
   2 |+x = [

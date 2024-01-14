@@ -1,9 +1,8 @@
 use std::fmt;
 
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -79,6 +78,50 @@ impl Violation for DjangoUnorderedBodyContentInModel {
     }
 }
 
+/// DJ012
+pub(crate) fn unordered_body_content_in_model(
+    checker: &mut Checker,
+    class_def: &ast::StmtClassDef,
+) {
+    if !helpers::is_model(class_def, checker.semantic()) {
+        return;
+    }
+
+    // Track all the element types we've seen so far.
+    let mut element_types = Vec::new();
+    let mut prev_element_type = None;
+    for element in &class_def.body {
+        let Some(element_type) = get_element_type(element, checker.semantic()) else {
+            continue;
+        };
+
+        // Skip consecutive elements of the same type. It's less noisy to only report
+        // violations at type boundaries (e.g., avoid raising a violation for _every_
+        // field declaration that's out of order).
+        if prev_element_type == Some(element_type) {
+            continue;
+        }
+
+        prev_element_type = Some(element_type);
+
+        if let Some(&prev_element_type) = element_types
+            .iter()
+            .find(|&&prev_element_type| prev_element_type > element_type)
+        {
+            let diagnostic = Diagnostic::new(
+                DjangoUnorderedBodyContentInModel {
+                    element_type,
+                    prev_element_type,
+                },
+                element.range(),
+            );
+            checker.diagnostics.push(diagnostic);
+        } else {
+            element_types.push(element_type);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
 enum ContentType {
     FieldDeclaration,
@@ -138,55 +181,5 @@ fn get_element_type(element: &Stmt, semantic: &SemanticModel) -> Option<ContentT
             _ => Some(ContentType::CustomMethod),
         },
         _ => None,
-    }
-}
-
-/// DJ012
-pub(crate) fn unordered_body_content_in_model(
-    checker: &mut Checker,
-    arguments: Option<&Arguments>,
-    body: &[Stmt],
-) {
-    if !arguments.is_some_and(|arguments| {
-        arguments
-            .args
-            .iter()
-            .any(|base| helpers::is_model(base, checker.semantic()))
-    }) {
-        return;
-    }
-
-    // Track all the element types we've seen so far.
-    let mut element_types = Vec::new();
-    let mut prev_element_type = None;
-    for element in body {
-        let Some(element_type) = get_element_type(element, checker.semantic()) else {
-            continue;
-        };
-
-        // Skip consecutive elements of the same type. It's less noisy to only report
-        // violations at type boundaries (e.g., avoid raising a violation for _every_
-        // field declaration that's out of order).
-        if prev_element_type == Some(element_type) {
-            continue;
-        }
-
-        prev_element_type = Some(element_type);
-
-        if let Some(&prev_element_type) = element_types
-            .iter()
-            .find(|&&prev_element_type| prev_element_type > element_type)
-        {
-            let diagnostic = Diagnostic::new(
-                DjangoUnorderedBodyContentInModel {
-                    element_type,
-                    prev_element_type,
-                },
-                element.range(),
-            );
-            checker.diagnostics.push(diagnostic);
-        } else {
-            element_types.push(element_type);
-        }
     }
 }

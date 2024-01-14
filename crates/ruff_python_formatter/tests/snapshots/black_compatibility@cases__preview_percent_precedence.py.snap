@@ -1,0 +1,99 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/preview_percent_precedence.py
+---
+## Input
+
+```python
+("" % a) ** 2
+("" % a)[0]
+("" % a)()
+("" % a).b
+
+2 * ("" % a)
+2 @ ("" % a)
+2 / ("" % a)
+2 // ("" % a)
+2 % ("" % a)
++("" % a)
+b + ("" % a)
+-("" % a)
+b - ("" % a)
+b + -("" % a)
+~("" % a)
+2 ** ("" % a)
+await ("" % a)
+b[("" % a)]
+b(("" % a))
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -9,9 +9,9 @@
+ 2 // ("" % a)
+ 2 % ("" % a)
+ +("" % a)
+-b + "" % a
++b + ("" % a)
+ -("" % a)
+-b - "" % a
++b - ("" % a)
+ b + -("" % a)
+ ~("" % a)
+ 2 ** ("" % a)
+```
+
+## Ruff Output
+
+```python
+("" % a) ** 2
+("" % a)[0]
+("" % a)()
+("" % a).b
+
+2 * ("" % a)
+2 @ ("" % a)
+2 / ("" % a)
+2 // ("" % a)
+2 % ("" % a)
++("" % a)
+b + ("" % a)
+-("" % a)
+b - ("" % a)
+b + -("" % a)
+~("" % a)
+2 ** ("" % a)
+await ("" % a)
+b[("" % a)]
+b(("" % a))
+```
+
+## Black Output
+
+```python
+("" % a) ** 2
+("" % a)[0]
+("" % a)()
+("" % a).b
+
+2 * ("" % a)
+2 @ ("" % a)
+2 / ("" % a)
+2 // ("" % a)
+2 % ("" % a)
++("" % a)
+b + "" % a
+-("" % a)
+b - "" % a
+b + -("" % a)
+~("" % a)
+2 ** ("" % a)
+await ("" % a)
+b[("" % a)]
+b(("" % a))
+```
+
+

@@ -6,7 +6,6 @@ use ruff_python_ast::helpers::any_over_expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for list comprehensions that are immediately unpacked.
@@ -45,7 +44,7 @@ impl AlwaysFixableViolation for UnpackedListComprehension {
 
 /// UP027
 pub(crate) fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], value: &Expr) {
-    let Some(target) = targets.get(0) else {
+    let Some(target) = targets.first() else {
         return;
     };
 
@@ -67,18 +66,16 @@ pub(crate) fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr
     }
 
     let mut diagnostic = Diagnostic::new(UnpackedListComprehension, value.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let existing = checker.locator().slice(value);
+    let existing = checker.locator().slice(value);
 
-        let mut content = String::with_capacity(existing.len());
-        content.push('(');
-        content.push_str(&existing[1..existing.len() - 1]);
-        content.push(')');
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            content,
-            value.range(),
-        )));
-    }
+    let mut content = String::with_capacity(existing.len());
+    content.push('(');
+    content.push_str(&existing[1..existing.len() - 1]);
+    content.push(')');
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        content,
+        value.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

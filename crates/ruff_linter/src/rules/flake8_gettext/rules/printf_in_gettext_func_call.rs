@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, Operator};
 
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -58,11 +58,7 @@ pub(crate) fn printf_in_gettext_func_call(checker: &mut Checker, args: &[Expr]) 
             ..
         }) = &first
         {
-            if let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_),
-                ..
-            }) = left.as_ref()
-            {
+            if left.is_string_literal_expr() {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/parentheses/opening_parentheses_comment_value.py
 ---
 ## Input
-```py
+```python
 # Opening parentheses end-of-line comment with value in the parentheses
 
 (  # a 1
@@ -157,7 +157,7 @@ f5 = {  # f5
 ```
 
 ## Output
-```py
+```python
 # Opening parentheses end-of-line comment with value in the parentheses
 
 (  # a 1
@@ -253,7 +253,7 @@ except (  # d 9
 
 
 def e1(  # e 1
-    x
+    x,
 ):
     pass
 
@@ -327,7 +327,9 @@ f3 = {  # f3
 
 
 # Non-empty parentheses: These are not allowed without a value
-def f1[T]():  # f1
+def f1[  # f1
+    T
+]():
     pass
 
 

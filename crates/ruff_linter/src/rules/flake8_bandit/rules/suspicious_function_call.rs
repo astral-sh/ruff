@@ -1,10 +1,9 @@
 //! Check for calls to suspicious functions, or calls into suspicious modules.
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html>
-use ruff_python_ast::ExprCall;
-
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -850,10 +849,23 @@ pub(crate) fn suspicious_function_call(checker: &mut Checker, call: &ExprCall) {
             ["" | "builtins", "eval"] => Some(SuspiciousEvalUsage.into()),
             // MarkSafe
             ["django", "utils", "safestring", "mark_safe"] => Some(SuspiciousMarkSafeUsage.into()),
-            // URLOpen
-            ["urllib", "urlopen" | "urlretrieve" | "URLopener" | "FancyURLopener" | "Request"] |
-            ["urllib", "request", "urlopen" | "urlretrieve" | "URLopener" | "FancyURLopener"] |
-            ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" | "URLopener" | "FancyURLopener"] => Some(SuspiciousURLOpenUsage.into()),
+            // URLOpen (`urlopen`, `urlretrieve`, `Request`)
+            ["urllib", "request", "urlopen" | "urlretrieve" | "Request"] |
+            ["six", "moves", "urllib", "request", "urlopen" | "urlretrieve" | "Request"] => {
+                // If the `url` argument is a string literal, allow `http` and `https` schemes.
+                if call.arguments.args.iter().all(|arg| !arg.is_starred_expr()) && call.arguments.keywords.iter().all(|keyword| keyword.arg.is_some()) {
+                    if let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) = &call.arguments.find_argument("url", 0) {
+                        let url = value.to_str().trim_start();
+                        if url.starts_with("http://") || url.starts_with("https://") {
+                            return None;
+                        }
+                    }
+                }
+                Some(SuspiciousURLOpenUsage.into())
+            },
+            // URLOpen (`URLopener`, `FancyURLopener`)
+            ["urllib", "request", "URLopener" | "FancyURLopener"] |
+            ["six", "moves", "urllib", "request", "URLopener" | "FancyURLopener"] => Some(SuspiciousURLOpenUsage.into()),
             // NonCryptographicRandom
             ["random", "random" | "randrange" | "randint" | "choice" | "choices" | "uniform" | "triangular"] => Some(SuspiciousNonCryptographicRandomUsage.into()),
             // UnverifiedContext

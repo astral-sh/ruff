@@ -8,28 +8,26 @@ expression: trace
     - MatchCase
       - PatternMatchClass
         - ExprName
-        - PatternMatchValue
-          - ExprConstant
-            - Int(0)
-        - PatternMatchValue
-          - ExprConstant
-            - Int(0)
+        - PatternArguments
+          - PatternMatchValue
+            - ExprNumberLiteral
+          - PatternMatchValue
+            - ExprNumberLiteral
       - StmtExpr
-        - ExprConstant
-          - Ellipsis
+        - ExprEllipsisLiteral
     - MatchCase
       - PatternMatchClass
         - ExprName
-        - PatternMatchValue
-          - ExprConstant
-            - Int(0)
-        - PatternMatchValue
-          - ExprConstant
-            - Int(0)
-        - PatternMatchValue
-          - ExprConstant
-            - Int(0)
+        - PatternArguments
+          - PatternKeyword
+            - PatternMatchValue
+              - ExprNumberLiteral
+          - PatternKeyword
+            - PatternMatchValue
+              - ExprNumberLiteral
+          - PatternKeyword
+            - PatternMatchValue
+              - ExprNumberLiteral
       - StmtExpr
-        - ExprConstant
-          - Ellipsis
+        - ExprEllipsisLiteral
 

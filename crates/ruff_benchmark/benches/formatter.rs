@@ -4,7 +4,7 @@ use ruff_benchmark::criterion::{
     criterion_group, criterion_main, BenchmarkId, Criterion, Throughput,
 };
 use ruff_benchmark::{TestCase, TestFile, TestFileDownloadError};
-use ruff_python_formatter::{format_module_ast, PyFormatOptions};
+use ruff_python_formatter::{format_module_ast, PreviewMode, PyFormatOptions};
 use ruff_python_index::CommentRangesBuilder;
 use ruff_python_parser::lexer::lex;
 use ruff_python_parser::{parse_tokens, Mode};
@@ -65,11 +65,12 @@ fn benchmark_formatter(criterion: &mut Criterion) {
                 let comment_ranges = comment_ranges.finish();
 
                 // Parse the AST.
-                let module = parse_tokens(tokens, case.code(), Mode::Module, "<filename>")
+                let module = parse_tokens(tokens, case.code(), Mode::Module)
                     .expect("Input to be a valid python program");
 
                 b.iter(|| {
-                    let options = PyFormatOptions::from_extension(Path::new(case.name()));
+                    let options = PyFormatOptions::from_extension(Path::new(case.name()))
+                        .with_preview(PreviewMode::Enabled);
                     let formatted =
                         format_module_ast(&module, &comment_ranges, case.code(), options)
                             .expect("Formatting to succeed");

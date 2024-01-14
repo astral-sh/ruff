@@ -50,6 +50,16 @@ use crate::checkers::ast::Checker;
 ///     return arg
 /// ```
 ///
+/// If the use of a singleton is intentional, assign the result call to a
+/// module-level variable, and use that variable in the default argument:
+/// ```python
+/// ERROR = ValueError("Hosts weren't successfully added")
+///
+///
+/// def add_host(error: Exception = ERROR) -> None:
+///     ...
+/// ```
+///
 /// ## Options
 /// - `flake8-bugbear.extend-immutable-calls`
 #[violation]
@@ -62,9 +72,9 @@ impl Violation for FunctionCallInDefaultArgument {
     fn message(&self) -> String {
         let FunctionCallInDefaultArgument { name } = self;
         if let Some(name) = name {
-            format!("Do not perform function call `{name}` in argument defaults")
+            format!("Do not perform function call `{name}` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable")
         } else {
-            format!("Do not perform function call in argument defaults")
+            format!("Do not perform function call in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable")
         }
     }
 }

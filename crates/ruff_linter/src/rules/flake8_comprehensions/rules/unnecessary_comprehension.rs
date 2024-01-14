@@ -5,7 +5,7 @@ use ruff_python_ast::{self as ast, Comprehension, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
@@ -29,6 +29,11 @@ use crate::rules::flake8_comprehensions::fixes;
 /// list(iterable)
 /// set(iterable)
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the comprehension. In most cases, though, comments will be
+/// preserved.
 #[violation]
 pub struct UnnecessaryComprehension {
     obj_type: String,
@@ -64,12 +69,10 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         },
         expr.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
-                .map(Fix::unsafe_edit)
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        fixes::fix_unnecessary_comprehension(expr, checker.locator(), checker.stylist())
+            .map(Fix::unsafe_edit)
+    });
     checker.diagnostics.push(diagnostic);
 }
 

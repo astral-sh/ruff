@@ -1,9 +1,9 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr, ExprAttribute, ExprCall};
+use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
 use ruff_text_size::Ranged;
 
-use crate::{checkers::ast::Checker, importer::ImportRequest, registry::AsRule};
+use crate::{checkers::ast::Checker, importer::ImportRequest};
 
 /// ## What it does
 /// Checks for current-directory lookups using `Path().resolve()`.
@@ -63,14 +63,10 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
         [] => {}
         // Ex) `Path(".").resolve()`
         [arg] => {
-            let Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(str),
-                ..
-            }) = arg
-            else {
+            let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = arg else {
                 return;
             };
-            if !matches!(str.value.as_str(), "" | ".") {
+            if !matches!(value.to_str(), "" | ".") {
                 return;
             }
         }
@@ -88,19 +84,17 @@ pub(crate) fn no_implicit_cwd(checker: &mut Checker, call: &ExprCall) {
 
     let mut diagnostic = Diagnostic::new(ImplicitCwd, call.range());
 
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("pathlib", "Path"),
-                call.start(),
-                checker.semantic(),
-            )?;
-            Ok(Fix::unsafe_edits(
-                Edit::range_replacement(format!("{binding}.cwd()"), call.range()),
-                [import_edit],
-            ))
-        });
-    }
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+        Ok(Fix::unsafe_edits(
+            Edit::range_replacement(format!("{binding}.cwd()"), call.range()),
+            [import_edit],
+        ))
+    });
 
     checker
         .diagnostics

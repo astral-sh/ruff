@@ -16,10 +16,12 @@ type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[Aaaaaaaaaaaaaaaaaaaaaaaaaaaa] = int
 type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx[Aaaaaaaaaaaaaaaaaaaaaaaaaaaa, Bbbbbbbbbbbbb] = int
 type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = Tttttttttttttttttttttttttttttttttttttttttttttttttttttttt
+type Xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx = Tttttttttttttttttttttttttttttttttttttttttttttttttttttttt # with comment
 
 # long value
 type X = Ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt
 type X = Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb | Ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+type XXXXXXXXXXXXX = Tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt # with comment
 
 # soft keyword as alias name
 type type = int
@@ -81,6 +83,10 @@ type type_params_comments[ # trailing open bracket comment
     D, # trailing comment
     # leading close bracket comment
 ] = int  # trailing value comment
+type type_params_single_comment[ # trailing open bracket comment
+    A,
+    B
+] = int
 type type_params_all_kinds[type_var, *type_var_tuple, **param_spec] = int
 
 # type variable bounds

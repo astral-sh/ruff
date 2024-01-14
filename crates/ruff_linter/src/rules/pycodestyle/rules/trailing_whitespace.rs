@@ -90,23 +90,19 @@ pub(crate) fn trailing_whitespace(
         if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
                 let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
-                if settings.rules.should_fix(Rule::BlankLineWithWhitespace) {
-                    // Remove any preceding continuations, to avoid introducing a potential
-                    // syntax error.
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
-                        indexer
-                            .preceded_by_continuations(line.start(), locator)
-                            .unwrap_or(range.start()),
-                        range.end(),
-                    ))));
-                }
+                // Remove any preceding continuations, to avoid introducing a potential
+                // syntax error.
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(TextRange::new(
+                    indexer
+                        .preceded_by_continuations(line.start(), locator)
+                        .unwrap_or(range.start()),
+                    range.end(),
+                ))));
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
             let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
-            if settings.rules.should_fix(Rule::TrailingWhitespace) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
             return Some(diagnostic);
         }
     }

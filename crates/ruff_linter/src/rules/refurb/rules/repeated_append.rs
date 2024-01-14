@@ -6,12 +6,11 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::is_list;
-use ruff_python_semantic::{Binding, BindingId, DefinitionId, SemanticModel};
+use ruff_python_semantic::{Binding, BindingId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for consecutive calls to `append`.
@@ -77,7 +76,7 @@ impl Violation for RepeatedAppend {
 
 /// FURB113
 pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
-    let Some(appends) = match_consecutive_appends(checker.semantic(), stmt) else {
+    let Some(appends) = match_consecutive_appends(stmt, checker.semantic()) else {
         return;
     };
 
@@ -107,7 +106,16 @@ pub(crate) fn repeated_append(checker: &mut Checker, stmt: &Stmt) {
 
             // We only suggest a fix when all appends in a group are clumped together. If they're
             // non-consecutive, fixing them is much more difficult.
-            if checker.patch(diagnostic.kind.rule()) && group.is_consecutive {
+            //
+            // Avoid fixing if there are comments in between the appends:
+            //
+            // ```python
+            // a.append(1)
+            // # comment
+            // a.append(2)
+            // ```
+            if group.is_consecutive && !checker.indexer().comment_ranges().intersects(group.range())
+            {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
                     replacement,
                     group.start(),
@@ -164,8 +172,8 @@ impl Ranged for AppendGroup<'_> {
 
 /// Match consecutive calls to `append` on list variables starting from the given statement.
 fn match_consecutive_appends<'a>(
-    semantic: &'a SemanticModel,
     stmt: &'a Stmt,
+    semantic: &'a SemanticModel,
 ) -> Option<Vec<Append<'a>>> {
     // Match the current statement, to see if it's an append.
     let append = match_append(semantic, stmt)?;
@@ -175,8 +183,7 @@ fn match_consecutive_appends<'a>(
     let siblings: &[Stmt] = if semantic.at_top_level() {
         // If the statement is at the top level, we should go to the parent module.
         // Module is available in the definitions list.
-        let module = semantic.definitions[DefinitionId::module()].as_module()?;
-        module.python_ast
+        semantic.definitions.python_ast()?
     } else {
         // Otherwise, go to the parent, and take its body as a sequence of siblings.
         semantic

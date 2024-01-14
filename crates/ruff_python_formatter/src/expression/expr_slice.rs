@@ -1,5 +1,5 @@
 use ruff_formatter::{write, FormatError};
-use ruff_python_ast::node::{AnyNodeRef, AstNode};
+use ruff_python_ast::{AnyNodeRef, AstNode};
 use ruff_python_ast::{Expr, ExprSlice, ExprUnaryOp, UnaryOp};
 use ruff_python_trivia::{SimpleToken, SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -209,7 +209,7 @@ fn is_simple_expr(expr: &Expr) -> bool {
     {
         is_simple_expr(operand)
     } else {
-        matches!(expr, Expr::Constant(_) | Expr::Name(_))
+        expr.is_literal_expr() || expr.is_name_expr()
     }
 }
 

@@ -78,16 +78,18 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                         },
                     ),
                     op: BitOr,
-                    right: Constant(
-                        ExprConstant {
+                    right: StringLiteral(
+                        ExprStringLiteral {
                             range: 48..61,
-                            value: Str(
-                                StringConstant {
-                                    value: "ForwardRefY",
-                                    unicode: false,
-                                    implicit_concatenated: false,
-                                },
-                            ),
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 48..61,
+                                        value: "ForwardRefY",
+                                        unicode: false,
+                                    },
+                                ),
+                            },
                         },
                     ),
                 },
@@ -845,6 +847,100 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     ctx: Load,
                 },
             ),
+        },
+    ),
+    TypeAlias(
+        StmtTypeAlias {
+            range: 590..602,
+            name: Name(
+                ExprName {
+                    range: 595..596,
+                    id: "X",
+                    ctx: Store,
+                },
+            ),
+            type_params: None,
+            value: Name(
+                ExprName {
+                    range: 599..602,
+                    id: "int",
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    TypeAlias(
+        StmtTypeAlias {
+            range: 604..616,
+            name: Name(
+                ExprName {
+                    range: 609..610,
+                    id: "X",
+                    ctx: Store,
+                },
+            ),
+            type_params: None,
+            value: Name(
+                ExprName {
+                    range: 613..616,
+                    id: "str",
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    TypeAlias(
+        StmtTypeAlias {
+            range: 618..631,
+            name: Name(
+                ExprName {
+                    range: 623..624,
+                    id: "X",
+                    ctx: Store,
+                },
+            ),
+            type_params: None,
+            value: Name(
+                ExprName {
+                    range: 627..631,
+                    id: "type",
+                    ctx: Load,
+                },
+            ),
+        },
+    ),
+    ClassDef(
+        StmtClassDef {
+            range: 632..653,
+            decorator_list: [],
+            name: Identifier {
+                id: "X",
+                range: 638..639,
+            },
+            type_params: None,
+            arguments: None,
+            body: [
+                TypeAlias(
+                    StmtTypeAlias {
+                        range: 641..653,
+                        name: Name(
+                            ExprName {
+                                range: 646..647,
+                                id: "X",
+                                ctx: Store,
+                            },
+                        ),
+                        type_params: None,
+                        value: Name(
+                            ExprName {
+                                range: 650..653,
+                                id: "int",
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                ),
+            ],
         },
     ),
 ]

@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F811_8.py:5:12: F811 [*] Redefinition of unused `os` from line 4
+  |
+3 | try:
+4 |     import os
+5 |     import os
+  |            ^^ F811
+6 | except:
+7 |     pass
+  |
+  = help: Remove definition: `os`
+
+ℹ Safe fix
+2 2 | 
+3 3 | try:
+4 4 |     import os
+5   |-    import os
+6 5 | except:
+7 6 |     pass
+8 7 | os.path
+
+

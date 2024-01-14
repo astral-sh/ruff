@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule, FormatRule, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Pattern;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{

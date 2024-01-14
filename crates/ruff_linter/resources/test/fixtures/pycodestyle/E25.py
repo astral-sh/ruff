@@ -54,3 +54,8 @@ f"{a=}"
 f"{a:=1}"
 f"{foo(a=1)}"
 f"normal {f"{a=}"} normal"
+
+# Okay as the `=` is used inside a f-string...
+print(f"{foo = }")
+# ...but then it creates false negatives for now
+print(f"{foo(a = 1)}")

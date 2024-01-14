@@ -96,18 +96,18 @@ pub(crate) use format::{
     leading_alternate_branch_comments, leading_comments, leading_node_comments, trailing_comments,
 };
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::node::AnyNodeRef;
 use ruff_python_ast::visitor::preorder::{PreorderVisitor, TraversalSignal};
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Mod;
 use ruff_python_trivia::{CommentRanges, PythonWhitespace};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+pub(crate) use visitor::collect_comments;
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::{CommentsMapBuilder, CommentsVisitor};
-pub(crate) use visitor::collect_comments;
 
 mod debug;
 pub(crate) mod format;
@@ -171,24 +171,37 @@ impl SourceComment {
 
     pub(crate) fn suppression_kind(&self, source: &str) -> Option<SuppressionKind> {
         let text = self.slice.text(SourceCode::new(source));
-        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
 
+        // Match against `# fmt: on`, `# fmt: off`, `# yapf: disable`, and `# yapf: enable`, which
+        // must be on their own lines.
+        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
         if let Some(command) = trimmed.strip_prefix("fmt:") {
             match command.trim_whitespace_start() {
-                "off" => Some(SuppressionKind::Off),
-                "on" => Some(SuppressionKind::On),
-                "skip" => Some(SuppressionKind::Skip),
-                _ => None,
+                "off" => return Some(SuppressionKind::Off),
+                "on" => return Some(SuppressionKind::On),
+                "skip" => return Some(SuppressionKind::Skip),
+                _ => {}
             }
         } else if let Some(command) = trimmed.strip_prefix("yapf:") {
             match command.trim_whitespace_start() {
-                "disable" => Some(SuppressionKind::Off),
-                "enable" => Some(SuppressionKind::On),
-                _ => None,
+                "disable" => return Some(SuppressionKind::Off),
+                "enable" => return Some(SuppressionKind::On),
+                _ => {}
             }
-        } else {
-            None
         }
+
+        // Search for `# fmt: skip` comments, which can be interspersed with other comments (e.g.,
+        // `# fmt: skip # noqa: E501`).
+        for segment in text.split('#') {
+            let trimmed = segment.trim_whitespace();
+            if let Some(command) = trimmed.strip_prefix("fmt:") {
+                if command.trim_whitespace_start() == "skip" {
+                    return Some(SuppressionKind::Skip);
+                }
+            }
+        }
+
+        None
     }
 
     /// Returns true if this comment is a `fmt: off` or `yapf: disable` own line suppression comment.
@@ -548,10 +561,9 @@ mod tests {
     use insta::assert_debug_snapshot;
 
     use ruff_formatter::SourceCode;
-    use ruff_python_ast::Mod;
+    use ruff_python_ast::{Mod, PySourceType};
     use ruff_python_index::tokens_and_ranges;
-
-    use ruff_python_parser::{parse_ok_tokens, Mode};
+    use ruff_python_parser::{parse_tokens, AsMode};
     use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
@@ -565,9 +577,10 @@ mod tests {
     impl<'a> CommentsTestCase<'a> {
         fn from_code(source: &'a str) -> Self {
             let source_code = SourceCode::new(source);
+            let source_type = PySourceType::Python;
             let (tokens, comment_ranges) =
-                tokens_and_ranges(source).expect("Expect source to be valid Python");
-            let parsed = parse_ok_tokens(tokens, source, Mode::Module, "test.py")
+                tokens_and_ranges(source, source_type).expect("Expect source to be valid Python");
+            let parsed = parse_tokens(tokens, source, source_type.as_mode())
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {
@@ -609,11 +622,11 @@ test(10, 20)
 
     #[test]
     fn only_comments() {
-        let source = r#"
+        let source = r"
 # Some comment
 
 # another comment
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -623,7 +636,7 @@ test(10, 20)
 
     #[test]
     fn empty_file() {
-        let source = r#""#;
+        let source = r"";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -633,12 +646,12 @@ test(10, 20)
 
     #[test]
     fn dangling_comment() {
-        let source = r#"
+        let source = r"
 def test(
         # Some comment
     ):
     pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -648,12 +661,12 @@ def test(
 
     #[test]
     fn parenthesized_expression() {
-        let source = r#"
+        let source = r"
 a = ( # Trailing comment
     10 + # More comments
      3
     )
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -663,11 +676,11 @@ a = ( # Trailing comment
 
     #[test]
     fn parenthesized_trailing_comment() {
-        let source = r#"(
+        let source = r"(
     a
     # comment
 )
-"#;
+";
 
         let test_case = CommentsTestCase::from_code(source);
         let comments = test_case.to_comments();
@@ -727,7 +740,7 @@ print("test")
 
     #[test]
     fn if_elif_else_comments() {
-        let source = r#"
+        let source = r"
 if x == y:
     pass # trailing `pass` comment
     # Root `if` trailing comment
@@ -740,7 +753,7 @@ elif x < y:
 else:
     pass
     # `else` trailing comment
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -750,7 +763,7 @@ else:
 
     #[test]
     fn if_elif_if_else_comments() {
-        let source = r#"
+        let source = r"
 if x == y:
     pass
 elif x < y:
@@ -760,7 +773,7 @@ elif x < y:
 # Leading else comment
 else:
     pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -854,10 +867,10 @@ print("Next statement");
 
     #[test]
     fn leading_most_outer() {
-        let source = r#"
+        let source = r"
 # leading comment
 x
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -868,10 +881,10 @@ x
     // Comment should be attached to the statement
     #[test]
     fn trailing_most_outer() {
-        let source = r#"
+        let source = r"
 x # trailing comment
 y # trailing last node
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -881,11 +894,11 @@ y # trailing last node
 
     #[test]
     fn trailing_most_outer_nested() {
-        let source = r#"
+        let source = r"
 x + (
     3 # trailing comment
 ) # outer
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -895,12 +908,12 @@ x + (
 
     #[test]
     fn trailing_after_comma() {
-        let source = r#"
+        let source = r"
 def test(
     a, # Trailing comment for argument `a`
     b,
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -910,7 +923,7 @@ def test(
 
     #[test]
     fn positional_argument_only_comment() {
-        let source = r#"
+        let source = r"
 def test(
     a, # trailing positional comment
     # Positional arguments only after here
@@ -918,7 +931,7 @@ def test(
     # leading b comment
     b,
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -928,7 +941,7 @@ def test(
 
     #[test]
     fn positional_argument_only_leading_comma_comment() {
-        let source = r#"
+        let source = r"
 def test(
     a # trailing positional comment
     # Positional arguments only after here
@@ -936,7 +949,7 @@ def test(
     # leading b comment
     b,
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -946,14 +959,14 @@ def test(
 
     #[test]
     fn positional_argument_only_comment_without_following_node() {
-        let source = r#"
+        let source = r"
 def test(
     a, # trailing positional comment
     # Positional arguments only after here
     /, # trailing positional argument comment.
     # Trailing on new line
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -963,7 +976,7 @@ def test(
 
     #[test]
     fn non_positional_arguments_with_defaults() {
-        let source = r#"
+        let source = r"
 def test(
     a=10 # trailing positional comment
     # Positional arguments only after here
@@ -971,7 +984,7 @@ def test(
     # leading comment for b
     b=20
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -981,12 +994,12 @@ def test(
 
     #[test]
     fn non_positional_arguments_slash_on_same_line() {
-        let source = r#"
+        let source = r"
 def test(a=10,/, # trailing positional argument comment.
     # leading comment for b
     b=20
 ): pass
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -996,7 +1009,7 @@ def test(a=10,/, # trailing positional argument comment.
 
     #[test]
     fn binary_expression_left_operand_comment() {
-        let source = r#"
+        let source = r"
 a = (
     5
     # trailing left comment
@@ -1004,7 +1017,7 @@ a = (
     # leading right comment
     3
 )
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -1014,14 +1027,14 @@ a = (
 
     #[test]
     fn binary_expression_left_operand_trailing_end_of_line_comment() {
-        let source = r#"
+        let source = r"
 a = (
     5 # trailing left comment
     + # trailing operator comment
     # leading right comment
     3
 )
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -1031,7 +1044,7 @@ a = (
 
     #[test]
     fn nested_binary_expression() {
-        let source = r#"
+        let source = r"
 a = (
     (5 # trailing left comment
         *
@@ -1040,7 +1053,7 @@ a = (
     # leading right comment
     3
 )
-"#;
+";
         let test_case = CommentsTestCase::from_code(source);
 
         let comments = test_case.to_comments();
@@ -1050,10 +1063,10 @@ a = (
 
     #[test]
     fn while_trailing_end_of_line_comment() {
-        let source = r#"while True:
+        let source = r"while True:
     if something.changed:
         do.stuff()  # trailing comment
-"#;
+";
 
         let test_case = CommentsTestCase::from_code(source);
 
@@ -1064,11 +1077,11 @@ a = (
 
     #[test]
     fn while_trailing_else_end_of_line_comment() {
-        let source = r#"while True:
+        let source = r"while True:
     pass
 else: # trailing comment
     pass
-"#;
+";
 
         let test_case = CommentsTestCase::from_code(source);
 

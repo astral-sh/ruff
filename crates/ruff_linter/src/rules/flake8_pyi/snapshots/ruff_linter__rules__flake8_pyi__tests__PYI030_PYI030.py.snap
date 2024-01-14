@@ -9,6 +9,7 @@ PYI030.py:9:9: PYI030 Multiple literal members in a union. Use a single literal,
 10 | 
 11 | # Should emit for union types in arguments.
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:12:17: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -17,6 +18,7 @@ PYI030.py:12:17: PYI030 Multiple literal members in a union. Use a single litera
    |                 ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 13 |     print(arg1)
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:17:16: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -25,6 +27,7 @@ PYI030.py:17:16: PYI030 Multiple literal members in a union. Use a single litera
    |                ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 18 |     return "my Literal[1]ing"
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:22:9: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -34,6 +37,7 @@ PYI030.py:22:9: PYI030 Multiple literal members in a union. Use a single literal
 23 | field4: str | Literal[1] | Literal[2]  # Error
 24 | field5: Literal[1] | str | Literal[2]  # Error
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:23:9: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -44,6 +48,7 @@ PYI030.py:23:9: PYI030 Multiple literal members in a union. Use a single literal
 24 | field5: Literal[1] | str | Literal[2]  # Error
 25 | field6: Literal[1] | bool | Literal[2] | str  # Error
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:24:9: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -53,6 +58,7 @@ PYI030.py:24:9: PYI030 Multiple literal members in a union. Use a single literal
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 25 | field6: Literal[1] | bool | Literal[2] | str  # Error
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:25:9: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -63,6 +69,7 @@ PYI030.py:25:9: PYI030 Multiple literal members in a union. Use a single literal
 26 | 
 27 | # Should emit for non-type unions.
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:28:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -72,6 +79,7 @@ PYI030.py:28:10: PYI030 Multiple literal members in a union. Use a single litera
 29 | 
 30 | # Should emit for parenthesized unions.
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:31:9: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -81,6 +89,7 @@ PYI030.py:31:9: PYI030 Multiple literal members in a union. Use a single literal
 32 | 
 33 | # Should handle user parentheses when fixing.
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:34:9: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -89,6 +98,7 @@ PYI030.py:34:9: PYI030 Multiple literal members in a union. Use a single literal
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
 35 | field10: (Literal[1] | str) | Literal[2]  # Error
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:35:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
@@ -99,12 +109,160 @@ PYI030.py:35:10: PYI030 Multiple literal members in a union. Use a single litera
 36 | 
 37 | # Should emit for union in generic parent type.
    |
+   = help: Replace with a single `Literal`
 
 PYI030.py:38:15: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
    |
 37 | # Should emit for union in generic parent type.
 38 | field11: dict[Literal[1] | Literal[2], str]  # Error
    |               ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+39 | 
+40 | # Should emit for unions with more than two cases
    |
+   = help: Replace with a single `Literal`
+
+PYI030.py:41:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
+   |
+40 | # Should emit for unions with more than two cases
+41 | field12: Literal[1] | Literal[2] | Literal[3]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:42:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
+   |
+40 | # Should emit for unions with more than two cases
+41 | field12: Literal[1] | Literal[2] | Literal[3]  # Error
+42 | field13: Literal[1] | Literal[2] | Literal[3] | Literal[4]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+43 | 
+44 | # Should emit for unions with more than two cases, even if not directly adjacent
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:45:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3]`
+   |
+44 | # Should emit for unions with more than two cases, even if not directly adjacent
+45 | field14: Literal[1] | Literal[2] | str | Literal[3]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+46 | 
+47 | # Should emit for unions with mixed literal internal types
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:48:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, "foo", True]`
+   |
+47 | # Should emit for unions with mixed literal internal types
+48 | field15: Literal[1] | Literal["foo"] | Literal[True]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+49 | 
+50 | # Shouldn't emit for duplicate field types with same value; covered by Y016
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:51:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 1]`
+   |
+50 | # Shouldn't emit for duplicate field types with same value; covered by Y016
+51 | field16: Literal[1] | Literal[1]  # OK
+   |          ^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+52 | 
+53 | # Shouldn't emit if in new parent type
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:60:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+   |
+59 | # Should respect name of literal type used
+60 | field19: typing.Literal[1] | typing.Literal[2]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+61 | 
+62 | # Should emit in cases with newlines
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:63:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+   |
+62 |   # Should emit in cases with newlines
+63 |   field20: typing.Union[
+   |  __________^
+64 | |     Literal[
+65 | |         1  # test
+66 | |     ],
+67 | |     Literal[2],
+68 | | ]  # Error, newline and comment will not be emitted in message
+   | |_^ PYI030
+69 |   
+70 |   # Should handle multiple unions with multiple members
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:71:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
+   |
+70 | # Should handle multiple unions with multiple members
+71 | field21: Literal[1, 2] | Literal[3, 4]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+72 | 
+73 | # Should emit in cases with `typing.Union` instead of `|`
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:74:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+   |
+73 | # Should emit in cases with `typing.Union` instead of `|`
+74 | field22: typing.Union[Literal[1], Literal[2]]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+75 | 
+76 | # Should emit in cases with `typing_extensions.Literal`
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:77:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+   |
+76 | # Should emit in cases with `typing_extensions.Literal`
+77 | field23: typing_extensions.Literal[1] | typing_extensions.Literal[2]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+78 | 
+79 | # Should emit in cases with nested `typing.Union`
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:80:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+   |
+79 | # Should emit in cases with nested `typing.Union`
+80 | field24: typing.Union[Literal[1], typing.Union[Literal[2], str]]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+81 | 
+82 | # Should emit in cases with mixed `typing.Union` and `|`
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:83:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2]`
+   |
+82 | # Should emit in cases with mixed `typing.Union` and `|`
+83 | field25: typing.Union[Literal[1], Literal[2] | str]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+84 | 
+85 | # Should emit only once in cases with multiple nested `typing.Union`
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:86:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
+   |
+85 | # Should emit only once in cases with multiple nested `typing.Union`
+86 | field24: typing.Union[Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]]]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+87 | 
+88 | # Should use the first literal subscript attribute when fixing
+   |
+   = help: Replace with a single `Literal`
+
+PYI030.py:89:10: PYI030 Multiple literal members in a union. Use a single literal, e.g. `Literal[1, 2, 3, 4]`
+   |
+88 | # Should use the first literal subscript attribute when fixing
+89 | field25: typing.Union[typing_extensions.Literal[1], typing.Union[Literal[2], typing.Union[Literal[3], Literal[4]]], str]  # Error
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI030
+   |
+   = help: Replace with a single `Literal`
 
 

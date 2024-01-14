@@ -23,7 +23,7 @@ ruff_macros = { path = "../ruff_macros" }
 
 anyhow = { workspace = true }
 colored = { workspace = true }
-dirs = { version = "5.0.0" }
+dirs = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
@@ -32,7 +32,7 @@ glob = { workspace = true }
 globset = { workspace = true }
 once_cell = { workspace = true }
 path-absolutize = { workspace = true }
-pep440_rs = { version = "0.3.12", features = ["serde"] }
+pep440_rs = { workspace = true, features = ["serde"] }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 schemars = { workspace = true, optional = true }
@@ -42,10 +42,11 @@ strum = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.6.0"
-
+tempfile = { workspace = true }
 
 [features]
+default = []
 schemars = [ "dep:schemars", "ruff_formatter/schemars", "ruff_python_formatter/schemars" ]
 
-default = []
+[lints]
+workspace = true

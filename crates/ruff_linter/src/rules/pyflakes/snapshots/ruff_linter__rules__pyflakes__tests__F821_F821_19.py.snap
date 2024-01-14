@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821_19.py:21:7: F821 Undefined name `y`
+   |
+19 | # Error: `y` is not defined.
+20 | x: (y := 1)
+21 | print(y)
+   |       ^ F821
+   |
+
+

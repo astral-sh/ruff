@@ -82,8 +82,8 @@ Ok(
                                 kwarg: None,
                             },
                         ),
-                        body: Constant(
-                            ExprConstant {
+                        body: NumberLiteral(
+                            ExprNumberLiteral {
                                 range: 25..26,
                                 value: Int(
                                     0,

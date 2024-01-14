@@ -16,7 +16,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 use super::helpers::{
     get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
@@ -28,7 +28,7 @@ use super::helpers::{
 /// setting.
 ///
 /// ## Why is this bad?
-/// If a `@pytext.fixture()` doesn't take any arguments, the parentheses are
+/// If a `@pytest.fixture()` doesn't take any arguments, the parentheses are
 /// optional.
 ///
 /// Either removing those unnecessary parentheses _or_ requiring them for all
@@ -681,9 +681,7 @@ fn pytest_fixture_parentheses(
         PytestFixtureIncorrectParenthesesStyle { expected, actual },
         decorator.range(),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(fix);
-    }
+    diagnostic.set_fix(fix);
     checker.diagnostics.push(diagnostic);
 }
 
@@ -727,17 +725,15 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &D
                     if keyword_is_literal(keyword, "function") {
                         let mut diagnostic =
                             Diagnostic::new(PytestExtraneousScopeFunction, keyword.range());
-                        if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.try_set_fix(|| {
-                                edits::remove_argument(
-                                    keyword,
-                                    arguments,
-                                    edits::Parentheses::Preserve,
-                                    checker.locator().contents(),
-                                )
-                                .map(Fix::unsafe_edit)
-                            });
-                        }
+                        diagnostic.try_set_fix(|| {
+                            edits::remove_argument(
+                                keyword,
+                                arguments,
+                                edits::Parentheses::Preserve,
+                                checker.locator().contents(),
+                            )
+                            .map(Fix::unsafe_edit)
+                        });
                         checker.diagnostics.push(diagnostic);
                     }
                 }
@@ -819,30 +815,28 @@ fn check_fixture_returns(
             },
             stmt.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            let yield_edit = Edit::range_replacement(
-                "return".to_string(),
-                TextRange::at(stmt.start(), "yield".text_len()),
-            );
-            let return_type_edit = returns.and_then(|returns| {
-                let ast::ExprSubscript { value, slice, .. } = returns.as_subscript_expr()?;
-                let ast::ExprTuple { elts, .. } = slice.as_tuple_expr()?;
-                let [first, ..] = elts.as_slice() else {
-                    return None;
-                };
-                if !checker.semantic().match_typing_expr(value, "Generator") {
-                    return None;
-                }
-                Some(Edit::range_replacement(
-                    checker.generator().expr(first),
-                    returns.range(),
-                ))
-            });
-            if let Some(return_type_edit) = return_type_edit {
-                diagnostic.set_fix(Fix::safe_edits(yield_edit, [return_type_edit]));
-            } else {
-                diagnostic.set_fix(Fix::safe_edit(yield_edit));
+        let yield_edit = Edit::range_replacement(
+            "return".to_string(),
+            TextRange::at(stmt.start(), "yield".text_len()),
+        );
+        let return_type_edit = returns.and_then(|returns| {
+            let ast::ExprSubscript { value, slice, .. } = returns.as_subscript_expr()?;
+            let ast::ExprTuple { elts, .. } = slice.as_tuple_expr()?;
+            let [first, ..] = elts.as_slice() else {
+                return None;
+            };
+            if !checker.semantic().match_typing_expr(value, "Generator") {
+                return None;
             }
+            Some(Edit::range_replacement(
+                checker.generator().expr(first),
+                returns.range(),
+            ))
+        });
+        if let Some(return_type_edit) = return_type_edit {
+            diagnostic.set_fix(Fix::safe_edits(yield_edit, [return_type_edit]));
+        } else {
+            diagnostic.set_fix(Fix::safe_edit(yield_edit));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -906,28 +900,23 @@ fn check_fixture_addfinalizer(checker: &mut Checker, parameters: &Parameters, bo
 
 /// PT024, PT025
 fn check_fixture_marks(checker: &mut Checker, decorators: &[Decorator]) {
-    for (expr, call_path) in get_mark_decorators(decorators) {
-        let name = call_path.last().expect("Expected a mark name");
+    for (expr, marker) in get_mark_decorators(decorators) {
         if checker.enabled(Rule::PytestUnnecessaryAsyncioMarkOnFixture) {
-            if *name == "asyncio" {
+            if marker == "asyncio" {
                 let mut diagnostic =
                     Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    let range = checker.locator().full_lines_range(expr.range());
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
-                }
+                let range = checker.locator().full_lines_range(expr.range());
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
                 checker.diagnostics.push(diagnostic);
             }
         }
 
         if checker.enabled(Rule::PytestErroneousUseFixturesOnFixture) {
-            if *name == "usefixtures" {
+            if marker == "usefixtures" {
                 let mut diagnostic =
                     Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
-                if checker.patch(diagnostic.kind.rule()) {
-                    let line_range = checker.locator().full_lines_range(expr.range());
-                    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(line_range)));
-                }
+                let line_range = checker.locator().full_lines_range(expr.range());
+                diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(line_range)));
                 checker.diagnostics.push(diagnostic);
             }
         }

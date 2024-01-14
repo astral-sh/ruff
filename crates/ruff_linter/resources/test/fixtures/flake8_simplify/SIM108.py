@@ -126,3 +126,12 @@ def f():
         x = yield 3
     else:
         x = yield 5
+
+
+from typing import TYPE_CHECKING
+
+# OK
+if TYPE_CHECKING:
+    x = 3
+else:
+    x = 5

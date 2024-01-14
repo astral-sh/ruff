@@ -3,15 +3,14 @@ use std::fmt;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Constant, Expr, Int};
+use ruff_python_ast::{Arguments, Expr, Int};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::analyze::typing::{is_dict, is_list, is_set, is_tuple};
-use ruff_python_semantic::Binding;
+
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `enumerate` that discard either the index or the value
@@ -115,7 +114,7 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
     };
 
     // Get the first argument, which is the sequence to iterate over.
-    let Some(Expr::Name(ast::ExprName { id: sequence, .. })) = arguments.args.first() else {
+    let Some(Expr::Name(sequence)) = arguments.args.first() else {
         return;
     };
 
@@ -139,30 +138,28 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
             );
 
             // The index is unused, so replace with `for value in sequence`.
-            if checker.patch(diagnostic.kind.rule()) {
-                let replace_iter = Edit::range_replacement(sequence.into(), stmt_for.iter.range());
-                let replace_target = Edit::range_replacement(
-                    pad(
-                        checker.locator().slice(value).to_string(),
-                        stmt_for.target.range(),
-                        checker.locator(),
-                    ),
+            let replace_iter =
+                Edit::range_replacement(sequence.id.to_string(), stmt_for.iter.range());
+            let replace_target = Edit::range_replacement(
+                pad(
+                    checker.locator().slice(value).to_string(),
                     stmt_for.target.range(),
-                );
-                diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
-            }
+                    checker.locator(),
+                ),
+                stmt_for.target.range(),
+            );
+            diagnostic.set_fix(Fix::unsafe_edits(replace_iter, [replace_target]));
 
             checker.diagnostics.push(diagnostic);
         }
         (false, true) => {
             // Ensure the sequence object works with `len`. If it doesn't, the
             // fix is unclear.
-            let scope = checker.semantic().current_scope();
-            let bindings: Vec<&Binding> = scope
-                .get_all(sequence)
-                .map(|binding_id| checker.semantic().binding(binding_id))
-                .collect();
-            let [binding] = bindings.as_slice() else {
+            let Some(binding) = checker
+                .semantic()
+                .only_binding(sequence)
+                .map(|id| checker.semantic().binding(id))
+            else {
                 return;
             };
             // This will lead to a lot of false negatives, but it is the best
@@ -182,24 +179,21 @@ pub(crate) fn unnecessary_enumerate(checker: &mut Checker, stmt_for: &ast::StmtF
                 },
                 func.range(),
             );
-            if checker.patch(diagnostic.kind.rule())
-                && checker.semantic().is_builtin("range")
-                && checker.semantic().is_builtin("len")
-            {
+            if checker.semantic().is_builtin("range") && checker.semantic().is_builtin("len") {
                 // If the `start` argument is set to something other than the `range` default,
                 // there's no clear fix.
                 let start = arguments.find_argument("start", 1);
                 if start.map_or(true, |start| {
                     matches!(
                         start,
-                        Expr::Constant(ast::ExprConstant {
-                            value: Constant::Int(Int::ZERO),
+                        Expr::NumberLiteral(ast::ExprNumberLiteral {
+                            value: ast::Number::Int(Int::ZERO),
                             ..
                         })
                     )
                 }) {
                     let replace_iter = Edit::range_replacement(
-                        generate_range_len_call(sequence, checker.generator()),
+                        generate_range_len_call(&sequence.id, checker.generator()),
                         stmt_for.iter.range(),
                     );
 

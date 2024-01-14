@@ -60,7 +60,7 @@ fn benchmark_parser(criterion: &mut Criterion<WallTime>) {
             &case,
             |b, case| {
                 b.iter(|| {
-                    let parsed = parse_suite(case.code(), case.name()).unwrap();
+                    let parsed = parse_suite(case.code()).unwrap();
 
                     let mut visitor = CountVisitor { count: 0 };
                     visitor.visit_body(&parsed);

@@ -12,7 +12,7 @@ SIM105_0.py:6:1: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `tr
   |
   = help: Replace with `contextlib.suppress(ValueError)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -41,7 +41,7 @@ SIM105_0.py:13:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
    |
    = help: Replace with `contextlib.suppress(ValueError, OSError)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -72,7 +72,7 @@ SIM105_0.py:19:1: SIM105 [*] Use `contextlib.suppress(ValueError, OSError)` inst
    |
    = help: Replace with `contextlib.suppress(ValueError, OSError)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -103,7 +103,7 @@ SIM105_0.py:25:1: SIM105 [*] Use `contextlib.suppress(Exception)` instead of `tr
    |
    = help: Replace with `contextlib.suppress(Exception)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -134,7 +134,7 @@ SIM105_0.py:31:1: SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead
    |
    = help: Replace with `contextlib.suppress(a.Error, b.Error)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -165,7 +165,7 @@ SIM105_0.py:85:5: SIM105 [*] Use `contextlib.suppress(ValueError)` instead of `t
    |
    = help: Replace with `contextlib.suppress(ValueError)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
    1  |+import contextlib
 1  2  | def foo():
 2  3  |     pass
@@ -212,7 +212,7 @@ SIM105_0.py:117:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
     |
     = help: Replace with `contextlib.suppress(OSError)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
     1   |+import contextlib
 1   2   | def foo():
 2   3   |     pass
@@ -244,7 +244,7 @@ SIM105_0.py:122:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
     |
     = help: Replace with `contextlib.suppress(OSError)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
     1   |+import contextlib
 1   2   | def foo():
 2   3   |     pass
@@ -275,7 +275,7 @@ SIM105_0.py:126:5: SIM105 [*] Use `contextlib.suppress(OSError)` instead of `try
     |
     = help: Replace with `contextlib.suppress(OSError)`
 
-ℹ Suggested fix
+ℹ Unsafe fix
     1   |+import contextlib
 1   2   | def foo():
 2   3   |     pass

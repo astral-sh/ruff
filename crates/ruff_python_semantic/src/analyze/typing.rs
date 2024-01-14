@@ -1,10 +1,8 @@
 //! Analysis rules for the `typing` module.
 
 use ruff_python_ast::call_path::{from_qualified_name, from_unqualified_name, CallPath};
-use ruff_python_ast::helpers::{is_const_false, map_subscript};
-use ruff_python_ast::{
-    self as ast, Constant, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt,
-};
+use ruff_python_ast::helpers::{any_over_expr, is_const_false, map_subscript};
+use ruff_python_ast::{self as ast, Expr, Int, Operator, ParameterWithDefault, Parameters, Stmt};
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, has_pep_585_generic, is_immutable_generic_type,
     is_immutable_non_generic_type, is_immutable_return_type, is_literal_member,
@@ -17,7 +15,7 @@ use crate::analyze::type_inference::{PythonType, ResolvedPythonType};
 use crate::model::SemanticModel;
 use crate::{Binding, BindingKind};
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Callable {
     Bool,
     Cast,
@@ -28,7 +26,7 @@ pub enum Callable {
     MypyExtension,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum SubscriptKind {
     /// A subscript of the form `typing.Literal["foo", "bar"]`, i.e., a literal.
     Literal,
@@ -144,10 +142,7 @@ pub fn to_pep604_operator(
     /// Returns `true` if any argument in the slice is a quoted annotation.
     fn quoted_annotation(slice: &Expr) -> bool {
         match slice {
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_),
-                ..
-            }) => true,
+            Expr::StringLiteral(_) => true,
             Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().any(quoted_annotation),
             _ => false,
         }
@@ -257,10 +252,7 @@ pub fn is_immutable_annotation(
             is_immutable_annotation(left, semantic, extend_immutable_calls)
                 && is_immutable_annotation(right, semantic, extend_immutable_calls)
         }
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::None,
-            ..
-        }) => true,
+        Expr::NoneLiteral(_) => true,
         _ => false,
     }
 }
@@ -302,7 +294,7 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     }
 }
 
-/// Return `true` if [`Expr`] is a guard for a type-checking block.
+/// Return `true` if [`ast::StmtIf`] is a guard for a type-checking block.
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;
 
@@ -314,8 +306,8 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     // Ex) `if 0:`
     if matches!(
         test.as_ref(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(Int::ZERO),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(Int::ZERO),
             ..
         })
     ) {
@@ -323,14 +315,85 @@ pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> b
     }
 
     // Ex) `if typing.TYPE_CHECKING:`
-    if semantic
-        .resolve_call_path(test)
-        .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "TYPE_CHECKING"]))
-    {
+    if semantic.match_typing_expr(test, "TYPE_CHECKING") {
         return true;
     }
 
     false
+}
+
+/// Returns `true` if the [`ast::StmtIf`] is a version-checking block (e.g., `if sys.version_info >= ...:`).
+pub fn is_sys_version_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
+    let ast::StmtIf { test, .. } = stmt;
+
+    any_over_expr(test, &|expr| {
+        semantic.resolve_call_path(expr).is_some_and(|call_path| {
+            matches!(call_path.as_slice(), ["sys", "version_info" | "platform"])
+        })
+    })
+}
+
+/// Traverse a "union" type annotation, applying `func` to each union member.
+///
+/// Supports traversal of `Union` and `|` union expressions.
+///
+/// The function is called with each expression in the union (excluding declarations of nested
+/// unions) and the parent expression.
+pub fn traverse_union<'a, F>(func: &mut F, semantic: &SemanticModel, expr: &'a Expr)
+where
+    F: FnMut(&'a Expr, &'a Expr),
+{
+    fn inner<'a, F>(
+        func: &mut F,
+        semantic: &SemanticModel,
+        expr: &'a Expr,
+        parent: Option<&'a Expr>,
+    ) where
+        F: FnMut(&'a Expr, &'a Expr),
+    {
+        // Ex) x | y
+        if let Expr::BinOp(ast::ExprBinOp {
+            op: Operator::BitOr,
+            left,
+            right,
+            range: _,
+        }) = expr
+        {
+            // The union data structure usually looks like this:
+            //  a | b | c -> (a | b) | c
+            //
+            // However, parenthesized expressions can coerce it into any structure:
+            //  a | (b | c)
+            //
+            // So we have to traverse both branches in order (left, then right), to report members
+            // in the order they appear in the source code.
+
+            // Traverse the left then right arms
+            inner(func, semantic, left, Some(expr));
+            inner(func, semantic, right, Some(expr));
+            return;
+        }
+
+        // Ex) Union[x, y]
+        if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
+            if semantic.match_typing_expr(value, "Union") {
+                if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
+                    // Traverse each element of the tuple within the union recursively to handle cases
+                    // such as `Union[..., Union[...]]
+                    elts.iter()
+                        .for_each(|elt| inner(func, semantic, elt, Some(expr)));
+                    return;
+                }
+            }
+        }
+
+        // Otherwise, call the function on expression, if it's not the top-level expression.
+        if let Some(parent) = parent {
+            func(expr, parent);
+        }
+    }
+
+    inner(func, semantic, expr, None);
 }
 
 /// Abstraction for a type checker, conservatively checks for the intended type(s).
@@ -567,4 +630,127 @@ pub fn resolve_assignment<'a>(
         }
         _ => None,
     }
+}
+
+/// Find the assigned [`Expr`] for a given symbol, if any.
+///
+/// For example given:
+/// ```python
+///  foo = 42
+///  (bar, bla) = 1, "str"
+/// ```
+///
+/// This function will return a `NumberLiteral` with value `Int(42)` when called with `foo` and a
+/// `StringLiteral` with value `"str"` when called with `bla`.
+pub fn find_assigned_value<'a>(symbol: &str, semantic: &'a SemanticModel<'a>) -> Option<&'a Expr> {
+    let binding_id = semantic.lookup_symbol(symbol)?;
+    let binding = semantic.binding(binding_id);
+    match binding.kind {
+        // Ex) `x := 1`
+        BindingKind::NamedExprAssignment => {
+            let parent_id = binding.source?;
+            let parent = semantic
+                .expressions(parent_id)
+                .find_map(|expr| expr.as_named_expr_expr());
+            if let Some(ast::ExprNamedExpr { target, value, .. }) = parent {
+                return match_value(symbol, target.as_ref(), value.as_ref());
+            }
+        }
+        // Ex) `x = 1`
+        BindingKind::Assignment => {
+            let parent_id = binding.source?;
+            let parent = semantic.statement(parent_id);
+            match parent {
+                Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
+                    if let Some(target) = targets.iter().find(|target| defines(symbol, target)) {
+                        return match_value(symbol, target, value.as_ref());
+                    }
+                }
+                Stmt::AnnAssign(ast::StmtAnnAssign {
+                    value: Some(value),
+                    target,
+                    ..
+                }) => {
+                    return match_value(symbol, target, value.as_ref());
+                }
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+    None
+}
+
+/// Given a target and value, find the value that's assigned to the given symbol.
+fn match_value<'a>(symbol: &str, target: &Expr, value: &'a Expr) -> Option<&'a Expr> {
+    match target {
+        Expr::Name(ast::ExprName { id, .. }) if id.as_str() == symbol => Some(value),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            match value {
+                Expr::Tuple(ast::ExprTuple {
+                    elts: value_elts, ..
+                })
+                | Expr::List(ast::ExprList {
+                    elts: value_elts, ..
+                })
+                | Expr::Set(ast::ExprSet {
+                    elts: value_elts, ..
+                }) => get_value_by_id(symbol, elts, value_elts),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Returns `true` if the [`Expr`] defines the symbol.
+fn defines(symbol: &str, expr: &Expr) -> bool {
+    match expr {
+        Expr::Name(ast::ExprName { id, .. }) => id == symbol,
+        Expr::Tuple(ast::ExprTuple { elts, .. })
+        | Expr::List(ast::ExprList { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. }) => elts.iter().any(|elt| defines(symbol, elt)),
+        _ => false,
+    }
+}
+
+fn get_value_by_id<'a>(target_id: &str, targets: &[Expr], values: &'a [Expr]) -> Option<&'a Expr> {
+    for (target, value) in targets.iter().zip(values.iter()) {
+        match target {
+            Expr::Tuple(ast::ExprTuple {
+                elts: target_elts, ..
+            })
+            | Expr::List(ast::ExprList {
+                elts: target_elts, ..
+            })
+            | Expr::Set(ast::ExprSet {
+                elts: target_elts, ..
+            }) => {
+                // Collection types can be mismatched like in: (a, b, [c, d]) = [1, 2, {3, 4}]
+                match value {
+                    Expr::Tuple(ast::ExprTuple {
+                        elts: value_elts, ..
+                    })
+                    | Expr::List(ast::ExprList {
+                        elts: value_elts, ..
+                    })
+                    | Expr::Set(ast::ExprSet {
+                        elts: value_elts, ..
+                    }) => {
+                        if let Some(result) = get_value_by_id(target_id, target_elts, value_elts) {
+                            return Some(result);
+                        }
+                    }
+                    _ => (),
+                };
+            }
+            Expr::Name(ast::ExprName { id, .. }) => {
+                if *id == target_id {
+                    return Some(value);
+                }
+            }
+            _ => (),
+        }
+    }
+    None
 }

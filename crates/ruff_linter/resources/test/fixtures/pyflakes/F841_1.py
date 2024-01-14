@@ -1,5 +1,5 @@
 def f(tup):
-    x, y = tup  # this does NOT trigger F841
+    x, y = tup
 
 
 def f():
@@ -7,17 +7,17 @@ def f():
 
 
 def f():
-    (x, y) = coords = 1, 2  # this does NOT trigger F841
+    (x, y) = coords = 1, 2
     if x > 1:
         print(coords)
 
 
 def f():
-    (x, y) = coords = 1, 2  # this triggers F841 on coords
+    (x, y) = coords = 1, 2
 
 
 def f():
-    coords = (x, y) = 1, 2  # this triggers F841 on coords
+    coords = (x, y) = 1, 2
 
 
 def f():

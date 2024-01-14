@@ -1,5 +1,5 @@
 use ruff_formatter::{write, FormatContext};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprName;
 
 use crate::comments::SourceComment;
@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn name_range_with_comments() {
-        let source = parse_program("a # comment", "file.py").unwrap();
+        let source = parse_program("a # comment").unwrap();
 
         let expression_statement = source
             .body

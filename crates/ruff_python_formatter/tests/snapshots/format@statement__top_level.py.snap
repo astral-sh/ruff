@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/top_level.py
 ---
 ## Input
-```py
+```python
 class A:
     def __init__(self):
         pass
@@ -46,7 +46,7 @@ def quuz():
 ```
 
 ## Output
-```py
+```python
 class A:
     def __init__(self):
         pass
@@ -112,6 +112,61 @@ def quux():
 
 def quuz():
     """Some docstring."""
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -12,25 +12,20 @@
+     pass
+ 
+ 
+-class Del(expr_context):
+-    ...
++class Del(expr_context): ...
+ 
+ 
+-class Load(expr_context):
+-    ...
++class Load(expr_context): ...
+ 
+ 
+ # Some comment.
+-class Other(expr_context):
+-    ...
++class Other(expr_context): ...
+ 
+ 
+-class Store(expr_context):
+-    ...
++class Store(expr_context): ...
+ 
+ 
+-class Foo(Bar):
+-    ...
++class Foo(Bar): ...
+ 
+ 
+ class Baz(Qux):
+@@ -49,14 +44,8 @@
+         pass
+ 
+ 
+-def bar():
+-    ...
+-
+-
+-def baz():
+-    ...
+-
+-
++def bar(): ...
++def baz(): ...
+ def quux():
+     """Some docstring."""
+ 
 ```
 
 

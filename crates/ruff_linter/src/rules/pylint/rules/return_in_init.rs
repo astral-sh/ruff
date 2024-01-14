@@ -2,11 +2,11 @@ use ruff_python_ast::{self as ast, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::pylint::helpers::in_dunder_init;
+use crate::rules::pylint::helpers::in_dunder_method;
 
 /// ## What it does
 /// Checks for `__init__` methods that return values.
@@ -48,7 +48,7 @@ impl Violation for ReturnInInit {
 pub(crate) fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
     if let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt {
         if let Some(expr) = value {
-            if is_const_none(expr) {
+            if expr.is_none_literal_expr() {
                 // Explicit `return None`.
                 return;
             }
@@ -58,7 +58,7 @@ pub(crate) fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
         }
     }
 
-    if in_dunder_init(checker.semantic(), checker.settings) {
+    if in_dunder_method("__init__", checker.semantic(), checker.settings) {
         checker
             .diagnostics
             .push(Diagnostic::new(ReturnInInit, stmt.range()));

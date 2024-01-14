@@ -54,7 +54,7 @@ impl<'a> Printer<'a> {
 
     /// Prints the passed in element as well as all its content,
     /// starting at the specified indentation level
-    #[tracing::instrument(name = "Printer::print", skip_all)]
+    #[tracing::instrument(level = "debug", name = "Printer::print", skip_all)]
     pub fn print_with_indent(
         mut self,
         document: &'a Document,
@@ -1472,6 +1472,11 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
     }
 
     fn fits_text(&mut self, text: Text, args: PrintElementArgs) -> Fits {
+        fn exceeds_width(fits: &FitsMeasurer, args: PrintElementArgs) -> bool {
+            fits.state.line_width > fits.options().line_width.into()
+                && !args.measure_mode().allows_text_overflow()
+        }
+
         let indent = std::mem::take(&mut self.state.pending_indent);
         self.state.line_width +=
             u32::from(indent.level()) * self.options().indent_width() + u32::from(indent.align());
@@ -1493,7 +1498,13 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                                     return Fits::No;
                                 }
                                 match args.measure_mode() {
-                                    MeasureMode::FirstLine => return Fits::Yes,
+                                    MeasureMode::FirstLine => {
+                                        return if exceeds_width(self, args) {
+                                            Fits::No
+                                        } else {
+                                            Fits::Yes
+                                        };
+                                    }
                                     MeasureMode::AllLines
                                     | MeasureMode::AllLinesAllowTextOverflow => {
                                         self.state.line_width = 0;
@@ -1511,9 +1522,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             }
         }
 
-        if self.state.line_width > self.options().line_width.into()
-            && !args.measure_mode().allows_text_overflow()
-        {
+        if exceeds_width(self, args) {
             return Fits::No;
         }
 
@@ -1711,14 +1720,14 @@ mod tests {
         ));
 
         assert_eq!(
-            r#"a
+            "a
   b
     c
       d
       d
     c
   b
-a"#,
+a",
             formatted.as_code()
         );
     }
@@ -2047,10 +2056,10 @@ two lines`,
 
         assert_eq!(
             printed.as_code(),
-            r#"Group with id-2
+            "Group with id-2
 Group with id-1 does not fit on the line because it exceeds the line width of 80 characters by
 Group 2 fits
-Group 1 breaks"#
+Group 1 breaks"
         );
     }
 

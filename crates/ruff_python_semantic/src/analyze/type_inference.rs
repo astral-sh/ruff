@@ -3,7 +3,7 @@
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast as ast;
-use ruff_python_ast::{Constant, Expr, Operator, UnaryOp};
+use ruff_python_ast::{Expr, Operator, UnaryOp};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResolvedPythonType {
@@ -24,22 +24,41 @@ impl ResolvedPythonType {
             (Self::TypeError, _) | (_, Self::TypeError) => Self::TypeError,
             (Self::Unknown, _) | (_, Self::Unknown) => Self::Unknown,
             (Self::Atom(a), Self::Atom(b)) => {
-                if a == b {
+                if a.is_subtype_of(b) {
+                    Self::Atom(b)
+                } else if b.is_subtype_of(a) {
                     Self::Atom(a)
                 } else {
                     Self::Union(FxHashSet::from_iter([a, b]))
                 }
             }
             (Self::Atom(a), Self::Union(mut b)) => {
-                b.insert(a);
+                // If `a` is a subtype of any of the types in `b`, then `a` is
+                // redundant.
+                if !b.iter().any(|b_element| a.is_subtype_of(*b_element)) {
+                    b.insert(a);
+                }
                 Self::Union(b)
             }
             (Self::Union(mut a), Self::Atom(b)) => {
-                a.insert(b);
+                // If `b` is a subtype of any of the types in `a`, then `b` is
+                // redundant.
+                if !a.iter().any(|a_element| b.is_subtype_of(*a_element)) {
+                    a.insert(b);
+                }
                 Self::Union(a)
             }
             (Self::Union(mut a), Self::Union(b)) => {
-                a.extend(b);
+                for b_element in b {
+                    // If `b_element` is a subtype of any of the types in `a`, then
+                    // `b_element` is redundant.
+                    if !a
+                        .iter()
+                        .any(|a_element| b_element.is_subtype_of(*a_element))
+                    {
+                        a.insert(b_element);
+                    }
+                }
                 Self::Union(a)
             }
         }
@@ -59,22 +78,24 @@ impl From<&Expr> for ResolvedPythonType {
             Expr::Tuple(_) => ResolvedPythonType::Atom(PythonType::Tuple),
             Expr::GeneratorExp(_) => ResolvedPythonType::Atom(PythonType::Generator),
             Expr::FString(_) => ResolvedPythonType::Atom(PythonType::String),
-            Expr::Constant(ast::ExprConstant { value, .. }) => match value {
-                Constant::Str(_) => ResolvedPythonType::Atom(PythonType::String),
-                Constant::Int(_) => {
+            Expr::StringLiteral(_) => ResolvedPythonType::Atom(PythonType::String),
+            Expr::BytesLiteral(_) => ResolvedPythonType::Atom(PythonType::Bytes),
+            Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+                ast::Number::Int(_) => {
                     ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
                 }
-                Constant::Float(_) => {
+                ast::Number::Float(_) => {
                     ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
                 }
-                Constant::Bool(_) => ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool)),
-                Constant::Complex { .. } => {
+                ast::Number::Complex { .. } => {
                     ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex))
                 }
-                Constant::None => ResolvedPythonType::Atom(PythonType::None),
-                Constant::Ellipsis => ResolvedPythonType::Atom(PythonType::Ellipsis),
-                Constant::Bytes(_) => ResolvedPythonType::Atom(PythonType::Bytes),
             },
+            Expr::BooleanLiteral(_) => {
+                ResolvedPythonType::Atom(PythonType::Number(NumberLike::Bool))
+            }
+            Expr::NoneLiteral(_) => ResolvedPythonType::Atom(PythonType::None),
+            Expr::EllipsisLiteral(_) => ResolvedPythonType::Atom(PythonType::Ellipsis),
             // Simple container expressions.
             Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => {
                 ResolvedPythonType::from(value.as_ref())
@@ -302,7 +323,6 @@ impl From<&Expr> for ResolvedPythonType {
             | Expr::YieldFrom(_)
             | Expr::Compare(_)
             | Expr::Call(_)
-            | Expr::FormattedValue(_)
             | Expr::Attribute(_)
             | Expr::Subscript(_)
             | Expr::Starred(_)
@@ -319,7 +339,7 @@ impl From<&Expr> for ResolvedPythonType {
 /// such as strings, integers, floats, and containers. It cannot infer the
 /// types of variables or expressions that are not statically known from
 /// individual AST nodes alone.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PythonType {
     /// A string literal, such as `"hello"`.
     String,
@@ -343,8 +363,48 @@ pub enum PythonType {
     Generator,
 }
 
+impl PythonType {
+    /// Returns `true` if `self` is a subtype of `other`.
+    fn is_subtype_of(self, other: Self) -> bool {
+        match (self, other) {
+            (PythonType::String, PythonType::String) => true,
+            (PythonType::Bytes, PythonType::Bytes) => true,
+            (PythonType::None, PythonType::None) => true,
+            (PythonType::Ellipsis, PythonType::Ellipsis) => true,
+            // The Numeric Tower (https://peps.python.org/pep-3141/)
+            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Bool)) => true,
+            (PythonType::Number(NumberLike::Integer), PythonType::Number(NumberLike::Integer)) => {
+                true
+            }
+            (PythonType::Number(NumberLike::Float), PythonType::Number(NumberLike::Float)) => true,
+            (PythonType::Number(NumberLike::Complex), PythonType::Number(NumberLike::Complex)) => {
+                true
+            }
+            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Integer)) => true,
+            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Float)) => true,
+            (PythonType::Number(NumberLike::Bool), PythonType::Number(NumberLike::Complex)) => true,
+            (PythonType::Number(NumberLike::Integer), PythonType::Number(NumberLike::Float)) => {
+                true
+            }
+            (PythonType::Number(NumberLike::Integer), PythonType::Number(NumberLike::Complex)) => {
+                true
+            }
+            (PythonType::Number(NumberLike::Float), PythonType::Number(NumberLike::Complex)) => {
+                true
+            }
+            // This simple type hierarchy doesn't support generics.
+            (PythonType::Dict, PythonType::Dict) => true,
+            (PythonType::List, PythonType::List) => true,
+            (PythonType::Set, PythonType::Set) => true,
+            (PythonType::Tuple, PythonType::Tuple) => true,
+            (PythonType::Generator, PythonType::Generator) => true,
+            _ => false,
+        }
+    }
+}
+
 /// A numeric type, or a type that can be trivially coerced to a numeric type.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NumberLike {
     /// An integer literal, such as `1` or `0x1`.
     Integer,
@@ -370,15 +430,13 @@ impl NumberLike {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashSet;
-
     use ruff_python_ast::Expr;
     use ruff_python_parser::parse_expression;
 
     use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
     fn parse(expression: &str) -> Expr {
-        parse_expression(expression, "").unwrap()
+        parse_expression(expression).unwrap()
     }
 
     #[test]
@@ -408,10 +466,7 @@ mod tests {
         );
         assert_eq!(
             ResolvedPythonType::from(&parse("1 and True")),
-            ResolvedPythonType::Union(FxHashSet::from_iter([
-                PythonType::Number(NumberLike::Integer),
-                PythonType::Number(NumberLike::Bool)
-            ]))
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
 
         // Binary operators.
@@ -473,17 +528,11 @@ mod tests {
         );
         assert_eq!(
             ResolvedPythonType::from(&parse("1 if True else 2.0")),
-            ResolvedPythonType::Union(FxHashSet::from_iter([
-                PythonType::Number(NumberLike::Integer),
-                PythonType::Number(NumberLike::Float)
-            ]))
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float))
         );
         assert_eq!(
             ResolvedPythonType::from(&parse("1 if True else False")),
-            ResolvedPythonType::Union(FxHashSet::from_iter([
-                PythonType::Number(NumberLike::Integer),
-                PythonType::Number(NumberLike::Bool)
-            ]))
+            ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer))
         );
     }
 }

@@ -1,8 +1,0 @@
-[tool.ruff]
-line-length = 88
-extend-exclude = [
-  "excluded_file.py",
-  "migrations",
-  "with_excluded_file/other_excluded_file.py",
-]
-per-file-ignores = { "__init__.py" = ["F401"] }

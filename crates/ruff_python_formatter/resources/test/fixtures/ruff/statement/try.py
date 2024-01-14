@@ -1,72 +1,72 @@
 try:
-    ...
+    pass
 except:
-    ...
+    pass
 
 try:
-    ...
+    pass
 except (KeyError):  # should remove brackets and be a single line
-    ...
+    pass
 
 
 try: # try
-    ...
+    pass
     # end of body
 # before except
 except (Exception, ValueError) as exc:  # except line
-    ...
+    pass
 # before except 2
 except KeyError as key:  # except line 2
-    ...
+    pass
     # in body 2
 # before else
 else:
-    ...
+    pass
 # before finally
 finally:
-    ...
+    pass
 
 
 
 # with line breaks
 try: # try
-    ...
+    pass
     # end of body
 
 # before except
 except (Exception, ValueError) as exc:  # except line
-    ...
+    pass
 
 # before except 2
 except KeyError as key:  # except line 2
-    ...
+    pass
     # in body 2
 
 # before else
 else:
-    ...
+    pass
 
 # before finally
 finally:
-    ...
+    pass
 
 
 # with line breaks
 try:
-    ...
+    pass
 
 except:
-    ...
+    pass
 
 
 try:
-    ...
+    pass
 except (Exception, Exception, Exception, Exception, Exception, Exception, Exception) as exc:  # splits exception over multiple lines
-    ...
+    pass
 
 
 try:
-    ...
+    pass
 except:
     a = 10 # trailing comment1
     b = 11 # trailing comment2
@@ -74,21 +74,21 @@ except:
 
 # try/except*, mostly the same as try
 try: # try
-    ...
+    pass
     # end of body
 # before except
 except* (Exception, ValueError) as exc:  # except line
-    ...
+    pass
 # before except 2
 except* KeyError as key:  # except line 2
-    ...
+    pass
     # in body 2
 # before else
 else:
-    ...
+    pass
 # before finally
 finally:
-    ...
+    pass
 
 # try and try star are statements with body
 # Minimized from https://github.com/python/cpython/blob/99b00efd5edfd5b26bf9e2a35cbfc96277fdcbb1/Lib/getpass.py#L68-L91

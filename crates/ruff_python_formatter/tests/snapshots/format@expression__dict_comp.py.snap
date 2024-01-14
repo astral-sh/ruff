@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/dict_comp.py
 ---
 ## Input
-```py
+```python
 {i: i for i in []}
 
 {i: i for i in [1,]}
@@ -186,7 +186,7 @@ query = {
 ```
 
 ## Output
-```py
+```python
 {i: i for i in []}
 
 {

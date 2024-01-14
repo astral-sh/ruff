@@ -6,16 +6,28 @@ expression: parse_ast
     Expr(
         StmtExpr {
             range: 0..17,
-            value: Constant(
-                ExprConstant {
+            value: StringLiteral(
+                ExprStringLiteral {
                     range: 0..17,
-                    value: Str(
-                        StringConstant {
-                            value: "Hello world",
-                            unicode: true,
-                            implicit_concatenated: true,
-                        },
-                    ),
+                    value: StringLiteralValue {
+                        inner: Concatenated(
+                            ConcatenatedStringLiteral {
+                                strings: [
+                                    StringLiteral {
+                                        range: 0..9,
+                                        value: "Hello ",
+                                        unicode: true,
+                                    },
+                                    StringLiteral {
+                                        range: 10..17,
+                                        value: "world",
+                                        unicode: false,
+                                    },
+                                ],
+                                value: "Hello world",
+                            },
+                        ),
+                    },
                 },
             ),
         },

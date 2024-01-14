@@ -1,10 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Constant, ElifElseClause, Expr, ExprContext, Stmt};
+use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
+use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `if` statements that can be replaced with `bool`.
@@ -49,16 +49,14 @@ impl Violation for NeedlessBool {
 }
 
 /// SIM103
-pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf {
+pub(crate) fn needless_bool(checker: &mut Checker, stmt_if: &ast::StmtIf) {
+    let ast::StmtIf {
         test: if_test,
         body: if_body,
         elif_else_clauses,
         range: _,
-    }) = stmt
-    else {
-        return;
-    };
+    } = stmt_if;
+
     // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
     let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
         // if-else case
@@ -66,7 +64,7 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
             body: else_body,
             test: None,
             ..
-        }] => (if_test.as_ref(), if_body, else_body, stmt.range()),
+        }] => (if_test.as_ref(), if_body, else_body, stmt_if.range()),
         // elif-else case
         [.., ElifElseClause {
             body: elif_body,
@@ -98,51 +96,59 @@ pub(crate) fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
 
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
+    if is_sys_version_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
+    if is_type_checking_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
     let condition = checker.generator().expr(if_test);
     let mut diagnostic = Diagnostic::new(NeedlessBool { condition }, range);
-    if checker.patch(diagnostic.kind.rule()) {
-        if matches!(if_return, Bool::True)
-            && matches!(else_return, Bool::False)
-            && !checker.indexer().has_comments(&range, checker.locator())
-            && (if_test.is_compare_expr() || checker.semantic().is_builtin("bool"))
-        {
-            if if_test.is_compare_expr() {
-                // If the condition is a comparison, we can replace it with the condition.
-                let node = ast::StmtReturn {
-                    value: Some(Box::new(if_test.clone())),
-                    range: TextRange::default(),
-                };
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    checker.generator().stmt(&node.into()),
-                    range,
-                )));
-            } else {
-                // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
-                // verified, above, that `bool` is a builtin.)
-                let node = ast::ExprName {
-                    id: "bool".into(),
-                    ctx: ExprContext::Load,
-                    range: TextRange::default(),
-                };
-                let node1 = ast::ExprCall {
-                    func: Box::new(node.into()),
-                    arguments: Arguments {
-                        args: vec![if_test.clone()],
-                        keywords: vec![],
-                        range: TextRange::default(),
-                    },
-                    range: TextRange::default(),
-                };
-                let node2 = ast::StmtReturn {
-                    value: Some(Box::new(node1.into())),
-                    range: TextRange::default(),
-                };
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    checker.generator().stmt(&node2.into()),
-                    range,
-                )));
+    if matches!(if_return, Bool::True)
+        && matches!(else_return, Bool::False)
+        && !checker.indexer().has_comments(&range, checker.locator())
+        && (if_test.is_compare_expr() || checker.semantic().is_builtin("bool"))
+    {
+        if if_test.is_compare_expr() {
+            // If the condition is a comparison, we can replace it with the condition.
+            let node = ast::StmtReturn {
+                value: Some(Box::new(if_test.clone())),
+                range: TextRange::default(),
             };
-        }
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().stmt(&node.into()),
+                range,
+            )));
+        } else {
+            // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
+            // verified, above, that `bool` is a builtin.)
+            let node = ast::ExprName {
+                id: "bool".into(),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            };
+            let node1 = ast::ExprCall {
+                func: Box::new(node.into()),
+                arguments: Arguments {
+                    args: vec![if_test.clone()],
+                    keywords: vec![],
+                    range: TextRange::default(),
+                },
+                range: TextRange::default(),
+            };
+            let node2 = ast::StmtReturn {
+                value: Some(Box::new(node1.into())),
+                range: TextRange::default(),
+            };
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                checker.generator().stmt(&node2.into()),
+                range,
+            )));
+        };
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -170,10 +176,7 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
     let Stmt::Return(ast::StmtReturn { value, range: _ }) = stmt else {
         return None;
     };
-    let Some(Expr::Constant(ast::ExprConstant { value, .. })) = value.as_deref() else {
-        return None;
-    };
-    let Constant::Bool(value) = value else {
+    let Some(Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. })) = value.as_deref() else {
         return None;
     };
     Some((*value).into())

@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/compare.py
 ---
 ## Input
-```py
+```python
 a == b
 a != b
 a < b
@@ -187,7 +187,7 @@ c = (a *
 ```
 
 ## Output
-```py
+```python
 a == b
 a != b
 a < b

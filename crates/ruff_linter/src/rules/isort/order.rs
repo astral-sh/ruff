@@ -1,27 +1,20 @@
-use std::cmp::Ordering;
-
+use crate::rules::isort::sorting::ImportStyle;
+use crate::rules::isort::{ImportSection, ImportType};
 use itertools::Itertools;
 
 use super::settings::Settings;
-use super::sorting::{cmp_import_from, cmp_members, cmp_modules};
-use super::types::{AliasData, CommentSet, ImportBlock, ImportFromStatement, OrderedImportBlock};
+use super::sorting::{MemberKey, ModuleKey};
+use super::types::EitherImport::{self, Import, ImportFrom};
+use super::types::{AliasData, CommentSet, ImportBlock, ImportFromStatement};
 
 pub(crate) fn order_imports<'a>(
     block: ImportBlock<'a>,
+    section: &ImportSection,
     settings: &Settings,
-) -> OrderedImportBlock<'a> {
-    let mut ordered = OrderedImportBlock::default();
+) -> Vec<EitherImport<'a>> {
+    let straight_imports = block.import.into_iter();
 
-    // Sort `Stmt::Import`.
-    ordered.import.extend(
-        block
-            .import
-            .into_iter()
-            .sorted_by(|(alias1, _), (alias2, _)| cmp_modules(alias1, alias2, settings)),
-    );
-
-    // Sort `Stmt::ImportFrom`.
-    ordered.import_from.extend(
+    let from_imports =
         // Include all non-re-exports.
         block
             .import_from
@@ -53,27 +46,101 @@ pub(crate) fn order_imports<'a>(
                         trailing_comma,
                         aliases
                             .into_iter()
-                            .sorted_by(|(alias1, _), (alias2, _)| {
-                                cmp_members(alias1, alias2, settings)
+                            .sorted_by_cached_key(|(alias, _)| {
+                                MemberKey::from_member(alias.name, alias.asname, settings)
                             })
                             .collect::<Vec<(AliasData, CommentSet)>>(),
                     )
                 },
-            )
-            .sorted_by(
-                |(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
-                    cmp_import_from(import_from1, import_from2, settings).then_with(|| {
-                        match (aliases1.first(), aliases2.first()) {
-                            (None, None) => Ordering::Equal,
-                            (None, Some(_)) => Ordering::Less,
-                            (Some(_), None) => Ordering::Greater,
-                            (Some((alias1, _)), Some((alias2, _))) => {
-                                cmp_members(alias1, alias2, settings)
-                            }
-                        }
+            );
+
+    let ordered_imports = if matches!(section, ImportSection::Known(ImportType::Future)) {
+        from_imports
+            .sorted_by_cached_key(|(import_from, _, _, aliases)| {
+                ModuleKey::from_module(
+                    import_from.module,
+                    None,
+                    import_from.level,
+                    aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
+                    settings,
+                )
+            })
+            .map(ImportFrom)
+            .chain(
+                straight_imports
+                    .sorted_by_cached_key(|(alias, _)| {
+                        ModuleKey::from_module(
+                            Some(alias.name),
+                            alias.asname,
+                            None,
+                            None,
+                            ImportStyle::Straight,
+                            settings,
+                        )
                     })
-                },
-            ),
-    );
-    ordered
+                    .map(Import),
+            )
+            .collect()
+    } else if settings.force_sort_within_sections {
+        straight_imports
+            .map(Import)
+            .chain(from_imports.map(ImportFrom))
+            .sorted_by_cached_key(|import| match import {
+                Import((alias, _)) => ModuleKey::from_module(
+                    Some(alias.name),
+                    alias.asname,
+                    None,
+                    None,
+                    ImportStyle::Straight,
+                    settings,
+                ),
+                ImportFrom((import_from, _, _, aliases)) => ModuleKey::from_module(
+                    import_from.module,
+                    None,
+                    import_from.level,
+                    aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
+                    settings,
+                ),
+            })
+            .collect()
+    } else {
+        let ordered_straight_imports = straight_imports.sorted_by_cached_key(|(alias, _)| {
+            ModuleKey::from_module(
+                Some(alias.name),
+                alias.asname,
+                None,
+                None,
+                ImportStyle::Straight,
+                settings,
+            )
+        });
+        let ordered_from_imports =
+            from_imports.sorted_by_cached_key(|(import_from, _, _, aliases)| {
+                ModuleKey::from_module(
+                    import_from.module,
+                    None,
+                    import_from.level,
+                    aliases.first().map(|(alias, _)| (alias.name, alias.asname)),
+                    ImportStyle::From,
+                    settings,
+                )
+            });
+        if settings.from_first {
+            ordered_from_imports
+                .into_iter()
+                .map(ImportFrom)
+                .chain(ordered_straight_imports.into_iter().map(Import))
+                .collect()
+        } else {
+            ordered_straight_imports
+                .into_iter()
+                .map(Import)
+                .chain(ordered_from_imports.into_iter().map(ImportFrom))
+                .collect()
+        }
+    };
+
+    ordered_imports
 }

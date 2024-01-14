@@ -5,7 +5,7 @@ use ruff_python_ast::{self as ast, Arguments, Expr, Keyword};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
+
 use crate::rules::flake8_comprehensions::fixes;
 
 /// ## What it does
@@ -43,6 +43,10 @@ use crate::rules::flake8_comprehensions::fixes;
 /// - Instead of `sorted(tuple(iterable))`, use `sorted(iterable)`.
 /// - Instead of `sorted(sorted(iterable))`, use `sorted(iterable)`.
 /// - Instead of `sorted(reversed(iterable))`, use `sorted(iterable)`.
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as it may occasionally drop comments
+/// when rewriting the call. In most cases, though, comments will be preserved.
 #[violation]
 pub struct UnnecessaryDoubleCastOrProcess {
     inner: String,
@@ -130,16 +134,14 @@ pub(crate) fn unnecessary_double_cast_or_process(
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_double_cast_or_process(
-                    expr,
-                    checker.locator(),
-                    checker.stylist(),
-                )
-                .map(Fix::unsafe_edit)
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            fixes::fix_unnecessary_double_cast_or_process(
+                expr,
+                checker.locator(),
+                checker.stylist(),
+            )
+            .map(Fix::unsafe_edit)
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

@@ -1,5 +1,5 @@
 use ruff_formatter::{format_args, write, FormatRuleWithOptions};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprTuple;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange};
@@ -172,10 +172,13 @@ impl FormatNodeRule<ExprTuple> for FormatExprTuple {
                         .finish()
                 }
                 TupleParentheses::Preserve => group(&ExprSequence::new(item)).fmt(f),
-                TupleParentheses::NeverPreserve | TupleParentheses::OptionalParentheses => {
+                TupleParentheses::NeverPreserve => {
                     optional_parentheses(&ExprSequence::new(item)).fmt(f)
                 }
-                TupleParentheses::Default => {
+                TupleParentheses::OptionalParentheses if item.elts.len() == 2 => {
+                    optional_parentheses(&ExprSequence::new(item)).fmt(f)
+                }
+                TupleParentheses::Default | TupleParentheses::OptionalParentheses => {
                     parenthesize_if_expands(&ExprSequence::new(item)).fmt(f)
                 }
             },
@@ -224,7 +227,7 @@ impl NeedsParentheses for ExprTuple {
 /// Return `true` if a tuple is parenthesized in the source code.
 pub(crate) fn is_tuple_parenthesized(tuple: &ExprTuple, source: &str) -> bool {
     let Some(elt) = tuple.elts.first() else {
-        return false;
+        return true;
     };
 
     // Count the number of open parentheses between the start of the tuple and the first element.

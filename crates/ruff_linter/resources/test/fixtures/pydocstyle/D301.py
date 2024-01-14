@@ -10,6 +10,10 @@ def double_quotes_backslash_uppercase():
     R"""Sum\\mary."""
 
 
+def shouldnt_add_raw_here():
+    "Ruff \U000026a1"
+
+
 def make_unique_pod_id(pod_id: str) -> str | None:
     r"""
     Generate a unique Pod name.
@@ -27,3 +31,7 @@ def make_unique_pod_id(pod_id: str) -> str | None:
     :param pod_id: requested pod name
     :return: ``str`` valid Pod name of appropriate length
     """
+
+
+def shouldnt_add_raw_here2():
+    u"Sum\\mary."

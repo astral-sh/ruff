@@ -9,8 +9,9 @@ use log::error;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_notebook::Notebook;
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, Suite};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::lexer::LexResult;
@@ -30,7 +31,7 @@ use crate::fix::{fix_file, FixResult};
 use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::noqa::add_noqa;
-use crate::registry::{AsRule, Rule};
+use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rules::pycodestyle;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
@@ -72,7 +73,6 @@ pub struct FixerResult<'a> {
 pub fn check_path(
     path: &Path,
     package: Option<&Path>,
-    tokens: Vec<LexResult>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -81,6 +81,7 @@ pub fn check_path(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
+    tokens: TokenSource,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -107,7 +108,8 @@ pub fn check_path(
             locator,
             indexer,
             settings,
-            source_type.is_stub(),
+            source_type,
+            source_kind.as_ipy_notebook().map(Notebook::cell_offsets),
         ));
     }
 
@@ -117,7 +119,7 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
-        diagnostics.extend(check_file_path(path, package, settings));
+        diagnostics.extend(check_file_path(path, package, locator, indexer, settings));
     }
 
     // Run the logical line-based rules.
@@ -142,13 +144,11 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
-        match ruff_python_parser::parse_program_tokens(
-            tokens,
-            source_kind.source_code(),
-            &path.to_string_lossy(),
-            source_type.is_ipynb(),
-        ) {
+        // Parse, if the AST wasn't pre-provided provided.
+        match tokens.into_ast_source(source_kind, source_type) {
             Ok(python_ast) => {
+                let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
+                let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
                 if use_ast {
                     diagnostics.extend(check_ast(
                         &python_ast,
@@ -161,6 +161,8 @@ pub fn check_path(
                         path,
                         package,
                         source_type,
+                        cell_offsets,
+                        notebook_index,
                     ));
                 }
                 if use_imports {
@@ -173,8 +175,8 @@ pub fn check_path(
                         stylist,
                         path,
                         package,
-                        source_kind,
                         source_type,
+                        cell_offsets,
                     );
                     imports = module_imports;
                     diagnostics.extend(import_diagnostics);
@@ -213,12 +215,14 @@ pub fn check_path(
     }
 
     // Ignore diagnostics based on per-file-ignores.
-    if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
-        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores);
-        if !ignores.is_empty() {
-            diagnostics.retain(|diagnostic| !ignores.contains(diagnostic.kind.rule()));
-        }
+    let per_file_ignores = if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
+        fs::ignores_from_path(path, &settings.per_file_ignores)
+    } else {
+        RuleSet::empty()
     };
+    if !per_file_ignores.is_empty() {
+        diagnostics.retain(|diagnostic| !per_file_ignores.contains(diagnostic.kind.rule()));
+    }
 
     // Enforce `noqa` directives.
     if (noqa.into() && !diagnostics.is_empty())
@@ -234,6 +238,7 @@ pub fn check_path(
             indexer.comment_ranges(),
             &directives.noqa_line_for,
             error.is_none(),
+            &per_file_ignores,
             settings,
         );
         if noqa.into() {
@@ -257,6 +262,25 @@ pub fn check_path(
         // If the syntax error _diagnostic_ is disabled, discard the _diagnostic_.
         if !settings.rules.enabled(Rule::SyntaxError) {
             diagnostics.retain(|diagnostic| diagnostic.kind.rule() != Rule::SyntaxError);
+        }
+    }
+
+    // Remove fixes for any rules marked as unfixable.
+    for diagnostic in &mut diagnostics {
+        if !settings.rules.should_fix(diagnostic.kind.rule()) {
+            diagnostic.fix = None;
+        }
+    }
+
+    // Update fix applicability to account for overrides
+    if !settings.fix_safety.is_empty() {
+        for diagnostic in &mut diagnostics {
+            if let Some(fix) = diagnostic.fix.take() {
+                let fixed_applicability = settings
+                    .fix_safety
+                    .resolve_applicability(diagnostic.kind.rule(), fix.applicability());
+                diagnostic.set_fix(fix.with_applicability(fixed_applicability));
+            }
         }
     }
 
@@ -302,7 +326,6 @@ pub fn add_noqa_to_path(
     } = check_path(
         path,
         package,
-        tokens,
         &locator,
         &stylist,
         &indexer,
@@ -311,13 +334,19 @@ pub fn add_noqa_to_path(
         flags::Noqa::Disabled,
         source_kind,
         source_type,
+        TokenSource::Tokens(tokens),
     );
 
     // Log any parse errors.
-    if let Some(err) = error {
+    if let Some(error) = error {
         error!(
             "{}",
-            DisplayParseError::new(err, locator.to_source_code(), source_kind)
+            DisplayParseError::from_source_code(
+                error,
+                Some(path.to_path_buf()),
+                &locator.to_source_code(),
+                source_kind,
+            )
         );
     }
 
@@ -342,10 +371,10 @@ pub fn lint_only(
     noqa: flags::Noqa,
     source_kind: &SourceKind,
     source_type: PySourceType,
+    data: ParseSource,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
-    let tokens: Vec<LexResult> =
-        ruff_python_parser::tokenize(source_kind.source_code(), source_type.as_mode());
+    let tokens = data.into_token_source(source_kind, source_type);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -368,7 +397,6 @@ pub fn lint_only(
     let result = check_path(
         path,
         package,
-        tokens,
         &locator,
         &stylist,
         &indexer,
@@ -377,6 +405,7 @@ pub fn lint_only(
         noqa,
         source_kind,
         source_type,
+        tokens,
     );
 
     result.map(|(diagnostics, imports)| {
@@ -464,7 +493,6 @@ pub fn lint_fix<'a>(
         let result = check_path(
             path,
             package,
-            tokens,
             &locator,
             &stylist,
             &indexer,
@@ -473,6 +501,7 @@ pub fn lint_fix<'a>(
             noqa,
             &transformed,
             source_type,
+            TokenSource::Tokens(tokens),
         );
 
         if iterations == 0 {
@@ -609,6 +638,93 @@ This indicates a bug in Ruff. If you could open an issue at:
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ParseSource<'a> {
+    /// Extract the tokens and AST from the given source code.
+    None,
+    /// Use the precomputed tokens and AST.
+    Precomputed {
+        tokens: &'a [LexResult],
+        ast: &'a Suite,
+    },
+}
+
+impl<'a> ParseSource<'a> {
+    /// Convert to a [`TokenSource`], tokenizing if necessary.
+    fn into_token_source(
+        self,
+        source_kind: &SourceKind,
+        source_type: PySourceType,
+    ) -> TokenSource<'a> {
+        match self {
+            Self::None => TokenSource::Tokens(ruff_python_parser::tokenize(
+                source_kind.source_code(),
+                source_type.as_mode(),
+            )),
+            Self::Precomputed { tokens, ast } => TokenSource::Precomputed { tokens, ast },
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TokenSource<'a> {
+    /// Use the precomputed tokens to generate the AST.
+    Tokens(Vec<LexResult>),
+    /// Use the precomputed tokens and AST.
+    Precomputed {
+        tokens: &'a [LexResult],
+        ast: &'a Suite,
+    },
+}
+
+impl Deref for TokenSource<'_> {
+    type Target = [LexResult];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Tokens(tokens) => tokens,
+            Self::Precomputed { tokens, .. } => tokens,
+        }
+    }
+}
+
+impl<'a> TokenSource<'a> {
+    /// Convert to an [`AstSource`], parsing if necessary.
+    fn into_ast_source(
+        self,
+        source_kind: &SourceKind,
+        source_type: PySourceType,
+    ) -> Result<AstSource<'a>, ParseError> {
+        match self {
+            Self::Tokens(tokens) => Ok(AstSource::Ast(ruff_python_parser::parse_program_tokens(
+                tokens,
+                source_kind.source_code(),
+                source_type.is_ipynb(),
+            )?)),
+            Self::Precomputed { ast, .. } => Ok(AstSource::Precomputed(ast)),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AstSource<'a> {
+    /// Extract the AST from the given source code.
+    Ast(Suite),
+    /// Use the precomputed AST.
+    Precomputed(&'a Suite),
+}
+
+impl Deref for AstSource<'_> {
+    type Target = Suite;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Ast(ast) => ast,
+            Self::Precomputed(ast) => ast,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -620,7 +736,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::source_kind::SourceKind;
-    use crate::test::{test_contents, test_notebook_path, TestedNotebook};
+    use crate::test::{assert_notebook_path, test_contents, TestedNotebook};
     use crate::{assert_messages, settings};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
@@ -636,7 +752,7 @@ mod tests {
             messages,
             source_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             &actual,
             expected,
             &settings::LinterSettings::for_rule(Rule::UnsortedImports),
@@ -653,7 +769,7 @@ mod tests {
             messages,
             source_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             &actual,
             expected,
             &settings::LinterSettings::for_rule(Rule::UnusedImport),
@@ -670,7 +786,7 @@ mod tests {
             messages,
             source_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             &actual,
             expected,
             &settings::LinterSettings::for_rule(Rule::UnusedVariable),
@@ -687,7 +803,7 @@ mod tests {
         let TestedNotebook {
             linted_notebook: fixed_notebook,
             ..
-        } = test_notebook_path(
+        } = assert_notebook_path(
             actual_path,
             &expected_path,
             &settings::LinterSettings::for_rule(Rule::UnusedImport),

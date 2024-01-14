@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/list_comp.py
 ---
 ## Input
-```py
+```python
 [i for i in []]
 
 [i for i in [1,]]
@@ -108,10 +108,13 @@ aaaaaaaaaaaaaaaaaaaaa = [
      c  # negative decimal
 ]
 
+# Parenthesized targets and iterators.
+[x for (x) in y]
+[x for x in (y)]
 ```
 
 ## Output
-```py
+```python
 [i for i in []]
 
 [
@@ -247,6 +250,10 @@ aaaaaaaaaaaaaaaaaaaaa = [
     for components in b  # pylint: disable=undefined-loop-variable  # integer 1 may only have decimal 01-09
     + c  # negative decimal
 ]
+
+# Parenthesized targets and iterators.
+[x for (x) in y]
+[x for x in (y)]
 ```
 
 

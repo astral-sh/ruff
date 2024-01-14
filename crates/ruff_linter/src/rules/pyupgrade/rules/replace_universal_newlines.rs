@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` that set the `universal_newlines`
@@ -65,23 +64,21 @@ pub(crate) fn replace_universal_newlines(checker: &mut Checker, call: &ast::Expr
 
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, arg.range());
 
-        if checker.patch(diagnostic.kind.rule()) {
-            if call.arguments.find_keyword("text").is_some() {
-                diagnostic.try_set_fix(|| {
-                    remove_argument(
-                        kwarg,
-                        &call.arguments,
-                        Parentheses::Preserve,
-                        checker.locator().contents(),
-                    )
-                    .map(Fix::unsafe_edit)
-                });
-            } else {
-                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                    "text".to_string(),
-                    arg.range(),
-                )));
-            }
+        if call.arguments.find_keyword("text").is_some() {
+            diagnostic.try_set_fix(|| {
+                remove_argument(
+                    kwarg,
+                    &call.arguments,
+                    Parentheses::Preserve,
+                    checker.locator().contents(),
+                )
+                .map(Fix::safe_edit)
+            });
+        } else {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "text".to_string(),
+                arg.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

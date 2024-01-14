@@ -1,25 +1,23 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, ConversionFlag, Expr};
+use ruff_python_ast::{self as ast, Arguments, ConversionFlag, Expr};
 use ruff_text_size::TextRange;
 
-/// Wrap an expression in a `FormattedValue` with no special formatting.
-fn to_formatted_value_expr(inner: &Expr) -> Expr {
-    let node = ast::ExprFormattedValue {
-        value: Box::new(inner.clone()),
+/// Wrap an expression in a [`ast::FStringElement::Expression`] with no special formatting.
+fn to_f_string_expression_element(inner: &Expr) -> ast::FStringElement {
+    ast::FStringElement::Expression(ast::FStringExpressionElement {
+        expression: Box::new(inner.clone()),
         debug_text: None,
         conversion: ConversionFlag::None,
         format_spec: None,
         range: TextRange::default(),
-    };
-    node.into()
+    })
 }
 
-/// Convert a string to a constant string expression.
-pub(super) fn to_constant_string(s: &str) -> Expr {
-    let node = ast::ExprConstant {
-        value: s.to_owned().into(),
+/// Convert a string to a [`ast::FStringElement::Literal`].
+pub(super) fn to_f_string_literal_element(s: &str) -> ast::FStringElement {
+    ast::FStringElement::Literal(ast::FStringLiteralElement {
+        value: s.to_owned(),
         range: TextRange::default(),
-    };
-    node.into()
+    })
 }
 
 /// Figure out if `expr` represents a "simple" call
@@ -51,24 +49,19 @@ fn is_simple_callee(func: &Expr) -> bool {
 }
 
 /// Convert an expression to a f-string element (if it looks like a good idea).
-pub(super) fn to_f_string_element(expr: &Expr) -> Option<Expr> {
+pub(super) fn to_f_string_element(expr: &Expr) -> Option<ast::FStringElement> {
     match expr {
-        // These are directly handled by `unparse_f_string_element`:
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(_),
-            ..
-        })
-        | Expr::FString(_)
-        | Expr::FormattedValue(_) => Some(expr.clone()),
+        Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => {
+            Some(ast::FStringElement::Literal(ast::FStringLiteralElement {
+                value: value.to_string(),
+                range: *range,
+            }))
+        }
         // These should be pretty safe to wrap in a formatted value.
-        Expr::Constant(ast::ExprConstant {
-            value:
-                Constant::Int(_) | Constant::Float(_) | Constant::Bool(_) | Constant::Complex { .. },
-            ..
-        })
-        | Expr::Name(_)
-        | Expr::Attribute(_) => Some(to_formatted_value_expr(expr)),
-        Expr::Call(_) if is_simple_call(expr) => Some(to_formatted_value_expr(expr)),
+        Expr::NumberLiteral(_) | Expr::BooleanLiteral(_) | Expr::Name(_) | Expr::Attribute(_) => {
+            Some(to_f_string_expression_element(expr))
+        }
+        Expr::Call(_) if is_simple_call(expr) => Some(to_f_string_expression_element(expr)),
         _ => None,
     }
 }

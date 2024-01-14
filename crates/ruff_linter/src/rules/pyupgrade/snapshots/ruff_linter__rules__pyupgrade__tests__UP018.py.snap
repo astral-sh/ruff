@@ -9,9 +9,9 @@ UP018.py:37:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 38 | str("foo")
 39 | str("""
    |
-   = help: Replace with empty string
+   = help: Replace with string literal
 
-ℹ Fix
+ℹ Safe fix
 34 34 | int().denominator
 35 35 | 
 36 36 | # These become string or byte literals
@@ -30,9 +30,9 @@ UP018.py:38:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 39 | str("""
 40 | foo""")
    |
-   = help: Replace with empty string
+   = help: Replace with string literal
 
-ℹ Fix
+ℹ Safe fix
 35 35 | 
 36 36 | # These become string or byte literals
 37 37 | str()
@@ -52,9 +52,9 @@ UP018.py:39:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 41 |   bytes()
 42 |   bytes(b"foo")
    |
-   = help: Replace with empty string
+   = help: Replace with string literal
 
-ℹ Fix
+ℹ Safe fix
 36 36 | # These become string or byte literals
 37 37 | str()
 38 38 | str("foo")
@@ -75,9 +75,9 @@ UP018.py:41:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
 42 | bytes(b"foo")
 43 | bytes(b"""
    |
-   = help: Replace with empty bytes
+   = help: Replace with bytes literal
 
-ℹ Fix
+ℹ Safe fix
 38 38 | str("foo")
 39 39 | str("""
 40 40 | foo""")
@@ -96,9 +96,9 @@ UP018.py:42:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
 43 | bytes(b"""
 44 | foo""")
    |
-   = help: Replace with empty bytes
+   = help: Replace with bytes literal
 
-ℹ Fix
+ℹ Safe fix
 39 39 | str("""
 40 40 | foo""")
 41 41 | bytes()
@@ -118,9 +118,9 @@ UP018.py:43:1: UP018 [*] Unnecessary `bytes` call (rewrite as a literal)
 45 |   f"{str()}"
 46 |   int()
    |
-   = help: Replace with empty bytes
+   = help: Replace with bytes literal
 
-ℹ Fix
+ℹ Safe fix
 40 40 | foo""")
 41 41 | bytes()
 42 42 | bytes(b"foo")
@@ -141,9 +141,9 @@ UP018.py:45:4: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 46 | int()
 47 | int(1)
    |
-   = help: Replace with empty string
+   = help: Replace with string literal
 
-ℹ Fix
+ℹ Safe fix
 42 42 | bytes(b"foo")
 43 43 | bytes(b"""
 44 44 | foo""")
@@ -162,9 +162,9 @@ UP018.py:46:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 47 | int(1)
 48 | float()
    |
-   = help: Replace with 0
+   = help: Replace with integer literal
 
-ℹ Fix
+ℹ Safe fix
 43 43 | bytes(b"""
 44 44 | foo""")
 45 45 | f"{str()}"
@@ -183,9 +183,9 @@ UP018.py:47:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 48 | float()
 49 | float(1.0)
    |
-   = help: Replace with 0
+   = help: Replace with integer literal
 
-ℹ Fix
+ℹ Safe fix
 44 44 | foo""")
 45 45 | f"{str()}"
 46 46 | int()
@@ -204,9 +204,9 @@ UP018.py:48:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 49 | float(1.0)
 50 | bool()
    |
-   = help: Replace with 0.0
+   = help: Replace with float literal
 
-ℹ Fix
+ℹ Safe fix
 45 45 | f"{str()}"
 46 46 | int()
 47 47 | int(1)
@@ -225,9 +225,9 @@ UP018.py:49:1: UP018 [*] Unnecessary `float` call (rewrite as a literal)
 50 | bool()
 51 | bool(True)
    |
-   = help: Replace with 0.0
+   = help: Replace with float literal
 
-ℹ Fix
+ℹ Safe fix
 46 46 | int()
 47 47 | int(1)
 48 48 | float()
@@ -246,9 +246,9 @@ UP018.py:50:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 51 | bool(True)
 52 | bool(False)
    |
-   = help: Replace with `False`
+   = help: Replace with boolean literal
 
-ℹ Fix
+ℹ Safe fix
 47 47 | int(1)
 48 48 | float()
 49 49 | float(1.0)
@@ -266,9 +266,9 @@ UP018.py:51:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
    | ^^^^^^^^^^ UP018
 52 | bool(False)
    |
-   = help: Replace with `False`
+   = help: Replace with boolean literal
 
-ℹ Fix
+ℹ Safe fix
 48 48 | float()
 49 49 | float(1.0)
 50 50 | bool()
@@ -287,9 +287,9 @@ UP018.py:52:1: UP018 [*] Unnecessary `bool` call (rewrite as a literal)
 53 | 
 54 | # These become a literal but retain parentheses
    |
-   = help: Replace with `False`
+   = help: Replace with boolean literal
 
-ℹ Fix
+ℹ Safe fix
 49 49 | float(1.0)
 50 50 | bool()
 51 51 | bool(True)
@@ -305,9 +305,9 @@ UP018.py:55:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
 55 | int(1).denominator
    | ^^^^^^ UP018
    |
-   = help: Replace with 0
+   = help: Replace with integer literal
 
-ℹ Fix
+ℹ Safe fix
 52 52 | bool(False)
 53 53 | 
 54 54 | # These become a literal but retain parentheses

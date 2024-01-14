@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
+
 use ruff_python_ast::{self as ast};
 use ruff_text_size::Ranged;
 
@@ -86,7 +86,7 @@ pub(crate) fn call_datetime_fromtimestamp(checker: &mut Checker, call: &ast::Exp
     }
 
     // none args
-    if call.arguments.args.len() > 1 && is_const_none(&call.arguments.args[1]) {
+    if call.arguments.args.len() > 1 && call.arguments.args[1].is_none_literal_expr() {
         checker
             .diagnostics
             .push(Diagnostic::new(CallDatetimeFromtimestamp, call.range()));

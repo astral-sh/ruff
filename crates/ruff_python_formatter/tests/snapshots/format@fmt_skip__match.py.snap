@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/match.py
 ---
 ## Input
-```py
+```python
 def http_error(status):
     match status   : # fmt: skip
         case 400   : # fmt: skip
@@ -80,7 +80,7 @@ match point:
 ```
 
 ## Output
-```py
+```python
 def http_error(status):
     match status   :  # fmt: skip
         case 400   :  # fmt: skip

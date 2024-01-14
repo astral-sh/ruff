@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Expr, ExprYield, ExprYieldFrom};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -59,7 +59,10 @@ impl NeedsParentheses for AnyExpressionYield<'_> {
                     OptionalParentheses::Never
                 } else {
                     // Ex) `x = yield f(1, 2, 3)`
-                    value.needs_parentheses(self.into(), context)
+                    match value.needs_parentheses(self.into(), context) {
+                        OptionalParentheses::BestFit => OptionalParentheses::Never,
+                        parentheses => parentheses,
+                    }
                 }
             } else {
                 // Ex) `x = yield`

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
@@ -128,15 +128,13 @@ pub(crate) fn logging_call(checker: &mut Checker, call: &ast::ExprCall) {
         _ => return,
     };
 
-    let Some(Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(ast::StringConstant { value, .. }),
-        ..
-    })) = call.arguments.find_positional(0)
+    let Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) =
+        call.arguments.find_positional(0)
     else {
         return;
     };
 
-    let Ok(summary) = CFormatSummary::try_from(value.as_str()) else {
+    let Ok(summary) = CFormatSummary::try_from(value.to_str()) else {
         return;
     };
 

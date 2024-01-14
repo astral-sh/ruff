@@ -5,7 +5,9 @@
 #
 # Expects to be run from the repo root after invoking `cargo build --release`,
 # in an environment with access to `black`, `autopep8`, and `yapf` (most recently:
-# `black` v23.9.1, `autopep8` v2.0.4, and `yapf` v0.40.1).
+# `black` v23.9.1, `autopep8` v2.0.4, and `yapf` v0.40.2, on Python 3.11.6, the
+# most recent combination of versions for which Black provides compiled wheels at
+# time of writing).
 #
 # Example usage:
 #

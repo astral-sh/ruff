@@ -5,7 +5,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `typing.Text`.
@@ -53,13 +52,11 @@ pub(crate) fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["typing", "Text"]))
     {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if checker.semantic().is_builtin("str") {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    "str".to_string(),
-                    expr.range(),
-                )));
-            }
+        if checker.semantic().is_builtin("str") {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "str".to_string(),
+                expr.range(),
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }

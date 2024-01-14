@@ -35,6 +35,7 @@ mod source_code;
 use crate::formatter::Formatter;
 use crate::group_id::UniqueGroupIdBuilder;
 use crate::prelude::TagKind;
+use std::fmt;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::num::{NonZeroU16, NonZeroU8, TryFromIntError};
@@ -95,7 +96,7 @@ impl std::fmt::Display for IndentStyle {
 ///
 /// Determines the visual width of a tab character (`\t`) and the number of
 /// spaces per indent when using [`IndentStyle::Space`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, CacheKey)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct IndentWidth(NonZeroU8);
@@ -110,6 +111,12 @@ impl IndentWidth {
 impl Default for IndentWidth {
     fn default() -> Self {
         Self(NonZeroU8::new(2).unwrap())
+    }
+}
+
+impl Display for IndentWidth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -143,6 +150,12 @@ impl LineWidth {
 impl Default for LineWidth {
     fn default() -> Self {
         Self(NonZeroU16::new(80).unwrap())
+    }
+}
+
+impl Display for LineWidth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -574,6 +587,10 @@ where
             rule,
             context: PhantomData,
         }
+    }
+
+    pub fn rule(&self) -> &R {
+        &self.rule
     }
 }
 

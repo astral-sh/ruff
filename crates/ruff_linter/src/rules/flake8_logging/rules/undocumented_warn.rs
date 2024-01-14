@@ -6,7 +6,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `logging.WARN`.
@@ -55,17 +54,15 @@ pub(crate) fn undocumented_warn(checker: &mut Checker, expr: &Expr) {
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "WARN"]))
     {
         let mut diagnostic = Diagnostic::new(UndocumentedWarn, expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import("logging", "WARNING"),
-                    expr.start(),
-                    checker.semantic(),
-                )?;
-                let reference_edit = Edit::range_replacement(binding, expr.range());
-                Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("logging", "WARNING"),
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let reference_edit = Edit::range_replacement(binding, expr.range());
+            Ok(Fix::safe_edits(import_edit, [reference_edit]))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

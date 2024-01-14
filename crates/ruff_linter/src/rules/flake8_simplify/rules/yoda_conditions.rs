@@ -1,3 +1,5 @@
+use std::cmp;
+
 use anyhow::Result;
 use libcst_native::CompOp;
 
@@ -14,7 +16,7 @@ use crate::cst::helpers::or_space;
 use crate::cst::matchers::{match_comparison, transform_expression};
 use crate::fix::edits::pad;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
+use crate::settings::types::PreviewMode;
 
 /// ## What it does
 /// Checks for conditions that position a constant on the left-hand side of the
@@ -79,19 +81,65 @@ impl Violation for YodaConditions {
     }
 }
 
-/// Return `true` if an [`Expr`] is a constant or a constant-like name.
-fn is_constant_like(expr: &Expr) -> bool {
-    match expr {
-        Expr::Attribute(ast::ExprAttribute { attr, .. }) => str::is_cased_uppercase(attr),
-        Expr::Constant(_) => true,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.iter().all(is_constant_like),
-        Expr::Name(ast::ExprName { id, .. }) => str::is_cased_uppercase(id),
-        Expr::UnaryOp(ast::ExprUnaryOp {
-            op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
-            operand,
-            range: _,
-        }) => operand.is_constant_expr(),
-        _ => false,
+/// Comparisons left-hand side must not be more [`ConstantLikelihood`] than the right-hand side.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum ConstantLikelihood {
+    /// The expression is unlikely to be a constant (e.g., `foo` or `foo(bar)`).
+    Unlikely = 0,
+
+    /// The expression is likely to be a constant (e.g., `FOO`).
+    Probably = 1,
+
+    /// The expression is definitely a constant (e.g., `42` or `"foo"`).
+    Definitely = 2,
+}
+
+impl ConstantLikelihood {
+    /// Determine the [`ConstantLikelihood`] of an expression.
+    fn from_expression(expr: &Expr, preview: PreviewMode) -> Self {
+        match expr {
+            _ if expr.is_literal_expr() => ConstantLikelihood::Definitely,
+            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                ConstantLikelihood::from_identifier(attr)
+            }
+            Expr::Name(ast::ExprName { id, .. }) => ConstantLikelihood::from_identifier(id),
+            Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+                .iter()
+                .map(|expr| ConstantLikelihood::from_expression(expr, preview))
+                .min()
+                .unwrap_or(ConstantLikelihood::Definitely),
+            Expr::List(ast::ExprList { elts, .. }) if preview.is_enabled() => elts
+                .iter()
+                .map(|expr| ConstantLikelihood::from_expression(expr, preview))
+                .min()
+                .unwrap_or(ConstantLikelihood::Definitely),
+            Expr::Dict(ast::ExprDict { values: vs, .. }) if preview.is_enabled() => {
+                if vs.is_empty() {
+                    ConstantLikelihood::Definitely
+                } else {
+                    ConstantLikelihood::Probably
+                }
+            }
+            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => cmp::min(
+                ConstantLikelihood::from_expression(left, preview),
+                ConstantLikelihood::from_expression(right, preview),
+            ),
+            Expr::UnaryOp(ast::ExprUnaryOp {
+                op: UnaryOp::UAdd | UnaryOp::USub | UnaryOp::Invert,
+                operand,
+                range: _,
+            }) => ConstantLikelihood::from_expression(operand, preview),
+            _ => ConstantLikelihood::Unlikely,
+        }
+    }
+
+    /// Determine the [`ConstantLikelihood`] of an identifier.
+    fn from_identifier(identifier: &str) -> Self {
+        if str::is_cased_uppercase(identifier) {
+            ConstantLikelihood::Probably
+        } else {
+            ConstantLikelihood::Unlikely
+        }
     }
 }
 
@@ -182,7 +230,9 @@ pub(crate) fn yoda_conditions(
         return;
     }
 
-    if !is_constant_like(left) || is_constant_like(right) {
+    if ConstantLikelihood::from_expression(left, checker.settings.preview)
+        <= ConstantLikelihood::from_expression(right, checker.settings.preview)
+    {
         return;
     }
 
@@ -193,12 +243,10 @@ pub(crate) fn yoda_conditions(
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                pad(suggestion, expr.range(), checker.locator()),
-                expr.range(),
-            )));
-        }
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            pad(suggestion, expr.range(), checker.locator()),
+            expr.range(),
+        )));
         checker.diagnostics.push(diagnostic);
     } else {
         checker.diagnostics.push(Diagnostic::new(

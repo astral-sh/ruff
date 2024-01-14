@@ -1,14 +1,7 @@
 # Ruff Formatter
 
 The Ruff formatter is an extremely fast Python code formatter that ships as part of the `ruff`
-CLI (as of Ruff v0.0.289).
-
-The formatter is currently in an **Alpha** state. The Alpha is primarily intended for
-experimentation: our focus is on collecting feedback that we can address prior to a production-ready
-Beta release later this year. (While we're using the formatter in production on our own projects,
-the CLI, configuration options, and code style may change arbitrarily between the Alpha and Beta.)
-
-[_We'd love to hear your feedback._](https://github.com/astral-sh/ruff/discussions/7310)
+CLI.
 
 ## Goals
 
@@ -30,7 +23,7 @@ For details, see [Black compatibility](#black-compatibility).
 
 ## Getting started
 
-The Ruff formatter shipped in an Alpha state as part of Ruff v0.0.289.
+The Ruff formatter is available in Beta as of Ruff v0.1.2.
 
 ### CLI
 
@@ -46,17 +39,29 @@ Arguments:
   [FILES]...  List of files or directories to format
 
 Options:
-      --check            Avoid writing any formatted files back; instead, exit with a non-zero status code if any files would have been modified, and zero otherwise
-      --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-  -h, --help             Print help
-
-File selection:
-      --respect-gitignore  Respect file exclusions via `.gitignore` and other standard ignore files
-      --force-exclude      Enforce exclusions, even for paths passed to Ruff directly on the command-line
+      --check
+          Avoid writing any formatted files back; instead, exit with a non-zero status code if any files would have been modified, and zero otherwise
+      --diff
+          Avoid writing any formatted files back; instead, exit with a non-zero status code and the difference between the current file and how the formatted file would look like
+      --config <CONFIG>
+          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --target-version <TARGET_VERSION>
+          The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311, py312]
+      --preview
+          Enable preview mode; enables unstable formatting. Use `--no-preview` to disable
+  -h, --help
+          Print help
 
 Miscellaneous:
+  -n, --no-cache                         Disable cache reads
+      --cache-dir <CACHE_DIR>            Path to the cache directory [env: RUFF_CACHE_DIR=]
       --isolated                         Ignore all configuration files
       --stdin-filename <STDIN_FILENAME>  The name of the file when passing it through stdin
+
+File selection:
+      --respect-gitignore       Respect file exclusions via `.gitignore` and other standard ignore files. Use `--no-respect-gitignore` to disable
+      --exclude <FILE_PATTERN>  List of paths, used to omit files and/or directories from analysis
+      --force-exclude           Enforce exclusions, even for paths passed to Ruff directly on the command-line. Use `--no-force-exclude` to disable
 
 Log levels:
   -v, --verbose  Enable verbose logging
@@ -64,23 +69,18 @@ Log levels:
   -s, --silent   Disable all logging (but still exit with status code "1" upon detecting diagnostics)
 ```
 
-Note: `ruff format` is currently hidden by default and will not be visible when running
-`ruff --help`.
-
 Similar to Black, running `ruff format /path/to/file.py` will format the given file or directory
 in-place, while `ruff format --check /path/to/file.py` will avoid writing any formatted files back,
 instead exiting with a non-zero status code if any files are not already formatted.
 
 ### VS Code
 
-As of `v2023.36.0`, the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
-ships with support for the Ruff formatter. To enable formatting capabilities, set the
-`ruff.enableExperimentalFormatter` setting to `true` in your `settings.json`, and mark the Ruff
+As of `v2023.44.0`, the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
+ships with full support for the Ruff formatter. To enable formatting capabilities, mark the Ruff
 extension as your default Python formatter:
 
 ```json
 {
-  "ruff.enableExperimentalFormatter": true,
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff"
   }
@@ -92,7 +92,6 @@ on-save by adding `"editor.formatOnSave": true` to your `settings.json`:
 
 ```json
 {
-  "ruff.enableExperimentalFormatter": true,
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true
@@ -110,10 +109,10 @@ as in:
 
 ```toml
 [tool.ruff.format]
-# Use tabs instead of 4 space indentation
+# Use tabs instead of 4 space indentation.
 indent-style = "tab"
 
-# Prefer single quotes over double quotes
+# Prefer single quotes over double quotes.
 quote-style = "single"
 ```
 
@@ -176,7 +175,7 @@ original intent, at the cost of retaining additional vertical space.
 This deviation only impacts unformatted code, in that Ruff's output should not deviate for code that
 has already been formatted by Black.
 
-### Pragma comments are ignored when computing line width
+#### Pragma comments are ignored when computing line width
 
 Pragma comments (`# type`, `# noqa`, `# pyright`, `# pylint`, etc.) are ignored when computing the width of a line.
 This prevents Ruff from moving pragma comments around, thereby modifying their meaning and behavior:
@@ -209,14 +208,14 @@ on both `first()` and `second()`:
 ]
 ```
 
-### Line width vs. line length
+#### Line width vs. line length
 
 Ruff uses the Unicode width of a line to determine if a line fits. Black's stable style uses
 character width, while Black's preview style uses Unicode width for strings ([#3445](https://github.com/psf/black/pull/3445)),
 and character width for all other tokens. Ruff's behavior is closer to Black's preview style than
 Black's stable style, although Ruff _also_ uses Unicode width for identifiers and comments.
 
-### Walruses in slice expressions
+#### Walruses in slice expressions
 
 Black avoids inserting space around `:=` operators within slices. For example, the following adheres
 to Black stable style:
@@ -241,7 +240,7 @@ x[y := 1]
 
 This will likely be incorporated into Black's preview style ([#3823](https://github.com/psf/black/pull/3823)).
 
-### `global` and `nonlocal` names are broken across multiple lines by continuations
+#### `global` and `nonlocal` names are broken across multiple lines by continuations
 
 If a `global` or `nonlocal` statement includes multiple names, and exceeds the configured line
 width, Ruff will break them across multiple lines using continuations:
@@ -259,7 +258,7 @@ global \
     analyze_size_model
 ```
 
-### Newlines are inserted after all class docstrings
+#### Newlines are inserted after all class docstrings
 
 Black typically enforces a single newline after a class docstring. However, it does not apply such
 formatting if the docstring is single-quoted rather than triple-quoted, while Ruff enforces a
@@ -289,7 +288,7 @@ class IntFromGeom(GEOSFuncFactory):
     errcheck = staticmethod(check_minus_one)
 ```
 
-### Trailing own-line comments on imports are not moved to the next line
+#### Trailing own-line comments on imports are not moved to the next line
 
 Black enforces a single empty line between an import and a trailing own-line comment. Ruff leaves
 such comments in-place:
@@ -315,7 +314,7 @@ import os
 import sys
 ```
 
-### Parentheses around awaited collections are not preserved
+#### Parentheses around awaited collections are not preserved
 
 Black preserves parentheses around awaited collections:
 
@@ -333,7 +332,7 @@ This is more consistent to the formatting of other awaited expressions: Ruff and
 remove parentheses around, e.g., `await (1)`, only retaining them when syntactically required,
 as in, e.g., `await (x := 1)`.
 
-### Implicit string concatenations in attribute accesses ([#7052](https://github.com/astral-sh/ruff/issues/7052))
+#### Implicit string concatenations in attribute accesses ([#7052](https://github.com/astral-sh/ruff/issues/7052))
 
 Given the following unformatted code:
 
@@ -375,7 +374,7 @@ In general, Black splits implicit string concatenations over multiple lines more
 even if those concatenations _can_ fit on a single line. Ruff instead avoids splitting such
 concatenations unless doing so is necessary to fit within the configured line width.
 
-### Own-line comments on expressions don't cause the expression to expand ([#7314](https://github.com/astral-sh/ruff/issues/7314))
+#### Own-line comments on expressions don't cause the expression to expand ([#7314](https://github.com/astral-sh/ruff/issues/7314))
 
 Given an expression like:
 
@@ -406,7 +405,7 @@ initial formatting:
 )
 ```
 
-### Tuples are parenthesized when expanded ([#7317](https://github.com/astral-sh/ruff/issues/7317))
+#### Tuples are parenthesized when expanded ([#7317](https://github.com/astral-sh/ruff/issues/7317))
 
 Ruff tends towards parenthesizing tuples (with a few exceptions), while Black tends to remove tuple
 parentheses more often.
@@ -454,7 +453,7 @@ for a, f(
     pass
 ```
 
-### Single-element tuples are always parenthesized
+#### Single-element tuples are always parenthesized
 
 Ruff always inserts parentheses around single-element tuples, while Black will omit them in some
 cases:
@@ -473,7 +472,7 @@ cases:
 Adding parentheses around single-element tuples adds visual distinction and helps avoid "accidental"
 tuples created by extraneous trailing commas (see, e.g., [#17181](https://github.com/django/django/pull/17181)).
 
-### Trailing commas are inserted when expanding a function definition with a single argument ([#7323](https://github.com/astral-sh/ruff/issues/7323))
+#### Trailing commas are inserted when expanding a function definition with a single argument ([#7323](https://github.com/astral-sh/ruff/issues/7323))
 
 When a function definition with a single argument is expanded over multiple lines, Black
 will add a trailing comma in some cases, depending on whether the argument includes a type
@@ -506,7 +505,7 @@ def func(
 
 Ruff will instead insert a trailing comma in all such cases for consistency.
 
-### Parentheses around call-chain assignment values are not preserved ([#7320](https://github.com/astral-sh/ruff/issues/7320))
+#### Parentheses around call-chain assignment values are not preserved ([#7320](https://github.com/astral-sh/ruff/issues/7320))
 
 Given:
 
@@ -539,29 +538,7 @@ def update_emission_strength():
     value = self.emission_strength * 2
 ```
 
-### Type annotations may be parenthesized when expanded ([#7315](https://github.com/astral-sh/ruff/issues/7315))
-
-Black will avoid parenthesizing type annotations in an annotated assignment, while Ruff will insert
-parentheses in some cases.
-
-For example:
-
-```python
-# Black
-StartElementHandler: Callable[[str, dict[str, str]], Any] | Callable[[str, list[str]], Any] | Callable[
-    [str, dict[str, str], list[str]], Any
-] | None
-
-# Ruff
-StartElementHandler: (
-    Callable[[str, dict[str, str]], Any]
-    | Callable[[str, list[str]], Any]
-    | Callable[[str, dict[str, str], list[str]], Any]
-    | None
-)
-```
-
-### Call chain calls break differently ([#7051](https://github.com/astral-sh/ruff/issues/7051))
+#### Call chain calls break differently ([#7051](https://github.com/astral-sh/ruff/issues/7051))
 
 Black occasionally breaks call chains differently than Ruff; in particular, Black occasionally
 expands the arguments for the last call in the chain, as in:
@@ -630,7 +607,7 @@ df.drop(columns=["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]).drop_duplicates(a).rename
 ).to_csv(path / "aaaaaa.csv", index=False).other(a)
 ```
 
-### Expressions with (non-pragma) trailing comments are split more often  ([#7823](https://github.com/astral-sh/ruff/issues/7823))
+#### Expressions with (non-pragma) trailing comments are split more often ([#7823](https://github.com/astral-sh/ruff/issues/7823))
 
 Both Ruff and Black will break the following expression over multiple lines, since it then allows
 the expression to fit within the configured line width:

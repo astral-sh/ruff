@@ -11,7 +11,7 @@ D215.py:1:1: D215 [*] Section underline is over-indented ("TODO")
   |
   = help: Remove over-indentation from "TODO" underline
 
-ℹ Fix
+ℹ Safe fix
 1 1 | """
 2 2 | TODO:
 3   |-    -

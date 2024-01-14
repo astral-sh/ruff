@@ -536,9 +536,29 @@ def non_empty_blank_line_before_section():  # noqa: D416
     """Toggle the gizmo.
 
     The function's description.
-    
+
     Returns
     -------
     A value of some sort.
 
+    """
+
+
+def lowercase_sub_section_header():
+    """Below, `returns:` should _not_ be considered a section header.
+
+    Args:
+        Here's a note.
+
+        returns:
+    """
+
+
+def titlecase_sub_section_header():
+    """Below, `Returns:` should be considered a section header.
+
+    Args:
+        Here's a note.
+
+        Returns:
     """

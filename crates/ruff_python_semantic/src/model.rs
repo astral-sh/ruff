@@ -8,7 +8,6 @@ use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallP
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
-use ruff_python_stdlib::typing::is_typing_extension;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -175,18 +174,11 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
-        if call_path.as_slice() == ["typing", target] {
+        if matches!(
+            call_path.as_slice(),
+            ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
+        ) {
             return true;
-        }
-
-        if call_path.as_slice() == ["_typeshed", target] {
-            return true;
-        }
-
-        if is_typing_extension(target) {
-            if call_path.as_slice() == ["typing_extensions", target] {
-                return true;
-            }
         }
 
         if self.typing_modules.iter().any(|module| {
@@ -198,6 +190,14 @@ impl<'a> SemanticModel<'a> {
         }
 
         false
+    }
+
+    /// Return an iterator over the set of `typing` modules allowed in the semantic model.
+    pub fn typing_modules(&self) -> impl Iterator<Item = &str> {
+        ["typing", "_typeshed", "typing_extensions"]
+            .iter()
+            .copied()
+            .chain(self.typing_modules.iter().map(String::as_str))
     }
 
     /// Create a new [`Binding`] for a builtin.
@@ -283,9 +283,12 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = self.scopes.global().get(name.id.as_str()) {
                 if !self.bindings[binding_id].is_unbound() {
                     // Mark the binding as used.
-                    let reference_id =
-                        self.resolved_references
-                            .push(ScopeId::global(), name.range, self.flags);
+                    let reference_id = self.resolved_references.push(
+                        ScopeId::global(),
+                        self.node_id,
+                        name.range,
+                        self.flags,
+                    );
                     self.bindings[binding_id].references.push(reference_id);
 
                     // Mark any submodule aliases as used.
@@ -294,6 +297,7 @@ impl<'a> SemanticModel<'a> {
                     {
                         let reference_id = self.resolved_references.push(
                             ScopeId::global(),
+                            self.node_id,
                             name.range,
                             self.flags,
                         );
@@ -348,18 +352,24 @@ impl<'a> SemanticModel<'a> {
 
             if let Some(binding_id) = scope.get(name.id.as_str()) {
                 // Mark the binding as used.
-                let reference_id =
-                    self.resolved_references
-                        .push(self.scope_id, name.range, self.flags);
+                let reference_id = self.resolved_references.push(
+                    self.scope_id,
+                    self.node_id,
+                    name.range,
+                    self.flags,
+                );
                 self.bindings[binding_id].references.push(reference_id);
 
                 // Mark any submodule aliases as used.
                 if let Some(binding_id) =
                     self.resolve_submodule(name.id.as_str(), scope_id, binding_id)
                 {
-                    let reference_id =
-                        self.resolved_references
-                            .push(self.scope_id, name.range, self.flags);
+                    let reference_id = self.resolved_references.push(
+                        self.scope_id,
+                        self.node_id,
+                        name.range,
+                        self.flags,
+                    );
                     self.bindings[binding_id].references.push(reference_id);
                 }
 
@@ -423,9 +433,12 @@ impl<'a> SemanticModel<'a> {
                     // The `x` in `print(x)` should resolve to the `x` in `x = 1`.
                     BindingKind::UnboundException(Some(binding_id)) => {
                         // Mark the binding as used.
-                        let reference_id =
-                            self.resolved_references
-                                .push(self.scope_id, name.range, self.flags);
+                        let reference_id = self.resolved_references.push(
+                            self.scope_id,
+                            self.node_id,
+                            name.range,
+                            self.flags,
+                        );
                         self.bindings[binding_id].references.push(reference_id);
 
                         // Mark any submodule aliases as used.
@@ -434,6 +447,7 @@ impl<'a> SemanticModel<'a> {
                         {
                             let reference_id = self.resolved_references.push(
                                 self.scope_id,
+                                self.node_id,
                                 name.range,
                                 self.flags,
                             );
@@ -616,6 +630,16 @@ impl<'a> SemanticModel<'a> {
         self.resolved_names.get(&name.into()).copied()
     }
 
+    /// Resolves the [`ast::ExprName`] to the [`BindingId`] of the symbol it refers to, if it's the
+    /// only binding to that name in its scope.
+    pub fn only_binding(&self, name: &ast::ExprName) -> Option<BindingId> {
+        self.resolve_name(name).filter(|id| {
+            let binding = self.binding(*id);
+            let scope = &self.scopes[binding.scope];
+            scope.shadowed_binding(*id).is_none()
+        })
+    }
+
     /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
     /// or builtin symbol.
     ///
@@ -675,7 +699,30 @@ impl<'a> SemanticModel<'a> {
                     };
                 Some(resolved)
             }
-            BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
+            BindingKind::Builtin => {
+                if value.is_name_expr() {
+                    // Ex) `dict`
+                    Some(smallvec!["", head.id.as_str()])
+                } else {
+                    // Ex) `dict.__dict__`
+                    let value_path = collect_call_path(value)?;
+                    Some(
+                        std::iter::once("")
+                            .chain(value_path.iter().copied())
+                            .collect(),
+                    )
+                }
+            }
+            BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
+                let value_path = collect_call_path(value)?;
+                let resolved: CallPath = self
+                    .module_path?
+                    .iter()
+                    .map(String::as_str)
+                    .chain(value_path)
+                    .collect();
+                Some(resolved)
+            }
             _ => None,
         }
     }
@@ -719,6 +766,7 @@ impl<'a> SemanticModel<'a> {
                                     {
                                         return Some(ImportedName {
                                             name: format!("{name}.{member}"),
+                                            source,
                                             range: self.nodes[source].range(),
                                             context: binding.context,
                                         });
@@ -743,6 +791,7 @@ impl<'a> SemanticModel<'a> {
                                         {
                                             return Some(ImportedName {
                                                 name: (*name).to_string(),
+                                                source,
                                                 range: self.nodes[source].range(),
                                                 context: binding.context,
                                             });
@@ -753,8 +802,10 @@ impl<'a> SemanticModel<'a> {
                         }
                         // Ex) Given `module="os"` and `object="name"`:
                         // `import os.path ` -> `os.name`
-                        BindingKind::SubmoduleImport(SubmoduleImport { .. }) => {
-                            if name == module {
+                        // Ex) Given `module="os.path"` and `object="join"`:
+                        // `import os.path ` -> `os.path.join`
+                        BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
+                            if call_path.starts_with(&module_path) {
                                 if let Some(source) = binding.source {
                                     // Verify that `os` isn't bound in an inner scope.
                                     if self
@@ -763,7 +814,8 @@ impl<'a> SemanticModel<'a> {
                                         .all(|scope| !scope.has(name))
                                     {
                                         return Some(ImportedName {
-                                            name: format!("{name}.{member}"),
+                                            name: format!("{module}.{member}"),
+                                            source,
                                             range: self.nodes[source].range(),
                                             context: binding.context,
                                         });
@@ -932,6 +984,11 @@ impl<'a> SemanticModel<'a> {
         scope.parent.map(|scope_id| &self.scopes[scope_id])
     }
 
+    /// Returns the ID of the parent of the given [`ScopeId`], if any.
+    pub fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+        self.scopes[scope_id].parent
+    }
+
     /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`], if any.
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
@@ -945,10 +1002,40 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
+    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`], if any.
+    pub fn first_non_type_parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+        let mut current_scope_id = scope_id;
+        while let Some(parent_id) = self.parent_scope_id(current_scope_id) {
+            if self.scopes[parent_id].kind.is_type() {
+                current_scope_id = parent_id;
+            } else {
+                return Some(parent_id);
+            }
+        }
+        None
+    }
+
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
     #[inline]
     pub fn node(&self, node_id: NodeId) -> &NodeRef<'a> {
         &self.nodes[node_id]
+    }
+
+    /// Given a [`NodeId`], return its parent, if any.
+    #[inline]
+    pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter_map(|id| self.nodes[id].as_expression())
+            .nth(1)
+    }
+
+    /// Given a [`NodeId`], return the [`NodeId`] of the parent expression, if any.
+    pub fn parent_expression_id(&self, node_id: NodeId) -> Option<NodeId> {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter(|id| self.nodes[*id].is_expression())
+            .nth(1)
     }
 
     /// Return the [`Stmt`] corresponding to the given [`NodeId`].
@@ -975,6 +1062,22 @@ impl<'a> SemanticModel<'a> {
             .ancestor_ids(node_id)
             .filter(|id| self.nodes[*id].is_statement())
             .nth(1)
+    }
+
+    /// Return the [`Expr`] corresponding to the given [`NodeId`].
+    #[inline]
+    pub fn expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+        self.nodes
+            .ancestor_ids(node_id)
+            .find_map(|id| self.nodes[id].as_expression())
+    }
+
+    /// Returns an [`Iterator`] over the expressions, starting from the given [`NodeId`].
+    /// through to any parents.
+    pub fn expressions(&self, node_id: NodeId) -> impl Iterator<Item = &'a Expr> + '_ {
+        self.nodes
+            .ancestor_ids(node_id)
+            .filter_map(move |id| self.nodes[id].as_expression())
     }
 
     /// Set the [`Globals`] for the current [`Scope`].
@@ -1078,11 +1181,11 @@ impl<'a> SemanticModel<'a> {
         false
     }
 
-    /// Returns `true` if `left` and `right` are on different branches of an `if`, `match`, or
+    /// Returns `true` if `left` and `right` are in the same branches of an `if`, `match`, or
     /// `try` statement.
     ///
     /// This implementation assumes that the statements are in the same scope.
-    pub fn different_branches(&self, left: NodeId, right: NodeId) -> bool {
+    pub fn same_branch(&self, left: NodeId, right: NodeId) -> bool {
         // Collect the branch path for the left statement.
         let left = self
             .nodes
@@ -1099,10 +1202,7 @@ impl<'a> SemanticModel<'a> {
             .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
             .collect::<Vec<_>>();
 
-        !left
-            .iter()
-            .zip(right.iter())
-            .all(|(left, right)| left == right)
+        left == right
     }
 
     /// Returns `true` if the given expression is an unused variable, or consists solely of
@@ -1141,17 +1241,17 @@ impl<'a> SemanticModel<'a> {
 
     /// Add a reference to the given [`BindingId`] in the local scope.
     pub fn add_local_reference(&mut self, binding_id: BindingId, range: TextRange) {
-        let reference_id = self
-            .resolved_references
-            .push(self.scope_id, range, self.flags);
+        let reference_id =
+            self.resolved_references
+                .push(self.scope_id, self.node_id, range, self.flags);
         self.bindings[binding_id].references.push(reference_id);
     }
 
     /// Add a reference to the given [`BindingId`] in the global scope.
     pub fn add_global_reference(&mut self, binding_id: BindingId, range: TextRange) {
-        let reference_id = self
-            .resolved_references
-            .push(ScopeId::global(), range, self.flags);
+        let reference_id =
+            self.resolved_references
+                .push(ScopeId::global(), self.node_id, range, self.flags);
         self.bindings[binding_id].references.push(reference_id);
     }
 
@@ -1159,7 +1259,7 @@ impl<'a> SemanticModel<'a> {
     pub fn add_delayed_annotation(&mut self, binding_id: BindingId, annotation_id: BindingId) {
         self.delayed_annotations
             .entry(binding_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(annotation_id);
     }
 
@@ -1173,7 +1273,7 @@ impl<'a> SemanticModel<'a> {
     pub fn add_rebinding_scope(&mut self, binding_id: BindingId, scope_id: ScopeId) {
         self.rebinding_scopes
             .entry(binding_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(scope_id);
     }
 
@@ -1195,6 +1295,16 @@ impl<'a> SemanticModel<'a> {
             exceptions.insert(*exception);
         }
         exceptions
+    }
+
+    /// Return `true` if the module at the given path was seen anywhere in the semantic model.
+    /// This includes both direct imports (`import trio`) and member imports (`from trio import
+    /// TrioTask`).
+    pub fn seen(&self, module: &[&str]) -> bool {
+        self.bindings
+            .iter()
+            .filter_map(Binding::as_any_import)
+            .any(|import| import.call_path().starts_with(module))
     }
 
     /// Generate a [`Snapshot`] of the current semantic model.
@@ -1244,10 +1354,16 @@ impl<'a> SemanticModel<'a> {
             .intersects(SemanticModelFlags::TYPING_ONLY_ANNOTATION)
     }
 
-    /// Return `true` if the model is in a runtime-required type annotation.
-    pub const fn in_runtime_annotation(&self) -> bool {
+    /// Return `true` if the context is in a runtime-evaluated type annotation.
+    pub const fn in_runtime_evaluated_annotation(&self) -> bool {
         self.flags
-            .intersects(SemanticModelFlags::RUNTIME_ANNOTATION)
+            .intersects(SemanticModelFlags::RUNTIME_EVALUATED_ANNOTATION)
+    }
+
+    /// Return `true` if the context is in a runtime-required type annotation.
+    pub const fn in_runtime_required_annotation(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::RUNTIME_REQUIRED_ANNOTATION)
     }
 
     /// Return `true` if the model is in a type definition.
@@ -1321,8 +1437,8 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if the model is in a `typing::Literal` annotation.
-    pub const fn in_literal(&self) -> bool {
-        self.flags.intersects(SemanticModelFlags::LITERAL)
+    pub const fn in_typing_literal(&self) -> bool {
+        self.flags.intersects(SemanticModelFlags::TYPING_LITERAL)
     }
 
     /// Return `true` if the model is in a subscript expression.
@@ -1419,8 +1535,9 @@ impl ShadowedBinding {
 bitflags! {
     /// Flags indicating the current model state.
     #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-    pub struct SemanticModelFlags: u16 {
-        /// The model is in a typing-time-only type annotation.
+    pub struct SemanticModelFlags: u32 {
+       /// The model is in a type annotation that will only be evaluated when running a type
+        /// checker.
         ///
         /// For example, the model could be visiting `int` in:
         /// ```python
@@ -1435,7 +1552,7 @@ bitflags! {
         /// are any annotated assignments in module or class scopes.
         const TYPING_ONLY_ANNOTATION = 1 << 0;
 
-        /// The model is in a runtime type annotation.
+        /// The model is in a type annotation that will be evaluated at runtime.
         ///
         /// For example, the model could be visiting `int` in:
         /// ```python
@@ -1449,7 +1566,27 @@ bitflags! {
         /// If `from __future__ import annotations` is used, all annotations are evaluated at
         /// typing time. Otherwise, all function argument annotations are evaluated at runtime, as
         /// are any annotated assignments in module or class scopes.
-        const RUNTIME_ANNOTATION = 1 << 1;
+        const RUNTIME_EVALUATED_ANNOTATION = 1 << 1;
+
+        /// The model is in a type annotation that is _required_ to be available at runtime.
+        ///
+        /// For example, the context could be visiting `int` in:
+        /// ```python
+        /// from pydantic import BaseModel
+        ///
+        /// class Foo(BaseModel):
+        ///    x: int
+        /// ```
+        ///
+        /// In this case, Pydantic requires that the type annotation be available at runtime
+        /// in order to perform runtime type-checking.
+        ///
+        /// Unlike [`RUNTIME_EVALUATED_ANNOTATION`], annotations that are marked as
+        /// [`RUNTIME_REQUIRED_ANNOTATION`] cannot be deferred to typing time via conversion to a
+        /// forward reference (e.g., by wrapping the type in quotes), as the annotations are not
+        /// only required by the Python interpreter, but by runtime type checkers too.
+        const RUNTIME_REQUIRED_ANNOTATION = 1 << 2;
+
 
         /// The model is in a type definition.
         ///
@@ -1463,7 +1600,7 @@ bitflags! {
         /// All type annotations are also type definitions, but the converse is not true.
         /// In our example, `int` is a type definition but not a type annotation, as it
         /// doesn't appear in a type annotation context, but rather in a type definition.
-        const TYPE_DEFINITION = 1 << 2;
+        const TYPE_DEFINITION = 1 << 3;
 
         /// The model is in a (deferred) "simple" string type definition.
         ///
@@ -1474,7 +1611,7 @@ bitflags! {
         ///
         /// "Simple" string type definitions are those that consist of a single string literal,
         /// as opposed to an implicitly concatenated string literal.
-        const SIMPLE_STRING_TYPE_DEFINITION =  1 << 3;
+        const SIMPLE_STRING_TYPE_DEFINITION =  1 << 4;
 
         /// The model is in a (deferred) "complex" string type definition.
         ///
@@ -1485,7 +1622,7 @@ bitflags! {
         ///
         /// "Complex" string type definitions are those that consist of a implicitly concatenated
         /// string literals. These are uncommon but valid.
-        const COMPLEX_STRING_TYPE_DEFINITION = 1 << 4;
+        const COMPLEX_STRING_TYPE_DEFINITION = 1 << 5;
 
         /// The model is in a (deferred) `__future__` type definition.
         ///
@@ -1498,7 +1635,7 @@ bitflags! {
         ///
         /// `__future__`-style type annotations are only enabled if the `annotations` feature
         /// is enabled via `from __future__ import annotations`.
-        const FUTURE_TYPE_DEFINITION = 1 << 5;
+        const FUTURE_TYPE_DEFINITION = 1 << 6;
 
         /// The model is in an exception handler.
         ///
@@ -1509,7 +1646,7 @@ bitflags! {
         /// except Exception:
         ///     x: int = 1
         /// ```
-        const EXCEPTION_HANDLER = 1 << 6;
+        const EXCEPTION_HANDLER = 1 << 7;
 
         /// The model is in an f-string.
         ///
@@ -1517,7 +1654,7 @@ bitflags! {
         /// ```python
         /// f'{x}'
         /// ```
-        const F_STRING = 1 << 7;
+        const F_STRING = 1 << 8;
 
         /// The model is in a boolean test.
         ///
@@ -1529,7 +1666,7 @@ bitflags! {
         ///
         /// The implication is that the actual value returned by the current expression is
         /// not used, only its truthiness.
-        const BOOLEAN_TEST = 1 << 8;
+        const BOOLEAN_TEST = 1 << 9;
 
         /// The model is in a `typing::Literal` annotation.
         ///
@@ -1538,7 +1675,7 @@ bitflags! {
         /// def f(x: Literal["A", "B", "C"]):
         ///     ...
         /// ```
-        const LITERAL = 1 << 9;
+        const TYPING_LITERAL = 1 << 10;
 
         /// The model is in a subscript expression.
         ///
@@ -1546,7 +1683,7 @@ bitflags! {
         /// ```python
         /// x["a"]["b"]
         /// ```
-        const SUBSCRIPT = 1 << 10;
+        const SUBSCRIPT = 1 << 11;
 
         /// The model is in a type-checking block.
         ///
@@ -1558,7 +1695,7 @@ bitflags! {
         /// if TYPE_CHECKING:
         ///    x: int = 1
         /// ```
-        const TYPE_CHECKING_BLOCK = 1 << 11;
+        const TYPE_CHECKING_BLOCK = 1 << 12;
 
         /// The model has traversed past the "top-of-file" import boundary.
         ///
@@ -1571,7 +1708,7 @@ bitflags! {
         ///
         /// x: int = 1
         /// ```
-        const IMPORT_BOUNDARY = 1 << 12;
+        const IMPORT_BOUNDARY = 1 << 13;
 
         /// The model has traversed past the `__future__` import boundary.
         ///
@@ -1586,7 +1723,7 @@ bitflags! {
         ///
         /// Python considers it a syntax error to import from `__future__` after
         /// any other non-`__future__`-importing statements.
-        const FUTURES_BOUNDARY = 1 << 13;
+        const FUTURES_BOUNDARY = 1 << 14;
 
         /// `__future__`-style type annotations are enabled in this model.
         ///
@@ -1598,10 +1735,30 @@ bitflags! {
         /// def f(x: int) -> int:
         ///   ...
         /// ```
-        const FUTURE_ANNOTATIONS = 1 << 14;
+        const FUTURE_ANNOTATIONS = 1 << 15;
+
+        /// The model has traversed past the module docstring.
+        ///
+        /// For example, the model could be visiting `x` in:
+        /// ```python
+        /// """Module docstring."""
+        ///
+        /// x: int = 1
+        /// ```
+        const MODULE_DOCSTRING = 1 << 16;
+
+        /// The model is in a type parameter definition.
+        ///
+        /// For example, the model could be visiting `Record` in:
+        /// ```python
+        /// from typing import TypeVar
+        ///
+        /// Record = TypeVar("Record")
+        ///
+        const TYPE_PARAM_DEFINITION = 1 << 17;
 
         /// The context is in any type annotation.
-        const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_ANNOTATION.bits();
+        const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
 
         /// The context is in any string type definition.
         const STRING_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()
@@ -1610,11 +1767,12 @@ bitflags! {
         /// The context is in any deferred type definition.
         const DEFERRED_TYPE_DEFINITION = Self::SIMPLE_STRING_TYPE_DEFINITION.bits()
             | Self::COMPLEX_STRING_TYPE_DEFINITION.bits()
-            | Self::FUTURE_TYPE_DEFINITION.bits();
+            | Self::FUTURE_TYPE_DEFINITION.bits()
+            | Self::TYPE_PARAM_DEFINITION.bits();
 
         /// The context is in a typing-only context.
         const TYPING_CONTEXT = Self::TYPE_CHECKING_BLOCK.bits() | Self::TYPING_ONLY_ANNOTATION.bits() |
-            Self::STRING_TYPE_DEFINITION.bits();
+            Self::STRING_TYPE_DEFINITION.bits() | Self::TYPE_PARAM_DEFINITION.bits();
     }
 }
 
@@ -1704,6 +1862,8 @@ pub enum ReadResult {
 pub struct ImportedName {
     /// The name to which the imported symbol is bound.
     name: String,
+    /// The statement from which the symbol is imported.
+    source: NodeId,
     /// The range at which the symbol is imported.
     range: TextRange,
     /// The context in which the symbol is imported.
@@ -1717,6 +1877,10 @@ impl ImportedName {
 
     pub const fn context(&self) -> ExecutionContext {
         self.context
+    }
+
+    pub fn statement<'a>(&self, semantic: &'a SemanticModel) -> &'a Stmt {
+        semantic.statement(self.source)
     }
 }
 

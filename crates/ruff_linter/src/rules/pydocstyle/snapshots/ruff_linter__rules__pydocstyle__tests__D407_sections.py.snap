@@ -16,7 +16,7 @@ sections.py:42:5: D407 [*] Missing dashed underline after section ("Returns")
    |
    = help: Add dashed line under "Returns"
 
-ℹ Fix
+ℹ Safe fix
 42 42 |     """Toggle the gizmo.
 43 43 | 
 44 44 |     Returns
@@ -39,7 +39,7 @@ sections.py:54:5: D407 [*] Missing dashed underline after section ("Returns")
    |
    = help: Add dashed line under "Returns"
 
-ℹ Fix
+ℹ Safe fix
 54 54 |     """Toggle the gizmo.
 55 55 | 
 56 56 |     Returns
@@ -60,7 +60,7 @@ sections.py:65:5: D407 [*] Missing dashed underline after section ("Returns")
    |
    = help: Add dashed line under "Returns"
 
-ℹ Fix
+ℹ Safe fix
 64 64 | def no_underline_and_no_newline():  # noqa: D416
 65 65 |     """Toggle the gizmo.
 66 66 | 
@@ -95,7 +95,7 @@ sections.py:216:5: D407 [*] Missing dashed underline after section ("Raises")
     |
     = help: Add dashed line under "Raises"
 
-ℹ Fix
+ℹ Safe fix
 225 225 |     ------
 226 226 |     Many many wonderful things.
 227 227 |     Raises:
@@ -124,7 +124,7 @@ sections.py:261:5: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 261 261 |     """Toggle the gizmo.
 262 262 | 
 263 263 |     Args:
@@ -153,7 +153,7 @@ sections.py:261:5: D407 [*] Missing dashed underline after section ("Returns")
     |
     = help: Add dashed line under "Returns"
 
-ℹ Fix
+ℹ Safe fix
 264 264 |         note: A random string.
 265 265 | 
 266 266 |     Returns:
@@ -182,7 +182,7 @@ sections.py:261:5: D407 [*] Missing dashed underline after section ("Raises")
     |
     = help: Add dashed line under "Raises"
 
-ℹ Fix
+ℹ Safe fix
 266 266 |     Returns:
 267 267 | 
 268 268 |     Raises:
@@ -206,7 +206,7 @@ sections.py:278:5: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 278 278 |     """Toggle the gizmo.
 279 279 | 
 280 280 |     Args
@@ -233,7 +233,7 @@ sections.py:293:9: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 295 295 |         Will this work when referencing x?
 296 296 | 
 297 297 |         Args:
@@ -257,7 +257,7 @@ sections.py:310:5: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 310 310 |     """Toggle the gizmo.
 311 311 | 
 312 312 |     Args:
@@ -283,7 +283,7 @@ sections.py:322:9: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 322 322 |         """Test a valid args section.
 323 323 | 
 324 324 |         Args:
@@ -309,7 +309,7 @@ sections.py:334:9: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 334 334 |         """Test a valid args section.
 335 335 | 
 336 336 |         Args:
@@ -336,7 +336,7 @@ sections.py:346:9: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 346 346 |         """Test a valid args section.
 347 347 | 
 348 348 |         Args:
@@ -362,7 +362,7 @@ sections.py:359:9: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 359 359 |         """Test a valid args section.
 360 360 | 
 361 361 |         Args:
@@ -388,7 +388,7 @@ sections.py:371:9: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 371 371 |         """Test a valid args section.
 372 372 | 
 373 373 |         Args:
@@ -418,7 +418,7 @@ sections.py:380:9: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 380 380 |         """Do stuff.
 381 381 | 
 382 382 |         Args:
@@ -444,7 +444,7 @@ sections.py:499:9: D407 [*] Missing dashed underline after section ("Args")
     |
     = help: Add dashed line under "Args"
 
-ℹ Fix
+ℹ Safe fix
 501 501 | Testing this incorrectly indented docstring.
 502 502 | 
 503 503 |         Args:
@@ -466,7 +466,7 @@ sections.py:519:5: D407 [*] Missing dashed underline after section ("Parameters"
     |
     = help: Add dashed line under "Parameters"
 
-ℹ Fix
+ℹ Safe fix
 519 519 |     """Equal length equals should be replaced with dashes.
 520 520 | 
 521 521 |     Parameters
@@ -489,7 +489,7 @@ sections.py:527:5: D407 [*] Missing dashed underline after section ("Parameters"
     |
     = help: Add dashed line under "Parameters"
 
-ℹ Fix
+ℹ Safe fix
 527 527 |     """Here, the length of equals is not the same.
 528 528 | 
 529 529 |     Parameters
@@ -497,5 +497,75 @@ sections.py:527:5: D407 [*] Missing dashed underline after section ("Parameters"
 530 531 |     ===========
 531 532 |     """
 532 533 | 
+
+sections.py:548:5: D407 [*] Missing dashed underline after section ("Args")
+    |
+547 |   def lowercase_sub_section_header():
+548 |       """Below, `returns:` should _not_ be considered a section header.
+    |  _____^
+549 | | 
+550 | |     Args:
+551 | |         Here's a note.
+552 | | 
+553 | |         returns:
+554 | |     """
+    | |_______^ D407
+    |
+    = help: Add dashed line under "Args"
+
+ℹ Safe fix
+548 548 |     """Below, `returns:` should _not_ be considered a section header.
+549 549 | 
+550 550 |     Args:
+    551 |+    ----
+551 552 |         Here's a note.
+552 553 | 
+553 554 |         returns:
+
+sections.py:558:5: D407 [*] Missing dashed underline after section ("Args")
+    |
+557 |   def titlecase_sub_section_header():
+558 |       """Below, `Returns:` should be considered a section header.
+    |  _____^
+559 | | 
+560 | |     Args:
+561 | |         Here's a note.
+562 | | 
+563 | |         Returns:
+564 | |     """
+    | |_______^ D407
+    |
+    = help: Add dashed line under "Args"
+
+ℹ Safe fix
+558 558 |     """Below, `Returns:` should be considered a section header.
+559 559 | 
+560 560 |     Args:
+    561 |+    ----
+561 562 |         Here's a note.
+562 563 | 
+563 564 |         Returns:
+
+sections.py:558:5: D407 [*] Missing dashed underline after section ("Returns")
+    |
+557 |   def titlecase_sub_section_header():
+558 |       """Below, `Returns:` should be considered a section header.
+    |  _____^
+559 | | 
+560 | |     Args:
+561 | |         Here's a note.
+562 | | 
+563 | |         Returns:
+564 | |     """
+    | |_______^ D407
+    |
+    = help: Add dashed line under "Returns"
+
+ℹ Safe fix
+561 561 |         Here's a note.
+562 562 | 
+563 563 |         Returns:
+    564 |+    -------
+564 565 |     """
 
 

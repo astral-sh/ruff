@@ -2,10 +2,11 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::{Decorator, ParameterWithDefault, Parameters};
+use ruff_python_semantic::analyze::visibility;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_boolean_trap::helpers::{is_allowed_func_def, is_boolean};
+use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,
@@ -94,20 +95,15 @@ impl Violation for BooleanDefaultValuePositionalArgument {
     }
 }
 
+/// FBT002
 pub(crate) fn boolean_default_value_positional_argument(
     checker: &mut Checker,
     name: &str,
     decorator_list: &[Decorator],
     parameters: &Parameters,
 ) {
+    // Allow Boolean defaults in explicitly-allowed functions.
     if is_allowed_func_def(name) {
-        return;
-    }
-
-    if decorator_list.iter().any(|decorator| {
-        collect_call_path(&decorator.expression)
-            .is_some_and(|call_path| call_path.as_slice() == [name, "setter"])
-    }) {
         return;
     }
 
@@ -117,7 +113,24 @@ pub(crate) fn boolean_default_value_positional_argument(
         range: _,
     } in parameters.posonlyargs.iter().chain(&parameters.args)
     {
-        if default.as_ref().is_some_and(|default| is_boolean(default)) {
+        if default
+            .as_ref()
+            .is_some_and(|default| default.is_boolean_literal_expr())
+        {
+            // Allow Boolean defaults in setters.
+            if decorator_list.iter().any(|decorator| {
+                collect_call_path(&decorator.expression)
+                    .is_some_and(|call_path| call_path.as_slice() == [name, "setter"])
+            }) {
+                return;
+            }
+
+            // Allow Boolean defaults in `@override` methods, since they're required to adhere to
+            // the parent signature.
+            if visibility::is_override(decorator_list, checker.semantic()) {
+                return;
+            }
+
             checker.diagnostics.push(Diagnostic::new(
                 BooleanDefaultValuePositionalArgument,
                 parameter.name.range(),

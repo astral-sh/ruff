@@ -109,6 +109,11 @@ match long_lines:
     ):  # another comment
         pass
 
+    case {
+        "long_long_long_key": str(long_long_long_key)
+    } if value := "long long long long long long long long long long long value":
+        pass
+
 
 match pattern_comments:
     case (
@@ -206,9 +211,9 @@ match pattern_singleton:
     case (
         True  # trailing
     ):
-        ...
+        pass
     case False:
-        ...
+        pass
 
 
 match foo:
@@ -406,39 +411,39 @@ match pattern_match_class:
     case Point2D(
             # own line
             ):
-        ...
+        pass
 
     case (
         Point2D
         # own line
         ()
     ):
-        ...
+        pass
 
     case Point2D(  # end of line line
             ):
-        ...
+        pass
 
     case Point2D(  # end of line
         0, 0
     ):
-        ...
+        pass
 
     case Point2D(0, 0):
-        ...
+        pass
 
     case Point2D(
         (  # end of line
         # own line
         0
         ), 0):
-        ...
+        pass
 
     case Point3D(x=0, y=0, z=000000000000000000000000000000000000000000000000000000000000000000000000000000000):
-        ...
+        pass
 
     case Bar(0, a=None, b="hello"):
-        ...
+        pass
 
     case FooBar(# leading
 # leading
@@ -449,7 +454,7 @@ match pattern_match_class:
     # trailing
         # trailing
             ):
-        ...
+        pass
 
     case A(
         b # b
@@ -481,26 +486,26 @@ match pattern_match_or:
           # own line 4
           c # trailing 5
             ):
-        ...
+        pass
 
     case (
         (a)
         | # trailing
         ( b )
     ):
-        ...
+        pass
 
     case (a|b|c):
-        ...
+        pass
 
     case foo | bar | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh:
-        ...
+        pass
 
     case ( # end of line
           a | b
     # own line
     ):
-        ...
+        pass
 
 
 # Single-element tuples.
@@ -563,4 +568,23 @@ match pattern:
     case (
         # comment
         a, b,):
+        pass
+
+# Tuple subject.
+match n % 3, n % 5:
+    case 0, 0:
+        # n is divisible by both 3 and 5
+        print("FizzBuzz")
+    case 0, _:
+        # n is divisible by 3, but not 5
+        print("Fizz")
+    case _, 0:
+        # n is divisible by 5, but not 3
+        print("Buzz")
+    case _:
+        print(n)
+
+# Unparenthesized tuples
+match x:
+    case Child(aaaaaaaaa, bbbbbbbbbbbbbbb, cccccc), Doc(aaaaa, bbbbbbbbbb, ddddddddddddd):
         pass

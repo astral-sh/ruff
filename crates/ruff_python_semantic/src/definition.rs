@@ -248,6 +248,12 @@ impl<'a> Definitions<'a> {
 
         ContextualizedDefinitions(definitions.raw)
     }
+
+    /// Returns a reference to the Python AST.
+    pub fn python_ast(&self) -> Option<&'a [Stmt]> {
+        let module = self[DefinitionId::module()].as_module()?;
+        Some(module.python_ast)
+    }
 }
 
 impl<'a> Deref for Definitions<'a> {
@@ -259,8 +265,8 @@ impl<'a> Deref for Definitions<'a> {
 }
 
 impl<'a> IntoIterator for Definitions<'a> {
-    type IntoIter = std::vec::IntoIter<Self::Item>;
     type Item = Definition<'a>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()

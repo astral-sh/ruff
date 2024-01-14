@@ -8,11 +8,12 @@ use ruff_linter::line_width::LineLength;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::registry::Rule;
 use ruff_linter::settings::types::{
-    FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion, SerializationFormat,
-    UnsafeFixes,
+    ExtensionPair, FilePattern, PatternPrefixPair, PerFileIgnore, PreviewMode, PythonVersion,
+    SerializationFormat, UnsafeFixes,
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_workspace::configuration::{Configuration, RuleSelection};
+use ruff_workspace::options::PycodestyleOptions;
 use ruff_workspace::resolver::ConfigurationTransformer;
 
 #[derive(Debug, Parser)]
@@ -49,7 +50,11 @@ pub enum Command {
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// List or describe the available configuration options.
     Config { option: Option<String> },
@@ -57,7 +62,11 @@ pub enum Command {
     Linter {
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
-        format: HelpFormat,
+        output_format: HelpFormat,
+
+        /// Output format (Deprecated: Use `--output-format` instead).
+        #[arg(long, value_enum, conflicts_with = "output_format", hide = true)]
+        format: Option<HelpFormat>,
     },
     /// Clear any caches in the current directory and any subdirectories.
     #[clap(alias = "--clean")]
@@ -66,9 +75,12 @@ pub enum Command {
     #[clap(alias = "--generate-shell-completion", hide = true)]
     GenerateShellCompletion { shell: clap_complete_command::Shell },
     /// Run the Ruff formatter on the given files or directories.
-    #[doc(hidden)]
-    #[clap(hide = true)]
     Format(FormatCommand),
+    /// Display Ruff's version
+    Version {
+        #[arg(long, value_enum, default_value = "text")]
+        output_format: HelpFormat,
+    },
 }
 
 // The `Parser` derive is for ruff_dev, for ruff_cli `Args` would be sufficient
@@ -76,6 +88,7 @@ pub enum Command {
 #[allow(clippy::struct_excessive_bools)]
 pub struct CheckCommand {
     /// List of files or directories to check.
+    #[clap(help = "List of files or directories to check [default: .]")]
     pub files: Vec<PathBuf>,
     /// Apply fixes to resolve lint violations.
     /// Use `--no-fix` to disable or `--unsafe-fixes` to include unsafe fixes.
@@ -116,16 +129,6 @@ pub struct CheckCommand {
     /// Ignore any `# noqa` comments.
     #[arg(long)]
     ignore_noqa: bool,
-
-    /// Output serialization format for violations. (Deprecated: Use `--output-format` instead).
-    #[arg(
-        long,
-        value_enum,
-        env = "RUFF_FORMAT",
-        conflicts_with = "output_format",
-        hide = true
-    )]
-    pub format: Option<SerializationFormat>,
 
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_OUTPUT_FORMAT")]
@@ -276,7 +279,7 @@ pub struct CheckCommand {
     #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
     /// Disable cache reads.
-    #[arg(short, long, help_heading = "Miscellaneous")]
+    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
     pub no_cache: bool,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
@@ -287,6 +290,10 @@ pub struct CheckCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
+    /// List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For
+    /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
+    #[arg(long, value_delimiter = ',')]
+    pub extension: Option<Vec<ExtensionPair>>,
     /// Exit with status code "0", even upon detecting lint violations.
     #[arg(
         short,
@@ -358,14 +365,27 @@ pub struct CheckCommand {
 #[allow(clippy::struct_excessive_bools)]
 pub struct FormatCommand {
     /// List of files or directories to format.
+    #[clap(help = "List of files or directories to format [default: .]")]
     pub files: Vec<PathBuf>,
     /// Avoid writing any formatted files back; instead, exit with a non-zero status code if any
     /// files would have been modified, and zero otherwise.
     #[arg(long)]
     pub check: bool,
+    /// Avoid writing any formatted files back; instead, exit with a non-zero status code and the
+    /// difference between the current file and how the formatted file would look like.
+    #[arg(long)]
+    pub diff: bool,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for configuration.
     #[arg(long, conflicts_with = "isolated")]
     pub config: Option<PathBuf>,
+
+    /// Disable cache reads.
+    #[arg(short, long, env = "RUFF_NO_CACHE", help_heading = "Miscellaneous")]
+    pub no_cache: bool,
+    /// Path to the cache directory.
+    #[arg(long, env = "RUFF_CACHE_DIR", help_heading = "Miscellaneous")]
+    pub cache_dir: Option<PathBuf>,
+
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
     /// Use `--no-respect-gitignore` to disable.
     #[arg(
@@ -376,6 +396,15 @@ pub struct FormatCommand {
     respect_gitignore: bool,
     #[clap(long, overrides_with("respect_gitignore"), hide = true)]
     no_respect_gitignore: bool,
+    /// List of paths, used to omit files and/or directories from analysis.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "FILE_PATTERN",
+        help_heading = "File selection"
+    )]
+    pub exclude: Option<Vec<FilePattern>>,
+
     /// Enforce exclusions, even for paths passed to Ruff directly on the command-line.
     /// Use `--no-force-exclude` to disable.
     #[arg(
@@ -387,7 +416,7 @@ pub struct FormatCommand {
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
     /// Set the line-length.
-    #[arg(long, help_heading = "Rule configuration", hide = true)]
+    #[arg(long, help_heading = "Format configuration")]
     pub line_length: Option<LineLength>,
     /// Ignore all configuration files.
     #[arg(long, conflicts_with = "config", help_heading = "Miscellaneous")]
@@ -395,10 +424,16 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
-
-    /// Enable preview mode; checks will include unstable rules and fixes.
+    /// List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For
+    /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
+    #[arg(long, value_delimiter = ',')]
+    pub extension: Option<Vec<ExtensionPair>>,
+    /// The minimum Python version that should be supported.
+    #[arg(long, value_enum)]
+    pub target_version: Option<PythonVersion>,
+    /// Enable preview mode; enables unstable formatting.
     /// Use `--no-preview` to disable.
-    #[arg(long, overrides_with("no_preview"), hide = true)]
+    #[arg(long, overrides_with("no_preview"))]
     preview: bool,
     #[clap(long, overrides_with("preview"), hide = true)]
     no_preview: bool,
@@ -485,6 +520,7 @@ impl CheckCommand {
                 extend_exclude: self.extend_exclude,
                 extend_fixable: self.extend_fixable,
                 extend_ignore: self.extend_ignore,
+                extend_per_file_ignores: self.extend_per_file_ignores,
                 extend_select: self.extend_select,
                 extend_unfixable: self.extend_unfixable,
                 fixable: self.fixable,
@@ -507,8 +543,9 @@ impl CheckCommand {
                 unsafe_fixes: resolve_bool_arg(self.unsafe_fixes, self.no_unsafe_fixes)
                     .map(UnsafeFixes::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
-                output_format: self.output_format.or(self.format),
+                output_format: self.output_format,
                 show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
+                extension: self.extension,
             },
         )
     }
@@ -521,9 +558,11 @@ impl FormatCommand {
         (
             FormatArguments {
                 check: self.check,
+                diff: self.diff,
                 config: self.config,
                 files: self.files,
                 isolated: self.isolated,
+                no_cache: self.no_cache,
                 stdin_filename: self.stdin_filename,
             },
             CliOverrides {
@@ -532,8 +571,13 @@ impl FormatCommand {
                     self.respect_gitignore,
                     self.no_respect_gitignore,
                 ),
+                exclude: self.exclude,
                 preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
+                target_version: self.target_version,
+                cache_dir: self.cache_dir,
+                extension: self.extension,
+
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..CliOverrides::default()
             },
@@ -577,6 +621,8 @@ pub struct CheckArguments {
 #[allow(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
+    pub no_cache: bool,
+    pub diff: bool,
     pub config: Option<PathBuf>,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
@@ -598,6 +644,7 @@ pub struct CliOverrides {
     pub ignore: Option<Vec<RuleSelector>>,
     pub line_length: Option<LineLength>,
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     pub preview: Option<PreviewMode>,
     pub respect_gitignore: Option<bool>,
     pub select: Option<Vec<RuleSelector>>,
@@ -612,6 +659,7 @@ pub struct CliOverrides {
     pub force_exclude: Option<bool>,
     pub output_format: Option<SerializationFormat>,
     pub show_fixes: Option<bool>,
+    pub extension: Option<Vec<ExtensionPair>>,
 }
 
 impl ConfigurationTransformer for CliOverrides {
@@ -627,6 +675,12 @@ impl ConfigurationTransformer for CliOverrides {
         }
         if let Some(extend_exclude) = &self.extend_exclude {
             config.extend_exclude.extend(extend_exclude.clone());
+        }
+        if let Some(extend_per_file_ignores) = &self.extend_per_file_ignores {
+            config
+                .lint
+                .extend_per_file_ignores
+                .extend(collect_per_file_ignores(extend_per_file_ignores.clone()));
         }
         if let Some(fix) = &self.fix {
             config.fix = Some(*fix);
@@ -663,11 +717,17 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(force_exclude) = &self.force_exclude {
             config.force_exclude = Some(*force_exclude);
         }
-        if let Some(line_length) = &self.line_length {
-            config.line_length = Some(*line_length);
+        if let Some(line_length) = self.line_length {
+            config.line_length = Some(line_length);
+            config.lint.pycodestyle = Some(PycodestyleOptions {
+                max_line_length: Some(line_length),
+                ..config.lint.pycodestyle.unwrap_or_default()
+            });
         }
         if let Some(preview) = &self.preview {
             config.preview = Some(*preview);
+            config.lint.preview = Some(*preview);
+            config.format.preview = Some(*preview);
         }
         if let Some(per_file_ignores) = &self.per_file_ignores {
             config.lint.per_file_ignores = Some(collect_per_file_ignores(per_file_ignores.clone()));
@@ -684,6 +744,9 @@ impl ConfigurationTransformer for CliOverrides {
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);
         }
+        if let Some(extension) = &self.extension {
+            config.extension = Some(extension.iter().cloned().collect());
+        }
 
         config
     }
@@ -695,7 +758,7 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     for pair in pairs {
         per_file_ignores
             .entry(pair.pattern)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(pair.prefix);
     }
     per_file_ignores

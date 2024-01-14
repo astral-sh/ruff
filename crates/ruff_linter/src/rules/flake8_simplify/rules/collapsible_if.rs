@@ -6,9 +6,10 @@ use log::error;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{self as ast, whitespace, Constant, ElifElseClause, Expr, Stmt};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{self as ast, whitespace, ElifElseClause, Expr, Stmt};
 use ruff_python_codegen::Stylist;
+use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
@@ -18,7 +19,6 @@ use crate::cst::helpers::space;
 use crate::cst::matchers::{match_function_def, match_if, match_indented_block, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::fix::edits::fits;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for nested `if` statements that can be collapsed into a single `if`
@@ -97,37 +97,45 @@ pub(crate) fn nested_if_statements(
         return;
     };
 
+    // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
+    if is_sys_version_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
+    // Avoid suggesting ternary for `if TYPE_CHECKING:`-style checks.
+    if is_type_checking_block(stmt_if, checker.semantic()) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf,
         TextRange::new(nested_if.start(), colon.end()),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // The fixer preserves comments in the nested body, but removes comments between
-        // the outer and inner if statements.
-        if !checker
-            .indexer()
-            .comment_ranges()
-            .intersects(TextRange::new(
-                nested_if.start(),
-                nested_if.body()[0].start(),
-            ))
-        {
-            match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
-                Ok(edit) => {
-                    if edit.content().map_or(true, |content| {
-                        fits(
-                            content,
-                            (&nested_if).into(),
-                            checker.locator(),
-                            checker.settings.line_length,
-                            checker.settings.tab_size,
-                        )
-                    }) {
-                        diagnostic.set_fix(Fix::unsafe_edit(edit));
-                    }
+    // The fixer preserves comments in the nested body, but removes comments between
+    // the outer and inner if statements.
+    if !checker
+        .indexer()
+        .comment_ranges()
+        .intersects(TextRange::new(
+            nested_if.start(),
+            nested_if.body()[0].start(),
+        ))
+    {
+        match collapse_nested_if(checker.locator(), checker.stylist(), nested_if) {
+            Ok(edit) => {
+                if edit.content().map_or(true, |content| {
+                    fits(
+                        content,
+                        (&nested_if).into(),
+                        checker.locator(),
+                        checker.settings.pycodestyle.max_line_length,
+                        checker.settings.tab_size,
+                    )
+                }) {
+                    diagnostic.set_fix(Fix::unsafe_edit(edit));
                 }
-                Err(err) => error!("Failed to fix nested if: {err}"),
             }
+            Err(err) => error!("Failed to fix nested if: {err}"),
         }
     }
     checker.diagnostics.push(diagnostic);
@@ -204,13 +212,7 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf> {
     }
 
     // Allow `if True:` and `if False:` statements.
-    if matches!(
-        test,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Bool(..),
-            ..
-        })
-    ) {
+    if test.is_boolean_literal_expr() {
         return None;
     }
 
@@ -251,10 +253,8 @@ fn is_main_check(expr: &Expr) -> bool {
     {
         if let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() {
             if id == "__name__" {
-                if let [Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(ast::StringConstant { value, .. }),
-                    ..
-                })] = comparators.as_slice()
+                if let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] =
+                    comparators.as_slice()
                 {
                     if value == "__main__" {
                         return true;

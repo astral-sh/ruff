@@ -160,6 +160,10 @@ impl ImportMap {
     pub fn extend(&mut self, other: Self) {
         self.module_to_imports.extend(other.module_to_imports);
     }
+
+    pub fn iter(&self) -> std::collections::hash_map::Iter<String, Vec<ModuleImport>> {
+        self.module_to_imports.iter()
+    }
 }
 
 impl<'a> IntoIterator for &'a ImportMap {
@@ -167,6 +171,6 @@ impl<'a> IntoIterator for &'a ImportMap {
     type Item = (&'a String, &'a Vec<ModuleImport>);
 
     fn into_iter(self) -> Self::IntoIter {
-        self.module_to_imports.iter()
+        self.iter()
     }
 }

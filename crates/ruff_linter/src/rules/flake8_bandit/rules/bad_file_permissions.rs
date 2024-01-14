@@ -3,7 +3,7 @@ use anyhow::Result;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::{self as ast, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -144,8 +144,8 @@ fn py_stat(call_path: &CallPath) -> Option<u16> {
 /// an integer value, but that value is out of range.
 fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> Result<Option<u16>> {
     match expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(int),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(int),
             ..
         }) => match int.as_u16() {
             Some(value) => Ok(Some(value)),

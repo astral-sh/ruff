@@ -102,3 +102,6 @@ aaaaaaaaaaaaaaaaaaaaa = [
      c  # negative decimal
 ]
 
+# Parenthesized targets and iterators.
+[x for (x) in y]
+[x for x in (y)]

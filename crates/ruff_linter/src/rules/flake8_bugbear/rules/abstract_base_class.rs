@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Keyword, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, Keyword, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -121,12 +121,12 @@ fn is_abc_class(bases: &[Expr], keywords: &[Keyword], semantic: &SemanticModel) 
 fn is_empty_body(body: &[Stmt]) -> bool {
     body.iter().all(|stmt| match stmt {
         Stmt::Pass(_) => true,
-        Stmt::Expr(ast::StmtExpr { value, range: _ }) => match value.as_ref() {
-            Expr::Constant(ast::ExprConstant { value, .. }) => {
-                matches!(value, Constant::Str(..) | Constant::Ellipsis)
-            }
-            _ => false,
-        },
+        Stmt::Expr(ast::StmtExpr { value, range: _ }) => {
+            matches!(
+                value.as_ref(),
+                Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
+            )
+        }
         _ => false,
     })
 }

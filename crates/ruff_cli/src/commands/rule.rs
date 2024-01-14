@@ -18,6 +18,7 @@ struct Explanation<'a> {
     summary: &'a str,
     message_formats: &'a [&'a str],
     fix: String,
+    #[allow(clippy::struct_field_names)]
     explanation: Option<&'a str>,
     preview: bool,
 }
@@ -63,7 +64,7 @@ fn format_rule_text(rule: Rule) -> String {
 
     if rule.is_preview() || rule.is_nursery() {
         output.push_str(
-            r#"This rule is in preview and is not stable. The `--preview` flag is required for use."#,
+            r"This rule is in preview and is not stable. The `--preview` flag is required for use.",
         );
         output.push('\n');
         output.push('\n');

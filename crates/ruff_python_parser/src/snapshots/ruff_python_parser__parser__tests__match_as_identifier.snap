@@ -627,8 +627,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             ctx: Store,
                         },
                     ),
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 520..521,
                             value: Int(
                                 1,
@@ -663,8 +663,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 550..551,
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 550..551,
                                     value: Int(
                                         1,
@@ -687,8 +687,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     pattern: MatchValue(
                         PatternMatchValue {
                             range: 567..568,
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 567..568,
                                     value: Int(
                                         2,
@@ -804,8 +804,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     arguments: Arguments {
                                         range: 631..635,
                                         args: [
-                                            Constant(
-                                                ExprConstant {
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 632..634,
                                                     value: Int(
                                                         12,

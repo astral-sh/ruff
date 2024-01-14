@@ -8,5 +8,6 @@ allow_overload.py:29:9: ANN201 Missing return type annotation for public functio
    |         ^^^ ANN201
 30 |         return i
    |
+   = help: Add return type annotation
 
 

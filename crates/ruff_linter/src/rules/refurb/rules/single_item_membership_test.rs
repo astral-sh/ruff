@@ -1,13 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::generate_comparison;
-use ruff_python_ast::ExprConstant;
-use ruff_python_ast::{CmpOp, Constant, Expr};
+use ruff_python_ast::{self as ast, CmpOp, Expr, ExprStringLiteral};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for membership tests against single-item containers.
@@ -78,37 +76,40 @@ pub(crate) fn single_item_membership_test(
 
     let mut diagnostic =
         Diagnostic::new(SingleItemMembershipTest { membership_test }, expr.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            pad(
-                generate_comparison(
-                    left,
-                    &[membership_test.replacement_op()],
-                    &[item.clone()],
-                    expr.into(),
-                    checker.indexer().comment_ranges(),
-                    checker.locator(),
-                ),
-                expr.range(),
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        pad(
+            generate_comparison(
+                left,
+                &[membership_test.replacement_op()],
+                &[item.clone()],
+                expr.into(),
+                checker.indexer().comment_ranges(),
                 checker.locator(),
             ),
             expr.range(),
-        )));
-    }
+            checker.locator(),
+        ),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 
-/// Return the single item wrapped in Some if the expression contains a single
-/// item, otherwise return None.
+/// Return the single item wrapped in `Some` if the expression contains a single
+/// item, otherwise return `None`.
 fn single_item(expr: &Expr) -> Option<&Expr> {
     match expr {
-        Expr::List(list) if list.elts.len() == 1 => Some(&list.elts[0]),
-        Expr::Tuple(tuple) if tuple.elts.len() == 1 => Some(&tuple.elts[0]),
-        Expr::Set(set) if set.elts.len() == 1 => Some(&set.elts[0]),
-        string_expr @ Expr::Constant(ExprConstant {
-            value: Constant::Str(string),
-            ..
-        }) if string.chars().count() == 1 => Some(string_expr),
+        Expr::List(ast::ExprList { elts, .. })
+        | Expr::Tuple(ast::ExprTuple { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. }) => match elts.as_slice() {
+            [Expr::Starred(_)] => None,
+            [item] => Some(item),
+            _ => None,
+        },
+        string_expr @ Expr::StringLiteral(ExprStringLiteral { value: string, .. })
+            if string.chars().count() == 1 =>
+        {
+            Some(string_expr)
+        }
         _ => None,
     }
 }

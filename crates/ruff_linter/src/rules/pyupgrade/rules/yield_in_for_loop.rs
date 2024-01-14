@@ -5,7 +5,6 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `for` loops that can be replaced with `yield from` expressions.
@@ -24,6 +23,16 @@ use crate::registry::AsRule;
 /// ```python
 /// yield from foo
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as converting a `for` loop to a `yield
+/// from` expression can change the behavior of the program in rare cases.
+/// For example, if a generator is being sent values via `send`, then rewriting
+/// to a `yield from` could lead to an attribute error if the underlying
+/// generator does not implement the `send` method.
+///
+/// In most cases, however, the fix is safe, and such a modification should have
+/// no effect on the behavior of the program.
 ///
 /// ## References
 /// - [Python documentation: The `yield` statement](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
@@ -103,22 +112,20 @@ pub(crate) fn yield_in_for_loop(checker: &mut Checker, stmt_for: &ast::StmtFor) 
     }
 
     let mut diagnostic = Diagnostic::new(YieldInForLoop, stmt_for.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        let contents = checker.locator().slice(
-            parenthesized_range(
-                iter.as_ref().into(),
-                stmt_for.into(),
-                checker.indexer().comment_ranges(),
-                checker.locator().contents(),
-            )
-            .unwrap_or(iter.range()),
-        );
-        let contents = format!("yield from {contents}");
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            contents,
-            stmt_for.range(),
-        )));
-    }
+    let contents = checker.locator().slice(
+        parenthesized_range(
+            iter.as_ref().into(),
+            stmt_for.into(),
+            checker.indexer().comment_ranges(),
+            checker.locator().contents(),
+        )
+        .unwrap_or(iter.range()),
+    );
+    let contents = format!("yield from {contents}");
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        contents,
+        stmt_for.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

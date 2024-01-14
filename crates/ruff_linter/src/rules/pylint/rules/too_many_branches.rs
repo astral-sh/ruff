@@ -180,14 +180,14 @@ mod tests {
     use super::num_branches;
 
     fn test_helper(source: &str, expected_num_branches: usize) -> Result<()> {
-        let branches = parse_suite(source, "<filename>")?;
+        let branches = parse_suite(source)?;
         assert_eq!(num_branches(&branches), expected_num_branches);
         Ok(())
     }
 
     #[test]
     fn if_else_nested_if_else() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 if x == 0:  # 3
     return
 else:
@@ -195,19 +195,19 @@ else:
         pass
     else:
         pass
-"#;
+";
         test_helper(source, 4)?;
         Ok(())
     }
 
     #[test]
     fn for_else() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 for _ in range(x):  # 2
     pass
 else:
     pass
-"#;
+";
 
         test_helper(source, 2)?;
         Ok(())
@@ -215,14 +215,14 @@ else:
 
     #[test]
     fn while_if_else_if() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 while x < 1:  # 4
     if x:
         pass
 else:
     if x:
         pass
-"#;
+";
 
         test_helper(source, 4)?;
         Ok(())
@@ -230,7 +230,7 @@ else:
 
     #[test]
     fn nested_def() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 if x:  # 2
     pass
 else:
@@ -241,7 +241,7 @@ def g(x):
         pass
 
 return 1
-"#;
+";
 
         test_helper(source, 2)?;
         Ok(())
@@ -249,7 +249,7 @@ return 1
 
     #[test]
     fn try_except_except_else_finally() -> Result<()> {
-        let source: &str = r#"
+        let source: &str = r"
 try:
     pass
 except:
@@ -260,7 +260,7 @@ else:
     pass
 finally:
     pass
-"#;
+";
 
         test_helper(source, 5)?;
         Ok(())

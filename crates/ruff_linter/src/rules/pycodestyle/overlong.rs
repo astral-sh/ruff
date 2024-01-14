@@ -7,7 +7,7 @@ use ruff_python_trivia::is_pragma_comment;
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange};
 
-use crate::line_width::{LineLength, LineWidthBuilder, TabSize};
+use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
 
 #[derive(Debug)]
 pub(super) struct Overlong {
@@ -23,7 +23,7 @@ impl Overlong {
         indexer: &Indexer,
         limit: LineLength,
         task_tags: &[String],
-        tab_size: TabSize,
+        tab_size: IndentWidth,
     ) -> Option<Self> {
         // The maximum width of the line is the number of bytes multiplied by the tab size (the
         // worst-case scenario is that the line is all tabs). If the maximum width is less than the
@@ -158,7 +158,7 @@ impl<'a> Deref for StrippedLine<'a> {
 }
 
 /// Returns the width of a given string, accounting for the tab size.
-fn measure(s: &str, tab_size: TabSize) -> LineWidthBuilder {
+fn measure(s: &str, tab_size: IndentWidth) -> LineWidthBuilder {
     let mut width = LineWidthBuilder::new(tab_size);
     width = width.add_str(s);
     width

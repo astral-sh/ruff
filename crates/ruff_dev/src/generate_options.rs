@@ -3,6 +3,7 @@
 //! Used for <https://docs.astral.sh/ruff/settings/>.
 use std::fmt::Write;
 
+use ruff_python_trivia::textwrap;
 use ruff_workspace::options::Options;
 use ruff_workspace::options_base::{OptionField, OptionSet, OptionsMetadata, Visit};
 
@@ -101,22 +102,109 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parent_set: 
         output.push_str(&format!("{header_level} [`{name}`](#{name})\n"));
     }
     output.push('\n');
+
+    if let Some(deprecated) = &field.deprecated {
+        output.push_str("!!! warning \"Deprecated\"\n");
+        output.push_str("    This option has been deprecated");
+
+        if let Some(since) = deprecated.since {
+            write!(output, " in {since}").unwrap();
+        }
+
+        output.push('.');
+
+        if let Some(message) = deprecated.message {
+            writeln!(output, " {message}").unwrap();
+        }
+
+        output.push('\n');
+    }
+
     output.push_str(field.doc);
     output.push_str("\n\n");
     output.push_str(&format!("**Default value**: `{}`\n", field.default));
     output.push('\n');
     output.push_str(&format!("**Type**: `{}`\n", field.value_type));
     output.push('\n');
-    output.push_str(&format!(
-        "**Example usage**:\n\n```toml\n[tool.ruff{}]\n{}\n```\n",
-        if let Some(set_name) = parent_set.name() {
-            format!(".{set_name}")
-        } else {
-            String::new()
-        },
-        field.example
+    output.push_str("**Example usage**:\n\n");
+    output.push_str(&format_tab(
+        "pyproject.toml",
+        &format_header(field.scope, parent_set, ConfigurationFile::PyprojectToml),
+        field.example,
+    ));
+    output.push_str(&format_tab(
+        "ruff.toml",
+        &format_header(field.scope, parent_set, ConfigurationFile::RuffToml),
+        field.example,
     ));
     output.push('\n');
+}
+
+fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
+    format!(
+        "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
+        tab_name,
+        header,
+        textwrap::indent(content, "    ")
+    )
+}
+
+/// Format the TOML header for the example usage for a given option.
+///
+/// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
+fn format_header(
+    scope: Option<&str>,
+    parent_set: &Set,
+    configuration: ConfigurationFile,
+) -> String {
+    match configuration {
+        ConfigurationFile::PyprojectToml => {
+            let mut header = if let Some(set_name) = parent_set.name() {
+                if set_name == "format" {
+                    String::from("tool.ruff.format")
+                } else {
+                    format!("tool.ruff.lint.{set_name}")
+                }
+            } else {
+                "tool.ruff".to_string()
+            };
+            if let Some(scope) = scope {
+                if !header.is_empty() {
+                    header.push('.');
+                }
+                header.push_str(scope);
+            }
+            format!("[{header}]")
+        }
+        ConfigurationFile::RuffToml => {
+            let mut header = if let Some(set_name) = parent_set.name() {
+                if set_name == "format" {
+                    String::from("format")
+                } else {
+                    format!("lint.{set_name}")
+                }
+            } else {
+                String::new()
+            };
+            if let Some(scope) = scope {
+                if !header.is_empty() {
+                    header.push('.');
+                }
+                header.push_str(scope);
+            }
+            if header.is_empty() {
+                String::new()
+            } else {
+                format!("[{header}]")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+enum ConfigurationFile {
+    PyprojectToml,
+    RuffToml,
 }
 
 #[derive(Default)]

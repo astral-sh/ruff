@@ -1,15 +1,16 @@
-use rustc_hash::FxHashSet;
 use std::fmt;
 
-use ast::Constant;
+use rustc_hash::FxHashSet;
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
+use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
 
 /// ## What it does
 /// Checks for the presence of redundant `Literal` types and builtin super
@@ -60,18 +61,18 @@ impl Violation for RedundantLiteralUnion {
 
 /// PYI051
 pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr) {
-    let mut literal_exprs = Vec::new();
+    let mut typing_literal_exprs = Vec::new();
     let mut builtin_types_in_union = FxHashSet::default();
 
     // Adds a member to `literal_exprs` for each value in a `Literal`, and any builtin types
     // to `builtin_types_in_union`.
-    let mut func = |expr: &'a Expr, _| {
+    let mut func = |expr: &'a Expr, _parent: &'a Expr| {
         if let Expr::Subscript(ast::ExprSubscript { value, slice, .. }) = expr {
             if checker.semantic().match_typing_expr(value, "Literal") {
                 if let Expr::Tuple(ast::ExprTuple { elts, .. }) = slice.as_ref() {
-                    literal_exprs.extend(elts.iter());
+                    typing_literal_exprs.extend(elts.iter());
                 } else {
-                    literal_exprs.push(slice);
+                    typing_literal_exprs.push(slice);
                 }
             }
             return;
@@ -83,20 +84,22 @@ pub(crate) fn redundant_literal_union<'a>(checker: &mut Checker, union: &'a Expr
         builtin_types_in_union.insert(builtin_type);
     };
 
-    traverse_union(&mut func, checker.semantic(), union, None);
+    traverse_union(&mut func, checker.semantic(), union);
 
-    for literal_expr in literal_exprs {
-        let Some(constant_type) = match_constant_type(literal_expr) else {
+    for typing_literal_expr in typing_literal_exprs {
+        let Some(literal_type) = match_literal_type(typing_literal_expr) else {
             continue;
         };
 
-        if builtin_types_in_union.contains(&constant_type) {
+        if builtin_types_in_union.contains(&literal_type) {
             checker.diagnostics.push(Diagnostic::new(
                 RedundantLiteralUnion {
-                    literal: SourceCodeSnippet::from_str(checker.locator().slice(literal_expr)),
-                    builtin_type: constant_type,
+                    literal: SourceCodeSnippet::from_str(
+                        checker.locator().slice(typing_literal_expr),
+                    ),
+                    builtin_type: literal_type,
                 },
-                literal_expr.range(),
+                typing_literal_expr.range(),
             ));
         }
     }
@@ -144,18 +147,24 @@ fn match_builtin_type(expr: &Expr, semantic: &SemanticModel) -> Option<ExprType>
     Some(result)
 }
 
-/// Return the [`ExprType`] of an [`Expr]` if it is a constant (e.g., an `int`, like `1`, or a
+/// Return the [`ExprType`] of an [`Expr`] if it is a literal (e.g., an `int`, like `1`, or a
 /// `bool`, like `True`).
-fn match_constant_type(expr: &Expr) -> Option<ExprType> {
-    let constant = expr.as_constant_expr()?;
-    let result = match constant.value {
-        Constant::Bool(_) => ExprType::Bool,
-        Constant::Str(_) => ExprType::Str,
-        Constant::Bytes(_) => ExprType::Bytes,
-        Constant::Int(_) => ExprType::Int,
-        Constant::Float(_) => ExprType::Float,
-        Constant::Complex { .. } => ExprType::Complex,
-        _ => return None,
+fn match_literal_type(expr: &Expr) -> Option<ExprType> {
+    let Some(literal_expr) = expr.as_literal_expr() else {
+        return None;
+    };
+    let result = match literal_expr {
+        LiteralExpressionRef::BooleanLiteral(_) => ExprType::Bool,
+        LiteralExpressionRef::StringLiteral(_) => ExprType::Str,
+        LiteralExpressionRef::BytesLiteral(_) => ExprType::Bytes,
+        LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => match value {
+            ast::Number::Int(_) => ExprType::Int,
+            ast::Number::Float(_) => ExprType::Float,
+            ast::Number::Complex { .. } => ExprType::Complex,
+        },
+        LiteralExpressionRef::NoneLiteral(_) | LiteralExpressionRef::EllipsisLiteral(_) => {
+            return None;
+        }
     };
     Some(result)
 }

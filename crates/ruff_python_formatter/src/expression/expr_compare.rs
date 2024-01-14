@@ -1,13 +1,13 @@
 use ruff_formatter::{FormatOwnedWithRule, FormatRefWithRule};
-use ruff_python_ast::node::AnyNodeRef;
-use ruff_python_ast::{CmpOp, Expr, ExprCompare};
+use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{CmpOp, ExprCompare};
 
 use crate::comments::SourceComment;
 use crate::expression::binary_like::BinaryLike;
-use crate::expression::expr_constant::is_multiline_string;
 use crate::expression::has_parentheses;
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses};
 use crate::prelude::*;
+use crate::string::AnyString;
 
 #[derive(Default)]
 pub struct FormatExprCompare;
@@ -37,11 +37,11 @@ impl NeedsParentheses for ExprCompare {
     ) -> OptionalParentheses {
         if parent.is_expr_await() {
             OptionalParentheses::Always
-        } else if let Expr::Constant(constant) = self.left.as_ref() {
+        } else if let Some(string) = AnyString::from_expression(&self.left) {
             // Multiline strings are guaranteed to never fit, avoid adding unnecessary parentheses
-            if !constant.value.is_implicit_concatenated()
-                && is_multiline_string(constant, context.source())
-                && !context.comments().has(self.left.as_ref())
+            if !string.is_implicit_concatenated()
+                && string.is_multiline(context.source())
+                && !context.comments().has(string)
                 && self.comparators.first().is_some_and(|right| {
                     has_parentheses(right, context).is_some() && !context.comments().has(right)
                 })

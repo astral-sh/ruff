@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/subscript.py
 ---
 ## Input
-```py
+```python
 # Regression test for: https://github.com/astral-sh/ruff/issues/7370
 result = (
     f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)
@@ -12,7 +12,7 @@ result = (
 ```
 
 ## Output
-```py
+```python
 # Regression test for: https://github.com/astral-sh/ruff/issues/7370
 result = (
     f(111111111111111111111111111111111111111111111111111111111111111111111111111111111)

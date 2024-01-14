@@ -19,6 +19,7 @@ mod tests {
 
     #[test_case(Path::new("doubles.py"))]
     #[test_case(Path::new("doubles_escaped.py"))]
+    #[test_case(Path::new("doubles_escaped_unnecessary.py"))]
     #[test_case(Path::new("doubles_implicit.py"))]
     #[test_case(Path::new("doubles_multiline_string.py"))]
     #[test_case(Path::new("doubles_noqa.py"))]
@@ -39,6 +40,7 @@ mod tests {
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
                     Rule::AvoidableEscapedQuote,
+                    Rule::UnnecessaryEscapedQuote,
                 ])
             },
         )?;
@@ -86,6 +88,7 @@ mod tests {
 
     #[test_case(Path::new("singles.py"))]
     #[test_case(Path::new("singles_escaped.py"))]
+    #[test_case(Path::new("singles_escaped_unnecessary.py"))]
     #[test_case(Path::new("singles_implicit.py"))]
     #[test_case(Path::new("singles_multiline_string.py"))]
     #[test_case(Path::new("singles_noqa.py"))]
@@ -106,6 +109,7 @@ mod tests {
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
                     Rule::AvoidableEscapedQuote,
+                    Rule::UnnecessaryEscapedQuote,
                 ])
             },
         )?;
@@ -139,6 +143,7 @@ mod tests {
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
                     Rule::AvoidableEscapedQuote,
+                    Rule::UnnecessaryEscapedQuote,
                 ])
             },
         )?;
@@ -172,6 +177,7 @@ mod tests {
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
                     Rule::AvoidableEscapedQuote,
+                    Rule::UnnecessaryEscapedQuote,
                 ])
             },
         )?;

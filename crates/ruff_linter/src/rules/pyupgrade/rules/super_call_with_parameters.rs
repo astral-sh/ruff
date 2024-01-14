@@ -4,7 +4,6 @@ use ruff_python_ast::{self as ast, Expr, Parameter, ParameterWithDefault, Stmt};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for `super` calls that pass redundant arguments.
@@ -128,12 +127,10 @@ pub(crate) fn super_call_with_parameters(checker: &mut Checker, call: &ast::Expr
     drop(parents);
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, call.arguments.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
-            call.arguments.start() + TextSize::new(1),
-            call.arguments.end() - TextSize::new(1),
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::deletion(
+        call.arguments.start() + TextSize::new(1),
+        call.arguments.end() - TextSize::new(1),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

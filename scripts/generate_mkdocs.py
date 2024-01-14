@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import subprocess
@@ -22,13 +23,15 @@ class Section(NamedTuple):
 SECTIONS: list[Section] = [
     Section("Overview", "index.md", generated=True),
     Section("Tutorial", "tutorial.md", generated=False),
-    Section("Installation", "installation.md", generated=False),
-    Section("Usage", "usage.md", generated=False),
-    Section("Configuration", "configuration.md", generated=False),
+    Section("Installing Ruff", "installation.md", generated=False),
+    Section("The Ruff Linter", "linter.md", generated=False),
+    Section("The Ruff Formatter", "formatter.md", generated=False),
+    Section("Configuring Ruff", "configuration.md", generated=False),
     Section("Preview", "preview.md", generated=False),
     Section("Rules", "rules.md", generated=True),
     Section("Settings", "settings.md", generated=True),
-    Section("Editor Integrations", "editor-integrations.md", generated=False),
+    Section("Versioning", "versioning.md", generated=False),
+    Section("Integrations", "integrations.md", generated=False),
     Section("FAQ", "faq.md", generated=False),
     Section("Contributing", "contributing.md", generated=True),
 ]
@@ -41,13 +44,12 @@ LINK_REWRITES: dict[str, str] = {
         "configuration.md#pyprojecttoml-discovery"
     ),
     "https://docs.astral.sh/ruff/contributing/": "contributing.md",
-    "https://docs.astral.sh/ruff/editor-integrations/": "editor-integrations.md",
+    "https://docs.astral.sh/ruff/integrations/": "integrations.md",
     "https://docs.astral.sh/ruff/faq/#how-does-ruff-compare-to-flake8": (
         "faq.md#how-does-ruff-compare-to-flake8"
     ),
     "https://docs.astral.sh/ruff/installation/": "installation.md",
     "https://docs.astral.sh/ruff/rules/": "rules.md",
-    "https://docs.astral.sh/ruff/rules/#error-e": "rules.md#error-e",
     "https://docs.astral.sh/ruff/settings/": "settings.md",
 }
 
@@ -137,9 +139,37 @@ def main() -> None:
 
             f.write(clean_file_content(file_content, title))
 
-    # Add the nav section to mkdocs.yml.
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)
+
+    # Add the redirect section to mkdocs.yml.
+    rules = json.loads(
+        subprocess.check_output(
+            [
+                "cargo",
+                "run",
+                "-p",
+                "ruff_cli",
+                "--",
+                "rule",
+                "--all",
+                "--output-format",
+                "json",
+            ],
+        ),
+    )
+    config["plugins"].append(
+        {
+            "redirects": {
+                "redirect_maps": {
+                    f'rules/{rule["code"]}.md': f'rules/{rule["name"]}.md'
+                    for rule in rules
+                },
+            },
+        },
+    )
+
+    # Add the nav section to mkdocs.yml.
     config["nav"] = [{section.title: section.filename} for section in SECTIONS]
 
     with Path("mkdocs.generated.yml").open("w+") as fp:

@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::{self as ast, Constant, Expr, Keyword};
+use ruff_python_ast::{self as ast, Expr, Keyword};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -17,9 +17,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::edits::fits_or_shrinks;
 
-use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
-use crate::rules::pyupgrade::helpers::curly_escape;
+use crate::rules::pyupgrade::helpers::{curly_escape, curly_unescape};
 
 /// ## What it does
 /// Checks for `str.format` calls that can be replaced with f-strings.
@@ -138,10 +137,9 @@ enum FormatContext {
     Accessed,
 }
 
-/// Given an [`Expr`], format it for use in a formatted expression within an f-string.
-fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>) -> Cow<'a, str> {
-    let text = locator.slice(expr);
-    let parenthesize = match (context, expr) {
+/// Returns `true` if the expression should be parenthesized when used in an f-string.
+fn parenthesize(expr: &Expr, text: &str, context: FormatContext) -> bool {
+    match (context, expr) {
         // E.g., `x + y` should be parenthesized in `f"{(x + y)[0]}"`.
         (
             FormatContext::Accessed,
@@ -160,8 +158,8 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
         // E.g., `12` should be parenthesized in `f"{(12).real}"`.
         (
             FormatContext::Accessed,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Int(..),
+            Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(..),
                 ..
             }),
         ) => text.chars().all(|c| c.is_ascii_digit()),
@@ -174,9 +172,44 @@ fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>
             | Expr::SetComp(_)
             | Expr::DictComp(_),
         ) => true,
+        (_, Expr::Subscript(ast::ExprSubscript { value, .. })) => {
+            matches!(
+                value.as_ref(),
+                Expr::GeneratorExp(_)
+                    | Expr::Dict(_)
+                    | Expr::Set(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
+            )
+        }
+        (_, Expr::Attribute(ast::ExprAttribute { value, .. })) => {
+            matches!(
+                value.as_ref(),
+                Expr::GeneratorExp(_)
+                    | Expr::Dict(_)
+                    | Expr::Set(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
+            )
+        }
+        (_, Expr::Call(ast::ExprCall { func, .. })) => {
+            matches!(
+                func.as_ref(),
+                Expr::GeneratorExp(_)
+                    | Expr::Dict(_)
+                    | Expr::Set(_)
+                    | Expr::SetComp(_)
+                    | Expr::DictComp(_)
+            )
+        }
         _ => false,
-    };
-    if parenthesize && !text.starts_with('(') && !text.ends_with(')') {
+    }
+}
+
+/// Given an [`Expr`], format it for use in a formatted expression within an f-string.
+fn formatted_expr<'a>(expr: &Expr, context: FormatContext, locator: &Locator<'a>) -> Cow<'a, str> {
+    let text = locator.slice(expr);
+    if parenthesize(expr, text, context) && !(text.starts_with('(') && text.ends_with(')')) {
         Cow::Owned(format!("({text})"))
     } else {
         Cow::Borrowed(text)
@@ -192,14 +225,20 @@ fn try_convert_to_f_string(
     summary: &mut FormatSummaryValues,
     locator: &Locator,
 ) -> Result<Option<String>> {
+    let contents = locator.slice(range);
+
     // Strip the unicode prefix. It's redundant in Python 3, and invalid when used
     // with f-strings.
-    let contents = locator.slice(range);
     let contents = if contents.starts_with('U') || contents.starts_with('u') {
         &contents[1..]
     } else {
         contents
     };
+
+    // Temporarily strip the raw prefix, if present. It will be prepended to the result, before the
+    // 'f', to match the prefix order both the Ruff formatter (and Black) use when formatting code.
+    let raw = contents.starts_with('R') || contents.starts_with('r');
+    let contents = if raw { &contents[1..] } else { contents };
 
     // Remove the leading and trailing quotes.
     let leading_quote = leading_quote(contents).context("Unable to identify leading quote")?;
@@ -292,7 +331,10 @@ fn try_convert_to_f_string(
     }
 
     // Construct the format string.
-    let mut contents = String::with_capacity(1 + converted.len());
+    let mut contents = String::with_capacity(usize::from(raw) + 1 + converted.len());
+    if raw {
+        contents.push('r');
+    }
     contents.push('f');
     contents.push_str(leading_quote);
     contents.push_str(&converted);
@@ -315,19 +357,14 @@ pub(crate) fn f_strings(
         return;
     };
 
-    if !matches!(
-        value.as_ref(),
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(..),
-            ..
-        }),
-    ) {
+    if !value.is_string_literal_expr() {
         return;
     };
 
     let Some(mut summary) = FormatSummaryValues::try_from_call(call, checker.locator()) else {
         return;
     };
+
     let mut patches: Vec<(TextRange, String)> = vec![];
     let mut lex = lexer::lex_starts_at(
         checker.locator().slice(call.func.range()),
@@ -354,9 +391,11 @@ pub(crate) fn f_strings(
             Some((Tok::String { .. }, range)) => {
                 match try_convert_to_f_string(range, &mut summary, checker.locator()) {
                     Ok(Some(fstring)) => patches.push((range, fstring)),
-                    // Skip any strings that don't require conversion (e.g., literal segments of an
-                    // implicit concatenation).
-                    Ok(None) => continue,
+                    // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
+                    Ok(None) => patches.push((
+                        range,
+                        curly_unescape(checker.locator().slice(range)).to_string(),
+                    )),
                     // If any of the segments fail to convert, then we can't convert the entire
                     // expression.
                     Err(_) => return,
@@ -381,7 +420,21 @@ pub(crate) fn f_strings(
         contents.push_str(&fstring);
         prev_end = range.end();
     }
-    contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));
+
+    // If the remainder is non-empty, add it to the contents.
+    let rest = checker.locator().slice(TextRange::new(prev_end, end));
+    if !lexer::lex_starts_at(rest, Mode::Expression, prev_end)
+        .flatten()
+        .all(|(token, _)| match token {
+            Tok::Comment(_) | Tok::Newline | Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent => {
+                true
+            }
+            Tok::String { value, .. } => value.is_empty(),
+            _ => false,
+        })
+    {
+        contents.push_str(rest);
+    }
 
     // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
     // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
@@ -399,9 +452,28 @@ pub(crate) fn f_strings(
         &contents,
         template.into(),
         checker.locator(),
-        checker.settings.line_length,
+        checker.settings.pycodestyle.max_line_length,
         checker.settings.tab_size,
     ) {
+        return;
+    }
+
+    // Finally, avoid refactors that would introduce a runtime error.
+    // For example, Django's `gettext` supports `format`-style arguments, but not f-strings.
+    // See: https://docs.djangoproject.com/en/4.2/topics/i18n/translation
+    if checker.semantic().current_expressions().any(|expr| {
+        expr.as_call_expr().is_some_and(|call| {
+            checker
+                .semantic()
+                .resolve_call_path(call.func.as_ref())
+                .map_or(false, |call_path| {
+                    matches!(
+                        call_path.as_slice(),
+                        ["django", "utils", "translation", "gettext" | "gettext_lazy"]
+                    )
+                })
+        })
+    }) {
         return;
     }
 
@@ -413,13 +485,12 @@ pub(crate) fn f_strings(
     //     0,  # 0
     // )
     // ```
-    if checker.patch(diagnostic.kind.rule())
-        && !checker
-            .indexer()
-            .comment_ranges()
-            .intersects(call.arguments.range())
+    if !checker
+        .indexer()
+        .comment_ranges()
+        .intersects(call.arguments.range())
     {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             contents,
             call.range(),
         )));

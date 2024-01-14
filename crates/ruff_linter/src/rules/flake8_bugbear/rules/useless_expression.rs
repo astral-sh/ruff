@@ -1,10 +1,12 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::{self as ast, Constant, Expr};
+use ruff_python_ast::Expr;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+
+use super::super::helpers::at_last_top_level_expression_in_cell;
 
 /// ## What it does
 /// Checks for useless expressions.
@@ -54,12 +56,21 @@ pub(crate) fn useless_expression(checker: &mut Checker, value: &Expr) {
     // Ignore strings, to avoid false positives with docstrings.
     if matches!(
         value,
-        Expr::FString(_)
-            | Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(..) | Constant::Ellipsis,
-                ..
-            })
+        Expr::FString(_) | Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
     ) {
+        return;
+    }
+
+    // For Jupyter Notebooks, ignore the last top-level expression for each cell.
+    // This is because it's common to have a cell that ends with an expression
+    // to display it's value.
+    if checker.source_type.is_ipynb()
+        && at_last_top_level_expression_in_cell(
+            checker.semantic(),
+            checker.locator(),
+            checker.cell_offsets(),
+        )
+    {
         return;
     }
 

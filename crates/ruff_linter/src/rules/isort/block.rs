@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 use std::slice;
 
-use ruff_notebook::Notebook;
+use ruff_notebook::CellOffsets;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::{self as ast, ElifElseClause, ExceptHandler, MatchCase, Stmt};
 use ruff_source_file::Locator;
@@ -9,7 +9,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::directives::IsortDirectives;
 use crate::rules::isort::helpers;
-use crate::source_kind::SourceKind;
 
 /// A block of imports within a Python module.
 #[derive(Debug, Default)]
@@ -43,7 +42,7 @@ impl<'a> BlockBuilder<'a> {
         locator: &'a Locator<'a>,
         directives: &'a IsortDirectives,
         is_stub: bool,
-        source_kind: &'a SourceKind,
+        cell_offsets: Option<&'a CellOffsets>,
     ) -> Self {
         Self {
             locator,
@@ -52,10 +51,7 @@ impl<'a> BlockBuilder<'a> {
             splits: directives.splits.iter().peekable(),
             exclusions: &directives.exclusions,
             nested: false,
-            cell_offsets: source_kind
-                .as_ipy_notebook()
-                .map(Notebook::cell_offsets)
-                .map(|offsets| offsets.iter().peekable()),
+            cell_offsets: cell_offsets.map(|offsets| offsets.iter().peekable()),
         }
     }
 

@@ -10,7 +10,7 @@ use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for docstrings on functions that are separated by one or more blank
@@ -132,13 +132,11 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Delete the blank line before the docstring.
-                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                    blank_lines_start,
-                    docstring.start() - docstring.indentation.text_len(),
-                )));
-            }
+            // Delete the blank line before the docstring.
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                blank_lines_start,
+                docstring.start() - docstring.indentation.text_len(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }
@@ -188,13 +186,11 @@ pub(crate) fn blank_before_after_function(checker: &mut Checker, docstring: &Doc
                 },
                 docstring.range(),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Delete the blank line after the docstring.
-                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                    first_line_end,
-                    blank_lines_end,
-                )));
-            }
+            // Delete the blank line after the docstring.
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                first_line_end,
+                blank_lines_end,
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

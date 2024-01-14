@@ -1,0 +1,155 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/remove_except_parens.py
+---
+## Input
+
+```python
+# These brackets are redundant, therefore remove.
+try:
+    a.something
+except (AttributeError) as err:
+    raise err
+
+# This is tuple of exceptions.
+# Although this could be replaced with just the exception,
+# we do not remove brackets to preserve AST.
+try:
+    a.something
+except (AttributeError,) as err:
+    raise err
+
+# This is a tuple of exceptions. Do not remove brackets.
+try:
+    a.something
+except (AttributeError, ValueError) as err:
+    raise err
+
+# Test long variants.
+try:
+    a.something
+except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
+    raise err
+
+try:
+    a.something
+except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,) as err:
+    raise err
+
+try:
+    a.something
+except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error, some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
+    raise err
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -21,9 +21,7 @@
+ # Test long variants.
+ try:
+     a.something
+-except (
+-    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error
+-) as err:
++except some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error as err:
+     raise err
+ 
+ try:
+```
+
+## Ruff Output
+
+```python
+# These brackets are redundant, therefore remove.
+try:
+    a.something
+except AttributeError as err:
+    raise err
+
+# This is tuple of exceptions.
+# Although this could be replaced with just the exception,
+# we do not remove brackets to preserve AST.
+try:
+    a.something
+except (AttributeError,) as err:
+    raise err
+
+# This is a tuple of exceptions. Do not remove brackets.
+try:
+    a.something
+except (AttributeError, ValueError) as err:
+    raise err
+
+# Test long variants.
+try:
+    a.something
+except some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error as err:
+    raise err
+
+try:
+    a.something
+except (
+    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+) as err:
+    raise err
+
+try:
+    a.something
+except (
+    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+) as err:
+    raise err
+```
+
+## Black Output
+
+```python
+# These brackets are redundant, therefore remove.
+try:
+    a.something
+except AttributeError as err:
+    raise err
+
+# This is tuple of exceptions.
+# Although this could be replaced with just the exception,
+# we do not remove brackets to preserve AST.
+try:
+    a.something
+except (AttributeError,) as err:
+    raise err
+
+# This is a tuple of exceptions. Do not remove brackets.
+try:
+    a.something
+except (AttributeError, ValueError) as err:
+    raise err
+
+# Test long variants.
+try:
+    a.something
+except (
+    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error
+) as err:
+    raise err
+
+try:
+    a.something
+except (
+    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+) as err:
+    raise err
+
+try:
+    a.something
+except (
+    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+    some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
+) as err:
+    raise err
+```
+
+

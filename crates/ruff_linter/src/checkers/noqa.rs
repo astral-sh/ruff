@@ -3,19 +3,20 @@
 use std::path::Path;
 
 use itertools::Itertools;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{CommentRanges, PythonWhitespace};
 use ruff_source_file::Locator;
 
 use crate::noqa;
 use crate::noqa::{Directive, FileExemption, NoqaDirectives, NoqaMapping};
-use crate::registry::{AsRule, Rule};
+use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     path: &Path,
@@ -23,6 +24,7 @@ pub(crate) fn check_noqa(
     comment_ranges: &CommentRanges,
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
+    per_file_ignores: &RuleSet,
     settings: &LinterSettings,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
@@ -109,10 +111,8 @@ pub(crate) fn check_noqa(
                     if line.matches.is_empty() {
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
-                        if settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic
-                                .set_fix(Fix::unsafe_edit(delete_noqa(directive.range(), locator)));
-                        }
+                        diagnostic.set_fix(Fix::safe_edit(delete_noqa(directive.range(), locator)));
+
                         diagnostics.push(diagnostic);
                     }
                 }
@@ -121,7 +121,7 @@ pub(crate) fn check_noqa(
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
                     let mut valid_codes = vec![];
-                    let mut self_ignore = false;
+                    let mut self_ignore = per_file_ignores.contains(Rule::UnusedNOQA);
                     for code in directive.codes() {
                         let code = get_redirect_target(code).unwrap_or(code);
                         if Rule::UnusedNOQA.noqa_code() == code {
@@ -130,7 +130,10 @@ pub(crate) fn check_noqa(
                         }
 
                         if line.matches.iter().any(|match_| *match_ == code)
-                            || settings.external.contains(code)
+                            || settings
+                                .external
+                                .iter()
+                                .any(|external| code.starts_with(external))
                         {
                             valid_codes.push(code);
                         } else {
@@ -173,18 +176,14 @@ pub(crate) fn check_noqa(
                             },
                             directive.range(),
                         );
-                        if settings.rules.should_fix(diagnostic.kind.rule()) {
-                            if valid_codes.is_empty() {
-                                diagnostic.set_fix(Fix::unsafe_edit(delete_noqa(
-                                    directive.range(),
-                                    locator,
-                                )));
-                            } else {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                    format!("# noqa: {}", valid_codes.join(", ")),
-                                    directive.range(),
-                                )));
-                            }
+                        if valid_codes.is_empty() {
+                            diagnostic
+                                .set_fix(Fix::safe_edit(delete_noqa(directive.range(), locator)));
+                        } else {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                format!("# noqa: {}", valid_codes.join(", ")),
+                                directive.range(),
+                            )));
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -203,17 +202,11 @@ fn delete_noqa(range: TextRange, locator: &Locator) -> Edit {
 
     // Compute the leading space.
     let prefix = locator.slice(TextRange::new(line_range.start(), range.start()));
-    let leading_space = prefix
-        .rfind(|c: char| !c.is_whitespace())
-        .map_or(prefix.len(), |i| prefix.len() - i - 1);
-    let leading_space_len = TextSize::try_from(leading_space).unwrap();
+    let leading_space_len = prefix.text_len() - prefix.trim_whitespace_end().text_len();
 
     // Compute the trailing space.
     let suffix = locator.slice(TextRange::new(range.end(), line_range.end()));
-    let trailing_space = suffix
-        .find(|c: char| !c.is_whitespace())
-        .map_or(suffix.len(), |i| i);
-    let trailing_space_len = TextSize::try_from(trailing_space).unwrap();
+    let trailing_space_len = suffix.text_len() - suffix.trim_whitespace_start().text_len();
 
     // Ex) `# noqa`
     if line_range

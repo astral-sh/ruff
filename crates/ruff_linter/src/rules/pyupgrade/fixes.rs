@@ -104,145 +104,145 @@ mod tests {
 
     #[test]
     fn once() {
-        let source = r#"from foo import bar, baz, bop, qux as q"#;
-        let expected = r#"from foo import bar, baz, qux as q"#;
+        let source = r"from foo import bar, baz, bop, qux as q";
+        let expected = r"from foo import bar, baz, qux as q";
         let actual = remove_import_members(source, &["bop"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn twice() {
-        let source = r#"from foo import bar, baz, bop, qux as q"#;
-        let expected = r#"from foo import bar, qux as q"#;
+        let source = r"from foo import bar, baz, bop, qux as q";
+        let expected = r"from foo import bar, qux as q";
         let actual = remove_import_members(source, &["baz", "bop"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn aliased() {
-        let source = r#"from foo import bar, baz, bop as boop, qux as q"#;
-        let expected = r#"from foo import bar, baz, qux as q"#;
+        let source = r"from foo import bar, baz, bop as boop, qux as q";
+        let expected = r"from foo import bar, baz, qux as q";
         let actual = remove_import_members(source, &["bop"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn parenthesized() {
-        let source = r#"from foo import (bar, baz, bop, qux as q)"#;
-        let expected = r#"from foo import (bar, baz, qux as q)"#;
+        let source = r"from foo import (bar, baz, bop, qux as q)";
+        let expected = r"from foo import (bar, baz, qux as q)";
         let actual = remove_import_members(source, &["bop"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn last_import() {
-        let source = r#"from foo import bar, baz, bop, qux as q"#;
-        let expected = r#"from foo import bar, baz, bop"#;
+        let source = r"from foo import bar, baz, bop, qux as q";
+        let expected = r"from foo import bar, baz, bop";
         let actual = remove_import_members(source, &["qux"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn first_import() {
-        let source = r#"from foo import bar, baz, bop, qux as q"#;
-        let expected = r#"from foo import baz, bop, qux as q"#;
+        let source = r"from foo import bar, baz, bop, qux as q";
+        let expected = r"from foo import baz, bop, qux as q";
         let actual = remove_import_members(source, &["bar"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn first_two_imports() {
-        let source = r#"from foo import bar, baz, bop, qux as q"#;
-        let expected = r#"from foo import bop, qux as q"#;
+        let source = r"from foo import bar, baz, bop, qux as q";
+        let expected = r"from foo import bop, qux as q";
         let actual = remove_import_members(source, &["bar", "baz"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn first_two_imports_multiline() {
-        let source = r#"from foo import (
+        let source = r"from foo import (
     bar,
     baz,
     bop,
     qux as q
-)"#;
-        let expected = r#"from foo import (
+)";
+        let expected = r"from foo import (
     bop,
     qux as q
-)"#;
+)";
         let actual = remove_import_members(source, &["bar", "baz"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn multiline_once() {
-        let source = r#"from foo import (
+        let source = r"from foo import (
     bar,
     baz,
     bop,
     qux as q,
-)"#;
-        let expected = r#"from foo import (
+)";
+        let expected = r"from foo import (
     bar,
     baz,
     qux as q,
-)"#;
+)";
         let actual = remove_import_members(source, &["bop"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn multiline_twice() {
-        let source = r#"from foo import (
+        let source = r"from foo import (
     bar,
     baz,
     bop,
     qux as q,
-)"#;
-        let expected = r#"from foo import (
+)";
+        let expected = r"from foo import (
     bar,
     qux as q,
-)"#;
+)";
         let actual = remove_import_members(source, &["baz", "bop"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn multiline_comment() {
-        let source = r#"from foo import (
+        let source = r"from foo import (
     bar,
     baz,
     # This comment should be removed.
     bop,
     # This comment should be retained.
     qux as q,
-)"#;
-        let expected = r#"from foo import (
+)";
+        let expected = r"from foo import (
     bar,
     baz,
     # This comment should be retained.
     qux as q,
-)"#;
+)";
         let actual = remove_import_members(source, &["bop"]);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn multi_comment_first_import() {
-        let source = r#"from foo import (
+        let source = r"from foo import (
     # This comment should be retained.
     bar,
     # This comment should be removed.
     baz,
     bop,
     qux as q,
-)"#;
-        let expected = r#"from foo import (
+)";
+        let expected = r"from foo import (
     # This comment should be retained.
     baz,
     bop,
     qux as q,
-)"#;
+)";
         let actual = remove_import_members(source, &["bar"]);
         assert_eq!(expected, actual);
     }

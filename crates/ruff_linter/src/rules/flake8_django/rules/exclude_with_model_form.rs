@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -46,21 +45,12 @@ impl Violation for DjangoExcludeWithModelForm {
 }
 
 /// DJ006
-pub(crate) fn exclude_with_model_form(
-    checker: &Checker,
-    arguments: Option<&Arguments>,
-    body: &[Stmt],
-) -> Option<Diagnostic> {
-    if !arguments.is_some_and(|arguments| {
-        arguments
-            .args
-            .iter()
-            .any(|base| is_model_form(base, checker.semantic()))
-    }) {
-        return None;
+pub(crate) fn exclude_with_model_form(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    if !is_model_form(class_def, checker.semantic()) {
+        return;
     }
 
-    for element in body {
+    for element in &class_def.body {
         let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
             continue;
         };
@@ -76,10 +66,12 @@ pub(crate) fn exclude_with_model_form(
                     continue;
                 };
                 if id == "exclude" {
-                    return Some(Diagnostic::new(DjangoExcludeWithModelForm, target.range()));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(DjangoExcludeWithModelForm, target.range()));
+                    return;
                 }
             }
         }
     }
-    None
 }

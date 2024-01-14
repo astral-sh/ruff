@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/statement/import_from.py
 ---
 ## Input
-```py
+```python
 from a import aksjdhflsakhdflkjsadlfajkslhf
 from a import (
     aksjdhflsakhdflkjsadlfajkslhf,
@@ -41,10 +41,12 @@ from a import \
     (  # comment
     bar,
 )
+
+from tqdm .  auto import tqdm
 ```
 
 ## Output
-```py
+```python
 from a import aksjdhflsakhdflkjsadlfajkslhf
 from a import (
     aksjdhflsakhdflkjsadlfajkslhf,
@@ -115,6 +117,8 @@ from a import (
 from a import (  # comment
     bar,
 )
+
+from tqdm.auto import tqdm
 ```
 
 

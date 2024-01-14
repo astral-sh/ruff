@@ -4,7 +4,7 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/miscellan
 ---
 ## Input
 
-```py
+```python
 def abc ():
     return ["hello", "world",
             "!"]
@@ -33,7 +33,7 @@ print(   "Incorrect formatting"
 
 ## Ruff Output
 
-```py
+```python
 def abc():
     return ["hello", "world", "!"]
 
@@ -43,7 +43,7 @@ print("Incorrect formatting")
 
 ## Black Output
 
-```py
+```python
 def abc ():
     return ["hello", "world",
             "!"]

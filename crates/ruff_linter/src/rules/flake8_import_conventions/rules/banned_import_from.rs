@@ -28,6 +28,9 @@ use ruff_text_size::Ranged;
 ///
 /// pd.Series
 /// ```
+///
+/// ## Options
+/// - `flake8-import-conventions.banned-from`
 #[violation]
 pub struct BannedImportFrom {
     name: String,

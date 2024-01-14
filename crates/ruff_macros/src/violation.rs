@@ -53,6 +53,7 @@ pub(crate) fn violation(violation: &ItemStruct) -> Result<TokenStream> {
             #[derive(Debug, PartialEq, Eq)]
             #violation
 
+            #[automatically_derived]
             impl From<#ident> for ruff_diagnostics::DiagnosticKind {
                 fn from(value: #ident) -> Self {
                     use ruff_diagnostics::Violation;
@@ -76,6 +77,7 @@ pub(crate) fn violation(violation: &ItemStruct) -> Result<TokenStream> {
                 }
             }
 
+            #[automatically_derived]
             impl From<#ident> for ruff_diagnostics::DiagnosticKind {
                 fn from(value: #ident) -> Self {
                     use ruff_diagnostics::Violation;

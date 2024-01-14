@@ -3,11 +3,9 @@ use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `functools.lru_cache` that set `maxsize=None`.
@@ -86,23 +84,21 @@ pub(crate) fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list:
                 value,
                 range: _,
             } = &keywords[0];
-            if arg.as_ref().is_some_and(|arg| arg == "maxsize") && is_const_none(value) {
+            if arg.as_ref().is_some_and(|arg| arg == "maxsize") && value.is_none_literal_expr() {
                 let mut diagnostic = Diagnostic::new(
                     LRUCacheWithMaxsizeNone,
                     TextRange::new(func.end(), decorator.end()),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
-                        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                            &ImportRequest::import("functools", "cache"),
-                            decorator.start(),
-                            checker.semantic(),
-                        )?;
-                        let reference_edit =
-                            Edit::range_replacement(binding, decorator.expression.range());
-                        Ok(Fix::safe_edits(import_edit, [reference_edit]))
-                    });
-                }
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                        &ImportRequest::import("functools", "cache"),
+                        decorator.start(),
+                        checker.semantic(),
+                    )?;
+                    let reference_edit =
+                        Edit::range_replacement(binding, decorator.expression.range());
+                    Ok(Fix::safe_edits(import_edit, [reference_edit]))
+                });
                 checker.diagnostics.push(diagnostic);
             }
         }

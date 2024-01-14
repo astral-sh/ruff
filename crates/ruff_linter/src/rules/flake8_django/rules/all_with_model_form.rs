@@ -1,7 +1,6 @@
-use ruff_python_ast::{self as ast, Arguments, Constant, Expr, Stmt};
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -48,21 +47,12 @@ impl Violation for DjangoAllWithModelForm {
 }
 
 /// DJ007
-pub(crate) fn all_with_model_form(
-    checker: &Checker,
-    arguments: Option<&Arguments>,
-    body: &[Stmt],
-) -> Option<Diagnostic> {
-    if !arguments.is_some_and(|arguments| {
-        arguments
-            .args
-            .iter()
-            .any(|base| is_model_form(base, checker.semantic()))
-    }) {
-        return None;
+pub(crate) fn all_with_model_form(checker: &mut Checker, class_def: &ast::StmtClassDef) {
+    if !is_model_form(class_def, checker.semantic()) {
+        return;
     }
 
-    for element in body {
+    for element in &class_def.body {
         let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
             continue;
         };
@@ -80,18 +70,21 @@ pub(crate) fn all_with_model_form(
                 if id != "fields" {
                     continue;
                 }
-                let Expr::Constant(ast::ExprConstant { value, .. }) = value.as_ref() else {
-                    continue;
-                };
-                match value {
-                    Constant::Str(ast::StringConstant { value, .. }) => {
+                match value.as_ref() {
+                    Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                         if value == "__all__" {
-                            return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(DjangoAllWithModelForm, element.range()));
+                            return;
                         }
                     }
-                    Constant::Bytes(ast::BytesConstant { value, .. }) => {
+                    Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => {
                         if value == "__all__".as_bytes() {
-                            return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(DjangoAllWithModelForm, element.range()));
+                            return;
                         }
                     }
                     _ => (),
@@ -99,5 +92,4 @@ pub(crate) fn all_with_model_form(
             }
         }
     }
-    None
 }

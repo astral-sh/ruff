@@ -75,7 +75,7 @@ if [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ] & aaaaaaaaaaaaaaaaaaaaaaaaaa:
-    ...
+    pass
 
 if [
     aaaaaaaaaaaaa,
@@ -84,7 +84,7 @@ if [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ] & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:
-    ...
+    pass
 
 # Right only can break
 if aaaaaaaaaaaaaaaaaaaaaaaaaa & [
@@ -94,7 +94,7 @@ if aaaaaaaaaaaaaaaaaaaaaaaaaa & [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ]:
-    ...
+    pass
 
 if aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa & [
     aaaaaaaaaaaaa,
@@ -103,7 +103,7 @@ if aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     dddddddddddddddddddd,
     eeeeeeeeee,
 ]:
-    ...
+    pass
 
 
 # Left or right can break
@@ -114,7 +114,7 @@ if [2222, 333] & [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ]:
-    ...
+    pass
 
 if [
     aaaaaaaaaaaaa,
@@ -123,7 +123,7 @@ if [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ] & [2222, 333]:
-    ...
+    pass
 
 if [
     aaaaaaaaaaaaa,
@@ -132,7 +132,7 @@ if [
     dddddddddddddddddddd,
     eeeeeeeeee,
 ] & [fffffffffffffffff, gggggggggggggggggggg, hhhhhhhhhhhhhhhhhhhhh, iiiiiiiiiiiiiiii, jjjjjjjjjjjjj]:
-    ...
+    pass
 
 if (
     # comment
@@ -152,7 +152,7 @@ if (
 ]:
     pass
 
-    ...
+    pass
 
 # Nesting
 if (aaaa + b) & [
@@ -162,7 +162,7 @@ if (aaaa + b) & [
     iiiiiiiiiiiiiiii,
     jjjjjjjjjjjjj,
 ]:
-    ...
+    pass
 
 if [
     fffffffffffffffff,
@@ -171,7 +171,7 @@ if [
     iiiiiiiiiiiiiiii,
     jjjjjjjjjjjjj,
 ] & (a + b):
-    ...
+    pass
 
 
 if [
@@ -185,7 +185,7 @@ if [
     a
     + b
 ):
-    ...
+    pass
 
 if (
     [
@@ -199,7 +199,7 @@ if (
     # comment
     a + b
 ):
-    ...
+    pass
 
 
 # Unstable formatting in https://github.com/realtyem/synapse-unraid/blob/unraid_develop/synapse/handlers/presence.py
@@ -319,6 +319,18 @@ expected_content = (
     )
 )
 
+# Skip FString content when determining whether to omit optional parentheses or not.0
+# The below expression should be parenthesized because it ends with an fstring and starts with a name.
+# (Call expressions at the beginning don't count as parenthesized because they don't start with parens).
+assert (
+    format.format_event(spec)
+    == f'Event("_remove_cookie", {{key:`testkey`,options:{json.dumps(options)}}})'
+)
+# Avoid parentheses for this example because it starts with a tuple expression.
+assert (
+    (spec, format)
+    == f'Event("_remove_cookie", {{key:`testkey`,options:{json.dumps(options)}}})'
+)
 
 rowuses = [(1 << j) |                  # column ordinal
            (1 << (n + i-j + n-1)) |    # NW-SE ordinal

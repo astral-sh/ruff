@@ -12,7 +12,7 @@ LOG001.py:3:1: LOG001 [*] Use `logging.getLogger()` to instantiate loggers
   |
   = help: Replace with `logging.getLogger()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | import logging
 2 2 | 
 3   |-logging.Logger(__name__)
@@ -29,7 +29,7 @@ LOG001.py:4:1: LOG001 [*] Use `logging.getLogger()` to instantiate loggers
   |
   = help: Replace with `logging.getLogger()`
 
-ℹ Suggested fix
+ℹ Unsafe fix
 1 1 | import logging
 2 2 | 
 3 3 | logging.Logger(__name__)

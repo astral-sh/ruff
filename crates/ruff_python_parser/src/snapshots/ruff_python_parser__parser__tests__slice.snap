@@ -16,8 +16,8 @@ Subscript(
             ExprSlice {
                 range: 2..7,
                 lower: Some(
-                    Constant(
-                        ExprConstant {
+                    NumberLiteral(
+                        ExprNumberLiteral {
                             range: 2..3,
                             value: Int(
                                 1,
@@ -26,8 +26,8 @@ Subscript(
                     ),
                 ),
                 upper: Some(
-                    Constant(
-                        ExprConstant {
+                    NumberLiteral(
+                        ExprNumberLiteral {
                             range: 4..5,
                             value: Int(
                                 2,
@@ -36,8 +36,8 @@ Subscript(
                     ),
                 ),
                 step: Some(
-                    Constant(
-                        ExprConstant {
+                    NumberLiteral(
+                        ExprNumberLiteral {
                             range: 6..7,
                             value: Int(
                                 3,

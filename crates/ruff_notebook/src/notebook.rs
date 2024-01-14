@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::fmt::Display;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -7,15 +7,16 @@ use std::{io, iter};
 
 use itertools::Itertools;
 use once_cell::sync::OnceCell;
+use rand::{Rng, SeedableRng};
 use serde::Serialize;
 use serde_json::error::Category;
 use thiserror::Error;
-use uuid::Uuid;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
-use ruff_source_file::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_source_file::{NewlineWithTrailingNewline, OneIndexed, UniversalNewlineIterator};
 use ruff_text_size::TextSize;
 
+use crate::cell::CellOffsets;
 use crate::index::NotebookIndex;
 use crate::schema::{Cell, RawNotebook, SortAlphabetically, SourceValue};
 
@@ -33,61 +34,6 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     let mut writer = Vec::new();
     notebook.write(&mut writer)?;
     Ok(String::from_utf8(writer)?)
-}
-
-impl Display for SourceValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SourceValue::String(string) => f.write_str(string),
-            SourceValue::StringArray(string_array) => {
-                for string in string_array {
-                    f.write_str(string)?;
-                }
-                Ok(())
-            }
-        }
-    }
-}
-
-impl Cell {
-    /// Return the [`SourceValue`] of the cell.
-    fn source(&self) -> &SourceValue {
-        match self {
-            Cell::Code(cell) => &cell.source,
-            Cell::Markdown(cell) => &cell.source,
-            Cell::Raw(cell) => &cell.source,
-        }
-    }
-
-    /// Update the [`SourceValue`] of the cell.
-    fn set_source(&mut self, source: SourceValue) {
-        match self {
-            Cell::Code(cell) => cell.source = source,
-            Cell::Markdown(cell) => cell.source = source,
-            Cell::Raw(cell) => cell.source = source,
-        }
-    }
-
-    /// Return `true` if it's a valid code cell.
-    ///
-    /// A valid code cell is a cell where the cell type is [`Cell::Code`] and the
-    /// source doesn't contain a cell magic.
-    fn is_valid_code_cell(&self) -> bool {
-        let source = match self {
-            Cell::Code(cell) => &cell.source,
-            _ => return false,
-        };
-        // Ignore cells containing cell magic as they act on the entire cell
-        // as compared to line magic which acts on a single line.
-        !match source {
-            SourceValue::String(string) => string
-                .lines()
-                .any(|line| line.trim_start().starts_with("%%")),
-            SourceValue::StringArray(string_array) => string_array
-                .iter()
-                .any(|line| line.trim_start().starts_with("%%")),
-        }
-    }
 }
 
 /// An error that can occur while deserializing a Jupyter Notebook.
@@ -121,7 +67,7 @@ pub struct Notebook {
     raw: RawNotebook,
     /// The offsets of each cell in the concatenated source code. This includes
     /// the first and last character offsets as well.
-    cell_offsets: Vec<TextSize>,
+    cell_offsets: CellOffsets,
     /// The cell index of all valid code cells in the notebook.
     valid_code_cells: Vec<u32>,
     /// Flag to indicate if the JSON string of the notebook has a trailing newline.
@@ -149,7 +95,7 @@ impl Notebook {
     {
         let trailing_newline = reader.seek(SeekFrom::End(-1)).is_ok_and(|_| {
             let mut buf = [0; 1];
-            reader.read_exact(&mut buf).is_ok_and(|_| buf[0] == b'\n')
+            reader.read_exact(&mut buf).is_ok_and(|()| buf[0] == b'\n')
         });
         reader.rewind()?;
         let mut raw_notebook: RawNotebook = match serde_json::from_reader(reader.by_ref()) {
@@ -179,12 +125,12 @@ impl Notebook {
             .iter()
             .enumerate()
             .filter(|(_, cell)| cell.is_valid_code_cell())
-            .map(|(idx, _)| u32::try_from(idx).unwrap())
+            .map(|(cell_index, _)| u32::try_from(cell_index).unwrap())
             .collect::<Vec<_>>();
 
         let mut contents = Vec::with_capacity(valid_code_cells.len());
         let mut current_offset = TextSize::from(0);
-        let mut cell_offsets = Vec::with_capacity(valid_code_cells.len());
+        let mut cell_offsets = CellOffsets::with_capacity(valid_code_cells.len());
         cell_offsets.push(TextSize::from(0));
 
         for &idx in &valid_code_cells {
@@ -200,7 +146,23 @@ impl Notebook {
         // Add cell ids to 4.5+ notebooks if they are missing
         // https://github.com/astral-sh/ruff/issues/6834
         // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#required-field
+        // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
         if raw_notebook.nbformat == 4 && raw_notebook.nbformat_minor >= 5 {
+            // We use a insecure random number generator to generate deterministic uuids
+            let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+            let mut existing_ids = HashSet::new();
+
+            for cell in &raw_notebook.cells {
+                let id = match cell {
+                    Cell::Code(cell) => &cell.id,
+                    Cell::Markdown(cell) => &cell.id,
+                    Cell::Raw(cell) => &cell.id,
+                };
+                if let Some(id) = id {
+                    existing_ids.insert(id.clone());
+                }
+            }
+
             for cell in &mut raw_notebook.cells {
                 let id = match cell {
                     Cell::Code(cell) => &mut cell.id,
@@ -208,8 +170,17 @@ impl Notebook {
                     Cell::Raw(cell) => &mut cell.id,
                 };
                 if id.is_none() {
-                    // https://github.com/jupyter/enhancement-proposals/blob/master/62-cell-id/cell-id.md#questions
-                    *id = Some(Uuid::new_v4().to_string());
+                    loop {
+                        let new_id = uuid::Builder::from_random_bytes(rng.gen())
+                            .into_uuid()
+                            .as_simple()
+                            .to_string();
+
+                        if existing_ids.insert(new_id.clone()) {
+                            *id = Some(new_id);
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -321,16 +292,16 @@ impl Notebook {
     /// The index building is expensive as it needs to go through the content of
     /// every valid code cell.
     fn build_index(&self) -> NotebookIndex {
-        let mut row_to_cell = vec![0];
-        let mut row_to_row_in_cell = vec![0];
+        let mut row_to_cell = Vec::new();
+        let mut row_to_row_in_cell = Vec::new();
 
-        for &idx in &self.valid_code_cells {
-            let line_count = match &self.raw.cells[idx as usize].source() {
+        for &cell_index in &self.valid_code_cells {
+            let line_count = match &self.raw.cells[cell_index as usize].source() {
                 SourceValue::String(string) => {
                     if string.is_empty() {
                         1
                     } else {
-                        u32::try_from(NewlineWithTrailingNewline::from(string).count()).unwrap()
+                        NewlineWithTrailingNewline::from(string).count()
                     }
                 }
                 SourceValue::StringArray(string_array) => {
@@ -339,12 +310,14 @@ impl Notebook {
                     } else {
                         let trailing_newline =
                             usize::from(string_array.last().is_some_and(|s| s.ends_with('\n')));
-                        u32::try_from(string_array.len() + trailing_newline).unwrap()
+                        string_array.len() + trailing_newline
                     }
                 }
             };
-            row_to_cell.extend(iter::repeat(idx + 1).take(line_count as usize));
-            row_to_row_in_cell.extend(1..=line_count);
+            row_to_cell.extend(
+                iter::repeat(OneIndexed::from_zero_indexed(cell_index as usize)).take(line_count),
+            );
+            row_to_row_in_cell.extend((0..line_count).map(OneIndexed::from_zero_indexed));
         }
 
         NotebookIndex {
@@ -378,9 +351,9 @@ impl Notebook {
         self.index.take().unwrap_or_else(|| self.build_index())
     }
 
-    /// Return the cell offsets for the concatenated source code corresponding
+    /// Return the [`CellOffsets`] for the concatenated source code corresponding
     /// the Jupyter notebook.
-    pub fn cell_offsets(&self) -> &[TextSize] {
+    pub fn cell_offsets(&self) -> &CellOffsets {
         &self.cell_offsets
     }
 
@@ -435,6 +408,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use ruff_source_file::OneIndexed;
+
     use crate::{Cell, Notebook, NotebookError, NotebookIndex};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
@@ -472,12 +447,18 @@ mod tests {
         ));
     }
 
-    #[test_case(Path::new("markdown.json"), false; "markdown")]
-    #[test_case(Path::new("only_magic.json"), true; "only_magic")]
-    #[test_case(Path::new("code_and_magic.json"), true; "code_and_magic")]
-    #[test_case(Path::new("only_code.json"), true; "only_code")]
-    #[test_case(Path::new("cell_magic.json"), false; "cell_magic")]
-    fn test_is_valid_code_cell(path: &Path, expected: bool) -> Result<()> {
+    #[test_case("markdown", false)]
+    #[test_case("only_magic", true)]
+    #[test_case("code_and_magic", true)]
+    #[test_case("only_code", true)]
+    #[test_case("cell_magic", false)]
+    #[test_case("valid_cell_magic", true)]
+    #[test_case("automagic", false)]
+    #[test_case("automagics", false)]
+    #[test_case("automagic_before_code", false)]
+    #[test_case("automagic_after_code", true)]
+    #[test_case("unicode_magic_gh9145", true)]
+    fn test_is_valid_code_cell(cell: &str, expected: bool) -> Result<()> {
         /// Read a Jupyter cell from the `resources/test/fixtures/jupyter/cell` directory.
         fn read_jupyter_cell(path: impl AsRef<Path>) -> Result<Cell> {
             let path = notebook_path("cell").join(path);
@@ -485,7 +466,10 @@ mod tests {
             Ok(serde_json::from_str(&source_code)?)
         }
 
-        assert_eq!(read_jupyter_cell(path)?.is_valid_code_cell(), expected);
+        assert_eq!(
+            read_jupyter_cell(format!("{cell}.json"))?.is_valid_code_cell(),
+            expected
+        );
         Ok(())
     }
 
@@ -514,12 +498,44 @@ print("after empty cells")
         assert_eq!(
             notebook.index(),
             &NotebookIndex {
-                row_to_cell: vec![0, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 5, 7, 7, 8],
-                row_to_row_in_cell: vec![0, 1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 1, 1, 2, 1],
+                row_to_cell: vec![
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(4),
+                    OneIndexed::from_zero_indexed(6),
+                    OneIndexed::from_zero_indexed(6),
+                    OneIndexed::from_zero_indexed(7)
+                ],
+                row_to_row_in_cell: vec![
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(3),
+                    OneIndexed::from_zero_indexed(4),
+                    OneIndexed::from_zero_indexed(5),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(2),
+                    OneIndexed::from_zero_indexed(3),
+                    OneIndexed::from_zero_indexed(4),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(0),
+                    OneIndexed::from_zero_indexed(1),
+                    OneIndexed::from_zero_indexed(0)
+                ],
             }
         );
         assert_eq!(
-            notebook.cell_offsets(),
+            notebook.cell_offsets().as_ref(),
             &[
                 0.into(),
                 90.into(),

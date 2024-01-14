@@ -332,17 +332,14 @@ pub enum BestFittingMode {
 pub struct BestFittingVariants(Box<[FormatElement]>);
 
 impl BestFittingVariants {
-    /// Creates a new best fitting IR with the given variants. The method itself isn't unsafe
-    /// but it is to discourage people from using it because the printer will panic if
-    /// the slice doesn't contain at least the least and most expanded variants.
+    /// Creates a new best fitting IR with the given variants.
+    ///
+    /// Callers are required to ensure that the number of variants given
+    /// is at least 2 when using `most_expanded` or `most_flag`.
     ///
     /// You're looking for a way to create a `BestFitting` object, use the `best_fitting![least_expanded, most_expanded]` macro.
-    ///
-    /// ## Safety
-    /// The slice must contain at least two variants.
     #[doc(hidden)]
-    #[allow(unsafe_code)]
-    pub unsafe fn from_vec_unchecked(variants: Vec<FormatElement>) -> Self {
+    pub fn from_vec_unchecked(variants: Vec<FormatElement>) -> Self {
         debug_assert!(
             variants
                 .iter()
@@ -351,12 +348,23 @@ impl BestFittingVariants {
                 >= 2,
             "Requires at least the least expanded and most expanded variants"
         );
-
         Self(variants.into_boxed_slice())
     }
 
     /// Returns the most expanded variant
+    ///
+    /// # Panics
+    ///
+    /// When the number of variants is less than two.
     pub fn most_expanded(&self) -> &[FormatElement] {
+        assert!(
+            self.as_slice()
+                .iter()
+                .filter(|element| matches!(element, FormatElement::Tag(Tag::StartBestFittingEntry)))
+                .count()
+                >= 2,
+            "Requires at least the least expanded and most expanded variants"
+        );
         self.into_iter().last().unwrap()
     }
 
@@ -365,7 +373,19 @@ impl BestFittingVariants {
     }
 
     /// Returns the least expanded variant
+    ///
+    /// # Panics
+    ///
+    /// When the number of variants is less than two.
     pub fn most_flat(&self) -> &[FormatElement] {
+        assert!(
+            self.as_slice()
+                .iter()
+                .filter(|element| matches!(element, FormatElement::Tag(Tag::StartBestFittingEntry)))
+                .count()
+                >= 2,
+            "Requires at least the least expanded and most expanded variants"
+        );
         self.into_iter().next().unwrap()
     }
 }

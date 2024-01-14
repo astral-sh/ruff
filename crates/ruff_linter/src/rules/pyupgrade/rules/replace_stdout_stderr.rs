@@ -7,7 +7,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::{remove_argument, Parentheses};
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `subprocess.run` that send `stdout` and `stderr` to a
@@ -44,7 +43,7 @@ impl Violation for ReplaceStdoutStderr {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Sending `stdout` and `stderr` to `PIPE` is deprecated, use `capture_output`")
+        format!("Prefer `capture_output` over sending `stdout` and `stderr` to `PIPE`")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -81,12 +80,9 @@ pub(crate) fn replace_stdout_stderr(checker: &mut Checker, call: &ast::ExprCall)
         }
 
         let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, call.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            if call.arguments.find_keyword("capture_output").is_none() {
-                diagnostic.try_set_fix(|| {
-                    generate_fix(stdout, stderr, call, checker.locator().contents())
-                });
-            }
+        if call.arguments.find_keyword("capture_output").is_none() {
+            diagnostic
+                .try_set_fix(|| generate_fix(stdout, stderr, call, checker.locator().contents()));
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::iter::Peekable;
 
 use ruff_formatter::{SourceCode, SourceCodeSlice};
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{Mod, Stmt};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.

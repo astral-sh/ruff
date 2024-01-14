@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::AstNode;
 use ruff_python_ast::MatchCase;
 
 use crate::builders::parenthesize_if_expands;

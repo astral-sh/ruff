@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
@@ -40,12 +41,33 @@ pub enum ImportType {
     LocalFolder,
 }
 
+impl fmt::Display for ImportType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Future => write!(f, "future"),
+            Self::StandardLibrary => write!(f, "standard_library"),
+            Self::ThirdParty => write!(f, "third_party"),
+            Self::FirstParty => write!(f, "first_party"),
+            Self::LocalFolder => write!(f, "local_folder"),
+        }
+    }
+}
+
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, CacheKey)]
 #[serde(untagged)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum ImportSection {
     Known(ImportType),
     UserDefined(String),
+}
+
+impl fmt::Display for ImportSection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Known(import_type) => write!(f, "known {{ type = {import_type} }}",),
+            Self::UserDefined(string) => fmt::Debug::fmt(string, f),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -61,6 +83,7 @@ enum Reason<'a> {
     SourceMatch(&'a Path),
     NoMatch,
     UserDefinedSection,
+    NoSections,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -72,16 +95,22 @@ pub(crate) fn categorize<'a>(
     detect_same_package: bool,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
+    no_sections: bool,
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
     let (import_type, reason) = {
-        if level.is_some_and(|level| level > 0) {
+        if matches!(level, None | Some(0)) && module_base == "__future__" {
+            (&ImportSection::Known(ImportType::Future), Reason::Future)
+        } else if no_sections {
+            (
+                &ImportSection::Known(ImportType::FirstParty),
+                Reason::NoSections,
+            )
+        } else if level.is_some_and(|level| level > 0) {
             (
                 &ImportSection::Known(ImportType::LocalFolder),
                 Reason::NonZeroLevel,
             )
-        } else if module_base == "__future__" {
-            (&ImportSection::Known(ImportType::Future), Reason::Future)
         } else if let Some((import_type, reason)) = known_modules.categorize(module_name) {
             (import_type, reason)
         } else if is_known_standard_library(target_version.minor(), module_base) {
@@ -98,6 +127,11 @@ pub(crate) fn categorize<'a>(
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
+            )
+        } else if matches!(level, None | Some(0)) && module_name == "__main__" {
+            (
+                &ImportSection::Known(ImportType::FirstParty),
+                Reason::KnownFirstParty,
             )
         } else {
             (
@@ -141,6 +175,7 @@ pub(crate) fn categorize_imports<'a>(
     detect_same_package: bool,
     known_modules: &'a KnownModules,
     target_version: PythonVersion,
+    no_sections: bool,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
     // Categorize `Stmt::Import`.
@@ -153,6 +188,7 @@ pub(crate) fn categorize_imports<'a>(
             detect_same_package,
             known_modules,
             target_version,
+            no_sections,
         );
         block_by_type
             .entry(import_type)
@@ -170,6 +206,7 @@ pub(crate) fn categorize_imports<'a>(
             detect_same_package,
             known_modules,
             target_version,
+            no_sections,
         );
         block_by_type
             .entry(classification)
@@ -187,6 +224,7 @@ pub(crate) fn categorize_imports<'a>(
             detect_same_package,
             known_modules,
             target_version,
+            no_sections,
         );
         block_by_type
             .entry(classification)
@@ -204,6 +242,7 @@ pub(crate) fn categorize_imports<'a>(
             detect_same_package,
             known_modules,
             target_version,
+            no_sections,
         );
         block_by_type
             .entry(classification)
@@ -359,5 +398,20 @@ impl KnownModules {
             }
         }
         user_defined
+    }
+}
+
+impl fmt::Display for KnownModules {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.known.is_empty() {
+            write!(f, "{{}}")?;
+        } else {
+            writeln!(f, "{{")?;
+            for (pattern, import_section) in &self.known {
+                writeln!(f, "\t{pattern} => {import_section:?},")?;
+            }
+            write!(f, "}}")?;
+        }
+        Ok(())
     }
 }

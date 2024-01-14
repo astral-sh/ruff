@@ -7,9 +7,6 @@ use ruff_python_index::Indexer;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::registry::AsRule;
-use crate::settings::LinterSettings;
-
 /// ## What it does
 /// Checks for unnecessary UTF-8 encoding declarations.
 ///
@@ -52,7 +49,6 @@ pub(crate) fn unnecessary_coding_comment(
     diagnostics: &mut Vec<Diagnostic>,
     locator: &Locator,
     indexer: &Indexer,
-    settings: &LinterSettings,
 ) {
     // The coding comment must be on one of the first two lines. Since each comment spans at least
     // one line, we only need to check the first two comments at most.
@@ -91,12 +87,10 @@ pub(crate) fn unnecessary_coding_comment(
             }
 
             let mut diagnostic = Diagnostic::new(UTF8EncodingDeclaration, *comment_range);
-            if settings.rules.should_fix(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                    line_range.start(),
-                    line_range.end(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
+                line_range.start(),
+                line_range.end(),
+            )));
             diagnostics.push(diagnostic);
         }
     }

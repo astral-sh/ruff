@@ -5,7 +5,6 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for direct instantiation of `logging.Logger`, as opposed to using
@@ -61,17 +60,15 @@ pub(crate) fn direct_logger_instantiation(checker: &mut Checker, call: &ast::Exp
         .is_some_and(|call_path| matches!(call_path.as_slice(), ["logging", "Logger"]))
     {
         let mut diagnostic = Diagnostic::new(DirectLoggerInstantiation, call.func.range());
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                    &ImportRequest::import("logging", "getLogger"),
-                    call.func.start(),
-                    checker.semantic(),
-                )?;
-                let reference_edit = Edit::range_replacement(binding, call.func.range());
-                Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
-            });
-        }
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import("logging", "getLogger"),
+                call.func.start(),
+                checker.semantic(),
+            )?;
+            let reference_edit = Edit::range_replacement(binding, call.func.range());
+            Ok(Fix::unsafe_edits(import_edit, [reference_edit]))
+        });
         checker.diagnostics.push(diagnostic);
     }
 }

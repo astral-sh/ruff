@@ -21,8 +21,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     func: Attribute(
                         ExprAttribute {
                             range: 4..17,
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 4..6,
                                     value: Float(
                                         0.1,
@@ -60,8 +60,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             value: Attribute(
                 ExprAttribute {
                     range: 24..32,
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 24..26,
                             value: Float(
                                 1.0,
@@ -92,8 +92,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             value: Attribute(
                 ExprAttribute {
                     range: 37..46,
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 37..41,
                             value: Float(
                                 10.0,
@@ -124,8 +124,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             value: Attribute(
                 ExprAttribute {
                     range: 51..60,
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 51..55,
                             value: Float(
                                 0.1,
@@ -159,8 +159,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     func: Attribute(
                         ExprAttribute {
                             range: 65..88,
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 65..84,
                                     value: Float(
                                         123456789.12345679,
@@ -198,8 +198,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             value: Attribute(
                 ExprAttribute {
                     range: 95..130,
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 95..124,
                             value: Float(
                                 inf,
@@ -233,8 +233,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     func: Attribute(
                         ExprAttribute {
                             range: 135..165,
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 135..154,
                                     value: Float(
                                         inf,
@@ -272,8 +272,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             value: Attribute(
                 ExprAttribute {
                     range: 172..187,
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 172..182,
                             value: Complex {
                                 real: 0.0,
@@ -308,8 +308,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     func: Attribute(
                         ExprAttribute {
                             range: 192..220,
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 192..212,
                                     value: Complex {
                                         real: 0.0,
@@ -333,8 +333,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                     func: Attribute(
                                         ExprAttribute {
                                             range: 221..238,
-                                            value: Constant(
-                                                ExprConstant {
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 221..227,
                                                     value: Int(
                                                         11,
@@ -380,8 +380,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     func: Attribute(
                         ExprAttribute {
                             range: 246..263,
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 246..253,
                                     value: Int(
                                         727756,
@@ -422,8 +422,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     func: Attribute(
                         ExprAttribute {
                             range: 270..287,
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 270..276,
                                     value: Int(
                                         11,
@@ -461,8 +461,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             value: Attribute(
                 ExprAttribute {
                     range: 294..305,
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 294..299,
                             value: Int(
                                 511,
@@ -496,8 +496,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                     func: Attribute(
                         ExprAttribute {
                             range: 310..327,
-                            value: Constant(
-                                ExprConstant {
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
                                     range: 310..321,
                                     value: Float(
                                         6e-9,
@@ -536,8 +536,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 ExprUnaryOp {
                     range: 334..344,
                     op: USub,
-                    operand: Constant(
-                        ExprConstant {
+                    operand: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 335..344,
                             value: Complex {
                                 real: 0.0,
@@ -555,8 +555,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             test: Attribute(
                 ExprAttribute {
                     range: 349..357,
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 349..351,
                             value: Int(
                                 10,
@@ -574,10 +574,9 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                 Expr(
                     StmtExpr {
                         range: 363..366,
-                        value: Constant(
-                            ExprConstant {
+                        value: EllipsisLiteral(
+                            ExprEllipsisLiteral {
                                 range: 363..366,
-                                value: Ellipsis,
                             },
                         ),
                     },
@@ -601,8 +600,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             value: Subscript(
                 ExprSubscript {
                     range: 372..379,
-                    value: Constant(
-                        ExprConstant {
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 372..375,
                             value: Int(
                                 100,
@@ -636,8 +635,8 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
             value: Call(
                 ExprCall {
                     range: 384..391,
-                    func: Constant(
-                        ExprConstant {
+                    func: NumberLiteral(
+                        ExprNumberLiteral {
                             range: 384..387,
                             value: Int(
                                 100,

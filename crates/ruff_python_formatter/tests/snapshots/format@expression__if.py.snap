@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/if.py
 ---
 ## Input
-```py
+```python
 a1 = 1 if True else 2
 
 a2 = "this is a very long text that will make the group break to check that parentheses are added" if True else 2
@@ -117,7 +117,7 @@ def something():
 ```
 
 ## Output
-```py
+```python
 a1 = 1 if True else 2
 
 a2 = (

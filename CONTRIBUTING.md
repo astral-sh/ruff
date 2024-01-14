@@ -114,7 +114,7 @@ such that all crates are contained in a flat `crates` directory.
 The vast majority of the code, including all lint rules, lives in the `ruff` crate (located at
 `crates/ruff_linter`). As a contributor, that's the crate that'll be most relevant to you.
 
-At time of writing, the repository includes the following crates:
+At the time of writing, the repository includes the following crates:
 
 - `crates/ruff_linter`: library crate containing all lint rules and the core logic for running them.
     If you're working on a rule, this is the crate for you.
@@ -170,7 +170,8 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
+1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). New rules
+    should be added in `RuleGroup::Preview`.
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
@@ -294,7 +295,7 @@ To preview any changes to the documentation locally:
 
     ```shell
     # For contributors.
-    mkdocs serve -f mkdocs.generated.yml
+    mkdocs serve -f mkdocs.public.yml
 
     # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
     mkdocs serve -f mkdocs.insiders.yml
@@ -314,45 +315,62 @@ even patch releases may contain [non-backwards-compatible changes](https://semve
 
 ### Creating a new release
 
-1. Update the version with `rg 0.0.269 --files-with-matches | xargs sed -i 's/0.0.269/0.0.270/g'`
-1. Update `BREAKING_CHANGES.md`
-1. Create a PR with the version and `BREAKING_CHANGES.md` updated
+We use an experimental in-house tool for managing releases.
+
+1. Install `rooster`: `pip install git+https://github.com/zanieb/rooster@main`
+1. Run `rooster release`; this command will:
+    - Generate a changelog entry in `CHANGELOG.md`
+    - Update versions in `pyproject.toml` and `Cargo.toml`
+    - Update references to versions in the `README.md` and documentation
+1. The changelog should then be editorialized for consistency
+    - Often labels will be missing from pull requests they will need to be manually organized into the proper section
+    - Changes should be edited to be user-facing descriptions, avoiding internal details
+1. Highlight any breaking changes in `BREAKING_CHANGES.md`
+1. Run `cargo check`. This should update the lock file with new versions.
+1. Create a pull request with the changelog and version updates
 1. Merge the PR
-1. Run the release workflow with the version number (without starting `v`) as input. Make sure
-    main has your merged PR as last commit
+1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yaml) with:
+    - The new version number (without starting `v`)
+    - The commit hash of the merged release pull request on `main`
 1. The release workflow will do the following:
     1. Build all the assets. If this fails (even though we tested in step 4), we haven't tagged or
         uploaded anything, you can restart after pushing a fix.
     1. Upload to PyPI.
     1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
-        after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/charliermarsh/ruff/issues/4468)).
+        after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/astral-sh/ruff/issues/4468)).
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
-1. Create release notes in GitHub UI and promote from draft.
-1. If needed, [update the schemastore](https://github.com/charliermarsh/ruff/blob/main/scripts/update_schemastore.py)
+1. Publish the GitHub release
+    1. Open the draft release in the GitHub release section
+    1. Copy the changelog for the release into the GitHub release
+        - See previous releases for formatting of section headers
+    1. Generate the contributor list with `rooster contributors` and add to the release notes
+1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
+    1. One can determine if an update is needed when
+        `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
+    1. Once run successfully, you should follow the link in the output to create a PR.
 1. If needed, update the `ruff-lsp` and `ruff-vscode` repositories.
 
 ## Ecosystem CI
 
 GitHub Actions will run your changes against a number of real-world projects from GitHub and
-report on any diagnostic differences. You can also run those checks locally via:
+report on any linter or formatter differences. You can also run those checks locally via:
 
 ```shell
-python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
+pip install -e ./python/ruff-ecosystem
+ruff-ecosystem check ruff "./target/debug/ruff"
+ruff-ecosystem format ruff "./target/debug/ruff"
 ```
 
-You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
-downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
-as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/astral-sh/ruff/blob/main/scripts/Dockerfile.ecosystem).
-Note that this check will take a while to run.
+See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/python/ruff-ecosystem) for more details.
 
 ## Benchmarking and Profiling
 
 We have several ways of benchmarking and profiling Ruff:
 
 - Our main performance benchmark comparing Ruff with other tools on the CPython codebase
-- Microbenchmarks which the linter or the formatter on individual files. There run on pull requests.
+- Microbenchmarks which run the linter or the formatter on individual files. These run on pull requests.
 - Profiling the linter on either the microbenchmarks or entire projects
 
 ### CPython Benchmark
@@ -543,10 +561,10 @@ examples.
 
 #### Linux
 
-Install `perf` and build `ruff_benchmark` with the `release-debug` profile and then run it with perf
+Install `perf` and build `ruff_benchmark` with the `profiling` profile and then run it with perf
 
 ```shell
-cargo bench -p ruff_benchmark --no-run --profile=release-debug && perf record --call-graph dwarf -F 9999 cargo bench -p ruff_benchmark --profile=release-debug -- --profile-time=1
+cargo bench -p ruff_benchmark --no-run --profile=profiling && perf record --call-graph dwarf -F 9999 cargo bench -p ruff_benchmark --profile=profiling -- --profile-time=1
 ```
 
 You can also use the `ruff_dev` launcher to run `ruff check` multiple times on a repository to
@@ -554,8 +572,8 @@ gather enough samples for a good flamegraph (change the 999, the sample rate, an
 of checks, to your liking)
 
 ```shell
-cargo build --bin ruff_dev --profile=release-debug
-perf record -g -F 999 target/release-debug/ruff_dev repeat --repeat 30 --exit-zero --no-cache path/to/cpython > /dev/null
+cargo build --bin ruff_dev --profile=profiling
+perf record -g -F 999 target/profiling/ruff_dev repeat --repeat 30 --exit-zero --no-cache path/to/cpython > /dev/null
 ```
 
 Then convert the recorded profile
@@ -585,7 +603,7 @@ cargo install cargo-instruments
 Then run the profiler with
 
 ```shell
-cargo instruments -t time --bench linter --profile release-debug -p ruff_benchmark -- --profile-time=1
+cargo instruments -t time --bench linter --profile profiling -p ruff_benchmark -- --profile-time=1
 ```
 
 - `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc`
@@ -876,5 +894,5 @@ By default, `src` is set to the project root. In the above example, we'd want to
 `src = ["./src"]` to ensure that we locate `./my_project/src/foo` and thus categorize `import foo`
 as first-party in `baz.py`. In practice, for this limited example, setting `src = ["./src"]` is
 unnecessary, as all imports within `./my_project/src/foo` would be categorized as first-party via
-the same-package heuristic; but your project contains multiple packages, you'll want to set `src`
+the same-package heuristic; but if your project contains multiple packages, you'll want to set `src`
 explicitly.

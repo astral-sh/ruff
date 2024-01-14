@@ -165,3 +165,19 @@ class AbstractTestModel5(models.Model):
 
     def my_beautiful_method(self):
         return 2
+
+
+# Subclass with its own __str__
+class SubclassTestModel1(TestModel1):
+    def __str__(self):
+        return self.new_field
+
+
+# Subclass with inherited __str__
+class SubclassTestModel2(TestModel4):
+    pass
+
+
+# Subclass without __str__
+class SubclassTestModel3(TestModel1):
+    pass

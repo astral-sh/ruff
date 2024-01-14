@@ -1,5 +1,5 @@
 use ruff_formatter::write;
-use ruff_python_ast::node::AnyNodeRef;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprLambda;
 use ruff_text_size::Ranged;
 

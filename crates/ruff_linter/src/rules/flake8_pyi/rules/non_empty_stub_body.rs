@@ -1,11 +1,10 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for non-empty function stub bodies.
@@ -61,19 +60,15 @@ pub(crate) fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
 
     // Ignore `...` (the desired case).
     if let Stmt::Expr(ast::StmtExpr { value, range: _ }) = stmt {
-        if let Expr::Constant(ast::ExprConstant { value, .. }) = value.as_ref() {
-            if value.is_ellipsis() {
-                return;
-            }
+        if value.is_ellipsis_literal_expr() {
+            return;
         }
     }
 
     let mut diagnostic = Diagnostic::new(NonEmptyStubBody, stmt.range());
-    if checker.patch(Rule::NonEmptyStubBody) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            format!("..."),
-            stmt.range(),
-        )));
-    };
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        format!("..."),
+        stmt.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }

@@ -3,11 +3,10 @@ use tracing::Level;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format, FormatError, Formatted, PrintError, Printed, SourceCode};
-use ruff_python_ast::node::AstNode;
+use ruff_python_ast::AstNode;
 use ruff_python_ast::Mod;
 use ruff_python_index::tokens_and_ranges;
-use ruff_python_parser::lexer::LexicalError;
-use ruff_python_parser::{parse_ok_tokens, Mode, ParseError};
+use ruff_python_parser::{parse_tokens, AsMode, ParseError, ParseErrorType};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Locator;
 
@@ -15,7 +14,11 @@ use crate::comments::{
     dangling_comments, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
-pub use crate::options::{MagicTrailingComma, PreviewMode, PyFormatOptions, QuoteStyle};
+pub use crate::options::{
+    DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
+    PythonVersion, QuoteStyle,
+};
+pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
 use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
@@ -29,11 +32,12 @@ mod options;
 pub(crate) mod other;
 pub(crate) mod pattern;
 mod prelude;
+mod preview;
+mod shared_traits;
 pub(crate) mod statement;
+pub(crate) mod string;
 pub(crate) mod type_param;
 mod verbatim;
-
-include!("../../ruff_formatter/shared_traits.rs");
 
 /// 'ast is the lifetime of the source code (input), 'buf is the lifetime of the buffer (output)
 pub(crate) type PyFormatter<'ast, 'buf> = Formatter<'buf, PyFormatContext<'ast>>;
@@ -60,7 +64,6 @@ where
             }
 
             self.fmt_fields(node, f)?;
-            self.fmt_dangling_comments(node_comments.dangling, f)?;
 
             if is_source_map_enabled {
                 source_position(node.end()).fmt(f)?;
@@ -104,26 +107,12 @@ where
 
 #[derive(Error, Debug)]
 pub enum FormatModuleError {
-    #[error("source contains syntax errors: {0:?}")]
-    LexError(LexicalError),
-    #[error("source contains syntax errors: {0:?}")]
-    ParseError(ParseError),
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
     #[error(transparent)]
     FormatError(#[from] FormatError),
     #[error(transparent)]
     PrintError(#[from] PrintError),
-}
-
-impl From<LexicalError> for FormatModuleError {
-    fn from(value: LexicalError) -> Self {
-        Self::LexError(value)
-    }
-}
-
-impl From<ParseError> for FormatModuleError {
-    fn from(value: ParseError) -> Self {
-        Self::ParseError(value)
-    }
 }
 
 #[tracing::instrument(name = "format", level = Level::TRACE, skip_all)]
@@ -131,8 +120,13 @@ pub fn format_module_source(
     source: &str,
     options: PyFormatOptions,
 ) -> Result<Printed, FormatModuleError> {
-    let (tokens, comment_ranges) = tokens_and_ranges(source)?;
-    let module = parse_ok_tokens(tokens, source, Mode::Module, "<filename>")?;
+    let source_type = options.source_type();
+    let (tokens, comment_ranges) =
+        tokens_and_ranges(source, source_type).map_err(|err| ParseError {
+            offset: err.location,
+            error: ParseErrorType::Lexical(err.error),
+        })?;
+    let module = parse_tokens(tokens, source, source_type.as_mode())?;
     let formatted = format_module_ast(&module, &comment_ranges, source, options)?;
     Ok(formatted.print()?)
 }
@@ -173,26 +167,26 @@ mod tests {
     use anyhow::Result;
     use insta::assert_snapshot;
 
+    use ruff_python_ast::PySourceType;
     use ruff_python_index::tokens_and_ranges;
-
-    use ruff_python_parser::{parse_ok_tokens, Mode};
+    use ruff_python_parser::{parse_tokens, AsMode};
 
     use crate::{format_module_ast, format_module_source, PyFormatOptions};
 
     /// Very basic test intentionally kept very similar to the CLI
     #[test]
     fn basic() -> Result<()> {
-        let input = r#"
+        let input = r"
 # preceding
 if    True:
     pass
 # trailing
-"#;
-        let expected = r#"# preceding
+";
+        let expected = r"# preceding
 if True:
     pass
 # trailing
-"#;
+";
         let actual = format_module_source(input, PyFormatOptions::default())?
             .as_code()
             .to_string();
@@ -214,11 +208,12 @@ def main() -> None:
         ]
 
 "#;
-        let (tokens, comment_ranges) = tokens_and_ranges(source).unwrap();
+        let source_type = PySourceType::Python;
+        let (tokens, comment_ranges) = tokens_and_ranges(source, source_type).unwrap();
 
         // Parse the AST.
         let source_path = "code_inline.py";
-        let module = parse_ok_tokens(tokens, source, Mode::Module, source_path).unwrap();
+        let module = parse_tokens(tokens, source, source_type.as_mode()).unwrap();
         let options = PyFormatOptions::from_extension(Path::new(source_path));
         let formatted = format_module_ast(&module, &comment_ranges, source, options).unwrap();
 
@@ -239,11 +234,11 @@ def main() -> None:
 
         assert_eq!(
             printed.as_code(),
-            r#"for converter in connection.ops.get_db_converters(
+            r"for converter in connection.ops.get_db_converters(
     expression
 ) + expression.get_db_converters(connection):
     ...
-"#
+"
         );
     }
 
@@ -302,9 +297,9 @@ def main() -> None:
 
         // 77 after g group (leading quote)
         let fits =
-            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h"#;
+            r"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg h";
         let breaks =
-            r#"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg hh"#;
+            r"aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeee ffffffffff gggggggggg hh";
 
         let output = format!(
             SimpleFormatContext::default(),

@@ -114,3 +114,8 @@ class ServiceRefOrValue:
 class Collection(Protocol[*_B0]):
     def __iter__(self) -> Iterator[Union[*_B0]]:
         ...
+
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/8609
+def f(x: Union[int, str, bytes]) -> None:
+    ...

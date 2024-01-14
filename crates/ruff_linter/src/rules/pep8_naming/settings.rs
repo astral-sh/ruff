@@ -2,7 +2,9 @@
 
 use std::error::Error;
 use std::fmt;
+use std::fmt::Formatter;
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 
 use crate::settings::types::IdentifierPattern;
@@ -41,6 +43,21 @@ impl Default for Settings {
             classmethod_decorators: Vec::new(),
             staticmethod_decorators: Vec::new(),
         }
+    }
+}
+
+impl fmt::Display for Settings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.pep8_naming",
+            fields = [
+                self.ignore_names | array,
+                self.classmethod_decorators | array,
+                self.staticmethod_decorators | array
+            ]
+        }
+        Ok(())
     }
 }
 

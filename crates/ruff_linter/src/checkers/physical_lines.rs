@@ -1,4 +1,5 @@
 //! Lint rules based on checking physical lines.
+
 use ruff_diagnostics::Diagnostic;
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -71,11 +72,7 @@ pub(crate) fn check_physical_lines(
     }
 
     if enforce_no_newline_at_end_of_file {
-        if let Some(diagnostic) = no_newline_at_end_of_file(
-            locator,
-            stylist,
-            settings.rules.should_fix(Rule::MissingNewlineAtEndOfFile),
-        ) {
+        if let Some(diagnostic) = no_newline_at_end_of_file(locator, stylist) {
             diagnostics.push(diagnostic);
         }
     }
@@ -99,6 +96,7 @@ mod tests {
 
     use crate::line_width::LineLength;
     use crate::registry::Rule;
+    use crate::rules::pycodestyle;
     use crate::settings::LinterSettings;
 
     use super::check_physical_lines;
@@ -118,7 +116,10 @@ mod tests {
                 &indexer,
                 &[],
                 &LinterSettings {
-                    line_length,
+                    pycodestyle: pycodestyle::settings::Settings {
+                        max_line_length: line_length,
+                        ..pycodestyle::settings::Settings::default()
+                    },
                     ..LinterSettings::for_rule(Rule::LineTooLong)
                 },
             )

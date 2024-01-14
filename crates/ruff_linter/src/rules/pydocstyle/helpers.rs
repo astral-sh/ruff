@@ -2,7 +2,6 @@ use std::collections::BTreeSet;
 
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::Expr;
 use ruff_python_semantic::{Definition, SemanticModel};
 use ruff_source_file::UniversalNewlines;
 
@@ -11,8 +10,9 @@ pub(super) fn logical_line(content: &str) -> Option<usize> {
     // Find the first logical line.
     let mut logical_line = None;
     for (i, line) in content.universal_newlines().enumerate() {
-        if line.trim().is_empty() {
-            // Empty line. If this is the line _after_ the first logical line, stop.
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.chars().all(|c| matches!(c, '-' | '~' | '=' | '#')) {
+            // Empty line, or underline. If this is the line _after_ the first logical line, stop.
             if logical_line.is_some() {
                 break;
             }
@@ -60,14 +60,4 @@ pub(crate) fn should_ignore_definition(
                     .any(|decorator| from_qualified_name(decorator) == call_path)
             })
     })
-}
-
-/// Check if a docstring should be ignored.
-pub(crate) fn should_ignore_docstring(docstring: &Expr) -> bool {
-    // Avoid analyzing docstrings that contain implicit string concatenations.
-    // Python does consider these docstrings, but they're almost certainly a
-    // user error, and supporting them "properly" is extremely difficult.
-    docstring
-        .as_constant_expr()
-        .is_some_and(|constant| constant.value.is_implicit_concatenated())
 }

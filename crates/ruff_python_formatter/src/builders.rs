@@ -1,4 +1,4 @@
-use ruff_formatter::{format_args, write, Argument, Arguments};
+use ruff_formatter::{write, Argument, Arguments};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::context::{NodeLevel, WithNodeLevel};
@@ -12,11 +12,20 @@ where
 {
     ParenthesizeIfExpands {
         inner: Argument::new(content),
+        indent: true,
     }
 }
 
 pub(crate) struct ParenthesizeIfExpands<'a, 'ast> {
     inner: Argument<'a, PyFormatContext<'ast>>,
+    indent: bool,
+}
+
+impl ParenthesizeIfExpands<'_, '_> {
+    pub(crate) fn with_indent(mut self, indent: bool) -> Self {
+        self.indent = indent;
+        self
+    }
 }
 
 impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
@@ -26,11 +35,17 @@ impl<'ast> Format<PyFormatContext<'ast>> for ParenthesizeIfExpands<'_, 'ast> {
 
             write!(
                 f,
-                [group(&format_args![
-                    if_group_breaks(&token("(")),
-                    soft_block_indent(&Arguments::from(&self.inner)),
-                    if_group_breaks(&token(")")),
-                ])]
+                [group(&format_with(|f| {
+                    if_group_breaks(&token("(")).fmt(f)?;
+
+                    if self.indent {
+                        soft_block_indent(&Arguments::from(&self.inner)).fmt(f)?;
+                    } else {
+                        Arguments::from(&self.inner).fmt(f)?;
+                    };
+
+                    if_group_breaks(&token(")")).fmt(f)
+                }))]
             )
         }
     }
@@ -150,7 +165,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         N: Ranged,
         Separator: Format<PyFormatContext<'ast>>,
     {
-        self.result = self.result.and_then(|_| {
+        self.result = self.result.and_then(|()| {
             if self.entries.is_one_or_more() {
                 write!(self.fmt, [token(","), separator])?;
             }
@@ -190,7 +205,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
     }
 
     pub(crate) fn finish(&mut self) -> FormatResult<()> {
-        self.result.and_then(|_| {
+        self.result.and_then(|()| {
             if let Some(last_end) = self.entries.position() {
                 let magic_trailing_comma = has_magic_trailing_comma(
                     TextRange::new(last_end, self.sequence_end),

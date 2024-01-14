@@ -2,14 +2,13 @@ use std::borrow::Cow;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Arguments, Comprehension, Constant, Expr, Int};
+use ruff_python_ast::{self as ast, Arguments, Comprehension, Expr, Int};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_stdlib::builtins::is_iterator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for uses of `list(...)[0]` that can be replaced with
@@ -20,15 +19,6 @@ use crate::registry::AsRule;
 /// can be very expensive for large collections. If you only need the first
 /// element of the collection, you can use `next(...)` or `next(iter(...)` to
 /// lazily fetch the first element.
-///
-/// Note that migrating from `list(...)[0]` to `next(iter(...))` can change
-/// the behavior of your program in two ways:
-///
-/// 1. First, `list(...)` will eagerly evaluate the entire collection, while
-///    `next(iter(...))` will only evaluate the first element. As such, any
-///    side effects that occur during iteration will be delayed.
-/// 2. Second, `list(...)[0]` will raise `IndexError` if the collection is
-///    empty, while `next(iter(...))` will raise `StopIteration`.
 ///
 /// ## Example
 /// ```python
@@ -41,6 +31,16 @@ use crate::registry::AsRule;
 /// head = next(iter(x))
 /// head = next(x * x for x in range(10))
 /// ```
+///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as migrating from `list(...)[0]` to
+/// `next(iter(...))` can change the behavior of your program in two ways:
+///
+/// 1. First, `list(...)` will eagerly evaluate the entire collection, while
+///    `next(iter(...))` will only evaluate the first element. As such, any
+///    side effects that occur during iteration will be delayed.
+/// 2. Second, `list(...)[0]` will raise `IndexError` if the collection is
+///    empty, while `next(iter(...))` will raise `StopIteration`.
 ///
 /// ## References
 /// - [Iterators and Iterables in Python: Run Efficient Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
@@ -97,12 +97,10 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
         *range,
     );
 
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-            format!("next({iterable})"),
-            *range,
-        )));
-    }
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+        format!("next({iterable})"),
+        *range,
+    )));
 
     checker.diagnostics.push(diagnostic);
 }
@@ -111,8 +109,8 @@ pub(crate) fn unnecessary_iterable_allocation_for_first_element(
 fn is_head_slice(expr: &Expr) -> bool {
     matches!(
         expr,
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Int(Int::ZERO),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(Int::ZERO),
             ..
         })
     )

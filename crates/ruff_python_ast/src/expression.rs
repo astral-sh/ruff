@@ -1,6 +1,6 @@
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::node::AnyNodeRef;
+use crate::AnyNodeRef;
 use crate::{self as ast, Expr};
 
 /// Unowned pendant to [`ast::Expr`] that stores a reference instead of a owned value.
@@ -23,9 +23,13 @@ pub enum ExpressionRef<'a> {
     YieldFrom(&'a ast::ExprYieldFrom),
     Compare(&'a ast::ExprCompare),
     Call(&'a ast::ExprCall),
-    FormattedValue(&'a ast::ExprFormattedValue),
     FString(&'a ast::ExprFString),
-    Constant(&'a ast::ExprConstant),
+    StringLiteral(&'a ast::ExprStringLiteral),
+    BytesLiteral(&'a ast::ExprBytesLiteral),
+    NumberLiteral(&'a ast::ExprNumberLiteral),
+    BooleanLiteral(&'a ast::ExprBooleanLiteral),
+    NoneLiteral(&'a ast::ExprNoneLiteral),
+    EllipsisLiteral(&'a ast::ExprEllipsisLiteral),
     Attribute(&'a ast::ExprAttribute),
     Subscript(&'a ast::ExprSubscript),
     Starred(&'a ast::ExprStarred),
@@ -62,9 +66,13 @@ impl<'a> From<&'a Expr> for ExpressionRef<'a> {
             Expr::YieldFrom(value) => ExpressionRef::YieldFrom(value),
             Expr::Compare(value) => ExpressionRef::Compare(value),
             Expr::Call(value) => ExpressionRef::Call(value),
-            Expr::FormattedValue(value) => ExpressionRef::FormattedValue(value),
             Expr::FString(value) => ExpressionRef::FString(value),
-            Expr::Constant(value) => ExpressionRef::Constant(value),
+            Expr::StringLiteral(value) => ExpressionRef::StringLiteral(value),
+            Expr::BytesLiteral(value) => ExpressionRef::BytesLiteral(value),
+            Expr::NumberLiteral(value) => ExpressionRef::NumberLiteral(value),
+            Expr::BooleanLiteral(value) => ExpressionRef::BooleanLiteral(value),
+            Expr::NoneLiteral(value) => ExpressionRef::NoneLiteral(value),
+            Expr::EllipsisLiteral(value) => ExpressionRef::EllipsisLiteral(value),
             Expr::Attribute(value) => ExpressionRef::Attribute(value),
             Expr::Subscript(value) => ExpressionRef::Subscript(value),
             Expr::Starred(value) => ExpressionRef::Starred(value),
@@ -162,19 +170,39 @@ impl<'a> From<&'a ast::ExprCall> for ExpressionRef<'a> {
         Self::Call(value)
     }
 }
-impl<'a> From<&'a ast::ExprFormattedValue> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprFormattedValue) -> Self {
-        Self::FormattedValue(value)
-    }
-}
 impl<'a> From<&'a ast::ExprFString> for ExpressionRef<'a> {
     fn from(value: &'a ast::ExprFString) -> Self {
         Self::FString(value)
     }
 }
-impl<'a> From<&'a ast::ExprConstant> for ExpressionRef<'a> {
-    fn from(value: &'a ast::ExprConstant) -> Self {
-        Self::Constant(value)
+impl<'a> From<&'a ast::ExprStringLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+        Self::StringLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprBytesLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+        Self::BytesLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprNumberLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprNumberLiteral) -> Self {
+        Self::NumberLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprBooleanLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprBooleanLiteral) -> Self {
+        Self::BooleanLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprNoneLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprNoneLiteral) -> Self {
+        Self::NoneLiteral(value)
+    }
+}
+impl<'a> From<&'a ast::ExprEllipsisLiteral> for ExpressionRef<'a> {
+    fn from(value: &'a ast::ExprEllipsisLiteral) -> Self {
+        Self::EllipsisLiteral(value)
     }
 }
 impl<'a> From<&'a ast::ExprAttribute> for ExpressionRef<'a> {
@@ -238,9 +266,15 @@ impl<'a> From<ExpressionRef<'a>> for AnyNodeRef<'a> {
             ExpressionRef::YieldFrom(expression) => AnyNodeRef::ExprYieldFrom(expression),
             ExpressionRef::Compare(expression) => AnyNodeRef::ExprCompare(expression),
             ExpressionRef::Call(expression) => AnyNodeRef::ExprCall(expression),
-            ExpressionRef::FormattedValue(expression) => AnyNodeRef::ExprFormattedValue(expression),
             ExpressionRef::FString(expression) => AnyNodeRef::ExprFString(expression),
-            ExpressionRef::Constant(expression) => AnyNodeRef::ExprConstant(expression),
+            ExpressionRef::StringLiteral(expression) => AnyNodeRef::ExprStringLiteral(expression),
+            ExpressionRef::BytesLiteral(expression) => AnyNodeRef::ExprBytesLiteral(expression),
+            ExpressionRef::NumberLiteral(expression) => AnyNodeRef::ExprNumberLiteral(expression),
+            ExpressionRef::BooleanLiteral(expression) => AnyNodeRef::ExprBooleanLiteral(expression),
+            ExpressionRef::NoneLiteral(expression) => AnyNodeRef::ExprNoneLiteral(expression),
+            ExpressionRef::EllipsisLiteral(expression) => {
+                AnyNodeRef::ExprEllipsisLiteral(expression)
+            }
             ExpressionRef::Attribute(expression) => AnyNodeRef::ExprAttribute(expression),
             ExpressionRef::Subscript(expression) => AnyNodeRef::ExprSubscript(expression),
             ExpressionRef::Starred(expression) => AnyNodeRef::ExprStarred(expression),
@@ -275,9 +309,13 @@ impl Ranged for ExpressionRef<'_> {
             ExpressionRef::YieldFrom(expression) => expression.range(),
             ExpressionRef::Compare(expression) => expression.range(),
             ExpressionRef::Call(expression) => expression.range(),
-            ExpressionRef::FormattedValue(expression) => expression.range(),
             ExpressionRef::FString(expression) => expression.range(),
-            ExpressionRef::Constant(expression) => expression.range(),
+            ExpressionRef::StringLiteral(expression) => expression.range(),
+            ExpressionRef::BytesLiteral(expression) => expression.range(),
+            ExpressionRef::NumberLiteral(expression) => expression.range(),
+            ExpressionRef::BooleanLiteral(expression) => expression.range(),
+            ExpressionRef::NoneLiteral(expression) => expression.range(),
+            ExpressionRef::EllipsisLiteral(expression) => expression.range(),
             ExpressionRef::Attribute(expression) => expression.range(),
             ExpressionRef::Subscript(expression) => expression.range(),
             ExpressionRef::Starred(expression) => expression.range(),
@@ -286,6 +324,110 @@ impl Ranged for ExpressionRef<'_> {
             ExpressionRef::Tuple(expression) => expression.range(),
             ExpressionRef::Slice(expression) => expression.range(),
             ExpressionRef::IpyEscapeCommand(expression) => expression.range(),
+        }
+    }
+}
+
+/// Unowned pendant to all the literal variants of [`ast::Expr`] that stores a
+/// reference instead of an owned value.
+#[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
+pub enum LiteralExpressionRef<'a> {
+    StringLiteral(&'a ast::ExprStringLiteral),
+    BytesLiteral(&'a ast::ExprBytesLiteral),
+    NumberLiteral(&'a ast::ExprNumberLiteral),
+    BooleanLiteral(&'a ast::ExprBooleanLiteral),
+    NoneLiteral(&'a ast::ExprNoneLiteral),
+    EllipsisLiteral(&'a ast::ExprEllipsisLiteral),
+}
+
+impl Ranged for LiteralExpressionRef<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            LiteralExpressionRef::StringLiteral(expression) => expression.range(),
+            LiteralExpressionRef::BytesLiteral(expression) => expression.range(),
+            LiteralExpressionRef::NumberLiteral(expression) => expression.range(),
+            LiteralExpressionRef::BooleanLiteral(expression) => expression.range(),
+            LiteralExpressionRef::NoneLiteral(expression) => expression.range(),
+            LiteralExpressionRef::EllipsisLiteral(expression) => expression.range(),
+        }
+    }
+}
+
+impl<'a> From<LiteralExpressionRef<'a>> for AnyNodeRef<'a> {
+    fn from(value: LiteralExpressionRef<'a>) -> Self {
+        match value {
+            LiteralExpressionRef::StringLiteral(expression) => {
+                AnyNodeRef::ExprStringLiteral(expression)
+            }
+            LiteralExpressionRef::BytesLiteral(expression) => {
+                AnyNodeRef::ExprBytesLiteral(expression)
+            }
+            LiteralExpressionRef::NumberLiteral(expression) => {
+                AnyNodeRef::ExprNumberLiteral(expression)
+            }
+            LiteralExpressionRef::BooleanLiteral(expression) => {
+                AnyNodeRef::ExprBooleanLiteral(expression)
+            }
+            LiteralExpressionRef::NoneLiteral(expression) => {
+                AnyNodeRef::ExprNoneLiteral(expression)
+            }
+            LiteralExpressionRef::EllipsisLiteral(expression) => {
+                AnyNodeRef::ExprEllipsisLiteral(expression)
+            }
+        }
+    }
+}
+
+impl LiteralExpressionRef<'_> {
+    /// Returns `true` if the literal is either a string or bytes literal that
+    /// is implicitly concatenated.
+    pub fn is_implicit_concatenated(&self) -> bool {
+        match self {
+            LiteralExpressionRef::StringLiteral(expression) => {
+                expression.value.is_implicit_concatenated()
+            }
+            LiteralExpressionRef::BytesLiteral(expression) => {
+                expression.value.is_implicit_concatenated()
+            }
+            _ => false,
+        }
+    }
+}
+
+/// An enum that holds a reference to a string-like literal from the AST.
+/// This includes string literals, bytes literals, and the literal parts of
+/// f-strings.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum StringLike<'a> {
+    StringLiteral(&'a ast::ExprStringLiteral),
+    BytesLiteral(&'a ast::ExprBytesLiteral),
+    FStringLiteral(&'a ast::FStringLiteralElement),
+}
+
+impl<'a> From<&'a ast::ExprStringLiteral> for StringLike<'a> {
+    fn from(value: &'a ast::ExprStringLiteral) -> Self {
+        StringLike::StringLiteral(value)
+    }
+}
+
+impl<'a> From<&'a ast::ExprBytesLiteral> for StringLike<'a> {
+    fn from(value: &'a ast::ExprBytesLiteral) -> Self {
+        StringLike::BytesLiteral(value)
+    }
+}
+
+impl<'a> From<&'a ast::FStringLiteralElement> for StringLike<'a> {
+    fn from(value: &'a ast::FStringLiteralElement) -> Self {
+        StringLike::FStringLiteral(value)
+    }
+}
+
+impl Ranged for StringLike<'_> {
+    fn range(&self) -> TextRange {
+        match self {
+            StringLike::StringLiteral(literal) => literal.range(),
+            StringLike::BytesLiteral(literal) => literal.range(),
+            StringLike::FStringLiteral(literal) => literal.range(),
         }
     }
 }

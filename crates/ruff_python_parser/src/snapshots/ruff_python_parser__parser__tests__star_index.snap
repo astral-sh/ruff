@@ -29,8 +29,8 @@ expression: parse_ast
                         ExprTuple {
                             range: 20..35,
                             elts: [
-                                Constant(
-                                    ExprConstant {
+                                NumberLiteral(
+                                    ExprNumberLiteral {
                                         range: 20..21,
                                         value: Int(
                                             0,
@@ -54,8 +54,8 @@ expression: parse_ast
                                     ExprUnaryOp {
                                         range: 33..35,
                                         op: USub,
-                                        operand: Constant(
-                                            ExprConstant {
+                                        operand: NumberLiteral(
+                                            ExprNumberLiteral {
                                                 range: 34..35,
                                                 value: Int(
                                                     1,
@@ -91,8 +91,8 @@ expression: parse_ast
                             ExprTuple {
                                 range: 43..58,
                                 elts: [
-                                    Constant(
-                                        ExprConstant {
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
                                             range: 43..44,
                                             value: Int(
                                                 0,
@@ -116,8 +116,8 @@ expression: parse_ast
                                         ExprUnaryOp {
                                             range: 56..58,
                                             op: USub,
-                                            operand: Constant(
-                                                ExprConstant {
+                                            operand: NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 57..58,
                                                     value: Int(
                                                         1,
@@ -216,8 +216,8 @@ expression: parse_ast
                                     ExprSlice {
                                         range: 126..129,
                                         lower: Some(
-                                            Constant(
-                                                ExprConstant {
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 126..127,
                                                     value: Int(
                                                         3,
@@ -226,8 +226,8 @@ expression: parse_ast
                                             ),
                                         ),
                                         upper: Some(
-                                            Constant(
-                                                ExprConstant {
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
                                                     range: 128..129,
                                                     value: Int(
                                                         5,

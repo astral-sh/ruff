@@ -4,7 +4,7 @@ expression: comments.debug(test_case.source_code)
 ---
 {
     Node {
-        kind: ExprConstant,
+        kind: ExprNumberLiteral,
         range: 11..12,
         source: `5`,
     }: {
@@ -34,7 +34,7 @@ expression: comments.debug(test_case.source_code)
         "trailing": [],
     },
     Node {
-        kind: ExprConstant,
+        kind: ExprNumberLiteral,
         range: 103..104,
         source: `3`,
     }: {

@@ -9,51 +9,53 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..18,
-                    values: [
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 2..5,
-                                value: Name(
-                                    ExprName {
-                                        range: 3..4,
-                                        id: "a",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
+                    value: FStringValue {
+                        inner: Single(
+                            FString(
+                                FString {
+                                    range: 0..18,
+                                    elements: [
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 2..5,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 3..4,
+                                                        id: "a",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Expression(
+                                            FStringExpressionElement {
+                                                range: 5..10,
+                                                expression: Name(
+                                                    ExprName {
+                                                        range: 7..8,
+                                                        id: "b",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                debug_text: None,
+                                                conversion: None,
+                                                format_spec: None,
+                                            },
+                                        ),
+                                        Literal(
+                                            FStringLiteralElement {
+                                                range: 10..17,
+                                                value: "{foo}",
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
                         ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 5..10,
-                                value: Name(
-                                    ExprName {
-                                        range: 7..8,
-                                        id: "b",
-                                        ctx: Load,
-                                    },
-                                ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
-                        ),
-                        Constant(
-                            ExprConstant {
-                                range: 10..17,
-                                value: Str(
-                                    StringConstant {
-                                        value: "{foo}",
-                                        unicode: false,
-                                        implicit_concatenated: false,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                    implicit_concatenated: false,
+                    },
                 },
             ),
         },

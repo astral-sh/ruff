@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
-B006_4.py:7:26: B006 Do not use mutable data structures for argument defaults
+B006_4.py:7:26: B006 [*] Do not use mutable data structures for argument defaults
   |
 6 | class FormFeedIndent:
 7 |    def __init__(self, a=[]):
@@ -10,7 +10,7 @@ B006_4.py:7:26: B006 Do not use mutable data structures for argument defaults
   |
   = help: Replace with `None`; initialize within function
 
-ℹ Possible fix
+ℹ Unsafe fix
 4  4  | 
 5  5  | 
 6  6  | class FormFeedIndent:

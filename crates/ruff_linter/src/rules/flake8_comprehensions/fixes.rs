@@ -367,7 +367,7 @@ pub(crate) fn fix_unnecessary_literal_dict(expr: &Expr, checker: &Checker) -> Re
                 comma,
             } = element
             {
-                if let Some(Element::Simple { value: key, .. }) = tuple.elements.get(0) {
+                if let Some(Element::Simple { value: key, .. }) = tuple.elements.first() {
                     if let Some(Element::Simple { value, .. }) = tuple.elements.get(1) {
                         return Ok(DictElement::Simple {
                             key: key.clone(),
@@ -1083,7 +1083,7 @@ pub(crate) fn fix_unnecessary_map(
     // If the expression is embedded in an f-string, surround it with spaces to avoid
     // syntax errors.
     if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
-        if parent.is_some_and(Expr::is_formatted_value_expr) {
+        if parent.is_some_and(Expr::is_f_string_expr) {
             content = format!(" {content} ");
         }
     }

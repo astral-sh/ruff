@@ -47,13 +47,12 @@ impl AlwaysFixableViolation for MissingWhitespace {
     }
 
     fn fix_title(&self) -> String {
-        let token = self.token_text();
-        format!("Added missing whitespace after '{token}'")
+        format!("Add missing whitespace")
     }
 }
 
 /// E231
-pub(crate) fn missing_whitespace(line: &LogicalLine, fix: bool, context: &mut LogicalLinesContext) {
+pub(crate) fn missing_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut open_parentheses = 0u32;
     let mut fstrings = 0u32;
     let mut prev_lsqb = TextSize::default();
@@ -65,14 +64,14 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, fix: bool, context: &mut Lo
         match kind {
             TokenKind::FStringStart => fstrings += 1,
             TokenKind::FStringEnd => fstrings = fstrings.saturating_sub(1),
-            TokenKind::Lsqb => {
+            TokenKind::Lsqb if fstrings == 0 => {
                 open_parentheses = open_parentheses.saturating_add(1);
                 prev_lsqb = token.start();
             }
-            TokenKind::Rsqb => {
+            TokenKind::Rsqb if fstrings == 0 => {
                 open_parentheses = open_parentheses.saturating_sub(1);
             }
-            TokenKind::Lbrace => {
+            TokenKind::Lbrace if fstrings == 0 => {
                 prev_lbrace = token.start();
             }
             TokenKind::Colon if fstrings > 0 => {
@@ -112,15 +111,12 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, fix: bool, context: &mut Lo
                         }
                     }
 
-                    let kind = MissingWhitespace { token: kind };
-                    let mut diagnostic = Diagnostic::new(kind, token.range());
-
-                    if fix {
-                        diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                            " ".to_string(),
-                            token.end(),
-                        )));
-                    }
+                    let mut diagnostic =
+                        Diagnostic::new(MissingWhitespace { token: kind }, token.range());
+                    diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
+                        " ".to_string(),
+                        token.end(),
+                    )));
                     context.push_diagnostic(diagnostic);
                 }
             }

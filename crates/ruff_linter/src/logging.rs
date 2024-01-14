@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use anyhow::Result;
@@ -9,7 +9,7 @@ use log::Level;
 use once_cell::sync::Lazy;
 use ruff_python_parser::{ParseError, ParseErrorType};
 
-use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
+use ruff_source_file::{LineIndex, OneIndexed, SourceCode, SourceLocation};
 
 use crate::fs;
 use crate::source_kind::SourceKind;
@@ -136,73 +136,111 @@ pub fn set_up_logging(level: &LogLevel) -> Result<()> {
     Ok(())
 }
 
-pub struct DisplayParseError<'a> {
+/// A wrapper around [`ParseError`] to translate byte offsets to user-facing
+/// source code locations (typically, line and column numbers).
+#[derive(Debug)]
+pub struct DisplayParseError {
     error: ParseError,
-    source_code: SourceCode<'a, 'a>,
-    source_kind: &'a SourceKind,
+    path: Option<PathBuf>,
+    location: ErrorLocation,
 }
 
-impl<'a> DisplayParseError<'a> {
-    pub fn new(
+impl DisplayParseError {
+    /// Create a [`DisplayParseError`] from a [`ParseError`] and a [`SourceKind`].
+    pub fn from_source_kind(
         error: ParseError,
-        source_code: SourceCode<'a, 'a>,
-        source_kind: &'a SourceKind,
+        path: Option<PathBuf>,
+        source_kind: &SourceKind,
     ) -> Self {
+        Self::from_source_code(
+            error,
+            path,
+            &SourceCode::new(
+                source_kind.source_code(),
+                &LineIndex::from_source_text(source_kind.source_code()),
+            ),
+            source_kind,
+        )
+    }
+
+    /// Create a [`DisplayParseError`] from a [`ParseError`] and a [`SourceCode`].
+    pub fn from_source_code(
+        error: ParseError,
+        path: Option<PathBuf>,
+        source_code: &SourceCode,
+        source_kind: &SourceKind,
+    ) -> Self {
+        // Translate the byte offset to a location in the originating source.
+        let location =
+            if let Some(jupyter_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
+                let source_location = source_code.source_location(error.offset);
+
+                ErrorLocation::Cell(
+                    jupyter_index
+                        .cell(source_location.row)
+                        .unwrap_or(OneIndexed::MIN),
+                    SourceLocation {
+                        row: jupyter_index
+                            .cell_row(source_location.row)
+                            .unwrap_or(OneIndexed::MIN),
+                        column: source_location.column,
+                    },
+                )
+            } else {
+                ErrorLocation::File(source_code.source_location(error.offset))
+            };
+
         Self {
             error,
-            source_code,
-            source_kind,
+            path,
+            location,
         }
+    }
+
+    /// Return the path of the file in which the error occurred.
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
     }
 }
 
-impl Display for DisplayParseError<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{header} {path}{colon}",
-            header = "Failed to parse".bold(),
-            path = fs::relativize_path(Path::new(&self.error.source_path)).bold(),
-            colon = ":".cyan(),
-        )?;
+impl std::error::Error for DisplayParseError {}
 
-        let source_location = self.source_code.source_location(self.error.offset);
-
-        // If we're working on a Jupyter notebook, translate the positions
-        // with respect to the cell and row in the cell. This is the same
-        // format as the `TextEmitter`.
-        let error_location =
-            if let Some(jupyter_index) = self.source_kind.as_ipy_notebook().map(Notebook::index) {
+impl Display for DisplayParseError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        if let Some(path) = self.path.as_ref() {
+            write!(
+                f,
+                "{header} {path}{colon}",
+                header = "Failed to parse".bold(),
+                path = fs::relativize_path(path).bold(),
+                colon = ":".cyan(),
+            )?;
+        } else {
+            write!(f, "{header}", header = "Failed to parse at ".bold())?;
+        }
+        match &self.location {
+            ErrorLocation::File(location) => {
                 write!(
                     f,
-                    "cell {cell}{colon}",
-                    cell = jupyter_index
-                        .cell(source_location.row.get())
-                        .unwrap_or_default(),
+                    "{row}{colon}{column}{colon} {inner}",
+                    row = location.row,
+                    column = location.column,
                     colon = ":".cyan(),
-                )?;
-
-                SourceLocation {
-                    row: OneIndexed::new(
-                        jupyter_index
-                            .cell_row(source_location.row.get())
-                            .unwrap_or(1) as usize,
-                    )
-                    .unwrap(),
-                    column: source_location.column,
-                }
-            } else {
-                source_location
-            };
-
-        write!(
-            f,
-            "{row}{colon}{column}{colon} {inner}",
-            row = error_location.row,
-            column = error_location.column,
-            colon = ":".cyan(),
-            inner = &DisplayParseErrorType(&self.error.error)
-        )
+                    inner = &DisplayParseErrorType(&self.error.error)
+                )
+            }
+            ErrorLocation::Cell(cell, location) => {
+                write!(
+                    f,
+                    "{cell}{colon}{row}{colon}{column}{colon} {inner}",
+                    cell = cell,
+                    row = location.row,
+                    column = location.column,
+                    colon = ":".cyan(),
+                    inner = &DisplayParseErrorType(&self.error.error)
+                )
+            }
+        }
     }
 }
 
@@ -238,6 +276,14 @@ impl Display for DisplayParseErrorType<'_> {
             ParseErrorType::Lexical(ref error) => write!(f, "{error}"),
         }
     }
+}
+
+#[derive(Debug)]
+enum ErrorLocation {
+    /// The error occurred in a Python file.
+    File(SourceLocation),
+    /// The error occurred in a Jupyter cell.
+    Cell(OneIndexed, SourceLocation),
 }
 
 /// Truncates the display text before the first newline character to avoid line breaks.

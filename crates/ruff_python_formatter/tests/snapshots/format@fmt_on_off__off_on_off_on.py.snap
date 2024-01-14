@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/off_on_off_on.py
 ---
 ## Input
-```py
+```python
 # Tricky sequences of fmt off and on
 
 # Formatted
@@ -78,7 +78,7 @@ a   + b
 ```
 
 ## Output
-```py
+```python
 # Tricky sequences of fmt off and on
 
 # Formatted

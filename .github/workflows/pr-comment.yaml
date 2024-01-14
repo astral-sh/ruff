@@ -1,4 +1,4 @@
-name: PR Check Comment
+name: Ecosystem check comment
 
 on:
   workflow_run:
@@ -17,14 +17,14 @@ jobs:
   comment:
     runs-on: ubuntu-latest
     steps:
-      - uses: dawidd6/action-download-artifact@v2
-        name: Download PR Number
+      - uses: dawidd6/action-download-artifact@v3
+        name: Download pull request number
         with:
           name: pr-number
           run_id: ${{ github.event.workflow_run.id ||  github.event.inputs.workflow_run_id }}
           if_no_artifact_found: ignore
 
-      - name: Extract PR Number
+      - name: Parse pull request number
         id: pr-number
         run: |
           if [[ -f pr-number ]]
@@ -32,8 +32,8 @@ jobs:
             echo "pr-number=$(<pr-number)" >> $GITHUB_OUTPUT
           fi
 
-      - uses: dawidd6/action-download-artifact@v2
-        name: "Download Ecosystem Result"
+      - uses: dawidd6/action-download-artifact@v3
+        name: "Download ecosystem results"
         id: download-ecosystem-result
         if: steps.pr-number.outputs.pr-number
         with:
@@ -41,15 +41,18 @@ jobs:
           workflow: ci.yaml
           pr: ${{ steps.pr-number.outputs.pr-number }}
           path: pr/ecosystem
+          workflow_conclusion: completed
           if_no_artifact_found: ignore
 
-      - name: Generate Comment
+      - name: Generate comment content
         id: generate-comment
         if: steps.download-ecosystem-result.outputs.found_artifact == 'true'
         run: |
-          echo '## PR Check Results' >> comment.txt
+          # Note this identifier is used to find the comment to update on
+          # subsequent runs
+          echo '<!-- generated-comment ecosystem -->' >> comment.txt
 
-          echo "### Ecosystem" >> comment.txt
+          echo '## `ruff-ecosystem` results' >> comment.txt
           cat pr/ecosystem/ecosystem-result >> comment.txt
           echo "" >> comment.txt
 
@@ -57,14 +60,14 @@ jobs:
           cat comment.txt >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
-      - name: Find Comment
+      - name: Find existing comment
         uses: peter-evans/find-comment@v2
         if: steps.generate-comment.outcome == 'success'
         id: find-comment
         with:
           issue-number: ${{ steps.pr-number.outputs.pr-number }}
           comment-author: "github-actions[bot]"
-          body-includes: PR Check Results
+          body-includes: "<!-- generated-comment ecosystem -->"
 
       - name: Create or update comment
         if: steps.find-comment.outcome == 'success'

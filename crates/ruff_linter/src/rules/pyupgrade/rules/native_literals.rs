@@ -3,11 +3,10 @@ use std::str::FromStr;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{self as ast, Constant, Expr};
-use ruff_text_size::Ranged;
+use ruff_python_ast::{self as ast, Expr, LiteralExpressionRef};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum LiteralType {
@@ -33,36 +32,44 @@ impl FromStr for LiteralType {
     }
 }
 
-impl From<LiteralType> for Constant {
-    fn from(value: LiteralType) -> Self {
-        match value {
-            LiteralType::Str => Constant::Str(ast::StringConstant {
-                value: String::new(),
-                unicode: false,
-                implicit_concatenated: false,
-            }),
-            LiteralType::Bytes => Constant::Bytes(ast::BytesConstant {
-                value: Vec::new(),
-                implicit_concatenated: false,
-            }),
-            LiteralType::Int => Constant::Int(0.into()),
-            LiteralType::Float => Constant::Float(0.0),
-            LiteralType::Bool => Constant::Bool(false),
+impl LiteralType {
+    fn as_zero_value_expr(self) -> Expr {
+        match self {
+            LiteralType::Str => ast::ExprStringLiteral::default().into(),
+            LiteralType::Bytes => ast::ExprBytesLiteral::default().into(),
+            LiteralType::Int => ast::ExprNumberLiteral {
+                value: ast::Number::Int(0.into()),
+                range: TextRange::default(),
+            }
+            .into(),
+            LiteralType::Float => ast::ExprNumberLiteral {
+                value: ast::Number::Float(0.0),
+                range: TextRange::default(),
+            }
+            .into(),
+            LiteralType::Bool => ast::ExprBooleanLiteral::default().into(),
         }
     }
 }
 
-impl TryFrom<&Constant> for LiteralType {
+impl TryFrom<LiteralExpressionRef<'_>> for LiteralType {
     type Error = ();
 
-    fn try_from(value: &Constant) -> Result<Self, Self::Error> {
-        match value {
-            Constant::Str(_) => Ok(LiteralType::Str),
-            Constant::Bytes(_) => Ok(LiteralType::Bytes),
-            Constant::Int(_) => Ok(LiteralType::Int),
-            Constant::Float(_) => Ok(LiteralType::Float),
-            Constant::Bool(_) => Ok(LiteralType::Bool),
-            _ => Err(()),
+    fn try_from(literal_expr: LiteralExpressionRef<'_>) -> Result<Self, Self::Error> {
+        match literal_expr {
+            LiteralExpressionRef::StringLiteral(_) => Ok(LiteralType::Str),
+            LiteralExpressionRef::BytesLiteral(_) => Ok(LiteralType::Bytes),
+            LiteralExpressionRef::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
+                match value {
+                    ast::Number::Int(_) => Ok(LiteralType::Int),
+                    ast::Number::Float(_) => Ok(LiteralType::Float),
+                    ast::Number::Complex { .. } => Err(()),
+                }
+            }
+            LiteralExpressionRef::BooleanLiteral(_) => Ok(LiteralType::Bool),
+            LiteralExpressionRef::NoneLiteral(_) | LiteralExpressionRef::EllipsisLiteral(_) => {
+                Err(())
+            }
         }
     }
 }
@@ -117,11 +124,11 @@ impl AlwaysFixableViolation for NativeLiterals {
     fn fix_title(&self) -> String {
         let NativeLiterals { literal_type } = self;
         match literal_type {
-            LiteralType::Str => "Replace with empty string".to_string(),
-            LiteralType::Bytes => "Replace with empty bytes".to_string(),
-            LiteralType::Int => "Replace with 0".to_string(),
-            LiteralType::Float => "Replace with 0.0".to_string(),
-            LiteralType::Bool => "Replace with `False`".to_string(),
+            LiteralType::Str => "Replace with string literal".to_string(),
+            LiteralType::Bytes => "Replace with bytes literal".to_string(),
+            LiteralType::Int => "Replace with integer literal".to_string(),
+            LiteralType::Float => "Replace with float literal".to_string(),
+            LiteralType::Bool => "Replace with boolean literal".to_string(),
         }
     }
 }
@@ -172,7 +179,7 @@ pub(crate) fn native_literals(
         }
     }
 
-    match args.get(0) {
+    match args.first() {
         None => {
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
 
@@ -182,27 +189,25 @@ pub(crate) fn native_literals(
                 return;
             }
 
-            if checker.patch(diagnostic.kind.rule()) {
-                let constant = Constant::from(literal_type);
-                let content = checker.generator().constant(&constant);
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    content,
-                    call.range(),
-                )));
-            }
+            let expr = literal_type.as_zero_value_expr();
+            let content = checker.generator().expr(&expr);
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                content,
+                call.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
         Some(arg) => {
-            let Expr::Constant(ast::ExprConstant { value, .. }) = arg else {
+            let Some(literal_expr) = arg.as_literal_expr() else {
                 return;
             };
 
             // Skip implicit string concatenations.
-            if value.is_implicit_concatenated() {
+            if literal_expr.is_implicit_concatenated() {
                 return;
             }
 
-            let Ok(arg_literal_type) = LiteralType::try_from(value) else {
+            let Ok(arg_literal_type) = LiteralType::try_from(literal_expr) else {
                 return;
             };
 
@@ -216,18 +221,22 @@ pub(crate) fn native_literals(
             // Ex) `(7).denominator` is valid but `7.denominator` is not
             // Note that floats do not have this problem
             // Ex) `(1.0).real` is valid and `1.0.real` is too
-            let content = match (parent_expr, value) {
-                (Some(Expr::Attribute(_)), Constant::Int(_)) => format!("({arg_code})"),
+            let content = match (parent_expr, arg) {
+                (
+                    Some(Expr::Attribute(_)),
+                    Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(_),
+                        ..
+                    }),
+                ) => format!("({arg_code})"),
                 _ => arg_code.to_string(),
             };
 
             let mut diagnostic = Diagnostic::new(NativeLiterals { literal_type }, call.range());
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    content,
-                    call.range(),
-                )));
-            }
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                content,
+                call.range(),
+            )));
             checker.diagnostics.push(diagnostic);
         }
     }

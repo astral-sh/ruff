@@ -26,7 +26,15 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 ///     a = 1
 /// ```
 ///
+/// ## Formatter compatibility
+/// We recommend against using this rule alongside the [formatter]. The
+/// formatter enforces consistent indentation, making the rule redundant.
+///
+/// The rule is also incompatible with the [formatter] when using
+/// `format.indent-style="tab"`.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
+/// [formatter]: https://docs.astral.sh/ruff/formatter
 #[violation]
 pub struct TabIndentation;
 

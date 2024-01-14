@@ -5,11 +5,9 @@ expression: trace
 - ModModule
   - StmtExpr
     - ExprCompare
-      - ExprConstant
-        - Int(4)
+      - ExprNumberLiteral
       - Lt
       - ExprName
       - Lt
-      - ExprConstant
-        - Int(5)
+      - ExprNumberLiteral
 

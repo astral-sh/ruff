@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_skip/parentheses.py
 ---
 ## Input
-```py
+```python
 if (
     # a leading condition comment
     len([1,   23, 3, 4, 5]) > 2 # trailing condition comment
@@ -27,7 +27,7 @@ if ( # trailing open parentheses comment
 ```
 
 ## Output
-```py
+```python
 if (
     # a leading condition comment
     len([1,   23, 3, 4, 5]) > 2 # trailing condition comment

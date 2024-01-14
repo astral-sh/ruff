@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -42,13 +42,13 @@ impl Violation for DuplicateValue {
 pub(crate) fn duplicate_value(checker: &mut Checker, elts: &Vec<Expr>) {
     let mut seen_values: FxHashSet<ComparableExpr> = FxHashSet::default();
     for elt in elts {
-        if let Expr::Constant(ast::ExprConstant { value, .. }) = elt {
+        if elt.is_literal_expr() {
             let comparable_value: ComparableExpr = elt.into();
 
             if !seen_values.insert(comparable_value) {
                 checker.diagnostics.push(Diagnostic::new(
                     DuplicateValue {
-                        value: checker.generator().constant(value),
+                        value: checker.generator().expr(elt),
                     },
                     elt.range(),
                 ));

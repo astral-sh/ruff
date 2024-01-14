@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/split_empty_brackets.py
 ---
 ## Input
-```py
+```python
 # Expressions with empty parentheses.
 ct_match = (
     unicodedata.normalize("NFKC", s1).casefold()
@@ -97,7 +97,7 @@ response = await sync_to_async(
 ```
 
 ## Output
-```py
+```python
 # Expressions with empty parentheses.
 ct_match = (
     unicodedata.normalize("NFKC", s1).casefold()
@@ -191,6 +191,26 @@ return (
 response = await sync_to_async(
     lambda: self.django_handler.get_response(request), thread_sensitive=True
 )()
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -62,9 +62,9 @@
+     1
+ }.unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
+ 
+-ct_match = ([]).unicodedata.normalize("NFKC", s1).casefold() == (
+-    []
+-).unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
++ct_match = ([]).unicodedata.normalize(
++    "NFKC", s1
++).casefold() == ([]).unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
+ 
+ return await self.http_client.fetch(
+     f"http://127.0.0.1:{self.port}{path}",
 ```
 
 

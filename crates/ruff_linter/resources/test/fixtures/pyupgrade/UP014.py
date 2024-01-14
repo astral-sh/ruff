@@ -23,3 +23,11 @@ MyType = typing.NamedTuple("MyType", a=int, b=tuple[str, ...])
 MyType = typing.NamedTuple("MyType", [("a", int)], [("b", str)])
 MyType = typing.NamedTuple("MyType", [("a", int)], b=str)
 MyType = typing.NamedTuple(typename="MyType", a=int, b=str)
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/8402#issuecomment-1788787357
+S3File = NamedTuple(
+    "S3File",
+    [
+        ("dataHPK",* str),
+    ],
+)

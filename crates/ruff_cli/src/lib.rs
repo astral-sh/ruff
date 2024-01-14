@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)]
+
 use std::fs::File;
 use std::io::{self, stdout, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -6,6 +8,7 @@ use std::sync::mpsc::channel;
 
 use anyhow::Result;
 use clap::CommandFactory;
+use colored::Colorize;
 use log::warn;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
@@ -15,7 +18,7 @@ use ruff_linter::settings::types::SerializationFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
-use crate::args::{Args, CheckCommand, Command, FormatCommand};
+use crate::args::{Args, CheckCommand, Command, FormatCommand, HelpFormat};
 use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
@@ -26,6 +29,7 @@ mod panic;
 mod printer;
 pub mod resolve;
 mod stdin;
+mod version;
 
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
@@ -97,6 +101,28 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     file == Path::new("-")
 }
 
+/// Returns the default set of files if none are provided, otherwise returns `None`.
+fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
+    if files.is_empty() {
+        if is_stdin {
+            vec![Path::new("-").to_path_buf()]
+        } else {
+            vec![Path::new(".").to_path_buf()]
+        }
+    } else {
+        files
+    }
+}
+
+/// Get the actual value of the `format` desired from either `output_format`
+/// or `format`, and warn the user if they're using the deprecated form.
+fn resolve_help_output_format(output_format: HelpFormat, format: Option<HelpFormat>) -> HelpFormat {
+    if format.is_some() {
+        warn_user!("The `--format` argument is deprecated. Use `--output-format` instead.");
+    }
+    format.unwrap_or(output_format)
+}
+
 pub fn run(
     Args {
         command,
@@ -104,8 +130,6 @@ pub fn run(
     }: Args,
 ) -> Result<ExitStatus> {
     {
-        use colored::Colorize;
-
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             #[allow(clippy::print_stderr)]
@@ -135,12 +159,22 @@ pub fn run(
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, all, format } => {
+        Command::Version { output_format } => {
+            commands::version::version(output_format)?;
+            Ok(ExitStatus::Success)
+        }
+        Command::Rule {
+            rule,
+            all,
+            format,
+            mut output_format,
+        } => {
+            output_format = resolve_help_output_format(output_format, format);
             if all {
-                commands::rule::rules(format)?;
+                commands::rule::rules(output_format)?;
             }
             if let Some(rule) = rule {
-                commands::rule::rule(rule, format)?;
+                commands::rule::rule(rule, output_format)?;
             }
             Ok(ExitStatus::Success)
         }
@@ -148,8 +182,12 @@ pub fn run(
             commands::config::config(option.as_deref())?;
             Ok(ExitStatus::Success)
         }
-        Command::Linter { format } => {
-            commands::linter::linter(format)?;
+        Command::Linter {
+            format,
+            mut output_format,
+        } => {
+            output_format = resolve_help_output_format(output_format, format);
+            commands::linter::linter(output_format)?;
             Ok(ExitStatus::Success)
         }
         Command::Clean => {
@@ -166,29 +204,16 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    warn_user_once!(
-        "`ruff format` is a work-in-progress, subject to change at any time, and intended only for \
-        experimentation."
-    );
-
     let (cli, overrides) = args.partition();
 
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &overrides)
     } else {
-        commands::format::format(&cli, &overrides, log_level)
+        commands::format::format(cli, &overrides, log_level)
     }
 }
 
 pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
-    if args.format.is_some() {
-        if std::env::var("RUFF_FORMAT").is_ok() {
-            warn_user!("The environment variable `RUFF_FORMAT` is deprecated. Use `RUFF_OUTPUT_FORMAT` instead.");
-        } else {
-            warn_user!("The argument `--format=<FORMAT>` is deprecated. Use `--output-format=<FORMAT>` instead.");
-        }
-    }
-
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -210,17 +235,15 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
     };
     let stderr_writer = Box::new(BufWriter::new(io::stderr()));
 
+    let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
+    let files = resolve_default_files(cli.files, is_stdin);
+
     if cli.show_settings {
-        commands::show_settings::show_settings(
-            &cli.files,
-            &pyproject_config,
-            &overrides,
-            &mut writer,
-        )?;
+        commands::show_settings::show_settings(&files, &pyproject_config, &overrides, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides, &mut writer)?;
+        commands::show_files::show_files(&files, &pyproject_config, &overrides, &mut writer)?;
         return Ok(ExitStatus::Success);
     }
 
@@ -283,8 +306,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         if !fix_mode.is_generate() {
             warn_user!("--fix is incompatible with --add-noqa.");
         }
-        let modifications =
-            commands::add_noqa::add_noqa(&cli.files, &pyproject_config, &overrides)?;
+        let modifications = commands::add_noqa::add_noqa(&files, &pyproject_config, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
@@ -311,7 +333,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         // Configure the file watcher.
         let (tx, rx) = channel();
         let mut watcher = recommended_watcher(tx)?;
-        for file in &cli.files {
+        for file in &files {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
         if let Some(file) = pyproject_config.path.as_ref() {
@@ -323,7 +345,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
         printer.write_to_user("Starting linter in watch mode...\n");
 
         let messages = commands::check::check(
-            &cli.files,
+            &files,
             &pyproject_config,
             &overrides,
             cache.into(),
@@ -356,7 +378,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
                     printer.write_to_user("File change detected...\n");
 
                     let messages = commands::check::check(
-                        &cli.files,
+                        &files,
                         &pyproject_config,
                         &overrides,
                         cache.into(),
@@ -370,8 +392,6 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             }
         }
     } else {
-        let is_stdin = is_stdin(&cli.files, cli.stdin_filename.as_deref());
-
         // Generate lint violations.
         let diagnostics = if is_stdin {
             commands::check_stdin::check_stdin(
@@ -383,7 +403,7 @@ pub fn check(args: CheckCommand, log_level: LogLevel) -> Result<ExitStatus> {
             )?
         } else {
             commands::check::check(
-                &cli.files,
+                &files,
                 &pyproject_config,
                 &overrides,
                 cache.into(),

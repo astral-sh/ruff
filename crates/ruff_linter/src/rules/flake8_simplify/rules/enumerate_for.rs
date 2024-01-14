@@ -1,12 +1,11 @@
-use ruff_python_ast::{self as ast, Constant, ExceptHandler, Expr, Int, MatchCase, Operator, Stmt};
-use ruff_text_size::{Ranged, TextRange};
-
-use crate::rules::flake8_simplify::rules::ast_bool_op::is_same_expr;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::traversal;
+use ruff_python_ast::{self as ast, ExceptHandler, Expr, Int, MatchCase, Number, Operator, Stmt};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_simplify::rules::ast_bool_op::is_same_expr;
 
 /// ## What it does
 /// Checks for loops which has explicit loop-index variables that can be simplified by using `enumerate()`.
@@ -138,8 +137,8 @@ fn get_candidate_loop_index<'a>(
     let [Expr::Name(ast::ExprName { id: _, .. })] = targets.as_slice() else {
         return None;
     };
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
+    if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: Number::Int(value),
         ..
     }) = value.as_ref()
     {
@@ -165,8 +164,8 @@ fn is_index_increment(stmt: &Stmt, index_var: &Expr) -> bool {
     let Some(_) = is_same_expr(index_var, target) else {
         return false;
     };
-    if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Int(value),
+    if let Expr::NumberLiteral(ast::ExprNumberLiteral {
+        value: Number::Int(value),
         ..
     }) = value.as_ref()
     {

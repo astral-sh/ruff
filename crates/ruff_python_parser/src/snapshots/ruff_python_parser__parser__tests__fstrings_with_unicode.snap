@@ -9,48 +9,55 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 0..29,
-                    values: [
-                        Constant(
-                            ExprConstant {
-                                range: 2..5,
-                                value: Str(
-                                    StringConstant {
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 0..6,
                                         value: "foo",
                                         unicode: true,
-                                        implicit_concatenated: true,
                                     },
                                 ),
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 9..14,
-                                value: Name(
-                                    ExprName {
-                                        range: 10..13,
-                                        id: "bar",
-                                        ctx: Load,
+                                FString(
+                                    FString {
+                                        range: 7..15,
+                                        elements: [
+                                            Expression(
+                                                FStringExpressionElement {
+                                                    range: 9..14,
+                                                    expression: Name(
+                                                        ExprName {
+                                                            range: 10..13,
+                                                            id: "bar",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
-                        ),
-                        Constant(
-                            ExprConstant {
-                                range: 17..28,
-                                value: Str(
-                                    StringConstant {
-                                        value: "baz some",
+                                Literal(
+                                    StringLiteral {
+                                        range: 16..21,
+                                        value: "baz",
                                         unicode: false,
-                                        implicit_concatenated: true,
                                     },
                                 ),
-                            },
+                                Literal(
+                                    StringLiteral {
+                                        range: 22..29,
+                                        value: " some",
+                                        unicode: false,
+                                    },
+                                ),
+                            ],
                         ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },
@@ -61,48 +68,55 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 30..59,
-                    values: [
-                        Constant(
-                            ExprConstant {
-                                range: 31..34,
-                                value: Str(
-                                    StringConstant {
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 30..35,
                                         value: "foo",
                                         unicode: false,
-                                        implicit_concatenated: true,
                                     },
                                 ),
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 38..43,
-                                value: Name(
-                                    ExprName {
-                                        range: 39..42,
-                                        id: "bar",
-                                        ctx: Load,
+                                FString(
+                                    FString {
+                                        range: 36..44,
+                                        elements: [
+                                            Expression(
+                                                FStringExpressionElement {
+                                                    range: 38..43,
+                                                    expression: Name(
+                                                        ExprName {
+                                                            range: 39..42,
+                                                            id: "bar",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
-                        ),
-                        Constant(
-                            ExprConstant {
-                                range: 47..58,
-                                value: Str(
-                                    StringConstant {
-                                        value: "baz some",
+                                Literal(
+                                    StringLiteral {
+                                        range: 45..51,
+                                        value: "baz",
                                         unicode: true,
-                                        implicit_concatenated: true,
                                     },
                                 ),
-                            },
+                                Literal(
+                                    StringLiteral {
+                                        range: 52..59,
+                                        value: " some",
+                                        unicode: false,
+                                    },
+                                ),
+                            ],
                         ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },
@@ -113,48 +127,55 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 60..89,
-                    values: [
-                        Constant(
-                            ExprConstant {
-                                range: 61..64,
-                                value: Str(
-                                    StringConstant {
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 60..65,
                                         value: "foo",
                                         unicode: false,
-                                        implicit_concatenated: true,
                                     },
                                 ),
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 68..73,
-                                value: Name(
-                                    ExprName {
-                                        range: 69..72,
-                                        id: "bar",
-                                        ctx: Load,
+                                FString(
+                                    FString {
+                                        range: 66..74,
+                                        elements: [
+                                            Expression(
+                                                FStringExpressionElement {
+                                                    range: 68..73,
+                                                    expression: Name(
+                                                        ExprName {
+                                                            range: 69..72,
+                                                            id: "bar",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
-                        ),
-                        Constant(
-                            ExprConstant {
-                                range: 76..88,
-                                value: Str(
-                                    StringConstant {
-                                        value: "baz some",
+                                Literal(
+                                    StringLiteral {
+                                        range: 75..80,
+                                        value: "baz",
                                         unicode: false,
-                                        implicit_concatenated: true,
                                     },
                                 ),
-                            },
+                                Literal(
+                                    StringLiteral {
+                                        range: 81..89,
+                                        value: " some",
+                                        unicode: true,
+                                    },
+                                ),
+                            ],
                         ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },
@@ -165,48 +186,67 @@ expression: parse_ast
             value: FString(
                 ExprFString {
                     range: 90..128,
-                    values: [
-                        Constant(
-                            ExprConstant {
-                                range: 92..103,
-                                value: Str(
-                                    StringConstant {
-                                        value: "foobar ",
+                    value: FStringValue {
+                        inner: Concatenated(
+                            [
+                                Literal(
+                                    StringLiteral {
+                                        range: 90..96,
+                                        value: "foo",
                                         unicode: true,
-                                        implicit_concatenated: true,
                                     },
                                 ),
-                            },
-                        ),
-                        FormattedValue(
-                            ExprFormattedValue {
-                                range: 103..108,
-                                value: Name(
-                                    ExprName {
-                                        range: 104..107,
-                                        id: "baz",
-                                        ctx: Load,
+                                FString(
+                                    FString {
+                                        range: 97..116,
+                                        elements: [
+                                            Literal(
+                                                FStringLiteralElement {
+                                                    range: 99..103,
+                                                    value: "bar ",
+                                                },
+                                            ),
+                                            Expression(
+                                                FStringExpressionElement {
+                                                    range: 103..108,
+                                                    expression: Name(
+                                                        ExprName {
+                                                            range: 104..107,
+                                                            id: "baz",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                            Literal(
+                                                FStringLiteralElement {
+                                                    range: 108..115,
+                                                    value: " really",
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
-                                debug_text: None,
-                                conversion: None,
-                                format_spec: None,
-                            },
-                        ),
-                        Constant(
-                            ExprConstant {
-                                range: 108..127,
-                                value: Str(
-                                    StringConstant {
-                                        value: " reallybarno",
+                                Literal(
+                                    StringLiteral {
+                                        range: 117..123,
+                                        value: "bar",
+                                        unicode: true,
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 124..128,
+                                        value: "no",
                                         unicode: false,
-                                        implicit_concatenated: true,
                                     },
                                 ),
-                            },
+                            ],
                         ),
-                    ],
-                    implicit_concatenated: true,
+                    },
                 },
             ),
         },

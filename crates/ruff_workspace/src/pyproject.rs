@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use log::debug;
 use pep440_rs::VersionSpecifiers;
 use serde::{Deserialize, Serialize};
@@ -41,14 +41,18 @@ impl Pyproject {
 
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
-    let contents = std::fs::read_to_string(path)?;
-    toml::from_str(&contents).map_err(Into::into)
+    let contents = std::fs::read_to_string(path.as_ref())
+        .with_context(|| format!("Failed to read {}", path.as_ref().display()))?;
+    toml::from_str(&contents)
+        .with_context(|| format!("Failed to parse {}", path.as_ref().display()))
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
-    let contents = std::fs::read_to_string(path)?;
-    toml::from_str(&contents).map_err(Into::into)
+    let contents = std::fs::read_to_string(path.as_ref())
+        .with_context(|| format!("Failed to read {}", path.as_ref().display()))?;
+    toml::from_str(&contents)
+        .with_context(|| format!("Failed to parse {}", path.as_ref().display()))
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -152,37 +156,38 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
     use std::str::FromStr;
 
-    use anyhow::Result;
+    use anyhow::{Context, Result};
     use rustc_hash::FxHashMap;
+    use tempfile::TempDir;
 
     use ruff_linter::codes;
     use ruff_linter::line_width::LineLength;
     use ruff_linter::settings::types::PatternPrefixPair;
 
-    use crate::options::{LintOptions, Options};
+    use crate::options::{LintCommonOptions, LintOptions, Options};
     use crate::pyproject::{find_settings_toml, parse_pyproject_toml, Pyproject, Tools};
-    use crate::tests::test_resource_path;
 
     #[test]
 
     fn deserialize() -> Result<()> {
-        let pyproject: Pyproject = toml::from_str(r#""#)?;
+        let pyproject: Pyproject = toml::from_str(r"")?;
         assert_eq!(pyproject.tool, None);
 
         let pyproject: Pyproject = toml::from_str(
-            r#"
+            r"
 [tool.black]
-"#,
+",
         )?;
         assert_eq!(pyproject.tool, Some(Tools { ruff: None }));
 
         let pyproject: Pyproject = toml::from_str(
-            r#"
+            r"
 [tool.black]
 [tool.ruff]
-"#,
+",
         )?;
         assert_eq!(
             pyproject.tool,
@@ -192,11 +197,11 @@ mod tests {
         );
 
         let pyproject: Pyproject = toml::from_str(
-            r#"
+            r"
 [tool.black]
 [tool.ruff]
 line-length = 79
-"#,
+",
         )?;
         assert_eq!(
             pyproject.tool,
@@ -228,7 +233,7 @@ exclude = ["foo.py"]
         let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
-[tool.ruff]
+[tool.ruff.lint]
 select = ["E501"]
 "#,
         )?;
@@ -236,10 +241,13 @@ select = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    lint_top_level: LintOptions {
-                        select: Some(vec![codes::Pycodestyle::E501.into()]),
+                    lint: Some(LintOptions {
+                        common: LintCommonOptions {
+                            select: Some(vec![codes::Pycodestyle::E501.into()]),
+                            ..LintCommonOptions::default()
+                        },
                         ..LintOptions::default()
-                    },
+                    }),
                     ..Options::default()
                 })
             })
@@ -248,7 +256,7 @@ select = ["E501"]
         let pyproject: Pyproject = toml::from_str(
             r#"
 [tool.black]
-[tool.ruff]
+[tool.ruff.lint]
 extend-select = ["RUF100"]
 ignore = ["E501"]
 "#,
@@ -257,41 +265,44 @@ ignore = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    lint_top_level: LintOptions {
-                        extend_select: Some(vec![codes::Ruff::_100.into()]),
-                        ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                    lint: Some(LintOptions {
+                        common: LintCommonOptions {
+                            extend_select: Some(vec![codes::Ruff::_100.into()]),
+                            ignore: Some(vec![codes::Pycodestyle::E501.into()]),
+                            ..LintCommonOptions::default()
+                        },
                         ..LintOptions::default()
-                    },
+                    }),
                     ..Options::default()
                 })
             })
         );
 
         assert!(toml::from_str::<Pyproject>(
-            r#"
+            r"
 [tool.black]
 [tool.ruff]
 line_length = 79
-"#,
+",
         )
         .is_err());
 
         assert!(toml::from_str::<Pyproject>(
             r#"
 [tool.black]
-[tool.ruff]
+[tool.ruff.lint]
 select = ["E123"]
 "#,
         )
         .is_err());
 
         assert!(toml::from_str::<Pyproject>(
-            r#"
+            r"
 [tool.black]
 [tool.ruff]
 line-length = 79
 other-attribute = 1
-"#,
+",
         )
         .is_err());
 
@@ -300,11 +311,32 @@ other-attribute = 1
 
     #[test]
     fn find_and_parse_pyproject_toml() -> Result<()> {
-        let pyproject = find_settings_toml(test_resource_path("fixtures/__init__.py"))?.unwrap();
-        assert_eq!(pyproject, test_resource_path("fixtures/pyproject.toml"));
+        let tempdir = TempDir::new()?;
+        let ruff_toml = tempdir.path().join("pyproject.toml");
+        fs::write(
+            ruff_toml,
+            r#"
+[tool.ruff]
+line-length = 88
+extend-exclude = [
+  "excluded_file.py",
+  "migrations",
+  "with_excluded_file/other_excluded_file.py",
+]
 
-        let pyproject = parse_pyproject_toml(&pyproject)?;
-        let config = pyproject.tool.unwrap().ruff.unwrap();
+[tool.ruff.lint]
+per-file-ignores = { "__init__.py" = ["F401"] }
+"#,
+        )?;
+
+        let pyproject =
+            find_settings_toml(tempdir.path())?.context("Failed to find pyproject.toml")?;
+        let pyproject = parse_pyproject_toml(pyproject)?;
+        let config = pyproject
+            .tool
+            .context("Expected to find [tool] field")?
+            .ruff
+            .context("Expected to find [tool.ruff] field")?;
         assert_eq!(
             config,
             Options {
@@ -315,13 +347,16 @@ other-attribute = 1
                     "with_excluded_file/other_excluded_file.py".to_string(),
                 ]),
 
-                lint_top_level: LintOptions {
-                    per_file_ignores: Some(FxHashMap::from_iter([(
-                        "__init__.py".to_string(),
-                        vec![codes::Pyflakes::_401.into()]
-                    )])),
+                lint: Some(LintOptions {
+                    common: LintCommonOptions {
+                        per_file_ignores: Some(FxHashMap::from_iter([(
+                            "__init__.py".to_string(),
+                            vec![codes::Pyflakes::_401.into()]
+                        )])),
+                        ..LintCommonOptions::default()
+                    },
                     ..LintOptions::default()
-                },
+                }),
                 ..Options::default()
             }
         );

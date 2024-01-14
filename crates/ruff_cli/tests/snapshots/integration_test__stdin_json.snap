@@ -17,6 +17,7 @@ exit_code: 1
 ----- stdout -----
 [
   {
+    "cell": null,
     "code": "F401",
     "end_location": {
       "column": 10,

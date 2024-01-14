@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/fmt_on_off/mixed_space_and_tab.py
 ---
 ## Input
-```py
+```python
 def test():
  # fmt: off
  	a_very_small_indent
@@ -24,15 +24,19 @@ not_fixed
 ## Outputs
 ### Output 1
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
 ```
 
-```py
+```python
 def test():
     # fmt: off
     a_very_small_indent
@@ -54,15 +58,19 @@ not_fixed
 
 ### Output 2
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 2
-quote-style             = Double
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 2
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
 ```
 
-```py
+```python
 def test():
   # fmt: off
   a_very_small_indent
@@ -84,15 +92,19 @@ not_fixed
 
 ### Output 3
 ```
-indent-style            = tab
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = tab
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
 ```
 
-```py
+```python
 def test():
 	# fmt: off
 	a_very_small_indent

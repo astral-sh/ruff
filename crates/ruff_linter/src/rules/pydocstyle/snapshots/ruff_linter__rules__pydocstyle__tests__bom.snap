@@ -6,5 +6,6 @@ bom.py:1:1: D300 Use triple double quotes `"""`
 1 | ﻿''' SAM macro definitions '''
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D300
   |
+  = help: Convert to triple double quotes
 
 

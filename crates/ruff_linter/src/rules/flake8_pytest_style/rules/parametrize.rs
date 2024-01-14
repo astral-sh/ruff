@@ -5,16 +5,16 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::node::AstNode;
 use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_ast::{self as ast, Arguments, Constant, Decorator, Expr, ExprContext};
+use ruff_python_ast::AstNode;
+use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprContext};
 use ruff_python_codegen::Generator;
 use ruff_python_trivia::CommentRanges;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Rule};
+use crate::registry::Rule;
 
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
@@ -248,38 +248,21 @@ impl Violation for PytestDuplicateParametrizeTestCases {
 }
 
 fn elts_to_csv(elts: &[Expr], generator: Generator) -> Option<String> {
-    let all_literals = elts.iter().all(|expr| {
-        matches!(
-            expr,
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(_),
-                ..
-            })
-        )
-    });
-
-    if !all_literals {
+    if !elts.iter().all(Expr::is_string_literal_expr) {
         return None;
     }
 
-    let node = Expr::Constant(ast::ExprConstant {
-        value: elts
-            .iter()
-            .fold(String::new(), |mut acc, elt| {
-                if let Expr::Constant(ast::ExprConstant {
-                    value: Constant::Str(ast::StringConstant { value, .. }),
-                    ..
-                }) = elt
-                {
-                    if !acc.is_empty() {
-                        acc.push(',');
-                    }
-                    acc.push_str(value.as_str());
+    let node = Expr::from(ast::StringLiteral {
+        value: elts.iter().fold(String::new(), |mut acc, elt| {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
+                if !acc.is_empty() {
+                    acc.push(',');
                 }
-                acc
-            })
-            .into(),
-        range: TextRange::default(),
+                acc.push_str(value.to_str());
+            }
+            acc
+        }),
+        ..ast::StringLiteral::default()
     });
     Some(generator.expr(&node))
 }
@@ -317,11 +300,8 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match expr {
-        Expr::Constant(ast::ExprConstant {
-            value: Constant::Str(string),
-            ..
-        }) => {
-            let names = split_names(string);
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
+            let names = split_names(value.to_str());
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
@@ -338,25 +318,23 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             },
                             name_range,
                         );
-                        if checker.patch(diagnostic.kind.rule()) {
-                            let node = Expr::Tuple(ast::ExprTuple {
-                                elts: names
-                                    .iter()
-                                    .map(|name| {
-                                        Expr::Constant(ast::ExprConstant {
-                                            value: (*name).to_string().into(),
-                                            range: TextRange::default(),
-                                        })
+                        let node = Expr::Tuple(ast::ExprTuple {
+                            elts: names
+                                .iter()
+                                .map(|name| {
+                                    Expr::from(ast::StringLiteral {
+                                        value: (*name).to_string(),
+                                        ..ast::StringLiteral::default()
                                     })
-                                    .collect(),
-                                ctx: ExprContext::Load,
-                                range: TextRange::default(),
-                            });
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                format!("({})", checker.generator().expr(&node)),
-                                name_range,
-                            )));
-                        }
+                                })
+                                .collect(),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        });
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            format!("({})", checker.generator().expr(&node)),
+                            name_range,
+                        )));
                         checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
@@ -373,25 +351,23 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             },
                             name_range,
                         );
-                        if checker.patch(diagnostic.kind.rule()) {
-                            let node = Expr::List(ast::ExprList {
-                                elts: names
-                                    .iter()
-                                    .map(|name| {
-                                        Expr::Constant(ast::ExprConstant {
-                                            value: (*name).to_string().into(),
-                                            range: TextRange::default(),
-                                        })
+                        let node = Expr::List(ast::ExprList {
+                            elts: names
+                                .iter()
+                                .map(|name| {
+                                    Expr::from(ast::StringLiteral {
+                                        value: (*name).to_string(),
+                                        ..ast::StringLiteral::default()
                                     })
-                                    .collect(),
-                                ctx: ExprContext::Load,
-                                range: TextRange::default(),
-                            });
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                checker.generator().expr(&node),
-                                name_range,
-                            )));
-                        }
+                                })
+                                .collect(),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        });
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            checker.generator().expr(&node),
+                            name_range,
+                        )));
                         checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {}
@@ -413,17 +389,15 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             },
                             expr.range(),
                         );
-                        if checker.patch(diagnostic.kind.rule()) {
-                            let node = Expr::List(ast::ExprList {
-                                elts: elts.clone(),
-                                ctx: ExprContext::Load,
-                                range: TextRange::default(),
-                            });
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                checker.generator().expr(&node),
-                                expr.range(),
-                            )));
-                        }
+                        let node = Expr::List(ast::ExprList {
+                            elts: elts.clone(),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        });
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            checker.generator().expr(&node),
+                            expr.range(),
+                        )));
                         checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {
@@ -433,13 +407,11 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             },
                             expr.range(),
                         );
-                        if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(content) = elts_to_csv(elts, checker.generator()) {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                    content,
-                                    expr.range(),
-                                )));
-                            }
+                        if let Some(content) = elts_to_csv(elts, checker.generator()) {
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                                content,
+                                expr.range(),
+                            )));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -461,17 +433,15 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             },
                             expr.range(),
                         );
-                        if checker.patch(diagnostic.kind.rule()) {
-                            let node = Expr::Tuple(ast::ExprTuple {
-                                elts: elts.clone(),
-                                ctx: ExprContext::Load,
-                                range: TextRange::default(),
-                            });
-                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                format!("({})", checker.generator().expr(&node)),
-                                expr.range(),
-                            )));
-                        }
+                        let node = Expr::Tuple(ast::ExprTuple {
+                            elts: elts.clone(),
+                            ctx: ExprContext::Load,
+                            range: TextRange::default(),
+                        });
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                            format!("({})", checker.generator().expr(&node)),
+                            expr.range(),
+                        )));
                         checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::Csv => {
@@ -481,13 +451,11 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             },
                             expr.range(),
                         );
-                        if checker.patch(diagnostic.kind.rule()) {
-                            if let Some(content) = elts_to_csv(elts, checker.generator()) {
-                                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                                    content,
-                                    expr.range(),
-                                )));
-                            }
+                        if let Some(content) = elts_to_csv(elts, checker.generator()) {
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                                content,
+                                expr.range(),
+                            )));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -507,12 +475,8 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         .flake8_pytest_style
         .parametrize_values_row_type;
 
-    let is_multi_named = if let Expr::Constant(ast::ExprConstant {
-        value: Constant::Str(string),
-        ..
-    }) = &names
-    {
-        split_names(string).len() > 1
+    let is_multi_named = if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &names {
+        split_names(value.to_str()).len() > 1
     } else {
         true
     };
@@ -585,22 +549,19 @@ fn check_duplicates(checker: &mut Checker, values: &Expr) {
                     PytestDuplicateParametrizeTestCases { index: *index },
                     element.range(),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(prev) = prev {
-                        let values_end = values.range().end() - TextSize::new(1);
-                        let previous_end = trailing_comma(prev, checker.locator().contents())
-                            .unwrap_or(values_end);
-                        let element_end = trailing_comma(element, checker.locator().contents())
-                            .unwrap_or(values_end);
-                        let deletion_range = TextRange::new(previous_end, element_end);
-                        if !checker
-                            .indexer()
-                            .comment_ranges()
-                            .intersects(deletion_range)
-                        {
-                            diagnostic
-                                .set_fix(Fix::unsafe_edit(Edit::range_deletion(deletion_range)));
-                        }
+                if let Some(prev) = prev {
+                    let values_end = values.end() - TextSize::new(1);
+                    let previous_end =
+                        trailing_comma(prev, checker.locator().contents()).unwrap_or(values_end);
+                    let element_end =
+                        trailing_comma(element, checker.locator().contents()).unwrap_or(values_end);
+                    let deletion_range = TextRange::new(previous_end, element_end);
+                    if !checker
+                        .indexer()
+                        .comment_ranges()
+                        .intersects(deletion_range)
+                    {
+                        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(deletion_range)));
                     }
                 }
                 checker.diagnostics.push(diagnostic);
@@ -618,13 +579,11 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
         expr.range(),
     );
 
-    if checker.patch(diagnostic.kind.rule()) {
-        let node = value.clone();
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            checker.generator().expr(&node),
-            expr.range(),
-        )));
-    }
+    let node = value.clone();
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+        checker.generator().expr(&node),
+        expr.range(),
+    )));
     checker.diagnostics.push(diagnostic);
 }
 

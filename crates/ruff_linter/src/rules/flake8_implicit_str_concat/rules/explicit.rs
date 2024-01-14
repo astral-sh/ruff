@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -51,18 +51,10 @@ pub(crate) fn explicit(expr: &Expr, locator: &Locator) -> Option<Diagnostic> {
         if matches!(op, Operator::Add) {
             if matches!(
                 left.as_ref(),
-                Expr::FString(_)
-                    | Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(..) | Constant::Bytes(..),
-                        ..
-                    })
+                Expr::FString(_) | Expr::StringLiteral(_) | Expr::BytesLiteral(_)
             ) && matches!(
                 right.as_ref(),
-                Expr::FString(_)
-                    | Expr::Constant(ast::ExprConstant {
-                        value: Constant::Str(..) | Constant::Bytes(..),
-                        ..
-                    })
+                Expr::FString(_) | Expr::StringLiteral(_) | Expr::BytesLiteral(_)
             ) && locator.contains_line_break(*range)
             {
                 return Some(Diagnostic::new(ExplicitStringConcatenation, expr.range()));

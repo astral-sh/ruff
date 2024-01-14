@@ -100,6 +100,8 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
+    ///             deprecated: None,
     ///         });
     ///     }
     /// }
@@ -121,6 +123,8 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
+    ///             deprecated: None
     ///         });
     ///
     ///         visit.record_set("format", Nested::metadata());
@@ -136,6 +140,8 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
+    ///             deprecated: None
     ///         });
     ///     }
     /// }
@@ -166,6 +172,8 @@ impl OptionSet {
     ///     default: "false",
     ///     value_type: "bool",
     ///     example: "",
+    ///     scope: None,
+    ///     deprecated: None
     ///  };
     ///
     /// impl OptionsMetadata for WithOptions {
@@ -187,6 +195,8 @@ impl OptionSet {
     ///     default: "false",
     ///     value_type: "bool",
     ///     example: "",
+    ///     scope: None,
+    ///     deprecated: None
     /// };
     ///
     /// struct Root;
@@ -198,6 +208,8 @@ impl OptionSet {
     ///             default: "false",
     ///             value_type: "bool",
     ///             example: "",
+    ///             scope: None,
+    ///             deprecated: None
     ///         });
     ///
     ///         visit.record_set("format", Nested::metadata());
@@ -280,11 +292,19 @@ impl<'fmt, 'buf> DisplayVisitor<'fmt, 'buf> {
 
 impl Visit for DisplayVisitor<'_, '_> {
     fn record_set(&mut self, name: &str, _: OptionSet) {
-        self.result = self.result.and_then(|_| writeln!(self.f, "{name}"));
+        self.result = self.result.and_then(|()| writeln!(self.f, "{name}"));
     }
 
-    fn record_field(&mut self, name: &str, _: OptionField) {
-        self.result = self.result.and_then(|_| writeln!(self.f, "{name}"));
+    fn record_field(&mut self, name: &str, field: OptionField) {
+        self.result = self.result.and_then(|()| {
+            write!(self.f, "{name}")?;
+
+            if field.deprecated.is_some() {
+                write!(self.f, " (deprecated)")?;
+            }
+
+            writeln!(self.f)
+        });
     }
 }
 
@@ -305,9 +325,20 @@ impl Debug for OptionSet {
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct OptionField {
     pub doc: &'static str,
+    /// Ex) `"false"`
     pub default: &'static str,
+    /// Ex) `"bool"`
     pub value_type: &'static str,
+    /// Ex) `"per-file-ignores"`
+    pub scope: Option<&'static str>,
     pub example: &'static str,
+    pub deprecated: Option<Deprecated>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Deprecated {
+    pub since: Option<&'static str>,
+    pub message: Option<&'static str>,
 }
 
 impl Display for OptionField {
@@ -316,6 +347,21 @@ impl Display for OptionField {
         writeln!(f)?;
         writeln!(f, "Default value: {}", self.default)?;
         writeln!(f, "Type: {}", self.value_type)?;
+
+        if let Some(deprecated) = &self.deprecated {
+            write!(f, "Deprecated")?;
+
+            if let Some(since) = deprecated.since {
+                write!(f, " (since {since})")?;
+            }
+
+            if let Some(message) = deprecated.message {
+                write!(f, ": {message}")?;
+            }
+
+            writeln!(f)?;
+        }
+
         writeln!(f, "Example usage:\n```toml\n{}\n```", self.example)
     }
 }

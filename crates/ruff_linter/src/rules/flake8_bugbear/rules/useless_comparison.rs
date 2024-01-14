@@ -5,6 +5,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
+use super::super::helpers::at_last_top_level_expression_in_cell;
+
 /// ## What it does
 /// Checks for useless comparisons.
 ///
@@ -32,8 +34,8 @@ impl Violation for UselessComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Pointless comparison. This comparison does nothing but waste CPU instructions. \
-             Either prepend `assert` or remove it."
+            "Pointless comparison. Did you mean to assign a value? \
+             Otherwise, prepend `assert` or remove it."
         )
     }
 }
@@ -41,6 +43,19 @@ impl Violation for UselessComparison {
 /// B015
 pub(crate) fn useless_comparison(checker: &mut Checker, expr: &Expr) {
     if expr.is_compare_expr() {
+        // For Jupyter Notebooks, ignore the last top-level expression for each cell.
+        // This is because it's common to have a cell that ends with an expression
+        // to display it's value.
+        if checker.source_type.is_ipynb()
+            && at_last_top_level_expression_in_cell(
+                checker.semantic(),
+                checker.locator(),
+                checker.cell_offsets(),
+            )
+        {
+            return;
+        }
+
         checker
             .diagnostics
             .push(Diagnostic::new(UselessComparison, expr.range()));

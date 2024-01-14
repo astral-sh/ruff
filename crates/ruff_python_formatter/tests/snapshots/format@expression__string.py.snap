@@ -3,7 +3,7 @@ source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/string.py
 ---
 ## Input
-```py
+```python
 "' test"
 '" test'
 
@@ -139,20 +139,29 @@ x = (b"""aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""" b"""bbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+
+a = f"""\x1F"""
+a = """\x1F"""
+a = """\\x1F"""
+a = """\\\x1F"""
 ```
 
 ## Outputs
 ### Output 1
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Double
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
 ```
 
-```py
+```python
 "' test"
 '" test'
 
@@ -312,20 +321,53 @@ x = (
 
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+
+a = f"""\x1F"""
+a = """\x1F"""
+a = """\\x1F"""
+a = """\\\x1F"""
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ "' test"
++
+ '" test'
+ 
+ '" test'
+@@ -158,7 +159,7 @@
+ # https://github.com/astral-sh/ruff/issues/7460
+ trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+ 
+-a = f"""\x1F"""
+-a = """\x1F"""
++a = f"""\x1f"""
++a = """\x1f"""
+ a = """\\x1F"""
+-a = """\\\x1F"""
++a = """\\\x1f"""
 ```
 
 
 ### Output 2
 ```
-indent-style            = space
-line-width              = 88
-indent-width            = 4
-quote-style             = Single
-magic-trailing-comma    = Respect
-preview                 = Disabled
+indent-style               = space
+line-width                 = 88
+indent-width               = 4
+quote-style                = Single
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = Py38
 ```
 
-```py
+```python
 "' test"
 '" test'
 
@@ -485,6 +527,35 @@ x = (
 
 # https://github.com/astral-sh/ruff/issues/7460
 trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+
+a = f"""\x1F"""
+a = """\x1F"""
+a = """\\x1F"""
+a = """\\\x1F"""
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -1,4 +1,5 @@
+ "' test"
++
+ '" test'
+ 
+ '" test'
+@@ -158,7 +159,7 @@
+ # https://github.com/astral-sh/ruff/issues/7460
+ trailing_preferred_quote_texts = [''' "''', ''' ""''', ''' """''', ''' """"''']
+ 
+-a = f"""\x1F"""
+-a = """\x1F"""
++a = f"""\x1f"""
++a = """\x1f"""
+ a = """\\x1F"""
+-a = """\\\x1F"""
++a = """\\\x1f"""
 ```
 
 

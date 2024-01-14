@@ -13,24 +13,35 @@ exclude: |
 
 repos:
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.12.1
+    rev: v0.15
     hooks:
       - id: validate-pyproject
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.16
+    rev: 0.7.17
     hooks:
       - id: mdformat
         additional_dependencies:
           - mdformat-mkdocs
+          - mdformat-admon
+        exclude: |
+          (?x)^(
+            docs/formatter/black\.md
+            | docs/\w+\.md
+          )$
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.33.0
+    rev: v0.37.0
     hooks:
       - id: markdownlint-fix
+        exclude: |
+          (?x)^(
+            docs/formatter/black\.md
+            | docs/\w+\.md
+          )$
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.14.12
+    rev: v1.16.22
     hooks:
       - id: typos
 
@@ -42,10 +53,13 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false # This makes it a lot faster
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.4
+    hooks:
+      - id: ruff-format
       - id: ruff
-        name: ruff
-        entry: cargo run --bin ruff -- check --no-cache --force-exclude --fix --exit-non-zero-on-fix
-        language: system
+        args: [--fix, --exit-non-zero-on-fix]
         types_or: [python, pyi]
         require_serial: true
         exclude: |
@@ -54,15 +68,9 @@ repos:
             crates/ruff_python_formatter/resources/.*
           )$
 
-  # Black
-  - repo: https://github.com/psf/black
-    rev: 23.1.0
-    hooks:
-      - id: black
-
   # Prettier
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.0.0
+    rev: v3.0.3
     hooks:
       - id: prettier
         types: [yaml]

@@ -5,8 +5,8 @@ use ruff_text_size::TextRange;
 
 #[test]
 fn test_parenthesized_name() {
-    let source_code = r#"(x) + 1"#;
-    let expr = parse_expression(source_code, "<filename>").unwrap();
+    let source_code = r"(x) + 1";
+    let expr = parse_expression(source_code).unwrap();
 
     let bin_op = expr.as_bin_op_expr().unwrap();
     let name = bin_op.left.as_ref();
@@ -22,8 +22,8 @@ fn test_parenthesized_name() {
 
 #[test]
 fn test_non_parenthesized_name() {
-    let source_code = r#"x + 1"#;
-    let expr = parse_expression(source_code, "<filename>").unwrap();
+    let source_code = r"x + 1";
+    let expr = parse_expression(source_code).unwrap();
 
     let bin_op = expr.as_bin_op_expr().unwrap();
     let name = bin_op.left.as_ref();
@@ -39,8 +39,8 @@ fn test_non_parenthesized_name() {
 
 #[test]
 fn test_parenthesized_argument() {
-    let source_code = r#"f((a))"#;
-    let expr = parse_expression(source_code, "<filename>").unwrap();
+    let source_code = r"f((a))";
+    let expr = parse_expression(source_code).unwrap();
 
     let call = expr.as_call_expr().unwrap();
     let arguments = &call.arguments;
@@ -57,8 +57,8 @@ fn test_parenthesized_argument() {
 
 #[test]
 fn test_non_parenthesized_argument() {
-    let source_code = r#"f(a)"#;
-    let expr = parse_expression(source_code, "<filename>").unwrap();
+    let source_code = r"f(a)";
+    let expr = parse_expression(source_code).unwrap();
 
     let call = expr.as_call_expr().unwrap();
     let arguments = &call.arguments;
@@ -75,8 +75,8 @@ fn test_non_parenthesized_argument() {
 
 #[test]
 fn test_parenthesized_tuple_member() {
-    let source_code = r#"(a, (b))"#;
-    let expr = parse_expression(source_code, "<filename>").unwrap();
+    let source_code = r"(a, (b))";
+    let expr = parse_expression(source_code).unwrap();
 
     let tuple = expr.as_tuple_expr().unwrap();
     let member = tuple.elts.last().unwrap();
@@ -92,8 +92,8 @@ fn test_parenthesized_tuple_member() {
 
 #[test]
 fn test_non_parenthesized_tuple_member() {
-    let source_code = r#"(a, b)"#;
-    let expr = parse_expression(source_code, "<filename>").unwrap();
+    let source_code = r"(a, b)";
+    let expr = parse_expression(source_code).unwrap();
 
     let tuple = expr.as_tuple_expr().unwrap();
     let member = tuple.elts.last().unwrap();
@@ -109,8 +109,8 @@ fn test_non_parenthesized_tuple_member() {
 
 #[test]
 fn test_twice_parenthesized_name() {
-    let source_code = r#"((x)) + 1"#;
-    let expr = parse_expression(source_code, "<filename>").unwrap();
+    let source_code = r"((x)) + 1";
+    let expr = parse_expression(source_code).unwrap();
 
     let bin_op = expr.as_bin_op_expr().unwrap();
     let name = bin_op.left.as_ref();
@@ -126,8 +126,8 @@ fn test_twice_parenthesized_name() {
 
 #[test]
 fn test_twice_parenthesized_argument() {
-    let source_code = r#"f(((a + 1)))"#;
-    let expr = parse_expression(source_code, "<filename>").unwrap();
+    let source_code = r"f(((a + 1)))";
+    let expr = parse_expression(source_code).unwrap();
 
     let call = expr.as_call_expr().unwrap();
     let arguments = &call.arguments;

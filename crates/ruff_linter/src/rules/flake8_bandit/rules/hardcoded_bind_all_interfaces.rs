@@ -1,7 +1,9 @@
-use ruff_text_size::TextRange;
-
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, StringLike};
+use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for hardcoded bindings to all network interfaces (`0.0.0.0`).
@@ -35,10 +37,16 @@ impl Violation for HardcodedBindAllInterfaces {
 }
 
 /// S104
-pub(crate) fn hardcoded_bind_all_interfaces(value: &str, range: TextRange) -> Option<Diagnostic> {
-    if value == "0.0.0.0" {
-        Some(Diagnostic::new(HardcodedBindAllInterfaces, range))
-    } else {
-        None
+pub(crate) fn hardcoded_bind_all_interfaces(checker: &mut Checker, string: StringLike) {
+    let is_bind_all_interface = match string {
+        StringLike::StringLiteral(ast::ExprStringLiteral { value, .. }) => value == "0.0.0.0",
+        StringLike::FStringLiteral(ast::FStringLiteralElement { value, .. }) => value == "0.0.0.0",
+        StringLike::BytesLiteral(_) => return,
+    };
+
+    if is_bind_all_interface {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(HardcodedBindAllInterfaces, string.range()));
     }
 }

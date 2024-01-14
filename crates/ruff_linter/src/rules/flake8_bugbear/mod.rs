@@ -1,4 +1,5 @@
 //! Rules from [flake8-bugbear](https://pypi.org/project/flake8-bugbear/).
+pub(crate) mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 
@@ -54,8 +55,10 @@ mod tests {
     #[test_case(Rule::UnreliableCallableCheck, Path::new("B004.py"))]
     #[test_case(Rule::UnusedLoopControlVariable, Path::new("B007.py"))]
     #[test_case(Rule::UselessComparison, Path::new("B015.py"))]
+    #[test_case(Rule::UselessComparison, Path::new("B015.ipynb"))]
     #[test_case(Rule::UselessContextlibSuppress, Path::new("B022.py"))]
     #[test_case(Rule::UselessExpression, Path::new("B018.py"))]
+    #[test_case(Rule::UselessExpression, Path::new("B018.ipynb"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

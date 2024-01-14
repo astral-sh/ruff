@@ -1,5 +1,5 @@
 use itertools::Either::{Left, Right};
-use ruff_python_ast::{self as ast, Constant, Expr, Operator};
+use ruff_python_ast::{self as ast, Expr, Operator};
 
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_parser::typing::parse_type_annotation;
@@ -57,6 +57,9 @@ enum TypingTarget<'a> {
     /// A `typing.Annotated` type e.g., `Annotated[int, ...]`.
     Annotated(&'a Expr),
 
+    /// The `typing.Hashable` type.
+    Hashable,
+
     /// Special type used to represent an unknown type (and not a typing target)
     /// which could be a type alias.
     Unknown,
@@ -76,30 +79,30 @@ impl<'a> TypingTarget<'a> {
     ) -> Option<Self> {
         match expr {
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                if semantic.match_typing_expr(value, "Optional") {
-                    Some(TypingTarget::Optional(slice.as_ref()))
-                } else if semantic.match_typing_expr(value, "Literal") {
-                    Some(TypingTarget::Literal(slice))
-                } else if semantic.match_typing_expr(value, "Union") {
-                    Some(TypingTarget::Union(slice))
-                } else if semantic.match_typing_expr(value, "Annotated") {
-                    resolve_slice_value(slice.as_ref())
-                        .next()
-                        .map(TypingTarget::Annotated)
-                } else {
-                    semantic.resolve_call_path(value).map_or(
-                        // If we can't resolve the call path, it must be defined
-                        // in the same file and could be a type alias.
-                        Some(TypingTarget::Unknown),
-                        |call_path| {
+                semantic.resolve_call_path(value).map_or(
+                    // If we can't resolve the call path, it must be defined
+                    // in the same file and could be a type alias.
+                    Some(TypingTarget::Unknown),
+                    |call_path| {
+                        if semantic.match_typing_call_path(&call_path, "Optional") {
+                            Some(TypingTarget::Optional(slice.as_ref()))
+                        } else if semantic.match_typing_call_path(&call_path, "Literal") {
+                            Some(TypingTarget::Literal(slice.as_ref()))
+                        } else if semantic.match_typing_call_path(&call_path, "Union") {
+                            Some(TypingTarget::Union(slice.as_ref()))
+                        } else if semantic.match_typing_call_path(&call_path, "Annotated") {
+                            resolve_slice_value(slice.as_ref())
+                                .next()
+                                .map(TypingTarget::Annotated)
+                        } else {
                             if is_known_type(&call_path, minor_version) {
                                 Some(TypingTarget::Known)
                             } else {
                                 Some(TypingTarget::Unknown)
                             }
-                        },
-                    )
-                }
+                        }
+                    },
+                )
             }
             Expr::BinOp(ast::ExprBinOp {
                 left,
@@ -107,15 +110,11 @@ impl<'a> TypingTarget<'a> {
                 right,
                 ..
             }) => Some(TypingTarget::PEP604Union(left, right)),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::None,
-                ..
-            }) => Some(TypingTarget::None),
-            Expr::Constant(ast::ExprConstant {
-                value: Constant::Str(string),
-                range,
-            }) => parse_type_annotation(string, *range, locator.contents())
-                .map_or(None, |(expr, _)| Some(TypingTarget::ForwardReference(expr))),
+            Expr::NoneLiteral(_) => Some(TypingTarget::None),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, range }) => {
+                parse_type_annotation(value.to_str(), *range, locator.contents())
+                    .map_or(None, |(expr, _)| Some(TypingTarget::ForwardReference(expr)))
+            }
             _ => semantic.resolve_call_path(expr).map_or(
                 // If we can't resolve the call path, it must be defined in the
                 // same file, so we assume it's `Any` as it could be a type alias.
@@ -125,6 +124,10 @@ impl<'a> TypingTarget<'a> {
                         Some(TypingTarget::Any)
                     } else if matches!(call_path.as_slice(), ["" | "builtins", "object"]) {
                         Some(TypingTarget::Object)
+                    } else if semantic.match_typing_call_path(&call_path, "Hashable")
+                        || matches!(call_path.as_slice(), ["collections", "abc", "Hashable"])
+                    {
+                        Some(TypingTarget::Hashable)
                     } else if !is_known_type(&call_path, minor_version) {
                         // If it's not a known type, we assume it's `Any`.
                         Some(TypingTarget::Unknown)
@@ -146,6 +149,7 @@ impl<'a> TypingTarget<'a> {
         match self {
             TypingTarget::None
             | TypingTarget::Optional(_)
+            | TypingTarget::Hashable
             | TypingTarget::Any
             | TypingTarget::Object
             | TypingTarget::Unknown => true,
@@ -195,6 +199,7 @@ impl<'a> TypingTarget<'a> {
             // `Literal` cannot contain `Any` as it's a dynamic value.
             TypingTarget::Literal(_)
             | TypingTarget::None
+            | TypingTarget::Hashable
             | TypingTarget::Object
             | TypingTarget::Known
             | TypingTarget::Unknown => false,
