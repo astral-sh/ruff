@@ -1312,7 +1312,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     perflint::rules::try_except_in_loop(checker, body);
                 }
                 if checker.enabled(Rule::EnumerateForLoop) {
-                    flake8_simplify::rules::use_enumerate_in_for_loop(checker, stmt);
+                    flake8_simplify::rules::enumerate_for_loop(checker, for_stmt);
                 }
             }
         }

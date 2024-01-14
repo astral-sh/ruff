@@ -1,11 +1,10 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::traversal;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, Int, MatchCase, Number, Operator, Stmt};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_semantic::analyze::typing;
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_simplify::rules::ast_bool_op::is_same_expr;
 
 /// ## What it does
 /// Checks for `for` loops with explicit loop-index variables that can be replaced
@@ -48,33 +47,74 @@ impl Violation for EnumerateForLoop {
 }
 
 /// SIM113
-pub(crate) fn use_enumerate_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
-    if !checker.semantic().current_scope().kind.is_function() {
-        return;
-    }
-    let Stmt::For(ast::StmtFor { body, .. }) = stmt else {
+pub(crate) fn enumerate_for_loop(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+    // If the loop contains a `continue`, abort.
+    if has_continue(&for_stmt.body) {
         return;
     };
 
-    // Check if loop body contains a continue statement.
-    if has_continue(body) {
-        return;
-    };
+    // If the loop contains an increment statement (e.g., `i += 1`)...
+    for stmt in &for_stmt.body {
+        if let Some(index) = match_index_increment(stmt) {
+            // Find the binding corresponding to the augmented assignment (e.g., `i += 1`).
+            let Some(id) = checker.semantic().resolve_name(index) else {
+                continue;
+            };
+            let binding = checker.semantic().binding(id);
 
-    // Check if index variable is initialized to zero prior to loop.
-    let Some((prev_stmt, index)) = get_candidate_loop_index(checker, stmt) else {
-        return;
-    };
+            // If it's not an assignment (e.g., it's a function argument), ignore it.
+            if !binding.kind.is_assignment() {
+                continue;
+            }
 
-    // Check if loop body contains an index increment statement matching `index`.
-    if body.iter().any(|stmt| is_index_increment(stmt, index)) {
-        let diagnostic = Diagnostic::new(
-            EnumerateForLoop {
-                index: checker.generator().expr(index),
-            },
-            TextRange::new(prev_stmt.start(), stmt.end()),
-        );
-        checker.diagnostics.push(diagnostic);
+            // Ensure that the index variable was initialized to 0.
+            let Some(value) = typing::find_binding_value(&index.id, binding, checker.semantic())
+            else {
+                continue;
+            };
+            let Expr::NumberLiteral(ast::ExprNumberLiteral { value: num, .. }) = value else {
+                continue;
+            };
+            let Some(int) = num.as_int() else {
+                continue;
+            };
+            if *int != Int::ZERO {
+                continue;
+            }
+
+            // If the binding is not at the same level as the `for` loop (e.g., it's in an `if`),
+            // ignore it.
+            let Some(for_loop_id) = checker.semantic().current_statement_id() else {
+                continue;
+            };
+            let Some(assignment_id) = binding.source else {
+                continue;
+            };
+            if !checker.semantic().same_branch(for_loop_id, assignment_id) {
+                continue;
+            }
+
+            // If there are multiple assignments to this variable _within_ the loop, ignore it.
+            if checker
+                .semantic()
+                .current_scope()
+                .get_all(&index.id)
+                .map(|id| checker.semantic().binding(id))
+                .filter(|binding| for_stmt.range().contains_range(binding.range()))
+                .count()
+                > 1
+            {
+                continue;
+            }
+
+            let diagnostic = Diagnostic::new(
+                EnumerateForLoop {
+                    index: index.id.to_string(),
+                },
+                stmt.range(),
+            );
+            checker.diagnostics.push(diagnostic);
+        }
     }
 }
 
@@ -117,64 +157,30 @@ fn has_continue(body: &[Stmt]) -> bool {
     })
 }
 
-/// Check previous statement of `for` loop to find a possible index variable
-/// which is initialized to zero
-/// Ex:
-/// ```python
-/// idx = 0
-/// for item in items:
-///     ...
-/// ```
-/// Return (&Stmt, &Expr) to initialization stmt and `idx` variable
-fn get_candidate_loop_index<'a>(
-    checker: &'a Checker,
-    stmt: &'a Stmt,
-) -> Option<(&'a Stmt, &'a Expr)> {
-    let parent = checker.semantic().current_statement_parent()?;
-    let suite = traversal::suite(stmt, parent)?;
-    let prev_stmt = traversal::prev_sibling(stmt, suite)?;
-    // check if it's a possible index initialization i.e. idx = 0
-    let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = prev_stmt else {
-        return None;
-    };
-    let [Expr::Name(ast::ExprName { id: _, .. })] = targets.as_slice() else {
-        return None;
-    };
-    if let Expr::NumberLiteral(ast::ExprNumberLiteral {
-        value: Number::Int(value),
-        ..
-    }) = value.as_ref()
-    {
-        if matches!(*value, Int::ZERO) {
-            return Some((prev_stmt, &targets[0]));
-        }
-    }
-
-    None
-}
-
-// Check if `stmt` is `index_var` += 1
-fn is_index_increment(stmt: &Stmt, index_var: &Expr) -> bool {
+/// If the statement is an index increment statement (e.g., `i += 1`), return
+/// the name of the index variable.
+fn match_index_increment(stmt: &Stmt) -> Option<&ast::ExprName> {
     let Stmt::AugAssign(ast::StmtAugAssign {
-        target, op, value, ..
+        target,
+        op: Operator::Add,
+        value,
+        ..
     }) = stmt
     else {
-        return false;
+        return None;
     };
-    if !matches!(op, Operator::Add) {
-        return false;
-    }
-    let Some(_) = is_same_expr(index_var, target) else {
-        return false;
-    };
+
+    let name = target.as_name_expr()?;
+
     if let Expr::NumberLiteral(ast::ExprNumberLiteral {
         value: Number::Int(value),
         ..
     }) = value.as_ref()
     {
         if matches!(*value, Int::ONE) {
-            return true;
+            return Some(name);
         }
     }
-    false
+
+    None
 }
