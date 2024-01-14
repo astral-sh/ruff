@@ -455,13 +455,15 @@ fn collect_dunder_all_lines(
     range: TextRange,
     locator: &Locator,
 ) -> Option<(Vec<DunderAllLine>, bool)> {
+    // These first three variables are used for keeping track of state
+    // regarding the entirety of the `__all__` definition...
     let mut parentheses_open = false;
-    let mut lines = vec![];
-    let mut first_item_in_line = None;
-    let mut following_items_in_line = vec![];
-    let mut comment_range_start = None;
-    let mut comment_in_line = None;
     let mut ends_with_trailing_comma = false;
+    let mut lines = vec![];
+    // ... all state regarding a single line of an `__all__` definition
+    // is encapsulated in this variable
+    let mut line_state = LineState::default();
+
     // `lex_starts_at()` gives us absolute ranges rather than relative ranges,
     // but (surprisingly) we still need to pass in the slice of code we want it to lex,
     // rather than the whole source file:
@@ -488,63 +490,84 @@ fn collect_dunder_all_lines(
                 parentheses_open = true;
             }
             Tok::Rpar | Tok::Rsqb | Tok::Newline => {
-                if let Some(first_item) = first_item_in_line {
-                    lines.push(DunderAllLine::OneOrMoreItems(LineWithItems {
-                        first_item,
-                        following_items: std::mem::take(&mut following_items_in_line),
-                        trailing_comment_range: comment_in_line,
-                    }));
-                } else {
-                    if let Some(comment) = comment_in_line {
-                        lines.push(DunderAllLine::JustAComment(LineWithJustAComment(comment)));
-                    }
+                if let Some(line) = line_state.into_dunder_all_line() {
+                    lines.push(line);
                 }
                 break;
             }
             Tok::NonLogicalNewline => {
-                if let Some(first_item) = first_item_in_line {
-                    lines.push(DunderAllLine::OneOrMoreItems(LineWithItems {
-                        first_item,
-                        following_items: std::mem::take(&mut following_items_in_line),
-                        trailing_comment_range: comment_in_line,
-                    }));
-                    first_item_in_line = None;
-                    comment_in_line = None;
-                    comment_range_start = None;
-                } else {
-                    if let Some(comment) = comment_in_line {
-                        lines.push(DunderAllLine::JustAComment(LineWithJustAComment(comment)));
-                        comment_in_line = None;
-                        comment_range_start = None;
-                    }
+                if let Some(line) = line_state.into_dunder_all_line() {
+                    lines.push(line);
                 }
+                line_state = LineState::default();
             }
             Tok::Comment(_) => {
-                comment_in_line = {
-                    if let Some(range_start) = comment_range_start {
-                        Some(TextRange::new(range_start, subrange.end()))
-                    } else {
-                        Some(subrange)
-                    }
-                }
+                line_state.receive_comment_token(subrange);
             }
             Tok::String { value, .. } => {
-                if first_item_in_line.is_none() {
-                    first_item_in_line = Some((value, subrange));
-                } else {
-                    following_items_in_line.push((value, subrange));
-                }
+                line_state.receive_string_token(value, subrange);
                 ends_with_trailing_comma = false;
-                comment_range_start = Some(subrange.end());
             }
             Tok::Comma => {
-                comment_range_start = Some(subrange.end());
+                line_state.receive_comma_token(subrange);
                 ends_with_trailing_comma = true;
             }
             _ => return None,
         }
     }
     Some((lines, ends_with_trailing_comma))
+}
+
+/// This struct is for keeping track of state
+/// regarding a single line in an `__all__` definition.
+/// It is purely internal to `collect_dunder_all_lines()`,
+/// and should not be used outside that function.
+#[derive(Debug, Default)]
+struct LineState {
+    first_item_in_line: Option<(String, TextRange)>,
+    following_items_in_line: Vec<(String, TextRange)>,
+    comment_range_start: Option<TextSize>,
+    comment_in_line: Option<TextRange>,
+}
+
+impl LineState {
+    fn receive_string_token(&mut self, token_value: String, token_range: TextRange) {
+        if self.first_item_in_line.is_none() {
+            self.first_item_in_line = Some((token_value, token_range));
+        } else {
+            self.following_items_in_line
+                .push((token_value, token_range));
+        }
+        self.comment_range_start = Some(token_range.end());
+    }
+
+    fn receive_comma_token(&mut self, token_range: TextRange) {
+        self.comment_range_start = Some(token_range.end());
+    }
+
+    fn receive_comment_token(&mut self, token_range: TextRange) {
+        self.comment_in_line = {
+            if let Some(range_start) = self.comment_range_start {
+                Some(TextRange::new(range_start, token_range.end()))
+            } else {
+                Some(token_range)
+            }
+        }
+    }
+
+    fn into_dunder_all_line(self) -> Option<DunderAllLine> {
+        if let Some(first_item) = self.first_item_in_line {
+            Some(DunderAllLine::OneOrMoreItems(LineWithItems {
+                first_item,
+                following_items: self.following_items_in_line,
+                trailing_comment_range: self.comment_in_line,
+            }))
+        } else {
+            self.comment_in_line.map(|comment_range| {
+                DunderAllLine::JustAComment(LineWithJustAComment(comment_range))
+            })
+        }
+    }
 }
 
 /// Instances of this struct represent source-code lines in the middle
