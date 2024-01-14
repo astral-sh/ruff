@@ -14,7 +14,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{
 };
 use crate::settings::LinterSettings;
 
-/// Return the amount of indentation, expanding tabs to the next multiple of 8.
+/// Return the amount of indentation, expanding tabs to the next multiple of the settings' tab size.
 fn expand_indent(line: &str, settings: &LinterSettings) -> usize {
     let line = line.trim_end_matches(['\n', '\r']);
 
