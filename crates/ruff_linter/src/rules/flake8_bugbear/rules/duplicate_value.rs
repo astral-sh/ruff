@@ -46,31 +46,49 @@ impl AlwaysFixableViolation for DuplicateValue {
 /// B033
 pub(crate) fn duplicate_value(checker: &mut Checker, elts: &[Expr], range: TextRange) {
     let mut seen_values: FxHashSet<ComparableExpr> = FxHashSet::default();
+    let mut duplicate_indices: Vec<usize> = Vec::new();
+    let mut unique_indices: Vec<usize> = Vec::new();
+
     for (index, elt) in elts.iter().enumerate() {
         if elt.is_literal_expr() {
             let comparable_value: ComparableExpr = elt.into();
 
-            if !seen_values.insert(comparable_value) {
-                let mut diagnostic = Diagnostic::new(
-                    DuplicateValue {
-                        value: checker.generator().expr(elt),
-                    },
-                    elt.range(),
-                );
-
-                let mut elts_without_duplicate = elts.to_owned();
-                elts_without_duplicate.remove(index);
-
-                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                    checker.generator().expr(&Expr::Set(ExprSet {
-                        elts: elts_without_duplicate,
-                        range,
-                    })),
-                    range,
-                )));
-
-                checker.diagnostics.push(diagnostic);
+            if seen_values.insert(comparable_value) {
+                unique_indices.push(index);
+            } else {
+                duplicate_indices.push(index);
             }
-        };
+        } else {
+            unique_indices.push(index);
+        }
+    }
+
+    if duplicate_indices.is_empty() {
+        return;
+    }
+
+    let fix = Fix::safe_edit(Edit::range_replacement(
+        checker.generator().expr(&Expr::Set(ExprSet {
+            elts: unique_indices
+                .into_iter()
+                .map(|index| elts[index].clone())
+                .collect(),
+            range: TextRange::default(),
+        })),
+        range,
+    ));
+
+    for index in duplicate_indices {
+        let elt = &elts[index];
+        let mut diagnostic = Diagnostic::new(
+            DuplicateValue {
+                value: checker.generator().expr(elt),
+            },
+            elt.range(),
+        );
+
+        diagnostic.set_fix(fix.clone());
+
+        checker.diagnostics.push(diagnostic);
     }
 }
