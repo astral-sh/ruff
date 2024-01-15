@@ -1,5 +1,12 @@
 #: E401
 import os, sys
+import re as regex, string  # also with a comment!
+
+def blah():
+    import datetime as dt, copy 
+    def nested_and_tested():
+        import builtins, textwrap as tw
+
 #: Okay
 import os
 import sys

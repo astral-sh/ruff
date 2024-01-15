@@ -1,0 +1,86 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E40.py:2:1: E401 [*] Multiple imports on one line
+  |
+1 | #: E401
+2 | import os, sys
+  | ^^^^^^^^^^^^^^ E401
+3 | import re as regex, string  # also with a comment!
+  |
+  = help: Split imports onto multiple lines
+
+ℹ Safe fix
+1 1 | #: E401
+2   |-import os, sys
+  2 |+import os
+  3 |+import sys
+3 4 | import re as regex, string  # also with a comment!
+4 5 | 
+5 6 | def blah():
+
+E40.py:3:1: E401 [*] Multiple imports on one line
+  |
+1 | #: E401
+2 | import os, sys
+3 | import re as regex, string  # also with a comment!
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+4 | 
+5 | def blah():
+  |
+  = help: Split imports onto multiple lines
+
+ℹ Safe fix
+1 1 | #: E401
+2 2 | import os, sys
+3   |-import re as regex, string  # also with a comment!
+  3 |+import re as regex
+  4 |+import string  # also with a comment!
+4 5 | 
+5 6 | def blah():
+6 7 |     import datetime as dt, copy 
+
+E40.py:6:5: E401 [*] Multiple imports on one line
+  |
+5 | def blah():
+6 |     import datetime as dt, copy 
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+7 |     def nested_and_tested():
+8 |         import builtins, textwrap as tw
+  |
+  = help: Split imports onto multiple lines
+
+ℹ Safe fix
+3 3 | import re as regex, string  # also with a comment!
+4 4 | 
+5 5 | def blah():
+6   |-    import datetime as dt, copy 
+  6 |+    import datetime as dt
+  7 |+    import copy 
+7 8 |     def nested_and_tested():
+8 9 |         import builtins, textwrap as tw
+9 10 | 
+
+E40.py:8:9: E401 [*] Multiple imports on one line
+   |
+ 6 |     import datetime as dt, copy 
+ 7 |     def nested_and_tested():
+ 8 |         import builtins, textwrap as tw
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+ 9 | 
+10 | #: Okay
+   |
+   = help: Split imports onto multiple lines
+
+ℹ Safe fix
+5  5  | def blah():
+6  6  |     import datetime as dt, copy 
+7  7  |     def nested_and_tested():
+8     |-        import builtins, textwrap as tw
+   8  |+        import builtins
+   9  |+        import textwrap as tw
+9  10 | 
+10 11 | #: Okay
+11 12 | import os
+
+

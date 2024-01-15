@@ -6,8 +6,40 @@ E40.py:2:1: E401 Multiple imports on one line
 1 | #: E401
 2 | import os, sys
   | ^^^^^^^^^^^^^^ E401
-3 | #: Okay
-4 | import os
+3 | import re as regex, string  # also with a comment!
   |
+  = help: Split imports onto multiple lines
+
+E40.py:3:1: E401 Multiple imports on one line
+  |
+1 | #: E401
+2 | import os, sys
+3 | import re as regex, string  # also with a comment!
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+4 | 
+5 | def blah():
+  |
+  = help: Split imports onto multiple lines
+
+E40.py:6:5: E401 Multiple imports on one line
+  |
+5 | def blah():
+6 |     import datetime as dt, copy 
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+7 |     def nested_and_tested():
+8 |         import builtins, textwrap as tw
+  |
+  = help: Split imports onto multiple lines
+
+E40.py:8:9: E401 Multiple imports on one line
+   |
+ 6 |     import datetime as dt, copy 
+ 7 |     def nested_and_tested():
+ 8 |         import builtins, textwrap as tw
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+ 9 | 
+10 | #: Okay
+   |
+   = help: Split imports onto multiple lines
 
 
