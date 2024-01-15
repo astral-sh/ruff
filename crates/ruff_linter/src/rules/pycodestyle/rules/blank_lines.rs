@@ -384,7 +384,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
         let mut last_token: Option<TokenKind> = None;
         let mut parens = 0u32;
 
-        while let Some((token, range)) = self.tokens.next() {
+        for (token, range) in self.tokens.by_ref() {
             let token_kind = TokenKind::from_token(token);
 
             if matches!(token_kind, TokenKind::Indent | TokenKind::Dedent) {
@@ -407,7 +407,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     // Ideally, we would like to have a "async def" token since we care about the "def" part.
                     // As a work around, we ignore the first token if it is "async".
                     if token_kind != TokenKind::Async {
-                        first_token = Some(token_kind.clone());
+                        first_token = Some(token_kind);
                     }
 
                     if first_token_range.is_none() {
