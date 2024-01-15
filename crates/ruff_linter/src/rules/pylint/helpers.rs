@@ -289,6 +289,7 @@ pub(super) fn is_known_dunder_method(method: &str) -> bool {
             | "__pos__"
             | "__post_init__"
             | "__pow__"
+            | "__prepare__"
             | "__radd__"
             | "__rand__"
             | "__rdivmod__"
