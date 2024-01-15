@@ -1,156 +1,164 @@
 ---
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
-E40.py:11:1: E402 Module level import not at top of file
+E40.py:6:8: E402 Module level import not at top of file
+  |
+4 | import re as regex, string; x = 1
+5 | 
+6 | x = 1; import re as regex, string
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+  |
+
+E40.py:15:1: E402 Module level import not at top of file
    |
-10 | #: Okay
-11 | import os
+14 | #: Okay
+15 | import os
    | ^^^^^^^^^ E402
-12 | import sys
-   |
-
-E40.py:12:1: E402 Module level import not at top of file
-   |
-10 | #: Okay
-11 | import os
-12 | import sys
-   | ^^^^^^^^^^ E402
-13 | 
-14 | from subprocess import Popen, PIPE
-   |
-
-E40.py:14:1: E402 Module level import not at top of file
-   |
-12 | import sys
-13 | 
-14 | from subprocess import Popen, PIPE
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
-15 | 
-16 | from myclass import MyClass
+16 | import sys
    |
 
 E40.py:16:1: E402 Module level import not at top of file
    |
-14 | from subprocess import Popen, PIPE
-15 | 
-16 | from myclass import MyClass
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
-17 | from foo.bar.yourclass import YourClass
+14 | #: Okay
+15 | import os
+16 | import sys
+   | ^^^^^^^^^^ E402
+17 | 
+18 | from subprocess import Popen, PIPE
    |
 
-E40.py:17:1: E402 Module level import not at top of file
+E40.py:18:1: E402 Module level import not at top of file
    |
-16 | from myclass import MyClass
-17 | from foo.bar.yourclass import YourClass
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
-18 | 
-19 | import myclass
-   |
-
-E40.py:19:1: E402 Module level import not at top of file
-   |
-17 | from foo.bar.yourclass import YourClass
-18 | 
-19 | import myclass
-   | ^^^^^^^^^^^^^^ E402
-20 | import foo.bar.yourclass
-21 | #: Okay
+16 | import sys
+17 | 
+18 | from subprocess import Popen, PIPE
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+19 | 
+20 | from myclass import MyClass
    |
 
 E40.py:20:1: E402 Module level import not at top of file
    |
-19 | import myclass
-20 | import foo.bar.yourclass
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ E402
-21 | #: Okay
-22 | __all__ = ['abc']
+18 | from subprocess import Popen, PIPE
+19 | 
+20 | from myclass import MyClass
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+21 | from foo.bar.yourclass import YourClass
+   |
+
+E40.py:21:1: E402 Module level import not at top of file
+   |
+20 | from myclass import MyClass
+21 | from foo.bar.yourclass import YourClass
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+22 | 
+23 | import myclass
+   |
+
+E40.py:23:1: E402 Module level import not at top of file
+   |
+21 | from foo.bar.yourclass import YourClass
+22 | 
+23 | import myclass
+   | ^^^^^^^^^^^^^^ E402
+24 | import foo.bar.yourclass
+25 | #: Okay
    |
 
 E40.py:24:1: E402 Module level import not at top of file
    |
-22 | __all__ = ['abc']
-23 | 
-24 | import foo
-   | ^^^^^^^^^^ E402
+23 | import myclass
+24 | import foo.bar.yourclass
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ E402
 25 | #: Okay
-26 | __version__ = "42"
+26 | __all__ = ['abc']
    |
 
 E40.py:28:1: E402 Module level import not at top of file
    |
-26 | __version__ = "42"
+26 | __all__ = ['abc']
 27 | 
 28 | import foo
    | ^^^^^^^^^^ E402
 29 | #: Okay
-30 | __author__ = "Simon Gomizelj"
+30 | __version__ = "42"
    |
 
 E40.py:32:1: E402 Module level import not at top of file
    |
-30 | __author__ = "Simon Gomizelj"
+30 | __version__ = "42"
 31 | 
 32 | import foo
    | ^^^^^^^^^^ E402
 33 | #: Okay
-34 | try:
+34 | __author__ = "Simon Gomizelj"
    |
 
-E40.py:43:1: E402 Module level import not at top of file
+E40.py:36:1: E402 Module level import not at top of file
    |
-41 |     print('made attempt to import foo')
-42 | 
-43 | import bar
+34 | __author__ = "Simon Gomizelj"
+35 | 
+36 | import foo
    | ^^^^^^^^^^ E402
-44 | #: Okay
-45 | with warnings.catch_warnings():
+37 | #: Okay
+38 | try:
    |
 
-E40.py:49:1: E402 Module level import not at top of file
+E40.py:47:1: E402 Module level import not at top of file
    |
-47 |     import foo
-48 | 
-49 | import bar
+45 |     print('made attempt to import foo')
+46 | 
+47 | import bar
    | ^^^^^^^^^^ E402
-50 | #: Okay
-51 | if False:
+48 | #: Okay
+49 | with warnings.catch_warnings():
    |
 
-E40.py:58:1: E402 Module level import not at top of file
+E40.py:53:1: E402 Module level import not at top of file
    |
-56 |     import mwahaha
-57 | 
-58 | import bar
+51 |     import foo
+52 | 
+53 | import bar
    | ^^^^^^^^^^ E402
-59 | #: E402
-60 | VERSION = '1.2.3'
+54 | #: Okay
+55 | if False:
    |
 
 E40.py:62:1: E402 Module level import not at top of file
    |
-60 | VERSION = '1.2.3'
+60 |     import mwahaha
 61 | 
-62 | import foo
+62 | import bar
    | ^^^^^^^^^^ E402
 63 | #: E402
-64 | import foo
+64 | VERSION = '1.2.3'
    |
 
-E40.py:64:1: E402 Module level import not at top of file
+E40.py:66:1: E402 Module level import not at top of file
    |
-62 | import foo
-63 | #: E402
-64 | import foo
-   | ^^^^^^^^^^ E402
+64 | VERSION = '1.2.3'
 65 | 
-66 | a = 1
+66 | import foo
+   | ^^^^^^^^^^ E402
+67 | #: E402
+68 | import foo
    |
 
 E40.py:68:1: E402 Module level import not at top of file
    |
-66 | a = 1
-67 | 
-68 | import bar
+66 | import foo
+67 | #: E402
+68 | import foo
+   | ^^^^^^^^^^ E402
+69 | 
+70 | a = 1
+   |
+
+E40.py:72:1: E402 Module level import not at top of file
+   |
+70 | a = 1
+71 | 
+72 | import bar
    | ^^^^^^^^^^ E402
    |
 

@@ -7,6 +7,7 @@ E40.py:2:1: E401 Multiple imports on one line
 2 | import os, sys
   | ^^^^^^^^^^^^^^ E401
 3 | import re as regex, string  # also with a comment!
+4 | import re as regex, string; x = 1
   |
   = help: Split imports onto multiple lines
 
@@ -16,29 +17,48 @@ E40.py:3:1: E401 Multiple imports on one line
 2 | import os, sys
 3 | import re as regex, string  # also with a comment!
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
-4 | 
-5 | def blah():
+4 | import re as regex, string; x = 1
   |
   = help: Split imports onto multiple lines
 
-E40.py:6:5: E401 Multiple imports on one line
+E40.py:4:1: E401 Multiple imports on one line
   |
-5 | def blah():
-6 |     import datetime as dt, copy 
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
-7 |     def nested_and_tested():
-8 |         import builtins, textwrap as tw
+2 | import os, sys
+3 | import re as regex, string  # also with a comment!
+4 | import re as regex, string; x = 1
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+5 | 
+6 | x = 1; import re as regex, string
   |
   = help: Split imports onto multiple lines
 
-E40.py:8:9: E401 Multiple imports on one line
+E40.py:6:8: E401 Multiple imports on one line
+  |
+4 | import re as regex, string; x = 1
+5 | 
+6 | x = 1; import re as regex, string
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+  |
+  = help: Split imports onto multiple lines
+
+E40.py:10:5: E401 Multiple imports on one line
    |
- 6 |     import datetime as dt, copy 
- 7 |     def nested_and_tested():
- 8 |         import builtins, textwrap as tw
+ 9 | def blah():
+10 |     import datetime as dt, copy 
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+11 |     def nested_and_tested():
+12 |         import builtins, textwrap as tw
+   |
+   = help: Split imports onto multiple lines
+
+E40.py:12:9: E401 Multiple imports on one line
+   |
+10 |     import datetime as dt, copy 
+11 |     def nested_and_tested():
+12 |         import builtins, textwrap as tw
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
- 9 | 
-10 | #: Okay
+13 | 
+14 | #: Okay
    |
    = help: Split imports onto multiple lines
 

@@ -7,6 +7,7 @@ E40.py:2:1: E401 [*] Multiple imports on one line
 2 | import os, sys
   | ^^^^^^^^^^^^^^ E401
 3 | import re as regex, string  # also with a comment!
+4 | import re as regex, string; x = 1
   |
   = help: Split imports onto multiple lines
 
@@ -16,8 +17,8 @@ E40.py:2:1: E401 [*] Multiple imports on one line
   2 |+import os
   3 |+import sys
 3 4 | import re as regex, string  # also with a comment!
-4 5 | 
-5 6 | def blah():
+4 5 | import re as regex, string; x = 1
+5 6 | 
 
 E40.py:3:1: E401 [*] Multiple imports on one line
   |
@@ -25,8 +26,7 @@ E40.py:3:1: E401 [*] Multiple imports on one line
 2 | import os, sys
 3 | import re as regex, string  # also with a comment!
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
-4 | 
-5 | def blah():
+4 | import re as regex, string; x = 1
   |
   = help: Split imports onto multiple lines
 
@@ -36,51 +36,93 @@ E40.py:3:1: E401 [*] Multiple imports on one line
 3   |-import re as regex, string  # also with a comment!
   3 |+import re as regex
   4 |+import string  # also with a comment!
-4 5 | 
-5 6 | def blah():
-6 7 |     import datetime as dt, copy 
+4 5 | import re as regex, string; x = 1
+5 6 | 
+6 7 | x = 1; import re as regex, string
 
-E40.py:6:5: E401 [*] Multiple imports on one line
+E40.py:4:1: E401 [*] Multiple imports on one line
   |
-5 | def blah():
-6 |     import datetime as dt, copy 
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
-7 |     def nested_and_tested():
-8 |         import builtins, textwrap as tw
+2 | import os, sys
+3 | import re as regex, string  # also with a comment!
+4 | import re as regex, string; x = 1
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+5 | 
+6 | x = 1; import re as regex, string
+  |
+  = help: Split imports onto multiple lines
+
+ℹ Safe fix
+1 1 | #: E401
+2 2 | import os, sys
+3 3 | import re as regex, string  # also with a comment!
+4   |-import re as regex, string; x = 1
+  4 |+import re as regex
+  5 |+import string; x = 1
+5 6 | 
+6 7 | x = 1; import re as regex, string
+7 8 | 
+
+E40.py:6:8: E401 [*] Multiple imports on one line
+  |
+4 | import re as regex, string; x = 1
+5 | 
+6 | x = 1; import re as regex, string
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
   |
   = help: Split imports onto multiple lines
 
 ℹ Safe fix
 3 3 | import re as regex, string  # also with a comment!
-4 4 | 
-5 5 | def blah():
-6   |-    import datetime as dt, copy 
-  6 |+    import datetime as dt
-  7 |+    import copy 
-7 8 |     def nested_and_tested():
-8 9 |         import builtins, textwrap as tw
-9 10 | 
+4 4 | import re as regex, string; x = 1
+5 5 | 
+6   |-x = 1; import re as regex, string
+  6 |+x = 1; import re as regex
+  7 |+import string
+7 8 | 
+8 9 | 
+9 10 | def blah():
 
-E40.py:8:9: E401 [*] Multiple imports on one line
+E40.py:10:5: E401 [*] Multiple imports on one line
    |
- 6 |     import datetime as dt, copy 
- 7 |     def nested_and_tested():
- 8 |         import builtins, textwrap as tw
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
- 9 | 
-10 | #: Okay
+ 9 | def blah():
+10 |     import datetime as dt, copy 
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+11 |     def nested_and_tested():
+12 |         import builtins, textwrap as tw
    |
    = help: Split imports onto multiple lines
 
 ℹ Safe fix
-5  5  | def blah():
-6  6  |     import datetime as dt, copy 
-7  7  |     def nested_and_tested():
-8     |-        import builtins, textwrap as tw
-   8  |+        import builtins
-   9  |+        import textwrap as tw
-9  10 | 
-10 11 | #: Okay
-11 12 | import os
+7  7  | 
+8  8  | 
+9  9  | def blah():
+10    |-    import datetime as dt, copy 
+   10 |+    import datetime as dt
+   11 |+    import copy 
+11 12 |     def nested_and_tested():
+12 13 |         import builtins, textwrap as tw
+13 14 | 
+
+E40.py:12:9: E401 [*] Multiple imports on one line
+   |
+10 |     import datetime as dt, copy 
+11 |     def nested_and_tested():
+12 |         import builtins, textwrap as tw
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+13 | 
+14 | #: Okay
+   |
+   = help: Split imports onto multiple lines
+
+ℹ Safe fix
+9  9  | def blah():
+10 10 |     import datetime as dt, copy 
+11 11 |     def nested_and_tested():
+12    |-        import builtins, textwrap as tw
+   12 |+        import builtins
+   13 |+        import textwrap as tw
+13 14 | 
+14 15 | #: Okay
+15 16 | import os
 
 

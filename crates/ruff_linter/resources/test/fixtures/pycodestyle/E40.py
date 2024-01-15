@@ -1,6 +1,10 @@
 #: E401
 import os, sys
 import re as regex, string  # also with a comment!
+import re as regex, string; x = 1
+
+x = 1; import re as regex, string
+
 
 def blah():
     import datetime as dt, copy 
