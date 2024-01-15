@@ -35,6 +35,7 @@ mod source_code;
 use crate::formatter::Formatter;
 use crate::group_id::UniqueGroupIdBuilder;
 use crate::prelude::TagKind;
+use std::fmt;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::num::{NonZeroU16, NonZeroU8, TryFromIntError};
@@ -113,6 +114,12 @@ impl Default for IndentWidth {
     }
 }
 
+impl Display for IndentWidth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
 impl TryFrom<u8> for IndentWidth {
     type Error = TryFromIntError;
 
@@ -143,6 +150,12 @@ impl LineWidth {
 impl Default for LineWidth {
     fn default() -> Self {
         Self(NonZeroU16::new(80).unwrap())
+    }
+}
+
+impl Display for LineWidth {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 

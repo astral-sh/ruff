@@ -154,6 +154,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     parameters,
                 );
             }
+            if checker.enabled(Rule::GeneratorReturnFromIterMethod) {
+                flake8_pyi::rules::bad_generator_return_type(function_def, checker);
+            }
             if checker.enabled(Rule::CustomTypeVarReturnType) {
                 flake8_pyi::rules::custom_type_var_return_type(
                     checker,
@@ -344,17 +347,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::FStringDocstring) {
                 flake8_bugbear::rules::f_string_docstring(checker, body);
             }
-            if let ScopeKind::Class(class_def) = checker.semantic.current_scope().kind {
-                if checker.enabled(Rule::BuiltinAttributeShadowing) {
-                    flake8_builtins::rules::builtin_method_shadowing(
-                        checker,
-                        class_def,
-                        name,
-                        decorator_list,
-                        name.range(),
-                    );
-                }
-            } else {
+            if !checker.semantic.current_scope().kind.is_class() {
                 if checker.enabled(Rule::BuiltinVariableShadowing) {
                     flake8_builtins::rules::builtin_variable_shadowing(checker, name, name.range());
                 }
@@ -362,14 +355,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::TrioAsyncFunctionWithTimeout) {
                 flake8_trio::rules::async_function_with_timeout(checker, function_def);
             }
-            #[cfg(feature = "unreachable-code")]
-            if checker.enabled(Rule::UnreachableCode) {
-                checker
-                    .diagnostics
-                    .extend(ruff::rules::unreachable::in_function(name, body));
-            }
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());
+            }
+            if checker.enabled(Rule::SslWithBadDefaults) {
+                flake8_bandit::rules::ssl_with_bad_defaults(checker, function_def);
             }
         }
         Stmt::Return(_) => {
@@ -548,6 +538,24 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::DeprecatedMockImport) {
                 pyupgrade::rules::deprecated_mock_import(checker, stmt);
+            }
+            if checker.any_enabled(&[
+                Rule::SuspiciousTelnetlibImport,
+                Rule::SuspiciousFtplibImport,
+                Rule::SuspiciousPickleImport,
+                Rule::SuspiciousSubprocessImport,
+                Rule::SuspiciousXmlEtreeImport,
+                Rule::SuspiciousXmlSaxImport,
+                Rule::SuspiciousXmlExpatImport,
+                Rule::SuspiciousXmlMinidomImport,
+                Rule::SuspiciousXmlPulldomImport,
+                Rule::SuspiciousLxmlImport,
+                Rule::SuspiciousXmlrpcImport,
+                Rule::SuspiciousHttpoxyImport,
+                Rule::SuspiciousPycryptoImport,
+                Rule::SuspiciousPyghmiImport,
+            ]) {
+                flake8_bandit::rules::suspicious_imports(checker, stmt);
             }
 
             for alias in names {
@@ -747,6 +755,24 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if let Some(module) = module {
                     pyupgrade::rules::unnecessary_builtin_import(checker, stmt, module, names);
                 }
+            }
+            if checker.any_enabled(&[
+                Rule::SuspiciousTelnetlibImport,
+                Rule::SuspiciousFtplibImport,
+                Rule::SuspiciousPickleImport,
+                Rule::SuspiciousSubprocessImport,
+                Rule::SuspiciousXmlEtreeImport,
+                Rule::SuspiciousXmlSaxImport,
+                Rule::SuspiciousXmlExpatImport,
+                Rule::SuspiciousXmlMinidomImport,
+                Rule::SuspiciousXmlPulldomImport,
+                Rule::SuspiciousLxmlImport,
+                Rule::SuspiciousXmlrpcImport,
+                Rule::SuspiciousHttpoxyImport,
+                Rule::SuspiciousPycryptoImport,
+                Rule::SuspiciousPyghmiImport,
+            ]) {
+                flake8_bandit::rules::suspicious_imports(checker, stmt);
             }
             if checker.enabled(Rule::BannedApi) {
                 if let Some(module) =
@@ -1232,9 +1258,10 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             },
         ) => {
             if checker.any_enabled(&[
-                Rule::UnusedLoopControlVariable,
+                Rule::EnumerateForLoop,
                 Rule::IncorrectDictIterator,
                 Rule::UnnecessaryEnumerate,
+                Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
             ]) {
                 checker.deferred.for_loops.push(checker.semantic.snapshot());

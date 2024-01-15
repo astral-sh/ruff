@@ -25,12 +25,10 @@ use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::pycodestyle;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore, PreviewMode, PythonVersion,
-    SerializationFormat, UnsafeFixes, Version,
+    ExtensionMapping, FilePattern, FilePatternSet, PerFileIgnore, PerFileIgnores, PreviewMode,
+    PythonVersion, SerializationFormat, UnsafeFixes, Version,
 };
-use ruff_linter::settings::{
-    resolve_per_file_ignores, LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS,
-};
+use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
 use ruff_linter::{
     fs, warn_user, warn_user_once, warn_user_once_by_id, RuleSelector, RUFF_PKG_VERSION,
 };
@@ -117,6 +115,7 @@ pub struct Configuration {
     pub output_format: Option<SerializationFormat>,
     pub preview: Option<PreviewMode>,
     pub required_version: Option<Version>,
+    pub extension: Option<ExtensionMapping>,
     pub show_fixes: Option<bool>,
     pub show_source: Option<bool>,
 
@@ -174,6 +173,7 @@ impl Configuration {
 
         let formatter = FormatterSettings {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
+            extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
             target_version: match target_version {
                 PythonVersion::Py37 => ruff_python_formatter::PythonVersion::Py37,
@@ -241,7 +241,7 @@ impl Configuration {
             linter: LinterSettings {
                 rules: lint.as_rule_table(lint_preview),
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
-                extension: lint.extension.unwrap_or_default(),
+                extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
                 target_version,
                 project_root: project_root.to_path_buf(),
@@ -258,7 +258,7 @@ impl Configuration {
                 line_length,
                 tab_size: self.indent_width.unwrap_or_default(),
                 namespace_packages: self.namespace_packages.unwrap_or_default(),
-                per_file_ignores: resolve_per_file_ignores(
+                per_file_ignores: PerFileIgnores::resolve(
                     lint.per_file_ignores
                         .unwrap_or_default()
                         .into_iter()
@@ -496,6 +496,9 @@ impl Configuration {
                 .map(|src| resolve_src(&src, project_root))
                 .transpose()?,
             target_version: options.target_version,
+            // `--extension` is a hidden command-line argument that isn't supported in configuration
+            // files at present.
+            extension: None,
 
             lint: LintConfiguration::from_options(lint, project_root)?,
             format: FormatConfiguration::from_options(
@@ -538,6 +541,7 @@ impl Configuration {
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
             preview: self.preview.or(config.preview),
+            extension: self.extension.or(config.extension),
 
             lint: self.lint.combine(config.lint),
             format: self.format.combine(config.format),
@@ -549,7 +553,6 @@ impl Configuration {
 pub struct LintConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
-    pub extension: Option<ExtensionMapping>,
 
     // Rule selection
     pub extend_per_file_ignores: Vec<PerFileIgnore>,
@@ -616,9 +619,6 @@ impl LintConfiguration {
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
         Ok(LintConfiguration {
-            // `--extension` is a hidden command-line argument that isn't supported in configuration
-            // files at present.
-            extension: None,
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
@@ -954,7 +954,6 @@ impl LintConfiguration {
         Self {
             exclude: self.exclude.or(config.exclude),
             preview: self.preview.or(config.preview),
-            extension: self.extension.or(config.extension),
             rule_selections: config
                 .rule_selections
                 .into_iter()
@@ -1031,6 +1030,7 @@ impl LintConfiguration {
 pub struct FormatConfiguration {
     pub exclude: Option<Vec<FilePattern>>,
     pub preview: Option<PreviewMode>,
+    pub extension: Option<ExtensionMapping>,
 
     pub indent_style: Option<IndentStyle>,
     pub quote_style: Option<QuoteStyle>,
@@ -1044,6 +1044,9 @@ impl FormatConfiguration {
     #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: FormatOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
+            // `--extension` is a hidden command-line argument that isn't supported in configuration
+            // files at present.
+            extension: None,
             exclude: options.exclude.map(|paths| {
                 paths
                     .into_iter()
@@ -1077,18 +1080,19 @@ impl FormatConfiguration {
 
     #[must_use]
     #[allow(clippy::needless_pass_by_value)]
-    pub fn combine(self, other: Self) -> Self {
+    pub fn combine(self, config: Self) -> Self {
         Self {
-            exclude: self.exclude.or(other.exclude),
-            preview: self.preview.or(other.preview),
-            indent_style: self.indent_style.or(other.indent_style),
-            quote_style: self.quote_style.or(other.quote_style),
-            magic_trailing_comma: self.magic_trailing_comma.or(other.magic_trailing_comma),
-            line_ending: self.line_ending.or(other.line_ending),
-            docstring_code_format: self.docstring_code_format.or(other.docstring_code_format),
+            exclude: self.exclude.or(config.exclude),
+            preview: self.preview.or(config.preview),
+            extension: self.extension.or(config.extension),
+            indent_style: self.indent_style.or(config.indent_style),
+            quote_style: self.quote_style.or(config.quote_style),
+            magic_trailing_comma: self.magic_trailing_comma.or(config.magic_trailing_comma),
+            line_ending: self.line_ending.or(config.line_ending),
+            docstring_code_format: self.docstring_code_format.or(config.docstring_code_format),
             docstring_code_line_width: self
                 .docstring_code_line_width
-                .or(other.docstring_code_line_width),
+                .or(config.docstring_code_line_width),
         }
     }
 }
@@ -1219,8 +1223,6 @@ mod tests {
         }
         .as_rule_table(preview.map(|preview| preview.mode).unwrap_or_default())
         .iter_enabled()
-        // Filter out rule gated behind `#[cfg(feature = "unreachable-code")]`, which is off-by-default
-        .filter(|rule| rule.noqa_code() != "RUF014")
         .collect()
     }
 

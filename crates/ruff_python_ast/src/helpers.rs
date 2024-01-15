@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::path::Path;
 
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 
 use ruff_python_trivia::CommentRanges;
@@ -307,10 +308,13 @@ pub fn any_over_pattern(pattern: &Pattern, func: &dyn Fn(&Expr) -> bool) -> bool
     }
 }
 
-pub fn any_over_f_string_element(element: &FStringElement, func: &dyn Fn(&Expr) -> bool) -> bool {
+pub fn any_over_f_string_element(
+    element: &ast::FStringElement,
+    func: &dyn Fn(&Expr) -> bool,
+) -> bool {
     match element {
-        FStringElement::Literal(_) => false,
-        FStringElement::Expression(ast::FStringExpressionElement {
+        ast::FStringElement::Literal(_) => false,
+        ast::FStringElement::Expression(ast::FStringExpressionElement {
             expression,
             format_spec,
             ..
@@ -891,6 +895,46 @@ pub fn resolve_imported_module_path<'a>(
     Some(Cow::Owned(qualified_path))
 }
 
+/// A [`Visitor`] to collect all [`Expr::Name`] nodes in an AST.
+#[derive(Debug, Default)]
+pub struct NameFinder<'a> {
+    /// A map from identifier to defining expression.
+    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+}
+
+impl<'a, 'b> Visitor<'b> for NameFinder<'a>
+where
+    'b: 'a,
+{
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(name) = expr {
+            self.names.insert(&name.id, name);
+        }
+        crate::visitor::walk_expr(self, expr);
+    }
+}
+
+/// A [`Visitor`] to collect all stored [`Expr::Name`] nodes in an AST.
+#[derive(Debug, Default)]
+pub struct StoredNameFinder<'a> {
+    /// A map from identifier to defining expression.
+    pub names: FxHashMap<&'a str, &'a ast::ExprName>,
+}
+
+impl<'a, 'b> Visitor<'b> for StoredNameFinder<'a>
+where
+    'b: 'a,
+{
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if let Expr::Name(name) = expr {
+            if name.ctx.is_store() {
+                self.names.insert(&name.id, name);
+            }
+        }
+        crate::visitor::walk_expr(self, expr);
+    }
+}
+
 /// A [`StatementVisitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
@@ -918,206 +962,6 @@ where
         } else {
             crate::visitor::walk_expr(self, expr);
         }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Terminal {
-    /// Every path through the function ends with a `raise` statement.
-    Raise,
-    /// Every path through the function ends with a `return` (or `raise`) statement.
-    Return,
-}
-
-impl Terminal {
-    /// Returns the [`Terminal`] behavior of the function, if it can be determined, or `None` if the
-    /// function contains at least one control flow path that does not end with a `return` or `raise`
-    /// statement.
-    pub fn from_function(function: &ast::StmtFunctionDef) -> Option<Terminal> {
-        /// Returns `true` if the body may break via a `break` statement.
-        fn sometimes_breaks(stmts: &[Stmt]) -> bool {
-            for stmt in stmts {
-                match stmt {
-                    Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-                        if returns(body).is_some() {
-                            return false;
-                        }
-                        if sometimes_breaks(orelse) {
-                            return true;
-                        }
-                    }
-                    Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                        if returns(body).is_some() {
-                            return false;
-                        }
-                        if sometimes_breaks(orelse) {
-                            return true;
-                        }
-                    }
-                    Stmt::If(ast::StmtIf {
-                        body,
-                        elif_else_clauses,
-                        ..
-                    }) => {
-                        if std::iter::once(body)
-                            .chain(elif_else_clauses.iter().map(|clause| &clause.body))
-                            .any(|body| sometimes_breaks(body))
-                        {
-                            return true;
-                        }
-                    }
-                    Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                        if cases.iter().any(|case| sometimes_breaks(&case.body)) {
-                            return true;
-                        }
-                    }
-                    Stmt::Try(ast::StmtTry {
-                        body,
-                        handlers,
-                        orelse,
-                        finalbody,
-                        ..
-                    }) => {
-                        if sometimes_breaks(body)
-                            || handlers.iter().any(|handler| {
-                                let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                                    body,
-                                    ..
-                                }) = handler;
-                                sometimes_breaks(body)
-                            })
-                            || sometimes_breaks(orelse)
-                            || sometimes_breaks(finalbody)
-                        {
-                            return true;
-                        }
-                    }
-                    Stmt::With(ast::StmtWith { body, .. }) => {
-                        if sometimes_breaks(body) {
-                            return true;
-                        }
-                    }
-                    Stmt::Break(_) => return true,
-                    Stmt::Return(_) => return false,
-                    Stmt::Raise(_) => return false,
-                    _ => {}
-                }
-            }
-            false
-        }
-
-        /// Returns `true` if the body may break via a `break` statement.
-        fn always_breaks(stmts: &[Stmt]) -> bool {
-            for stmt in stmts {
-                match stmt {
-                    Stmt::Break(_) => return true,
-                    Stmt::Return(_) => return false,
-                    Stmt::Raise(_) => return false,
-                    _ => {}
-                }
-            }
-            false
-        }
-
-        /// Returns `true` if the body contains a branch that ends without an explicit `return` or
-        /// `raise` statement.
-        fn returns(stmts: &[Stmt]) -> Option<Terminal> {
-            for stmt in stmts.iter().rev() {
-                match stmt {
-                    Stmt::For(ast::StmtFor { body, orelse, .. })
-                    | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                        if always_breaks(body) {
-                            return None;
-                        }
-                        if let Some(terminal) = returns(body) {
-                            return Some(terminal);
-                        }
-                        if !sometimes_breaks(body) {
-                            if let Some(terminal) = returns(orelse) {
-                                return Some(terminal);
-                            }
-                        }
-                    }
-                    Stmt::If(ast::StmtIf {
-                        body,
-                        elif_else_clauses,
-                        ..
-                    }) => {
-                        if elif_else_clauses.iter().any(|clause| clause.test.is_none()) {
-                            match Terminal::combine(std::iter::once(returns(body)).chain(
-                                elif_else_clauses.iter().map(|clause| returns(&clause.body)),
-                            )) {
-                                Some(Terminal::Raise) => return Some(Terminal::Raise),
-                                Some(Terminal::Return) => return Some(Terminal::Return),
-                                _ => {}
-                            }
-                        }
-                    }
-                    Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                        // Note: we assume the `match` is exhaustive.
-                        match Terminal::combine(cases.iter().map(|case| returns(&case.body))) {
-                            Some(Terminal::Raise) => return Some(Terminal::Raise),
-                            Some(Terminal::Return) => return Some(Terminal::Return),
-                            _ => {}
-                        }
-                    }
-                    Stmt::Try(ast::StmtTry {
-                        body,
-                        handlers,
-                        orelse,
-                        finalbody,
-                        ..
-                    }) => {
-                        // If the `finally` block returns, the `try` block must also return.
-                        if let Some(terminal) = returns(finalbody) {
-                            return Some(terminal);
-                        }
-
-                        // If the body returns, the `try` block must also return.
-                        if returns(body) == Some(Terminal::Return) {
-                            return Some(Terminal::Return);
-                        }
-
-                        // If the else block and all the handlers return, the `try` block must also
-                        // return.
-                        if let Some(terminal) =
-                            Terminal::combine(std::iter::once(returns(orelse)).chain(
-                                handlers.iter().map(|handler| {
-                                    let ExceptHandler::ExceptHandler(
-                                        ast::ExceptHandlerExceptHandler { body, .. },
-                                    ) = handler;
-                                    returns(body)
-                                }),
-                            ))
-                        {
-                            return Some(terminal);
-                        }
-                    }
-                    Stmt::With(ast::StmtWith { body, .. }) => {
-                        if let Some(terminal) = returns(body) {
-                            return Some(terminal);
-                        }
-                    }
-                    Stmt::Return(_) => return Some(Terminal::Return),
-                    Stmt::Raise(_) => return Some(Terminal::Raise),
-                    _ => {}
-                }
-            }
-            None
-        }
-
-        returns(&function.body)
-    }
-
-    /// Combine a series of [`Terminal`] operators.
-    fn combine(iter: impl Iterator<Item = Option<Terminal>>) -> Option<Terminal> {
-        iter.reduce(|acc, terminal| match (acc, terminal) {
-            (Some(Self::Raise), Some(Self::Raise)) => Some(Self::Raise),
-            (Some(_), Some(Self::Return)) => Some(Self::Return),
-            (Some(Self::Return), Some(_)) => Some(Self::Return),
-            _ => None,
-        })
-        .flatten()
     }
 }
 
@@ -1351,21 +1195,10 @@ impl Truthiness {
             }
             Expr::NoneLiteral(_) => Self::Falsey,
             Expr::EllipsisLiteral(_) => Self::Truthy,
-            Expr::FString(ast::ExprFString { value, .. }) => {
-                if value.iter().all(|part| match part {
-                    ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
-                    ast::FStringPart::FString(f_string) => f_string.elements.is_empty(),
-                }) {
+            Expr::FString(f_string) => {
+                if is_empty_f_string(f_string) {
                     Self::Falsey
-                } else if value
-                    .elements()
-                    .any(|f_string_element| match f_string_element {
-                        ast::FStringElement::Literal(ast::FStringLiteralElement {
-                            value, ..
-                        }) => !value.is_empty(),
-                        ast::FStringElement::Expression(_) => true,
-                    })
-                {
+                } else if is_non_empty_f_string(f_string) {
                     Self::Truthy
                 } else {
                     Self::Unknown
@@ -1421,6 +1254,99 @@ impl Truthiness {
             Self::Unknown => None,
         }
     }
+}
+
+/// Returns `true` if the expression definitely resolves to a non-empty string, when used as an
+/// f-string expression, or `false` if the expression may resolve to an empty string.
+fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
+    fn inner(expr: &Expr) -> bool {
+        match expr {
+            // When stringified, these expressions are always non-empty.
+            Expr::Lambda(_) => true,
+            Expr::Dict(_) => true,
+            Expr::Set(_) => true,
+            Expr::ListComp(_) => true,
+            Expr::SetComp(_) => true,
+            Expr::DictComp(_) => true,
+            Expr::Compare(_) => true,
+            Expr::NumberLiteral(_) => true,
+            Expr::BooleanLiteral(_) => true,
+            Expr::NoneLiteral(_) => true,
+            Expr::EllipsisLiteral(_) => true,
+            Expr::List(_) => true,
+            Expr::Tuple(_) => true,
+
+            // These expressions must resolve to the inner expression.
+            Expr::IfExp(ast::ExprIfExp { body, orelse, .. }) => inner(body) && inner(orelse),
+            Expr::NamedExpr(ast::ExprNamedExpr { value, .. }) => inner(value),
+
+            // These expressions are complex. We can't determine whether they're empty or not.
+            Expr::BoolOp(ast::ExprBoolOp { .. }) => false,
+            Expr::BinOp(ast::ExprBinOp { .. }) => false,
+            Expr::UnaryOp(ast::ExprUnaryOp { .. }) => false,
+            Expr::GeneratorExp(_) => false,
+            Expr::Await(_) => false,
+            Expr::Yield(_) => false,
+            Expr::YieldFrom(_) => false,
+            Expr::Call(_) => false,
+            Expr::Attribute(_) => false,
+            Expr::Subscript(_) => false,
+            Expr::Starred(_) => false,
+            Expr::Name(_) => false,
+            Expr::Slice(_) => false,
+            Expr::IpyEscapeCommand(_) => false,
+
+            // These literals may or may not be empty.
+            Expr::FString(f_string) => is_non_empty_f_string(f_string),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+        }
+    }
+
+    expr.value.iter().any(|part| match part {
+        ast::FStringPart::Literal(string_literal) => !string_literal.is_empty(),
+        ast::FStringPart::FString(f_string) => {
+            f_string.elements.iter().all(|element| match element {
+                FStringElement::Literal(string_literal) => !string_literal.is_empty(),
+                FStringElement::Expression(f_string) => inner(&f_string.expression),
+            })
+        }
+    })
+}
+
+/// Returns `true` if the expression definitely resolves to the empty string, when used as an f-string
+/// expression.
+fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
+    fn inner(expr: &Expr) -> bool {
+        match expr {
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+            Expr::FString(ast::ExprFString { value, .. }) => {
+                value
+                    .elements()
+                    .all(|f_string_element| match f_string_element {
+                        FStringElement::Literal(ast::FStringLiteralElement { value, .. }) => {
+                            value.is_empty()
+                        }
+                        FStringElement::Expression(ast::FStringExpressionElement {
+                            expression,
+                            ..
+                        }) => inner(expression),
+                    })
+            }
+            _ => false,
+        }
+    }
+
+    expr.value.iter().all(|part| match part {
+        ast::FStringPart::Literal(string_literal) => string_literal.is_empty(),
+        ast::FStringPart::FString(f_string) => {
+            f_string.elements.iter().all(|element| match element {
+                FStringElement::Literal(string_literal) => string_literal.is_empty(),
+                FStringElement::Expression(f_string) => inner(&f_string.expression),
+            })
+        }
+    })
 }
 
 pub fn generate_comparison(

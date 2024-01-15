@@ -17,7 +17,7 @@ use tracing::debug;
 
 use ruff_diagnostics::SourceMap;
 use ruff_linter::fs;
-use ruff_linter::logging::LogLevel;
+use ruff_linter::logging::{DisplayParseError, LogLevel};
 use ruff_linter::registry::Rule;
 use ruff_linter::rules::flake8_quotes::settings::Quote;
 use ruff_linter::source_kind::{SourceError, SourceKind};
@@ -25,9 +25,7 @@ use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::{format_module_source, FormatModuleError, QuoteStyle};
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use ruff_workspace::resolver::{
-    match_exclusion, python_files_in_path, PyprojectConfig, ResolvedFile, Resolver,
-};
+use ruff_workspace::resolver::{match_exclusion, python_files_in_path, ResolvedFile, Resolver};
 use ruff_workspace::FormatterSettings;
 
 use crate::args::{CliOverrides, FormatArguments};
@@ -79,7 +77,7 @@ pub(crate) fn format(
         return Ok(ExitStatus::Success);
     }
 
-    warn_incompatible_formatter_settings(&pyproject_config, Some(&resolver));
+    warn_incompatible_formatter_settings(&resolver);
 
     // Discover the package root for each Python file.
     let package_roots = resolver.package_roots(
@@ -88,7 +86,6 @@ pub(crate) fn format(
             .flatten()
             .map(ResolvedFile::path)
             .collect::<Vec<_>>(),
-        &pyproject_config,
     );
 
     let caches = if cli.no_cache {
@@ -99,11 +96,7 @@ pub(crate) fn format(
         #[cfg(debug_assertions)]
         crate::warn_user!("Detected debug build without --no-cache.");
 
-        Some(PackageCacheMap::init(
-            &pyproject_config,
-            &package_roots,
-            &resolver,
-        ))
+        Some(PackageCacheMap::init(&package_roots, &resolver))
     };
 
     let start = Instant::now();
@@ -113,12 +106,18 @@ pub(crate) fn format(
             match entry {
                 Ok(resolved_file) => {
                     let path = resolved_file.path();
-                    let SourceType::Python(source_type) = SourceType::from(&path) else {
-                        // Ignore any non-Python files.
-                        return None;
-                    };
+                    let settings = resolver.resolve(path);
 
-                    let settings = resolver.resolve(path, &pyproject_config);
+                    let source_type = match settings.formatter.extension.get(path) {
+                        None => match SourceType::from(path) {
+                            SourceType::Python(source_type) => source_type,
+                            SourceType::Toml(_) => {
+                                // Ignore any non-Python files.
+                                return None;
+                            }
+                        },
+                        Some(language) => PySourceType::from(language),
+                    };
 
                     // Ignore files that are excluded from formatting
                     if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -244,7 +243,7 @@ pub(crate) fn format_path(
     // Extract the sources from the file.
     let unformatted = match SourceKind::from_path(path, source_type) {
         Ok(Some(source_kind)) => source_kind,
-        // Non Python Jupyter notebook
+        // Non-Python Jupyter notebook.
         Ok(None) => return Ok(FormatResult::Skipped),
         Err(err) => {
             return Err(FormatCommandError::Read(Some(path.to_path_buf()), err));
@@ -321,12 +320,22 @@ pub(crate) fn format_source(
     path: Option<&Path>,
     settings: &FormatterSettings,
 ) -> Result<FormattedSource, FormatCommandError> {
-    match source_kind {
+    match &source_kind {
         SourceKind::Python(unformatted) => {
             let options = settings.to_format_options(source_type, unformatted);
 
-            let formatted = format_module_source(unformatted, options)
-                .map_err(|err| FormatCommandError::Format(path.map(Path::to_path_buf), err))?;
+            let formatted = format_module_source(unformatted, options).map_err(|err| {
+                if let FormatModuleError::ParseError(err) = err {
+                    DisplayParseError::from_source_kind(
+                        err,
+                        path.map(Path::to_path_buf),
+                        source_kind,
+                    )
+                    .into()
+                } else {
+                    FormatCommandError::Format(path.map(Path::to_path_buf), err)
+                }
+            })?;
 
             let formatted = formatted.into_code();
             if formatted.len() == unformatted.len() && formatted == *unformatted {
@@ -352,8 +361,19 @@ pub(crate) fn format_source(
                 let unformatted = &notebook.source_code()[range];
 
                 // Format the cell.
-                let formatted = format_module_source(unformatted, options.clone())
-                    .map_err(|err| FormatCommandError::Format(path.map(Path::to_path_buf), err))?;
+                let formatted =
+                    format_module_source(unformatted, options.clone()).map_err(|err| {
+                        if let FormatModuleError::ParseError(err) = err {
+                            DisplayParseError::from_source_kind(
+                                err,
+                                path.map(Path::to_path_buf),
+                                source_kind,
+                            )
+                            .into()
+                        } else {
+                            FormatCommandError::Format(path.map(Path::to_path_buf), err)
+                        }
+                    })?;
 
                 // If the cell is unchanged, skip it.
                 let formatted = formatted.as_code();
@@ -408,11 +428,13 @@ pub(crate) fn format_source(
 pub(crate) enum FormatResult {
     /// The file was formatted.
     Formatted,
+
     /// The file was formatted, [`SourceKind`] contains the formatted code
     Diff {
         unformatted: SourceKind,
         formatted: SourceKind,
     },
+
     /// The file was unchanged, as the formatted contents matched the existing contents.
     Unchanged,
 
@@ -561,6 +583,7 @@ impl<'a> FormatResults<'a> {
 #[derive(Error, Debug)]
 pub(crate) enum FormatCommandError {
     Ignore(#[from] ignore::Error),
+    Parse(#[from] DisplayParseError),
     Panic(Option<PathBuf>, PanicError),
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
@@ -578,6 +601,7 @@ impl FormatCommandError {
                     None
                 }
             }
+            Self::Parse(err) => err.path(),
             Self::Panic(path, _)
             | Self::Read(path, _)
             | Self::Format(path, _)
@@ -610,6 +634,9 @@ impl Display for FormatCommandError {
                             .map_or_else(|| err.to_string(), std::string::ToString::to_string)
                     )
                 }
+            }
+            Self::Parse(err) => {
+                write!(f, "{err}")
             }
             Self::Read(path, err) => {
                 if let Some(path) = path {
@@ -695,15 +722,10 @@ impl Display for FormatCommandError {
     }
 }
 
-pub(super) fn warn_incompatible_formatter_settings(
-    pyproject_config: &PyprojectConfig,
-    resolver: Option<&Resolver>,
-) {
+pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
     // First, collect all rules that are incompatible regardless of the linter-specific settings.
     let mut incompatible_rules = FxHashSet::default();
-    for setting in std::iter::once(&pyproject_config.settings)
-        .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
-    {
+    for setting in resolver.settings() {
         for rule in [
             // The formatter might collapse implicit string concatenation on a single line.
             Rule::SingleLineImplicitStringConcatenation,
@@ -732,9 +754,7 @@ pub(super) fn warn_incompatible_formatter_settings(
     }
 
     // Next, validate settings-specific incompatibilities.
-    for setting in std::iter::once(&pyproject_config.settings)
-        .chain(resolver.iter().flat_map(|resolver| resolver.settings()))
-    {
+    for setting in resolver.settings() {
         // Validate all rules that rely on tab styles.
         if setting.linter.rules.enabled(Rule::TabIndentation)
             && setting.formatter.indent_style.is_tab()

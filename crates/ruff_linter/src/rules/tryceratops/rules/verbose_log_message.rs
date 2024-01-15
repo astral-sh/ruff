@@ -43,21 +43,6 @@ impl Violation for VerboseLogMessage {
     }
 }
 
-#[derive(Default)]
-struct NameVisitor<'a> {
-    names: Vec<&'a ast::ExprName>,
-}
-
-impl<'a> Visitor<'a> for NameVisitor<'a> {
-    fn visit_expr(&mut self, expr: &'a Expr) {
-        match expr {
-            Expr::Name(name) if name.ctx.is_load() => self.names.push(name),
-            Expr::Attribute(_) => {}
-            _ => visitor::walk_expr(self, expr),
-        }
-    }
-}
-
 /// TRY401
 pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandler]) {
     for handler in handlers {
@@ -75,13 +60,15 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
             if matches!(logging_level, LoggingLevel::Exception) {
                 // Collect all referenced names in the `logging.exception` call.
                 let names: Vec<&ast::ExprName> = {
-                    let mut names = Vec::new();
-                    for arg in &expr.arguments.args {
-                        let mut visitor = NameVisitor::default();
-                        visitor.visit_expr(arg);
-                        names.extend(visitor.names);
-                    }
-                    names
+                    expr.arguments
+                        .args
+                        .iter()
+                        .flat_map(|arg| {
+                            let mut visitor = NameVisitor::default();
+                            visitor.visit_expr(arg);
+                            visitor.names
+                        })
+                        .collect()
                 };
 
                 // Find any bound exceptions in the call.
@@ -97,6 +84,21 @@ pub(crate) fn verbose_log_message(checker: &mut Checker, handlers: &[ExceptHandl
                     }
                 }
             }
+        }
+    }
+}
+
+#[derive(Default)]
+struct NameVisitor<'a> {
+    names: Vec<&'a ast::ExprName>,
+}
+
+impl<'a> Visitor<'a> for NameVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Name(name) if name.ctx.is_load() => self.names.push(name),
+            Expr::Attribute(_) => {}
+            _ => visitor::walk_expr(self, expr),
         }
     }
 }

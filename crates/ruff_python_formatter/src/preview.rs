@@ -57,3 +57,13 @@ pub(crate) const fn is_module_docstring_newlines_enabled(context: &PyFormatConte
 pub(crate) const fn is_dummy_implementations_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`hex_codes_in_unicode_sequences`](https://github.com/psf/black/pull/2916) preview style is enabled.
+pub(crate) const fn is_hex_codes_in_unicode_sequences_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
+
+/// Returns `true` if the [`multiline_string_handling`](https://github.com/astral-sh/ruff/issues/8896) preview style is enabled.
+pub(crate) const fn is_multiline_string_handling_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}

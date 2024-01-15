@@ -147,3 +147,9 @@ if (a and [] and False and []) == (a and []):  # SIM223
 
 if f(a and [] and False and []):  # SIM223
     pass
+
+# Regression test for: https://github.com/astral-sh/ruff/issues/9479
+print(f"{a}{b}" and "bar")
+print(f"{a}{''}" and "bar")
+print(f"{''}{''}" and "bar")
+print(f"{1}{''}" and "bar")

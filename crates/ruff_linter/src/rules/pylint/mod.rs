@@ -40,6 +40,7 @@ mod tests {
     )]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
+    #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
     #[test_case(Rule::ManualFromImport, Path::new("import_aliasing.py"))]
     #[test_case(Rule::SingleStringSlots, Path::new("single_string_slots.py"))]
     #[test_case(Rule::SysExitAlias, Path::new("sys_exit_alias_0.py"))]
@@ -160,7 +161,9 @@ mod tests {
         Path::new("unnecessary_list_index_lookup.py")
     )]
     #[test_case(Rule::NoClassmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::UnnecessaryDunderCall, Path::new("unnecessary_dunder_call.py"))]
     #[test_case(Rule::NoStaticmethodDecorator, Path::new("no_method_decorator.py"))]
+    #[test_case(Rule::SuperWithoutBrackets, Path::new("super_without_brackets.py"))]
     #[test_case(
         Rule::UnnecessaryDictIndexLookup,
         Path::new("unnecessary_dict_index_lookup.py")

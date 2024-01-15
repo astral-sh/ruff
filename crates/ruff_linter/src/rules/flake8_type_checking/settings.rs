@@ -1,6 +1,8 @@
 //! Settings for the `flake8-type-checking` plugin.
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, CacheKey)]
 pub struct Settings {
@@ -20,5 +22,22 @@ impl Default for Settings {
             runtime_required_decorators: vec![],
             quote_annotations: false,
         }
+    }
+}
+
+impl Display for Settings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.flake8_type_checking",
+            fields = [
+                self.strict,
+                self.exempt_modules | array,
+                self.runtime_required_base_classes | array,
+                self.runtime_required_decorators | array,
+                self.quote_annotations
+            ]
+        }
+        Ok(())
     }
 }

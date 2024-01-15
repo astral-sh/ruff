@@ -3,10 +3,11 @@ use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers::{
-    pep_604_union, typing_optional, typing_union, ReturnStatementVisitor, Terminal,
+    pep_604_union, typing_optional, typing_union, ReturnStatementVisitor,
 };
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
+use ruff_python_semantic::analyze::terminal::Terminal;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{Definition, SemanticModel};
@@ -61,7 +62,7 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
     let terminal = Terminal::from_function(function);
 
     // If every control flow path raises an exception, return `NoReturn`.
-    if terminal == Some(Terminal::Raise) {
+    if terminal == Terminal::Raise {
         return Some(AutoPythonType::Never);
     }
 
@@ -88,7 +89,7 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
     //     if x > 0:
     //         return 1
     // ```
-    if terminal.is_none() {
+    if terminal.has_implicit_return() {
         return_type = return_type.union(ResolvedPythonType::Atom(PythonType::None));
     }
 

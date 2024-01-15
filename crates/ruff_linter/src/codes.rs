@@ -226,6 +226,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0415") => (RuleGroup::Preview, rules::pylint::rules::ImportOutsideTopLevel),
         (Pylint, "C2401") => (RuleGroup::Preview, rules::pylint::rules::NonAsciiName),
         (Pylint, "C2403") => (RuleGroup::Preview, rules::pylint::rules::NonAsciiImportName),
+        (Pylint, "C2801") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDunderCall),
         #[allow(deprecated)]
         (Pylint, "C1901") => (RuleGroup::Nursery, rules::pylint::rules::CompareToEmptyString),
         (Pylint, "C3002") => (RuleGroup::Stable, rules::pylint::rules::UnnecessaryDirectLambdaCall),
@@ -277,6 +278,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1733") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryDictIndexLookup),
         (Pylint, "R1736") => (RuleGroup::Preview, rules::pylint::rules::UnnecessaryListIndexLookup),
         (Pylint, "R2004") => (RuleGroup::Stable, rules::pylint::rules::MagicValueComparison),
+        (Pylint, "R2044") => (RuleGroup::Preview, rules::pylint::rules::EmptyComment),
         (Pylint, "R5501") => (RuleGroup::Stable, rules::pylint::rules::CollapsibleElseIf),
         (Pylint, "R6201") => (RuleGroup::Preview, rules::pylint::rules::LiteralMembership),
         #[allow(deprecated)]
@@ -286,6 +288,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0127") => (RuleGroup::Stable, rules::pylint::rules::SelfAssigningVariable),
         (Pylint, "W0129") => (RuleGroup::Stable, rules::pylint::rules::AssertOnStringLiteral),
         (Pylint, "W0131") => (RuleGroup::Stable, rules::pylint::rules::NamedExprWithoutContext),
+        (Pylint, "W0245") => (RuleGroup::Preview, rules::pylint::rules::SuperWithoutBrackets),
         (Pylint, "W0406") => (RuleGroup::Stable, rules::pylint::rules::ImportSelf),
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),
         (Pylint, "W0604") => (RuleGroup::Preview, rules::pylint::rules::GlobalAtModuleLevel),
@@ -463,6 +466,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "109") => (RuleGroup::Stable, rules::flake8_simplify::rules::CompareWithTuple),
         (Flake8Simplify, "110") => (RuleGroup::Stable, rules::flake8_simplify::rules::ReimplementedBuiltin),
         (Flake8Simplify, "112") => (RuleGroup::Stable, rules::flake8_simplify::rules::UncapitalizedEnvironmentVariables),
+        (Flake8Simplify, "113") => (RuleGroup::Preview, rules::flake8_simplify::rules::EnumerateForLoop),
         (Flake8Simplify, "114") => (RuleGroup::Stable, rules::flake8_simplify::rules::IfWithSameArms),
         (Flake8Simplify, "115") => (RuleGroup::Stable, rules::flake8_simplify::rules::OpenFileWithContextHandler),
         (Flake8Simplify, "116") => (RuleGroup::Stable, rules::flake8_simplify::rules::IfElseBlockInsteadOfDictLookup),
@@ -481,6 +485,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Simplify, "300") => (RuleGroup::Stable, rules::flake8_simplify::rules::YodaConditions),
         (Flake8Simplify, "401") => (RuleGroup::Stable, rules::flake8_simplify::rules::IfElseBlockInsteadOfDictGet),
         (Flake8Simplify, "910") => (RuleGroup::Stable, rules::flake8_simplify::rules::DictGetWithNoneDefault),
+        (Flake8Simplify, "911") => (RuleGroup::Preview, rules::flake8_simplify::rules::ZipDictKeysAndValues),
 
         // flake8-copyright
         #[allow(deprecated)]
@@ -636,7 +641,24 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Bandit, "321") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousFTPLibUsage),
         (Flake8Bandit, "323") => (RuleGroup::Stable, rules::flake8_bandit::rules::SuspiciousUnverifiedContextUsage),
         (Flake8Bandit, "324") => (RuleGroup::Stable, rules::flake8_bandit::rules::HashlibInsecureHashFunction),
+        (Flake8Bandit, "401") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousTelnetlibImport),
+        (Flake8Bandit, "402") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousFtplibImport),
+        (Flake8Bandit, "403") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousPickleImport),
+        (Flake8Bandit, "404") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousSubprocessImport),
+        (Flake8Bandit, "405") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlEtreeImport),
+        (Flake8Bandit, "406") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlSaxImport),
+        (Flake8Bandit, "407") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlExpatImport),
+        (Flake8Bandit, "408") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlMinidomImport),
+        (Flake8Bandit, "409") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlPulldomImport),
+        (Flake8Bandit, "410") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousLxmlImport),
+        (Flake8Bandit, "411") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousXmlrpcImport),
+        (Flake8Bandit, "412") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousHttpoxyImport),
+        (Flake8Bandit, "413") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousPycryptoImport),
+        (Flake8Bandit, "415") => (RuleGroup::Preview, rules::flake8_bandit::rules::SuspiciousPyghmiImport),
         (Flake8Bandit, "501") => (RuleGroup::Stable, rules::flake8_bandit::rules::RequestWithNoCertValidation),
+        (Flake8Bandit, "502") => (RuleGroup::Preview, rules::flake8_bandit::rules::SslInsecureVersion),
+        (Flake8Bandit, "503") => (RuleGroup::Preview, rules::flake8_bandit::rules::SslWithBadDefaults),
+        (Flake8Bandit, "504") => (RuleGroup::Preview, rules::flake8_bandit::rules::SslWithNoVersion),
         (Flake8Bandit, "505") => (RuleGroup::Preview, rules::flake8_bandit::rules::WeakCryptographicKey),
         (Flake8Bandit, "506") => (RuleGroup::Stable, rules::flake8_bandit::rules::UnsafeYAMLLoad),
         (Flake8Bandit, "507") => (RuleGroup::Preview, rules::flake8_bandit::rules::SSHNoHostKeyVerification),
@@ -759,6 +781,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "053") => (RuleGroup::Stable, rules::flake8_pyi::rules::StringOrBytesTooLong),
         (Flake8Pyi, "055") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnnecessaryTypeUnion),
         (Flake8Pyi, "056") => (RuleGroup::Stable, rules::flake8_pyi::rules::UnsupportedMethodCallOnAll),
+        (Flake8Pyi, "058") => (RuleGroup::Preview, rules::flake8_pyi::rules::GeneratorReturnFromIterMethod),
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => (RuleGroup::Stable, rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle),
@@ -904,9 +927,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "011") => (RuleGroup::Stable, rules::ruff::rules::StaticKeyDictComprehension),
         (Ruff, "012") => (RuleGroup::Stable, rules::ruff::rules::MutableClassDefault),
         (Ruff, "013") => (RuleGroup::Stable, rules::ruff::rules::ImplicitOptional),
-        #[cfg(feature = "unreachable-code")] // When removing this feature gate, also update rules_selector.rs
-        #[allow(deprecated)]
-        (Ruff, "014") => (RuleGroup::Nursery, rules::ruff::rules::UnreachableCode),
         (Ruff, "015") => (RuleGroup::Stable, rules::ruff::rules::UnnecessaryIterableAllocationForFirstElement),
         (Ruff, "016") => (RuleGroup::Stable, rules::ruff::rules::InvalidIndexType),
         #[allow(deprecated)]
@@ -914,6 +934,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "018") => (RuleGroup::Preview, rules::ruff::rules::AssignmentInAssert),
         (Ruff, "019") => (RuleGroup::Preview, rules::ruff::rules::UnnecessaryKeyCheck),
         (Ruff, "020") => (RuleGroup::Preview, rules::ruff::rules::NeverUnion),
+        (Ruff, "021") => (RuleGroup::Preview, rules::ruff::rules::ParenthesizeChainedOperators),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
 
@@ -976,7 +997,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Refurb, "145") => (RuleGroup::Preview, rules::refurb::rules::SliceCopy),
         (Refurb, "148") => (RuleGroup::Preview, rules::refurb::rules::UnnecessaryEnumerate),
         (Refurb, "152") => (RuleGroup::Preview, rules::refurb::rules::MathConstant),
+        (Refurb, "161") => (RuleGroup::Preview, rules::refurb::rules::BitCount),
         (Refurb, "163") => (RuleGroup::Preview, rules::refurb::rules::RedundantLogBase),
+        (Refurb, "167") => (RuleGroup::Preview, rules::refurb::rules::RegexFlagAlias),
         (Refurb, "168") => (RuleGroup::Preview, rules::refurb::rules::IsinstanceTypeNone),
         (Refurb, "169") => (RuleGroup::Preview, rules::refurb::rules::TypeNoneComparison),
         (Refurb, "171") => (RuleGroup::Preview, rules::refurb::rules::SingleItemMembershipTest),

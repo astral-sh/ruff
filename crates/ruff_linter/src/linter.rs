@@ -31,7 +31,7 @@ use crate::fix::{fix_file, FixResult};
 use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::noqa::add_noqa;
-use crate::registry::{AsRule, Rule};
+use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rules::pycodestyle;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{flags, LinterSettings};
@@ -146,9 +146,10 @@ pub fn check_path(
             .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
         // Parse, if the AST wasn't pre-provided provided.
-        match tokens.into_ast_source(source_kind, source_type, path) {
+        match tokens.into_ast_source(source_kind, source_type) {
             Ok(python_ast) => {
                 let cell_offsets = source_kind.as_ipy_notebook().map(Notebook::cell_offsets);
+                let notebook_index = source_kind.as_ipy_notebook().map(Notebook::index);
                 if use_ast {
                     diagnostics.extend(check_ast(
                         &python_ast,
@@ -162,6 +163,7 @@ pub fn check_path(
                         package,
                         source_type,
                         cell_offsets,
+                        notebook_index,
                     ));
                 }
                 if use_imports {
@@ -214,12 +216,14 @@ pub fn check_path(
     }
 
     // Ignore diagnostics based on per-file-ignores.
-    if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
-        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores);
-        if !ignores.is_empty() {
-            diagnostics.retain(|diagnostic| !ignores.contains(diagnostic.kind.rule()));
-        }
+    let per_file_ignores = if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
+        fs::ignores_from_path(path, &settings.per_file_ignores)
+    } else {
+        RuleSet::empty()
     };
+    if !per_file_ignores.is_empty() {
+        diagnostics.retain(|diagnostic| !per_file_ignores.contains(diagnostic.kind.rule()));
+    }
 
     // Enforce `noqa` directives.
     if (noqa.into() && !diagnostics.is_empty())
@@ -235,6 +239,7 @@ pub fn check_path(
             indexer.comment_ranges(),
             &directives.noqa_line_for,
             error.is_none(),
+            &per_file_ignores,
             settings,
         );
         if noqa.into() {
@@ -334,10 +339,15 @@ pub fn add_noqa_to_path(
     );
 
     // Log any parse errors.
-    if let Some(err) = error {
+    if let Some(error) = error {
         error!(
             "{}",
-            DisplayParseError::new(err, locator.to_source_code(), source_kind)
+            DisplayParseError::from_source_code(
+                error,
+                Some(path.to_path_buf()),
+                &locator.to_source_code(),
+                source_kind,
+            )
         );
     }
 
@@ -685,13 +695,11 @@ impl<'a> TokenSource<'a> {
         self,
         source_kind: &SourceKind,
         source_type: PySourceType,
-        path: &Path,
     ) -> Result<AstSource<'a>, ParseError> {
         match self {
             Self::Tokens(tokens) => Ok(AstSource::Ast(ruff_python_parser::parse_program_tokens(
                 tokens,
                 source_kind.source_code(),
-                &path.to_string_lossy(),
                 source_type.is_ipynb(),
             )?)),
             Self::Precomputed { ast, .. } => Ok(AstSource::Precomputed(ast)),

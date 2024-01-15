@@ -8,7 +8,6 @@ use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallP
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_stdlib::path::is_python_stub_file;
-use ruff_python_stdlib::typing::is_typing_extension;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::binding::{
@@ -175,18 +174,11 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
     pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
-        if call_path.as_slice() == ["typing", target] {
+        if matches!(
+            call_path.as_slice(),
+            ["typing" | "_typeshed" | "typing_extensions", member] if *member == target
+        ) {
             return true;
-        }
-
-        if call_path.as_slice() == ["_typeshed", target] {
-            return true;
-        }
-
-        if is_typing_extension(target) {
-            if call_path.as_slice() == ["typing_extensions", target] {
-                return true;
-            }
         }
 
         if self.typing_modules.iter().any(|module| {
@@ -707,7 +699,20 @@ impl<'a> SemanticModel<'a> {
                     };
                 Some(resolved)
             }
-            BindingKind::Builtin => Some(smallvec!["", head.id.as_str()]),
+            BindingKind::Builtin => {
+                if value.is_name_expr() {
+                    // Ex) `dict`
+                    Some(smallvec!["", head.id.as_str()])
+                } else {
+                    // Ex) `dict.__dict__`
+                    let value_path = collect_call_path(value)?;
+                    Some(
+                        std::iter::once("")
+                            .chain(value_path.iter().copied())
+                            .collect(),
+                    )
+                }
+            }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
                 let value_path = collect_call_path(value)?;
                 let resolved: CallPath = self
@@ -797,8 +802,10 @@ impl<'a> SemanticModel<'a> {
                         }
                         // Ex) Given `module="os"` and `object="name"`:
                         // `import os.path ` -> `os.name`
-                        BindingKind::SubmoduleImport(SubmoduleImport { .. }) => {
-                            if name == module {
+                        // Ex) Given `module="os.path"` and `object="join"`:
+                        // `import os.path ` -> `os.path.join`
+                        BindingKind::SubmoduleImport(SubmoduleImport { call_path }) => {
+                            if call_path.starts_with(&module_path) {
                                 if let Some(source) = binding.source {
                                     // Verify that `os` isn't bound in an inner scope.
                                     if self
@@ -807,7 +814,7 @@ impl<'a> SemanticModel<'a> {
                                         .all(|scope| !scope.has(name))
                                     {
                                         return Some(ImportedName {
-                                            name: format!("{name}.{member}"),
+                                            name: format!("{module}.{member}"),
                                             source,
                                             range: self.nodes[source].range(),
                                             context: binding.context,
@@ -977,6 +984,11 @@ impl<'a> SemanticModel<'a> {
         scope.parent.map(|scope_id| &self.scopes[scope_id])
     }
 
+    /// Returns the ID of the parent of the given [`ScopeId`], if any.
+    pub fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+        self.scopes[scope_id].parent
+    }
+
     /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`], if any.
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
@@ -985,6 +997,19 @@ impl<'a> SemanticModel<'a> {
                 current_scope = parent;
             } else {
                 return Some(parent);
+            }
+        }
+        None
+    }
+
+    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`], if any.
+    pub fn first_non_type_parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+        let mut current_scope_id = scope_id;
+        while let Some(parent_id) = self.parent_scope_id(current_scope_id) {
+            if self.scopes[parent_id].kind.is_type() {
+                current_scope_id = parent_id;
+            } else {
+                return Some(parent_id);
             }
         }
         None
@@ -1156,11 +1181,11 @@ impl<'a> SemanticModel<'a> {
         false
     }
 
-    /// Returns `true` if `left` and `right` are on different branches of an `if`, `match`, or
+    /// Returns `true` if `left` and `right` are in the same branches of an `if`, `match`, or
     /// `try` statement.
     ///
     /// This implementation assumes that the statements are in the same scope.
-    pub fn different_branches(&self, left: NodeId, right: NodeId) -> bool {
+    pub fn same_branch(&self, left: NodeId, right: NodeId) -> bool {
         // Collect the branch path for the left statement.
         let left = self
             .nodes
@@ -1177,10 +1202,7 @@ impl<'a> SemanticModel<'a> {
             .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
             .collect::<Vec<_>>();
 
-        !left
-            .iter()
-            .zip(right.iter())
-            .all(|(left, right)| left == right)
+        left == right
     }
 
     /// Returns `true` if the given expression is an unused variable, or consists solely of

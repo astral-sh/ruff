@@ -1,5 +1,6 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
+use std::borrow::Cow;
 use std::fs::File;
 use std::io;
 use std::ops::{Add, AddAssign};
@@ -10,23 +11,24 @@ use colored::Colorize;
 use log::{debug, error, warn};
 use rustc_hash::FxHashMap;
 
-use crate::cache::{Cache, FileCacheKey, LintCacheData};
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
 use ruff_linter::logging::DisplayParseError;
 use ruff_linter::message::Message;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::types::{ExtensionMapping, UnsafeFixes};
+use ruff_linter::settings::types::UnsafeFixes;
 use ruff_linter::settings::{flags, LinterSettings};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{fs, IOError, SyntaxError};
 use ruff_notebook::{Notebook, NotebookError, NotebookIndex};
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
-use ruff_source_file::{LineIndex, SourceCode, SourceFileBuilder};
+use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
 use ruff_workspace::Settings;
+
+use crate::cache::{Cache, FileCacheKey, LintCacheData};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
@@ -177,11 +179,6 @@ impl AddAssign for FixMap {
     }
 }
 
-fn override_source_type(path: Option<&Path>, extension: &ExtensionMapping) -> Option<PySourceType> {
-    let ext = path?.extension()?.to_str()?;
-    extension.get(ext).map(PySourceType::from)
-}
-
 /// Lint the source code at the given `Path`.
 pub(crate) fn lint_path(
     path: &Path,
@@ -226,7 +223,7 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    let source_type = match override_source_type(Some(path), &settings.extension) {
+    let source_type = match settings.extension.get(path).map(PySourceType::from) {
         Some(source_type) => source_type,
         None => match SourceType::from(path) {
             SourceType::Toml(TomlSourceType::Pyproject) => {
@@ -272,6 +269,7 @@ pub(crate) fn lint_path(
             data: (messages, imports),
             error: parse_error,
         },
+        transformed,
         fixed,
     ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok(FixerResult {
@@ -300,7 +298,12 @@ pub(crate) fn lint_path(
                     flags::FixMode::Generate => {}
                 }
             }
-            (result, fixed)
+            let transformed = if let Cow::Owned(transformed) = transformed {
+                transformed
+            } else {
+                source_kind
+            };
+            (result, transformed, fixed)
         } else {
             // If we fail to fix, lint the original source code.
             let result = lint_only(
@@ -312,8 +315,9 @@ pub(crate) fn lint_path(
                 source_type,
                 ParseSource::None,
             );
+            let transformed = source_kind;
             let fixed = FxHashMap::default();
-            (result, fixed)
+            (result, transformed, fixed)
         }
     } else {
         let result = lint_only(
@@ -325,8 +329,9 @@ pub(crate) fn lint_path(
             source_type,
             ParseSource::None,
         );
+        let transformed = source_kind;
         let fixed = FxHashMap::default();
-        (result, fixed)
+        (result, transformed, fixed)
     };
 
     let imports = imports.unwrap_or_default();
@@ -334,7 +339,7 @@ pub(crate) fn lint_path(
     if let Some((cache, relative_path, key)) = caching {
         // We don't cache parsing errors.
         if parse_error.is_none() {
-            // `FixMode::Generate` and `FixMode::Diff` rely on side-effects (writing to disk,
+            // `FixMode::Apply` and `FixMode::Diff` rely on side-effects (writing to disk,
             // and writing the diff to stdout, respectively). If a file has diagnostics, we
             // need to avoid reading from and writing to the cache in these modes.
             if match fix_mode {
@@ -349,28 +354,21 @@ pub(crate) fn lint_path(
                     LintCacheData::from_messages(
                         &messages,
                         imports.clone(),
-                        source_kind.as_ipy_notebook().map(Notebook::index).cloned(),
+                        transformed.as_ipy_notebook().map(Notebook::index).cloned(),
                     ),
                 );
             }
         }
     }
 
-    if let Some(err) = parse_error {
+    if let Some(error) = parse_error {
         error!(
             "{}",
-            DisplayParseError::new(
-                err,
-                SourceCode::new(
-                    source_kind.source_code(),
-                    &LineIndex::from_source_text(source_kind.source_code())
-                ),
-                &source_kind,
-            )
+            DisplayParseError::from_source_kind(error, Some(path.to_path_buf()), &transformed)
         );
     }
 
-    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
+    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
         FxHashMap::from_iter([(path.to_string_lossy().to_string(), notebook.into_index())])
     } else {
         FxHashMap::default()
@@ -395,15 +393,14 @@ pub(crate) fn lint_stdin(
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     // TODO(charlie): Support `pyproject.toml`.
-    let source_type = if let Some(source_type) =
-        override_source_type(path, &settings.linter.extension)
-    {
-        source_type
-    } else {
-        let SourceType::Python(source_type) = path.map(SourceType::from).unwrap_or_default() else {
-            return Ok(Diagnostics::default());
-        };
-        source_type
+    let source_type = match path.and_then(|path| settings.linter.extension.get(path)) {
+        None => match path.map(SourceType::from).unwrap_or_default() {
+            SourceType::Python(source_type) => source_type,
+            SourceType::Toml(_) => {
+                return Ok(Diagnostics::default());
+            }
+        },
+        Some(language) => PySourceType::from(language),
     };
 
     // Extract the sources from the file.
@@ -421,6 +418,7 @@ pub(crate) fn lint_stdin(
             data: (messages, imports),
             error: parse_error,
         },
+        transformed,
         fixed,
     ) = if matches!(fix_mode, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok(FixerResult {
@@ -449,8 +447,12 @@ pub(crate) fn lint_stdin(
                 }
                 flags::FixMode::Generate => {}
             }
-
-            (result, fixed)
+            let transformed = if let Cow::Owned(transformed) = transformed {
+                transformed
+            } else {
+                source_kind
+            };
+            (result, transformed, fixed)
         } else {
             // If we fail to fix, lint the original source code.
             let result = lint_only(
@@ -462,14 +464,15 @@ pub(crate) fn lint_stdin(
                 source_type,
                 ParseSource::None,
             );
-            let fixed = FxHashMap::default();
 
             // Write the contents to stdout anyway.
             if fix_mode.is_apply() {
                 source_kind.write(&mut io::stdout().lock())?;
             }
 
-            (result, fixed)
+            let transformed = source_kind;
+            let fixed = FxHashMap::default();
+            (result, transformed, fixed)
         }
     } else {
         let result = lint_only(
@@ -481,20 +484,21 @@ pub(crate) fn lint_stdin(
             source_type,
             ParseSource::None,
         );
+        let transformed = source_kind;
         let fixed = FxHashMap::default();
-        (result, fixed)
+        (result, transformed, fixed)
     };
 
     let imports = imports.unwrap_or_default();
 
-    if let Some(err) = parse_error {
+    if let Some(error) = parse_error {
         error!(
-            "Failed to parse {}: {err}",
-            path.map_or_else(|| "-".into(), fs::relativize_path).bold()
+            "{}",
+            DisplayParseError::from_source_kind(error, path.map(Path::to_path_buf), &transformed)
         );
     }
 
-    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = source_kind {
+    let notebook_indexes = if let SourceKind::IpyNotebook(notebook) = transformed {
         FxHashMap::from_iter([(
             path.map_or_else(|| "-".into(), |path| path.to_string_lossy().to_string()),
             notebook.into_index(),

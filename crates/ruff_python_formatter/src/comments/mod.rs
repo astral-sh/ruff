@@ -102,12 +102,12 @@ use ruff_python_ast::Mod;
 use ruff_python_trivia::{CommentRanges, PythonWhitespace};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange};
+pub(crate) use visitor::collect_comments;
 
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::visitor::{CommentsMapBuilder, CommentsVisitor};
-pub(crate) use visitor::collect_comments;
 
 mod debug;
 pub(crate) mod format;
@@ -171,24 +171,37 @@ impl SourceComment {
 
     pub(crate) fn suppression_kind(&self, source: &str) -> Option<SuppressionKind> {
         let text = self.slice.text(SourceCode::new(source));
-        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
 
+        // Match against `# fmt: on`, `# fmt: off`, `# yapf: disable`, and `# yapf: enable`, which
+        // must be on their own lines.
+        let trimmed = text.strip_prefix('#').unwrap_or(text).trim_whitespace();
         if let Some(command) = trimmed.strip_prefix("fmt:") {
             match command.trim_whitespace_start() {
-                "off" => Some(SuppressionKind::Off),
-                "on" => Some(SuppressionKind::On),
-                "skip" => Some(SuppressionKind::Skip),
-                _ => None,
+                "off" => return Some(SuppressionKind::Off),
+                "on" => return Some(SuppressionKind::On),
+                "skip" => return Some(SuppressionKind::Skip),
+                _ => {}
             }
         } else if let Some(command) = trimmed.strip_prefix("yapf:") {
             match command.trim_whitespace_start() {
-                "disable" => Some(SuppressionKind::Off),
-                "enable" => Some(SuppressionKind::On),
-                _ => None,
+                "disable" => return Some(SuppressionKind::Off),
+                "enable" => return Some(SuppressionKind::On),
+                _ => {}
             }
-        } else {
-            None
         }
+
+        // Search for `# fmt: skip` comments, which can be interspersed with other comments (e.g.,
+        // `# fmt: skip # noqa: E501`).
+        for segment in text.split('#') {
+            let trimmed = segment.trim_whitespace();
+            if let Some(command) = trimmed.strip_prefix("fmt:") {
+                if command.trim_whitespace_start() == "skip" {
+                    return Some(SuppressionKind::Skip);
+                }
+            }
+        }
+
+        None
     }
 
     /// Returns true if this comment is a `fmt: off` or `yapf: disable` own line suppression comment.
@@ -550,8 +563,7 @@ mod tests {
     use ruff_formatter::SourceCode;
     use ruff_python_ast::{Mod, PySourceType};
     use ruff_python_index::tokens_and_ranges;
-
-    use ruff_python_parser::{parse_ok_tokens, AsMode};
+    use ruff_python_parser::{parse_tokens, AsMode};
     use ruff_python_trivia::CommentRanges;
 
     use crate::comments::Comments;
@@ -568,7 +580,7 @@ mod tests {
             let source_type = PySourceType::Python;
             let (tokens, comment_ranges) =
                 tokens_and_ranges(source, source_type).expect("Expect source to be valid Python");
-            let parsed = parse_ok_tokens(tokens, source, source_type.as_mode(), "test.py")
+            let parsed = parse_tokens(tokens, source, source_type.as_mode())
                 .expect("Expect source to be valid Python");
 
             CommentsTestCase {

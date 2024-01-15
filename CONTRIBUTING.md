@@ -337,7 +337,7 @@ We use an experimental in-house tool for managing releases.
         uploaded anything, you can restart after pushing a fix.
     1. Upload to PyPI.
     1. Create and push the Git tag (as extracted from `pyproject.toml`). We create the Git tag only
-        after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/charliermarsh/ruff/issues/4468)).
+        after building the wheels and uploading to PyPI, since we can't delete or modify the tag ([#4468](https://github.com/astral-sh/ruff/issues/4468)).
     1. Attach artifacts to draft GitHub release
     1. Trigger downstream repositories. This can fail non-catastrophically, as we can run any
         downstream jobs manually if needed.
@@ -346,7 +346,7 @@ We use an experimental in-house tool for managing releases.
     1. Copy the changelog for the release into the GitHub release
         - See previous releases for formatting of section headers
     1. Generate the contributor list with `rooster contributors` and add to the release notes
-1. If needed, [update the schemastore](https://github.com/charliermarsh/ruff/blob/main/scripts/update_schemastore.py).
+1. If needed, [update the schemastore](https://github.com/astral-sh/ruff/blob/main/scripts/update_schemastore.py).
     1. One can determine if an update is needed when
         `git diff old-version-tag new-version-tag -- ruff.schema.json` returns a non-empty diff.
     1. Once run successfully, you should follow the link in the output to create a PR.
@@ -370,7 +370,7 @@ See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/pyt
 We have several ways of benchmarking and profiling Ruff:
 
 - Our main performance benchmark comparing Ruff with other tools on the CPython codebase
-- Microbenchmarks which the linter or the formatter on individual files. There run on pull requests.
+- Microbenchmarks which run the linter or the formatter on individual files. These run on pull requests.
 - Profiling the linter on either the microbenchmarks or entire projects
 
 ### CPython Benchmark

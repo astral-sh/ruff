@@ -1003,5 +1003,25 @@ SIM223.py:148:12: SIM223 [*] Use `[]` instead of `[] and ...`
 148     |-if f(a and [] and False and []):  # SIM223
     148 |+if f(a and []):  # SIM223
 149 149 |     pass
+150 150 | 
+151 151 | # Regression test for: https://github.com/astral-sh/ruff/issues/9479
+
+SIM223.py:154:7: SIM223 [*] Use `f"{''}{''}"` instead of `f"{''}{''}" and ...`
+    |
+152 | print(f"{a}{b}" and "bar")
+153 | print(f"{a}{''}" and "bar")
+154 | print(f"{''}{''}" and "bar")
+    |       ^^^^^^^^^^^^^^^^^^^^^ SIM223
+155 | print(f"{1}{''}" and "bar")
+    |
+    = help: Replace with `f"{''}{''}"`
+
+ℹ Unsafe fix
+151 151 | # Regression test for: https://github.com/astral-sh/ruff/issues/9479
+152 152 | print(f"{a}{b}" and "bar")
+153 153 | print(f"{a}{''}" and "bar")
+154     |-print(f"{''}{''}" and "bar")
+    154 |+print(f"{''}{''}")
+155 155 | print(f"{1}{''}" and "bar")
 
 

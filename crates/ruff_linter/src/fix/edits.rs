@@ -397,13 +397,13 @@ mod tests {
     #[test]
     fn find_semicolon() -> Result<()> {
         let contents = "x = 1";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(trailing_semicolon(stmt.end(), &locator), None);
 
         let contents = "x = 1; y = 1";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -412,7 +412,7 @@ mod tests {
         );
 
         let contents = "x = 1 ; y = 1";
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(
@@ -425,7 +425,7 @@ x = 1 \
   ; y = 1
 "
         .trim();
-        let program = parse_suite(contents, "<filename>")?;
+        let program = parse_suite(contents)?;
         let stmt = program.first().unwrap();
         let locator = Locator::new(contents);
         assert_eq!(

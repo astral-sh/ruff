@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S410.py:1:8: S410 `lxml` is vulnerable to XML attacks
+  |
+1 | import lxml  # S410
+  |        ^^^^ S410
+2 | from lxml import etree  # S410
+  |
+
+S410.py:2:6: S410 `lxml` is vulnerable to XML attacks
+  |
+1 | import lxml  # S410
+2 | from lxml import etree  # S410
+  |      ^^^^ S410
+  |
+
+

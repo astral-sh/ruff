@@ -2,6 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::{self as ast, StringLike};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -44,8 +45,14 @@ impl AlwaysFixableViolation for StringOrBytesTooLong {
 
 /// PYI053
 pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike) {
+    let semantic = checker.semantic();
+
     // Ignore docstrings.
-    if is_docstring_stmt(checker.semantic().current_statement()) {
+    if is_docstring_stmt(semantic.current_statement()) {
+        return;
+    }
+
+    if is_warnings_dot_deprecated(semantic.current_expression_parent(), semantic) {
         return;
     }
 
@@ -66,4 +73,22 @@ pub(crate) fn string_or_bytes_too_long(checker: &mut Checker, string: StringLike
         string.range(),
     )));
     checker.diagnostics.push(diagnostic);
+}
+
+fn is_warnings_dot_deprecated(expr: Option<&ast::Expr>, semantic: &SemanticModel) -> bool {
+    // Does `expr` represent a call to `warnings.deprecated` or `typing_extensions.deprecated`?
+    let Some(expr) = expr else {
+        return false;
+    };
+    let Some(call) = expr.as_call_expr() else {
+        return false;
+    };
+    semantic
+        .resolve_call_path(&call.func)
+        .is_some_and(|call_path| {
+            matches!(
+                call_path.as_slice(),
+                ["warnings" | "typing_extensions", "deprecated"]
+            )
+        })
 }

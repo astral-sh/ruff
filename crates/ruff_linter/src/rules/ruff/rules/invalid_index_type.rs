@@ -41,10 +41,10 @@ impl Violation for InvalidIndexType {
             is_slice,
         } = self;
         if *is_slice {
-            format!("Slice in indexed access to type `{value_type}` uses type `{index_type}` instead of an integer.")
+            format!("Slice in indexed access to type `{value_type}` uses type `{index_type}` instead of an integer")
         } else {
             format!(
-                "Indexed access to type `{value_type}` uses type `{index_type}` instead of an integer or slice."
+                "Indexed access to type `{value_type}` uses type `{index_type}` instead of an integer or slice"
             )
         }
     }

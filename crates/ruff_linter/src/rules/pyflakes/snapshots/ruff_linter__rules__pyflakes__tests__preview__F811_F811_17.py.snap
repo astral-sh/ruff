@@ -1,0 +1,32 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F811_17.py:6:12: F811 [*] Redefinition of unused `fu` from line 2
+  |
+5 | def bar():
+6 |     import fu
+  |            ^^ F811
+7 | 
+8 |     def baz():
+  |
+  = help: Remove definition: `fu`
+
+ℹ Safe fix
+3 3 | 
+4 4 | 
+5 5 | def bar():
+6   |-    import fu
+7 6 | 
+8 7 |     def baz():
+9 8 |         def fu():
+
+F811_17.py:9:13: F811 Redefinition of unused `fu` from line 6
+   |
+ 8 |     def baz():
+ 9 |         def fu():
+   |             ^^ F811
+10 |             pass
+   |
+   = help: Remove definition: `fu`
+
+

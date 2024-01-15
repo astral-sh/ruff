@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S408.py:1:6: S408 `xml.dom.minidom` is vulnerable to XML attacks
+  |
+1 | from xml.dom.minidom import parseString  # S408
+  |      ^^^^^^^^^^^^^^^ S408
+2 | import xml.dom.minidom  # S408
+  |
+
+S408.py:2:8: S408 `xml.dom.minidom` is vulnerable to XML attacks
+  |
+1 | from xml.dom.minidom import parseString  # S408
+2 | import xml.dom.minidom  # S408
+  |        ^^^^^^^^^^^^^^^ S408
+  |
+
+

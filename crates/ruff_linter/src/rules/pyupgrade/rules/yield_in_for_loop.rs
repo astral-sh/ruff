@@ -24,6 +24,16 @@ use crate::checkers::ast::Checker;
 /// yield from foo
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as converting a `for` loop to a `yield
+/// from` expression can change the behavior of the program in rare cases.
+/// For example, if a generator is being sent values via `send`, then rewriting
+/// to a `yield from` could lead to an attribute error if the underlying
+/// generator does not implement the `send` method.
+///
+/// In most cases, however, the fix is safe, and such a modification should have
+/// no effect on the behavior of the program.
+///
 /// ## References
 /// - [Python documentation: The `yield` statement](https://docs.python.org/3/reference/simple_stmts.html#the-yield-statement)
 /// - [PEP 380](https://peps.python.org/pep-0380/)

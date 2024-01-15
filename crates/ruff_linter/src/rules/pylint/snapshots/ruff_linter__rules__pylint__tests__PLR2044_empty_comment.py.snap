@@ -1,0 +1,133 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+empty_comment.py:3:1: PLR2044 [*] Line with empty comment
+  |
+1 | # this line has a non-empty comment and is OK
+2 |     # this line is also OK, but the three following lines are not
+3 | #
+  | ^ PLR2044
+4 |     #
+5 |         #
+  |
+  = help: Delete the empty comment
+
+ℹ Safe fix
+1 1 | # this line has a non-empty comment and is OK
+2 2 |     # this line is also OK, but the three following lines are not
+3   |-#
+4 3 |     #
+5 4 |         #
+6 5 | 
+
+empty_comment.py:4:5: PLR2044 [*] Line with empty comment
+  |
+2 |     # this line is also OK, but the three following lines are not
+3 | #
+4 |     #
+  |     ^ PLR2044
+5 |         #
+  |
+  = help: Delete the empty comment
+
+ℹ Safe fix
+1 1 | # this line has a non-empty comment and is OK
+2 2 |     # this line is also OK, but the three following lines are not
+3 3 | #
+4   |-    #
+5 4 |         #
+6 5 | 
+7 6 | # this non-empty comment has trailing whitespace and is OK
+
+empty_comment.py:5:9: PLR2044 [*] Line with empty comment
+  |
+3 | #
+4 |     #
+5 |         #
+  |         ^ PLR2044
+6 | 
+7 | # this non-empty comment has trailing whitespace and is OK
+  |
+  = help: Delete the empty comment
+
+ℹ Safe fix
+2 2 |     # this line is also OK, but the three following lines are not
+3 3 | #
+4 4 |     #
+5   |-        #
+6 5 | 
+7 6 | # this non-empty comment has trailing whitespace and is OK
+8 7 | 
+
+empty_comment.py:18:11: PLR2044 [*] Line with empty comment
+   |
+17 | def foo():  # this comment is OK, the one below is not
+18 |     pass  #
+   |           ^ PLR2044
+   |
+   = help: Delete the empty comment
+
+ℹ Safe fix
+15 15 | 
+16 16 | 
+17 17 | def foo():  # this comment is OK, the one below is not
+18    |-    pass  #
+   18 |+    pass
+19 19 | 
+20 20 | 
+21 21 | # the lines below have no comments and are OK
+
+empty_comment.py:44:1: PLR2044 [*] Line with empty comment
+   |
+42 | # These should be removed, despite being an empty "block comment".
+43 | 
+44 | #
+   | ^ PLR2044
+45 | #
+   |
+   = help: Delete the empty comment
+
+ℹ Safe fix
+42 42 | # These should be removed, despite being an empty "block comment".
+43 43 | 
+44 44 | #
+45    |-#
+46 45 | 
+47 46 | # These should also be removed.
+48 47 | 
+
+empty_comment.py:45:1: PLR2044 [*] Line with empty comment
+   |
+44 | #
+45 | #
+   | ^ PLR2044
+46 | 
+47 | # These should also be removed.
+   |
+   = help: Delete the empty comment
+
+ℹ Safe fix
+42 42 | # These should be removed, despite being an empty "block comment".
+43 43 | 
+44 44 | #
+45    |-#
+46 45 | 
+47 46 | # These should also be removed.
+48 47 | 
+
+empty_comment.py:58:2: PLR2044 [*] Line with empty comment
+   |
+57 | α = 1
+58 | α#
+   |  ^ PLR2044
+   |
+   = help: Delete the empty comment
+
+ℹ Safe fix
+55 55 | # This should be removed.
+56 56 | 
+57 57 | α = 1
+58    |-α#
+   58 |+α
+
+

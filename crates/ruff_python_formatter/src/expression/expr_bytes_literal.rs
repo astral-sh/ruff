@@ -2,7 +2,6 @@ use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::ExprBytesLiteral;
 
 use crate::comments::SourceComment;
-use crate::expression::expr_string_literal::is_multiline_string;
 use crate::expression::parentheses::{
     in_parentheses_only_group, NeedsParentheses, OptionalParentheses,
 };
@@ -41,7 +40,7 @@ impl NeedsParentheses for ExprBytesLiteral {
     ) -> OptionalParentheses {
         if self.value.is_implicit_concatenated() {
             OptionalParentheses::Multiline
-        } else if is_multiline_string(self.into(), context.source()) {
+        } else if AnyString::Bytes(self).is_multiline(context.source()) {
             OptionalParentheses::Never
         } else {
             OptionalParentheses::BestFit

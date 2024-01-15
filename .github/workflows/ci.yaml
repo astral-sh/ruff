@@ -180,7 +180,7 @@ jobs:
       - name: "Install cargo-fuzz"
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-fuzz@0.11
+          tool: cargo-fuzz@0.11.2
       - run: cargo fuzz build -s none
 
   scripts:

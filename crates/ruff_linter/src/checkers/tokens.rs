@@ -45,7 +45,13 @@ pub(crate) fn check_tokens(
         Rule::BlankLinesBeforeNestedDefinition,
     ]) {
         let mut blank_lines_checker = BlankLinesChecker::default();
-        blank_lines_checker.check_lines(tokens, locator, stylist, &mut diagnostics);
+        blank_lines_checker.check_lines(
+            tokens,
+            locator,
+            stylist,
+            settings.tab_size,
+            &mut diagnostics,
+        );
     }
 
     if settings.rules.enabled(Rule::BlanketNOQA) {
@@ -54,6 +60,10 @@ pub(crate) fn check_tokens(
 
     if settings.rules.enabled(Rule::BlanketTypeIgnore) {
         pygrep_hooks::rules::blanket_type_ignore(&mut diagnostics, indexer, locator);
+    }
+
+    if settings.rules.enabled(Rule::EmptyComment) {
+        pylint::rules::empty_comments(&mut diagnostics, indexer, locator);
     }
 
     if settings.rules.any_enabled(&[

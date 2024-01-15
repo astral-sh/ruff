@@ -17,6 +17,7 @@ use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
 use crate::checkers::logical_lines::expand_indent;
+use crate::line_width::IndentWidth;
 
 /// Number of blank lines around top level classes and functions.
 const BLANK_LINES_TOP_LEVEL: u32 = 2;
@@ -346,6 +347,7 @@ struct LogicalLineInfo {
 struct LinePreprocessor<'a> {
     tokens: Flatten<Iter<'a, Result<(Tok, TextRange), LexicalError>>>,
     locator: &'a Locator<'a>,
+    indent_width: IndentWidth,
     /// Maximum number of consecutive blank lines between the current line and the previous non-comment logical line.
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
     /// It is also used to match the results of pydocstyle.
@@ -353,11 +355,16 @@ struct LinePreprocessor<'a> {
 }
 
 impl<'a> LinePreprocessor<'a> {
-    fn new(tokens: &'a [LexResult], locator: &'a Locator) -> LinePreprocessor<'a> {
+    fn new(
+        tokens: &'a [LexResult],
+        locator: &'a Locator,
+        indent_width: IndentWidth,
+    ) -> LinePreprocessor<'a> {
         LinePreprocessor {
             tokens: tokens.iter().flatten(),
             locator,
             preceding_blank_lines: 0,
+            indent_width,
         }
     }
 }
@@ -442,7 +449,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         first_range.start(),
                     );
 
-                    let indent_length = expand_indent(self.locator.slice(range));
+                    let indent_length = expand_indent(self.locator.slice(range), self.indent_width);
 
                     if self.preceding_blank_lines < current_blank_lines {
                         self.preceding_blank_lines = current_blank_lines;
@@ -517,10 +524,11 @@ impl BlankLinesChecker {
         tokens: &[LexResult],
         locator: &Locator,
         stylist: &Stylist,
+        indent_width: IndentWidth,
         diagnostics: &mut Vec<Diagnostic>,
     ) {
         let mut prev_indent_length: Option<usize> = None;
-        let line_preprocessor = LinePreprocessor::new(tokens, locator);
+        let line_preprocessor = LinePreprocessor::new(tokens, locator, indent_width);
 
         for logical_line in line_preprocessor {
             self.check_line(

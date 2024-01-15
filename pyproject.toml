@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.1.9"
+version = "0.1.13"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -93,7 +93,6 @@ changelog_contributors = false
 version_files = [
   "README.md",
   "docs/integrations.md",
-  "crates/flake8_to_ruff/Cargo.toml",
   "crates/ruff_cli/Cargo.toml",
   "crates/ruff_linter/Cargo.toml",
   "crates/ruff_shrinking/Cargo.toml",

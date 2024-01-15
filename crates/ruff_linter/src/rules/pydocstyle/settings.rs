@@ -1,9 +1,11 @@
 //! Settings for the `pydocstyle` plugin.
 
 use std::collections::BTreeSet;
+use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 
 use crate::registry::Rule;
@@ -71,9 +73,34 @@ impl Convention {
     }
 }
 
+impl fmt::Display for Convention {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Google => write!(f, "google"),
+            Self::Numpy => write!(f, "numpy"),
+            Self::Pep257 => write!(f, "pep257"),
+        }
+    }
+}
+
 #[derive(Debug, Default, CacheKey)]
 pub struct Settings {
     pub convention: Option<Convention>,
     pub ignore_decorators: BTreeSet<String>,
     pub property_decorators: BTreeSet<String>,
+}
+
+impl fmt::Display for Settings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.pydocstyle",
+            fields = [
+                self.convention | optional,
+                self.ignore_decorators | debug,
+                self.property_decorators | debug
+            ]
+        }
+        Ok(())
+    }
 }

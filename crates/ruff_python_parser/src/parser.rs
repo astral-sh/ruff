@@ -12,19 +12,9 @@
 //! [Abstract Syntax Tree]: https://en.wikipedia.org/wiki/Abstract_syntax_tree
 //! [`Mode`]: crate::mode
 
-use std::{fmt, iter};
-
 use itertools::Itertools;
 pub(super) use lalrpop_util::ParseError as LalrpopError;
-use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::lexer::{lex, lex_starts_at, Spanned};
-use crate::{
-    lexer::{self, LexResult, LexicalError, LexicalErrorType},
-    python,
-    token::Tok,
-    Mode,
-};
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprAwait, ExprBinOp, ExprBoolOp, ExprBooleanLiteral, ExprBytesLiteral,
     ExprCall, ExprCompare, ExprDict, ExprDictComp, ExprEllipsisLiteral, ExprFString,
@@ -32,6 +22,16 @@ use ruff_python_ast::{
     ExprName, ExprNamedExpr, ExprNoneLiteral, ExprNumberLiteral, ExprSet, ExprSetComp, ExprSlice,
     ExprStarred, ExprStringLiteral, ExprSubscript, ExprTuple, ExprUnaryOp, ExprYield,
     ExprYieldFrom, Mod, ModModule, Suite,
+};
+use ruff_text_size::{Ranged, TextRange, TextSize};
+
+use crate::lexer::{lex, lex_starts_at, LexResult};
+use crate::token_source::TokenSource;
+use crate::{
+    lexer::{self, LexicalError, LexicalErrorType},
+    python,
+    token::Tok,
+    Mode,
 };
 
 /// Parse a full Python program usually consisting of multiple lines.
@@ -51,19 +51,19 @@ use ruff_python_ast::{
 ///
 /// print(foo())
 /// "#;
-/// let program = parser::parse_program(source, "<embedded>");
+/// let program = parser::parse_program(source);
 /// assert!(program.is_ok());
 /// ```
-pub fn parse_program(source: &str, source_path: &str) -> Result<ModModule, ParseError> {
+pub fn parse_program(source: &str) -> Result<ModModule, ParseError> {
     let lexer = lex(source, Mode::Module);
-    match parse_tokens(lexer, source, Mode::Module, source_path)? {
+    match parse_tokens(lexer.collect(), source, Mode::Module)? {
         Mod::Module(m) => Ok(m),
         Mod::Expression(_) => unreachable!("Mode::Module doesn't return other variant"),
     }
 }
 
-pub fn parse_suite(source: &str, source_path: &str) -> Result<Suite, ParseError> {
-    parse_program(source, source_path).map(|m| m.body)
+pub fn parse_suite(source: &str) -> Result<Suite, ParseError> {
+    parse_program(source).map(|m| m.body)
 }
 
 /// Parses a single Python expression.
@@ -77,14 +77,14 @@ pub fn parse_suite(source: &str, source_path: &str) -> Result<Suite, ParseError>
 ///
 ///  ```
 /// use ruff_python_parser as parser;
-/// let expr = parser::parse_expression("1 + 2", "<embedded>");
+/// let expr = parser::parse_expression("1 + 2");
 ///
 /// assert!(expr.is_ok());
 ///
 /// ```
-pub fn parse_expression(source: &str, source_path: &str) -> Result<Expr, ParseError> {
+pub fn parse_expression(source: &str) -> Result<Expr, ParseError> {
     let lexer = lex(source, Mode::Expression);
-    match parse_tokens(lexer, source, Mode::Expression, source_path)? {
+    match parse_tokens(lexer.collect(), source, Mode::Expression)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
     }
@@ -104,16 +104,12 @@ pub fn parse_expression(source: &str, source_path: &str) -> Result<Expr, ParseEr
 /// use ruff_python_parser::{parse_expression_starts_at};
 /// # use ruff_text_size::TextSize;
 ///
-/// let expr = parse_expression_starts_at("1 + 2", "<embedded>", TextSize::from(400));
+/// let expr = parse_expression_starts_at("1 + 2", TextSize::from(400));
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_expression_starts_at(
-    source: &str,
-    source_path: &str,
-    offset: TextSize,
-) -> Result<Expr, ParseError> {
+pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr, ParseError> {
     let lexer = lex_starts_at(source, Mode::Module, offset);
-    match parse_tokens(lexer, source, Mode::Expression, source_path)? {
+    match parse_tokens(lexer.collect(), source, Mode::Expression)? {
         Mod::Expression(expression) => Ok(*expression.body),
         Mod::Module(_m) => unreachable!("Mode::Expression doesn't return other variant"),
     }
@@ -133,7 +129,7 @@ pub fn parse_expression_starts_at(
 /// ```
 /// use ruff_python_parser::{Mode, parse};
 ///
-/// let expr = parse("1 + 2", Mode::Expression, "<embedded>");
+/// let expr = parse("1 + 2", Mode::Expression);
 /// assert!(expr.is_ok());
 /// ```
 ///
@@ -148,7 +144,7 @@ pub fn parse_expression_starts_at(
 ///   def greet(self):
 ///    print("Hello, world!")
 /// "#;
-/// let program = parse(source, Mode::Module, "<embedded>");
+/// let program = parse(source, Mode::Module);
 /// assert!(program.is_ok());
 /// ```
 ///
@@ -162,11 +158,11 @@ pub fn parse_expression_starts_at(
 /// ?str.replace
 /// !ls
 /// "#;
-/// let program = parse(source, Mode::Ipython, "<embedded>");
+/// let program = parse(source, Mode::Ipython);
 /// assert!(program.is_ok());
 /// ```
-pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<Mod, ParseError> {
-    parse_starts_at(source, mode, source_path, TextSize::default())
+pub fn parse(source: &str, mode: Mode) -> Result<Mod, ParseError> {
+    parse_starts_at(source, mode, TextSize::default())
 }
 
 /// Parse the given Python source code using the specified [`Mode`] and [`TextSize`].
@@ -189,17 +185,12 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<Mod, ParseEr
 ///
 /// print(fib(42))
 /// "#;
-/// let program = parse_starts_at(source, Mode::Module, "<embedded>", TextSize::from(0));
+/// let program = parse_starts_at(source, Mode::Module, TextSize::from(0));
 /// assert!(program.is_ok());
 /// ```
-pub fn parse_starts_at(
-    source: &str,
-    mode: Mode,
-    source_path: &str,
-    offset: TextSize,
-) -> Result<Mod, ParseError> {
+pub fn parse_starts_at(source: &str, mode: Mode, offset: TextSize) -> Result<Mod, ParseError> {
     let lxr = lexer::lex_starts_at(source, mode, offset);
-    parse_tokens(lxr, source, mode, source_path)
+    parse_tokens(lxr.collect(), source, mode)
 }
 
 /// Parse an iterator of [`LexResult`]s using the specified [`Mode`].
@@ -215,59 +206,19 @@ pub fn parse_starts_at(
 /// use ruff_python_parser::{lexer::lex, Mode, parse_tokens};
 ///
 /// let source = "1 + 2";
-/// let expr = parse_tokens(lex(source, Mode::Expression), source, Mode::Expression, "<embedded>");
+/// let expr = parse_tokens(lex(source, Mode::Expression).collect(), source, Mode::Expression);
 /// assert!(expr.is_ok());
 /// ```
-pub fn parse_tokens(
-    lxr: impl IntoIterator<Item = LexResult>,
-    source: &str,
-    mode: Mode,
-    source_path: &str,
-) -> Result<Mod, ParseError> {
-    let lxr = lxr.into_iter();
-
-    parse_filtered_tokens(
-        lxr.filter_ok(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline)),
-        source,
-        mode,
-        source_path,
-    )
-}
-
-/// Parse tokens into an AST like [`parse_tokens`], but we already know all tokens are valid.
-pub fn parse_ok_tokens(
-    lxr: impl IntoIterator<Item = Spanned>,
-    source: &str,
-    mode: Mode,
-    source_path: &str,
-) -> Result<Mod, ParseError> {
-    let lxr = lxr
-        .into_iter()
-        .filter(|(tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
+pub fn parse_tokens(tokens: Vec<LexResult>, source: &str, mode: Mode) -> Result<Mod, ParseError> {
     let marker_token = (Tok::start_marker(mode), TextRange::default());
-    let lexer = iter::once(marker_token)
-        .chain(lxr)
-        .map(|(t, range)| (range.start(), t, range.end()));
-    python::TopParser::new()
-        .parse(source, mode, lexer)
-        .map_err(|e| parse_error_from_lalrpop(e, source_path))
-}
-
-fn parse_filtered_tokens(
-    lxr: impl IntoIterator<Item = LexResult>,
-    source: &str,
-    mode: Mode,
-    source_path: &str,
-) -> Result<Mod, ParseError> {
-    let marker_token = (Tok::start_marker(mode), TextRange::default());
-    let lexer = iter::once(Ok(marker_token)).chain(lxr);
+    let lexer = std::iter::once(Ok(marker_token)).chain(TokenSource::new(tokens));
     python::TopParser::new()
         .parse(
             source,
             mode,
             lexer.map_ok(|(t, range)| (range.start(), t, range.end())),
         )
-        .map_err(|e| parse_error_from_lalrpop(e, source_path))
+        .map_err(parse_error_from_lalrpop)
 }
 
 /// Represents represent errors that occur during parsing and are
@@ -277,7 +228,6 @@ fn parse_filtered_tokens(
 pub struct ParseError {
     pub error: ParseErrorType,
     pub offset: TextSize,
-    pub source_path: String,
 }
 
 impl std::ops::Deref for ParseError {
@@ -294,7 +244,7 @@ impl std::error::Error for ParseError {
     }
 }
 
-impl fmt::Display for ParseError {
+impl std::fmt::Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -302,12 +252,6 @@ impl fmt::Display for ParseError {
             &self.error,
             u32::from(self.offset)
         )
-    }
-}
-
-impl ParseError {
-    pub fn error(self) -> ParseErrorType {
-        self.error
     }
 }
 
@@ -330,28 +274,20 @@ pub enum ParseErrorType {
 impl std::error::Error for ParseErrorType {}
 
 // Convert `lalrpop_util::ParseError` to our internal type
-fn parse_error_from_lalrpop(
-    err: LalrpopError<TextSize, Tok, LexicalError>,
-    source_path: &str,
-) -> ParseError {
-    let source_path = source_path.to_owned();
-
+fn parse_error_from_lalrpop(err: LalrpopError<TextSize, Tok, LexicalError>) -> ParseError {
     match err {
         // TODO: Are there cases where this isn't an EOF?
         LalrpopError::InvalidToken { location } => ParseError {
             error: ParseErrorType::Eof,
             offset: location,
-            source_path,
         },
         LalrpopError::ExtraToken { token } => ParseError {
             error: ParseErrorType::ExtraToken(token.1),
             offset: token.0,
-            source_path,
         },
         LalrpopError::User { error } => ParseError {
             error: ParseErrorType::Lexical(error.error),
             offset: error.location,
-            source_path,
         },
         LalrpopError::UnrecognizedToken { token, expected } => {
             // Hacky, but it's how CPython does it. See PyParser_AddToken,
@@ -360,7 +296,6 @@ fn parse_error_from_lalrpop(
             ParseError {
                 error: ParseErrorType::UnrecognizedToken(token.1, expected),
                 offset: token.0,
-                source_path,
             }
         }
         LalrpopError::UnrecognizedEof { location, expected } => {
@@ -370,13 +305,11 @@ fn parse_error_from_lalrpop(
                 ParseError {
                     error: ParseErrorType::Lexical(LexicalErrorType::IndentationError),
                     offset: location,
-                    source_path,
                 }
             } else {
                 ParseError {
                     error: ParseErrorType::Eof,
                     offset: location,
-                    source_path,
                 }
             }
         }
@@ -421,6 +354,15 @@ impl ParseErrorType {
             self,
             ParseErrorType::Lexical(LexicalErrorType::TabError | LexicalErrorType::TabsAfterSpaces)
         )
+    }
+}
+
+impl From<LexicalError> for ParseError {
+    fn from(error: LexicalError) -> Self {
+        ParseError {
+            error: ParseErrorType::Lexical(error.error),
+            offset: error.location,
+        }
     }
 }
 
@@ -621,8 +563,9 @@ impl From<ExprSlice> for ParenthesizedExpr {
 
 #[cfg(target_pointer_width = "64")]
 mod size_assertions {
-    use crate::parser::ParenthesizedExpr;
     use static_assertions::assert_eq_size;
+
+    use crate::parser::ParenthesizedExpr;
 
     assert_eq_size!(ParenthesizedExpr, [u8; 88]);
 }
@@ -635,63 +578,63 @@ mod tests {
 
     #[test]
     fn test_parse_empty() {
-        let parse_ast = parse_suite("", "<test>").unwrap();
+        let parse_ast = parse_suite("").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_string() {
         let source = "'Hello world'";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_f_string() {
         let source = "f'Hello world'";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_print_hello() {
         let source = "print('Hello world')";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_print_2() {
         let source = "print('Hello world', 2)";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_kwargs() {
         let source = "my_func('positional', keyword=2)";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_if_elif_else() {
         let source = "if 1: 10\nelif 2: 20\nelse: 30";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_lambda() {
         let source = "lambda x, y: x * y"; // lambda(x, y): x * y";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_lambda_no_args() {
         let source = "lambda: 1";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -699,7 +642,7 @@ mod tests {
     fn test_parse_tuples() {
         let source = "a, b = 4, 5";
 
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -711,7 +654,7 @@ class Foo(A, B):
  def method_with_default(self, arg='default'):
   pass
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -742,7 +685,7 @@ class Foo[**P](): ...
 class Foo[X, Y: str, *U, **P]():
   pass
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
     #[test]
     fn test_parse_function_definition() {
@@ -768,76 +711,76 @@ def func[**P](*args: P.args, **kwargs: P.kwargs):
 def func[T, U: str, *Ts, **P]():
     pass
   ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
     fn test_parse_dict_comprehension() {
         let source = "{x1: x2 for y in z}";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_list_comprehension() {
         let source = "[x for y in z]";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_double_list_comprehension() {
         let source = "[x for y, y2 in z for a in b if a < 5 if a > 10]";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_generator_comprehension() {
         let source = "(x for y in z)";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_named_expression_generator_comprehension() {
         let source = "(x := y + 1 for y in z)";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_if_else_generator_comprehension() {
         let source = "(x if y else y for y in z)";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_bool_op_or() {
         let source = "x or y";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_parse_bool_op_and() {
         let source = "x and y";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_slice() {
         let source = "x[1:2:3]";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
     fn test_named_expression() {
         let source = "(x := ( y * z ))";
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -871,7 +814,7 @@ with (0 as a,): pass
 with (0 as a, 1 as b): pass
 with (0 as a, 1 as b,): pass
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -895,7 +838,7 @@ with (yield from a): pass
 with ((yield)): pass
 with ((yield from a)): pass
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -918,7 +861,7 @@ with ((yield from a)): pass
             "with a := 0 as x: pass",
             "with (a := 0 as x): pass",
         ] {
-            assert!(parse_suite(source, "<test>").is_err());
+            assert!(parse_suite(source).is_err());
         }
     }
 
@@ -930,7 +873,7 @@ array[0, *indexes, -1] = array_slice
 array[*indexes_to_select, *indexes_to_select]
 array[3:5, *indexes_to_select]
 ";
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -943,7 +886,7 @@ array[3:5, *indexes_to_select]
         ("OFFSET %d" % offset) if offset else None,
     )
 )"#;
-        let parse_ast = parse_expression(source, "<test>").unwrap();
+        let parse_ast = parse_expression(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -956,7 +899,6 @@ except TypeError as e:
     print(f'caught {type(e)}')
 except OSError as e:
     print(f'caught {type(e)}')",
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -972,7 +914,6 @@ except* TypeError as e:
     print(f'caught {type(e)} with nested {e.exceptions}')
 except* OSError as e:
     print(f'caught {type(e)} with nested {e.exceptions}')"#,
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -980,7 +921,7 @@ except* OSError as e:
 
     #[test]
     fn test_dict_unpacking() {
-        let parse_ast = parse_expression(r#"{"a": "b", **c, "d": "e"}"#, "<test>").unwrap();
+        let parse_ast = parse_expression(r#"{"a": "b", **c, "d": "e"}"#).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -988,8 +929,8 @@ except* OSError as e:
     fn test_modes() {
         let source = "a[0][1][2][3][4]";
 
-        assert!(parse(source, Mode::Expression, "<embedded>").is_ok());
-        assert!(parse(source, Mode::Module, "<embedded>").is_ok());
+        assert!(parse(source, Mode::Expression).is_ok());
+        assert!(parse(source, Mode::Module).is_ok());
     }
 
     #[test]
@@ -1036,7 +977,7 @@ type X[T] \
 type X = int; type X = str; type X = type
 class X: type X = int
 "#;
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -1074,13 +1015,13 @@ type = x = 1
 x = type = 1
 lambda x: type
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
     fn test_invalid_type() {
-        assert!(parse_suite("a: type X = int", "<test>").is_err());
-        assert!(parse_suite("lambda: type X = int", "<test>").is_err());
+        assert!(parse_suite("a: type X = int").is_err());
+        assert!(parse_suite("lambda: type X = int").is_err());
     }
 
     #[test]
@@ -1105,7 +1046,7 @@ x = 10000
 x = 133333
 ";
 
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -1131,7 +1072,7 @@ if 10 .real:
 y = 100[no]
 y = 100(no)
 ";
-        assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -1159,7 +1100,7 @@ match match:
 match = lambda query: query == event
 print(match(12))
 ";
-        insta::assert_debug_snapshot!(parse_suite(source, "<test>").unwrap());
+        insta::assert_debug_snapshot!(parse_suite(source).unwrap());
     }
 
     #[test]
@@ -1329,7 +1270,7 @@ match w := x,:
     case y as v,:
         z = 0
 "#;
-        let parse_ast = parse_suite(source, "<test>").unwrap();
+        let parse_ast = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
@@ -1366,7 +1307,6 @@ match x, y,:
     case z:
         pass
 "#,
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -1381,7 +1321,6 @@ match x:
     case f"{y}":
         pass
 "#,
-            "<test>",
         )
         .err();
         assert!(
@@ -1396,7 +1335,6 @@ match x:
             r"
 def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
 ",
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -1415,7 +1353,6 @@ class Abcd:
     pass
 "
             .trim(),
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -1492,7 +1429,6 @@ foo.bar[0].baz[2].egg??
 "
             .trim(),
             Mode::Ipython,
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -1506,7 +1442,7 @@ a = 1
     "
         .trim();
         let lxr = lexer::lex_starts_at(source, Mode::Ipython, TextSize::default());
-        let parse_err = parse_tokens(lxr, source, Mode::Module, "<test>").unwrap_err();
+        let parse_err = parse_tokens(lxr.collect(), source, Mode::Module).unwrap_err();
         assert_eq!(
             parse_err.to_string(),
             "IPython escape commands are only allowed in `Mode::Ipython` at byte offset 6"
@@ -1546,7 +1482,6 @@ f"""{
 }"""
 "#
             .trim(),
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -1562,7 +1497,6 @@ u"foo" f"{bar}" "baz" " some"
 u"foo" f"bar {baz} really" u"bar" "no"
 "#
             .trim(),
-            "<test>",
         )
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -1571,7 +1505,7 @@ u"foo" f"bar {baz} really" u"bar" "no"
     #[test]
     fn test_unicode_aliases() {
         // https://github.com/RustPython/RustPython/issues/4566
-        let parse_ast = parse_suite(r#"x = "\N{BACKSPACE}another cool trick""#, "<test>").unwrap();
+        let parse_ast = parse_suite(r#"x = "\N{BACKSPACE}another cool trick""#).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 }

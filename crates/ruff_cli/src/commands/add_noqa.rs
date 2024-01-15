@@ -38,7 +38,6 @@ pub(crate) fn add_noqa(
             .flatten()
             .map(ResolvedFile::path)
             .collect::<Vec<_>>(),
-        pyproject_config,
     );
 
     let start = Instant::now();
@@ -57,7 +56,7 @@ pub(crate) fn add_noqa(
                 .parent()
                 .and_then(|parent| package_roots.get(parent))
                 .and_then(|package| *package);
-            let settings = resolver.resolve(path, pyproject_config);
+            let settings = resolver.resolve(path);
             let source_kind = match SourceKind::from_path(path, source_type) {
                 Ok(Some(source_kind)) => source_kind,
                 Ok(None) => return None,

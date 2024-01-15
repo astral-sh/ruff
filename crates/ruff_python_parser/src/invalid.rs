@@ -100,343 +100,322 @@ mod tests {
     // Regression test: https://github.com/astral-sh/ruff/issues/6895
     #[test]
     fn err_literal_assignment() {
-        let ast = parse_suite(r"5 = 3", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"5 = 3");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     // This test previously passed before the assignment operator checking
     // above, but we include it here for good measure.
     #[test]
     fn err_assignment_expr() {
-        let ast = parse_suite(r"(5 := 3)", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: UnrecognizedToken(
-            ColonEqual,
-            None,
-        ),
-        offset: 3,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"(5 := 3)");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: UnrecognizedToken(
+                    ColonEqual,
+                    None,
+                ),
+                offset: 3,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_literal_augment_assignment() {
-        let ast = parse_suite(r"5 += 3", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"5 += 3");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_literal_annotation_assignment() {
-        let ast = parse_suite(r"(5): int = 3", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 1,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"(5): int = 3");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 1,
+            },
+        )
+        "###);
     }
 
     // Now we exhaustively test all possible cases where assignment can fail.
 
     #[test]
     fn err_bool_op() {
-        let ast = parse_suite(r"x or y = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"x or y = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_named_expr() {
-        let ast = parse_suite(r"(x := 5) = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 1,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"(x := 5) = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 1,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_bin_op() {
-        let ast = parse_suite(r"x + y = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"x + y = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_unary_op() {
-        let ast = parse_suite(r"-x = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"-x = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_lambda() {
-        let ast = parse_suite(r"(lambda _: 1) = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 1,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"(lambda _: 1) = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 1,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_if_exp() {
-        let ast = parse_suite(r"a if b else c = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"a if b else c = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_dict() {
-        let ast = parse_suite(r"{'a':5} = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"{'a':5} = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_set() {
-        let ast = parse_suite(r"{a} = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"{a} = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_list_comp() {
-        let ast = parse_suite(r"[x for x in xs] = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"[x for x in xs] = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_set_comp() {
-        let ast = parse_suite(r"{x for x in xs} = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"{x for x in xs} = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_dict_comp() {
-        let ast = parse_suite(r"{x: x*2 for x in xs} = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"{x: x*2 for x in xs} = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_generator_exp() {
-        let ast = parse_suite(r"(x for x in xs) = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"(x for x in xs) = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_await() {
-        let ast = parse_suite(r"await x = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"await x = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_yield() {
-        let ast = parse_suite(r"(yield x) = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 1,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"(yield x) = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 1,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_yield_from() {
-        let ast = parse_suite(r"(yield from xs) = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 1,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"(yield from xs) = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 1,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_compare() {
-        let ast = parse_suite(r"a < b < c = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"a < b < c = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_call() {
-        let ast = parse_suite(r"foo() = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"foo() = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
@@ -452,194 +431,182 @@ Err(
         // is coupled.
         //
         // See: https://docs.python.org/3/library/ast.html#ast.FormattedValue
-        let ast = parse_suite(r#"f"{quux}" = 42"#, "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r#"f"{quux}" = 42"#);
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_fstring() {
-        let ast = parse_suite(r#"f"{foo} and {bar}" = 42"#, "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r#"f"{foo} and {bar}" = 42"#);
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_string_literal() {
-        let ast = parse_suite(r#""foo" = 42"#, "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r#""foo" = 42"#);
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_bytes_literal() {
-        let ast = parse_suite(r#"b"foo" = 42"#, "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r#"b"foo" = 42"#);
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_number_literal() {
-        let ast = parse_suite(r"123 = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"123 = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_boolean_literal() {
-        let ast = parse_suite(r"True = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"True = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_none_literal() {
-        let ast = parse_suite(r"None = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"None = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_ellipsis_literal() {
-        let ast = parse_suite(r"... = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 0,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"... = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 0,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_starred() {
-        let ast = parse_suite(r"*foo() = 42", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 1,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"*foo() = 42");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 1,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_list() {
-        let ast = parse_suite(r"[x, foo(), y] = [42, 42, 42]", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 4,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"[x, foo(), y] = [42, 42, 42]");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 4,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_list_nested() {
-        let ast = parse_suite(r"[[a, b], [[42]], d] = [[1, 2], [[3]], 4]", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 11,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"[[a, b], [[42]], d] = [[1, 2], [[3]], 4]");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 11,
+            },
+        )
+        "###);
     }
 
     #[test]
     fn err_tuple() {
-        let ast = parse_suite(r"(x, foo(), y) = (42, 42, 42)", "<test>");
-        insta::assert_debug_snapshot!(ast, @r#"
-Err(
-    ParseError {
-        error: Lexical(
-            AssignmentError,
-        ),
-        offset: 4,
-        source_path: "<test>",
-    },
-)
-"#);
+        let ast = parse_suite(r"(x, foo(), y) = (42, 42, 42)");
+        insta::assert_debug_snapshot!(ast, @r###"
+        Err(
+            ParseError {
+                error: Lexical(
+                    AssignmentError,
+                ),
+                offset: 4,
+            },
+        )
+        "###);
     }
 
     // This last group of tests checks that assignments we expect to be parsed
@@ -647,25 +614,25 @@ Err(
 
     #[test]
     fn ok_starred() {
-        let ast = parse_suite(r"*foo = 42", "<test>");
+        let ast = parse_suite(r"*foo = 42");
         insta::assert_debug_snapshot!(ast);
     }
 
     #[test]
     fn ok_list() {
-        let ast = parse_suite(r"[x, y, z] = [1, 2, 3]", "<test>");
+        let ast = parse_suite(r"[x, y, z] = [1, 2, 3]");
         insta::assert_debug_snapshot!(ast);
     }
 
     #[test]
     fn ok_tuple() {
-        let ast = parse_suite(r"(x, y, z) = (1, 2, 3)", "<test>");
+        let ast = parse_suite(r"(x, y, z) = (1, 2, 3)");
         insta::assert_debug_snapshot!(ast);
     }
 
     #[test]
     fn ok_subscript_normal() {
-        let ast = parse_suite(r"x[0] = 42", "<test>");
+        let ast = parse_suite(r"x[0] = 42");
         insta::assert_debug_snapshot!(ast);
     }
 
@@ -673,13 +640,13 @@ Err(
     // doesn't fail parsing.
     #[test]
     fn ok_subscript_weird() {
-        let ast = parse_suite(r"5[0] = 42", "<test>");
+        let ast = parse_suite(r"5[0] = 42");
         insta::assert_debug_snapshot!(ast);
     }
 
     #[test]
     fn ok_slice_normal() {
-        let ast = parse_suite(r"x[1:2] = [42]", "<test>");
+        let ast = parse_suite(r"x[1:2] = [42]");
         insta::assert_debug_snapshot!(ast);
     }
 
@@ -687,13 +654,13 @@ Err(
     // doesn't fail parsing.
     #[test]
     fn ok_slice_weird() {
-        let ast = parse_suite(r"5[1:2] = [42]", "<test>");
+        let ast = parse_suite(r"5[1:2] = [42]");
         insta::assert_debug_snapshot!(ast);
     }
 
     #[test]
     fn ok_attribute_normal() {
-        let ast = parse_suite(r"foo.bar = 42", "<test>");
+        let ast = parse_suite(r"foo.bar = 42");
         insta::assert_debug_snapshot!(ast);
     }
 
@@ -701,13 +668,13 @@ Err(
     // it doesn't fail parsing.
     #[test]
     fn ok_attribute_weird() {
-        let ast = parse_suite(r#""foo".y = 42"#, "<test>");
+        let ast = parse_suite(r#""foo".y = 42"#);
         insta::assert_debug_snapshot!(ast);
     }
 
     #[test]
     fn ok_name() {
-        let ast = parse_suite(r"foo = 42", "<test>");
+        let ast = parse_suite(r"foo = 42");
         insta::assert_debug_snapshot!(ast);
     }
 
@@ -720,13 +687,13 @@ Err(
 
         let src = r"!foo = 42";
         let tokens = crate::lexer::lex(src, Mode::Ipython);
-        let ast = crate::parse_tokens(tokens, src, Mode::Ipython, "<test>");
+        let ast = crate::parse_tokens(tokens.collect(), src, Mode::Ipython);
         insta::assert_debug_snapshot!(ast);
     }
 
     #[test]
     fn ok_assignment_expr() {
-        let ast = parse_suite(r"(x := 5)", "<test>");
+        let ast = parse_suite(r"(x := 5)");
         insta::assert_debug_snapshot!(ast);
     }
 }

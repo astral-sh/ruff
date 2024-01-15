@@ -270,6 +270,7 @@ impl Rule {
             | Rule::BlankLinesBeforeNestedDefinition
             | Rule::BlankLinesTopLevel
             | Rule::CommentedOutCode
+            | Rule::EmptyComment
             | Rule::ExtraneousParentheses
             | Rule::InvalidCharacterBackspace
             | Rule::InvalidCharacterEsc

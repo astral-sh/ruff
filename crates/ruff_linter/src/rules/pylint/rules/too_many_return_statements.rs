@@ -103,7 +103,7 @@ mod tests {
     use super::num_returns;
 
     fn test_helper(source: &str, expected: usize) -> Result<()> {
-        let stmts = parse_suite(source, "<filename>")?;
+        let stmts = parse_suite(source)?;
         assert_eq!(num_returns(&stmts), expected);
         Ok(())
     }

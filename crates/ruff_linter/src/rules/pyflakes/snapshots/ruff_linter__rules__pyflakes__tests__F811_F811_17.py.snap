@@ -9,6 +9,7 @@ F811_17.py:6:12: F811 Redefinition of unused `fu` from line 2
 7 | 
 8 |     def baz():
   |
+  = help: Remove definition: `fu`
 
 F811_17.py:9:13: F811 Redefinition of unused `fu` from line 6
    |
@@ -17,5 +18,6 @@ F811_17.py:9:13: F811 Redefinition of unused `fu` from line 6
    |             ^^ F811
 10 |             pass
    |
+   = help: Remove definition: `fu`
 
 

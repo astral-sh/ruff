@@ -150,7 +150,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.1.9
+  rev: v0.1.13
   hooks:
     # Run the linter.
     - id: ruff
@@ -386,6 +386,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Benchling ([Refac](https://github.com/benchling/refac))
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- CERN ([Indico](https://getindico.io/))
 - [DVC](https://github.com/iterative/dvc)
 - [Dagger](https://github.com/dagger/dagger)
 - [Dagster](https://github.com/dagster-io/dagster)
@@ -417,6 +418,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [NoneBot](https://github.com/nonebot/nonebot2)
+- [NumPyro](https://github.com/pyro-ppl/numpyro)
 - [ONNX](https://github.com/onnx/onnx)
 - [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
 - [PDM](https://github.com/pdm-project/pdm)
@@ -428,10 +430,12 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PostHog](https://github.com/PostHog/posthog)
 - Prefect ([Python SDK](https://github.com/PrefectHQ/prefect), [Marvin](https://github.com/PrefectHQ/marvin))
 - [PyInstaller](https://github.com/pyinstaller/pyinstaller)
+- [PyMC](https://github.com/pymc-devs/pymc/)
 - [PyMC-Marketing](https://github.com/pymc-labs/pymc-marketing)
 - [PyTorch](https://github.com/pytorch/pytorch)
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
+- [PyVista](https://github.com/pyvista/pyvista)
 - [Reflex](https://github.com/reflex-dev/reflex)
 - [River](https://github.com/online-ml/river)
 - [Rippling](https://rippling.com)

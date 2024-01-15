@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::hash::BuildHasherDefault;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
@@ -40,12 +41,33 @@ pub enum ImportType {
     LocalFolder,
 }
 
+impl fmt::Display for ImportType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Future => write!(f, "future"),
+            Self::StandardLibrary => write!(f, "standard_library"),
+            Self::ThirdParty => write!(f, "third_party"),
+            Self::FirstParty => write!(f, "first_party"),
+            Self::LocalFolder => write!(f, "local_folder"),
+        }
+    }
+}
+
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, CacheKey)]
 #[serde(untagged)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum ImportSection {
     Known(ImportType),
     UserDefined(String),
+}
+
+impl fmt::Display for ImportSection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Known(import_type) => write!(f, "known {{ type = {import_type} }}",),
+            Self::UserDefined(string) => fmt::Debug::fmt(string, f),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -376,5 +398,20 @@ impl KnownModules {
             }
         }
         user_defined
+    }
+}
+
+impl fmt::Display for KnownModules {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.known.is_empty() {
+            write!(f, "{{}}")?;
+        } else {
+            writeln!(f, "{{")?;
+            for (pattern, import_section) in &self.known {
+                writeln!(f, "\t{pattern} => {import_section:?},")?;
+            }
+            write!(f, "}}")?;
+        }
+        Ok(())
     }
 }
