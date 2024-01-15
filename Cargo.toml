@@ -83,7 +83,7 @@ serde_test = { version = "1.0.152" }
 serde_with = { version = "3.4.0", default-features = false, features = ["macros"] }
 shellexpand = { version = "3.0.0" }
 shlex = { version ="1.2.0"}
-similar = { version = "2.3.0", features = ["inline"] }
+similar = { version = "2.4.0", features = ["inline"] }
 smallvec = { version = "1.11.2" }
 static_assertions = "1.1.0"
 strum = { version = "0.25.0", features = ["strum_macros"] }
