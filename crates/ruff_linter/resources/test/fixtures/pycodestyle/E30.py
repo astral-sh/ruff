@@ -748,3 +748,9 @@ def a():
     async def b():
         pass
 # end
+
+
+class Test:
+    async
+
+    def a(self): pass

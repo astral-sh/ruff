@@ -1,18 +1,16 @@
+use std::slice::Iter;
+
 use ruff_diagnostics::AlwaysFixableViolation;
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Fix;
-use ruff_python_parser::Tok;
-use std::iter::Flatten;
-use std::slice::Iter;
-
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::lexer::LexResult;
 use ruff_python_parser::lexer::LexicalError;
+use ruff_python_parser::Tok;
 use ruff_python_parser::TokenKind;
 use ruff_source_file::Locator;
-
 use ruff_text_size::TextRange;
 use ruff_text_size::TextSize;
 
@@ -312,17 +310,6 @@ impl AlwaysFixableViolation for BlankLinesBeforeNestedDefinition {
     }
 }
 
-/// Returns `true` if the token is a top level token.
-/// It is sufficient to test for Class and Def since the `LinePreprocessor` ignores Async tokens.
-fn is_top_level_token(token: Option<TokenKind>) -> bool {
-    matches!(&token, Some(TokenKind::Class | TokenKind::Def))
-}
-
-/// Returns `true` if the token is At, Async, Class or Def
-fn is_top_level_token_or_decorator(token: TokenKind) -> bool {
-    matches!(&token, TokenKind::Class | TokenKind::Def | TokenKind::At)
-}
-
 #[derive(Debug)]
 struct LogicalLineInfo {
     kind: LogicalLineKind,
@@ -334,6 +321,8 @@ struct LogicalLineInfo {
     // The end of the logical line including the newline.
     logical_line_end: TextSize,
     is_comment_only: bool,
+
+    /// `true` if the line is a string only (including trivia tokens) line, which is a docstring if coming right after a class/function definition.
     is_docstring: bool,
     indent_length: usize,
     /// `blank_lines` is the straightforward amount of blank lines preceding the current line.
@@ -352,6 +341,8 @@ struct LinePreprocessor<'a> {
     tokens: Iter<'a, Result<(Tok, TextRange), LexicalError>>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
+    /// The start position of the next logical line.
+    line_start: TextSize,
     /// Maximum number of consecutive blank lines between the current line and the previous non-comment logical line.
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
     /// It is also used to match the results of pydocstyle.
@@ -367,6 +358,7 @@ impl<'a> LinePreprocessor<'a> {
         LinePreprocessor {
             tokens: tokens.iter(),
             locator,
+            line_start: TextSize::new(0),
             preceding_blank_lines: 0,
             indent_width,
         }
@@ -409,8 +401,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 if token_kind == TokenKind::NonLogicalNewline {
                     current_blank_lines += 1;
                     current_blank_characters += range.len().to_usize();
-                    // self.current_blank_characters +=
-                    //     range.end().to_usize() - first_range.start().to_usize() + 1;
+
+                    self.line_start = range.end();
 
                     continue;
                 }
@@ -453,24 +445,20 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     parens = parens.saturating_sub(1);
                 }
                 TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
-                    let last_token_end = range.end();
+                    let indent_range = TextRange::new(self.line_start, first_token_range.start());
 
-                    let range = TextRange::new(
-                        self.locator.line_start(first_token_range.start()),
-                        first_token_range.start(),
-                    );
+                    let indent_length =
+                        expand_indent(self.locator.slice(indent_range), self.indent_width);
 
-                    let indent_length = expand_indent(self.locator.slice(range), self.indent_width);
-
-                    if self.preceding_blank_lines < current_blank_lines {
-                        self.preceding_blank_lines = current_blank_lines;
-                    }
+                    // if self.preceding_blank_lines < current_blank_lines {
+                    //     self.preceding_blank_lines = current_blank_lines;
+                    // }
 
                     let logical_line = LogicalLineInfo {
                         kind: logical_line_kind,
                         first_token_range,
                         last_token,
-                        logical_line_end: last_token_end,
+                        logical_line_end: range.end(),
                         is_comment_only: line_is_comment_only,
                         is_docstring,
                         indent_length,
@@ -482,6 +470,9 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     if !line_is_comment_only {
                         self.preceding_blank_lines = 0;
                     }
+                    // Set the start for the next logical line.
+                    self.line_start = range.end();
+
                     return Some(logical_line);
                 }
                 _ => {}
@@ -714,7 +705,7 @@ impl BlankLinesChecker {
             if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
                 && self
                     .previous_unindented_line_kind
-                    .is_some_and(|kind| kind.is_top_level())
+                    .is_some_and(LogicalLineKind::is_top_level)
                 && line.indent_length == 0
                 && !line.is_comment_only
                 && !line.kind.is_top_level()
@@ -740,7 +731,7 @@ impl BlankLinesChecker {
             }
 
             if line.preceding_blank_lines == 0
-            // Only apply to nested functions.
+                // Only apply to nested functions.
                 && matches!(self.fn_status, Status::Inside(_))
                 && line.kind.is_top_level()
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
