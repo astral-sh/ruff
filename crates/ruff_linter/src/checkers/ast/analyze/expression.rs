@@ -170,6 +170,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                     if checker.enabled(Rule::CollectionsNamedTuple) {
                         flake8_pyi::rules::collections_named_tuple(checker, expr);
                     }
+                    if checker.enabled(Rule::RegexFlagAlias) {
+                        refurb::rules::regex_flag_alias(checker, expr);
+                    }
 
                     // Ex) List[...]
                     if checker.any_enabled(&[
@@ -292,6 +295,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                         }
                     }
                 }
+            }
+            if checker.enabled(Rule::RegexFlagAlias) {
+                refurb::rules::regex_flag_alias(checker, expr);
             }
             if checker.enabled(Rule::DatetimeTimezoneUTC) {
                 if checker.settings.target_version >= PythonVersion::Py311 {
@@ -983,9 +989,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 flake8_pie::rules::unnecessary_spread(checker, dict);
             }
         }
-        Expr::Set(ast::ExprSet { elts, range: _ }) => {
+        Expr::Set(set) => {
             if checker.enabled(Rule::DuplicateValue) {
-                flake8_bugbear::rules::duplicate_value(checker, elts);
+                flake8_bugbear::rules::duplicate_value(checker, set);
             }
         }
         Expr::Yield(_) => {
