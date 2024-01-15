@@ -93,14 +93,8 @@ pub(crate) fn sort_dunder_all_assign(
 /// Sort an `__all__` mutation represented by a `StmtAugAssign` AST node.
 /// For example: `__all__ += ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::StmtAugAssign) {
-    if let ast::StmtAugAssign {
-        value,
-        target,
-        op: ast::Operator::Add,
-        ..
-    } = node
-    {
-        sort_dunder_all(checker, target, value);
+    if node.op.is_add() {
+        sort_dunder_all(checker, &node.target, &node.value);
     }
 }
 
@@ -132,13 +126,8 @@ pub(crate) fn sort_dunder_all_extend_call(
 /// Sort an `__all__` definition represented by a `StmtAnnAssign` AST node.
 /// For example: `__all__: list[str] = ["b", "c", "a"]`.
 pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::StmtAnnAssign) {
-    if let ast::StmtAnnAssign {
-        target,
-        value: Some(val),
-        ..
-    } = node
-    {
-        sort_dunder_all(checker, target, val);
+    if let Some(value) = &node.value {
+        sort_dunder_all(checker, &node.target, value);
     }
 }
 
@@ -579,6 +568,12 @@ struct LineWithItems {
     trailing_comment_range: Option<TextRange>,
 }
 
+impl LineWithItems {
+    fn num_items(&self) -> usize {
+        self.following_items.len() + 1
+    }
+}
+
 #[derive(Debug)]
 enum DunderAllLine {
     JustAComment(LineWithJustAComment),
@@ -599,9 +594,7 @@ fn collect_dunder_all_items(
     locator: &Locator,
 ) -> Vec<DunderAllItem> {
     let mut all_items = Vec::with_capacity(match lines.as_slice() {
-        [DunderAllLine::OneOrMoreItems(LineWithItems {
-            following_items, ..
-        })] => following_items.len() + 1,
+        [DunderAllLine::OneOrMoreItems(single)] => single.num_items(),
         _ => lines.len(),
     });
     let mut first_item_encountered = false;
