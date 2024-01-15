@@ -1,4 +1,5 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ast::{Expr, ExprAttribute};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, ExceptHandler};
@@ -48,9 +49,15 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 pub struct ErrorInsteadOfException;
 
 impl Violation for ErrorInsteadOfException {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `logging.exception` instead of `logging.error`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!("Replace with `exception`"))
     }
 }
 
@@ -67,9 +74,20 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
         for (expr, logging_level) in calls {
             if matches!(logging_level, LoggingLevel::Error) {
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(ErrorInsteadOfException, expr.range()));
+                    let mut diagnostic = Diagnostic::new(ErrorInsteadOfException, expr.range());
+
+                    if checker.settings.preview.is_enabled() {
+                        let Expr::Attribute(ExprAttribute { attr, .. }) = expr.func.as_ref() else {
+                            return;
+                        };
+
+                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                            "exception".to_string(),
+                            attr.range(),
+                        )));
+                    }
+
+                    checker.diagnostics.push(diagnostic);
                 }
             }
         }
