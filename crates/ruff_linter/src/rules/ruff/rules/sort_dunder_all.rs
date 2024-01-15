@@ -7,7 +7,7 @@ use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_python_stdlib::str::is_cased_uppercase;
-use ruff_python_trivia::{leading_indentation, SimpleTokenKind, SimpleTokenizer};
+use ruff_python_trivia::leading_indentation;
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -163,7 +163,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
             return;
         };
         // If any strings are implicitly concatenated, don't bother trying to autofix
-        if possibly_fixable && string_literal.value.is_implicit_concatenated() {
+        if string_literal.value.is_implicit_concatenated() {
             possibly_fixable = false;
         }
         string_items.push(string_literal.value.to_str());
@@ -262,6 +262,37 @@ impl From<&DunderAllItem> for AllItemSortKey {
     }
 }
 
+/// Classification for an element in `__all__`.
+///
+/// This is necessary to achieve an "isort-style" sort,
+/// where elements are sorted first by category,
+/// then, within categories, are sorted according
+/// to a natural sort.
+///
+/// You'll notice that a very similar enum exists
+/// in ruff's reimplementation of isort.
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy)]
+enum InferredMemberType {
+    Constant,
+    Class,
+    Other,
+}
+
+impl InferredMemberType {
+    fn of(value: &str) -> Self {
+        // E.g. `CONSTANT`
+        if value.len() > 1 && is_cased_uppercase(value) {
+            Self::Constant
+        // E.g. `Class`
+        } else if value.chars().next().is_some_and(char::is_uppercase) {
+            Self::Class
+        // E.g. `some_variable` or `some_function`
+        } else {
+            Self::Other
+        }
+    }
+}
+
 fn get_fix(
     range: TextRange,
     elts: &[ast::Expr],
@@ -338,10 +369,15 @@ impl MultilineDunderAllValue {
 
     /// Sort a multiline `__all__` definition
     /// that is known to be unsorted.
+    ///
+    /// Panics if this is called and `self.items`
+    /// has length < 2. It's redundant to call this method in this case,
+    /// since lists with < 2 items cannot be unsorted,
+    /// so this is a logic error.
     fn into_sorted_source_code(mut self, locator: &Locator, stylist: &Stylist) -> String {
         let (first_item_start, last_item_end) = match self.items.as_slice() {
             [first_item, .., last_item] => (first_item.start(), last_item.end()),
-            _ => unreachable!(
+            _ => panic!(
                 "We shouldn't be attempting an autofix if `__all__` has < 2 elements;
                 an `__all__` definition with 1 or 0 elements cannot be unsorted."
             ),
@@ -659,37 +695,6 @@ fn collect_dunder_all_items(
     all_items
 }
 
-/// Classification for an element in `__all__`.
-///
-/// This is necessary to achieve an "isort-style" sort,
-/// where elements are sorted first by category,
-/// then, within categories, are sorted according
-/// to a natural sort.
-///
-/// You'll notice that a very similar enum exists
-/// in ruff's reimplementation of isort.
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy)]
-enum InferredMemberType {
-    Constant,
-    Class,
-    Other,
-}
-
-impl InferredMemberType {
-    fn of(value: &str) -> Self {
-        // E.g. `CONSTANT`
-        if value.len() > 1 && is_cased_uppercase(value) {
-            Self::Constant
-        // E.g. `Class`
-        } else if value.chars().next().is_some_and(char::is_uppercase) {
-            Self::Class
-        // E.g. `some_variable` or `some_function`
-        } else {
-            Self::Other
-        }
-    }
-}
-
 /// An instance of this struct represents a single element
 /// from a multiline `__all__` tuple/list, *and* any comments that
 /// are "attached" to it. The comments "attached" to the element
@@ -868,42 +873,11 @@ fn sort_single_line_dunder_all(
     match kind {
         DunderAllKind::List => format!("[{joined_items}]"),
         DunderAllKind::Tuple(tuple_node) => {
-            if is_tuple_parenthesized(tuple_node, locator.contents()) {
+            if tuple_node.is_parenthesized(locator.contents()) {
                 format!("({joined_items})")
             } else {
                 joined_items
             }
         }
     }
-}
-
-/// Return `true` if a tuple is parenthesized in the source code.
-///
-/// (Yes, this function is shamelessly copied from the formatter.)
-fn is_tuple_parenthesized(tuple: &ast::ExprTuple, source: &str) -> bool {
-    let Some(elt) = tuple.elts.first() else {
-        return true;
-    };
-
-    // Count the number of open parentheses between the start of the tuple and the first element.
-    let open_parentheses_count =
-        SimpleTokenizer::new(source, TextRange::new(tuple.start(), elt.start()))
-            .skip_trivia()
-            .filter(|token| token.kind() == SimpleTokenKind::LParen)
-            .count();
-    if open_parentheses_count == 0 {
-        return false;
-    }
-
-    // Count the number of parentheses between the end of the first element and its trailing comma.
-    let close_parentheses_count =
-        SimpleTokenizer::new(source, TextRange::new(elt.end(), tuple.end()))
-            .skip_trivia()
-            .take_while(|token| token.kind() != SimpleTokenKind::Comma)
-            .filter(|token| token.kind() == SimpleTokenKind::RParen)
-            .count();
-
-    // If the number of open parentheses is greater than the number of close parentheses, the tuple
-    // is parenthesized.
-    open_parentheses_count > close_parentheses_count
 }
