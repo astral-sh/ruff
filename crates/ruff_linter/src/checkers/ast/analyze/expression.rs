@@ -1243,6 +1243,9 @@ pub(crate) fn expression(expr: &Expr, checker: &mut Checker) {
                 range: _,
             },
         ) => {
+            if checker.enabled(Rule::BoolLiteralCompare) {
+                refurb::rules::bool_literal_compare(checker, compare);
+            }
             if checker.any_enabled(&[Rule::NoneComparison, Rule::TrueFalseComparison]) {
                 pycodestyle::rules::literal_comparisons(checker, compare);
             }

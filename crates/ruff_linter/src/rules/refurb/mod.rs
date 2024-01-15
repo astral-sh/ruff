@@ -24,6 +24,7 @@ mod tests {
     #[test_case(Rule::ReimplementedStarmap, Path::new("FURB140.py"))]
     #[test_case(Rule::SliceCopy, Path::new("FURB145.py"))]
     #[test_case(Rule::UnnecessaryEnumerate, Path::new("FURB148.py"))]
+    #[test_case(Rule::BoolLiteralCompare, Path::new("FURB149.py"))]
     #[test_case(Rule::MathConstant, Path::new("FURB152.py"))]
     #[test_case(Rule::PrintEmptyString, Path::new("FURB105.py"))]
     #[test_case(Rule::ImplicitCwd, Path::new("FURB177.py"))]
