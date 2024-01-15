@@ -623,17 +623,12 @@ fn collect_dunder_all_items(
                 first_item_encountered = true;
                 all_items.push(DunderAllItem::new(
                     first_val,
-                    all_items.len(),
                     std::mem::take(&mut preceding_comment_ranges),
                     first_range,
                     comment_range,
                 ));
                 for (value, range) in following_items {
-                    all_items.push(DunderAllItem::with_no_comments(
-                        value,
-                        all_items.len(),
-                        range,
-                    ));
+                    all_items.push(DunderAllItem::with_no_comments(value, range));
                 }
             }
         }
@@ -711,8 +706,6 @@ impl InferredMemberType {
 struct DunderAllItem {
     value: String,
     category: InferredMemberType,
-    // Each `AllItem` in any given list should have a unique `original_index`:
-    original_index: usize,
     preceding_comment_ranges: Vec<TextRange>,
     element_range: TextRange,
     // total_range incorporates the ranges of preceding comments
@@ -725,7 +718,6 @@ struct DunderAllItem {
 impl DunderAllItem {
     fn new(
         value: String,
-        original_index: usize,
         preceding_comment_ranges: Vec<TextRange>,
         element_range: TextRange,
         end_of_line_comments: Option<TextRange>,
@@ -741,7 +733,6 @@ impl DunderAllItem {
         Self {
             value,
             category,
-            original_index,
             preceding_comment_ranges,
             element_range,
             total_range,
@@ -749,8 +740,8 @@ impl DunderAllItem {
         }
     }
 
-    fn with_no_comments(value: String, original_index: usize, element_range: TextRange) -> Self {
-        Self::new(value, original_index, vec![], element_range, None)
+    fn with_no_comments(value: String, element_range: TextRange) -> Self {
+        Self::new(value, vec![], element_range, None)
     }
 }
 
@@ -760,20 +751,11 @@ impl Ranged for DunderAllItem {
     }
 }
 
-impl PartialEq for DunderAllItem {
-    fn eq(&self, other: &Self) -> bool {
-        self.original_index == other.original_index
-    }
-}
-
-impl Eq for DunderAllItem {}
-
 impl Ord for DunderAllItem {
     fn cmp(&self, other: &Self) -> Ordering {
         self.category
             .cmp(&other.category)
             .then_with(|| natord::compare(&self.value, &other.value))
-            .then_with(|| self.original_index.cmp(&other.original_index))
     }
 }
 
@@ -782,6 +764,14 @@ impl PartialOrd for DunderAllItem {
         Some(self.cmp(other))
     }
 }
+
+impl PartialEq for DunderAllItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for DunderAllItem {}
 
 fn join_singleline_dunder_all_items(sorted_items: &[DunderAllItem], locator: &Locator) -> String {
     sorted_items
