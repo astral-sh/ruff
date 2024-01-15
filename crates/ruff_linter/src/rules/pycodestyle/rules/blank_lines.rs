@@ -325,10 +325,14 @@ fn is_top_level_token_or_decorator(token: TokenKind) -> bool {
 
 #[derive(Debug)]
 struct LogicalLineInfo {
-    first_token: TokenKind,
+    kind: LogicalLineKind,
     first_token_range: TextRange,
+
+    // The token's kind right before the newline ending the logical line.
     last_token: TokenKind,
-    last_token_end: TextSize,
+
+    // The end of the logical line including the newline.
+    logical_line_end: TextSize,
     is_comment_only: bool,
     is_docstring: bool,
     indent_length: usize,
@@ -345,7 +349,7 @@ struct LogicalLineInfo {
 /// Iterator that processes tokens until a full logical line (or comment line) is "built".
 /// It then returns characteristics of that logical line (see `LogicalLineInfo`).
 struct LinePreprocessor<'a> {
-    tokens: Flatten<Iter<'a, Result<(Tok, TextRange), LexicalError>>>,
+    tokens: Iter<'a, Result<(Tok, TextRange), LexicalError>>,
     locator: &'a Locator<'a>,
     indent_width: IndentWidth,
     /// Maximum number of consecutive blank lines between the current line and the previous non-comment logical line.
@@ -361,7 +365,7 @@ impl<'a> LinePreprocessor<'a> {
         indent_width: IndentWidth,
     ) -> LinePreprocessor<'a> {
         LinePreprocessor {
-            tokens: tokens.iter().flatten(),
+            tokens: tokens.iter(),
             locator,
             preceding_blank_lines: 0,
             indent_width,
@@ -374,25 +378,33 @@ impl<'a> Iterator for LinePreprocessor<'a> {
 
     fn next(&mut self) -> Option<LogicalLineInfo> {
         let mut line_is_comment_only = true;
-        let mut is_docstring = true;
+        let mut is_docstring = false;
         // Number of consecutive blank lines.
         let mut current_blank_lines = 0u32;
         // Number of blank characters in the blank lines (\n vs \r\n for example).
         let mut current_blank_characters: usize = 0;
-        let mut first_token: Option<TokenKind> = None;
-        let mut first_token_range: Option<TextRange> = None;
-        let mut last_token: Option<TokenKind> = None;
+        let mut logical_line_start: Option<(LogicalLineKind, TextRange)> = None;
+        let mut last_token: TokenKind = TokenKind::EndOfFile;
         let mut parens = 0u32;
 
-        while let Some((token, range)) = self.tokens.next() {
-            let token_kind = TokenKind::from_token(token);
+        while let Some(result) = self.tokens.next() {
+            let Ok((token, range)) = result else {
+                continue;
+            };
 
-            if matches!(token_kind, TokenKind::Indent | TokenKind::Dedent) {
+            if matches!(token, Tok::Indent | Tok::Dedent) {
                 continue;
             }
 
+            let token_kind = TokenKind::from_token(token);
+
+            let (logical_line_kind, first_token_range) = if let Some(first_token_range) =
+                logical_line_start
+            {
+                first_token_range
+            }
             // At the start of the line...
-            if first_token.is_none() {
+            else {
                 // An empty line
                 if token_kind == TokenKind::NonLogicalNewline {
                     current_blank_lines += 1;
@@ -403,18 +415,25 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     continue;
                 }
 
-                if !token_kind.is_newline() {
-                    // Ideally, we would like to have a "async def" token since we care about the "def" part.
-                    // As a work around, we ignore the first token if it is "async".
-                    if token_kind != TokenKind::Async {
-                        first_token = Some(token_kind.clone());
-                    }
+                is_docstring = token_kind == TokenKind::String;
 
-                    if first_token_range.is_none() {
-                        first_token_range = Some(*range);
+                let logical_line_kind = match token_kind {
+                    TokenKind::Class => LogicalLineKind::Class,
+                    TokenKind::Comment => LogicalLineKind::Comment,
+                    TokenKind::At => LogicalLineKind::Decorator,
+                    TokenKind::Def => LogicalLineKind::Function,
+                    TokenKind::Async
+                        if matches!(self.tokens.as_slice().first(), Some(Ok((Tok::Def, _)))) =>
+                    {
+                        LogicalLineKind::Function
                     }
-                }
-            }
+                    _ => LogicalLineKind::Other,
+                };
+
+                logical_line_start = Some((logical_line_kind, *range));
+
+                (logical_line_kind, *range)
+            };
 
             if !token_kind.is_trivia() {
                 line_is_comment_only = false;
@@ -436,17 +455,9 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 TokenKind::Newline | TokenKind::NonLogicalNewline if parens == 0 => {
                     let last_token_end = range.end();
 
-                    // For a line to be a docstring, the first token must be a string (since indents are ignored)
-                    if first_token != Some(TokenKind::String) {
-                        is_docstring = false;
-                    }
-
-                    let first_range = first_token_range
-                        .expect("that Newline cannot be the first token of a line (there is at least a NonLogicalNewline token)");
-
                     let range = TextRange::new(
-                        self.locator.line_start(first_range.start()),
-                        first_range.start(),
+                        self.locator.line_start(first_token_range.start()),
+                        first_token_range.start(),
                     );
 
                     let indent_length = expand_indent(self.locator.slice(range), self.indent_width);
@@ -456,12 +467,10 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     }
 
                     let logical_line = LogicalLineInfo {
-                        first_token: first_token
-                            .expect("that Newline cannot be the first token of a line (there is at least a NonLogicalNewline token)"),
-                        first_token_range: first_range,
-                        last_token: last_token
-                            .expect("that Newline cannot be the first token of a line (there is at least a NonLogicalNewline token)"),
-                        last_token_end,
+                        kind: logical_line_kind,
+                        first_token_range,
+                        last_token,
+                        logical_line_end: last_token_end,
                         is_comment_only: line_is_comment_only,
                         is_docstring,
                         indent_length,
@@ -477,7 +486,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                 }
                 _ => {}
             }
-            last_token = Some(token_kind);
+
+            last_token = token_kind;
         }
 
         None
@@ -514,7 +524,7 @@ pub(crate) struct BlankLinesChecker {
     /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
     /// to the second line instead of the first.
     last_non_comment_line_end: TextSize,
-    previous_unindented_token: Option<TokenKind>,
+    previous_unindented_line_kind: Option<LogicalLineKind>,
 }
 
 impl BlankLinesChecker {
@@ -602,7 +612,7 @@ impl BlankLinesChecker {
         if self.is_not_first_logical_line {
             if line.preceding_blank_lines == 0
                 // Only applies to methods.
-                && line.first_token == TokenKind::Def
+                && matches!(line.kind,  LogicalLineKind::Function)
                 && matches!(self.class_status, Status::Inside(_))
                 // The class/parent method's docstring can directly precede the def.
                 && !matches!(self.follows, Follows::Docstring)
@@ -634,7 +644,7 @@ impl BlankLinesChecker {
                 // Only trigger on non-indented classes and functions (for example functions within an if are ignored)
                 && line.indent_length == 0
                 // Only apply to functions or classes.
-                && is_top_level_token_or_decorator(line.first_token)
+                && line.kind.is_top_level()
             {
                 // E302
                 let mut diagnostic = Diagnostic::new(
@@ -702,10 +712,12 @@ impl BlankLinesChecker {
             }
 
             if line.preceding_blank_lines < BLANK_LINES_TOP_LEVEL
-                && is_top_level_token(self.previous_unindented_token)
+                && self
+                    .previous_unindented_line_kind
+                    .is_some_and(|kind| kind.is_top_level())
                 && line.indent_length == 0
                 && !line.is_comment_only
-                && !is_top_level_token_or_decorator(line.first_token)
+                && !line.kind.is_top_level()
             {
                 // E305
                 let mut diagnostic = Diagnostic::new(
@@ -730,7 +742,7 @@ impl BlankLinesChecker {
             if line.preceding_blank_lines == 0
             // Only apply to nested functions.
                 && matches!(self.fn_status, Status::Inside(_))
-                && is_top_level_token_or_decorator(line.first_token)
+                && line.kind.is_top_level()
                 // Allow following a decorator (if there is an error it will be triggered on the first decorator).
                 && !matches!(self.follows, Follows::Decorator)
                 // The class's docstring can directly precede the first function.
@@ -757,24 +769,24 @@ impl BlankLinesChecker {
             }
         }
 
-        match line.first_token {
-            TokenKind::Class => {
+        match line.kind {
+            LogicalLineKind::Class => {
                 if matches!(self.class_status, Status::Outside) {
                     self.class_status = Status::Inside(line.indent_length);
                 }
                 self.follows = Follows::Other;
             }
-            TokenKind::At => {
+            LogicalLineKind::Decorator => {
                 self.follows = Follows::Decorator;
             }
-            TokenKind::Def => {
+            LogicalLineKind::Function => {
                 if matches!(self.fn_status, Status::Outside) {
                     self.fn_status = Status::Inside(line.indent_length);
                 }
                 self.follows = Follows::Def;
             }
-            TokenKind::Comment => {}
-            _ => {
+            LogicalLineKind::Comment => {}
+            LogicalLineKind::Other => {
                 self.follows = Follows::Other;
             }
         }
@@ -786,11 +798,34 @@ impl BlankLinesChecker {
         if !line.is_comment_only {
             self.is_not_first_logical_line = true;
 
-            self.last_non_comment_line_end = line.last_token_end;
+            self.last_non_comment_line_end = line.logical_line_end;
 
             if line.indent_length == 0 {
-                self.previous_unindented_token = Some(line.first_token);
+                self.previous_unindented_line_kind = Some(line.kind);
             }
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+enum LogicalLineKind {
+    /// The clause header of a class definition
+    Class,
+    /// A decorator
+    Decorator,
+    /// The clause header of a function
+    Function,
+    /// A comment only line
+    Comment,
+    /// Any other statement or clause header
+    Other,
+}
+
+impl LogicalLineKind {
+    fn is_top_level(self) -> bool {
+        matches!(
+            self,
+            LogicalLineKind::Class | LogicalLineKind::Function | LogicalLineKind::Decorator
+        )
     }
 }
