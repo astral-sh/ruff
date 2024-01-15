@@ -413,7 +413,7 @@ enum SortedDunderAll {
 
 /// Collect data on each line of `__all__`.
 /// Return `None` if `__all__` appears to be invalid,
-/// or if it's an edge case we don't care about.
+/// or if it's an edge case we don't support.
 ///
 /// Why do we need to do this using the raw tokens,
 /// when we already have the AST? The AST strips out
