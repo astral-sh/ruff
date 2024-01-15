@@ -479,14 +479,14 @@ fn collect_dunder_all_lines(
                 line_state = LineState::default();
             }
             Tok::Comment(_) => {
-                line_state.receive_comment_token(subrange);
+                line_state.visit_comment_token(subrange);
             }
             Tok::String { value, .. } => {
-                line_state.receive_string_token(value, subrange);
+                line_state.visit_string_token(value, subrange);
                 ends_with_trailing_comma = false;
             }
             Tok::Comma => {
-                line_state.receive_comma_token(subrange);
+                line_state.visit_comma_token(subrange);
                 ends_with_trailing_comma = true;
             }
             _ => return None,
@@ -508,7 +508,7 @@ struct LineState {
 }
 
 impl LineState {
-    fn receive_string_token(&mut self, token_value: String, token_range: TextRange) {
+    fn visit_string_token(&mut self, token_value: String, token_range: TextRange) {
         if self.first_item_in_line.is_none() {
             self.first_item_in_line = Some((token_value, token_range));
         } else {
@@ -518,14 +518,14 @@ impl LineState {
         self.comment_range_start = Some(token_range.end());
     }
 
-    fn receive_comma_token(&mut self, token_range: TextRange) {
+    fn visit_comma_token(&mut self, token_range: TextRange) {
         self.comment_range_start = Some(token_range.end());
     }
 
-    fn receive_comment_token(&mut self, token_range: TextRange) {
+    fn visit_comment_token(&mut self, token_range: TextRange) {
         self.comment_in_line = {
-            if let Some(range_start) = self.comment_range_start {
-                Some(TextRange::new(range_start, token_range.end()))
+            if let Some(comment_range_start) = self.comment_range_start {
+                Some(TextRange::new(comment_range_start, token_range.end()))
             } else {
                 Some(token_range)
             }
