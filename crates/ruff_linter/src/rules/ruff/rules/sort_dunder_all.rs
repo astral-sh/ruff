@@ -335,10 +335,9 @@ struct MultilineDunderAllValue {
 }
 
 impl MultilineDunderAllValue {
-    /// Analyse an AST node for a Python tuple/list that represents an `__all__`
+    /// Analyse the source range for a Python tuple/list that represents an `__all__`
     /// definition or augmentation. Return `None` if the analysis fails
-    /// for whatever reason, or if it looks like we're not actually looking at a
-    /// tuple/list after all.
+    /// for whatever reason.
     fn from_source_range(
         range: TextRange,
         kind: &DunderAllKind,
