@@ -251,3 +251,13 @@ __all__.extend(
         "foo"
     )
 )
+
+# We don't deduplicate elements (yet);
+# this just ensures that duplicate elements aren't unnecessarily
+# reordered by an autofix:
+__all__ = (
+    "duplicate_element",  # comment1
+    "duplicate_element",  # comment3
+    "duplicate_element",  # comment2
+    "duplicate_element",  # comment0
+)
