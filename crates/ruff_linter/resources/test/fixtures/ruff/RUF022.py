@@ -208,6 +208,14 @@ __all__ = (
     ),
 )
 
+__all__ = (
+    "b",
+    ((
+        "c"
+    )),
+    "a"
+)
+
 __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
 
 ###################################
@@ -273,3 +281,12 @@ __all__ = (
     "duplicate_element",  # comment2
     "duplicate_element",  # comment0
 )
+
+__all__ =[[]]
+__all__ [()]
+__all__ = (())
+__all__ = ([])
+__all__ = ((),)
+__all__ = ([],)
+__all__ = ("foo", [], "bar")
+__all__ = ["foo", (), "bar"]

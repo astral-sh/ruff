@@ -133,97 +133,6 @@ pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::Stmt
     }
 }
 
-/// Return `true` if a tuple is parenthesized in the source code.
-///
-/// (Yes, this function is shamelessly copied from the formatter.)
-fn is_tuple_parenthesized(tuple: &ast::ExprTuple, source: &str) -> bool {
-    let Some(elt) = tuple.elts.first() else {
-        return true;
-    };
-
-    // Count the number of open parentheses between the start of the tuple and the first element.
-    let open_parentheses_count =
-        SimpleTokenizer::new(source, TextRange::new(tuple.start(), elt.start()))
-            .skip_trivia()
-            .filter(|token| token.kind() == SimpleTokenKind::LParen)
-            .count();
-    if open_parentheses_count == 0 {
-        return false;
-    }
-
-    // Count the number of parentheses between the end of the first element and its trailing comma.
-    let close_parentheses_count =
-        SimpleTokenizer::new(source, TextRange::new(elt.end(), tuple.end()))
-            .skip_trivia()
-            .take_while(|token| token.kind() != SimpleTokenKind::Comma)
-            .filter(|token| token.kind() == SimpleTokenKind::RParen)
-            .count();
-
-    // If the number of open parentheses is greater than the number of close parentheses, the tuple
-    // is parenthesized.
-    open_parentheses_count > close_parentheses_count
-}
-
-fn sort_single_line_dunder_all(
-    elts: &[ast::Expr],
-    elements: &[&str],
-    kind: &DunderAllKind,
-    locator: &Locator,
-) -> String {
-    let mut element_pairs = elts.iter().zip(elements).collect_vec();
-    element_pairs.sort_by_cached_key(|(_, elem)| AllItemSortKey::from(**elem));
-    let joined_items = element_pairs
-        .iter()
-        .map(|(elt, _)| locator.slice(elt))
-        .join(", ");
-    match kind {
-        DunderAllKind::List => format!("[{joined_items}]"),
-        DunderAllKind::Tuple(tuple_node) => {
-            if is_tuple_parenthesized(tuple_node, locator.contents()) {
-                format!("({joined_items})")
-            } else {
-                joined_items
-            }
-        }
-    }
-}
-
-enum DunderAllKind<'a> {
-    List,
-    Tuple(&'a ast::ExprTuple),
-}
-
-fn get_fix(
-    range: TextRange,
-    elts: &[ast::Expr],
-    string_items: &[&str],
-    kind: &DunderAllKind,
-    checker: &Checker,
-) -> Option<Fix> {
-    let locator = checker.locator();
-    let is_multiline = locator.contains_line_break(range);
-
-    let sorted_source_code = {
-        if is_multiline {
-            MultilineDunderAllValue::from_source_range(range, locator)?
-                .into_sorted_source_code(locator, checker.stylist())
-        } else {
-            sort_single_line_dunder_all(elts, string_items, kind, locator)
-        }
-    };
-
-    let applicability = {
-        if is_multiline && checker.indexer().comment_ranges().intersects(range) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        }
-    };
-
-    let edit = Edit::range_replacement(sorted_source_code, range);
-    Some(Fix::applicable_edit(edit, applicability))
-}
-
 fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) {
     let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
@@ -274,6 +183,117 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     checker.diagnostics.push(diagnostic);
 }
 
+enum DunderAllKind<'a> {
+    List,
+    Tuple(&'a ast::ExprTuple),
+}
+
+impl DunderAllKind<'_> {
+    fn opening_token_for_multiline_definition(&self) -> Tok {
+        match self {
+            Self::List => Tok::Lsqb,
+            Self::Tuple(_) => Tok::Lpar,
+        }
+    }
+
+    fn closing_token_for_multiline_definition(&self) -> Tok {
+        match self {
+            Self::List => Tok::Rsqb,
+            Self::Tuple(_) => Tok::Rpar,
+        }
+    }
+}
+
+fn dunder_all_is_already_sorted(string_elements: &[&str]) -> bool {
+    let mut element_iter = string_elements.iter();
+    let Some(this) = element_iter.next() else {
+        return true;
+    };
+    let mut this_key = AllItemSortKey::from(*this);
+    for next in element_iter {
+        let next_key = AllItemSortKey::from(*next);
+        if next_key < this_key {
+            return false;
+        }
+        this_key = next_key;
+    }
+    true
+}
+
+struct AllItemSortKey {
+    category: InferredMemberType,
+    value: String,
+}
+
+impl Ord for AllItemSortKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.category
+            .cmp(&other.category)
+            .then_with(|| natord::compare(&self.value, &other.value))
+    }
+}
+
+impl PartialOrd for AllItemSortKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for AllItemSortKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for AllItemSortKey {}
+
+impl From<&str> for AllItemSortKey {
+    fn from(value: &str) -> Self {
+        Self {
+            category: InferredMemberType::of(value),
+            value: String::from(value),
+        }
+    }
+}
+
+impl From<&DunderAllItem> for AllItemSortKey {
+    fn from(item: &DunderAllItem) -> Self {
+        Self::from(item.value.as_str())
+    }
+}
+
+fn get_fix(
+    range: TextRange,
+    elts: &[ast::Expr],
+    string_items: &[&str],
+    kind: &DunderAllKind,
+    checker: &Checker,
+) -> Option<Fix> {
+    let locator = checker.locator();
+    let is_multiline = locator.contains_line_break(range);
+
+    let sorted_source_code = {
+        if is_multiline {
+            let value = MultilineDunderAllValue::from_source_range(range, kind, locator)?;
+            assert_eq!(value.items.len(), elts.len());
+            value.into_sorted_source_code(locator, checker.stylist())
+        } else {
+            sort_single_line_dunder_all(elts, string_items, kind, locator)
+        }
+    };
+
+    let applicability = {
+        if is_multiline && checker.indexer().comment_ranges().intersects(range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        }
+    };
+
+    let edit = Edit::range_replacement(sorted_source_code, range);
+    Some(Fix::applicable_edit(edit, applicability))
+}
+
 /// An instance of this struct encapsulates an analysis
 /// of a Python tuple/list that represents an `__all__`
 /// definition or augmentation.
@@ -288,17 +308,20 @@ impl MultilineDunderAllValue {
     /// definition or augmentation. Return `None` if the analysis fails
     /// for whatever reason, or if it looks like we're not actually looking at a
     /// tuple/list after all.
-    fn from_source_range(range: TextRange, locator: &Locator) -> Option<MultilineDunderAllValue> {
-        // Parse the `__all__` definition using the raw tokens.
+    fn from_source_range(
+        range: TextRange,
+        kind: &DunderAllKind,
+        locator: &Locator,
+    ) -> Option<MultilineDunderAllValue> {
+        // Parse the multiline `__all__` definition using the raw tokens.
         // See the docs for `collect_dunder_all_lines()` for why we have to
         // use the raw tokens, rather than just the AST, to do this parsing.
         //
         // Step (1). Start by collecting information on each line individually:
-        let (lines, ends_with_trailing_comma) = collect_dunder_all_lines(range, locator)?;
+        let (lines, ends_with_trailing_comma) = collect_dunder_all_lines(range, kind, locator)?;
 
         // Step (2). Group lines together into sortable "items":
         //   - Any "item" contains a single element of the `__all__` list/tuple
-        //   - "Items" are ordered according to the element they contain
         //   - Assume that any comments on their own line are meant to be grouped
         //     with the element immediately below them: if the element moves,
         //     the comments above the element move with it.
@@ -319,18 +342,17 @@ impl MultilineDunderAllValue {
         let (first_item_start, last_item_end) = match self.items.as_slice() {
             [first_item, .., last_item] => (first_item.start(), last_item.end()),
             _ => unreachable!(
-                "We shouldn't be attempting an autofix if `__all__` has < 2 elements,
-                as it cannot be unsorted in that situation."
+                "We shouldn't be attempting an autofix if `__all__` has < 2 elements;
+                an `__all__` definition with 1 or 0 elements cannot be unsorted."
             ),
         };
 
         // As well as the "items" in the `__all__` definition,
         // there is also a "prelude" and a "postlude":
-        //  - Prelude == the region of source code from the opening parenthesis
-        //    (if there was one), up to the start of the first item in `__all__`.
+        //  - Prelude == the region of source code from the opening parenthesis,
+        //    up to the start of the first item in `__all__`.
         //  - Postlude == the region of source code from the end of the last
-        //    item in `__all__` up to and including the closing parenthesis
-        //    (if there was one).
+        //    item in `__all__` up to and including the closing parenthesis.
         //
         // For example:
         //
@@ -359,14 +381,6 @@ impl MultilineDunderAllValue {
         //   as it's an inline comment on the same line as an element,
         //   but `# comment3` becomes part of the postlude because there are no items
         //   below it.
-        //
-        // "Prelude" and "postlude" could both possibly be empty strings, for example
-        // in a situation like this, where there is neither an opening parenthesis
-        // nor a closing parenthesis:
-        //
-        // ```python
-        // __all__ = "foo", "bar", "baz"
-        // ```
         //
         let newline = stylist.line_ending().as_str();
         let start_offset = self.start();
@@ -404,79 +418,14 @@ impl Ranged for MultilineDunderAllValue {
     }
 }
 
-fn multiline_dunder_all_prelude(
-    first_item_start_offset: TextSize,
-    newline: &str,
-    dunder_all_offset: TextSize,
-    locator: &Locator,
-) -> String {
-    let prelude_end = {
-        let first_item_line_offset = locator.line_start(first_item_start_offset);
-        if first_item_line_offset == locator.line_start(dunder_all_offset) {
-            first_item_start_offset
-        } else {
-            first_item_line_offset
-        }
-    };
-    let prelude = locator.slice(TextRange::new(dunder_all_offset, prelude_end));
-    format!("{}{}", prelude.trim_end(), newline)
-}
-
-fn dunder_all_is_already_sorted(string_elements: &[&str]) -> bool {
-    let mut element_iter = string_elements.iter();
-    let Some(this) = element_iter.next() else {
-        return true;
-    };
-    let mut this_key = AllItemSortKey::from(*this);
-    for next in element_iter {
-        let next_key = AllItemSortKey::from(*next);
-        if next_key < this_key {
-            return false;
-        }
-        this_key = next_key;
-    }
-    true
-}
-
-fn multiline_dunder_all_postlude<'a>(
-    last_item_end_offset: TextSize,
-    newline: &str,
-    leading_indent: &str,
-    item_indent: &str,
-    dunder_all_range_end: TextSize,
-    locator: &'a Locator,
-) -> Cow<'a, str> {
-    let postlude_start = {
-        let last_item_line_offset = locator.line_end(last_item_end_offset);
-        if last_item_line_offset == locator.line_end(dunder_all_range_end) {
-            last_item_end_offset
-        } else {
-            last_item_line_offset
-        }
-    };
-    let postlude = locator.slice(TextRange::new(postlude_start, dunder_all_range_end));
-    if !postlude.starts_with(newline) {
-        return Cow::Borrowed(postlude);
-    }
-    if TextSize::of(leading_indentation(postlude.trim_start_matches(newline)))
-        <= TextSize::of(item_indent)
-    {
-        return Cow::Borrowed(postlude);
-    }
-    let trimmed_postlude = postlude.trim_start();
-    if trimmed_postlude.starts_with(']') || trimmed_postlude.starts_with(')') {
-        return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
-    }
-    Cow::Borrowed(postlude)
-}
-
-/// Collect data on each line of `__all__`.
+/// Collect data on each line of a multiline `__all__` definition.
 /// Return `None` if `__all__` appears to be invalid,
 /// or if it's an edge case we don't support.
 ///
 /// Why do we need to do this using the raw tokens,
 /// when we already have the AST? The AST strips out
-/// crucial information that we need to track here, such as:
+/// crucial information that we need to track here for
+/// a multiline `__all__` definition, such as:
 /// - The value of comments
 /// - The amount of whitespace between the end of a line
 ///   and an inline comment
@@ -489,11 +438,11 @@ fn multiline_dunder_all_postlude<'a>(
 /// in the original source code.
 fn collect_dunder_all_lines(
     range: TextRange,
+    kind: &DunderAllKind,
     locator: &Locator,
 ) -> Option<(Vec<DunderAllLine>, bool)> {
-    // These first three variables are used for keeping track of state
+    // These first two variables are used for keeping track of state
     // regarding the entirety of the `__all__` definition...
-    let mut parentheses_open = false;
     let mut ends_with_trailing_comma = false;
     let mut lines = vec![];
     // ... all state regarding a single line of an `__all__` definition
@@ -503,38 +452,19 @@ fn collect_dunder_all_lines(
     // `lex_starts_at()` gives us absolute ranges rather than relative ranges,
     // but (surprisingly) we still need to pass in the slice of code we want it to lex,
     // rather than the whole source file:
-    for pair in lexer::lex_starts_at(locator.slice(range), Mode::Expression, range.start()) {
+    let mut token_iter =
+        lexer::lex_starts_at(locator.slice(range), Mode::Expression, range.start());
+    let (first_tok, _) = token_iter.next()?.ok()?;
+    if first_tok != kind.opening_token_for_multiline_definition() {
+        return None;
+    }
+    let expected_final_token = kind.closing_token_for_multiline_definition();
+
+    for pair in token_iter {
         let (tok, subrange) = pair.ok()?;
         match tok {
-            // If exactly one `Lpar` or `Lsqb` is encountered, that's fine
-            // -- a valid __all__ definition has to be a list or tuple,
-            // and most (though not all) lists/tuples start with either a `(` or a `[`.
-            //
-            // Any more than one `(` or `[` in an `__all__` definition, however,
-            // indicates that we've got something here that's just too complex
-            // for us to handle. Maybe a string element in `__all__` is parenthesized;
-            // maybe the `__all__` definition is in fact invalid syntax;
-            // maybe there's some other thing going on that we haven't anticipated.
-            //
-            // Whatever the case -- if we encounter more than one `(` or `[`,
-            // we evidently don't know what to do here. So just return `None` to
-            // signal failure.
-            Tok::Lpar | Tok::Lsqb => {
-                if parentheses_open {
-                    return None;
-                }
-                parentheses_open = true;
-            }
-            Tok::Rpar | Tok::Rsqb | Tok::Newline => {
-                if let Some(line) = line_state.into_dunder_all_line() {
-                    lines.push(line);
-                }
-                break;
-            }
             Tok::NonLogicalNewline => {
-                if let Some(line) = line_state.into_dunder_all_line() {
-                    lines.push(line);
-                }
+                lines.push(line_state.into_dunder_all_line());
                 line_state = LineState::default();
             }
             Tok::Comment(_) => {
@@ -548,6 +478,10 @@ fn collect_dunder_all_lines(
                 line_state.visit_comma_token(subrange);
                 ends_with_trailing_comma = true;
             }
+            tok if tok == expected_final_token => {
+                lines.push(line_state.into_dunder_all_line());
+                break;
+            }
             _ => return None,
         }
     }
@@ -558,6 +492,21 @@ fn collect_dunder_all_lines(
 /// regarding a single line in an `__all__` definition.
 /// It is purely internal to `collect_dunder_all_lines()`,
 /// and should not be used outside that function.
+///
+/// There are three possible kinds of line in a multiline
+/// `__all__` definition, and we don't know what kind of a line
+/// we're in until all tokens in that line have been processed:
+///
+/// - A line with just a comment (`DunderAllLine::JustAComment)`)
+/// - A line with one or more string items in it (`DunderAllLine::OneOrMoreItems`)
+/// - An empty line (`DunderAllLine::Empty`)
+///
+/// As we process the tokens in a single line,
+/// this struct accumulates the necessary state for us
+/// to be able to determine what kind of a line we're in.
+/// Once the entire line has been processed, `into_dunder_all_line()`
+/// is called, which consumes `self` and produces the
+/// classification for the line.
 #[derive(Debug, Default)]
 struct LineState {
     first_item_in_line: Option<(String, TextRange)>,
@@ -581,6 +530,16 @@ impl LineState {
         self.comment_range_start = Some(token_range.end());
     }
 
+    /// If this is a comment on its own line,
+    /// record the range of that comment.
+    ///
+    /// *If*, however, we've already seen a comma
+    /// or a stringin this line, that means that we're
+    /// in a line with items. In that case, we want to
+    /// record the range of the comment, *plus* the whitespace
+    /// preceding the comment. This is so that we don't
+    /// unnecessarily apply opinionated formatting changes
+    /// where they might not be welcome.
     fn visit_comment_token(&mut self, token_range: TextRange) {
         self.comment_in_line = {
             if let Some(comment_range_start) = self.comment_range_start {
@@ -591,17 +550,18 @@ impl LineState {
         }
     }
 
-    fn into_dunder_all_line(self) -> Option<DunderAllLine> {
+    fn into_dunder_all_line(self) -> DunderAllLine {
         if let Some(first_item) = self.first_item_in_line {
-            Some(DunderAllLine::OneOrMoreItems(LineWithItems {
+            DunderAllLine::OneOrMoreItems(LineWithItems {
                 first_item,
                 following_items: self.following_items_in_line,
                 trailing_comment_range: self.comment_in_line,
-            }))
-        } else {
-            self.comment_in_line.map(|comment_range| {
-                DunderAllLine::JustAComment(LineWithJustAComment(comment_range))
             })
+        } else {
+            self.comment_in_line
+                .map_or(DunderAllLine::Empty, |comment_range| {
+                    DunderAllLine::JustAComment(LineWithJustAComment(comment_range))
+                })
         }
     }
 }
@@ -637,9 +597,12 @@ impl LineWithItems {
 enum DunderAllLine {
     JustAComment(LineWithJustAComment),
     OneOrMoreItems(LineWithItems),
+    Empty,
 }
 
-/// Given data on each line in `__all__`, group lines together into "items".
+/// Given data on each line in a multiline `__all__` definition,
+/// group lines together into "items".
+///
 /// Each item contains exactly one string element,
 /// but might contain multiple comments attached to that element
 /// that must move with the element when `__all__` is sorted.
@@ -690,6 +653,7 @@ fn collect_dunder_all_items(
                     all_items.push(DunderAllItem::with_no_comments(value, range));
                 }
             }
+            DunderAllLine::Empty => continue, // discard empty lines
         }
     }
     all_items
@@ -726,50 +690,8 @@ impl InferredMemberType {
     }
 }
 
-struct AllItemSortKey {
-    category: InferredMemberType,
-    value: String,
-}
-
-impl Ord for AllItemSortKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.category
-            .cmp(&other.category)
-            .then_with(|| natord::compare(&self.value, &other.value))
-    }
-}
-
-impl PartialOrd for AllItemSortKey {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for AllItemSortKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
-    }
-}
-
-impl Eq for AllItemSortKey {}
-
-impl From<&str> for AllItemSortKey {
-    fn from(value: &str) -> Self {
-        Self {
-            category: InferredMemberType::of(value),
-            value: String::from(value),
-        }
-    }
-}
-
-impl From<&DunderAllItem> for AllItemSortKey {
-    fn from(item: &DunderAllItem) -> Self {
-        Self::from(item.value.as_str())
-    }
-}
-
 /// An instance of this struct represents a single element
-/// from the original tuple/list, *and* any comments that
+/// from a multiline `__all__` tuple/list, *and* any comments that
 /// are "attached" to it. The comments "attached" to the element
 /// will move with the element when the `__all__` tuple/list is sorted.
 ///
@@ -849,6 +771,24 @@ impl Ranged for DunderAllItem {
     }
 }
 
+fn multiline_dunder_all_prelude(
+    first_item_start_offset: TextSize,
+    newline: &str,
+    dunder_all_offset: TextSize,
+    locator: &Locator,
+) -> String {
+    let prelude_end = {
+        let first_item_line_offset = locator.line_start(first_item_start_offset);
+        if first_item_line_offset == locator.line_start(dunder_all_offset) {
+            first_item_start_offset
+        } else {
+            first_item_line_offset
+        }
+    };
+    let prelude = locator.slice(TextRange::new(dunder_all_offset, prelude_end));
+    format!("{}{}", prelude.trim_end(), newline)
+}
+
 fn join_multiline_dunder_all_items(
     sorted_items: &[DunderAllItem],
     locator: &Locator,
@@ -879,4 +819,91 @@ fn join_multiline_dunder_all_items(
         }
     }
     new_dunder_all
+}
+
+fn multiline_dunder_all_postlude<'a>(
+    last_item_end_offset: TextSize,
+    newline: &str,
+    leading_indent: &str,
+    item_indent: &str,
+    dunder_all_range_end: TextSize,
+    locator: &'a Locator,
+) -> Cow<'a, str> {
+    let postlude_start = {
+        let last_item_line_offset = locator.line_end(last_item_end_offset);
+        if last_item_line_offset == locator.line_end(dunder_all_range_end) {
+            last_item_end_offset
+        } else {
+            last_item_line_offset
+        }
+    };
+    let postlude = locator.slice(TextRange::new(postlude_start, dunder_all_range_end));
+    if !postlude.starts_with(newline) {
+        return Cow::Borrowed(postlude);
+    }
+    if TextSize::of(leading_indentation(postlude.trim_start_matches(newline)))
+        <= TextSize::of(item_indent)
+    {
+        return Cow::Borrowed(postlude);
+    }
+    let trimmed_postlude = postlude.trim_start();
+    if trimmed_postlude.starts_with(']') || trimmed_postlude.starts_with(')') {
+        return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
+    }
+    Cow::Borrowed(postlude)
+}
+
+fn sort_single_line_dunder_all(
+    elts: &[ast::Expr],
+    elements: &[&str],
+    kind: &DunderAllKind,
+    locator: &Locator,
+) -> String {
+    let mut element_pairs = elts.iter().zip(elements).collect_vec();
+    element_pairs.sort_by_cached_key(|(_, elem)| AllItemSortKey::from(**elem));
+    let joined_items = element_pairs
+        .iter()
+        .map(|(elt, _)| locator.slice(elt))
+        .join(", ");
+    match kind {
+        DunderAllKind::List => format!("[{joined_items}]"),
+        DunderAllKind::Tuple(tuple_node) => {
+            if is_tuple_parenthesized(tuple_node, locator.contents()) {
+                format!("({joined_items})")
+            } else {
+                joined_items
+            }
+        }
+    }
+}
+
+/// Return `true` if a tuple is parenthesized in the source code.
+///
+/// (Yes, this function is shamelessly copied from the formatter.)
+fn is_tuple_parenthesized(tuple: &ast::ExprTuple, source: &str) -> bool {
+    let Some(elt) = tuple.elts.first() else {
+        return true;
+    };
+
+    // Count the number of open parentheses between the start of the tuple and the first element.
+    let open_parentheses_count =
+        SimpleTokenizer::new(source, TextRange::new(tuple.start(), elt.start()))
+            .skip_trivia()
+            .filter(|token| token.kind() == SimpleTokenKind::LParen)
+            .count();
+    if open_parentheses_count == 0 {
+        return false;
+    }
+
+    // Count the number of parentheses between the end of the first element and its trailing comma.
+    let close_parentheses_count =
+        SimpleTokenizer::new(source, TextRange::new(elt.end(), tuple.end()))
+            .skip_trivia()
+            .take_while(|token| token.kind() != SimpleTokenKind::Comma)
+            .filter(|token| token.kind() == SimpleTokenKind::RParen)
+            .count();
+
+    // If the number of open parentheses is greater than the number of close parentheses, the tuple
+    // is parenthesized.
+    open_parentheses_count > close_parentheses_count
 }

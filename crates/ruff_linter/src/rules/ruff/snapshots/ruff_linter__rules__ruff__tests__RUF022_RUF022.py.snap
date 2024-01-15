@@ -867,18 +867,36 @@ RUF022.py:204:11: RUF022 `__all__` is not sorted
 209 | | )
     | |_^ RUF022
 210 |   
-211 |   __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
+211 |   __all__ = (
     |
     = help: Apply an isort-style sorting to `__all__`
 
 RUF022.py:211:11: RUF022 `__all__` is not sorted
     |
-209 | )
-210 | 
-211 | __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
+209 |   )
+210 |   
+211 |   __all__ = (
+    |  ___________^
+212 | |     "b",
+213 | |     ((
+214 | |         "c"
+215 | |     )),
+216 | |     "a"
+217 | | )
+    | |_^ RUF022
+218 |   
+219 |   __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+RUF022.py:219:11: RUF022 `__all__` is not sorted
+    |
+217 | )
+218 | 
+219 | __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
     |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
-212 | 
-213 | ###################################
+220 | 
+221 | ###################################
     |
     = help: Apply an isort-style sorting to `__all__`
 
