@@ -518,10 +518,10 @@ if the benchmark improved/regressed compared to that baseline.
 
 ```shell
 # Run once on your "baseline" code
-cargo benchmark --save-baseline=main
+cargo bench -p ruff_benchmark -- --save-baseline=main
 
 # Then iterate with
-cargo benchmark --baseline=main
+cargo bench -p ruff_benchmark -- --baseline=main
 ```
 
 #### PR Summary
@@ -531,10 +531,10 @@ This is useful to illustrate the improvements of a PR.
 
 ```shell
 # On main
-cargo benchmark --save-baseline=main
+cargo bench -p ruff_benchmark -- --save-baseline=main
 
 # After applying your changes
-cargo benchmark --save-baseline=pr
+cargo bench -p ruff_benchmark -- --save-baseline=pr
 
 critcmp main pr
 ```
@@ -547,10 +547,10 @@ cargo install critcmp
 
 #### Tips
 
-- Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic`
-    to only run the pydantic tests.
-- Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
-- Use `cargo benchmark --quick` to get faster results (more prone to noise)
+- Use `cargo bench -p ruff_benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark lexer`
+    to only run the lexer benchmarks.
+- Use `cargo bench -p ruff_benchmark -- --quiet` for a more cleaned up output (without statistical relevance)
+- Use `cargo bench -p ruff_benchmark -- --quick` to get faster results (more prone to noise)
 
 ### Profiling Projects
 
