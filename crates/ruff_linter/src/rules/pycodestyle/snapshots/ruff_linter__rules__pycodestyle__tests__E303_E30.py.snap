@@ -160,4 +160,38 @@ E30.py:602:5: E303 [*] Too many blank lines (2)
 603 602 | # end
 604 603 | 
 
+E30.py:769:5: E303 [*] Too many blank lines (2)
+    |
+769 |     # comment
+    |     ^^^^^^^^^ E303
+    |
+    = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+765 765 | 
+766 766 | class Test:
+767 767 | 
+768     |-
+769 768 |     # comment
+770 769 | 
+771 770 | 
+
+E30.py:772:5: E303 [*] Too many blank lines (2)
+    |
+772 |     # another comment
+    |     ^^^^^^^^^^^^^^^^^ E303
+773 | 
+774 |     def test(self): pass
+    |
+    = help: Remove extraneous blank line(s)
+
+ℹ Safe fix
+768 768 | 
+769 769 |     # comment
+770 770 | 
+771     |-
+772 771 |     # another comment
+773 772 | 
+774 773 |     def test(self): pass
+
 

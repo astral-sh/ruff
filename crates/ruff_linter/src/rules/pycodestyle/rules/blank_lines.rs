@@ -320,19 +320,22 @@ struct LogicalLineInfo {
 
     // The end of the logical line including the newline.
     logical_line_end: TextSize,
+
+    // `true` if this is not a blank but only consists of a comment.
     is_comment_only: bool,
 
     /// `true` if the line is a string only (including trivia tokens) line, which is a docstring if coming right after a class/function definition.
     is_docstring: bool,
     indent_length: usize,
-    /// `blank_lines` is the straightforward amount of blank lines preceding the current line.
+
+    /// The number of blank lines preceding the current line.
     blank_lines: u32,
-    /// `preceding_blank_lines` is the maximum number of consecutive blank lines between the current line
+    blank_lines_len: TextSize,
+
+    /// The maximum number of consecutive blank lines between the current line
     /// and the previous non-comment logical line.
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
-    /// It is also used to match the results of pydocstyle.
     preceding_blank_lines: u32,
-    preceding_blank_characters: usize,
 }
 
 /// Iterator that processes tokens until a full logical line (or comment line) is "built".
@@ -345,8 +348,7 @@ struct LinePreprocessor<'a> {
     line_start: TextSize,
     /// Maximum number of consecutive blank lines between the current line and the previous non-comment logical line.
     /// One of its main uses is to allow a comment to directly precede a class/function definition.
-    /// It is also used to match the results of pydocstyle.
-    preceding_blank_lines: u32,
+    max_preceding_blank_lines: u32,
 }
 
 impl<'a> LinePreprocessor<'a> {
@@ -359,7 +361,7 @@ impl<'a> LinePreprocessor<'a> {
             tokens: tokens.iter(),
             locator,
             line_start: TextSize::new(0),
-            preceding_blank_lines: 0,
+            max_preceding_blank_lines: 0,
             indent_width,
         }
     }
@@ -371,10 +373,9 @@ impl<'a> Iterator for LinePreprocessor<'a> {
     fn next(&mut self) -> Option<LogicalLineInfo> {
         let mut line_is_comment_only = true;
         let mut is_docstring = false;
-        // Number of consecutive blank lines.
-        let mut current_blank_lines = 0u32;
-        // Number of blank characters in the blank lines (\n vs \r\n for example).
-        let mut current_blank_characters: usize = 0;
+        // Number of consecutive blank lines directly preceding this logical line.
+        let mut blank_lines = 0;
+        let mut blank_lines_len = TextSize::default();
         let mut logical_line_start: Option<(LogicalLineKind, TextRange)> = None;
         let mut last_token: TokenKind = TokenKind::EndOfFile;
         let mut parens = 0u32;
@@ -399,8 +400,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
             else {
                 // An empty line
                 if token_kind == TokenKind::NonLogicalNewline {
-                    current_blank_lines += 1;
-                    current_blank_characters += range.len().to_usize();
+                    blank_lines += 1;
+                    blank_lines_len += range.len();
 
                     self.line_start = range.end();
 
@@ -414,6 +415,7 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     TokenKind::Comment => LogicalLineKind::Comment,
                     TokenKind::At => LogicalLineKind::Decorator,
                     TokenKind::Def => LogicalLineKind::Function,
+                    // Lookahead to distinguish `async def` from `async with`.
                     TokenKind::Async
                         if matches!(self.tokens.as_slice().first(), Some(Ok((Tok::Def, _)))) =>
                     {
@@ -450,9 +452,8 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                     let indent_length =
                         expand_indent(self.locator.slice(indent_range), self.indent_width);
 
-                    // if self.preceding_blank_lines < current_blank_lines {
-                    //     self.preceding_blank_lines = current_blank_lines;
-                    // }
+                    self.max_preceding_blank_lines =
+                        self.max_preceding_blank_lines.max(blank_lines);
 
                     let logical_line = LogicalLineInfo {
                         kind: logical_line_kind,
@@ -462,14 +463,18 @@ impl<'a> Iterator for LinePreprocessor<'a> {
                         is_comment_only: line_is_comment_only,
                         is_docstring,
                         indent_length,
-                        blank_lines: current_blank_lines,
-                        preceding_blank_lines: self.preceding_blank_lines,
-                        preceding_blank_characters: current_blank_characters,
+
+                        blank_lines,
+                        blank_lines_len,
+
+                        preceding_blank_lines: self.max_preceding_blank_lines,
                     };
 
+                    // Reset the blank lines after a non-comment only line.
                     if !line_is_comment_only {
-                        self.preceding_blank_lines = 0;
+                        self.max_preceding_blank_lines = 0;
                     }
+
                     // Set the start for the next logical line.
                     self.line_start = range.end();
 
@@ -620,7 +625,7 @@ impl BlankLinesChecker {
                     line.first_token_range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    stylist.line_ending().as_str().to_string(),
+                    stylist.line_ending().to_string(),
                     locator.line_start(self.last_non_comment_line_end),
                 )));
 
@@ -647,8 +652,6 @@ impl BlankLinesChecker {
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     stylist
                         .line_ending()
-                        .as_str()
-                        .to_string()
                         .repeat((BLANK_LINES_TOP_LEVEL - line.preceding_blank_lines) as usize),
                     locator.line_start(self.last_non_comment_line_end),
                 )));
@@ -668,13 +671,9 @@ impl BlankLinesChecker {
                 );
 
                 let chars_to_remove = if line.indent_length > 0 {
-                    u32::try_from(line.preceding_blank_characters)
-                        .expect("Number of blank characters to be small.")
-                        - BLANK_LINES_METHOD_LEVEL
+                    u32::from(line.blank_lines_len) - BLANK_LINES_METHOD_LEVEL
                 } else {
-                    u32::try_from(line.preceding_blank_characters)
-                        .expect("Number of blank characters to be small.")
-                        - BLANK_LINES_TOP_LEVEL
+                    u32::from(line.blank_lines_len) - BLANK_LINES_TOP_LEVEL
                 };
                 let end = locator.line_start(line.first_token_range.start());
                 let start = end - TextSize::new(chars_to_remove);
@@ -690,12 +689,7 @@ impl BlankLinesChecker {
 
                 let range = line.first_token_range;
                 diagnostic.set_fix(Fix::safe_edit(Edit::deletion(
-                    locator.line_start(range.start())
-                        - TextSize::new(
-                            line.preceding_blank_characters
-                                .try_into()
-                                .expect("Number of blank characters to be small."),
-                        ),
+                    locator.line_start(range.start()) - line.blank_lines_len,
                     locator.line_start(range.start()),
                 )));
 
@@ -721,8 +715,6 @@ impl BlankLinesChecker {
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     stylist
                         .line_ending()
-                        .as_str()
-                        .to_string()
                         .repeat((BLANK_LINES_TOP_LEVEL - line.blank_lines) as usize),
                     locator.line_start(line.first_token_range.start()),
                 )));
@@ -746,13 +738,13 @@ impl BlankLinesChecker {
                 // E306
                 let mut diagnostic = Diagnostic::new(
                     BlankLinesBeforeNestedDefinition {
-                        actual_blank_lines: line.blank_lines,
+                        actual_blank_lines: 0,
                     },
                     line.first_token_range,
                 );
 
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                    stylist.line_ending().as_str().to_string(),
+                    stylist.line_ending().to_string(),
                     locator.line_start(line.first_token_range.start()),
                 )));
 

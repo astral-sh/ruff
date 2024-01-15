@@ -608,6 +608,13 @@ if True:
 
 def function():
     pass
+
+
+@decorator
+
+# comment
+def function():
+    pass
 # end
 
 
@@ -754,3 +761,14 @@ class Test:
     async
 
     def a(self): pass
+
+
+class Test:
+
+
+    # comment
+
+
+    # another comment
+
+    def test(self): pass
