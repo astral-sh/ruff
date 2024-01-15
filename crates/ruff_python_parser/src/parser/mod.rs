@@ -134,8 +134,10 @@ enum FunctionKind {
 pub(crate) struct Parser<'src> {
     source: &'src str,
     tokens: TokenSource,
+
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
+
     /// This tracks the current expression or statement being parsed. For example,
     /// if we're parsing a tuple expression, e.g. `(1, 2)`, `ctx` has the value
     /// `ParserCtxFlags::TUPLE_EXPR`.
@@ -144,6 +146,7 @@ pub(crate) struct Parser<'src> {
     /// expressions or statements of being parsed. The `ctx` should be empty after
     /// an expression or statement is done parsing.
     ctx: ParserCtxFlags,
+
     /// During the parsing of expression or statement, multiple `ctx`s can be created.
     /// `ctx_stack` stores the previous `ctx`s that were created during the parsing. For example,
     /// when parsing a tuple expression, e.g. `(1, 2, 3)`, two [`ParserCtxFlags`] will be
@@ -157,13 +160,21 @@ pub(crate) struct Parser<'src> {
     ///
     /// The end of the vector is the top of the stack.
     ctx_stack: Vec<ParserCtxFlags>,
+
     /// Stores the last `ctx` of an expression or statement that was parsed.
     last_ctx: ParserCtxFlags,
+
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
+
     /// Defer the creation of the invalid node for the skipped unexpected tokens.
     /// Holds the range of the skipped tokens.
     defer_invalid_node_creation: Option<TextRange>,
+
+    current: Spanned,
+
+    /// The end of the last processed non-trivia token
+    last_token_end: TextSize,
 }
 
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new(&[TokenKind::Newline, TokenKind::EndOfFile]);
@@ -248,7 +259,11 @@ const SIMPLE_STMT_SET: TokenSet = TokenSet::new(&[
 const SIMPLE_STMT_SET2: TokenSet = SIMPLE_STMT_SET.union(EXPR_SET);
 
 impl<'src> Parser<'src> {
-    pub(crate) fn new(source: &'src str, mode: Mode, tokens: TokenSource) -> Parser<'src> {
+    pub(crate) fn new(source: &'src str, mode: Mode, mut tokens: TokenSource) -> Parser<'src> {
+        let current = tokens
+            .next()
+            .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(source.text_len())));
+
         Parser {
             mode,
             source,
@@ -257,8 +272,50 @@ impl<'src> Parser<'src> {
             ctx: ParserCtxFlags::empty(),
             last_ctx: ParserCtxFlags::empty(),
             tokens,
+            current,
+
+            last_token_end: TextSize::default(),
             defer_invalid_node_creation: None,
         }
+    }
+    fn finish(self) -> Vec<ParseError> {
+        // After parsing, the `ctx` and `ctx_stack` should be empty.
+        // If it's not, you probably forgot to call `clear_ctx` somewhere.
+        assert_eq!(self.ctx, ParserCtxFlags::empty());
+        assert_eq!(&self.ctx_stack, &[]);
+        assert_eq!(
+            self.current,
+            (Tok::EndOfFile, TextRange::empty(self.source.text_len())),
+            "Parser should be at the end of the file."
+        );
+
+        let parse_errors = self.errors;
+        let lex_errors = self.tokens.finish();
+
+        // Fast path for when there are no lex errors.
+        // There's no fast path for when there are no parse errors because a lex error
+        // always results in a parse error.
+        if lex_errors.is_empty() {
+            return parse_errors;
+        }
+
+        let mut merged = Vec::with_capacity(parse_errors.len().saturating_add(lex_errors.len()));
+
+        let mut parse_errors = parse_errors.into_iter().peekable();
+        let mut lex_errors = lex_errors.into_iter().peekable();
+
+        while let (Some(parse_error), Some(lex_error)) = (parse_errors.peek(), lex_errors.peek()) {
+            if parse_error.location.start() < lex_error.location.start() {
+                merged.push(parse_errors.next().unwrap());
+            } else {
+                merged.push(ParseError::from(lex_errors.next().unwrap()));
+            }
+        }
+
+        merged.extend(parse_errors);
+        merged.extend(lex_errors.map(ParseError::from));
+
+        merged
     }
 
     pub(crate) fn parse(mut self) -> Program {
@@ -316,14 +373,9 @@ impl<'src> Parser<'src> {
             })
         };
 
-        // After parsing, the `ctx` and `ctx_stack` should be empty.
-        // If it's not, you probably forgot to call `clear_ctx` somewhere.
-        assert_eq!(self.ctx, ParserCtxFlags::empty());
-        assert_eq!(&self.ctx_stack, &[]);
-
         Program {
             ast,
-            parse_errors: self.errors,
+            parse_errors: self.finish(),
         }
     }
 
@@ -342,62 +394,61 @@ impl<'src> Parser<'src> {
         }
     }
 
+    /// Returns the start position for a node that starts at the current token.
+    fn node_start(&self) -> TextSize {
+        self.current_range().start()
+    }
+
+    fn finish_node(&self, start: TextSize) -> TextRange {
+        TextRange::new(start, self.last_token_end)
+    }
+
     #[inline]
     fn has_ctx(&self, ctx: ParserCtxFlags) -> bool {
         self.ctx.intersects(ctx)
     }
 
+    /// Moves the parser to the next token. Returns the old current token as an owned value..
     fn next_token(&mut self) -> Spanned {
-        self.tokens
+        let next = self
+            .tokens
             .next()
-            .map(|result| match result {
-                Ok(token) => token,
-                Err(lex_error) => {
-                    self.add_error(ParseErrorType::Lexical(lex_error.error), lex_error.location);
+            .unwrap_or_else(|| (Tok::EndOfFile, TextRange::empty(self.source.text_len())));
 
-                    // Return a `Invalid` token when encountering an error
-                    (Tok::Invalid, lex_error.location)
-                }
-            })
-            .unwrap_or((Tok::EndOfFile, TextRange::empty(self.source.text_len())))
-    }
+        let current = std::mem::replace(&mut self.current, next);
 
-    fn current(&mut self) -> (TokenKind, TextRange) {
-        self.tokens.current().map_or(
-            (
-                TokenKind::EndOfFile,
-                TextRange::empty(self.source.text_len()),
-            ),
-            |result| match result {
-                Ok((tok, range)) => (tok.into(), *range),
-                // Return a `Invalid` token when encountering an error
-                Err(err) => (TokenKind::Invalid, err.location),
-            },
-        )
+        self.last_token_end = current.1.end();
+
+        current
     }
 
     fn peek_nth(&mut self, offset: usize) -> (TokenKind, TextRange) {
-        self.tokens.peek_nth(offset).map_or(
-            (
-                TokenKind::EndOfFile,
-                TextRange::empty(self.source.text_len()),
-            ),
-            |result| match result {
-                Ok((tok, range)) => (tok.into(), *range),
-                // Return a `Invalid` token when encountering an error
-                Err(err) => (TokenKind::Invalid, err.location),
-            },
-        )
+        if offset == 0 {
+            self.current_token()
+        } else {
+            self.tokens.peek_nth(offset - 1).unwrap_or_else(|| {
+                (
+                    TokenKind::EndOfFile,
+                    TextRange::empty(self.source.text_len()),
+                )
+            })
+        }
     }
 
     #[inline]
-    fn current_token(&mut self) -> (TokenKind, TextRange) {
-        self.peek_nth(0)
+    fn current_token(&self) -> (TokenKind, TextRange) {
+        (self.current_kind(), self.current_range())
     }
 
     #[inline]
-    fn current_kind(&mut self) -> TokenKind {
-        self.current().0
+    fn current_kind(&self) -> TokenKind {
+        // TODO: Converting the token kind over and over again can be expensive.
+        TokenKind::from_token(&self.current.0)
+    }
+
+    #[inline]
+    fn current_range(&self) -> TextRange {
+        self.current.1
     }
 
     fn eat(&mut self, kind: TokenKind) -> bool {
@@ -407,6 +458,19 @@ impl<'src> Parser<'src> {
 
         self.next_token();
         true
+    }
+
+    /// Bumps the current token assuming it is of the given kind.
+    ///
+    /// # Panics
+    /// If the current token is not of the given kind.
+    ///
+    /// # Returns
+    /// The current token
+    fn bump(&mut self, kind: TokenKind) -> Spanned {
+        assert_eq!(self.current_kind(), kind);
+
+        self.next_token()
     }
 
     fn expect(&mut self, expected: TokenKind) -> bool {
@@ -495,10 +559,6 @@ impl<'src> Parser<'src> {
             range = TextRange::new(0.into(), self.source.text_len() - TextSize::from(1));
         }
         &self.source[range]
-    }
-
-    fn current_range(&mut self) -> TextRange {
-        self.current().1
     }
 
     /// Parses elements enclosed within a delimiter pair, such as parentheses, brackets,
@@ -1527,17 +1587,19 @@ impl<'src> Parser<'src> {
 
         while self.at(TokenKind::At) {
             let range = self.current_range();
-            self.eat(TokenKind::At);
+            self.bump(TokenKind::At);
 
             let (parsed_expr, expr_range) = self.parse_expr2();
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,
                 range: range.cover(expr_range),
             });
-            self.eat(TokenKind::Newline);
+
+            self.expect(TokenKind::Newline);
         }
 
         let (kind, kind_range) = self.current_token();
+
         match kind {
             TokenKind::Def => self.parse_func_def_stmt(decorators, range),
             TokenKind::Class => self.parse_class_def_stmt(decorators, range),
@@ -1574,6 +1636,7 @@ impl<'src> Parser<'src> {
         decorator_list: Vec<ast::Decorator>,
         func_range: TextRange,
     ) -> StmtWithRange {
+        // FIXME shouldn't this be expect?
         self.eat(TokenKind::Def);
         let name = self.parse_identifier();
         let type_params = if self.at(TokenKind::Lsqb) {
@@ -2079,20 +2142,19 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_simple_stmt(&mut self) -> StmtWithRange {
-        let (kind, range) = self.current_token();
-        match kind {
-            TokenKind::Del => self.parse_del_stmt(range),
-            TokenKind::Pass => self.parse_pass_stmt(range),
-            TokenKind::Break => self.parse_break_stmt(range),
-            TokenKind::Raise => self.parse_raise_stmt(range),
-            TokenKind::Assert => self.parse_assert_stmt(range),
-            TokenKind::Global => self.parse_global_stmt(range),
-            TokenKind::Import => self.parse_import_stmt(range),
-            TokenKind::Return => self.parse_return_stmt(range),
-            TokenKind::From => self.parse_import_from_stmt(range),
-            TokenKind::Continue => self.parse_continue_stmt(range),
-            TokenKind::Nonlocal => self.parse_nonlocal_stmt(range),
-            TokenKind::Type => self.parse_type_stmt(range),
+        match self.current_kind() {
+            TokenKind::Del => self.parse_del_stmt(),
+            TokenKind::Pass => self.parse_pass_stmt(),
+            TokenKind::Break => self.parse_break_stmt(),
+            TokenKind::Raise => self.parse_raise_stmt(),
+            TokenKind::Assert => self.parse_assert_stmt(),
+            TokenKind::Global => self.parse_global_stmt(),
+            TokenKind::Import => self.parse_import_stmt(),
+            TokenKind::Return => self.parse_return_stmt(),
+            TokenKind::From => self.parse_import_from_stmt(),
+            TokenKind::Continue => self.parse_continue_stmt(),
+            TokenKind::Nonlocal => self.parse_nonlocal_stmt(),
+            TokenKind::Type => self.parse_type_stmt(),
             TokenKind::EscapeCommand if self.mode == Mode::Ipython => {
                 self.parse_ipython_escape_command_stmt()
             }
@@ -2149,28 +2211,37 @@ impl<'src> Parser<'src> {
     }
 
     #[inline]
-    fn parse_pass_stmt(&mut self, range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Pass);
+    fn parse_pass_stmt(&mut self) -> StmtWithRange {
+        let range = self.current_range();
+        self.bump(TokenKind::Pass);
         (Stmt::Pass(ast::StmtPass { range }), range)
     }
 
     #[inline]
-    fn parse_continue_stmt(&mut self, range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Continue);
+    fn parse_continue_stmt(&mut self) -> StmtWithRange {
+        let range = self.current_range();
+        self.bump(TokenKind::Continue);
         (Stmt::Continue(ast::StmtContinue { range }), range)
     }
 
     #[inline]
-    fn parse_break_stmt(&mut self, range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Break);
+    fn parse_break_stmt(&mut self) -> StmtWithRange {
+        let range = self.current_range();
+        self.bump(TokenKind::Break);
         (Stmt::Break(ast::StmtBreak { range }), range)
     }
 
-    fn parse_del_stmt(&mut self, mut del_range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Del);
+    /// Parses a delete statement.
+    ///
+    /// # Panics
+    /// If the parser isn't positioned at a `del` token.
+    fn parse_del_stmt(&mut self) -> StmtWithRange {
+        let start = self.node_start();
+
+        self.bump(TokenKind::Del);
         let mut targets = vec![];
 
-        let range = self.parse_separated(
+        self.parse_separated(
             true,
             TokenKind::Comma,
             [TokenKind::Newline].as_slice(),
@@ -2192,19 +2263,15 @@ impl<'src> Parser<'src> {
                 target_range
             },
         );
-        del_range = del_range.cover(range.unwrap_or(del_range));
 
-        (
-            Stmt::Delete(ast::StmtDelete {
-                targets,
-                range: del_range,
-            }),
-            del_range,
-        )
+        let range = self.finish_node(start);
+
+        (Stmt::Delete(ast::StmtDelete { targets, range }), range)
     }
 
-    fn parse_assert_stmt(&mut self, mut range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Assert);
+    fn parse_assert_stmt(&mut self) -> StmtWithRange {
+        let mut range = self.current_range();
+        self.bump(TokenKind::Assert);
 
         let (test, test_range) = self.parse_expr();
         range = range.cover(test_range);
@@ -2228,8 +2295,9 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn parse_global_stmt(&mut self, global_range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Global);
+    fn parse_global_stmt(&mut self) -> StmtWithRange {
+        let global_range = self.current_range();
+        self.bump(TokenKind::Global);
 
         let mut names = vec![];
         let range = self.parse_separated(
@@ -2248,8 +2316,9 @@ impl<'src> Parser<'src> {
         (Stmt::Global(ast::StmtGlobal { range, names }), range)
     }
 
-    fn parse_nonlocal_stmt(&mut self, nonlocal_range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Nonlocal);
+    fn parse_nonlocal_stmt(&mut self) -> StmtWithRange {
+        let nonlocal_range = self.current_range();
+        self.bump(TokenKind::Nonlocal);
 
         let mut names = vec![];
 
@@ -2270,8 +2339,9 @@ impl<'src> Parser<'src> {
         (Stmt::Nonlocal(ast::StmtNonlocal { range, names }), range)
     }
 
-    fn parse_return_stmt(&mut self, mut range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Return);
+    fn parse_return_stmt(&mut self) -> StmtWithRange {
+        let mut range = self.current_range();
+        self.bump(TokenKind::Return);
 
         let value = if self.at_expr() {
             let (value, value_range) = self.parse_exprs();
@@ -2284,8 +2354,9 @@ impl<'src> Parser<'src> {
         (Stmt::Return(ast::StmtReturn { range, value }), range)
     }
 
-    fn parse_raise_stmt(&mut self, mut range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Raise);
+    fn parse_raise_stmt(&mut self) -> StmtWithRange {
+        let mut range = self.current_range();
+        self.bump(TokenKind::Raise);
 
         let exc = if self.at(TokenKind::Newline) {
             None
@@ -2331,8 +2402,9 @@ impl<'src> Parser<'src> {
         (Stmt::Raise(ast::StmtRaise { range, exc, cause }), range)
     }
 
-    fn parse_type_stmt(&mut self, range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Type);
+    fn parse_type_stmt(&mut self) -> StmtWithRange {
+        let range = self.current_range();
+        self.bump(TokenKind::Type);
 
         let (tok, tok_range) = self.next_token();
         let name = if let Tok::Name { name } = tok {
@@ -2436,9 +2508,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_alias(&mut self) -> ast::Alias {
-        let (kind, mut range) = self.current_token();
-        if kind == TokenKind::Star {
-            self.eat(TokenKind::Star);
+        let mut range = self.current_range();
+        if self.eat(TokenKind::Star) {
             return ast::Alias {
                 name: ast::Identifier {
                     id: "*".into(),
@@ -2467,8 +2538,9 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_import_stmt(&mut self, import_range: TextRange) -> StmtWithRange {
-        self.eat(TokenKind::Import);
+    fn parse_import_stmt(&mut self) -> StmtWithRange {
+        let import_range = self.current_range();
+        self.bump(TokenKind::Import);
 
         let mut names = vec![];
         let range = self
@@ -2488,13 +2560,14 @@ impl<'src> Parser<'src> {
         (Stmt::Import(ast::StmtImport { range, names }), range)
     }
 
-    fn parse_import_from_stmt(&mut self, from_range: TextRange) -> StmtWithRange {
-        const DOT_ELLIPSIS_SET: TokenSet = TokenSet::new(&[TokenKind::Dot, TokenKind::Ellipsis]);
-        self.eat(TokenKind::From);
+    fn parse_import_from_stmt(&mut self) -> StmtWithRange {
+        let from_range = self.current_range();
+        self.bump(TokenKind::From);
 
         let mut module = None;
         let mut level = if self.eat(TokenKind::Ellipsis) { 3 } else { 0 };
 
+        const DOT_ELLIPSIS_SET: TokenSet = TokenSet::new(&[TokenKind::Dot, TokenKind::Ellipsis]);
         while self.at_ts(DOT_ELLIPSIS_SET) {
             if self.eat(TokenKind::Dot) {
                 level += 1;
@@ -2749,7 +2822,7 @@ impl<'src> Parser<'src> {
     /// See <https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html>
     fn current_op(&mut self) -> (u8, TokenKind, Associativity) {
         const NOT_AN_OP: (u8, TokenKind, Associativity) =
-            (0, TokenKind::Invalid, Associativity::Left);
+            (0, TokenKind::Unknown, Associativity::Left);
         let kind = self.current_kind();
 
         match kind {
@@ -2864,8 +2937,8 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_identifier(&mut self) -> ast::Identifier {
-        let (kind, range) = self.current_token();
-        if kind == TokenKind::Name {
+        let range = self.current_range();
+        if self.current_kind() == TokenKind::Name {
             let (Tok::Name { name }, _) = self.next_token() else {
                 unreachable!();
             };
@@ -2922,7 +2995,7 @@ impl<'src> Parser<'src> {
             // avoid creating an "unexpected token" error for `Tok::Invalid`
             // we handle it here. We try to parse an expression to avoid
             // creating "statements in the same line" error in some cases.
-            Tok::Invalid => {
+            Tok::Unknown => {
                 if self.at_expr() {
                     let (parsed_expr, expr_range) = self.parse_exprs();
                     range = expr_range;
@@ -3568,7 +3641,7 @@ impl<'src> Parser<'src> {
                 }
                 // `Invalid` tokens are created when there's a lexical error, so
                 // we ignore it here to avoid creating unexpected token errors
-                TokenKind::Invalid => {
+                TokenKind::Unknown => {
                     self.next_token();
                     continue;
                 }

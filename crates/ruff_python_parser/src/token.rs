@@ -219,7 +219,7 @@ pub enum Tok {
     With,
     Yield,
 
-    Invalid,
+    Unknown,
     // RustPython specific.
     StartModule,
     StartExpression,
@@ -350,7 +350,7 @@ impl fmt::Display for Tok {
             With => f.write_str("'with'"),
             Yield => f.write_str("'yield'"),
             ColonEqual => f.write_str("':='"),
-            Invalid => f.write_str("Invalid"),
+            Unknown => f.write_str("Invalid"),
         }
     }
 }
@@ -627,7 +627,7 @@ pub enum TokenKind {
     With,
     Yield,
 
-    Invalid,
+    Unknown,
     // RustPython specific.
     StartModule,
     StartInteractive,
@@ -924,7 +924,7 @@ impl TokenKind {
             Tok::Type => TokenKind::Type,
             Tok::With => TokenKind::With,
             Tok::Yield => TokenKind::Yield,
-            Tok::Invalid => TokenKind::Invalid,
+            Tok::Unknown => TokenKind::Unknown,
             Tok::StartModule => TokenKind::StartModule,
             Tok::StartExpression => TokenKind::StartExpression,
         }

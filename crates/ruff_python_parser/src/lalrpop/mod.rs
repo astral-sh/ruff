@@ -14,7 +14,6 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::lexer::{LexResult, LexicalError, LexicalErrorType};
-use crate::token_source::TokenSource;
 use crate::{Mode, ParseError, ParseErrorType, Tok};
 
 mod context;
@@ -51,7 +50,11 @@ pub(crate) fn parse_tokens(
     mode: Mode,
 ) -> Result<Mod, ParseError> {
     let marker_token = (Tok::start_marker(mode), TextRange::default());
-    let lexer = std::iter::once(Ok(marker_token)).chain(TokenSource::new(tokens));
+    let lexer = std::iter::once(Ok(marker_token)).chain(
+        tokens
+            .into_iter()
+            .filter_ok(|token| !matches!(token, (Tok::Comment(..) | Tok::NonLogicalNewline, _))),
+    );
     python::TopParser::new()
         .parse(
             source,
