@@ -398,11 +398,10 @@ impl MultilineDunderAllValue {
         //   "last item"  # comment2
         //   # comment3
         // ]  # comment4
-        //                                   <-- Tokenizer emits a LogicalNewline here
         // ```
         //
         // - The prelude in the above example is the source code region
-        //   starting at the opening `[` and ending just before `# comment1`.
+        //   starting just before the opening `[` and ending just after `# comment0`.
         //   `comment0` here counts as part of the prelude because it is on
         //   the same line as the opening paren, and because we haven't encountered
         //   any elements of `__all__` yet, but `comment1` counts as part of the first item,
@@ -411,11 +410,12 @@ impl MultilineDunderAllValue {
         //   (an "item" being a region of source code that all moves as one unit
         //   when `__all__` is sorted).
         // - The postlude in the above example is the source code region starting
-        //   just after `# comment2` and ending just before the logical newline
-        //   that follows the closing paren. `# comment2` is part of the last item,
-        //   as it's an inline comment on the same line as an element,
-        //   but `# comment3` becomes part of the postlude because there are no items
-        //   below it.
+        //   just after `# comment2` and ending just after the closing paren.
+        //   `# comment2` is part of the last item, as it's an inline comment on the
+        //   same line as an element, but `# comment3` becomes part of the postlude
+        //   because there are no items below it. `# comment4` is not part of the
+        //   postlude: it's outside of the source-code range considered by this rule,
+        //   and should therefore be untouched.
         //
         let newline = stylist.line_ending().as_str();
         let start_offset = self.start();
@@ -569,10 +569,10 @@ impl LineState {
     /// record the range of that comment.
     ///
     /// *If*, however, we've already seen a comma
-    /// or a stringin this line, that means that we're
+    /// or a string in this line, that means that we're
     /// in a line with items. In that case, we want to
     /// record the range of the comment, *plus* the whitespace
-    /// preceding the comment. This is so that we don't
+    /// (if any) preceding the comment. This is so that we don't
     /// unnecessarily apply opinionated formatting changes
     /// where they might not be welcome.
     fn visit_comment_token(&mut self, token_range: TextRange) {
