@@ -67,7 +67,6 @@ bitflags! {
 }
 
 type ExprWithRange = (ParsedExpr, TextRange);
-type StmtWithRange = (Stmt, TextRange);
 
 #[derive(Debug)]
 struct ParsedExpr {
@@ -173,7 +172,7 @@ pub(crate) struct Parser<'src> {
 
     current: Spanned,
 
-    /// The end of the last processed non-trivia token
+    /// The end of the last processed. Used to determine a node's end.
     last_token_end: TextSize,
 }
 
@@ -289,6 +288,7 @@ impl<'src> Parser<'src> {
             "Parser should be at the end of the file."
         );
 
+        // TODO consider re-integrating lexical error handling into the aprser?
         let parse_errors = self.errors;
         let lex_errors = self.tokens.finish();
 
@@ -341,8 +341,8 @@ impl<'src> Parser<'src> {
                     self.handle_unexpected_indentation(&mut body, "unexpected indentation");
                     continue;
                 }
-                let (stmt, _) = self.parse_statement();
-                body.push(stmt);
+
+                body.push(self.parse_statement());
 
                 if let Some(range) = self.defer_invalid_node_creation {
                     self.defer_invalid_node_creation = None;
@@ -399,7 +399,7 @@ impl<'src> Parser<'src> {
         self.current_range().start()
     }
 
-    fn finish_node(&self, start: TextSize) -> TextRange {
+    fn node_range(&self, start: TextSize) -> TextRange {
         TextRange::new(start, self.last_token_end)
     }
 
@@ -408,7 +408,7 @@ impl<'src> Parser<'src> {
         self.ctx.intersects(ctx)
     }
 
-    /// Moves the parser to the next token. Returns the old current token as an owned value..
+    /// Moves the parser to the next token. Returns the old current token as an owned value.
     fn next_token(&mut self) -> Spanned {
         let next = self
             .tokens
@@ -417,7 +417,18 @@ impl<'src> Parser<'src> {
 
         let current = std::mem::replace(&mut self.current, next);
 
-        self.last_token_end = current.1.end();
+        if !matches!(
+            current.0,
+            // TODO explore including everything up to the dedent as part of the body.
+            Tok::Dedent
+            // Don't include newlines in the body
+            | Tok::Newline
+            // TODO(micha): Including the semi feels more correct but it isn't compatible with lalrpop and breaks the
+            // formatters semicolon detection. Exclude it for now
+            | Tok::Semi
+        ) {
+            self.last_token_end = current.1.end();
+        }
 
         current
     }
@@ -640,47 +651,43 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn handle_unexpected_indentation(
-        &mut self,
-        stmts: &mut Vec<Stmt>,
-        error_msg: &str,
-    ) -> TextRange {
-        self.eat(TokenKind::Indent);
+    fn handle_unexpected_indentation(&mut self, stmts: &mut Vec<Stmt>, error_msg: &str) {
+        self.bump(TokenKind::Indent);
 
-        let mut range = self.current_range();
-        self.add_error(ParseErrorType::OtherError(error_msg.to_string()), range);
+        self.add_error(
+            ParseErrorType::OtherError(error_msg.to_string()),
+            self.current_range(),
+        );
 
         while !self.at(TokenKind::Dedent) && !self.at(TokenKind::EndOfFile) {
-            let (stmt, stmt_range) = self.parse_statement();
+            let stmt = self.parse_statement();
             stmts.push(stmt);
-            range = stmt_range;
         }
-        assert!(self.eat(TokenKind::Dedent));
 
-        range
+        assert!(self.eat(TokenKind::Dedent));
     }
 
-    fn parse_statement(&mut self) -> StmtWithRange {
-        let (kind, range) = self.current_token();
-        match kind {
-            TokenKind::If => self.parse_if_stmt(),
-            TokenKind::Try => self.parse_try_stmt(),
-            TokenKind::For => self.parse_for_stmt(),
-            TokenKind::With => self.parse_with_stmt(),
+    fn parse_statement(&mut self) -> Stmt {
+        let start_offset = self.node_start();
+        match self.current_kind() {
+            TokenKind::If => Stmt::If(self.parse_if_stmt()),
+            TokenKind::Try => Stmt::Try(self.parse_try_stmt()),
+            TokenKind::For => Stmt::For(self.parse_for_stmt(start_offset)),
+            TokenKind::With => Stmt::With(self.parse_with_stmt(start_offset)),
             TokenKind::At => self.parse_decorators(),
             TokenKind::Async => self.parse_async_stmt(),
-            TokenKind::While => self.parse_while_stmt(),
-            TokenKind::Def => self.parse_func_def_stmt(vec![], range),
-            TokenKind::Class => self.parse_class_def_stmt(vec![], range),
-            TokenKind::Match => self.parse_match_stmt(),
+            TokenKind::While => Stmt::While(self.parse_while_stmt()),
+            TokenKind::Def => Stmt::FunctionDef(self.parse_func_def_stmt(vec![], start_offset)),
+            TokenKind::Class => Stmt::ClassDef(self.parse_class_def_stmt(vec![], start_offset)),
+            TokenKind::Match => Stmt::Match(self.parse_match_stmt()),
             _ => self.parse_simple_stmt_newline(),
         }
     }
 
-    fn parse_match_stmt(&mut self) -> StmtWithRange {
-        let mut range = self.current_range();
+    fn parse_match_stmt(&mut self) -> ast::StmtMatch {
+        let start_offset = self.node_start();
 
-        self.eat(TokenKind::Match);
+        self.bump(TokenKind::Match);
         let (subject, _) = self.parse_expr_with_recovery(
             |parser| {
                 let (parsed_expr, expr_range) = parser.parse_expr2();
@@ -709,25 +716,21 @@ impl<'src> Parser<'src> {
             );
         }
 
-        let (cases, cases_range) = self.parse_match_cases();
-        range = range.cover(cases_range);
+        let (cases, _) = self.parse_match_cases();
 
         self.eat(TokenKind::Dedent);
 
-        (
-            Stmt::Match(ast::StmtMatch {
-                subject: Box::new(subject.expr),
-                cases,
-                range,
-            }),
-            range,
-        )
+        ast::StmtMatch {
+            subject: Box::new(subject.expr),
+            cases,
+            range: self.node_range(start_offset),
+        }
     }
 
     fn parse_match_case(&mut self) -> ast::MatchCase {
-        let mut range = self.current_range();
+        let start = self.node_start();
 
-        self.eat(TokenKind::Case);
+        self.bump(TokenKind::Case);
         let (pattern, _) = self.parse_match_patterns();
 
         let guard = if self.eat(TokenKind::If) {
@@ -738,14 +741,13 @@ impl<'src> Parser<'src> {
         };
 
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
-        let (body, body_range) = self.parse_body(Clause::Match);
-        range = range.cover(body_range);
+        let body = self.parse_body(Clause::Match);
 
         ast::MatchCase {
             pattern,
             guard,
             body,
-            range: range.cover(range),
+            range: self.node_range(start),
         }
     }
 
@@ -1352,46 +1354,38 @@ impl<'src> Parser<'src> {
         )
     }
 
-    fn parse_async_stmt(&mut self) -> StmtWithRange {
-        let mut range = self.current_range();
-        self.eat(TokenKind::Async);
+    fn parse_async_stmt(&mut self) -> Stmt {
+        let async_start = self.node_start();
+        self.bump(TokenKind::Async);
 
-        let (kind, kind_range) = self.current_token();
-        let (mut stmt, stmt_range) = match kind {
-            TokenKind::Def => self.parse_func_def_stmt(vec![], kind_range),
-            TokenKind::With => self.parse_with_stmt(),
-            TokenKind::For => self.parse_for_stmt(),
+        match self.current_kind() {
+            TokenKind::Def => {
+                let mut function = self.parse_func_def_stmt(vec![], async_start);
+                function.is_async = true;
+                Stmt::FunctionDef(function)
+            }
+            TokenKind::With => {
+                let mut with_stmt = self.parse_with_stmt(async_start);
+                with_stmt.is_async = true;
+                Stmt::With(with_stmt)
+            }
+            TokenKind::For => {
+                let mut for_stmt = self.parse_for_stmt(async_start);
+                for_stmt.is_async = true;
+                Stmt::For(for_stmt)
+            }
             kind => {
                 // Although this statement is not a valid `async` statement,
                 // we still parse it.
-                self.add_error(ParseErrorType::StmtIsNotAsync(kind), kind_range);
+                self.add_error(ParseErrorType::StmtIsNotAsync(kind), self.current_range());
                 self.parse_statement()
             }
-        };
-        range = range.cover(stmt_range);
-
-        match stmt {
-            Stmt::FunctionDef(ref mut func) => {
-                func.range = range;
-                func.is_async = true;
-            }
-            Stmt::For(ref mut for_stmt) => {
-                for_stmt.range = range;
-                for_stmt.is_async = true;
-            }
-            Stmt::With(ref mut with_stmt) => {
-                with_stmt.range = range;
-                with_stmt.is_async = true;
-            }
-            _ => {}
-        };
-
-        (stmt, range)
+        }
     }
 
-    fn parse_while_stmt(&mut self) -> StmtWithRange {
-        let mut range = self.current_range();
-        self.eat(TokenKind::While);
+    fn parse_while_stmt(&mut self) -> ast::StmtWhile {
+        let while_start = self.node_start();
+        self.bump(TokenKind::While);
 
         let (test, _) = self.parse_expr_with_recovery(
             Parser::parse_expr2,
@@ -1400,33 +1394,27 @@ impl<'src> Parser<'src> {
         );
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body(Clause::While);
-        range = range.cover(body_range);
+        let body = self.parse_body(Clause::While);
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (else_body, else_body_range) = self.parse_body(Clause::Else);
-            range = range.cover(else_body_range);
+            let else_body = self.parse_body(Clause::Else);
             else_body
         } else {
             vec![]
         };
 
-        (
-            Stmt::While(ast::StmtWhile {
-                test: Box::new(test.expr),
-                body,
-                orelse,
-                range,
-            }),
-            range,
-        )
+        ast::StmtWhile {
+            test: Box::new(test.expr),
+            body,
+            orelse,
+            range: self.node_range(while_start),
+        }
     }
 
-    fn parse_for_stmt(&mut self) -> StmtWithRange {
-        let mut range = self.current_range();
-        self.eat(TokenKind::For);
+    fn parse_for_stmt(&mut self, for_start: TextSize) -> ast::StmtFor {
+        self.bump(TokenKind::For);
 
         self.set_ctx(ParserCtxFlags::FOR_TARGET);
         let (mut target, _) = self.parse_expr_with_recovery(
@@ -1447,46 +1435,41 @@ impl<'src> Parser<'src> {
         );
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body(Clause::For);
-        range = range.cover(body_range);
+        let body = self.parse_body(Clause::For);
 
         let orelse = if self.eat(TokenKind::Else) {
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (else_body, else_body_range) = self.parse_body(Clause::Else);
-            range = range.cover(else_body_range);
+            let else_body = self.parse_body(Clause::Else);
             else_body
         } else {
             vec![]
         };
 
-        (
-            Stmt::For(ast::StmtFor {
-                target: Box::new(target.expr),
-                iter: Box::new(iter.expr),
-                is_async: false,
-                body,
-                orelse,
-                range,
-            }),
-            range,
-        )
+        ast::StmtFor {
+            target: Box::new(target.expr),
+            iter: Box::new(iter.expr),
+            is_async: false,
+            body,
+            orelse,
+            range: self.node_range(for_start),
+        }
     }
 
-    fn parse_try_stmt(&mut self) -> StmtWithRange {
-        let mut range = self.current_range();
-        self.eat(TokenKind::Try);
+    fn parse_try_stmt(&mut self) -> ast::StmtTry {
+        let try_start = self.node_start();
+        self.bump(TokenKind::Try);
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
         let mut is_star = false;
         let mut has_except = false;
         let mut has_finally = false;
 
-        let (try_body, _) = self.parse_body(Clause::Try);
+        let try_body = self.parse_body(Clause::Try);
 
         let mut handlers = vec![];
         loop {
-            let mut except_range = self.current_range();
+            let except_start = self.node_start();
             if self.eat(TokenKind::Except) {
                 has_except = true;
             } else {
@@ -1518,11 +1501,9 @@ impl<'src> Parser<'src> {
 
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (except_body, except_body_range) = self.parse_body(Clause::Except);
+            let except_body = self.parse_body(Clause::Except);
 
-            except_range = except_range.cover(except_body_range);
-            range = range.cover(except_range);
-
+            let except_range = self.node_range(except_start);
             handlers.push(ExceptHandler::ExceptHandler(
                 ast::ExceptHandlerExceptHandler {
                     type_,
@@ -1540,9 +1521,7 @@ impl<'src> Parser<'src> {
         let orelse = if self.eat(TokenKind::Else) {
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (else_body, else_body_range) = self.parse_body(Clause::Else);
-            range = range.cover(else_body_range);
-            else_body
+            self.parse_body(Clause::Else)
         } else {
             vec![]
         };
@@ -1551,9 +1530,7 @@ impl<'src> Parser<'src> {
             has_finally = true;
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (finally_body, finally_body_range) = self.parse_body(Clause::Finally);
-            range = range.cover(finally_body_range);
-            finally_body
+            self.parse_body(Clause::Finally)
         } else {
             vec![]
         };
@@ -1568,63 +1545,53 @@ impl<'src> Parser<'src> {
             );
         }
 
-        (
-            Stmt::Try(ast::StmtTry {
-                body: try_body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star,
-                range,
-            }),
+        let range = self.node_range(try_start);
+
+        ast::StmtTry {
+            body: try_body,
+            handlers,
+            orelse,
+            finalbody,
+            is_star,
             range,
-        )
+        }
     }
 
-    fn parse_decorators(&mut self) -> StmtWithRange {
-        let range = self.current_range();
+    fn parse_decorators(&mut self) -> Stmt {
+        let start_offset = self.node_start();
+
         let mut decorators = vec![];
 
         while self.at(TokenKind::At) {
-            let range = self.current_range();
+            let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
-            let (parsed_expr, expr_range) = self.parse_expr2();
+            let (parsed_expr, _) = self.parse_expr2();
             decorators.push(ast::Decorator {
                 expression: parsed_expr.expr,
-                range: range.cover(expr_range),
+                range: self.node_range(decorator_start),
             });
 
             self.expect(TokenKind::Newline);
         }
 
-        let (kind, kind_range) = self.current_token();
-
-        match kind {
-            TokenKind::Def => self.parse_func_def_stmt(decorators, range),
-            TokenKind::Class => self.parse_class_def_stmt(decorators, range),
+        match self.current_kind() {
+            TokenKind::Def => Stmt::FunctionDef(self.parse_func_def_stmt(decorators, start_offset)),
+            TokenKind::Class => Stmt::ClassDef(self.parse_class_def_stmt(decorators, start_offset)),
             TokenKind::Async if self.peek_nth(1).0 == TokenKind::Def => {
-                let mut async_range = self.current_range();
-                self.eat(TokenKind::Async);
+                self.bump(TokenKind::Async);
 
-                let (Stmt::FunctionDef(mut func), stmt_range) =
-                    self.parse_func_def_stmt(decorators, range)
-                else {
-                    unreachable!()
-                };
-
-                async_range = async_range.cover(stmt_range);
-                func.range = async_range;
+                let mut func = self.parse_func_def_stmt(decorators, start_offset);
                 func.is_async = true;
 
-                (Stmt::FunctionDef(func), async_range)
+                Stmt::FunctionDef(func)
             }
             _ => {
                 self.add_error(
                     ParseErrorType::OtherError(
                         "expected class, function definition or async function definition after decorator".to_string(),
                     ),
-                    kind_range,
+                    self.current_range(),
                 );
                 self.parse_statement()
             }
@@ -1634,10 +1601,9 @@ impl<'src> Parser<'src> {
     fn parse_func_def_stmt(
         &mut self,
         decorator_list: Vec<ast::Decorator>,
-        func_range: TextRange,
-    ) -> StmtWithRange {
-        // FIXME shouldn't this be expect?
-        self.eat(TokenKind::Def);
+        start_offset: TextSize,
+    ) -> ast::StmtFunctionDef {
+        self.bump(TokenKind::Def);
         let name = self.parse_identifier();
         let type_params = if self.at(TokenKind::Lsqb) {
             Some(self.parse_type_params())
@@ -1690,30 +1656,26 @@ impl<'src> Parser<'src> {
                 .union([TokenKind::Rarrow].as_slice().into()),
         );
 
-        let (body, body_range) = self.parse_body(Clause::FunctionDef);
-        let range = func_range.cover(body_range);
+        let body = self.parse_body(Clause::FunctionDef);
 
-        (
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                name,
-                type_params,
-                parameters: Box::new(parameters),
-                body,
-                decorator_list,
-                is_async: false,
-                returns,
-                range,
-            }),
-            range,
-        )
+        ast::StmtFunctionDef {
+            name,
+            type_params,
+            parameters: Box::new(parameters),
+            body,
+            decorator_list,
+            is_async: false,
+            returns,
+            range: self.node_range(start_offset),
+        }
     }
 
     fn parse_class_def_stmt(
         &mut self,
         decorator_list: Vec<ast::Decorator>,
-        class_range: TextRange,
-    ) -> StmtWithRange {
-        self.eat(TokenKind::Class);
+        start_offset: TextSize,
+    ) -> ast::StmtClassDef {
+        self.bump(TokenKind::Class);
 
         let name = self.parse_identifier();
         let type_params = if self.at(TokenKind::Lsqb) {
@@ -1729,20 +1691,16 @@ impl<'src> Parser<'src> {
 
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body(Clause::Class);
-        let range = class_range.cover(body_range);
+        let body = self.parse_body(Clause::Class);
 
-        (
-            Stmt::ClassDef(ast::StmtClassDef {
-                range,
-                decorator_list,
-                name,
-                type_params,
-                arguments,
-                body,
-            }),
-            range,
-        )
+        ast::StmtClassDef {
+            range: self.node_range(start_offset),
+            decorator_list,
+            name,
+            type_params,
+            arguments,
+            body,
+        }
     }
 
     fn parse_with_item(&mut self) -> ast::WithItem {
@@ -1938,39 +1896,31 @@ impl<'src> Parser<'src> {
         items
     }
 
-    fn parse_with_stmt(&mut self) -> StmtWithRange {
-        let mut range = self.current_range();
-
-        self.eat(TokenKind::With);
+    fn parse_with_stmt(&mut self, start_offset: TextSize) -> ast::StmtWith {
+        self.bump(TokenKind::With);
 
         let items = self.parse_with_items();
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body(Clause::With);
-        range = range.cover(body_range);
+        let body = self.parse_body(Clause::With);
 
-        (
-            Stmt::With(ast::StmtWith {
-                items,
-                body,
-                is_async: false,
-                range,
-            }),
-            range,
-        )
+        ast::StmtWith {
+            items,
+            body,
+            is_async: false,
+            range: self.node_range(start_offset),
+        }
     }
 
-    fn parse_assign_stmt(&mut self, target: ParsedExpr, mut range: TextRange) -> StmtWithRange {
+    fn parse_assign_stmt(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
         let mut targets = vec![target.expr];
-        let (mut value, value_range) = self.parse_exprs();
-        range = range.cover(value_range);
+        let (mut value, _) = self.parse_exprs();
 
         while self.eat(TokenKind::Equal) {
-            let (mut parsed_expr, expr_range) = self.parse_exprs();
+            let (mut parsed_expr, _) = self.parse_exprs();
 
             std::mem::swap(&mut value, &mut parsed_expr);
 
-            range = range.cover(expr_range);
             targets.push(parsed_expr.expr);
         }
 
@@ -1985,21 +1935,18 @@ impl<'src> Parser<'src> {
                 .for_each(|target| self.add_error(ParseErrorType::AssignmentError, target.range()));
         }
 
-        (
-            Stmt::Assign(ast::StmtAssign {
-                targets,
-                value: Box::new(value.expr),
-                range,
-            }),
-            range,
-        )
+        ast::StmtAssign {
+            targets,
+            value: Box::new(value.expr),
+            range: self.node_range(start),
+        }
     }
 
     fn parse_ann_assign_stmt(
         &mut self,
         mut target: ParsedExpr,
-        mut range: TextRange,
-    ) -> StmtWithRange {
+        start: TextSize,
+    ) -> ast::StmtAnnAssign {
         if !helpers::is_valid_assignment_target(&target.expr) {
             self.add_error(ParseErrorType::AssignmentError, target.expr.range());
         }
@@ -2009,51 +1956,47 @@ impl<'src> Parser<'src> {
                 ParseErrorType::OtherError(
                     "only single target (not tuple) can be annotated".into(),
                 ),
-                range,
+                target.expr.range(),
             );
         }
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
         let simple = matches!(target.expr, Expr::Name(_)) && !target.is_parenthesized;
-        let (annotation, ann_range) = self.parse_exprs();
-        range = range.cover(ann_range);
+        let (annotation, _) = self.parse_exprs();
 
         if matches!(annotation.expr, Expr::Tuple(_)) && !annotation.is_parenthesized {
             self.add_error(
                 ParseErrorType::OtherError("annotation cannot be unparenthesized".into()),
-                range,
+                annotation.expr.range(),
             );
         }
 
         let value = if self.eat(TokenKind::Equal) {
-            let (value, value_range) = self.parse_exprs();
-            range = range.cover(value_range);
+            let (value, _) = self.parse_exprs();
 
             Some(Box::new(value.expr))
         } else {
             None
         };
 
-        (
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target: Box::new(target.expr),
-                annotation: Box::new(annotation.expr),
-                value,
-                simple,
-                range,
-            }),
-            range,
-        )
+        ast::StmtAnnAssign {
+            target: Box::new(target.expr),
+            annotation: Box::new(annotation.expr),
+            value,
+            simple,
+            range: self.node_range(start),
+        }
     }
 
     fn parse_aug_assign_stmt(
         &mut self,
         mut target: ParsedExpr,
         op: Operator,
-        mut range: TextRange,
-    ) -> StmtWithRange {
+        start: TextSize,
+    ) -> ast::StmtAugAssign {
         // Consume the operator
+        // FIXME(micha): assert that it is an agumented assign token
         self.next_token();
 
         if !helpers::is_valid_aug_assignment_target(&target.expr) {
@@ -2062,21 +2005,17 @@ impl<'src> Parser<'src> {
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
-        let (value, value_range) = self.parse_exprs();
-        range = range.cover(value_range);
+        let (value, _) = self.parse_exprs();
 
-        (
-            Stmt::AugAssign(ast::StmtAugAssign {
-                target: Box::new(target.expr),
-                op,
-                value: Box::new(value.expr),
-                range,
-            }),
-            range,
-        )
+        ast::StmtAugAssign {
+            target: Box::new(target.expr),
+            op,
+            value: Box::new(value.expr),
+            range: self.node_range(start),
+        }
     }
 
-    fn parse_simple_stmt_newline(&mut self) -> StmtWithRange {
+    fn parse_simple_stmt_newline(&mut self) -> Stmt {
         let stmt = self.parse_simple_stmt();
 
         self.last_ctx = ParserCtxFlags::empty();
@@ -2085,7 +2024,10 @@ impl<'src> Parser<'src> {
 
         if !has_eaten_newline && !has_eaten_semicolon && self.at_simple_stmt() {
             let range = self.current_range();
-            self.add_error(ParseErrorType::SimpleStmtsInSameLine, stmt.1.cover(range));
+            self.add_error(
+                ParseErrorType::SimpleStmtsInSameLine,
+                stmt.range().cover(range),
+            );
         }
 
         if !has_eaten_newline && self.at_compound_stmt() {
@@ -2095,29 +2037,27 @@ impl<'src> Parser<'src> {
             // ! def x(): ...
             // ```
             // The `!` (an unexpected token) will be parsed as `Expr::Invalid`.
-            if let Stmt::Expr(expr) = &stmt.0 {
+            if let Stmt::Expr(expr) = &stmt {
                 if let Expr::Invalid(_) = expr.value.as_ref() {
                     return stmt;
                 }
             }
-            let range = self.current_range();
+
             self.add_error(
                 ParseErrorType::SimpleStmtAndCompoundStmtInSameLine,
-                stmt.1.cover(range),
+                stmt.range().cover(self.current_range()),
             );
         }
 
         stmt
     }
 
-    fn parse_simple_stmts(&mut self) -> (Vec<Stmt>, TextRange) {
-        let mut range;
+    fn parse_simple_stmts(&mut self) -> Vec<Stmt> {
         let mut stmts = vec![];
+        let start = self.node_start();
 
         loop {
-            let (stmt, stmt_range) = self.parse_simple_stmt();
-            stmts.push(stmt);
-            range = stmt_range;
+            stmts.push(self.parse_simple_stmt());
 
             if !self.eat(TokenKind::Semi) {
                 if self.at_simple_stmt() {
@@ -2135,107 +2075,108 @@ impl<'src> Parser<'src> {
         }
 
         if !self.eat(TokenKind::Newline) && self.at_compound_stmt() {
-            self.add_error(ParseErrorType::SimpleStmtAndCompoundStmtInSameLine, range);
+            self.add_error(
+                ParseErrorType::SimpleStmtAndCompoundStmtInSameLine,
+                self.node_range(start),
+            );
         }
 
-        (stmts, range)
+        stmts
     }
 
-    fn parse_simple_stmt(&mut self) -> StmtWithRange {
+    fn parse_simple_stmt(&mut self) -> Stmt {
         match self.current_kind() {
-            TokenKind::Del => self.parse_del_stmt(),
-            TokenKind::Pass => self.parse_pass_stmt(),
-            TokenKind::Break => self.parse_break_stmt(),
-            TokenKind::Raise => self.parse_raise_stmt(),
-            TokenKind::Assert => self.parse_assert_stmt(),
-            TokenKind::Global => self.parse_global_stmt(),
-            TokenKind::Import => self.parse_import_stmt(),
-            TokenKind::Return => self.parse_return_stmt(),
-            TokenKind::From => self.parse_import_from_stmt(),
-            TokenKind::Continue => self.parse_continue_stmt(),
-            TokenKind::Nonlocal => self.parse_nonlocal_stmt(),
-            TokenKind::Type => self.parse_type_stmt(),
+            TokenKind::Del => Stmt::Delete(self.parse_del_stmt()),
+            TokenKind::Pass => Stmt::Pass(self.parse_pass_stmt()),
+            TokenKind::Break => Stmt::Break(self.parse_break_stmt()),
+            TokenKind::Raise => Stmt::Raise(self.parse_raise_stmt()),
+            TokenKind::Assert => Stmt::Assert(self.parse_assert_stmt()),
+            TokenKind::Global => Stmt::Global(self.parse_global_stmt()),
+            TokenKind::Import => Stmt::Import(self.parse_import_stmt()),
+            TokenKind::Return => Stmt::Return(self.parse_return_stmt()),
+            TokenKind::From => Stmt::ImportFrom(self.parse_import_from_stmt()),
+            TokenKind::Continue => Stmt::Continue(self.parse_continue_stmt()),
+            TokenKind::Nonlocal => Stmt::Nonlocal(self.parse_nonlocal_stmt()),
+            TokenKind::Type => Stmt::TypeAlias(self.parse_type_alias_stmt()),
             TokenKind::EscapeCommand if self.mode == Mode::Ipython => {
-                self.parse_ipython_escape_command_stmt()
+                Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_stmt())
             }
             _ => {
+                let start = self.node_start();
                 let (parsed_expr, range) = self.parse_exprs();
 
                 if self.eat(TokenKind::Equal) {
-                    self.parse_assign_stmt(parsed_expr, range)
+                    Stmt::Assign(self.parse_assign_stmt(parsed_expr, start))
                 } else if self.eat(TokenKind::Colon) {
-                    self.parse_ann_assign_stmt(parsed_expr, range)
+                    Stmt::AnnAssign(self.parse_ann_assign_stmt(parsed_expr, start))
                 } else if let Ok(op) = Operator::try_from(self.current_kind()) {
-                    self.parse_aug_assign_stmt(parsed_expr, op, range)
+                    Stmt::AugAssign(self.parse_aug_assign_stmt(parsed_expr, op, start))
                 } else if self.mode == Mode::Ipython && self.at(TokenKind::Question) {
                     let mut kind = IpyEscapeKind::Help;
-                    let mut ipy_range = range.cover(self.current_range());
 
                     self.eat(TokenKind::Question);
                     if self.at(TokenKind::Question) {
                         kind = IpyEscapeKind::Help2;
-                        ipy_range = ipy_range.cover(self.current_range());
                         self.eat(TokenKind::Question);
                     }
 
-                    (
-                        Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand {
-                            value: self.src_text(range).to_string(),
-                            kind,
-                            range: ipy_range,
-                        }),
-                        ipy_range,
-                    )
+                    Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand {
+                        value: self.src_text(range).to_string(),
+                        kind,
+                        range: self.node_range(start),
+                    })
                 } else {
-                    (
-                        Stmt::Expr(ast::StmtExpr {
-                            value: Box::new(parsed_expr.expr),
-                            range,
-                        }),
-                        range,
-                    )
+                    Stmt::Expr(ast::StmtExpr {
+                        value: Box::new(parsed_expr.expr),
+                        range: self.node_range(start),
+                    })
                 }
             }
         }
     }
 
-    fn parse_ipython_escape_command_stmt(&mut self) -> StmtWithRange {
-        let (Tok::IpyEscapeCommand { value, kind }, range) = self.next_token() else {
+    fn parse_ipython_escape_command_stmt(&mut self) -> ast::StmtIpyEscapeCommand {
+        let start = self.node_start();
+        let (Tok::IpyEscapeCommand { value, kind }, _) = self.bump(TokenKind::EscapeCommand) else {
             unreachable!()
         };
 
-        (
-            Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand { range, kind, value }),
-            range,
-        )
+        ast::StmtIpyEscapeCommand {
+            range: self.node_range(start),
+            kind,
+            value,
+        }
     }
 
-    #[inline]
-    fn parse_pass_stmt(&mut self) -> StmtWithRange {
-        let range = self.current_range();
+    fn parse_pass_stmt(&mut self) -> ast::StmtPass {
+        let start = self.node_start();
         self.bump(TokenKind::Pass);
-        (Stmt::Pass(ast::StmtPass { range }), range)
+        ast::StmtPass {
+            range: self.node_range(start),
+        }
     }
 
-    #[inline]
-    fn parse_continue_stmt(&mut self) -> StmtWithRange {
-        let range = self.current_range();
+    fn parse_continue_stmt(&mut self) -> ast::StmtContinue {
+        let start = self.node_start();
         self.bump(TokenKind::Continue);
-        (Stmt::Continue(ast::StmtContinue { range }), range)
+        ast::StmtContinue {
+            range: self.node_range(start),
+        }
     }
 
-    #[inline]
-    fn parse_break_stmt(&mut self) -> StmtWithRange {
-        let range = self.current_range();
+    fn parse_break_stmt(&mut self) -> ast::StmtBreak {
+        let start = self.node_start();
         self.bump(TokenKind::Break);
-        (Stmt::Break(ast::StmtBreak { range }), range)
+        ast::StmtBreak {
+            range: self.node_range(start),
+        }
     }
 
     /// Parses a delete statement.
     ///
     /// # Panics
     /// If the parser isn't positioned at a `del` token.
-    fn parse_del_stmt(&mut self) -> StmtWithRange {
+    fn parse_del_stmt(&mut self) -> ast::StmtDelete {
         let start = self.node_start();
 
         self.bump(TokenKind::Del);
@@ -2264,43 +2205,39 @@ impl<'src> Parser<'src> {
             },
         );
 
-        let range = self.finish_node(start);
-
-        (Stmt::Delete(ast::StmtDelete { targets, range }), range)
+        ast::StmtDelete {
+            targets,
+            range: self.node_range(start),
+        }
     }
 
-    fn parse_assert_stmt(&mut self) -> StmtWithRange {
-        let mut range = self.current_range();
+    fn parse_assert_stmt(&mut self) -> ast::StmtAssert {
+        let start = self.node_start();
         self.bump(TokenKind::Assert);
 
-        let (test, test_range) = self.parse_expr();
-        range = range.cover(test_range);
+        let (test, _) = self.parse_expr();
 
         let msg = if self.eat(TokenKind::Comma) {
-            let (msg, msg_range) = self.parse_expr();
-            range = range.cover(msg_range);
+            let (msg, _) = self.parse_expr();
 
             Some(Box::new(msg.expr))
         } else {
             None
         };
 
-        (
-            Stmt::Assert(ast::StmtAssert {
-                test: Box::new(test.expr),
-                msg,
-                range,
-            }),
-            range,
-        )
+        ast::StmtAssert {
+            test: Box::new(test.expr),
+            msg,
+            range: self.node_range(start),
+        }
     }
 
-    fn parse_global_stmt(&mut self) -> StmtWithRange {
-        let global_range = self.current_range();
+    fn parse_global_stmt(&mut self) -> ast::StmtGlobal {
+        let start = self.node_start();
         self.bump(TokenKind::Global);
 
         let mut names = vec![];
-        let range = self.parse_separated(
+        self.parse_separated(
             false,
             TokenKind::Comma,
             [TokenKind::Newline].as_slice(),
@@ -2311,58 +2248,62 @@ impl<'src> Parser<'src> {
                 range
             },
         );
-        let range = global_range.cover(range.unwrap_or(global_range));
 
-        (Stmt::Global(ast::StmtGlobal { range, names }), range)
+        ast::StmtGlobal {
+            range: self.node_range(start),
+            names,
+        }
     }
 
-    fn parse_nonlocal_stmt(&mut self) -> StmtWithRange {
-        let nonlocal_range = self.current_range();
+    fn parse_nonlocal_stmt(&mut self) -> ast::StmtNonlocal {
+        let start = self.node_start();
         self.bump(TokenKind::Nonlocal);
 
         let mut names = vec![];
 
-        let range = self
-            .parse_separated(
-                false,
-                TokenKind::Comma,
-                [TokenKind::Newline].as_slice(),
-                |parser| {
-                    let ident = parser.parse_identifier();
-                    let range = ident.range;
-                    names.push(ident);
-                    range
-                },
-            )
-            .map_or(nonlocal_range, |range| nonlocal_range.cover(range));
+        self.parse_separated(
+            false,
+            TokenKind::Comma,
+            [TokenKind::Newline].as_slice(),
+            |parser| {
+                let ident = parser.parse_identifier();
+                let range = ident.range;
+                names.push(ident);
+                range
+            },
+        );
 
-        (Stmt::Nonlocal(ast::StmtNonlocal { range, names }), range)
+        ast::StmtNonlocal {
+            range: self.node_range(start),
+            names,
+        }
     }
 
-    fn parse_return_stmt(&mut self) -> StmtWithRange {
-        let mut range = self.current_range();
+    fn parse_return_stmt(&mut self) -> ast::StmtReturn {
+        let start = self.node_start();
         self.bump(TokenKind::Return);
 
         let value = if self.at_expr() {
-            let (value, value_range) = self.parse_exprs();
-            range = range.cover(value_range);
+            let (value, _) = self.parse_exprs();
             Some(Box::new(value.expr))
         } else {
             None
         };
 
-        (Stmt::Return(ast::StmtReturn { range, value }), range)
+        ast::StmtReturn {
+            range: self.node_range(start),
+            value,
+        }
     }
 
-    fn parse_raise_stmt(&mut self) -> StmtWithRange {
-        let mut range = self.current_range();
+    fn parse_raise_stmt(&mut self) -> ast::StmtRaise {
+        let start = self.node_start();
         self.bump(TokenKind::Raise);
 
         let exc = if self.at(TokenKind::Newline) {
             None
         } else {
-            let (exc, exc_range) = self.parse_exprs();
-            range = range.cover(exc_range);
+            let (exc, _) = self.parse_exprs();
 
             if let Expr::Tuple(node) = &exc.expr {
                 if !exc.is_parenthesized {
@@ -2379,8 +2320,7 @@ impl<'src> Parser<'src> {
         };
 
         let cause = if exc.is_some() && self.eat(TokenKind::From) {
-            let (cause, cause_range) = self.parse_exprs();
-            range = range.cover(cause_range);
+            let (cause, _) = self.parse_exprs();
 
             if let Expr::Tuple(node) = &cause.expr {
                 if !cause.is_parenthesized {
@@ -2399,11 +2339,15 @@ impl<'src> Parser<'src> {
             None
         };
 
-        (Stmt::Raise(ast::StmtRaise { range, exc, cause }), range)
+        ast::StmtRaise {
+            range: self.node_range(start),
+            exc,
+            cause,
+        }
     }
 
-    fn parse_type_stmt(&mut self) -> StmtWithRange {
-        let range = self.current_range();
+    fn parse_type_alias_stmt(&mut self) -> ast::StmtTypeAlias {
+        let start = self.node_start();
         self.bump(TokenKind::Type);
 
         let (tok, tok_range) = self.next_token();
@@ -2430,18 +2374,14 @@ impl<'src> Parser<'src> {
         };
         self.expect_and_recover(TokenKind::Equal, EXPR_SET);
 
-        let (value, value_range) = self.parse_expr();
-        let range = range.cover(value_range);
+        let (value, _) = self.parse_expr();
 
-        (
-            Stmt::TypeAlias(ast::StmtTypeAlias {
-                name: Box::new(name),
-                type_params,
-                value: Box::new(value.expr),
-                range,
-            }),
-            range,
-        )
+        ast::StmtTypeAlias {
+            name: Box::new(name),
+            type_params,
+            value: Box::new(value.expr),
+            range: self.node_range(start),
+        }
     }
 
     fn parse_type_params(&mut self) -> ast::TypeParams {
@@ -2538,30 +2478,31 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_import_stmt(&mut self) -> StmtWithRange {
-        let import_range = self.current_range();
+    fn parse_import_stmt(&mut self) -> ast::StmtImport {
+        let start = self.node_start();
         self.bump(TokenKind::Import);
 
         let mut names = vec![];
-        let range = self
-            .parse_separated(
-                false,
-                TokenKind::Comma,
-                [TokenKind::Newline].as_slice(),
-                |parser| {
-                    let alias = parser.parse_alias();
-                    let range = alias.range;
-                    names.push(alias);
-                    range
-                },
-            )
-            .map_or(import_range, |range| import_range.cover(range));
+        self.parse_separated(
+            false,
+            TokenKind::Comma,
+            [TokenKind::Newline].as_slice(),
+            |parser| {
+                let alias = parser.parse_alias();
+                let range = alias.range;
+                names.push(alias);
+                range
+            },
+        );
 
-        (Stmt::Import(ast::StmtImport { range, names }), range)
+        ast::StmtImport {
+            range: self.node_range(start),
+            names,
+        }
     }
 
-    fn parse_import_from_stmt(&mut self) -> StmtWithRange {
-        let from_range = self.current_range();
+    fn parse_import_from_stmt(&mut self) -> ast::StmtImportFrom {
+        let start = self.node_start();
         self.bump(TokenKind::From);
 
         let mut module = None;
@@ -2593,8 +2534,8 @@ impl<'src> Parser<'src> {
         self.expect_and_recover(TokenKind::Import, TokenSet::EMPTY);
 
         let mut names = vec![];
-        let range = if self.at(TokenKind::Lpar) {
-            let delim_range = self.parse_delimited(
+        if self.at(TokenKind::Lpar) {
+            self.parse_delimited(
                 true,
                 TokenKind::Lpar,
                 TokenKind::Comma,
@@ -2603,7 +2544,6 @@ impl<'src> Parser<'src> {
                     names.push(parser.parse_alias());
                 },
             );
-            from_range.cover(delim_range)
         } else {
             self.parse_separated(
                 false,
@@ -2615,25 +2555,21 @@ impl<'src> Parser<'src> {
                     names.push(alias);
                     range
                 },
-            )
-            .map_or(from_range, |range| from_range.cover(range))
+            );
         };
 
-        (
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                level: Some(level),
-                range,
-            }),
-            range,
-        )
+        ast::StmtImportFrom {
+            module,
+            names,
+            level: Some(level),
+            range: self.node_range(start),
+        }
     }
 
     const ELSE_ELIF_SET: TokenSet = TokenSet::new(&[TokenKind::Else, TokenKind::Elif]);
-    fn parse_if_stmt(&mut self) -> StmtWithRange {
-        let mut if_range = self.current_range();
-        assert!(self.eat(TokenKind::If));
+    fn parse_if_stmt(&mut self) -> ast::StmtIf {
+        let if_start = self.node_start();
+        self.bump(TokenKind::If);
 
         let (test, _) = self.parse_expr_with_recovery(
             Parser::parse_expr2,
@@ -2642,35 +2578,28 @@ impl<'src> Parser<'src> {
         );
         self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-        let (body, body_range) = self.parse_body(Clause::If);
-        if_range = if_range.cover(body_range);
+        let body = self.parse_body(Clause::If);
 
         let elif_else_clauses = if self.at_ts(Self::ELSE_ELIF_SET) {
-            let (elif_else_clauses, range) = self.parse_elif_else_clauses();
-            if_range = if_range.cover(range);
-
-            elif_else_clauses
+            self.parse_elif_else_clauses()
         } else {
             vec![]
         };
 
-        (
-            Stmt::If(ast::StmtIf {
-                test: Box::new(test.expr),
-                body,
-                elif_else_clauses,
-                range: if_range,
-            }),
-            if_range,
-        )
+        ast::StmtIf {
+            test: Box::new(test.expr),
+            body,
+            elif_else_clauses,
+            range: self.node_range(if_start),
+        }
     }
 
-    fn parse_elif_else_clauses(&mut self) -> (Vec<ast::ElifElseClause>, TextRange) {
+    fn parse_elif_else_clauses(&mut self) -> Vec<ast::ElifElseClause> {
         let mut elif_else_stmts = vec![];
-        let mut range = self.current_range();
+
         while self.at(TokenKind::Elif) {
-            let elif_range = self.current_range();
-            self.eat(TokenKind::Elif);
+            let elif_start = self.node_start();
+            self.bump(TokenKind::Elif);
 
             let (test, _) = self.parse_expr_with_recovery(
                 Parser::parse_expr2,
@@ -2679,34 +2608,33 @@ impl<'src> Parser<'src> {
             );
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (body, body_range) = self.parse_body(Clause::ElIf);
-            range = body_range;
+            let body = self.parse_body(Clause::ElIf);
+
             elif_else_stmts.push(ast::ElifElseClause {
                 test: Some(test.expr),
                 body,
-                range: elif_range.cover(body_range),
+                range: self.node_range(elif_start),
             });
         }
 
         if self.at(TokenKind::Else) {
-            let else_range = self.current_range();
-            self.eat(TokenKind::Else);
+            let else_start = self.node_start();
+            self.bump(TokenKind::Else);
             self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            let (body, body_range) = self.parse_body(Clause::Else);
-            range = body_range;
+            let body = self.parse_body(Clause::Else);
+
             elif_else_stmts.push(ast::ElifElseClause {
                 test: None,
                 body,
-                range: else_range.cover(body_range),
+                range: self.node_range(else_start),
             });
         }
 
-        (elif_else_stmts, range)
+        elif_else_stmts
     }
 
-    fn parse_body(&mut self, parent_clause: Clause) -> (Vec<Stmt>, TextRange) {
-        let mut last_stmt_range = TextRange::default();
+    fn parse_body(&mut self, parent_clause: Clause) -> Vec<Stmt> {
         let mut stmts = vec![];
 
         // Check if we are currently at a simple statement
@@ -2719,15 +2647,14 @@ impl<'src> Parser<'src> {
                 TokenSet::new(&[TokenKind::Dedent]).union(NEWLINE_EOF_SET);
             while !self.at_ts(BODY_END_SET) {
                 if self.at(TokenKind::Indent) {
-                    last_stmt_range = self.handle_unexpected_indentation(
+                    self.handle_unexpected_indentation(
                         &mut stmts,
                         "indentation doesn't match previous indentation",
                     );
                     continue;
                 }
-                let (stmt, stmt_range) = self.parse_statement();
-                last_stmt_range = stmt_range;
-                stmts.push(stmt);
+
+                stmts.push(self.parse_statement());
             }
 
             self.eat(TokenKind::Dedent);
@@ -2741,7 +2668,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        (stmts, last_stmt_range)
+        stmts
     }
 
     /// Parses every Python expression.
