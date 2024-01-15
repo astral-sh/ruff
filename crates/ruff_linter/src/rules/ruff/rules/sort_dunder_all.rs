@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
-use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
 use ruff_python_parser::{lexer, Mode, Tok};
 use ruff_python_stdlib::str::is_cased_uppercase;
-use ruff_python_trivia::leading_indentation;
+use ruff_python_trivia::{leading_indentation, SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -68,14 +68,16 @@ use natord;
 #[violation]
 pub struct UnsortedDunderAll;
 
-impl AlwaysFixableViolation for UnsortedDunderAll {
+impl Violation for UnsortedDunderAll {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`__all__` is not sorted")
     }
 
-    fn fix_title(&self) -> String {
-        "Apply an isort-style sorting to `__all__`".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Apply an isort-style sorting to `__all__`".to_string())
     }
 }
 
@@ -131,6 +133,97 @@ pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::Stmt
     }
 }
 
+/// Return `true` if a tuple is parenthesized in the source code.
+///
+/// (Yes, this function is shamelessly copied from the formatter.)
+fn is_tuple_parenthesized(tuple: &ast::ExprTuple, source: &str) -> bool {
+    let Some(elt) = tuple.elts.first() else {
+        return true;
+    };
+
+    // Count the number of open parentheses between the start of the tuple and the first element.
+    let open_parentheses_count =
+        SimpleTokenizer::new(source, TextRange::new(tuple.start(), elt.start()))
+            .skip_trivia()
+            .filter(|token| token.kind() == SimpleTokenKind::LParen)
+            .count();
+    if open_parentheses_count == 0 {
+        return false;
+    }
+
+    // Count the number of parentheses between the end of the first element and its trailing comma.
+    let close_parentheses_count =
+        SimpleTokenizer::new(source, TextRange::new(elt.end(), tuple.end()))
+            .skip_trivia()
+            .take_while(|token| token.kind() != SimpleTokenKind::Comma)
+            .filter(|token| token.kind() == SimpleTokenKind::RParen)
+            .count();
+
+    // If the number of open parentheses is greater than the number of close parentheses, the tuple
+    // is parenthesized.
+    open_parentheses_count > close_parentheses_count
+}
+
+fn sort_single_line_dunder_all(
+    elts: &[ast::Expr],
+    elements: &[&str],
+    kind: &DunderAllKind,
+    locator: &Locator,
+) -> String {
+    let mut element_pairs = elts.iter().zip(elements).collect_vec();
+    element_pairs.sort_by_cached_key(|(_, elem)| AllItemSortKey::from(**elem));
+    let joined_items = element_pairs
+        .iter()
+        .map(|(elt, _)| locator.slice(elt))
+        .join(", ");
+    match kind {
+        DunderAllKind::List => format!("[{joined_items}]"),
+        DunderAllKind::Tuple(tuple_node) => {
+            if is_tuple_parenthesized(tuple_node, locator.contents()) {
+                format!("({joined_items})")
+            } else {
+                joined_items
+            }
+        }
+    }
+}
+
+enum DunderAllKind<'a> {
+    List,
+    Tuple(&'a ast::ExprTuple),
+}
+
+fn get_fix(
+    range: TextRange,
+    elts: &[ast::Expr],
+    string_items: &[&str],
+    kind: &DunderAllKind,
+    checker: &Checker,
+) -> Option<Fix> {
+    let locator = checker.locator();
+    let is_multiline = locator.contains_line_break(range);
+
+    let sorted_source_code = {
+        if is_multiline {
+            MultilineDunderAllValue::from_source_range(range, locator)?
+                .into_sorted_source_code(locator, checker.stylist())
+        } else {
+            sort_single_line_dunder_all(elts, string_items, kind, locator)
+        }
+    };
+
+    let applicability = {
+        if is_multiline && checker.indexer().comment_ranges().intersects(range) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        }
+    };
+
+    let edit = Edit::range_replacement(sorted_source_code, range);
+    Some(Fix::applicable_edit(edit, applicability))
+}
+
 fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) {
     let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
@@ -145,92 +238,65 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
         return;
     }
 
-    let locator = checker.locator();
-
-    let Some(
-        dunder_all_val @ DunderAllValue {
-            range, multiline, ..
-        },
-    ) = DunderAllValue::from_expr(node, locator)
-    else {
-        return;
-    };
-
-    let new_dunder_all = match dunder_all_val.into_sorted_source_code(locator, checker.stylist()) {
-        SortedDunderAll::AlreadySorted => return,
-        SortedDunderAll::Sorted(value) => value,
-    };
-
-    let applicability = {
-        if multiline && checker.indexer().comment_ranges().intersects(node.range()) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
+    let (elts, range, kind) = match node {
+        ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, *range, DunderAllKind::List),
+        ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => {
+            (elts, *range, DunderAllKind::Tuple(tuple_node))
         }
+        _ => return,
     };
 
-    let edit = Edit::range_replacement(new_dunder_all, range);
+    let mut possibly_fixable = true;
+    let mut string_items = vec![];
+    for elt in elts {
+        // Don't flag `__all__` definitions that contain non-strings
+        let Some(string_literal) = elt.as_string_literal_expr() else {
+            return;
+        };
+        // If any strings are implicitly concatenated, don't bother trying to autofix
+        if possibly_fixable && string_literal.value.is_implicit_concatenated() {
+            possibly_fixable = false;
+        }
+        string_items.push(string_literal.value.to_str());
+    }
+    if dunder_all_is_already_sorted(&string_items) {
+        return;
+    }
 
-    checker.diagnostics.push(
-        Diagnostic::new(UnsortedDunderAll, range)
-            .with_fix(Fix::applicable_edit(edit, applicability)),
-    );
+    let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
+
+    if possibly_fixable {
+        if let Some(fix) = get_fix(range, elts, &string_items, &kind, checker) {
+            diagnostic.set_fix(fix);
+        }
+    }
+
+    checker.diagnostics.push(diagnostic);
 }
 
 /// An instance of this struct encapsulates an analysis
 /// of a Python tuple/list that represents an `__all__`
 /// definition or augmentation.
-struct DunderAllValue {
+struct MultilineDunderAllValue {
     items: Vec<DunderAllItem>,
     range: TextRange,
-    multiline: bool,
     ends_with_trailing_comma: bool,
 }
 
-impl DunderAllValue {
+impl MultilineDunderAllValue {
     /// Analyse an AST node for a Python tuple/list that represents an `__all__`
     /// definition or augmentation. Return `None` if the analysis fails
     /// for whatever reason, or if it looks like we're not actually looking at a
     /// tuple/list after all.
-    fn from_expr(value: &ast::Expr, locator: &Locator) -> Option<DunderAllValue> {
-        // Step (1): inspect the AST to check that we're looking at something vaguely sane:
-        let (elts, range) = match value {
-            ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, range),
-            ast::Expr::Tuple(ast::ExprTuple { elts, range, .. }) => (elts, range),
-            _ => return None,
-        };
-
-        // An `__all__` definition with < 2 elements can't be unsorted;
-        // no point in proceeding any further here.
-        //
-        // N.B. Here, this is just an optimisation
-        // (and to avoid us rewriting code when we don't have to).
-        //
-        // While other parts of this file *do* depend on there being a
-        // minimum of 2 elements in `__all__`, that invariant
-        // is maintained elsewhere. (For example, see comments at the
-        // start of `into_sorted_source_code()`.)
-        if elts.len() < 2 {
-            return None;
-        }
-
-        for elt in elts {
-            // Only consider sorting it if __all__ only has strings in it
-            let string_literal = elt.as_string_literal_expr()?;
-            // And if any strings are implicitly concatenated, don't bother
-            if string_literal.value.is_implicit_concatenated() {
-                return None;
-            }
-        }
-
-        // Step (2): parse the `__all__` definition using the raw tokens.
+    fn from_source_range(range: TextRange, locator: &Locator) -> Option<MultilineDunderAllValue> {
+        // Parse the `__all__` definition using the raw tokens.
         // See the docs for `collect_dunder_all_lines()` for why we have to
         // use the raw tokens, rather than just the AST, to do this parsing.
         //
-        // (2a). Start by collecting information on each line individually:
-        let (lines, ends_with_trailing_comma) = collect_dunder_all_lines(*range, locator)?;
+        // Step (1). Start by collecting information on each line individually:
+        let (lines, ends_with_trailing_comma) = collect_dunder_all_lines(range, locator)?;
 
-        // (2b). Group lines together into sortable "items":
+        // Step (2). Group lines together into sortable "items":
         //   - Any "item" contains a single element of the `__all__` list/tuple
         //   - "Items" are ordered according to the element they contain
         //   - Assume that any comments on their own line are meant to be grouped
@@ -238,44 +304,25 @@ impl DunderAllValue {
         //     the comments above the element move with it.
         //   - The same goes for any comments on the same line as an element:
         //     if the element moves, the comment moves with it.
-        let items = collect_dunder_all_items(lines, *range, locator);
+        let items = collect_dunder_all_items(lines, range, locator);
 
-        Some(DunderAllValue {
+        Some(MultilineDunderAllValue {
             items,
-            range: *range,
-            multiline: locator.contains_line_break(value.range()),
+            range,
             ends_with_trailing_comma,
         })
     }
 
-    /// Implementation of the unstable [`&[T].is_sorted`] function.
-    /// See <https://github.com/rust-lang/rust/issues/53485>
-    fn is_already_sorted(&self) -> bool {
-        // tuple_windows() clones,
-        // but here that's okay: we're only cloning *references*, rather than the items themselves
-        for (this, next) in self.items.iter().tuple_windows() {
-            if next < this {
-                return false;
-            }
-        }
-        true
-    }
-
-    /// Determine whether `__all__` is already sorted.
-    /// If it is not already sorted, attempt to sort `__all__`,
-    /// and return a string with the sorted `__all__ definition/augmentation`
-    /// that can be inserted into the source code as a range replacement.
-    fn into_sorted_source_code(self, locator: &Locator, stylist: &Stylist) -> SortedDunderAll {
-        // As well as saving us unnecessary work,
-        // returning early here also means that we can rely on the invariant
-        // throughout the rest of this function that both `items` and `sorted_items`
-        // have length of at least two.
-        let [first_item, .., last_item] = self.items.as_slice() else {
-            return SortedDunderAll::AlreadySorted;
+    /// Sort a multiline `__all__` definition
+    /// that is known to be unsorted.
+    fn into_sorted_source_code(mut self, locator: &Locator, stylist: &Stylist) -> String {
+        let (first_item_start, last_item_end) = match self.items.as_slice() {
+            [first_item, .., last_item] => (first_item.start(), last_item.end()),
+            _ => unreachable!(
+                "We shouldn't be attempting an autofix if `__all__` has < 2 elements,
+                as it cannot be unsorted in that situation."
+            ),
         };
-        if self.is_already_sorted() {
-            return SortedDunderAll::AlreadySorted;
-        }
 
         // As well as the "items" in the `__all__` definition,
         // there is also a "prelude" and a "postlude":
@@ -321,94 +368,106 @@ impl DunderAllValue {
         // __all__ = "foo", "bar", "baz"
         // ```
         //
-        let prelude_end = {
-            let first_item_line_offset = locator.line_start(first_item.start());
-            if first_item_line_offset == locator.line_start(self.start()) {
-                first_item.start()
-            } else {
-                first_item_line_offset
-            }
-        };
-        let postlude_start = {
-            let last_item_line_offset = locator.line_end(last_item.end());
-            if last_item_line_offset == locator.line_end(self.end()) {
-                last_item.end()
-            } else {
-                last_item_line_offset
-            }
-        };
-        let mut prelude = Cow::Borrowed(locator.slice(TextRange::new(self.start(), prelude_end)));
-        let mut postlude = Cow::Borrowed(locator.slice(TextRange::new(postlude_start, self.end())));
-
+        let newline = stylist.line_ending().as_str();
         let start_offset = self.start();
-        let mut sorted_items = self.items;
-        sorted_items.sort();
+        let leading_indent = leading_indentation(locator.full_line(start_offset));
+        let item_indent = format!("{}{}", leading_indent, stylist.indentation().as_str());
 
-        let joined_items = if self.multiline {
-            let leading_indent = leading_indentation(locator.full_line(start_offset));
-            let item_indent = format!("{}{}", leading_indent, stylist.indentation().as_str());
-            let newline = stylist.line_ending().as_str();
-            prelude = Cow::Owned(format!("{}{}", prelude.trim_end(), newline));
-            postlude = fixup_postlude(postlude, newline, leading_indent, &item_indent);
-            join_multiline_dunder_all_items(
-                &sorted_items,
-                locator,
-                &item_indent,
-                newline,
-                self.ends_with_trailing_comma,
-            )
-        } else {
-            join_singleline_dunder_all_items(&sorted_items, locator)
-        };
+        let prelude =
+            multiline_dunder_all_prelude(first_item_start, newline, start_offset, locator);
+        let postlude = multiline_dunder_all_postlude(
+            last_item_end,
+            newline,
+            leading_indent,
+            &item_indent,
+            self.end(),
+            locator,
+        );
 
-        SortedDunderAll::Sorted(format!("{prelude}{joined_items}{postlude}"))
+        self.items
+            .sort_by_cached_key(|item| AllItemSortKey::from(item));
+        let joined_items = join_multiline_dunder_all_items(
+            &self.items,
+            locator,
+            &item_indent,
+            newline,
+            self.ends_with_trailing_comma,
+        );
+
+        format!("{prelude}{joined_items}{postlude}")
     }
 }
 
-impl Ranged for DunderAllValue {
+impl Ranged for MultilineDunderAllValue {
     fn range(&self) -> TextRange {
         self.range
     }
 }
 
-/// Fixup the postlude for a multiline `__all__` definition.
-///
-/// Without the fixup, closing `)` or `]` characters
-/// at the end of sorted `__all__` definitions can sometimes
-/// have strange indentations.
-fn fixup_postlude<'a>(
-    postlude: Cow<'a, str>,
+fn multiline_dunder_all_prelude(
+    first_item_start_offset: TextSize,
+    newline: &str,
+    dunder_all_offset: TextSize,
+    locator: &Locator,
+) -> String {
+    let prelude_end = {
+        let first_item_line_offset = locator.line_start(first_item_start_offset);
+        if first_item_line_offset == locator.line_start(dunder_all_offset) {
+            first_item_start_offset
+        } else {
+            first_item_line_offset
+        }
+    };
+    let prelude = locator.slice(TextRange::new(dunder_all_offset, prelude_end));
+    format!("{}{}", prelude.trim_end(), newline)
+}
+
+fn dunder_all_is_already_sorted(string_elements: &[&str]) -> bool {
+    let mut element_iter = string_elements.iter();
+    let Some(this) = element_iter.next() else {
+        return true;
+    };
+    let mut this_key = AllItemSortKey::from(*this);
+    for next in element_iter {
+        let next_key = AllItemSortKey::from(*next);
+        if next_key < this_key {
+            return false;
+        }
+        this_key = next_key;
+    }
+    true
+}
+
+fn multiline_dunder_all_postlude<'a>(
+    last_item_end_offset: TextSize,
     newline: &str,
     leading_indent: &str,
     item_indent: &str,
+    dunder_all_range_end: TextSize,
+    locator: &'a Locator,
 ) -> Cow<'a, str> {
+    let postlude_start = {
+        let last_item_line_offset = locator.line_end(last_item_end_offset);
+        if last_item_line_offset == locator.line_end(dunder_all_range_end) {
+            last_item_end_offset
+        } else {
+            last_item_line_offset
+        }
+    };
+    let postlude = locator.slice(TextRange::new(postlude_start, dunder_all_range_end));
     if !postlude.starts_with(newline) {
-        return postlude;
+        return Cow::Borrowed(postlude);
     }
     if TextSize::of(leading_indentation(postlude.trim_start_matches(newline)))
         <= TextSize::of(item_indent)
     {
-        return postlude;
+        return Cow::Borrowed(postlude);
     }
     let trimmed_postlude = postlude.trim_start();
     if trimmed_postlude.starts_with(']') || trimmed_postlude.starts_with(')') {
         return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
     }
-    postlude
-}
-
-/// Variants of this enum are returned by `into_sorted_source_code()`.
-///
-/// - `SortedDunderAll::AlreadySorted` is returned if `__all__` was
-///   already sorted; this means no code rewriting is required.
-/// - `SortedDunderAll::Sorted` is returned if `__all__` was not already
-///   sorted. The string data attached to this variant is the source
-///   code of the sorted `__all__`, that can be inserted into the source
-///   code as a `range_replacement` autofix.
-#[derive(Debug)]
-enum SortedDunderAll {
-    AlreadySorted,
-    Sorted(String),
+    Cow::Borrowed(postlude)
 }
 
 /// Collect data on each line of `__all__`.
@@ -645,7 +704,7 @@ fn collect_dunder_all_items(
 ///
 /// You'll notice that a very similar enum exists
 /// in ruff's reimplementation of isort.
-#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone)]
+#[derive(Debug, Ord, PartialOrd, Eq, PartialEq, Clone, Copy)]
 enum InferredMemberType {
     Constant,
     Class,
@@ -664,6 +723,48 @@ impl InferredMemberType {
         } else {
             Self::Other
         }
+    }
+}
+
+struct AllItemSortKey {
+    category: InferredMemberType,
+    value: String,
+}
+
+impl Ord for AllItemSortKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.category
+            .cmp(&other.category)
+            .then_with(|| natord::compare(&self.value, &other.value))
+    }
+}
+
+impl PartialOrd for AllItemSortKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for AllItemSortKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for AllItemSortKey {}
+
+impl From<&str> for AllItemSortKey {
+    fn from(value: &str) -> Self {
+        Self {
+            category: InferredMemberType::of(value),
+            value: String::from(value),
+        }
+    }
+}
+
+impl From<&DunderAllItem> for AllItemSortKey {
+    fn from(item: &DunderAllItem) -> Self {
+        Self::from(item.value.as_str())
     }
 }
 
@@ -705,7 +806,6 @@ impl InferredMemberType {
 #[derive(Debug)]
 struct DunderAllItem {
     value: String,
-    category: InferredMemberType,
     preceding_comment_ranges: Vec<TextRange>,
     element_range: TextRange,
     // total_range incorporates the ranges of preceding comments
@@ -722,7 +822,6 @@ impl DunderAllItem {
         element_range: TextRange,
         end_of_line_comments: Option<TextRange>,
     ) -> Self {
-        let category = InferredMemberType::of(value.as_str());
         let total_range = {
             if let Some(first_comment_range) = preceding_comment_ranges.first() {
                 TextRange::new(first_comment_range.start(), element_range.end())
@@ -732,7 +831,6 @@ impl DunderAllItem {
         };
         Self {
             value,
-            category,
             preceding_comment_ranges,
             element_range,
             total_range,
@@ -749,35 +847,6 @@ impl Ranged for DunderAllItem {
     fn range(&self) -> TextRange {
         self.total_range
     }
-}
-
-impl Ord for DunderAllItem {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.category
-            .cmp(&other.category)
-            .then_with(|| natord::compare(&self.value, &other.value))
-    }
-}
-
-impl PartialOrd for DunderAllItem {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl PartialEq for DunderAllItem {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
-    }
-}
-
-impl Eq for DunderAllItem {}
-
-fn join_singleline_dunder_all_items(sorted_items: &[DunderAllItem], locator: &Locator) -> String {
-    sorted_items
-        .iter()
-        .map(|item| locator.slice(item))
-        .join(", ")
 }
 
 fn join_multiline_dunder_all_items(

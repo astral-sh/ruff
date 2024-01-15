@@ -6,8 +6,12 @@ __all__ = ["d", "c", "b", "a"]  # a comment that is untouched
 __all__ += ["foo", "bar", "antipasti"]
 __all__ = ("d", "c", "b", "a")
 
-__all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
-__all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
+# Quoting style is retained,
+# but unnecessary parens are not
+__all__: list = ['b', "c", ((('a')))]
+# Trailing commas are also not retained in single-line `__all__` definitions
+# (but they are in multiline `__all__` definitions)
+__all__: tuple = ("b", "c", "a",)
 
 if bool():
     __all__ += ("x", "m", "a", "s")
@@ -15,6 +19,11 @@ else:
     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
 
 __all__: list[str] = ["the", "three", "little", "pigs"]
+
+__all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+__all__.extend(["foo", "bar"])
+__all__.extend(("foo", "bar"))
+__all__.extend((((["foo", "bar"]))))
 
 ####################################
 # Neat multiline __all__ definitions
@@ -133,8 +142,6 @@ __all__ = (
     "aadvark532"                       # the even longer whitespace span before this comment is retained
 )
 
-__all__.extend(["foo", "bar"])
-__all__.extend(("foo", "bar"))
 __all__.extend((  # comment0
     # comment about foo
     "foo",  # comment about foo
@@ -188,6 +195,21 @@ __all__ = [
     "baz",
     ]
 
+#########################################################################
+# These should be flagged, but not fixed:
+# - Parenthesized items in multiline definitions are out of scope
+# - The same goes for any `__all__` definitions with concatenated strings
+#########################################################################
+
+__all__ = (
+    "look",
+    (
+        "a_veeeeeeeeeeeeeeeeeeery_long_parenthesized_item"
+    ),
+)
+
+__all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
+
 ###################################
 # These should all not get flagged:
 ###################################
@@ -223,15 +245,6 @@ __all__ = {"look", "a", "set"}
 __all__ = {"very": "strange", "not": "sorted", "we don't": "care"}
 ["not", "an", "assignment", "just", "an", "expression"]
 __all__ = (9, 8, 7)
-__all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
-
-__all__ = (
-    "look",
-    (
-        "a_veeeeeeeeeeeeeeeeeeery_long_parenthesized_item_we_dont_care_about"
-    ),
-)
-
 __all__ = (  # This is just an empty tuple,
     # but,
     # it's very well
@@ -239,7 +252,6 @@ __all__ = (  # This is just an empty tuple,
 
 __all__.append("foo")
 __all__.extend(["bar", "foo"])
-__all__.extend((((["bar", "foo"]))))
 __all__.extend([
     "bar",  # comment0
     "foo"  # comment1

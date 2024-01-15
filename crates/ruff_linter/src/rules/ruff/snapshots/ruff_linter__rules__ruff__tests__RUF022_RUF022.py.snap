@@ -39,7 +39,7 @@ RUF022.py:6:12: RUF022 [*] `__all__` is not sorted
   6 |+__all__ += ["antipasti", "bar", "foo"]
 7 7 | __all__ = ("d", "c", "b", "a")
 8 8 | 
-9 9 | __all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
+9 9 | # Quoting style is retained,
 
 RUF022.py:7:11: RUF022 [*] `__all__` is not sorted
   |
@@ -48,7 +48,7 @@ RUF022.py:7:11: RUF022 [*] `__all__` is not sorted
 7 | __all__ = ("d", "c", "b", "a")
   |           ^^^^^^^^^^^^^^^^^^^^ RUF022
 8 | 
-9 | __all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
+9 | # Quoting style is retained,
   |
   = help: Apply an isort-style sorting to `__all__`
 
@@ -59,756 +59,827 @@ RUF022.py:7:11: RUF022 [*] `__all__` is not sorted
 7   |-__all__ = ("d", "c", "b", "a")
   7 |+__all__ = ("a", "b", "c", "d")
 8 8 | 
-9 9 | __all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
-10 10 | __all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
+9 9 | # Quoting style is retained,
+10 10 | # but unnecessary parens are not
 
-RUF022.py:9:17: RUF022 [*] `__all__` is not sorted
+RUF022.py:11:17: RUF022 [*] `__all__` is not sorted
    |
- 7 | __all__ = ("d", "c", "b", "a")
- 8 | 
- 9 | __all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
-   |                 ^^^^^^^^^^^^^^^^ RUF022
-10 | __all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
+ 9 | # Quoting style is retained,
+10 | # but unnecessary parens are not
+11 | __all__: list = ['b', "c", ((('a')))]
+   |                 ^^^^^^^^^^^^^^^^^^^^^ RUF022
+12 | # Trailing commas are also not retained in single-line `__all__` definitions
+13 | # (but they are in multiline `__all__` definitions)
    |
    = help: Apply an isort-style sorting to `__all__`
 
 ℹ Safe fix
-6  6  | __all__ += ["foo", "bar", "antipasti"]
-7  7  | __all__ = ("d", "c", "b", "a")
 8  8  | 
-9     |-__all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
-   9  |+__all__: list = ["a", "b", "c",]  # note the trailing comma, which is retained
-10 10 | __all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
-11 11 | 
-12 12 | if bool():
+9  9  | # Quoting style is retained,
+10 10 | # but unnecessary parens are not
+11    |-__all__: list = ['b', "c", ((('a')))]
+   11 |+__all__: list = ['a', 'b', "c"]
+12 12 | # Trailing commas are also not retained in single-line `__all__` definitions
+13 13 | # (but they are in multiline `__all__` definitions)
+14 14 | __all__: tuple = ("b", "c", "a",)
 
-RUF022.py:10:18: RUF022 [*] `__all__` is not sorted
+RUF022.py:14:18: RUF022 [*] `__all__` is not sorted
    |
- 9 | __all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
-10 | __all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
+12 | # Trailing commas are also not retained in single-line `__all__` definitions
+13 | # (but they are in multiline `__all__` definitions)
+14 | __all__: tuple = ("b", "c", "a",)
    |                  ^^^^^^^^^^^^^^^^ RUF022
-11 | 
-12 | if bool():
+15 | 
+16 | if bool():
    |
    = help: Apply an isort-style sorting to `__all__`
 
 ℹ Safe fix
-7  7  | __all__ = ("d", "c", "b", "a")
-8  8  | 
-9  9  | __all__: list = ["b", "c", "a",]  # note the trailing comma, which is retained
-10    |-__all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
-   10 |+__all__: tuple = ("a", "b", "c",)  # note the trailing comma, which is retained
-11 11 | 
-12 12 | if bool():
-13 13 |     __all__ += ("x", "m", "a", "s")
+11 11 | __all__: list = ['b', "c", ((('a')))]
+12 12 | # Trailing commas are also not retained in single-line `__all__` definitions
+13 13 | # (but they are in multiline `__all__` definitions)
+14    |-__all__: tuple = ("b", "c", "a",)
+   14 |+__all__: tuple = ("a", "b", "c")
+15 15 | 
+16 16 | if bool():
+17 17 |     __all__ += ("x", "m", "a", "s")
 
-RUF022.py:13:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:17:16: RUF022 [*] `__all__` is not sorted
    |
-12 | if bool():
-13 |     __all__ += ("x", "m", "a", "s")
+16 | if bool():
+17 |     __all__ += ("x", "m", "a", "s")
    |                ^^^^^^^^^^^^^^^^^^^^ RUF022
-14 | else:
-15 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+18 | else:
+19 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    |
    = help: Apply an isort-style sorting to `__all__`
 
 ℹ Safe fix
-10 10 | __all__: tuple = ("b", "c", "a",)  # note the trailing comma, which is retained
-11 11 | 
-12 12 | if bool():
-13    |-    __all__ += ("x", "m", "a", "s")
-   13 |+    __all__ += ("a", "m", "s", "x")
-14 14 | else:
-15 15 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-16 16 | 
+14 14 | __all__: tuple = ("b", "c", "a",)
+15 15 | 
+16 16 | if bool():
+17    |-    __all__ += ("x", "m", "a", "s")
+   17 |+    __all__ += ("a", "m", "s", "x")
+18 18 | else:
+19 19 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+20 20 | 
 
-RUF022.py:15:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:19:16: RUF022 [*] `__all__` is not sorted
    |
-13 |     __all__ += ("x", "m", "a", "s")
-14 | else:
-15 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+17 |     __all__ += ("x", "m", "a", "s")
+18 | else:
+19 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
    |                ^^^^^^^^^^^^^^^^^^^^^^ RUF022
-16 | 
-17 | __all__: list[str] = ["the", "three", "little", "pigs"]
+20 | 
+21 | __all__: list[str] = ["the", "three", "little", "pigs"]
    |
    = help: Apply an isort-style sorting to `__all__`
 
 ℹ Safe fix
-12 12 | if bool():
-13 13 |     __all__ += ("x", "m", "a", "s")
-14 14 | else:
-15    |-    __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-   15 |+    __all__ += "foo1", "foo2", "foo3"  # NB: an implicit tuple (without parens)
-16 16 | 
-17 17 | __all__: list[str] = ["the", "three", "little", "pigs"]
-18 18 | 
+16 16 | if bool():
+17 17 |     __all__ += ("x", "m", "a", "s")
+18 18 | else:
+19    |-    __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+   19 |+    __all__ += "foo1", "foo2", "foo3"  # NB: an implicit tuple (without parens)
+20 20 | 
+21 21 | __all__: list[str] = ["the", "three", "little", "pigs"]
+22 22 | 
 
-RUF022.py:17:22: RUF022 [*] `__all__` is not sorted
+RUF022.py:21:22: RUF022 [*] `__all__` is not sorted
    |
-15 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-16 | 
-17 | __all__: list[str] = ["the", "three", "little", "pigs"]
+19 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+20 | 
+21 | __all__: list[str] = ["the", "three", "little", "pigs"]
    |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
-18 | 
-19 | ####################################
+22 | 
+23 | __all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
    |
    = help: Apply an isort-style sorting to `__all__`
 
 ℹ Safe fix
-14 14 | else:
-15 15 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
-16 16 | 
-17    |-__all__: list[str] = ["the", "three", "little", "pigs"]
-   17 |+__all__: list[str] = ["little", "pigs", "the", "three"]
-18 18 | 
-19 19 | ####################################
-20 20 | # Neat multiline __all__ definitions
+18 18 | else:
+19 19 |     __all__ += "foo3", "foo2", "foo1"  # NB: an implicit tuple (without parens)
+20 20 | 
+21    |-__all__: list[str] = ["the", "three", "little", "pigs"]
+   21 |+__all__: list[str] = ["little", "pigs", "the", "three"]
+22 22 | 
+23 23 | __all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+24 24 | __all__.extend(["foo", "bar"])
 
 RUF022.py:23:11: RUF022 [*] `__all__` is not sorted
    |
-21 |   ####################################
-22 |   
-23 |   __all__ = (
-   |  ___________^
-24 | |     "d0",
-25 | |     "c0",  # a comment regarding 'c0'
-26 | |     "b0",
-27 | |     # a comment regarding 'a0':
-28 | |     "a0"
-29 | | )
-   | |_^ RUF022
-30 |   
-31 |   __all__ = [
-   |
-   = help: Apply an isort-style sorting to `__all__`
-
-ℹ Unsafe fix
-21 21 | ####################################
-22 22 | 
-23 23 | __all__ = (
-24    |-    "d0",
-   24 |+    # a comment regarding 'a0':
-   25 |+    "a0",
-   26 |+    "b0",
-25 27 |     "c0",  # a comment regarding 'c0'
-26    |-    "b0",
-27    |-    # a comment regarding 'a0':
-28    |-    "a0"
-   28 |+    "d0"
-29 29 | )
-30 30 | 
-31 31 | __all__ = [
-
-RUF022.py:31:11: RUF022 [*] `__all__` is not sorted
-   |
-29 |   )
-30 |   
-31 |   __all__ = [
-   |  ___________^
-32 | |     "d",
-33 | |     "c",  # a comment regarding 'c'
-34 | |     "b",
-35 | |     # a comment regarding 'a':
-36 | |     "a"
-37 | | ]
-   | |_^ RUF022
-38 |   
-39 |   # we implement an "isort-style sort":
-   |
-   = help: Apply an isort-style sorting to `__all__`
-
-ℹ Unsafe fix
-29 29 | )
-30 30 | 
-31 31 | __all__ = [
-32    |-    "d",
-   32 |+    # a comment regarding 'a':
-   33 |+    "a",
-   34 |+    "b",
-33 35 |     "c",  # a comment regarding 'c'
-34    |-    "b",
-35    |-    # a comment regarding 'a':
-36    |-    "a"
-   36 |+    "d"
-37 37 | ]
-38 38 | 
-39 39 | # we implement an "isort-style sort":
-
-RUF022.py:45:11: RUF022 [*] `__all__` is not sorted
-   |
-43 |   # This (which is currently alphabetically sorted)
-44 |   # should get reordered accordingly:
-45 |   __all__ = [
-   |  ___________^
-46 | |     "APRIL",
-47 | |     "AUGUST",
-48 | |     "Calendar",
-49 | |     "DECEMBER",
-50 | |     "Day",
-51 | |     "FEBRUARY",
-52 | |     "FRIDAY",
-53 | |     "HTMLCalendar",
-54 | |     "IllegalMonthError",
-55 | |     "JANUARY",
-56 | |     "JULY",
-57 | |     "JUNE",
-58 | |     "LocaleHTMLCalendar",
-59 | |     "MARCH",
-60 | |     "MAY",
-61 | |     "MONDAY",
-62 | |     "Month",
-63 | |     "NOVEMBER",
-64 | |     "OCTOBER",
-65 | |     "SATURDAY",
-66 | |     "SEPTEMBER",
-67 | |     "SUNDAY",
-68 | |     "THURSDAY",
-69 | |     "TUESDAY",
-70 | |     "TextCalendar",
-71 | |     "WEDNESDAY",
-72 | |     "calendar",
-73 | |     "timegm",
-74 | |     "weekday",
-75 | |     "weekheader"]
-   | |_________________^ RUF022
-76 |   
-77 |   ##########################################
+21 | __all__: list[str] = ["the", "three", "little", "pigs"]
+22 | 
+23 | __all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
+24 | __all__.extend(["foo", "bar"])
+25 | __all__.extend(("foo", "bar"))
    |
    = help: Apply an isort-style sorting to `__all__`
 
 ℹ Safe fix
-45 45 | __all__ = [
-46 46 |     "APRIL",
-47 47 |     "AUGUST",
-48    |-    "Calendar",
-49 48 |     "DECEMBER",
-50    |-    "Day",
-51 49 |     "FEBRUARY",
-52 50 |     "FRIDAY",
-53    |-    "HTMLCalendar",
-54    |-    "IllegalMonthError",
-55 51 |     "JANUARY",
-56 52 |     "JULY",
-57 53 |     "JUNE",
-58    |-    "LocaleHTMLCalendar",
-59 54 |     "MARCH",
-60 55 |     "MAY",
-61 56 |     "MONDAY",
-62    |-    "Month",
-63 57 |     "NOVEMBER",
-64 58 |     "OCTOBER",
-65 59 |     "SATURDAY",
---------------------------------------------------------------------------------
-67 61 |     "SUNDAY",
-68 62 |     "THURSDAY",
-69 63 |     "TUESDAY",
-   64 |+    "WEDNESDAY",
-   65 |+    "Calendar",
-   66 |+    "Day",
-   67 |+    "HTMLCalendar",
-   68 |+    "IllegalMonthError",
-   69 |+    "LocaleHTMLCalendar",
-   70 |+    "Month",
-70 71 |     "TextCalendar",
-71    |-    "WEDNESDAY",
-72 72 |     "calendar",
-73 73 |     "timegm",
-74 74 |     "weekday",
+20 20 | 
+21 21 | __all__: list[str] = ["the", "three", "little", "pigs"]
+22 22 | 
+23    |-__all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+   23 |+__all__ = "an_unparenthesized_tuple", "in", "parenthesized_item"
+24 24 | __all__.extend(["foo", "bar"])
+25 25 | __all__.extend(("foo", "bar"))
+26 26 | __all__.extend((((["foo", "bar"]))))
 
-RUF022.py:82:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:24:16: RUF022 [*] `__all__` is not sorted
    |
-81 |   # comment0
-82 |   __all__ = ("d", "a",  # comment1
+23 | __all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+24 | __all__.extend(["foo", "bar"])
+   |                ^^^^^^^^^^^^^^ RUF022
+25 | __all__.extend(("foo", "bar"))
+26 | __all__.extend((((["foo", "bar"]))))
+   |
+   = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+21 21 | __all__: list[str] = ["the", "three", "little", "pigs"]
+22 22 | 
+23 23 | __all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+24    |-__all__.extend(["foo", "bar"])
+   24 |+__all__.extend(["bar", "foo"])
+25 25 | __all__.extend(("foo", "bar"))
+26 26 | __all__.extend((((["foo", "bar"]))))
+27 27 | 
+
+RUF022.py:25:16: RUF022 [*] `__all__` is not sorted
+   |
+23 | __all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+24 | __all__.extend(["foo", "bar"])
+25 | __all__.extend(("foo", "bar"))
+   |                ^^^^^^^^^^^^^^ RUF022
+26 | __all__.extend((((["foo", "bar"]))))
+   |
+   = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+22 22 | 
+23 23 | __all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+24 24 | __all__.extend(["foo", "bar"])
+25    |-__all__.extend(("foo", "bar"))
+   25 |+__all__.extend(("bar", "foo"))
+26 26 | __all__.extend((((["foo", "bar"]))))
+27 27 | 
+28 28 | ####################################
+
+RUF022.py:26:19: RUF022 [*] `__all__` is not sorted
+   |
+24 | __all__.extend(["foo", "bar"])
+25 | __all__.extend(("foo", "bar"))
+26 | __all__.extend((((["foo", "bar"]))))
+   |                   ^^^^^^^^^^^^^^ RUF022
+27 | 
+28 | ####################################
+   |
+   = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+23 23 | __all__ = ("parenthesized_item"), "in", ("an_unparenthesized_tuple")
+24 24 | __all__.extend(["foo", "bar"])
+25 25 | __all__.extend(("foo", "bar"))
+26    |-__all__.extend((((["foo", "bar"]))))
+   26 |+__all__.extend((((["bar", "foo"]))))
+27 27 | 
+28 28 | ####################################
+29 29 | # Neat multiline __all__ definitions
+
+RUF022.py:32:11: RUF022 [*] `__all__` is not sorted
+   |
+30 |   ####################################
+31 |   
+32 |   __all__ = (
    |  ___________^
-83 | |            # comment2
-84 | |            "f", "b",
-85 | |                                         "strangely",  # comment3
-86 | |             # comment4
-87 | |     "formatted",
-88 | |     # comment5
-89 | | )  # comment6
+33 | |     "d0",
+34 | |     "c0",  # a comment regarding 'c0'
+35 | |     "b0",
+36 | |     # a comment regarding 'a0':
+37 | |     "a0"
+38 | | )
    | |_^ RUF022
-90 |   # comment7
+39 |   
+40 |   __all__ = [
    |
    = help: Apply an isort-style sorting to `__all__`
 
 ℹ Unsafe fix
-79 79 | ##########################################
-80 80 | 
-81 81 | # comment0
-82    |-__all__ = ("d", "a",  # comment1
-83    |-           # comment2
-84    |-           "f", "b",
-85    |-                                        "strangely",  # comment3
-86    |-            # comment4
-   82 |+__all__ = (
-   83 |+    "a",
-   84 |+    "b",
-   85 |+    "d",  # comment1
-   86 |+    # comment2
-   87 |+    "f",
-   88 |+    # comment4
-87 89 |     "formatted",
-   90 |+    "strangely",  # comment3
-88 91 |     # comment5
-89 92 | )  # comment6
-90 93 | # comment7
+30 30 | ####################################
+31 31 | 
+32 32 | __all__ = (
+33    |-    "d0",
+   33 |+    # a comment regarding 'a0':
+   34 |+    "a0",
+   35 |+    "b0",
+34 36 |     "c0",  # a comment regarding 'c0'
+35    |-    "b0",
+36    |-    # a comment regarding 'a0':
+37    |-    "a0"
+   37 |+    "d0"
+38 38 | )
+39 39 | 
+40 40 | __all__ = [
 
-RUF022.py:92:11: RUF022 [*] `__all__` is not sorted
-    |
- 90 |   # comment7
- 91 |   
- 92 |   __all__ = [  # comment0
-    |  ___________^
- 93 | |     # comment1
- 94 | |     # comment2
- 95 | |     "dx", "cx", "bx", "ax"  # comment3
- 96 | |     # comment4
- 97 | |     # comment5
- 98 | |     # comment6
- 99 | | ]  # comment7
-    | |_^ RUF022
-100 |   
-101 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
-    |
-    = help: Apply an isort-style sorting to `__all__`
+RUF022.py:40:11: RUF022 [*] `__all__` is not sorted
+   |
+38 |   )
+39 |   
+40 |   __all__ = [
+   |  ___________^
+41 | |     "d",
+42 | |     "c",  # a comment regarding 'c'
+43 | |     "b",
+44 | |     # a comment regarding 'a':
+45 | |     "a"
+46 | | ]
+   | |_^ RUF022
+47 |   
+48 |   # we implement an "isort-style sort":
+   |
+   = help: Apply an isort-style sorting to `__all__`
 
 ℹ Unsafe fix
-90 90 | # comment7
-91 91 | 
-92 92 | __all__ = [  # comment0
-   93 |+    "ax",
-   94 |+    "bx",
-   95 |+    "cx",
-93 96 |     # comment1
-94 97 |     # comment2
-95    |-    "dx", "cx", "bx", "ax"  # comment3
-   98 |+    "dx"  # comment3
-96 99 |     # comment4
-97 100 |     # comment5
-98 101 |     # comment6
+38 38 | )
+39 39 | 
+40 40 | __all__ = [
+41    |-    "d",
+   41 |+    # a comment regarding 'a':
+   42 |+    "a",
+   43 |+    "b",
+42 44 |     "c",  # a comment regarding 'c'
+43    |-    "b",
+44    |-    # a comment regarding 'a':
+45    |-    "a"
+   45 |+    "d"
+46 46 | ]
+47 47 | 
+48 48 | # we implement an "isort-style sort":
+
+RUF022.py:54:11: RUF022 [*] `__all__` is not sorted
+   |
+52 |   # This (which is currently alphabetically sorted)
+53 |   # should get reordered accordingly:
+54 |   __all__ = [
+   |  ___________^
+55 | |     "APRIL",
+56 | |     "AUGUST",
+57 | |     "Calendar",
+58 | |     "DECEMBER",
+59 | |     "Day",
+60 | |     "FEBRUARY",
+61 | |     "FRIDAY",
+62 | |     "HTMLCalendar",
+63 | |     "IllegalMonthError",
+64 | |     "JANUARY",
+65 | |     "JULY",
+66 | |     "JUNE",
+67 | |     "LocaleHTMLCalendar",
+68 | |     "MARCH",
+69 | |     "MAY",
+70 | |     "MONDAY",
+71 | |     "Month",
+72 | |     "NOVEMBER",
+73 | |     "OCTOBER",
+74 | |     "SATURDAY",
+75 | |     "SEPTEMBER",
+76 | |     "SUNDAY",
+77 | |     "THURSDAY",
+78 | |     "TUESDAY",
+79 | |     "TextCalendar",
+80 | |     "WEDNESDAY",
+81 | |     "calendar",
+82 | |     "timegm",
+83 | |     "weekday",
+84 | |     "weekheader"]
+   | |_________________^ RUF022
+85 |   
+86 |   ##########################################
+   |
+   = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+54 54 | __all__ = [
+55 55 |     "APRIL",
+56 56 |     "AUGUST",
+57    |-    "Calendar",
+58 57 |     "DECEMBER",
+59    |-    "Day",
+60 58 |     "FEBRUARY",
+61 59 |     "FRIDAY",
+62    |-    "HTMLCalendar",
+63    |-    "IllegalMonthError",
+64 60 |     "JANUARY",
+65 61 |     "JULY",
+66 62 |     "JUNE",
+67    |-    "LocaleHTMLCalendar",
+68 63 |     "MARCH",
+69 64 |     "MAY",
+70 65 |     "MONDAY",
+71    |-    "Month",
+72 66 |     "NOVEMBER",
+73 67 |     "OCTOBER",
+74 68 |     "SATURDAY",
+--------------------------------------------------------------------------------
+76 70 |     "SUNDAY",
+77 71 |     "THURSDAY",
+78 72 |     "TUESDAY",
+   73 |+    "WEDNESDAY",
+   74 |+    "Calendar",
+   75 |+    "Day",
+   76 |+    "HTMLCalendar",
+   77 |+    "IllegalMonthError",
+   78 |+    "LocaleHTMLCalendar",
+   79 |+    "Month",
+79 80 |     "TextCalendar",
+80    |-    "WEDNESDAY",
+81 81 |     "calendar",
+82 82 |     "timegm",
+83 83 |     "weekday",
+
+RUF022.py:91:11: RUF022 [*] `__all__` is not sorted
+   |
+90 |   # comment0
+91 |   __all__ = ("d", "a",  # comment1
+   |  ___________^
+92 | |            # comment2
+93 | |            "f", "b",
+94 | |                                         "strangely",  # comment3
+95 | |             # comment4
+96 | |     "formatted",
+97 | |     # comment5
+98 | | )  # comment6
+   | |_^ RUF022
+99 |   # comment7
+   |
+   = help: Apply an isort-style sorting to `__all__`
+
+ℹ Unsafe fix
+88  88  | ##########################################
+89  89  | 
+90  90  | # comment0
+91      |-__all__ = ("d", "a",  # comment1
+92      |-           # comment2
+93      |-           "f", "b",
+94      |-                                        "strangely",  # comment3
+95      |-            # comment4
+    91  |+__all__ = (
+    92  |+    "a",
+    93  |+    "b",
+    94  |+    "d",  # comment1
+    95  |+    # comment2
+    96  |+    "f",
+    97  |+    # comment4
+96  98  |     "formatted",
+    99  |+    "strangely",  # comment3
+97  100 |     # comment5
+98  101 | )  # comment6
+99  102 | # comment7
 
 RUF022.py:101:11: RUF022 [*] `__all__` is not sorted
     |
- 99 |   ]  # comment7
+ 99 |   # comment7
 100 |   
-101 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
+101 |   __all__ = [  # comment0
     |  ___________^
-102 | |            "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
-103 | |            "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
-104 | |            "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
-105 | |            "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
-106 | |            "StreamReader", "StreamWriter",
-107 | |            "StreamReaderWriter", "StreamRecoder",
-108 | |            "getencoder", "getdecoder", "getincrementalencoder",
-109 | |            "getincrementaldecoder", "getreader", "getwriter",
-110 | |            "encode", "decode", "iterencode", "iterdecode",
-111 | |            "strict_errors", "ignore_errors", "replace_errors",
-112 | |            "xmlcharrefreplace_errors",
-113 | |            "backslashreplace_errors", "namereplace_errors",
-114 | |            "register_error", "lookup_error"]
-    | |____________________________________________^ RUF022
-115 |   
-116 |   __all__: tuple[str, ...] = (  # a comment about the opening paren
+102 | |     # comment1
+103 | |     # comment2
+104 | |     "dx", "cx", "bx", "ax"  # comment3
+105 | |     # comment4
+106 | |     # comment5
+107 | |     # comment6
+108 | | ]  # comment7
+    | |_^ RUF022
+109 |   
+110 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
     |
     = help: Apply an isort-style sorting to `__all__`
 
-ℹ Safe fix
-98  98  |     # comment6
-99  99  | ]  # comment7
+ℹ Unsafe fix
+99  99  | # comment7
 100 100 | 
-101     |-__all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
-102     |-           "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
-103     |-           "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
-104     |-           "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
-105     |-           "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
-106     |-           "StreamReader", "StreamWriter",
-107     |-           "StreamReaderWriter", "StreamRecoder",
-108     |-           "getencoder", "getdecoder", "getincrementalencoder",
-109     |-           "getincrementaldecoder", "getreader", "getwriter",
-110     |-           "encode", "decode", "iterencode", "iterdecode",
-111     |-           "strict_errors", "ignore_errors", "replace_errors",
-112     |-           "xmlcharrefreplace_errors",
-113     |-           "backslashreplace_errors", "namereplace_errors",
-114     |-           "register_error", "lookup_error"]
-    101 |+__all__ = [
-    102 |+    "BOM",
-    103 |+    "BOM32_BE",
-    104 |+    "BOM32_LE",
-    105 |+    "BOM64_BE",
-    106 |+    "BOM64_LE",
-    107 |+    "BOM_BE",
-    108 |+    "BOM_LE",
-    109 |+    "BOM_UTF8",
-    110 |+    "BOM_UTF16",
-    111 |+    "BOM_UTF16_BE",
-    112 |+    "BOM_UTF16_LE",
-    113 |+    "BOM_UTF32",
-    114 |+    "BOM_UTF32_BE",
-    115 |+    "BOM_UTF32_LE",
-    116 |+    "Codec",
-    117 |+    "CodecInfo",
-    118 |+    "EncodedFile",
-    119 |+    "IncrementalDecoder",
-    120 |+    "IncrementalEncoder",
-    121 |+    "StreamReader",
-    122 |+    "StreamReaderWriter",
-    123 |+    "StreamRecoder",
-    124 |+    "StreamWriter",
-    125 |+    "backslashreplace_errors",
-    126 |+    "decode",
-    127 |+    "encode",
-    128 |+    "getdecoder",
-    129 |+    "getencoder",
-    130 |+    "getincrementaldecoder",
-    131 |+    "getincrementalencoder",
-    132 |+    "getreader",
-    133 |+    "getwriter",
-    134 |+    "ignore_errors",
-    135 |+    "iterdecode",
-    136 |+    "iterencode",
-    137 |+    "lookup",
-    138 |+    "lookup_error",
-    139 |+    "namereplace_errors",
-    140 |+    "open",
-    141 |+    "register",
-    142 |+    "register_error",
-    143 |+    "replace_errors",
-    144 |+    "strict_errors",
-    145 |+    "xmlcharrefreplace_errors"]
-115 146 | 
-116 147 | __all__: tuple[str, ...] = (  # a comment about the opening paren
-117 148 |     # multiline comment about "bbb" part 1
+101 101 | __all__ = [  # comment0
+    102 |+    "ax",
+    103 |+    "bx",
+    104 |+    "cx",
+102 105 |     # comment1
+103 106 |     # comment2
+104     |-    "dx", "cx", "bx", "ax"  # comment3
+    107 |+    "dx"  # comment3
+105 108 |     # comment4
+106 109 |     # comment5
+107 110 |     # comment6
 
-RUF022.py:116:28: RUF022 [*] `__all__` is not sorted
+RUF022.py:110:11: RUF022 [*] `__all__` is not sorted
     |
-114 |              "register_error", "lookup_error"]
-115 |   
-116 |   __all__: tuple[str, ...] = (  # a comment about the opening paren
-    |  ____________________________^
-117 | |     # multiline comment about "bbb" part 1
-118 | |     # multiline comment about "bbb" part 2
-119 | |     "bbb",
-120 | |     # multiline comment about "aaa" part 1
-121 | |     # multiline comment about "aaa" part 2
-122 | |     "aaa",
-123 | | )
-    | |_^ RUF022
+108 |   ]  # comment7
+109 |   
+110 |   __all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
+    |  ___________^
+111 | |            "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
+112 | |            "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
+113 | |            "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
+114 | |            "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
+115 | |            "StreamReader", "StreamWriter",
+116 | |            "StreamReaderWriter", "StreamRecoder",
+117 | |            "getencoder", "getdecoder", "getincrementalencoder",
+118 | |            "getincrementaldecoder", "getreader", "getwriter",
+119 | |            "encode", "decode", "iterencode", "iterdecode",
+120 | |            "strict_errors", "ignore_errors", "replace_errors",
+121 | |            "xmlcharrefreplace_errors",
+122 | |            "backslashreplace_errors", "namereplace_errors",
+123 | |            "register_error", "lookup_error"]
+    | |____________________________________________^ RUF022
 124 |   
-125 |   # we use natural sort for `__all__`,
+125 |   __all__: tuple[str, ...] = (  # a comment about the opening paren
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+ℹ Safe fix
+107 107 |     # comment6
+108 108 | ]  # comment7
+109 109 | 
+110     |-__all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
+111     |-           "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
+112     |-           "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
+113     |-           "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
+114     |-           "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
+115     |-           "StreamReader", "StreamWriter",
+116     |-           "StreamReaderWriter", "StreamRecoder",
+117     |-           "getencoder", "getdecoder", "getincrementalencoder",
+118     |-           "getincrementaldecoder", "getreader", "getwriter",
+119     |-           "encode", "decode", "iterencode", "iterdecode",
+120     |-           "strict_errors", "ignore_errors", "replace_errors",
+121     |-           "xmlcharrefreplace_errors",
+122     |-           "backslashreplace_errors", "namereplace_errors",
+123     |-           "register_error", "lookup_error"]
+    110 |+__all__ = [
+    111 |+    "BOM",
+    112 |+    "BOM32_BE",
+    113 |+    "BOM32_LE",
+    114 |+    "BOM64_BE",
+    115 |+    "BOM64_LE",
+    116 |+    "BOM_BE",
+    117 |+    "BOM_LE",
+    118 |+    "BOM_UTF8",
+    119 |+    "BOM_UTF16",
+    120 |+    "BOM_UTF16_BE",
+    121 |+    "BOM_UTF16_LE",
+    122 |+    "BOM_UTF32",
+    123 |+    "BOM_UTF32_BE",
+    124 |+    "BOM_UTF32_LE",
+    125 |+    "Codec",
+    126 |+    "CodecInfo",
+    127 |+    "EncodedFile",
+    128 |+    "IncrementalDecoder",
+    129 |+    "IncrementalEncoder",
+    130 |+    "StreamReader",
+    131 |+    "StreamReaderWriter",
+    132 |+    "StreamRecoder",
+    133 |+    "StreamWriter",
+    134 |+    "backslashreplace_errors",
+    135 |+    "decode",
+    136 |+    "encode",
+    137 |+    "getdecoder",
+    138 |+    "getencoder",
+    139 |+    "getincrementaldecoder",
+    140 |+    "getincrementalencoder",
+    141 |+    "getreader",
+    142 |+    "getwriter",
+    143 |+    "ignore_errors",
+    144 |+    "iterdecode",
+    145 |+    "iterencode",
+    146 |+    "lookup",
+    147 |+    "lookup_error",
+    148 |+    "namereplace_errors",
+    149 |+    "open",
+    150 |+    "register",
+    151 |+    "register_error",
+    152 |+    "replace_errors",
+    153 |+    "strict_errors",
+    154 |+    "xmlcharrefreplace_errors"]
+124 155 | 
+125 156 | __all__: tuple[str, ...] = (  # a comment about the opening paren
+126 157 |     # multiline comment about "bbb" part 1
+
+RUF022.py:125:28: RUF022 [*] `__all__` is not sorted
+    |
+123 |              "register_error", "lookup_error"]
+124 |   
+125 |   __all__: tuple[str, ...] = (  # a comment about the opening paren
+    |  ____________________________^
+126 | |     # multiline comment about "bbb" part 1
+127 | |     # multiline comment about "bbb" part 2
+128 | |     "bbb",
+129 | |     # multiline comment about "aaa" part 1
+130 | |     # multiline comment about "aaa" part 2
+131 | |     "aaa",
+132 | | )
+    | |_^ RUF022
+133 |   
+134 |   # we use natural sort for `__all__`,
     |
     = help: Apply an isort-style sorting to `__all__`
 
 ℹ Unsafe fix
-114 114 |            "register_error", "lookup_error"]
-115 115 | 
-116 116 | __all__: tuple[str, ...] = (  # a comment about the opening paren
-    117 |+    # multiline comment about "aaa" part 1
-    118 |+    # multiline comment about "aaa" part 2
-    119 |+    "aaa",
-117 120 |     # multiline comment about "bbb" part 1
-118 121 |     # multiline comment about "bbb" part 2
-119 122 |     "bbb",
-120     |-    # multiline comment about "aaa" part 1
-121     |-    # multiline comment about "aaa" part 2
-122     |-    "aaa",
-123 123 | )
+123 123 |            "register_error", "lookup_error"]
 124 124 | 
-125 125 | # we use natural sort for `__all__`,
+125 125 | __all__: tuple[str, ...] = (  # a comment about the opening paren
+    126 |+    # multiline comment about "aaa" part 1
+    127 |+    # multiline comment about "aaa" part 2
+    128 |+    "aaa",
+126 129 |     # multiline comment about "bbb" part 1
+127 130 |     # multiline comment about "bbb" part 2
+128 131 |     "bbb",
+129     |-    # multiline comment about "aaa" part 1
+130     |-    # multiline comment about "aaa" part 2
+131     |-    "aaa",
+132 132 | )
+133 133 | 
+134 134 | # we use natural sort for `__all__`,
 
-RUF022.py:129:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:138:11: RUF022 [*] `__all__` is not sorted
     |
-127 |   # Also, this doesn't end with a trailing comma,
-128 |   # so the autofix shouldn't introduce one:
-129 |   __all__ = (
+136 |   # Also, this doesn't end with a trailing comma,
+137 |   # so the autofix shouldn't introduce one:
+138 |   __all__ = (
     |  ___________^
-130 | |     "aadvark237",
-131 | |     "aadvark10092",
-132 | |     "aadvark174",         # the very long whitespace span before this comment is retained
-133 | |     "aadvark532"                       # the even longer whitespace span before this comment is retained
-134 | | )
+139 | |     "aadvark237",
+140 | |     "aadvark10092",
+141 | |     "aadvark174",         # the very long whitespace span before this comment is retained
+142 | |     "aadvark532"                       # the even longer whitespace span before this comment is retained
+143 | | )
     | |_^ RUF022
-135 |   
-136 |   __all__.extend(["foo", "bar"])
+144 |   
+145 |   __all__.extend((  # comment0
     |
     = help: Apply an isort-style sorting to `__all__`
 
 ℹ Unsafe fix
-127 127 | # Also, this doesn't end with a trailing comma,
-128 128 | # so the autofix shouldn't introduce one:
-129 129 | __all__ = (
-    130 |+    "aadvark174",         # the very long whitespace span before this comment is retained
-130 131 |     "aadvark237",
-131     |-    "aadvark10092",
-132     |-    "aadvark174",         # the very long whitespace span before this comment is retained
-133     |-    "aadvark532"                       # the even longer whitespace span before this comment is retained
-    132 |+    "aadvark532",                       # the even longer whitespace span before this comment is retained
-    133 |+    "aadvark10092"
-134 134 | )
-135 135 | 
-136 136 | __all__.extend(["foo", "bar"])
+136 136 | # Also, this doesn't end with a trailing comma,
+137 137 | # so the autofix shouldn't introduce one:
+138 138 | __all__ = (
+    139 |+    "aadvark174",         # the very long whitespace span before this comment is retained
+139 140 |     "aadvark237",
+140     |-    "aadvark10092",
+141     |-    "aadvark174",         # the very long whitespace span before this comment is retained
+142     |-    "aadvark532"                       # the even longer whitespace span before this comment is retained
+    141 |+    "aadvark532",                       # the even longer whitespace span before this comment is retained
+    142 |+    "aadvark10092"
+143 143 | )
+144 144 | 
+145 145 | __all__.extend((  # comment0
 
-RUF022.py:136:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:145:16: RUF022 [*] `__all__` is not sorted
     |
-134 | )
-135 | 
-136 | __all__.extend(["foo", "bar"])
-    |                ^^^^^^^^^^^^^^ RUF022
-137 | __all__.extend(("foo", "bar"))
-138 | __all__.extend((  # comment0
-    |
-    = help: Apply an isort-style sorting to `__all__`
-
-ℹ Safe fix
-133 133 |     "aadvark532"                       # the even longer whitespace span before this comment is retained
-134 134 | )
-135 135 | 
-136     |-__all__.extend(["foo", "bar"])
-    136 |+__all__.extend(["bar", "foo"])
-137 137 | __all__.extend(("foo", "bar"))
-138 138 | __all__.extend((  # comment0
-139 139 |     # comment about foo
-
-RUF022.py:137:16: RUF022 [*] `__all__` is not sorted
-    |
-136 | __all__.extend(["foo", "bar"])
-137 | __all__.extend(("foo", "bar"))
-    |                ^^^^^^^^^^^^^^ RUF022
-138 | __all__.extend((  # comment0
-139 |     # comment about foo
-    |
-    = help: Apply an isort-style sorting to `__all__`
-
-ℹ Safe fix
-134 134 | )
-135 135 | 
-136 136 | __all__.extend(["foo", "bar"])
-137     |-__all__.extend(("foo", "bar"))
-    137 |+__all__.extend(("bar", "foo"))
-138 138 | __all__.extend((  # comment0
-139 139 |     # comment about foo
-140 140 |     "foo",  # comment about foo
-
-RUF022.py:138:16: RUF022 [*] `__all__` is not sorted
-    |
-136 |   __all__.extend(["foo", "bar"])
-137 |   __all__.extend(("foo", "bar"))
-138 |   __all__.extend((  # comment0
+143 |   )
+144 |   
+145 |   __all__.extend((  # comment0
     |  ________________^
-139 | |     # comment about foo
-140 | |     "foo",  # comment about foo
-141 | |     # comment about bar
-142 | |     "bar"  # comment about bar
-143 | |     # comment1
-144 | | ))  # comment2
+146 | |     # comment about foo
+147 | |     "foo",  # comment about foo
+148 | |     # comment about bar
+149 | |     "bar"  # comment about bar
+150 | |     # comment1
+151 | | ))  # comment2
     | |_^ RUF022
-145 |   
-146 |   __all__.extend(  # comment0
+152 |   
+153 |   __all__.extend(  # comment0
     |
     = help: Apply an isort-style sorting to `__all__`
 
 ℹ Unsafe fix
-136 136 | __all__.extend(["foo", "bar"])
-137 137 | __all__.extend(("foo", "bar"))
-138 138 | __all__.extend((  # comment0
-    139 |+    # comment about bar
-    140 |+    "bar",  # comment about bar
-139 141 |     # comment about foo
-140     |-    "foo",  # comment about foo
-141     |-    # comment about bar
-142     |-    "bar"  # comment about bar
-    142 |+    "foo"  # comment about foo
-143 143 |     # comment1
-144 144 | ))  # comment2
-145 145 | 
+143 143 | )
+144 144 | 
+145 145 | __all__.extend((  # comment0
+    146 |+    # comment about bar
+    147 |+    "bar",  # comment about bar
+146 148 |     # comment about foo
+147     |-    "foo",  # comment about foo
+148     |-    # comment about bar
+149     |-    "bar"  # comment about bar
+    149 |+    "foo"  # comment about foo
+150 150 |     # comment1
+151 151 | ))  # comment2
+152 152 | 
 
-RUF022.py:148:5: RUF022 [*] `__all__` is not sorted
+RUF022.py:155:5: RUF022 [*] `__all__` is not sorted
     |
-146 |   __all__.extend(  # comment0
-147 |       # comment1
-148 |       (  # comment2
+153 |   __all__.extend(  # comment0
+154 |       # comment1
+155 |       (  # comment2
     |  _____^
-149 | |         # comment about foo
-150 | |         "foo",  # comment about foo
-151 | |         # comment about bar
-152 | |         "bar"  # comment about bar
-153 | |         # comment3
-154 | |     )  # comment4
+156 | |         # comment about foo
+157 | |         "foo",  # comment about foo
+158 | |         # comment about bar
+159 | |         "bar"  # comment about bar
+160 | |         # comment3
+161 | |     )  # comment4
     | |_____^ RUF022
-155 |   )  # comment2
+162 |   )  # comment2
     |
     = help: Apply an isort-style sorting to `__all__`
 
 ℹ Unsafe fix
-146 146 | __all__.extend(  # comment0
-147 147 |     # comment1
-148 148 |     (  # comment2
-    149 |+        # comment about bar
-    150 |+        "bar",  # comment about bar
-149 151 |         # comment about foo
-150     |-        "foo",  # comment about foo
-151     |-        # comment about bar
-152     |-        "bar"  # comment about bar
-    152 |+        "foo"  # comment about foo
-153 153 |         # comment3
-154 154 |     )  # comment4
-155 155 | )  # comment2
+153 153 | __all__.extend(  # comment0
+154 154 |     # comment1
+155 155 |     (  # comment2
+    156 |+        # comment about bar
+    157 |+        "bar",  # comment about bar
+156 158 |         # comment about foo
+157     |-        "foo",  # comment about foo
+158     |-        # comment about bar
+159     |-        "bar"  # comment about bar
+    159 |+        "foo"  # comment about foo
+160 160 |         # comment3
+161 161 |     )  # comment4
+162 162 | )  # comment2
 
-RUF022.py:157:16: RUF022 [*] `__all__` is not sorted
+RUF022.py:164:16: RUF022 [*] `__all__` is not sorted
     |
-155 |   )  # comment2
-156 |   
-157 |   __all__.extend([  # comment0
+162 |   )  # comment2
+163 |   
+164 |   __all__.extend([  # comment0
     |  ________________^
-158 | |     # comment about foo
-159 | |     "foo",  # comment about foo
-160 | |     # comment about bar
-161 | |     "bar"  # comment about bar
-162 | |     # comment1
-163 | | ])  # comment2
+165 | |     # comment about foo
+166 | |     "foo",  # comment about foo
+167 | |     # comment about bar
+168 | |     "bar"  # comment about bar
+169 | |     # comment1
+170 | | ])  # comment2
     | |_^ RUF022
-164 |   
-165 |   __all__.extend(  # comment0
+171 |   
+172 |   __all__.extend(  # comment0
     |
     = help: Apply an isort-style sorting to `__all__`
 
 ℹ Unsafe fix
-155 155 | )  # comment2
-156 156 | 
-157 157 | __all__.extend([  # comment0
-    158 |+    # comment about bar
-    159 |+    "bar",  # comment about bar
-158 160 |     # comment about foo
-159     |-    "foo",  # comment about foo
-160     |-    # comment about bar
-161     |-    "bar"  # comment about bar
-    161 |+    "foo"  # comment about foo
-162 162 |     # comment1
-163 163 | ])  # comment2
-164 164 | 
+162 162 | )  # comment2
+163 163 | 
+164 164 | __all__.extend([  # comment0
+    165 |+    # comment about bar
+    166 |+    "bar",  # comment about bar
+165 167 |     # comment about foo
+166     |-    "foo",  # comment about foo
+167     |-    # comment about bar
+168     |-    "bar"  # comment about bar
+    168 |+    "foo"  # comment about foo
+169 169 |     # comment1
+170 170 | ])  # comment2
+171 171 | 
 
-RUF022.py:167:5: RUF022 [*] `__all__` is not sorted
+RUF022.py:174:5: RUF022 [*] `__all__` is not sorted
     |
-165 |   __all__.extend(  # comment0
-166 |       # comment1
-167 |       [  # comment2
+172 |   __all__.extend(  # comment0
+173 |       # comment1
+174 |       [  # comment2
     |  _____^
-168 | |         # comment about foo
-169 | |         "foo",  # comment about foo
-170 | |         # comment about bar
-171 | |         "bar"  # comment about bar
-172 | |         # comment3
-173 | |     ]  # comment4
+175 | |         # comment about foo
+176 | |         "foo",  # comment about foo
+177 | |         # comment about bar
+178 | |         "bar"  # comment about bar
+179 | |         # comment3
+180 | |     ]  # comment4
     | |_____^ RUF022
-174 |   )  # comment2
+181 |   )  # comment2
     |
     = help: Apply an isort-style sorting to `__all__`
 
 ℹ Unsafe fix
-165 165 | __all__.extend(  # comment0
-166 166 |     # comment1
-167 167 |     [  # comment2
-    168 |+        # comment about bar
-    169 |+        "bar",  # comment about bar
-168 170 |         # comment about foo
-169     |-        "foo",  # comment about foo
-170     |-        # comment about bar
-171     |-        "bar"  # comment about bar
-    171 |+        "foo"  # comment about foo
-172 172 |         # comment3
-173 173 |     ]  # comment4
-174 174 | )  # comment2
+172 172 | __all__.extend(  # comment0
+173 173 |     # comment1
+174 174 |     [  # comment2
+    175 |+        # comment about bar
+    176 |+        "bar",  # comment about bar
+175 177 |         # comment about foo
+176     |-        "foo",  # comment about foo
+177     |-        # comment about bar
+178     |-        "bar"  # comment about bar
+    178 |+        "foo"  # comment about foo
+179 179 |         # comment3
+180 180 |     ]  # comment4
+181 181 | )  # comment2
 
-RUF022.py:176:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:183:11: RUF022 [*] `__all__` is not sorted
     |
-174 |   )  # comment2
-175 |   
-176 |   __all__ = ["Style", "Treeview",
+181 |   )  # comment2
+182 |   
+183 |   __all__ = ["Style", "Treeview",
     |  ___________^
-177 | |            # Extensions
-178 | |            "LabeledScale", "OptionMenu",
-179 | | ]
+184 | |            # Extensions
+185 | |            "LabeledScale", "OptionMenu",
+186 | | ]
     | |_^ RUF022
-180 |   
-181 |   __all__ = ["Awaitable", "Coroutine",
+187 |   
+188 |   __all__ = ["Awaitable", "Coroutine",
     |
     = help: Apply an isort-style sorting to `__all__`
 
 ℹ Unsafe fix
-173 173 |     ]  # comment4
-174 174 | )  # comment2
-175 175 | 
-176     |-__all__ = ["Style", "Treeview",
-177     |-           # Extensions
-178     |-           "LabeledScale", "OptionMenu",
-    176 |+__all__ = [
-    177 |+    # Extensions
-    178 |+    "LabeledScale",
-    179 |+    "OptionMenu",
-    180 |+    "Style",
-    181 |+    "Treeview",
-179 182 | ]
-180 183 | 
-181 184 | __all__ = ["Awaitable", "Coroutine",
+180 180 |     ]  # comment4
+181 181 | )  # comment2
+182 182 | 
+183     |-__all__ = ["Style", "Treeview",
+184     |-           # Extensions
+185     |-           "LabeledScale", "OptionMenu",
+    183 |+__all__ = [
+    184 |+    # Extensions
+    185 |+    "LabeledScale",
+    186 |+    "OptionMenu",
+    187 |+    "Style",
+    188 |+    "Treeview",
+186 189 | ]
+187 190 | 
+188 191 | __all__ = ["Awaitable", "Coroutine",
 
-RUF022.py:181:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:188:11: RUF022 [*] `__all__` is not sorted
     |
-179 |   ]
-180 |   
-181 |   __all__ = ["Awaitable", "Coroutine",
+186 |   ]
+187 |   
+188 |   __all__ = ["Awaitable", "Coroutine",
     |  ___________^
-182 | |            "AsyncIterable", "AsyncIterator", "AsyncGenerator",
-183 | |            ]
+189 | |            "AsyncIterable", "AsyncIterator", "AsyncGenerator",
+190 | |            ]
     | |____________^ RUF022
-184 |   
-185 |   __all__ = [
+191 |   
+192 |   __all__ = [
     |
     = help: Apply an isort-style sorting to `__all__`
 
 ℹ Safe fix
-178 178 |            "LabeledScale", "OptionMenu",
-179 179 | ]
-180 180 | 
-181     |-__all__ = ["Awaitable", "Coroutine",
-182     |-           "AsyncIterable", "AsyncIterator", "AsyncGenerator",
-183     |-           ]
-    181 |+__all__ = [
-    182 |+    "AsyncGenerator",
-    183 |+    "AsyncIterable",
-    184 |+    "AsyncIterator",
-    185 |+    "Awaitable",
-    186 |+    "Coroutine",
-    187 |+]
-184 188 | 
-185 189 | __all__ = [
-186 190 |     "foo",
+185 185 |            "LabeledScale", "OptionMenu",
+186 186 | ]
+187 187 | 
+188     |-__all__ = ["Awaitable", "Coroutine",
+189     |-           "AsyncIterable", "AsyncIterator", "AsyncGenerator",
+190     |-           ]
+    188 |+__all__ = [
+    189 |+    "AsyncGenerator",
+    190 |+    "AsyncIterable",
+    191 |+    "AsyncIterator",
+    192 |+    "Awaitable",
+    193 |+    "Coroutine",
+    194 |+]
+191 195 | 
+192 196 | __all__ = [
+193 197 |     "foo",
 
-RUF022.py:185:11: RUF022 [*] `__all__` is not sorted
+RUF022.py:192:11: RUF022 [*] `__all__` is not sorted
     |
-183 |              ]
-184 |   
-185 |   __all__ = [
+190 |              ]
+191 |   
+192 |   __all__ = [
     |  ___________^
-186 | |     "foo",
-187 | |     "bar",
-188 | |     "baz",
-189 | |     ]
+193 | |     "foo",
+194 | |     "bar",
+195 | |     "baz",
+196 | |     ]
     | |_____^ RUF022
-190 |   
-191 |   ###################################
+197 |   
+198 |   #########################################################################
     |
     = help: Apply an isort-style sorting to `__all__`
 
 ℹ Safe fix
-183 183 |            ]
-184 184 | 
-185 185 | __all__ = [
-186     |-    "foo",
-187 186 |     "bar",
-188 187 |     "baz",
-    188 |+    "foo",
-189 189 |     ]
-190 190 | 
-191 191 | ###################################
+190 190 |            ]
+191 191 | 
+192 192 | __all__ = [
+193     |-    "foo",
+194 193 |     "bar",
+195 194 |     "baz",
+    195 |+    "foo",
+196 196 |     ]
+197 197 | 
+198 198 | #########################################################################
+
+RUF022.py:204:11: RUF022 `__all__` is not sorted
+    |
+202 |   #########################################################################
+203 |   
+204 |   __all__ = (
+    |  ___________^
+205 | |     "look",
+206 | |     (
+207 | |         "a_veeeeeeeeeeeeeeeeeeery_long_parenthesized_item"
+208 | |     ),
+209 | | )
+    | |_^ RUF022
+210 |   
+211 |   __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
+    |
+    = help: Apply an isort-style sorting to `__all__`
+
+RUF022.py:211:11: RUF022 `__all__` is not sorted
+    |
+209 | )
+210 | 
+211 | __all__ = ("don't" "care" "about", "__all__" "with", "concatenated" "strings")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF022
+212 | 
+213 | ###################################
+    |
+    = help: Apply an isort-style sorting to `__all__`
 
 
