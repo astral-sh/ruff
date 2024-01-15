@@ -714,7 +714,7 @@ impl LintConfiguration {
             .collect();
 
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.rules(&preview).collect();
+        let mut fixable_set: RuleSet = RuleSelector::All.all_rules().collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
@@ -786,7 +786,7 @@ impl LintConfiguration {
                     .chain(selection.extend_fixable.iter())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(&preview) {
+                    for rule in selector.all_rules() {
                         fixable_map_updates.insert(rule, true);
                     }
                 }
@@ -796,7 +796,7 @@ impl LintConfiguration {
                     .chain(carriedover_unfixables.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.rules(&preview) {
+                    for rule in selector.all_rules() {
                         fixable_map_updates.insert(rule, false);
                     }
                 }
