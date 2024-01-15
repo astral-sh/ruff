@@ -31,8 +31,6 @@
 use std::iter::FusedIterator;
 use std::{char, cmp::Ordering, str::FromStr};
 
-use unicode_ident::{is_xid_continue, is_xid_start};
-
 use ruff_python_ast::{Int, IpyEscapeKind};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -1491,18 +1489,38 @@ const fn is_ascii_identifier_start(c: char) -> bool {
 
 // Checks if the character c is a valid starting character as described
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
+#[cold]
 fn is_unicode_identifier_start(c: char) -> bool {
-    is_xid_start(c)
+    unicode_ident::is_xid_start(c)
 }
 
 // Checks if the character c is a valid continuation character as described
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
 fn is_identifier_continuation(c: char) -> bool {
-    match c {
-        'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => true,
-        c => is_xid_continue(c),
+    if c.is_ascii() {
+        ASCII_CONTINUE.0[c as usize]
+    } else {
+        is_unicode_identifier_continue(c)
     }
 }
+
+#[cold]
+fn is_unicode_identifier_continue(c: char) -> bool {
+    unicode_ident::is_xid_continue(c)
+}
+
+const T: bool = true;
+const F: bool = false;
+
+#[repr(C, align(64))]
+struct Align64<T>(pub(crate) T);
+
+static ASCII_CONTINUE: Align64<[bool; 128]> = Align64([
+    F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F,
+    F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, F, T, T, T, T, T, T, T, T, T, T, F, F, F, F, F, F,
+    F, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, F, F, F, F, T,
+    F, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, F, F, F, F, F,
+]);
 
 /// Returns `true` for [whitespace](https://docs.python.org/3/reference/lexical_analysis.html#whitespace-between-tokens)
 /// characters.
