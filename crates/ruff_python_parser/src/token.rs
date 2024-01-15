@@ -11,6 +11,10 @@ use ruff_text_size::TextSize;
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
+///
+/// [`Tok`] and [`TokenKind`] must have the same variants in the same order and the
+/// same representation for [`TokenKind::from_token`] to be safe.
+#[repr(u8)]
 #[derive(Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Tok {
     /// Token value for a name, commonly known as an identifier.
@@ -448,7 +452,7 @@ impl StringKind {
     }
 }
 
-// TODO move to ruff_python_parser?
+#[repr(u8)]
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.
@@ -628,6 +632,7 @@ pub enum TokenKind {
     StartModule,
     StartInteractive,
     StartExpression,
+    // Ensure to update [`TokenKind::from_token`] when adding a new variant
 }
 
 impl TokenKind {
@@ -795,113 +800,14 @@ impl TokenKind {
         matches!(self, TokenKind::Match | TokenKind::Case)
     }
 
+    #[allow(unsafe_code)]
     pub const fn from_token(token: &Tok) -> Self {
-        match token {
-            Tok::Name { .. } => TokenKind::Name,
-            Tok::Int { .. } => TokenKind::Int,
-            Tok::Float { .. } => TokenKind::Float,
-            Tok::Complex { .. } => TokenKind::Complex,
-            Tok::String { .. } => TokenKind::String,
-            Tok::FStringStart => TokenKind::FStringStart,
-            Tok::FStringMiddle { .. } => TokenKind::FStringMiddle,
-            Tok::FStringEnd => TokenKind::FStringEnd,
-            Tok::IpyEscapeCommand { .. } => TokenKind::EscapeCommand,
-            Tok::Comment(_) => TokenKind::Comment,
-            Tok::Newline => TokenKind::Newline,
-            Tok::NonLogicalNewline => TokenKind::NonLogicalNewline,
-            Tok::Indent => TokenKind::Indent,
-            Tok::Dedent => TokenKind::Dedent,
-            Tok::EndOfFile => TokenKind::EndOfFile,
-            Tok::Question => TokenKind::Question,
-            Tok::Exclamation => TokenKind::Exclamation,
-            Tok::Lpar => TokenKind::Lpar,
-            Tok::Rpar => TokenKind::Rpar,
-            Tok::Lsqb => TokenKind::Lsqb,
-            Tok::Rsqb => TokenKind::Rsqb,
-            Tok::Colon => TokenKind::Colon,
-            Tok::Comma => TokenKind::Comma,
-            Tok::Semi => TokenKind::Semi,
-            Tok::Plus => TokenKind::Plus,
-            Tok::Minus => TokenKind::Minus,
-            Tok::Star => TokenKind::Star,
-            Tok::Slash => TokenKind::Slash,
-            Tok::Vbar => TokenKind::Vbar,
-            Tok::Amper => TokenKind::Amper,
-            Tok::Less => TokenKind::Less,
-            Tok::Greater => TokenKind::Greater,
-            Tok::Equal => TokenKind::Equal,
-            Tok::Dot => TokenKind::Dot,
-            Tok::Percent => TokenKind::Percent,
-            Tok::Lbrace => TokenKind::Lbrace,
-            Tok::Rbrace => TokenKind::Rbrace,
-            Tok::EqEqual => TokenKind::EqEqual,
-            Tok::NotEqual => TokenKind::NotEqual,
-            Tok::LessEqual => TokenKind::LessEqual,
-            Tok::GreaterEqual => TokenKind::GreaterEqual,
-            Tok::Tilde => TokenKind::Tilde,
-            Tok::CircumFlex => TokenKind::CircumFlex,
-            Tok::LeftShift => TokenKind::LeftShift,
-            Tok::RightShift => TokenKind::RightShift,
-            Tok::DoubleStar => TokenKind::DoubleStar,
-            Tok::DoubleStarEqual => TokenKind::DoubleStarEqual,
-            Tok::PlusEqual => TokenKind::PlusEqual,
-            Tok::MinusEqual => TokenKind::MinusEqual,
-            Tok::StarEqual => TokenKind::StarEqual,
-            Tok::SlashEqual => TokenKind::SlashEqual,
-            Tok::PercentEqual => TokenKind::PercentEqual,
-            Tok::AmperEqual => TokenKind::AmperEqual,
-            Tok::VbarEqual => TokenKind::VbarEqual,
-            Tok::CircumflexEqual => TokenKind::CircumflexEqual,
-            Tok::LeftShiftEqual => TokenKind::LeftShiftEqual,
-            Tok::RightShiftEqual => TokenKind::RightShiftEqual,
-            Tok::DoubleSlash => TokenKind::DoubleSlash,
-            Tok::DoubleSlashEqual => TokenKind::DoubleSlashEqual,
-            Tok::ColonEqual => TokenKind::ColonEqual,
-            Tok::At => TokenKind::At,
-            Tok::AtEqual => TokenKind::AtEqual,
-            Tok::Rarrow => TokenKind::Rarrow,
-            Tok::Ellipsis => TokenKind::Ellipsis,
-            Tok::False => TokenKind::False,
-            Tok::None => TokenKind::None,
-            Tok::True => TokenKind::True,
-            Tok::And => TokenKind::And,
-            Tok::As => TokenKind::As,
-            Tok::Assert => TokenKind::Assert,
-            Tok::Async => TokenKind::Async,
-            Tok::Await => TokenKind::Await,
-            Tok::Break => TokenKind::Break,
-            Tok::Class => TokenKind::Class,
-            Tok::Continue => TokenKind::Continue,
-            Tok::Def => TokenKind::Def,
-            Tok::Del => TokenKind::Del,
-            Tok::Elif => TokenKind::Elif,
-            Tok::Else => TokenKind::Else,
-            Tok::Except => TokenKind::Except,
-            Tok::Finally => TokenKind::Finally,
-            Tok::For => TokenKind::For,
-            Tok::From => TokenKind::From,
-            Tok::Global => TokenKind::Global,
-            Tok::If => TokenKind::If,
-            Tok::Import => TokenKind::Import,
-            Tok::In => TokenKind::In,
-            Tok::Is => TokenKind::Is,
-            Tok::Lambda => TokenKind::Lambda,
-            Tok::Nonlocal => TokenKind::Nonlocal,
-            Tok::Not => TokenKind::Not,
-            Tok::Or => TokenKind::Or,
-            Tok::Pass => TokenKind::Pass,
-            Tok::Raise => TokenKind::Raise,
-            Tok::Return => TokenKind::Return,
-            Tok::Try => TokenKind::Try,
-            Tok::While => TokenKind::While,
-            Tok::Match => TokenKind::Match,
-            Tok::Case => TokenKind::Case,
-            Tok::Type => TokenKind::Type,
-            Tok::With => TokenKind::With,
-            Tok::Yield => TokenKind::Yield,
-            Tok::StartModule => TokenKind::StartModule,
-            Tok::StartExpression => TokenKind::StartExpression,
-        }
+        // SAFETY: Safe because `Tok` is repr(u16). See https://doc.rust-lang.org/reference/items/enumerations.html#pointer-casting
+        let token_discriminant = unsafe { *(token as *const Tok).cast::<u8>() };
+
+        assert!(token_discriminant <= TokenKind::StartExpression as u8);
+
+        unsafe { std::mem::transmute(token_discriminant) }
     }
 }
 
