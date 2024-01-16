@@ -383,6 +383,7 @@ Program {
                                                     ),
                                                 ],
                                                 ctx: Store,
+                                                parenthesized: false,
                                             },
                                         ),
                                         iter: Name(

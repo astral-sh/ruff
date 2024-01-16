@@ -521,6 +521,7 @@ mod tests {
         parse_suite(source)
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(LexicalErrorType::FStringError(e)) => e,
+                ParseErrorType::FStringError(e) => e,
                 e => unreachable!("Expected FStringError: {:?}", e),
             })
             .expect_err("Expected error")

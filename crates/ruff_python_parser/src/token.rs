@@ -978,10 +978,10 @@ impl TryFrom<TokenKind> for BoolOp {
     }
 }
 
-impl TryFrom<Tok> for UnaryOp {
+impl TryFrom<&Tok> for UnaryOp {
     type Error = ();
 
-    fn try_from(value: Tok) -> Result<Self, Self::Error> {
+    fn try_from(value: &Tok) -> Result<Self, Self::Error> {
         Ok(match value {
             Tok::Plus => UnaryOp::UAdd,
             Tok::Minus => UnaryOp::USub,

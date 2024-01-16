@@ -2,7 +2,6 @@ use std::hash::BuildHasherDefault;
 
 use ast::CmpOp;
 use ruff_python_ast::{self as ast, Expr, ExprContext};
-use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 
 use crate::{ParseError, ParseErrorType, TokenKind};
@@ -29,45 +28,6 @@ pub(super) fn set_expr_ctx(expr: &mut Expr, new_ctx: ExprContext) {
                 .for_each(|element| set_expr_ctx(element, new_ctx));
         }
         _ => {}
-    }
-}
-
-/// Sets the `range` for a given expression.
-pub(super) fn set_expr_range(expr: &mut Expr, range: TextRange) {
-    match expr {
-        Expr::Name(node) => node.range = range,
-        Expr::Set(node) => node.range = range,
-        Expr::Call(node) => node.range = range,
-        Expr::Dict(node) => node.range = range,
-        Expr::List(node) => node.range = range,
-        Expr::NamedExpr(node) => node.range = range,
-        Expr::Yield(node) => node.range = range,
-        Expr::Await(node) => node.range = range,
-        Expr::Slice(node) => node.range = range,
-        Expr::Tuple(node) => node.range = range,
-        Expr::BoolOp(node) => node.range = range,
-        Expr::IfExp(node) => node.range = range,
-        Expr::Lambda(node) => node.range = range,
-        Expr::Compare(node) => node.range = range,
-        Expr::UnaryOp(node) => node.range = range,
-        Expr::FString(node) => node.range = range,
-        Expr::SetComp(node) => node.range = range,
-        Expr::Starred(node) => node.range = range,
-        Expr::BinOp(node) => node.range = range,
-        Expr::DictComp(node) => node.range = range,
-        Expr::ListComp(node) => node.range = range,
-        Expr::Attribute(node) => node.range = range,
-        Expr::GeneratorExp(node) => node.range = range,
-        Expr::Subscript(node) => node.range = range,
-        Expr::YieldFrom(node) => node.range = range,
-        Expr::NoneLiteral(node) => node.range = range,
-        Expr::StringLiteral(node) => node.range = range,
-        Expr::BytesLiteral(node) => node.range = range,
-        Expr::NumberLiteral(node) => node.range = range,
-        Expr::BooleanLiteral(node) => node.range = range,
-        Expr::EllipsisLiteral(node) => node.range = range,
-        Expr::IpyEscapeCommand(node) => node.range = range,
-        Expr::Invalid(node) => node.range = range,
     }
 }
 

@@ -242,6 +242,7 @@ Program {
                                         ),
                                     ],
                                     ctx: Del,
+                                    parenthesized: true,
                                 },
                             ),
                             Name(
@@ -501,6 +502,7 @@ Program {
                                         ),
                                     ],
                                     ctx: Load,
+                                    parenthesized: false,
                                 },
                             ),
                         ),

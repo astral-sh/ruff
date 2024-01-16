@@ -71,6 +71,7 @@ Module(
                                                 ),
                                             ],
                                             ctx: Load,
+                                            parenthesized: true,
                                         },
                                     ),
                                     ifs: [],

@@ -265,6 +265,7 @@ Program {
                                     ),
                                 ],
                                 ctx: Store,
+                                parenthesized: false,
                             },
                         ),
                         iter: Name(
@@ -313,6 +314,7 @@ Program {
                                     ),
                                 ],
                                 ctx: Store,
+                                parenthesized: true,
                             },
                         ),
                         iter: Name(
@@ -486,6 +488,7 @@ Program {
                                     ),
                                 ],
                                 ctx: Load,
+                                parenthesized: false,
                             },
                         ),
                         body: [

@@ -1077,6 +1077,7 @@ impl<'a> From<&'a ast::Expr> for ComparableExpr<'a> {
                 elts,
                 ctx: _,
                 range: _,
+                parenthesized: _,
             }) => Self::Tuple(ExprTuple {
                 elts: elts.iter().map(Into::into).collect(),
             }),

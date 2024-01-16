@@ -881,6 +881,7 @@ Program {
                                                                         ),
                                                                     ],
                                                                     ctx: Load,
+                                                                    parenthesized: false,
                                                                 },
                                                             ),
                                                             debug_text: None,

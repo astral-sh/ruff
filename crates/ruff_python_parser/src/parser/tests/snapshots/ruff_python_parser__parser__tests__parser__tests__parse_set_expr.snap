@@ -92,6 +92,7 @@ Program {
                                                 ),
                                             ],
                                             ctx: Load,
+                                            parenthesized: true,
                                         },
                                     ),
                                     Set(

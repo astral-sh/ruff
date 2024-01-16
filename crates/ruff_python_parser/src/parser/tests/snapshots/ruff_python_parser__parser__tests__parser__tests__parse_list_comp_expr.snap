@@ -458,6 +458,7 @@ Program {
                                                     ),
                                                 ],
                                                 ctx: Store,
+                                                parenthesized: false,
                                             },
                                         ),
                                         iter: Name(
@@ -516,6 +517,7 @@ Program {
                                                     ),
                                                 ],
                                                 ctx: Store,
+                                                parenthesized: false,
                                             },
                                         ),
                                         iter: Name(

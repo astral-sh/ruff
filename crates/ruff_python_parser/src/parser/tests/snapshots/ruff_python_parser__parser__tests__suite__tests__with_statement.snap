@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/parser/tests/suite.rs
-expression: "parse_suite(source, \"<test>\").unwrap()"
+expression: parse_suite(source).unwrap()
 ---
 [
     With(
@@ -275,6 +275,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             range: 133..135,
                             elts: [],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: None,
@@ -301,6 +302,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                             range: 147..149,
                             elts: [],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -433,6 +435,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -523,6 +526,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -571,6 +575,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: None,
@@ -611,6 +616,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -667,6 +673,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: None,
@@ -715,6 +722,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(
@@ -876,6 +884,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: None,
@@ -943,6 +952,7 @@ expression: "parse_suite(source, \"<test>\").unwrap()"
                                 ),
                             ],
                             ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                     optional_vars: Some(

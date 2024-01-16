@@ -378,6 +378,7 @@ Program {
                                     ),
                                 ],
                                 ctx: Load,
+                                parenthesized: false,
                             },
                         ),
                     },

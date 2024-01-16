@@ -1828,6 +1828,7 @@ pub struct ExprTuple {
     pub range: TextRange,
     pub elts: Vec<Expr>,
     pub ctx: ExprContext,
+    pub parenthesized: bool,
 }
 
 impl From<ExprTuple> for Expr {
