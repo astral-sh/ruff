@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from collections import Counter
+import re
+import os
 from typing import cast
 
+cast(lambda: re.match, 1)
 
-def get_most_common_fn(k):
-    return lambda c: cast(Counter, c).most_common(k)
+cast(lambda: cast(lambda: os.path, 1), 1)
