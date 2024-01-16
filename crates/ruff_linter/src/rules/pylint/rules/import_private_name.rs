@@ -1,8 +1,9 @@
-use itertools::join;
-use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{derive_message_formats, violation};
 use std::borrow::Cow;
 
+use itertools::Itertools;
+
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_text_size::Ranged;
 
@@ -12,25 +13,25 @@ use crate::checkers::ast::Checker;
 /// Checks for import statements that import a private name (a name starting
 /// with an underscore `_`) from another module.
 ///
-/// Ignores private name imports that are used for type annotations. Ideally,
-/// types would be public; however, this is not always possible when using
-/// third-party libraries.
-///
 /// ## Why is this bad?
 /// [PEP 8] states that names starting with an underscore are private. Thus,
 /// they are not intended to be used outside of the module in which they are
 /// defined.
 ///
 /// Further, as private imports are not considered part of the public API, they
-/// are prone to unexpected changes, even in a minor version bump.
+/// are prone to unexpected changes, especially outside of semantic versioning.
 ///
 /// Instead, consider using the public API of the module.
+///
+/// This rule ignores private name imports that are exclusively used in type
+/// annotations. Ideally, types would be public; however, this is not always
+/// possible when using third-party libraries.
 ///
 /// ## Known problems
 /// Does not ignore private name imports from within the module that defines
 /// the private name if the module is defined with [PEP 420] namespace packages
-/// (directories that omit the `__init__.py` file). Instead, namespace packages
-/// must be made known to ruff using the [`namespace-packages`] setting.
+/// (i.e., directories that omit the `__init__.py` file). Namespace packages
+/// must be configured via the [`namespace-packages`] setting.
 ///
 /// ## Example
 /// ```python
@@ -38,7 +39,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Options
-/// - [`namespace-packages`]: List of namespace packages that are known to ruff
+/// - [`namespace-packages`]: List of packages that are defined as namespace
+///   packages.
 ///
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
@@ -110,42 +112,36 @@ pub(crate) fn import_private_name(
             continue;
         }
 
-        if import_info
+        // Ignore public imports; require at least one private name.
+        // Ex) `from foo import bar`
+        let Some((index, private_name)) = import_info
             .call_path
             .iter()
-            .any(|name| name.starts_with('_'))
-        {
-            // Ignore private imports used for typing.
-            if binding.context.is_runtime()
-                && binding
-                    .references()
-                    .map(|reference_id| checker.semantic().reference(reference_id))
-                    .any(is_typing)
-            {
-                continue;
-            }
+            .find_position(|name| name.starts_with('_'))
+        else {
+            continue;
+        };
 
-            let private_name = import_info
-                .call_path
-                .iter()
-                .find(|name| name.starts_with('_'))
-                .unwrap();
-            let external_module = Some(join(
-                import_info
-                    .call_path
-                    .iter()
-                    .take_while(|name| name != &private_name),
-                ".",
-            ))
-            .filter(|module| !module.is_empty());
-            diagnostics.push(Diagnostic::new(
-                ImportPrivateName {
-                    name: (*private_name).to_string(),
-                    module: external_module,
-                },
-                binding.range(),
-            ));
+        // Ignore private imports used exclusively for typing.
+        if !binding.references.is_empty()
+            && binding
+                .references()
+                .map(|reference_id| checker.semantic().reference(reference_id))
+                .all(is_typing)
+        {
+            continue;
         }
+
+        let name = (*private_name).to_string();
+        let module = if index > 0 {
+            Some(import_info.module_name[..index].join("."))
+        } else {
+            None
+        };
+        diagnostics.push(Diagnostic::new(
+            ImportPrivateName { name, module },
+            binding.range(),
+        ));
     }
 }
 
