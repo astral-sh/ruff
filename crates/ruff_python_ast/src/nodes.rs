@@ -8,6 +8,7 @@ use std::slice::{Iter, IterMut};
 
 use itertools::Itertools;
 
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{int, LiteralExpressionRef};
@@ -1129,6 +1130,14 @@ impl<'a> IntoIterator for &'a FStringValue {
     }
 }
 
+impl<'a> IntoIterator for &'a mut FStringValue {
+    type Item = &'a mut FStringPart;
+    type IntoIter = IterMut<'a, FStringPart>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
 /// An internal representation of [`FStringValue`].
 #[derive(Clone, Debug, PartialEq)]
 enum FStringValueInner {
@@ -1321,6 +1330,14 @@ impl<'a> IntoIterator for &'a StringLiteralValue {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut StringLiteralValue {
+    type Item = &'a mut StringLiteral;
+    type IntoIter = IterMut<'a, StringLiteral>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -1544,6 +1561,14 @@ impl<'a> IntoIterator for &'a BytesLiteralValue {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut BytesLiteralValue {
+    type Item = &'a mut BytesLiteral;
+    type IntoIter = IterMut<'a, BytesLiteral>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
     }
 }
 
@@ -1774,6 +1799,37 @@ pub struct ExprTuple {
 impl From<ExprTuple> for Expr {
     fn from(payload: ExprTuple) -> Self {
         Expr::Tuple(payload)
+    }
+}
+
+impl ExprTuple {
+    /// Return `true` if a tuple is parenthesized in the source code.
+    pub fn is_parenthesized(&self, source: &str) -> bool {
+        let Some(elt) = self.elts.first() else {
+            return true;
+        };
+
+        // Count the number of open parentheses between the start of the tuple and the first element.
+        let open_parentheses_count =
+            SimpleTokenizer::new(source, TextRange::new(self.start(), elt.start()))
+                .skip_trivia()
+                .filter(|token| token.kind() == SimpleTokenKind::LParen)
+                .count();
+        if open_parentheses_count == 0 {
+            return false;
+        }
+
+        // Count the number of parentheses between the end of the first element and its trailing comma.
+        let close_parentheses_count =
+            SimpleTokenizer::new(source, TextRange::new(elt.end(), self.end()))
+                .skip_trivia()
+                .take_while(|token| token.kind() != SimpleTokenKind::Comma)
+                .filter(|token| token.kind() == SimpleTokenKind::RParen)
+                .count();
+
+        // If the number of open parentheses is greater than the number of close parentheses, the tuple
+        // is parenthesized.
+        open_parentheses_count > close_parentheses_count
     }
 }
 

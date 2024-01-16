@@ -68,6 +68,7 @@ impl Rule {
         }
     }
 }
+
 impl Linter {
     pub const fn upstream_categories(&self) -> Option<&'static [UpstreamCategoryAndPrefix]> {
         match self {

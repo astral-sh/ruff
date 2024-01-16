@@ -83,6 +83,20 @@ fn convert_to_constant(
     ))
 }
 
+fn matches_constant(constant: f64, value: f64) -> bool {
+    for point in 2..=15 {
+        let rounded = (constant * 10_f64.powi(point)).round() / 10_f64.powi(point);
+        if (rounded - value).abs() < f64::EPSILON {
+            return true;
+        }
+        let rounded = (constant * 10_f64.powi(point)).floor() / 10_f64.powi(point);
+        if (rounded - value).abs() < f64::EPSILON {
+            return true;
+        }
+    }
+    false
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Constant {
     Pi,
@@ -94,11 +108,11 @@ impl Constant {
     #[allow(clippy::approx_constant)]
     fn from_value(value: f64) -> Option<Self> {
         if (3.14..3.15).contains(&value) {
-            Some(Self::Pi)
+            matches_constant(std::f64::consts::PI, value).then_some(Self::Pi)
         } else if (2.71..2.72).contains(&value) {
-            Some(Self::E)
+            matches_constant(std::f64::consts::E, value).then_some(Self::E)
         } else if (6.28..6.29).contains(&value) {
-            Some(Self::Tau)
+            matches_constant(std::f64::consts::TAU, value).then_some(Self::Tau)
         } else {
             None
         }

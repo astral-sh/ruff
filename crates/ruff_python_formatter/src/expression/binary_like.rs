@@ -394,12 +394,12 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                             f,
                             [
                                 operand.leading_binary_comments().map(leading_comments),
-                                leading_comments(comments.leading(&string_constant)),
+                                leading_comments(comments.leading(string_constant)),
                                 // Call `FormatStringContinuation` directly to avoid formatting
                                 // the implicitly concatenated string with the enclosing group
                                 // because the group is added by the binary like formatting.
                                 FormatStringContinuation::new(&string_constant),
-                                trailing_comments(comments.trailing(&string_constant)),
+                                trailing_comments(comments.trailing(string_constant)),
                                 operand.trailing_binary_comments().map(trailing_comments),
                                 line_suffix_boundary(),
                             ]
@@ -413,12 +413,12 @@ impl Format<PyFormatContext<'_>> for BinaryLike<'_> {
                         write!(
                             f,
                             [
-                                leading_comments(comments.leading(&string_constant)),
+                                leading_comments(comments.leading(string_constant)),
                                 // Call `FormatStringContinuation` directly to avoid formatting
                                 // the implicitly concatenated string with the enclosing group
                                 // because the group is added by the binary like formatting.
                                 FormatStringContinuation::new(&string_constant),
-                                trailing_comments(comments.trailing(&string_constant)),
+                                trailing_comments(comments.trailing(string_constant)),
                             ]
                         )?;
                     }
@@ -657,7 +657,7 @@ impl<'a> FlatBinaryExpressionSlice<'a> {
 /// The formatting is recursive (with a depth of `O(operators)` where `operators` are operators with different precedences).
 ///
 /// Comments before or after the first operand must be formatted by the caller because they shouldn't be part of the group
-/// wrapping the whole binary chain. This is to avoid that `b * c` expands in the following example because of its trailing comemnt:
+/// wrapping the whole binary chain. This is to avoid that `b * c` expands in the following example because of its trailing comment:
 ///
 /// ```python
 ///

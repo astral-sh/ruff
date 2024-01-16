@@ -152,3 +152,13 @@ async def f(x: bool):
         t = asyncio.create_task(asyncio.sleep(1))
     else:
         t = None
+
+
+# OK
+async def f(x: bool):
+    global T
+
+    if x:
+        T = asyncio.create_task(asyncio.sleep(1))
+    else:
+        T = None

@@ -4,14 +4,14 @@ use ruff_python_semantic::{analyze, SemanticModel};
 
 /// Return `true` if a Python class appears to be a Django model, based on its base classes.
 pub(super) fn is_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_over_body(class_def, semantic, &|call_path| {
+    analyze::class::any_call_path(class_def, semantic, &|call_path| {
         matches!(call_path.as_slice(), ["django", "db", "models", "Model"])
     })
 }
 
 /// Return `true` if a Python class appears to be a Django model form, based on its base classes.
 pub(super) fn is_model_form(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
-    analyze::class::any_over_body(class_def, semantic, &|call_path| {
+    analyze::class::any_call_path(class_def, semantic, &|call_path| {
         matches!(
             call_path.as_slice(),
             ["django", "forms", "ModelForm"] | ["django", "forms", "models", "ModelForm"]

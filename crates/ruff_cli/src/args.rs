@@ -290,6 +290,10 @@ pub struct CheckCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
+    /// List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For
+    /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
+    #[arg(long, value_delimiter = ',')]
+    pub extension: Option<Vec<ExtensionPair>>,
     /// Exit with status code "0", even upon detecting lint violations.
     #[arg(
         short,
@@ -352,9 +356,6 @@ pub struct CheckCommand {
         conflicts_with = "watch",
     )]
     pub show_settings: bool,
-    /// List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]).
-    #[arg(long, value_delimiter = ',', hide = true)]
-    pub extension: Option<Vec<ExtensionPair>>,
     /// Dev-only argument to show fixes
     #[arg(long, hide = true)]
     pub ecosystem_ci: bool,
@@ -423,6 +424,10 @@ pub struct FormatCommand {
     /// The name of the file when passing it through stdin.
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
+    /// List of mappings from file extension to language (one of ["python", "ipynb", "pyi"]). For
+    /// example, to treat `.ipy` files as IPython notebooks, use `--extension ipy:ipynb`.
+    #[arg(long, value_delimiter = ',')]
+    pub extension: Option<Vec<ExtensionPair>>,
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
@@ -571,6 +576,7 @@ impl FormatCommand {
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 target_version: self.target_version,
                 cache_dir: self.cache_dir,
+                extension: self.extension,
 
                 // Unsupported on the formatter CLI, but required on `Overrides`.
                 ..CliOverrides::default()
@@ -739,7 +745,7 @@ impl ConfigurationTransformer for CliOverrides {
             config.target_version = Some(*target_version);
         }
         if let Some(extension) = &self.extension {
-            config.lint.extension = Some(extension.clone().into_iter().collect());
+            config.extension = Some(extension.iter().cloned().collect());
         }
 
         config

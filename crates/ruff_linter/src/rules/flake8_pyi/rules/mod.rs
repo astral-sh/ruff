@@ -1,4 +1,5 @@
 pub(crate) use any_eq_ne_annotation::*;
+pub(crate) use bad_generator_return_type::*;
 pub(crate) use bad_version_info_comparison::*;
 pub(crate) use collections_named_tuple::*;
 pub(crate) use complex_assignment_in_stub::*;
@@ -36,6 +37,7 @@ pub(crate) use unsupported_method_call_on_all::*;
 pub(crate) use unused_private_type_definition::*;
 
 mod any_eq_ne_annotation;
+mod bad_generator_return_type;
 mod bad_version_info_comparison;
 mod collections_named_tuple;
 mod complex_assignment_in_stub;

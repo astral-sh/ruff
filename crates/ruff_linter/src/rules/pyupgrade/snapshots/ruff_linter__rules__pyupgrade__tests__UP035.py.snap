@@ -995,26 +995,6 @@ UP035.py:77:1: UP035 [*] Import from `collections.abc` instead: `Callable`
 79 79 | 
 80 80 | # OK
 
-UP035.py:87:1: UP035 [*] Import from `typing` instead: `NamedTuple`
-   |
-86 | # OK: `typing_extensions` contains backported improvements.
-87 | from typing_extensions import NamedTuple
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
-88 | 
-89 | # OK: `typing_extensions` supports `frozen_default` (backported from 3.12).
-   |
-   = help: Import from `typing`
-
-ℹ Safe fix
-84 84 | from typing_extensions import SupportsIndex
-85 85 | 
-86 86 | # OK: `typing_extensions` contains backported improvements.
-87    |-from typing_extensions import NamedTuple
-   87 |+from typing import NamedTuple
-88 88 | 
-89 89 | # OK: `typing_extensions` supports `frozen_default` (backported from 3.12).
-90 90 | from typing_extensions import dataclass_transform
-
 UP035.py:90:1: UP035 [*] Import from `typing` instead: `dataclass_transform`
    |
 89 | # OK: `typing_extensions` supports `frozen_default` (backported from 3.12).
@@ -1040,6 +1020,8 @@ UP035.py:93:1: UP035 [*] Import from `enum` instead: `StrEnum`
 92 | # UP035
 93 | from backports.strenum import StrEnum
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+94 | 
+95 | # UP035
    |
    = help: Import from `enum`
 
@@ -1049,5 +1031,63 @@ UP035.py:93:1: UP035 [*] Import from `enum` instead: `StrEnum`
 92 92 | # UP035
 93    |-from backports.strenum import StrEnum
    93 |+from enum import StrEnum
+94 94 | 
+95 95 | # UP035
+96 96 | from typing_extensions import override
+
+UP035.py:96:1: UP035 [*] Import from `typing` instead: `override`
+   |
+95 | # UP035
+96 | from typing_extensions import override
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+97 | 
+98 | # UP035
+   |
+   = help: Import from `typing`
+
+ℹ Safe fix
+93 93 | from backports.strenum import StrEnum
+94 94 | 
+95 95 | # UP035
+96    |-from typing_extensions import override
+   96 |+from typing import override
+97 97 | 
+98 98 | # UP035
+99 99 | from typing_extensions import Buffer
+
+UP035.py:99:1: UP035 [*] Import from `collections.abc` instead: `Buffer`
+    |
+ 98 | # UP035
+ 99 | from typing_extensions import Buffer
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+100 | 
+101 | # UP035
+    |
+    = help: Import from `collections.abc`
+
+ℹ Safe fix
+96  96  | from typing_extensions import override
+97  97  | 
+98  98  | # UP035
+99      |-from typing_extensions import Buffer
+    99  |+from collections.abc import Buffer
+100 100 | 
+101 101 | # UP035
+102 102 | from typing_extensions import get_original_bases
+
+UP035.py:102:1: UP035 [*] Import from `types` instead: `get_original_bases`
+    |
+101 | # UP035
+102 | from typing_extensions import get_original_bases
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+    |
+    = help: Import from `types`
+
+ℹ Safe fix
+99  99  | from typing_extensions import Buffer
+100 100 | 
+101 101 | # UP035
+102     |-from typing_extensions import get_original_bases
+    102 |+from types import get_original_bases
 
 

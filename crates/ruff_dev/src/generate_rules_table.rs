@@ -3,6 +3,7 @@
 //! Used for <https://docs.astral.sh/ruff/rules/>.
 
 use itertools::Itertools;
+use std::borrow::Cow;
 use strum::IntoEnumIterator;
 
 use ruff_diagnostics::FixAvailability;
@@ -37,6 +38,16 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
 
         let rule_name = rule.as_ref();
 
+        // If the message ends in a bracketed expression (like: "Use {replacement}"), escape the
+        // brackets. Otherwise, it'll be interpreted as an HTML attribute via the `attr_list`
+        // plugin. (Above, we'd convert to "Use {replacement\}".)
+        let message = rule.message_formats()[0];
+        let message = if let Some(prefix) = message.strip_suffix('}') {
+            Cow::Owned(format!("{prefix}\\}}"))
+        } else {
+            Cow::Borrowed(message)
+        };
+
         #[allow(clippy::or_fun_call)]
         table_out.push_str(&format!(
             "| {0}{1} {{ #{0}{1} }} | {2} | {3} | {4} |",
@@ -46,7 +57,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 .is_some()
                 .then_some(format_args!("[{rule_name}](rules/{rule_name}.md)"))
                 .unwrap_or(format_args!("{rule_name}")),
-            rule.message_formats()[0],
+            message,
             status_token,
         ));
         table_out.push('\n');

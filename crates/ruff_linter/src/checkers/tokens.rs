@@ -40,6 +40,10 @@ pub(crate) fn check_tokens(
         pygrep_hooks::rules::blanket_type_ignore(&mut diagnostics, indexer, locator);
     }
 
+    if settings.rules.enabled(Rule::EmptyComment) {
+        pylint::rules::empty_comments(&mut diagnostics, indexer, locator);
+    }
+
     if settings.rules.any_enabled(&[
         Rule::AmbiguousUnicodeCharacterString,
         Rule::AmbiguousUnicodeCharacterDocstring,

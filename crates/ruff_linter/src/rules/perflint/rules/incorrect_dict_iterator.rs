@@ -1,6 +1,5 @@
 use std::fmt;
 
-use crate::fix::edits::pad;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
@@ -8,6 +7,7 @@ use ruff_python_ast::{Arguments, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::pad;
 
 /// ## What it does
 /// Checks for uses of `dict.items()` that discard either the key or the value
@@ -37,6 +37,12 @@ use crate::checkers::ast::Checker;
 /// for value in obj.values():
 ///     print(value)
 /// ```
+///
+/// ## Fix safety
+/// The fix does not perform any type analysis and, as such, may suggest an
+/// incorrect fix if the object in question does not duck-type as a mapping
+/// (e.g., if it is missing a `.keys()` or `.values()` method, or if those
+/// methods behave differently than they do on standard mapping types).
 #[violation]
 pub struct IncorrectDictIterator {
     subset: DictSubset,

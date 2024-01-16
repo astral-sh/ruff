@@ -65,6 +65,7 @@ impl Violation for MultipleImportsOnOneLine {
 /// ```
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[violation]
 pub struct ModuleImportNotAtTopOfFile {
     source_type: PySourceType,

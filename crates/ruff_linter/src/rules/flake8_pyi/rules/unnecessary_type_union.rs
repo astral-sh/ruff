@@ -1,10 +1,12 @@
-use ast::{ExprContext, Operator};
+use ast::ExprContext;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{checkers::ast::Checker, rules::flake8_pyi::helpers::traverse_union};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for the presence of multiple `type`s in a union.
@@ -49,19 +51,6 @@ impl Violation for UnnecessaryTypeUnion {
     }
 }
 
-fn concatenate_bin_ors(exprs: Vec<&Expr>) -> Expr {
-    let mut exprs = exprs.into_iter();
-    let first = exprs.next().unwrap();
-    exprs.fold((*first).clone(), |acc, expr| {
-        Expr::BinOp(ast::ExprBinOp {
-            left: Box::new(acc),
-            op: Operator::BitOr,
-            right: Box::new((*expr).clone()),
-            range: TextRange::default(),
-        })
-    })
-}
-
 /// PYI055
 pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr) {
     // The `|` operator isn't always safe to allow to runtime-evaluated annotations.
@@ -82,7 +71,7 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
     let mut type_exprs = Vec::new();
     let mut other_exprs = Vec::new();
 
-    let mut collect_type_exprs = |expr: &'a Expr, _| {
+    let mut collect_type_exprs = |expr: &'a Expr, _parent: &'a Expr| {
         let subscript = expr.as_subscript_expr();
 
         if subscript.is_none() {
@@ -94,20 +83,20 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                 .resolve_call_path(unwrapped.value.as_ref())
                 .is_some_and(|call_path| matches!(call_path.as_slice(), ["" | "builtins", "type"]))
             {
-                type_exprs.push(&unwrapped.slice);
+                type_exprs.push(unwrapped.slice.as_ref());
             } else {
                 other_exprs.push(expr);
             }
         }
     };
 
-    traverse_union(&mut collect_type_exprs, checker.semantic(), union, None);
+    traverse_union(&mut collect_type_exprs, checker.semantic(), union);
 
     if type_exprs.len() > 1 {
         let type_members: Vec<String> = type_exprs
             .clone()
             .into_iter()
-            .map(|type_expr| checker.locator().slice(type_expr.as_ref()).to_string())
+            .map(|type_expr| checker.locator().slice(type_expr).to_string())
             .collect();
 
         let mut diagnostic = Diagnostic::new(
@@ -170,31 +159,25 @@ pub(crate) fn unnecessary_type_union<'a>(checker: &mut Checker, union: &'a Expr)
                     checker.generator().expr(&union)
                 }
             } else {
-                let types = &Expr::Subscript(ast::ExprSubscript {
+                let elts: Vec<Expr> = type_exprs.into_iter().cloned().collect();
+                let types = Expr::Subscript(ast::ExprSubscript {
                     value: Box::new(Expr::Name(ast::ExprName {
                         id: "type".into(),
                         ctx: ExprContext::Load,
                         range: TextRange::default(),
                     })),
-                    slice: Box::new(concatenate_bin_ors(
-                        type_exprs
-                            .clone()
-                            .into_iter()
-                            .map(std::convert::AsRef::as_ref)
-                            .collect(),
-                    )),
+                    slice: Box::new(pep_604_union(&elts)),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
                 });
 
                 if other_exprs.is_empty() {
-                    checker.generator().expr(types)
+                    checker.generator().expr(&types)
                 } else {
-                    let mut exprs = Vec::new();
-                    exprs.push(types);
-                    exprs.extend(other_exprs);
-
-                    checker.generator().expr(&concatenate_bin_ors(exprs))
+                    let elts: Vec<Expr> = std::iter::once(types)
+                        .chain(other_exprs.into_iter().cloned())
+                        .collect();
+                    checker.generator().expr(&pep_604_union(&elts))
                 }
             };
 

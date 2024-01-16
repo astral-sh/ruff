@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S411.py:1:8: S411 XMLRPC is vulnerable to remote XML attacks
+  |
+1 | import xmlrpc  # S411
+  |        ^^^^^^ S411
+2 | from xmlrpc import server  # S411
+  |
+
+S411.py:2:6: S411 XMLRPC is vulnerable to remote XML attacks
+  |
+1 | import xmlrpc  # S411
+2 | from xmlrpc import server  # S411
+  |      ^^^^^^ S411
+  |
+
+

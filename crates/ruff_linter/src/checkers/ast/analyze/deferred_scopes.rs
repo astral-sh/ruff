@@ -1,12 +1,14 @@
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{Binding, BindingKind, ScopeKind};
+use ruff_python_semantic::{Binding, BindingKind, Imported, ScopeKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Rule;
+use crate::fix;
 use crate::rules::{
-    flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint, ruff,
+    flake8_builtins, flake8_pyi, flake8_type_checking, flake8_unused_arguments, pyflakes, pylint,
+    ruff,
 };
 
 /// Run lint rules over all deferred scopes in the [`SemanticModel`].
@@ -27,6 +29,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
         Rule::UndefinedLocal,
         Rule::UnusedAnnotation,
         Rule::UnusedClassMethodArgument,
+        Rule::BuiltinAttributeShadowing,
         Rule::UnusedFunctionArgument,
         Rule::UnusedImport,
         Rule::UnusedLambdaArgument,
@@ -75,7 +78,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     };
 
     let mut diagnostics: Vec<Diagnostic> = vec![];
-    for scope_id in checker.deferred.scopes.iter().rev().copied() {
+    for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
 
         if checker.enabled(Rule::UndefinedLocal) {
@@ -145,20 +148,17 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
-                        binding.source.map_or(true, |right| {
-                            checker.semantic.different_branches(left, right)
-                        })
+                        binding
+                            .source
+                            .map_or(true, |right| !checker.semantic.same_branch(left, right))
                     }) {
                         continue;
                     }
 
-                    #[allow(deprecated)]
-                    let line = checker.locator.compute_line_index(shadowed.start());
-
                     checker.diagnostics.push(Diagnostic::new(
                         pyflakes::rules::ImportShadowedByLoopVar {
                             name: name.to_string(),
-                            line,
+                            row: checker.compute_source_row(shadowed.start()),
                         },
                         binding.range(),
                     ));
@@ -237,25 +237,47 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
                     // If the bindings are in different forks, abort.
                     if shadowed.source.map_or(true, |left| {
-                        binding.source.map_or(true, |right| {
-                            checker.semantic.different_branches(left, right)
-                        })
+                        binding
+                            .source
+                            .map_or(true, |right| !checker.semantic.same_branch(left, right))
                     }) {
                         continue;
                     }
 
-                    #[allow(deprecated)]
-                    let line = checker.locator.compute_line_index(shadowed.start());
                     let mut diagnostic = Diagnostic::new(
                         pyflakes::rules::RedefinedWhileUnused {
                             name: (*name).to_string(),
-                            line,
+                            row: checker.compute_source_row(shadowed.start()),
                         },
                         binding.range(),
                     );
+
                     if let Some(range) = binding.parent_range(&checker.semantic) {
                         diagnostic.set_parent(range.start());
                     }
+
+                    if checker.settings.preview.is_enabled() {
+                        if let Some(import) = binding.as_any_import() {
+                            if let Some(source) = binding.source {
+                                diagnostic.try_set_fix(|| {
+                                    let statement = checker.semantic().statement(source);
+                                    let parent = checker.semantic().parent_statement(source);
+                                    let edit = fix::edits::remove_unused_imports(
+                                        std::iter::once(import.member_name().as_ref()),
+                                        statement,
+                                        parent,
+                                        checker.locator(),
+                                        checker.stylist(),
+                                        checker.indexer(),
+                                    )?;
+                                    Ok(Fix::safe_edit(edit).isolate(Checker::isolation(
+                                        checker.semantic().parent_statement_id(source),
+                                    )))
+                                });
+                            }
+                        }
+                    }
+
                     diagnostics.push(diagnostic);
                 }
             }
@@ -276,6 +298,18 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
         if checker.enabled(Rule::AsyncioDanglingTask) {
             ruff::rules::asyncio_dangling_binding(scope, &checker.semantic, &mut diagnostics);
+        }
+
+        if let Some(class_def) = scope.kind.as_class() {
+            if checker.enabled(Rule::BuiltinAttributeShadowing) {
+                flake8_builtins::rules::builtin_attribute_shadowing(
+                    checker,
+                    scope_id,
+                    scope,
+                    class_def,
+                    &mut diagnostics,
+                );
+            }
         }
 
         if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Lambda(_)) {

@@ -180,7 +180,7 @@ mod tests {
     use super::num_branches;
 
     fn test_helper(source: &str, expected_num_branches: usize) -> Result<()> {
-        let branches = parse_suite(source, "<filename>")?;
+        let branches = parse_suite(source)?;
         assert_eq!(num_branches(&branches), expected_num_branches);
         Ok(())
     }

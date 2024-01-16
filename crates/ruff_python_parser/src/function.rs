@@ -148,7 +148,7 @@ mod tests {
             $(
                 #[test]
                 fn $name() {
-                    let parse_ast = crate::parser::parse_suite($code, "<test>");
+                    let parse_ast = crate::parser::parse_suite($code, );
                     insta::assert_debug_snapshot!(parse_ast);
                 }
             )*
@@ -179,7 +179,7 @@ mod tests {
     }
 
     fn function_parse_error(src: &str) -> LexicalErrorType {
-        let parse_ast = parse_suite(src, "<test>");
+        let parse_ast = parse_suite(src);
         parse_ast
             .map_err(|e| match e.error {
                 ParseErrorType::Lexical(e) => e,

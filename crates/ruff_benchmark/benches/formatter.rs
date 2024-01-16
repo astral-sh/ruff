@@ -65,7 +65,7 @@ fn benchmark_formatter(criterion: &mut Criterion) {
                 let comment_ranges = comment_ranges.finish();
 
                 // Parse the AST.
-                let module = parse_tokens(tokens, case.code(), Mode::Module, "<filename>")
+                let module = parse_tokens(tokens, case.code(), Mode::Module)
                     .expect("Input to be a valid python program");
 
                 b.iter(|| {

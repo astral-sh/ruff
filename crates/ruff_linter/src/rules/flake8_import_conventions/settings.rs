@@ -1,7 +1,9 @@
 //! Settings for import conventions.
 
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::fmt::{Display, Formatter};
 
+use crate::display_settings;
 use ruff_macros::CacheKey;
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
@@ -42,5 +44,20 @@ impl Default for Settings {
             banned_aliases: FxHashMap::default(),
             banned_from: FxHashSet::default(),
         }
+    }
+}
+
+impl Display for Settings {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        display_settings! {
+            formatter = f,
+            namespace = "linter.flake8_import_conventions",
+            fields = [
+                self.aliases | debug,
+                self.banned_aliases | debug,
+                self.banned_from | array,
+            ]
+        }
+        Ok(())
     }
 }

@@ -25,10 +25,9 @@ use ruff_notebook::NotebookIndex;
 use ruff_python_ast::imports::ImportMap;
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::{TextRange, TextSize};
-use ruff_workspace::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy, Resolver};
+use ruff_workspace::resolver::Resolver;
 use ruff_workspace::Settings;
 
-use crate::cache;
 use crate::diagnostics::Diagnostics;
 
 /// [`Path`] that is relative to the package root in [`PackageCache`].
@@ -86,6 +85,7 @@ pub(crate) struct Cache {
     changes: Mutex<Vec<Change>>,
     /// The "current" timestamp used as cache for the updates of
     /// [`FileCache::last_seen`]
+    #[allow(clippy::struct_field_names)]
     last_seen_cache: u64,
 }
 
@@ -442,7 +442,7 @@ pub(super) struct CacheMessage {
 pub(crate) trait PackageCaches {
     fn get(&self, package_root: &Path) -> Option<&Cache>;
 
-    fn persist(self) -> anyhow::Result<()>;
+    fn persist(self) -> Result<()>;
 }
 
 impl<T> PackageCaches for Option<T>
@@ -468,27 +468,17 @@ pub(crate) struct PackageCacheMap<'a>(FxHashMap<&'a Path, Cache>);
 
 impl<'a> PackageCacheMap<'a> {
     pub(crate) fn init(
-        pyproject_config: &PyprojectConfig,
         package_roots: &FxHashMap<&'a Path, Option<&'a Path>>,
         resolver: &Resolver,
     ) -> Self {
         fn init_cache(path: &Path) {
-            if let Err(e) = cache::init(path) {
+            if let Err(e) = init(path) {
                 error!("Failed to initialize cache at {}: {e:?}", path.display());
             }
         }
 
-        match pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => {
-                init_cache(&pyproject_config.settings.cache_dir);
-            }
-            PyprojectDiscoveryStrategy::Hierarchical => {
-                for settings in
-                    std::iter::once(&pyproject_config.settings).chain(resolver.settings())
-                {
-                    init_cache(&settings.cache_dir);
-                }
-            }
+        for settings in resolver.settings() {
+            init_cache(&settings.cache_dir);
         }
 
         Self(
@@ -498,7 +488,7 @@ impl<'a> PackageCacheMap<'a> {
                 .unique()
                 .par_bridge()
                 .map(|cache_root| {
-                    let settings = resolver.resolve(cache_root, pyproject_config);
+                    let settings = resolver.resolve(cache_root);
                     let cache = Cache::open(cache_root.to_path_buf(), settings);
                     (cache_root, cache)
                 })

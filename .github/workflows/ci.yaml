@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v40
+      - uses: tj-actions/changed-files@v41
         id: changed
         with:
           files_yaml: |
@@ -95,9 +95,9 @@ jobs:
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: "Clippy"
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
+        run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
   cargo-test-linux:
     runs-on: ubuntu-latest
@@ -180,7 +180,7 @@ jobs:
       - name: "Install cargo-fuzz"
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-fuzz@0.11
+          tool: cargo-fuzz@0.11.2
       - run: cargo fuzz build -s none
 
   scripts:

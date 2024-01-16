@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: "weekly"
     labels: ["internal"]
+    groups:
+      actions:
+        patterns:
+          - "*"
 
   - package-ecosystem: "cargo"
     directory: "/"

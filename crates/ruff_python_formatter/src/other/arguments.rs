@@ -6,10 +6,11 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::comments::SourceComment;
 use crate::expression::expr_generator_exp::GeneratorExpParentheses;
 use crate::expression::is_expression_huggable;
-use crate::expression::parentheses::{empty_parenthesized, parenthesized, Parentheses};
+use crate::expression::parentheses::{
+    empty_parenthesized, parenthesized, HuggingStyle, Parentheses,
+};
 use crate::other::commas;
 use crate::prelude::*;
-use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 #[derive(Default)]
 pub struct FormatArguments;
@@ -107,7 +108,7 @@ impl FormatNodeRule<Arguments> for FormatArguments {
                 // )
                 // ```
                 parenthesized("(", &group(&all_arguments), ")")
-                    .with_indent(!is_argument_huggable(item, f.context()))
+                    .with_hugging(is_arguments_huggable(item, f.context()))
                     .with_dangling_comments(dangling_comments)
             ]
         )
@@ -177,29 +178,23 @@ fn is_single_argument_parenthesized(argument: &Expr, call_end: TextSize, source:
 ///
 /// Hugging should only be applied to single-argument collections, like lists, or starred versions
 /// of those collections.
-fn is_argument_huggable(item: &Arguments, context: &PyFormatContext) -> bool {
-    if !is_hug_parens_with_braces_and_square_brackets_enabled(context) {
-        return false;
-    }
-
+fn is_arguments_huggable(item: &Arguments, context: &PyFormatContext) -> Option<HuggingStyle> {
     // Find the lone argument or `**kwargs` keyword.
     let arg = match (item.args.as_slice(), item.keywords.as_slice()) {
         ([arg], []) => arg,
         ([], [keyword]) if keyword.arg.is_none() && !context.comments().has(keyword) => {
             &keyword.value
         }
-        _ => return false,
+        _ => return None,
     };
 
     // If the expression itself isn't huggable, then we can't hug it.
-    if !is_expression_huggable(arg, context) {
-        return false;
-    }
+    let hugging_style = is_expression_huggable(arg, context)?;
 
     // If the expression has leading or trailing comments, then we can't hug it.
     let comments = context.comments().leading_dangling_trailing(arg);
     if comments.has_leading() || comments.has_trailing() {
-        return false;
+        return None;
     }
 
     let options = context.options();
@@ -208,8 +203,8 @@ fn is_argument_huggable(item: &Arguments, context: &PyFormatContext) -> bool {
     if options.magic_trailing_comma().is_respect()
         && commas::has_magic_trailing_comma(TextRange::new(arg.end(), item.end()), options, context)
     {
-        return false;
+        return None;
     }
 
-    true
+    Some(hugging_style)
 }

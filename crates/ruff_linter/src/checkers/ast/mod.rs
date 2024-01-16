@@ -37,7 +37,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
-use ruff_notebook::CellOffsets;
+use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::all::{extract_all_names, DunderAllFlags};
 use ruff_python_ast::helpers::{
     collect_import_from_member, extract_handled_exceptions, to_module_path,
@@ -52,14 +52,13 @@ use ruff_python_parser::typing::{parse_type_annotation, AnnotationKind};
 use ruff_python_semantic::analyze::{imports, typing, visibility};
 use ruff_python_semantic::{
     BindingFlags, BindingId, BindingKind, Exceptions, Export, FromImport, Globals, Import, Module,
-    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, Snapshot,
-    StarImport, SubmoduleImport,
+    ModuleKind, NodeId, ScopeId, ScopeKind, SemanticModel, SemanticModelFlags, StarImport,
+    SubmoduleImport,
 };
 use ruff_python_stdlib::builtins::{IPYTHON_BUILTINS, MAGIC_GLOBALS, PYTHON_BUILTINS};
-use ruff_source_file::Locator;
+use ruff_source_file::{Locator, OneIndexed, SourceRow};
 
 use crate::checkers::ast::annotation::AnnotationContext;
-use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
@@ -83,6 +82,8 @@ pub(crate) struct Checker<'a> {
     pub(crate) source_type: PySourceType,
     /// The [`CellOffsets`] for the current file, if it's a Jupyter notebook.
     cell_offsets: Option<&'a CellOffsets>,
+    /// The [`NotebookIndex`] for the current file, if it's a Jupyter notebook.
+    notebook_index: Option<&'a NotebookIndex>,
     /// The [`flags::Noqa`] for the current analysis (i.e., whether to respect suppression
     /// comments).
     noqa: flags::Noqa,
@@ -103,8 +104,10 @@ pub(crate) struct Checker<'a> {
     importer: Importer<'a>,
     /// The [`SemanticModel`], built up over the course of the AST traversal.
     semantic: SemanticModel<'a>,
-    /// A set of deferred nodes to be processed after the current traversal (e.g., function bodies).
-    deferred: Deferred<'a>,
+    /// A set of deferred nodes to be visited after the current traversal (e.g., function bodies).
+    visit: deferred::Visit<'a>,
+    /// A set of deferred nodes to be analyzed after the AST traversal (e.g., `for` loops).
+    analyze: deferred::Analyze,
     /// The cumulative set of diagnostics computed across all lint rules.
     pub(crate) diagnostics: Vec<Diagnostic>,
     /// The list of names already seen by flake8-bugbear diagnostics, to avoid duplicate violations..
@@ -128,6 +131,7 @@ impl<'a> Checker<'a> {
         importer: Importer<'a>,
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
+        notebook_index: Option<&'a NotebookIndex>,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -142,10 +146,12 @@ impl<'a> Checker<'a> {
             indexer,
             importer,
             semantic: SemanticModel::new(&settings.typing_modules, path, module),
-            deferred: Deferred::default(),
+            visit: deferred::Visit::default(),
+            analyze: deferred::Analyze::default(),
             diagnostics: Vec::default(),
             flake8_bugbear_seen: Vec::default(),
             cell_offsets,
+            notebook_index,
             last_stmt_end: TextSize::default(),
         }
     }
@@ -195,6 +201,20 @@ impl<'a> Checker<'a> {
             "'" => Some(Quote::Double),
             "\"" => Some(Quote::Single),
             _ => None,
+        }
+    }
+
+    /// Returns the [`SourceRow`] for the given offset.
+    pub(crate) fn compute_source_row(&self, offset: TextSize) -> SourceRow {
+        #[allow(deprecated)]
+        let line = self.locator.compute_line_index(offset);
+
+        if let Some(notebook_index) = self.notebook_index {
+            let cell = notebook_index.cell(line).unwrap_or(OneIndexed::MIN);
+            let line = notebook_index.cell_row(line).unwrap_or(OneIndexed::MIN);
+            SourceRow::Notebook { cell, line }
+        } else {
+            SourceRow::SourceFile { line }
         }
     }
 
@@ -287,7 +307,18 @@ where
 
         // Track whether we've seen docstrings, non-imports, etc.
         match stmt {
+            Stmt::Expr(ast::StmtExpr { value, .. })
+                if !self
+                    .semantic
+                    .flags
+                    .intersects(SemanticModelFlags::MODULE_DOCSTRING)
+                    && value.is_string_literal_expr() =>
+            {
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+            }
             Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
+
                 // Allow __future__ imports until we see a non-__future__ import.
                 if let Some("__future__") = module.as_deref() {
                     if names
@@ -301,9 +332,11 @@ where
                 }
             }
             Stmt::Import(_) => {
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
+                self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING;
                 self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !(self.semantic.seen_import_boundary()
                     || helpers::is_assignment_to_a_dunder(stmt)
@@ -565,7 +598,7 @@ where
                 self.semantic.push_scope(ScopeKind::Function(function_def));
                 self.semantic.flags -= SemanticModelFlags::EXCEPTION_HANDLER;
 
-                self.deferred.functions.push(self.semantic.snapshot());
+                self.visit.functions.push(self.semantic.snapshot());
 
                 // Extract any global bindings from the function body.
                 if let Some(globals) = Globals::from_body(body) {
@@ -621,7 +654,7 @@ where
                 if let Some(type_params) = type_params {
                     self.visit_type_params(type_params);
                 }
-                self.deferred
+                self.visit
                     .type_param_definitions
                     .push((value, self.semantic.snapshot()));
                 self.semantic.pop_scope();
@@ -754,7 +787,7 @@ where
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
-                self.deferred.scopes.push(scope_id);
+                self.analyze.scopes.push(scope_id);
                 self.semantic.pop_scope(); // Function scope
                 self.semantic.pop_definition();
                 self.semantic.pop_scope(); // Type parameter scope
@@ -767,7 +800,7 @@ where
             }
             Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
                 let scope_id = self.semantic.scope_id;
-                self.deferred.scopes.push(scope_id);
+                self.analyze.scopes.push(scope_id);
                 self.semantic.pop_scope(); // Class scope
                 self.semantic.pop_definition();
                 self.semantic.pop_scope(); // Type parameter scope
@@ -804,13 +837,13 @@ where
             && self.semantic.future_annotations()
         {
             if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                self.deferred.string_type_definitions.push((
+                self.visit.string_type_definitions.push((
                     expr.range(),
                     value.to_str(),
                     self.semantic.snapshot(),
                 ));
             } else {
-                self.deferred
+                self.visit
                     .future_type_definitions
                     .push((expr, self.semantic.snapshot()));
             }
@@ -914,7 +947,8 @@ where
                 }
 
                 self.semantic.push_scope(ScopeKind::Lambda(lambda));
-                self.deferred.lambdas.push(self.semantic.snapshot());
+                self.visit.lambdas.push(self.semantic.snapshot());
+                self.analyze.lambdas.push(self.semantic.snapshot());
             }
             Expr::IfExp(ast::ExprIfExp {
                 test,
@@ -1221,7 +1255,7 @@ where
             }
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 if self.semantic.in_type_definition() && !self.semantic.in_typing_literal() {
-                    self.deferred.string_type_definitions.push((
+                    self.visit.string_type_definitions.push((
                         expr.range(),
                         value.to_str(),
                         self.semantic.snapshot(),
@@ -1242,7 +1276,7 @@ where
             | Expr::ListComp(_)
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
-                self.deferred.scopes.push(self.semantic.scope_id);
+                self.analyze.scopes.push(self.semantic.scope_id);
                 self.semantic.pop_scope();
             }
             _ => {}
@@ -1416,7 +1450,7 @@ where
             bound: Some(bound), ..
         }) = type_param
         {
-            self.deferred
+            self.visit
                 .type_param_definitions
                 .push((bound, self.semantic.snapshot()));
         }
@@ -1435,11 +1469,8 @@ where
 
 impl<'a> Checker<'a> {
     /// Visit a [`Module`]. Returns `true` if the module contains a module-level docstring.
-    fn visit_module(&mut self, python_ast: &'a Suite) -> bool {
+    fn visit_module(&mut self, python_ast: &'a Suite) {
         analyze::module(python_ast, self);
-
-        let docstring = docstrings::extraction::docstring_from(python_ast);
-        docstring.is_some()
     }
 
     /// Visit a list of [`Comprehension`] nodes, assumed to be the comprehensions that compose a
@@ -1745,10 +1776,13 @@ impl<'a> Checker<'a> {
             return;
         }
 
+        // If the expression is the left-hand side of a walrus operator, then it's a named
+        // expression assignment.
         if self
             .semantic
             .current_expressions()
-            .any(Expr::is_named_expr_expr)
+            .filter_map(Expr::as_named_expr_expr)
+            .any(|parent| parent.target.as_ref() == expr)
         {
             self.add_binding(id, expr.range(), BindingKind::NamedExprAssignment, flags);
             return;
@@ -1778,8 +1812,8 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_future_type_definitions(&mut self) {
         let snapshot = self.semantic.snapshot();
-        while !self.deferred.future_type_definitions.is_empty() {
-            let type_definitions = std::mem::take(&mut self.deferred.future_type_definitions);
+        while !self.visit.future_type_definitions.is_empty() {
+            let type_definitions = std::mem::take(&mut self.visit.future_type_definitions);
             for (expr, snapshot) in type_definitions {
                 self.semantic.restore(snapshot);
 
@@ -1793,8 +1827,8 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_type_param_definitions(&mut self) {
         let snapshot = self.semantic.snapshot();
-        while !self.deferred.type_param_definitions.is_empty() {
-            let type_params = std::mem::take(&mut self.deferred.type_param_definitions);
+        while !self.visit.type_param_definitions.is_empty() {
+            let type_params = std::mem::take(&mut self.visit.type_param_definitions);
             for (type_param, snapshot) in type_params {
                 self.semantic.restore(snapshot);
 
@@ -1808,8 +1842,8 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         let snapshot = self.semantic.snapshot();
-        while !self.deferred.string_type_definitions.is_empty() {
-            let type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
+        while !self.visit.string_type_definitions.is_empty() {
+            let type_definitions = std::mem::take(&mut self.visit.string_type_definitions);
             for (range, value, snapshot) in type_definitions {
                 if let Ok((expr, kind)) =
                     parse_type_annotation(value, range, self.locator.contents())
@@ -1856,8 +1890,8 @@ impl<'a> Checker<'a> {
 
     fn visit_deferred_functions(&mut self) {
         let snapshot = self.semantic.snapshot();
-        while !self.deferred.functions.is_empty() {
-            let deferred_functions = std::mem::take(&mut self.deferred.functions);
+        while !self.visit.functions.is_empty() {
+            let deferred_functions = std::mem::take(&mut self.visit.functions);
             for snapshot in deferred_functions {
                 self.semantic.restore(snapshot);
 
@@ -1875,11 +1909,12 @@ impl<'a> Checker<'a> {
         self.semantic.restore(snapshot);
     }
 
+    /// Visit all deferred lambdas. Returns a list of snapshots, such that the caller can restore
+    /// the semantic model to the state it was in before visiting the deferred lambdas.
     fn visit_deferred_lambdas(&mut self) {
         let snapshot = self.semantic.snapshot();
-        let mut deferred: Vec<Snapshot> = Vec::with_capacity(self.deferred.lambdas.len());
-        while !self.deferred.lambdas.is_empty() {
-            let lambdas = std::mem::take(&mut self.deferred.lambdas);
+        while !self.visit.lambdas.is_empty() {
+            let lambdas = std::mem::take(&mut self.visit.lambdas);
             for snapshot in lambdas {
                 self.semantic.restore(snapshot);
 
@@ -1896,13 +1931,21 @@ impl<'a> Checker<'a> {
                     self.visit_parameters(parameters);
                 }
                 self.visit_expr(body);
-
-                deferred.push(snapshot);
             }
         }
-        // Reset the deferred lambdas, so we can analyze them later on.
-        self.deferred.lambdas = deferred;
         self.semantic.restore(snapshot);
+    }
+
+    /// Recursively visit all deferred AST nodes, including lambdas, functions, and type
+    /// annotations.
+    fn visit_deferred(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
+        while !self.visit.is_empty() {
+            self.visit_deferred_functions();
+            self.visit_deferred_type_param_definitions();
+            self.visit_deferred_lambdas();
+            self.visit_deferred_future_type_definitions();
+            self.visit_deferred_string_type_definitions(allocator);
+        }
     }
 
     /// Run any lint rules that operate over the module exports (i.e., members of `__all__`).
@@ -1971,6 +2014,7 @@ pub(crate) fn check_ast(
     package: Option<&Path>,
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
+    notebook_index: Option<&NotebookIndex>,
 ) -> Vec<Diagnostic> {
     let module_path = package.and_then(|package| to_module_path(package, path));
     let module = Module {
@@ -2000,28 +2044,19 @@ pub(crate) fn check_ast(
         Importer::new(python_ast, locator, stylist),
         source_type,
         cell_offsets,
+        notebook_index,
     );
     checker.bind_builtins();
 
-    // Check for module docstring.
-    let python_ast = if checker.visit_module(python_ast) {
-        &python_ast[1..]
-    } else {
-        python_ast
-    };
-
     // Iterate over the AST.
+    checker.visit_module(python_ast);
     checker.visit_body(python_ast);
 
     // Visit any deferred syntax nodes. Take care to visit in order, such that we avoid adding
     // new deferred nodes after visiting nodes of that kind. For example, visiting a deferred
     // function can add a deferred lambda, but the opposite is not true.
-    checker.visit_deferred_functions();
-    checker.visit_deferred_type_param_definitions();
-    checker.visit_deferred_future_type_definitions();
     let allocator = typed_arena::Arena::new();
-    checker.visit_deferred_string_type_definitions(&allocator);
-    checker.visit_deferred_lambdas();
+    checker.visit_deferred(&allocator);
     checker.visit_exports();
 
     // Check docstrings, bindings, and unresolved references.
@@ -2033,7 +2068,7 @@ pub(crate) fn check_ast(
 
     // Reset the scope to module-level, and check all consumed scopes.
     checker.semantic.scope_id = ScopeId::global();
-    checker.deferred.scopes.push(ScopeId::global());
+    checker.analyze.scopes.push(ScopeId::global());
     analyze::deferred_scopes(&mut checker);
 
     checker.diagnostics

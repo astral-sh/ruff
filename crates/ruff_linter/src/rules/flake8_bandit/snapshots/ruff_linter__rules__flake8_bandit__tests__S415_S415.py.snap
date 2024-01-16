@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+S415.py:1:8: S415 An IPMI-related module is being imported. Prefer an encrypted protocol over IPMI.
+  |
+1 | import pyghmi  # S415
+  |        ^^^^^^ S415
+2 | from pyghmi import foo  # S415
+  |
+
+S415.py:2:6: S415 An IPMI-related module is being imported. Prefer an encrypted protocol over IPMI.
+  |
+1 | import pyghmi  # S415
+2 | from pyghmi import foo  # S415
+  |      ^^^^^^ S415
+  |
+
+

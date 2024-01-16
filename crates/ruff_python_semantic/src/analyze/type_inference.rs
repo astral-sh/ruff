@@ -436,7 +436,7 @@ mod tests {
     use crate::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 
     fn parse(expression: &str) -> Expr {
-        parse_expression(expression, "").unwrap()
+        parse_expression(expression).unwrap()
     }
 
     #[test]

@@ -48,9 +48,6 @@ pub(crate) fn no_newline_at_end_of_file(
     }
 
     if !source.ends_with(['\n', '\r']) {
-        // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
-        // want to raise W292 anyway).
-        // Both locations are at the end of the file (and thus the same).
         let range = TextRange::empty(locator.contents().text_len());
 
         let mut diagnostic = Diagnostic::new(MissingNewlineAtEndOfFile, range);
@@ -60,5 +57,6 @@ pub(crate) fn no_newline_at_end_of_file(
         )));
         return Some(diagnostic);
     }
+
     None
 }

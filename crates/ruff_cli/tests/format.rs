@@ -329,6 +329,32 @@ OTHER = "OTHER"
 }
 
 #[test]
+fn syntax_error() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    fs::write(
+        tempdir.path().join("main.py"),
+        r#"
+from module import =
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .args(["format", "--no-cache", "--isolated", "--check"])
+        .arg("main.py"), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to parse main.py:2:20: Unexpected token '='
+    "###);
+
+    Ok(())
+}
+
+#[test]
 fn messages() -> Result<()> {
     let tempdir = TempDir::new()?;
 
@@ -646,7 +672,8 @@ format = "json"
 
         ----- stderr -----
         ruff failed
-          Cause: Failed to parse `[RUFF-TOML-PATH]`: TOML parse error at line 2, column 10
+          Cause: Failed to parse [RUFF-TOML-PATH]
+          Cause: TOML parse error at line 2, column 10
           |
         2 | format = "json"
           |          ^^^^^^
@@ -1440,4 +1467,74 @@ fn test_notebook_trailing_semicolon() {
 
     ----- stderr -----
     "###);
+}
+
+#[test]
+fn extension() -> Result<()> {
+    let tempdir = TempDir::new()?;
+
+    let ruff_toml = tempdir.path().join("ruff.toml");
+    fs::write(
+        &ruff_toml,
+        r#"
+include = ["*.ipy"]
+"#,
+    )?;
+
+    fs::write(
+        tempdir.path().join("main.ipy"),
+        r#"
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ad6f36d9-4b7d-4562-8d00-f15a0f1fbb6d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "x=1"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.12.0"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
+"#,
+    )?;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .current_dir(tempdir.path())
+        .arg("format")
+        .arg("--no-cache")
+        .args(["--config", &ruff_toml.file_name().unwrap().to_string_lossy()])
+        .args(["--extension", "ipy:ipynb"])
+        .arg("."), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    1 file reformatted
+
+    ----- stderr -----
+    "###);
+    Ok(())
 }

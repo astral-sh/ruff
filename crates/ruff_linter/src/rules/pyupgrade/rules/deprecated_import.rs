@@ -332,7 +332,12 @@ const BACKPORTS_STR_ENUM_TO_ENUM_311: &[&str] = &["StrEnum"];
 
 // Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
-    "NamedTuple",
+    // Introduced in Python 3.12, but `typing_extensions` backports some bug fixes.
+    // "NamedTuple",
+
+    // Introduced in Python 3.12, but `typing_extensions` backports support for PEP 705.
+    // "TypedDict",
+
     // Introduced in Python 3.8, but `typing_extensions` backports a ton of optimizations that were
     // added in Python 3.12.
     "Protocol",
@@ -342,12 +347,19 @@ const TYPING_EXTENSIONS_TO_TYPING_312: &[&str] = &[
     "SupportsFloat",
     "SupportsInt",
     "SupportsRound",
-    "TypedDict",
+    "TypeAliasType",
     "Unpack",
     // Introduced in Python 3.11, but `typing_extensions` backports the `frozen_default` argument,
     // which was introduced in Python 3.12.
     "dataclass_transform",
+    "override",
 ];
+
+// Members of `typing_extensions` that were moved to `collections.abc`.
+const TYPING_EXTENSIONS_TO_COLLECTIONS_ABC_312: &[&str] = &["Buffer"];
+
+// Members of `typing_extensions` that were moved to `types`.
+const TYPING_EXTENSIONS_TO_TYPES_312: &[&str] = &["get_original_bases"];
 
 struct ImportReplacer<'a> {
     stmt: &'a Stmt,
@@ -417,6 +429,28 @@ impl<'a> ImportReplacer<'a> {
                 }
             }
             "typing_extensions" => {
+                // `typing_extensions` to `collections.abc`
+                let mut typing_extensions_to_collections_abc = vec![];
+                if self.version >= PythonVersion::Py312 {
+                    typing_extensions_to_collections_abc
+                        .extend(TYPING_EXTENSIONS_TO_COLLECTIONS_ABC_312);
+                }
+                if let Some(operation) =
+                    self.try_replace(&typing_extensions_to_collections_abc, "collections.abc")
+                {
+                    operations.push(operation);
+                }
+
+                // `typing_extensions` to `types`
+                let mut typing_extensions_to_types = vec![];
+                if self.version >= PythonVersion::Py312 {
+                    typing_extensions_to_types.extend(TYPING_EXTENSIONS_TO_TYPES_312);
+                }
+                if let Some(operation) = self.try_replace(&typing_extensions_to_types, "types") {
+                    operations.push(operation);
+                }
+
+                // `typing_extensions` to `typing`
                 let mut typing_extensions_to_typing = TYPING_EXTENSIONS_TO_TYPING.to_vec();
                 if self.version >= PythonVersion::Py37 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_37);

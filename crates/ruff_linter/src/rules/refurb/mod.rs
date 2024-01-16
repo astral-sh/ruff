@@ -27,6 +27,8 @@ mod tests {
     #[test_case(Rule::PrintEmptyString, Path::new("FURB105.py"))]
     #[test_case(Rule::ImplicitCwd, Path::new("FURB177.py"))]
     #[test_case(Rule::SingleItemMembershipTest, Path::new("FURB171.py"))]
+    #[test_case(Rule::BitCount, Path::new("FURB161.py"))]
+    #[test_case(Rule::RegexFlagAlias, Path::new("FURB167.py"))]
     #[test_case(Rule::IsinstanceTypeNone, Path::new("FURB168.py"))]
     #[test_case(Rule::TypeNoneComparison, Path::new("FURB169.py"))]
     #[test_case(Rule::RedundantLogBase, Path::new("FURB163.py"))]

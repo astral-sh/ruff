@@ -23,7 +23,7 @@ mod tests {
     use ruff_source_file::Locator;
     use ruff_text_size::Ranged;
 
-    use crate::linter::{check_path, LinterResult};
+    use crate::linter::{check_path, LinterResult, TokenSource};
     use crate::registry::{AsRule, Linter, Rule};
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -53,9 +53,13 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_18.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_19.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_20.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_21.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_22.py"))]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"))]
+    #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.ipynb"))]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"))]
-    #[test_case(Rule::LateFutureImport, Path::new("F404.py"))]
+    #[test_case(Rule::LateFutureImport, Path::new("F404_0.py"))]
+    #[test_case(Rule::LateFutureImport, Path::new("F404_1.py"))]
     #[test_case(Rule::UndefinedLocalWithImportStarUsage, Path::new("F405.py"))]
     #[test_case(Rule::UndefinedLocalWithNestedImportStarUsage, Path::new("F406.py"))]
     #[test_case(Rule::FutureFeatureNotDefined, Path::new("F407.py"))]
@@ -118,6 +122,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_24.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_25.py"))]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_26.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_27.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"))]
@@ -142,6 +147,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_21.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_22.ipynb"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_23.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_24.py"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_25.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"))]
@@ -163,6 +170,34 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_0.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_1.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_10.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_11.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_12.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_13.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_14.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_15.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_16.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_17.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_18.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_19.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_2.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_20.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_21.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_22.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_23.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_24.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_25.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_26.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_27.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_3.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_4.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_5.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_6.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_7.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_8.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_9.py"))]
     #[test_case(Rule::UnusedVariable, Path::new("F841_4.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
@@ -558,7 +593,6 @@ mod tests {
         } = check_path(
             Path::new("<filename>"),
             None,
-            tokens,
             &locator,
             &stylist,
             &indexer,
@@ -567,6 +601,7 @@ mod tests {
             flags::Noqa::Enabled,
             &source_kind,
             source_type,
+            TokenSource::Tokens(tokens),
         );
         diagnostics.sort_by_key(Ranged::start);
         let actual = diagnostics
