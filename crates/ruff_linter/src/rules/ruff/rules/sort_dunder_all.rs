@@ -956,7 +956,8 @@ fn multiline_dunder_all_postlude<'a>(
     }
     if TextSize::of(leading_indentation(
         postlude.trim_start_matches(newline_chars),
-    )) <= TextSize::of(item_indent) {
+    )) <= TextSize::of(item_indent)
+    {
         return Cow::Borrowed(postlude);
     }
     let trimmed_postlude = postlude.trim_start();
