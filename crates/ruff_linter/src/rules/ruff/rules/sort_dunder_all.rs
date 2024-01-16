@@ -161,7 +161,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     };
 
     let mut possibly_fixable = true;
-    let mut string_items = vec![];
+    let mut string_items = Vec::with_capacity(elts.len());
     for elt in elts {
         // Don't flag `__all__` definitions that contain non-strings
         let Some(string_literal) = elt.as_string_literal_expr() else {
@@ -180,7 +180,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
 
     if possibly_fixable {
-        if let Some(fix) = get_fix(range, elts, &string_items, &kind, checker) {
+        if let Some(fix) = create_fix(range, elts, &string_items, &kind, checker) {
             diagnostic.set_fix(fix);
         }
     }
@@ -312,7 +312,7 @@ impl InferredMemberType {
         if value.len() > 1 && is_cased_uppercase(value) {
             Self::Constant
         // E.g. `Class`
-        } else if value.chars().next().is_some_and(char::is_uppercase) {
+        } else if value.starts_with(char::is_uppercase) {
             Self::Class
         // E.g. `some_variable` or `some_function`
         } else {
@@ -330,7 +330,7 @@ impl InferredMemberType {
 /// `MultilineDunderAllValue::from_source_range()` encounters
 /// something it doesn't expect, meaning the violation
 /// is unfixable in this instance.
-fn get_fix(
+fn create_fix(
     range: TextRange,
     elts: &[ast::Expr],
     string_items: &[&str],
@@ -871,11 +871,11 @@ fn join_multiline_dunder_all_items(
     newline: &str,
     needs_trailing_comma: bool,
 ) -> String {
-    let max_index = sorted_items.len() - 1;
+    let last_item_index = sorted_items.len() - 1;
 
     let mut new_dunder_all = String::new();
     for (i, item) in sorted_items.iter().enumerate() {
-        let is_final_item = i == max_index;
+        let is_final_item = i == last_item_index;
         for comment_range in &item.preceding_comment_ranges {
             new_dunder_all.push_str(item_indent);
             new_dunder_all.push_str(locator.slice(comment_range));
