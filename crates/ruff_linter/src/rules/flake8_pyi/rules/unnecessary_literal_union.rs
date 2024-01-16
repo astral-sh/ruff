@@ -72,6 +72,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                     elts,
                     range: _,
                     ctx: _,
+                    parenthesized: _,
                 }) = slice.as_ref()
                 {
                     for expr in elts {
@@ -123,6 +124,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                 elts: literal_exprs.into_iter().cloned().collect(),
                 range: TextRange::default(),
                 ctx: ExprContext::Load,
+                parenthesized: true,
             })),
             range: TextRange::default(),
             ctx: ExprContext::Load,
@@ -148,6 +150,7 @@ pub(crate) fn unnecessary_literal_union<'a>(checker: &mut Checker, expr: &'a Exp
                             elts,
                             range: TextRange::default(),
                             ctx: ExprContext::Load,
+                            parenthesized: true,
                         })),
                         range: TextRange::default(),
                         ctx: ExprContext::Load,

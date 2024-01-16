@@ -116,6 +116,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                 elts,
                 ctx: _,
                 range: _,
+                parenthesized: _,
             }) = slice.as_ref()
             else {
                 return;
@@ -157,6 +158,7 @@ pub(crate) fn never_union(checker: &mut Checker, expr: &Expr) {
                                         elts: rest,
                                         ctx: ast::ExprContext::Load,
                                         range: TextRange::default(),
+                                        parenthesized: true,
                                     })),
                                     ctx: ast::ExprContext::Load,
                                     range: TextRange::default(),

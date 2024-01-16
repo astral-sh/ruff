@@ -15,7 +15,6 @@ use crate::builders::parenthesize_if_expands;
 use crate::comments::{leading_comments, trailing_comments, LeadingDanglingTrailingComments};
 use crate::context::{NodeLevel, WithNodeLevel};
 use crate::expression::expr_generator_exp::is_generator_parenthesized;
-use crate::expression::expr_tuple::is_tuple_parenthesized;
 use crate::expression::parentheses::{
     is_expression_parenthesized, optional_parentheses, parenthesized, HuggingStyle,
     NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize,
@@ -674,7 +673,10 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
                 return;
             }
 
-            Expr::Tuple(tuple) if is_tuple_parenthesized(tuple, self.context.source()) => {
+            Expr::Tuple(ast::ExprTuple {
+                parenthesized: true,
+                ..
+            }) => {
                 self.any_parenthesized_expressions = true;
                 // The values are always parenthesized, don't visit.
                 return;
@@ -1064,7 +1066,12 @@ pub(crate) fn has_own_parentheses(
             }
         }
 
-        Expr::Tuple(tuple) if is_tuple_parenthesized(tuple, context.source()) => {
+        Expr::Tuple(
+            tuple @ ast::ExprTuple {
+                parenthesized: true,
+                ..
+            },
+        ) => {
             if !tuple.elts.is_empty() || context.comments().has_dangling(AnyNodeRef::from(expr)) {
                 Some(OwnParentheses::NonEmpty)
             } else {

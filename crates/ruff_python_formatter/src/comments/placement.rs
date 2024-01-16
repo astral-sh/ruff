@@ -14,7 +14,6 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_generator_exp::is_generator_parenthesized;
 use crate::expression::expr_slice::{assign_comment_in_slice, ExprSliceCommentSection};
-use crate::expression::expr_tuple::is_tuple_parenthesized;
 use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
@@ -294,9 +293,10 @@ fn handle_enclosed_comment<'a>(
         | AnyNodeRef::ExprSet(_)
         | AnyNodeRef::ExprListComp(_)
         | AnyNodeRef::ExprSetComp(_) => handle_bracketed_end_of_line_comment(comment, locator),
-        AnyNodeRef::ExprTuple(tuple) if is_tuple_parenthesized(tuple, locator.contents()) => {
-            handle_bracketed_end_of_line_comment(comment, locator)
-        }
+        AnyNodeRef::ExprTuple(ast::ExprTuple {
+            parenthesized: true,
+            ..
+        }) => handle_bracketed_end_of_line_comment(comment, locator),
         AnyNodeRef::ExprGeneratorExp(generator)
             if is_generator_parenthesized(generator, locator.contents()) =>
         {

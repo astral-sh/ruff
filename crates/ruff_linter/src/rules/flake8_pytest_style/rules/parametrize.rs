@@ -330,6 +330,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                                 .collect(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             format!("({})", checker.generator().expr(&node)),
@@ -437,6 +438,7 @@ fn check_names(checker: &mut Checker, decorator: &Decorator, expr: &Expr) {
                             elts: elts.clone(),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
+                            parenthesized: true,
                         });
                         diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                             format!("({})", checker.generator().expr(&node)),
