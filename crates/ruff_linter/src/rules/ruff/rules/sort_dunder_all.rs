@@ -165,7 +165,7 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     };
 
     let elts_analysis = DunderAllSortClassification::from_elements(elts);
-    if elts_analysis.is_invalid() || elts_analysis.is_sorted() {
+    if elts_analysis.is_not_a_list_of_string_literals() || elts_analysis.is_sorted() {
         return;
     }
 
@@ -217,18 +217,25 @@ impl DunderAllKind<'_> {
     }
 }
 
-/// Determine whether an `__all__` tuple/list is sorted,
-/// unsorted, or invalid. If it's unsorted, determine whether
-/// there's a possibility that we could generate a fix for it.
+/// An enumeration of the possible conclusions we could come to
+/// regarding the ordering of the elements in an `__all__` definition:
+///
+/// 1. `__all__` is a list of string literals that is already sorted
+/// 2. `__all__` is an unsorted list of string literals,
+///    but we wouldn't be able to autofix it
+/// 3. `__all__` is an unsorted list of string literals,
+///    and it's possible we could generate a fix for it
+/// 4. `__all__` contains one or more items that are not string
+///    literals.
 ///
 /// ("Sorted" here means "ordered according to an isort-style sort".
 /// See the module-level docs for a definition of "isort-style sort.")
 #[derive(Debug, is_macro::Is)]
 enum DunderAllSortClassification<'a> {
     Sorted,
-    Invalid,
     UnsortedButUnfixable,
     UnsortedAndMaybeFixable { items: Vec<&'a str> },
+    NotAListOfStringLiterals,
 }
 
 impl<'a> DunderAllSortClassification<'a> {
@@ -237,32 +244,27 @@ impl<'a> DunderAllSortClassification<'a> {
             return Self::Sorted;
         };
         let Some(string_node) = first.as_string_literal_expr() else {
-            return Self::Invalid;
+            return Self::NotAListOfStringLiterals;
         };
-        let mut possibly_fixable = !string_node.value.is_implicit_concatenated();
         let mut this = string_node.value.to_str();
 
         for expr in rest {
             let Some(string_node) = expr.as_string_literal_expr() else {
-                return Self::Invalid;
+                return Self::NotAListOfStringLiterals;
             };
-            possibly_fixable |= string_node.value.is_implicit_concatenated();
             let next = string_node.value.to_str();
             if AllItemSortKey::from(next) < AllItemSortKey::from(this) {
-                if possibly_fixable {
-                    let mut items = Vec::with_capacity(elements.len());
-                    for expr in elements {
-                        let Some(string_node) = expr.as_string_literal_expr() else {
-                            return Self::Invalid;
-                        };
-                        if string_node.value.is_implicit_concatenated() {
-                            return Self::UnsortedButUnfixable;
-                        }
-                        items.push(string_node.value.to_str());
+                let mut items = Vec::with_capacity(elements.len());
+                for expr in elements {
+                    let Some(string_node) = expr.as_string_literal_expr() else {
+                        return Self::NotAListOfStringLiterals;
+                    };
+                    if string_node.value.is_implicit_concatenated() {
+                        return Self::UnsortedButUnfixable;
                     }
-                    return Self::UnsortedAndMaybeFixable { items };
+                    items.push(string_node.value.to_str());
                 }
-                return Self::UnsortedButUnfixable;
+                return Self::UnsortedAndMaybeFixable { items };
             }
             this = next;
         }
