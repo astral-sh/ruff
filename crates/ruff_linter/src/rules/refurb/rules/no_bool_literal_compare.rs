@@ -74,26 +74,45 @@ pub(crate) fn bool_literal_compare(checker: &mut Checker, compare: &ast::ExprCom
         return;
     };
 
-    let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next else {
-        return;
+    // we'll try to determine what they're doing, whether or not they're using a yoda comparison
+    let (expr, boolvalue) = match (comparator, next) {
+        (
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral { .. }),
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral { .. }),
+        ) => {
+            // they're comparing two bools, so we can't do anything here
+            return;
+        }
+        (
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                value: boolvalue, ..
+            }),
+            expr,
+        )
+        | (
+            expr,
+            Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                value: boolvalue, ..
+            }),
+        ) => (expr, boolvalue),
+        _ => {
+            return;
+        }
     };
 
-    let content;
-    let check_type;
-
-    match (op, value) {
+    let (content, check_type) = match (op, boolvalue) {
         (ast::CmpOp::Is | ast::CmpOp::Eq, true)
         | (ast::CmpOp::IsNot | ast::CmpOp::NotEq, false) => {
-            content = checker.generator().expr(comparator);
-            check_type = CheckType::Truthy;
+            (checker.generator().expr(expr), CheckType::Truthy)
         }
+
         (ast::CmpOp::Is | ast::CmpOp::Eq, false)
-        | (ast::CmpOp::IsNot | ast::CmpOp::NotEq, true) => {
-            content = format!("not {}", checker.generator().expr(comparator));
-            check_type = CheckType::Falsey;
-        }
+        | (ast::CmpOp::IsNot | ast::CmpOp::NotEq, true) => (
+            format!("not {}", checker.generator().expr(expr)),
+            CheckType::Falsey,
+        ),
         _ => return,
-    }
+    };
 
     let mut diagnostic = Diagnostic::new(BoolLiteralCompare { check_type }, compare.range());
 

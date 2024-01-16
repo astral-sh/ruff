@@ -5,7 +5,7 @@ FURB149.py:3:4: FURB149 [*] Comparison to `True` should be `cond`
   |
 1 | failed = True
 2 | 
-3 | if failed is True:  # FURB149
+3 | if True == failed:  # FURB149
   |    ^^^^^^^^^^^^^^ FURB149
 4 |     print("You failed")
   |
@@ -14,190 +14,350 @@ FURB149.py:3:4: FURB149 [*] Comparison to `True` should be `cond`
 ℹ Unsafe fix
 1 1 | failed = True
 2 2 | 
-3   |-if failed is True:  # FURB149
+3   |-if True == failed:  # FURB149
   3 |+if failed:  # FURB149
 4 4 |     print("You failed")
 5 5 | 
-6 6 | if failed is not True:  # FURB149
+6 6 | if True != failed:  # FURB149
 
 FURB149.py:6:4: FURB149 [*] Comparison to `False` should be `not cond`
   |
 4 |     print("You failed")
 5 | 
-6 | if failed is not True:  # FURB149
-  |    ^^^^^^^^^^^^^^^^^^ FURB149
+6 | if True != failed:  # FURB149
+  |    ^^^^^^^^^^^^^^ FURB149
 7 |     print("You did not fail")
   |
   = help: Use shorthand falsey check
 
 ℹ Unsafe fix
-3 3 | if failed is True:  # FURB149
+3 3 | if True == failed:  # FURB149
 4 4 |     print("You failed")
 5 5 | 
-6   |-if failed is not True:  # FURB149
+6   |-if True != failed:  # FURB149
   6 |+if not failed:  # FURB149
 7 7 |     print("You did not fail")
 8 8 | 
-9 9 | if failed is False:  # FURB149
+9 9 | if False == failed:  # FURB149
 
 FURB149.py:9:4: FURB149 [*] Comparison to `False` should be `not cond`
    |
  7 |     print("You did not fail")
  8 | 
- 9 | if failed is False:  # FURB149
+ 9 | if False == failed:  # FURB149
    |    ^^^^^^^^^^^^^^^ FURB149
 10 |     print("You did not fail")
    |
    = help: Use shorthand falsey check
 
 ℹ Unsafe fix
-6  6  | if failed is not True:  # FURB149
+6  6  | if True != failed:  # FURB149
 7  7  |     print("You did not fail")
 8  8  | 
-9     |-if failed is False:  # FURB149
+9     |-if False == failed:  # FURB149
    9  |+if not failed:  # FURB149
 10 10 |     print("You did not fail")
 11 11 | 
-12 12 | if failed is not False:  # FURB149
+12 12 | if False != failed:  # FURB149
 
 FURB149.py:12:4: FURB149 [*] Comparison to `True` should be `cond`
    |
 10 |     print("You did not fail")
 11 | 
-12 | if failed is not False:  # FURB149
-   |    ^^^^^^^^^^^^^^^^^^^ FURB149
+12 | if False != failed:  # FURB149
+   |    ^^^^^^^^^^^^^^^ FURB149
 13 |     print("You failed")
    |
    = help: Use shorthand truthy check
 
 ℹ Unsafe fix
-9  9  | if failed is False:  # FURB149
+9  9  | if False == failed:  # FURB149
 10 10 |     print("You did not fail")
 11 11 | 
-12    |-if failed is not False:  # FURB149
+12    |-if False != failed:  # FURB149
    12 |+if failed:  # FURB149
 13 13 |     print("You failed")
 14 14 | 
-15 15 | if failed == True:  # FURB149
+15 15 | if True is failed:  # FURB149
 
 FURB149.py:15:4: FURB149 [*] Comparison to `True` should be `cond`
    |
 13 |     print("You failed")
 14 | 
-15 | if failed == True:  # FURB149
+15 | if True is failed:  # FURB149
    |    ^^^^^^^^^^^^^^ FURB149
 16 |     print("You failed")
    |
    = help: Use shorthand truthy check
 
 ℹ Unsafe fix
-12 12 | if failed is not False:  # FURB149
+12 12 | if False != failed:  # FURB149
 13 13 |     print("You failed")
 14 14 | 
-15    |-if failed == True:  # FURB149
+15    |-if True is failed:  # FURB149
    15 |+if failed:  # FURB149
 16 16 |     print("You failed")
 17 17 | 
-18 18 | if failed != True:  # FURB149
+18 18 | if True is not failed:  # FURB149
 
 FURB149.py:18:4: FURB149 [*] Comparison to `False` should be `not cond`
    |
 16 |     print("You failed")
 17 | 
-18 | if failed != True:  # FURB149
-   |    ^^^^^^^^^^^^^^ FURB149
+18 | if True is not failed:  # FURB149
+   |    ^^^^^^^^^^^^^^^^^^ FURB149
 19 |     print("You did not fail")
    |
    = help: Use shorthand falsey check
 
 ℹ Unsafe fix
-15 15 | if failed == True:  # FURB149
+15 15 | if True is failed:  # FURB149
 16 16 |     print("You failed")
 17 17 | 
-18    |-if failed != True:  # FURB149
+18    |-if True is not failed:  # FURB149
    18 |+if not failed:  # FURB149
 19 19 |     print("You did not fail")
 20 20 | 
-21 21 | if failed == False:  # FURB149
+21 21 | if False is failed:  # FURB149
 
 FURB149.py:21:4: FURB149 [*] Comparison to `False` should be `not cond`
    |
 19 |     print("You did not fail")
 20 | 
-21 | if failed == False:  # FURB149
+21 | if False is failed:  # FURB149
    |    ^^^^^^^^^^^^^^^ FURB149
 22 |     print("You did not fail")
    |
    = help: Use shorthand falsey check
 
 ℹ Unsafe fix
-18 18 | if failed != True:  # FURB149
+18 18 | if True is not failed:  # FURB149
 19 19 |     print("You did not fail")
 20 20 | 
-21    |-if failed == False:  # FURB149
+21    |-if False is failed:  # FURB149
    21 |+if not failed:  # FURB149
 22 22 |     print("You did not fail")
 23 23 | 
-24 24 | if failed != False:  # FURB149
+24 24 | if False is not failed:  # FURB149
 
 FURB149.py:24:4: FURB149 [*] Comparison to `True` should be `cond`
    |
 22 |     print("You did not fail")
 23 | 
-24 | if failed != False:  # FURB149
-   |    ^^^^^^^^^^^^^^^ FURB149
+24 | if False is not failed:  # FURB149
+   |    ^^^^^^^^^^^^^^^^^^^ FURB149
 25 |     print("You failed")
    |
    = help: Use shorthand truthy check
 
 ℹ Unsafe fix
-21 21 | if failed == False:  # FURB149
+21 21 | if False is failed:  # FURB149
 22 22 |     print("You did not fail")
 23 23 | 
-24    |-if failed != False:  # FURB149
+24    |-if False is not failed:  # FURB149
    24 |+if failed:  # FURB149
 25 25 |     print("You failed")
 26 26 | 
-27 27 | if (failed == True) or (failed == False):  # FURB149
+27 27 | if failed is True:  # FURB149
 
-FURB149.py:27:5: FURB149 [*] Comparison to `True` should be `cond`
+FURB149.py:27:4: FURB149 [*] Comparison to `True` should be `cond`
    |
 25 |     print("You failed")
 26 | 
-27 | if (failed == True) or (failed == False):  # FURB149
-   |     ^^^^^^^^^^^^^^ FURB149
-28 |     print("wat")
+27 | if failed is True:  # FURB149
+   |    ^^^^^^^^^^^^^^ FURB149
+28 |     print("You failed")
    |
    = help: Use shorthand truthy check
 
 ℹ Unsafe fix
-24 24 | if failed != False:  # FURB149
+24 24 | if False is not failed:  # FURB149
 25 25 |     print("You failed")
 26 26 | 
-27    |-if (failed == True) or (failed == False):  # FURB149
-   27 |+if (failed) or (failed == False):  # FURB149
-28 28 |     print("wat")
+27    |-if failed is True:  # FURB149
+   27 |+if failed:  # FURB149
+28 28 |     print("You failed")
 29 29 | 
-30 30 | 
+30 30 | if failed is not True:  # FURB149
 
-FURB149.py:27:25: FURB149 [*] Comparison to `False` should be `not cond`
+FURB149.py:30:4: FURB149 [*] Comparison to `False` should be `not cond`
    |
-25 |     print("You failed")
-26 | 
-27 | if (failed == True) or (failed == False):  # FURB149
-   |                         ^^^^^^^^^^^^^^^ FURB149
-28 |     print("wat")
+28 |     print("You failed")
+29 | 
+30 | if failed is not True:  # FURB149
+   |    ^^^^^^^^^^^^^^^^^^ FURB149
+31 |     print("You did not fail")
    |
    = help: Use shorthand falsey check
 
 ℹ Unsafe fix
-24 24 | if failed != False:  # FURB149
-25 25 |     print("You failed")
-26 26 | 
-27    |-if (failed == True) or (failed == False):  # FURB149
-   27 |+if (failed == True) or (not failed):  # FURB149
-28 28 |     print("wat")
+27 27 | if failed is True:  # FURB149
+28 28 |     print("You failed")
 29 29 | 
-30 30 | 
+30    |-if failed is not True:  # FURB149
+   30 |+if not failed:  # FURB149
+31 31 |     print("You did not fail")
+32 32 | 
+33 33 | if failed is False:  # FURB149
+
+FURB149.py:33:4: FURB149 [*] Comparison to `False` should be `not cond`
+   |
+31 |     print("You did not fail")
+32 | 
+33 | if failed is False:  # FURB149
+   |    ^^^^^^^^^^^^^^^ FURB149
+34 |     print("You did not fail")
+   |
+   = help: Use shorthand falsey check
+
+ℹ Unsafe fix
+30 30 | if failed is not True:  # FURB149
+31 31 |     print("You did not fail")
+32 32 | 
+33    |-if failed is False:  # FURB149
+   33 |+if not failed:  # FURB149
+34 34 |     print("You did not fail")
+35 35 | 
+36 36 | if failed is not False:  # FURB149
+
+FURB149.py:36:4: FURB149 [*] Comparison to `True` should be `cond`
+   |
+34 |     print("You did not fail")
+35 | 
+36 | if failed is not False:  # FURB149
+   |    ^^^^^^^^^^^^^^^^^^^ FURB149
+37 |     print("You failed")
+   |
+   = help: Use shorthand truthy check
+
+ℹ Unsafe fix
+33 33 | if failed is False:  # FURB149
+34 34 |     print("You did not fail")
+35 35 | 
+36    |-if failed is not False:  # FURB149
+   36 |+if failed:  # FURB149
+37 37 |     print("You failed")
+38 38 | 
+39 39 | if failed == True:  # FURB149
+
+FURB149.py:39:4: FURB149 [*] Comparison to `True` should be `cond`
+   |
+37 |     print("You failed")
+38 | 
+39 | if failed == True:  # FURB149
+   |    ^^^^^^^^^^^^^^ FURB149
+40 |     print("You failed")
+   |
+   = help: Use shorthand truthy check
+
+ℹ Unsafe fix
+36 36 | if failed is not False:  # FURB149
+37 37 |     print("You failed")
+38 38 | 
+39    |-if failed == True:  # FURB149
+   39 |+if failed:  # FURB149
+40 40 |     print("You failed")
+41 41 | 
+42 42 | if failed != True:  # FURB149
+
+FURB149.py:42:4: FURB149 [*] Comparison to `False` should be `not cond`
+   |
+40 |     print("You failed")
+41 | 
+42 | if failed != True:  # FURB149
+   |    ^^^^^^^^^^^^^^ FURB149
+43 |     print("You did not fail")
+   |
+   = help: Use shorthand falsey check
+
+ℹ Unsafe fix
+39 39 | if failed == True:  # FURB149
+40 40 |     print("You failed")
+41 41 | 
+42    |-if failed != True:  # FURB149
+   42 |+if not failed:  # FURB149
+43 43 |     print("You did not fail")
+44 44 | 
+45 45 | if failed == False:  # FURB149
+
+FURB149.py:45:4: FURB149 [*] Comparison to `False` should be `not cond`
+   |
+43 |     print("You did not fail")
+44 | 
+45 | if failed == False:  # FURB149
+   |    ^^^^^^^^^^^^^^^ FURB149
+46 |     print("You did not fail")
+   |
+   = help: Use shorthand falsey check
+
+ℹ Unsafe fix
+42 42 | if failed != True:  # FURB149
+43 43 |     print("You did not fail")
+44 44 | 
+45    |-if failed == False:  # FURB149
+   45 |+if not failed:  # FURB149
+46 46 |     print("You did not fail")
+47 47 | 
+48 48 | if failed != False:  # FURB149
+
+FURB149.py:48:4: FURB149 [*] Comparison to `True` should be `cond`
+   |
+46 |     print("You did not fail")
+47 | 
+48 | if failed != False:  # FURB149
+   |    ^^^^^^^^^^^^^^^ FURB149
+49 |     print("You failed")
+   |
+   = help: Use shorthand truthy check
+
+ℹ Unsafe fix
+45 45 | if failed == False:  # FURB149
+46 46 |     print("You did not fail")
+47 47 | 
+48    |-if failed != False:  # FURB149
+   48 |+if failed:  # FURB149
+49 49 |     print("You failed")
+50 50 | 
+51 51 | if (failed == True) or (failed == False):  # FURB149
+
+FURB149.py:51:5: FURB149 [*] Comparison to `True` should be `cond`
+   |
+49 |     print("You failed")
+50 | 
+51 | if (failed == True) or (failed == False):  # FURB149
+   |     ^^^^^^^^^^^^^^ FURB149
+52 |     print("wat")
+   |
+   = help: Use shorthand truthy check
+
+ℹ Unsafe fix
+48 48 | if failed != False:  # FURB149
+49 49 |     print("You failed")
+50 50 | 
+51    |-if (failed == True) or (failed == False):  # FURB149
+   51 |+if (failed) or (failed == False):  # FURB149
+52 52 |     print("wat")
+53 53 | 
+54 54 | 
+
+FURB149.py:51:25: FURB149 [*] Comparison to `False` should be `not cond`
+   |
+49 |     print("You failed")
+50 | 
+51 | if (failed == True) or (failed == False):  # FURB149
+   |                         ^^^^^^^^^^^^^^^ FURB149
+52 |     print("wat")
+   |
+   = help: Use shorthand falsey check
+
+ℹ Unsafe fix
+48 48 | if failed != False:  # FURB149
+49 49 |     print("You failed")
+50 50 | 
+51    |-if (failed == True) or (failed == False):  # FURB149
+   51 |+if (failed == True) or (not failed):  # FURB149
+52 52 |     print("wat")
+53 53 | 
+54 54 | 
 
 
