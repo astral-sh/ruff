@@ -248,44 +248,44 @@ fn dunder_all_is_already_sorted(string_elements: &[&str]) -> bool {
 ///
 /// See the docs for this module as a whole for the
 /// definition we use here of an "isort-style sort".
-struct AllItemSortKey {
+struct AllItemSortKey<'a> {
     category: InferredMemberType,
-    value: String,
+    value: &'a str,
 }
 
-impl Ord for AllItemSortKey {
+impl Ord for AllItemSortKey<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.category
             .cmp(&other.category)
-            .then_with(|| natord::compare(&self.value, &other.value))
+            .then_with(|| natord::compare(self.value, other.value))
     }
 }
 
-impl PartialOrd for AllItemSortKey {
+impl PartialOrd for AllItemSortKey<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl PartialEq for AllItemSortKey {
+impl PartialEq for AllItemSortKey<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
     }
 }
 
-impl Eq for AllItemSortKey {}
+impl Eq for AllItemSortKey<'_> {}
 
-impl From<&str> for AllItemSortKey {
-    fn from(value: &str) -> Self {
+impl<'a> From<&'a str> for AllItemSortKey<'a> {
+    fn from(value: &'a str) -> Self {
         Self {
             category: InferredMemberType::of(value),
-            value: String::from(value),
+            value,
         }
     }
 }
 
-impl From<&DunderAllItem> for AllItemSortKey {
-    fn from(item: &DunderAllItem) -> Self {
+impl<'a> From<&'a DunderAllItem> for AllItemSortKey<'a> {
+    fn from(item: &'a DunderAllItem) -> Self {
         Self::from(item.value.as_str())
     }
 }
@@ -484,7 +484,7 @@ impl MultilineDunderAllValue {
         );
 
         self.items
-            .sort_by_cached_key(|item| AllItemSortKey::from(item));
+            .sort_by(|this, next| AllItemSortKey::from(this).cmp(&AllItemSortKey::from(next)));
         let joined_items = join_multiline_dunder_all_items(
             &self.items,
             locator,
