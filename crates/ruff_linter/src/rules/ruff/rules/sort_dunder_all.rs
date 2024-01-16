@@ -923,13 +923,40 @@ fn multiline_dunder_all_postlude<'a>(
         }
     };
     let postlude = locator.slice(TextRange::new(postlude_start, dunder_all_range_end));
+
+    // The rest of this function uses heuristics to
+    // avoid very long indents for the closing paren
+    // that don't match the style for the rest of the
+    // new `__all__` definition.
+    //
+    // For example, we want to avoid something like this
+    // (not uncommon in code that hasn't been
+    // autoformatted)...
+    //
+    // ```python
+    // __all__ = ["xxxxxx", "yyyyyy",
+    //            "aaaaaa", "bbbbbb",
+    //            ]
+    // ```
+    //
+    // ...getting autofixed to this:
+    //
+    // ```python
+    // __all__ = [
+    //     "a",
+    //     "b",
+    //     "x",
+    //     "y",
+    //            ]
+    // ```
+
     let newline_chars = ['\r', '\n'];
     if !postlude.starts_with(newline_chars) {
         return Cow::Borrowed(postlude);
     }
-    if TextSize::of(leading_indentation(postlude.trim_start_matches(newline_chars)))
-        <= TextSize::of(item_indent)
-    {
+    if TextSize::of(leading_indentation(
+        postlude.trim_start_matches(newline_chars),
+    )) <= TextSize::of(item_indent) {
         return Cow::Borrowed(postlude);
     }
     let trimmed_postlude = postlude.trim_start();
