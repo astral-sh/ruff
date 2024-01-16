@@ -895,7 +895,7 @@ impl LintConfiguration {
         }
 
         for (from, target) in redirects {
-            // TODO(martin): This belongs into the ruff_cli crate.
+            // TODO(martin): This belongs into the ruff crate.
             warn_user_once_by_id!(
                 from,
                 "`{from}` has been remapped to `{}{}`.",

@@ -2003,40 +2003,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff_benchmark"
-version = "0.0.0"
-dependencies = [
- "codspeed-criterion-compat",
- "criterion",
- "mimalloc",
- "once_cell",
- "ruff_linter",
- "ruff_python_ast",
- "ruff_python_formatter",
- "ruff_python_index",
- "ruff_python_parser",
- "serde",
- "serde_json",
- "tikv-jemallocator",
- "ureq",
- "url",
-]
-
-[[package]]
-name = "ruff_cache"
-version = "0.0.0"
-dependencies = [
- "filetime",
- "glob",
- "globset",
- "itertools 0.12.0",
- "regex",
- "ruff_macros",
- "seahash",
-]
-
-[[package]]
-name = "ruff_cli"
+name = "ruff"
 version = "0.1.13"
 dependencies = [
  "anyhow",
@@ -2087,6 +2054,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_benchmark"
+version = "0.0.0"
+dependencies = [
+ "codspeed-criterion-compat",
+ "criterion",
+ "mimalloc",
+ "once_cell",
+ "ruff_linter",
+ "ruff_python_ast",
+ "ruff_python_formatter",
+ "ruff_python_index",
+ "ruff_python_parser",
+ "serde",
+ "serde_json",
+ "tikv-jemallocator",
+ "ureq",
+ "url",
+]
+
+[[package]]
+name = "ruff_cache"
+version = "0.0.0"
+dependencies = [
+ "filetime",
+ "glob",
+ "globset",
+ "itertools 0.12.0",
+ "regex",
+ "ruff_macros",
+ "seahash",
+]
+
+[[package]]
 name = "ruff_dev"
 version = "0.0.0"
 dependencies = [
@@ -2102,7 +2102,7 @@ dependencies = [
  "pretty_assertions",
  "rayon",
  "regex",
- "ruff_cli",
+ "ruff",
  "ruff_diagnostics",
  "ruff_formatter",
  "ruff_linter",
