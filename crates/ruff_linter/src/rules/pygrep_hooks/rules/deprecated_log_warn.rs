@@ -1,9 +1,7 @@
-use ast::ExprAttribute;
-use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::logging;
-
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::analyze::logging;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
@@ -83,7 +81,7 @@ pub(crate) fn deprecated_log_warn(checker: &mut Checker, call: &ast::ExprCall) {
 
     let mut diagnostic = Diagnostic::new(DeprecatedLogWarn, call.func.range());
     if checker.settings.preview.is_enabled() {
-        if let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() {
+        if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = call.func.as_ref() {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 "warning".to_string(),
                 attr.range(),
