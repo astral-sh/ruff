@@ -373,8 +373,8 @@ fn create_fix(
 }
 
 /// An instance of this struct encapsulates an analysis
-/// of a Python tuple/list that represents an `__all__`
-/// definition or augmentation.
+/// of a multiline Python tuple/list that represents an
+/// `__all__` definition or augmentation.
 struct MultilineDunderAllValue {
     items: Vec<DunderAllItem>,
     range: TextRange,
@@ -382,9 +382,9 @@ struct MultilineDunderAllValue {
 }
 
 impl MultilineDunderAllValue {
-    /// Analyse the source range for a Python tuple/list that represents an `__all__`
-    /// definition or augmentation. Return `None` if the analysis fails
-    /// for whatever reason.
+    /// Analyse the source range for a multiline Python tuple/list that
+    /// represents an `__all__` definition or augmentation. Return `None`
+    /// if the analysis fails for whatever reason.
     fn from_source_range(
         range: TextRange,
         kind: &DunderAllKind,
@@ -571,7 +571,7 @@ fn collect_dunder_all_lines(
 }
 
 /// This struct is for keeping track of state
-/// regarding a single line in an `__all__` definition.
+/// regarding a single line in a multiline `__all__` definition.
 /// It is purely internal to `collect_dunder_all_lines()`,
 /// and should not be used outside that function.
 ///
@@ -791,6 +791,7 @@ struct DunderAllItem {
     // total_range incorporates the ranges of preceding comments
     // (which must be contiguous with the element),
     // but doesn't incorporate any trailing comments
+    // (which might be contiguous, but also might not be)
     total_range: TextRange,
     end_of_line_comments: Option<TextRange>,
 }
@@ -946,7 +947,6 @@ fn multiline_dunder_all_postlude<'a>(
     //     "y",
     //            ]
     // ```
-
     let newline_chars = ['\r', '\n'];
     if !postlude.starts_with(newline_chars) {
         return Cow::Borrowed(postlude);
