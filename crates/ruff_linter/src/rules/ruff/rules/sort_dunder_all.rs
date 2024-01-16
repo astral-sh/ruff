@@ -13,6 +13,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 
+use is_macro;
 use itertools::Itertools;
 use natord;
 
@@ -163,27 +164,15 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
         _ => return,
     };
 
-    let mut possibly_fixable = true;
-    let mut string_items = Vec::with_capacity(elts.len());
-    for elt in elts {
-        // Don't flag `__all__` definitions that contain non-strings
-        let Some(string_literal) = elt.as_string_literal_expr() else {
-            return;
-        };
-        // If any strings are implicitly concatenated, don't bother trying to autofix
-        if string_literal.value.is_implicit_concatenated() {
-            possibly_fixable = false;
-        }
-        string_items.push(string_literal.value.to_str());
-    }
-    if dunder_all_is_already_sorted(&string_items) {
+    let elts_analysis = DunderAllSortClassification::from_elements(elts);
+    if elts_analysis.is_invalid() || elts_analysis.is_sorted() {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
 
-    if possibly_fixable {
-        if let Some(fix) = create_fix(range, elts, &string_items, &kind, checker) {
+    if let DunderAllSortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
+        if let Some(fix) = create_fix(range, elts, &items, &kind, checker) {
             diagnostic.set_fix(fix);
         }
     }
@@ -228,22 +217,57 @@ impl DunderAllKind<'_> {
     }
 }
 
-/// Given an array of strings, return `true` if they are already
-/// ordered according to an isort-style sort.
-fn dunder_all_is_already_sorted(string_elements: &[&str]) -> bool {
-    let mut element_iter = string_elements.iter();
-    let Some(this) = element_iter.next() else {
-        return true;
-    };
-    let mut this_key = AllItemSortKey::from(*this);
-    for next in element_iter {
-        let next_key = AllItemSortKey::from(*next);
-        if next_key < this_key {
-            return false;
+/// Determine whether an `__all__` tuple/list is sorted,
+/// unsorted, or invalid. If it's unsorted, determine whether
+/// there's a possibility that we could generate a fix for it.
+///
+/// ("Sorted" here means "ordered according to an isort-style sort".
+/// See the module-level docs for a definition of "isort-style sort.")
+#[derive(Debug, is_macro::Is)]
+enum DunderAllSortClassification<'a> {
+    Sorted,
+    Invalid,
+    UnsortedButUnfixable,
+    UnsortedAndMaybeFixable { items: Vec<&'a str> },
+}
+
+impl<'a> DunderAllSortClassification<'a> {
+    fn from_elements(elements: &'a [ast::Expr]) -> Self {
+        let Some((first, rest @ [_, ..])) = elements.split_first() else {
+            return Self::Sorted;
+        };
+        let Some(string_node) = first.as_string_literal_expr() else {
+            return Self::Invalid;
+        };
+        let mut possibly_fixable = !string_node.value.is_implicit_concatenated();
+        let mut this = string_node.value.to_str();
+
+        for expr in rest {
+            let Some(string_node) = expr.as_string_literal_expr() else {
+                return Self::Invalid;
+            };
+            possibly_fixable |= string_node.value.is_implicit_concatenated();
+            let next = string_node.value.to_str();
+            if AllItemSortKey::from(next) < AllItemSortKey::from(this) {
+                if possibly_fixable {
+                    let mut items = Vec::with_capacity(elements.len());
+                    for expr in elements {
+                        let Some(string_node) = expr.as_string_literal_expr() else {
+                            return Self::Invalid;
+                        };
+                        if string_node.value.is_implicit_concatenated() {
+                            return Self::UnsortedButUnfixable;
+                        }
+                        items.push(string_node.value.to_str());
+                    }
+                    return Self::UnsortedAndMaybeFixable { items };
+                }
+                return Self::UnsortedButUnfixable;
+            }
+            this = next;
         }
-        this_key = next_key;
+        Self::Sorted
     }
-    true
 }
 
 /// A struct to implement logic necessary to achieve
