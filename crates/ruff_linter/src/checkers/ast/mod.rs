@@ -2045,10 +2045,10 @@ pub(crate) fn check_ast(
     // function can add a deferred lambda, but the opposite is not true.
     checker.visit_deferred_functions();
     checker.visit_deferred_type_param_definitions();
+    checker.visit_deferred_lambdas();
     checker.visit_deferred_future_type_definitions();
     let allocator = typed_arena::Arena::new();
     checker.visit_deferred_string_type_definitions(&allocator);
-    checker.visit_deferred_lambdas();
     checker.visit_exports();
 
     // Check docstrings, bindings, and unresolved references.
