@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr};
@@ -43,6 +43,12 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 ///         logging.exception("Exception occurred")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe when run against `logging.error` calls,
+/// but unsafe when marked against other logger-like calls (e.g.,
+/// `logger.error`), since the rule is prone to false positives when detecting
+/// logger-like calls outside of the `logging` module.
+///
 /// ## References
 /// - [Python documentation: `logging.exception`](https://docs.python.org/3/library/logging.html#logging.exception)
 #[violation]
@@ -78,10 +84,22 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
                     if checker.settings.preview.is_enabled() {
                         match expr.func.as_ref() {
                             Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
-                                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                                    "exception".to_string(),
-                                    attr.range(),
-                                )));
+                                diagnostic.set_fix(Fix::applicable_edit(
+                                    Edit::range_replacement("exception".to_string(), attr.range()),
+                                    // When run against `logging.error`, the fix is safe; otherwise,
+                                    // the object _may_ not be a logger.
+                                    if checker
+                                        .semantic()
+                                        .resolve_call_path(expr.func.as_ref())
+                                        .is_some_and(|call_path| {
+                                            matches!(call_path.as_slice(), ["logging", "error"])
+                                        })
+                                    {
+                                        Applicability::Safe
+                                    } else {
+                                        Applicability::Unsafe
+                                    },
+                                ));
                             }
                             Expr::Name(_) => {
                                 diagnostic.try_set_fix(|| {
@@ -93,7 +111,23 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
                                         )?;
                                     let name_edit =
                                         Edit::range_replacement(binding, expr.func.range());
-                                    Ok(Fix::safe_edits(import_edit, [name_edit]))
+                                    Ok(Fix::applicable_edits(
+                                        import_edit,
+                                        [name_edit],
+                                        // When run against `logging.error`, the fix is safe; otherwise,
+                                        // the object _may_ not be a logger.
+                                        if checker
+                                            .semantic()
+                                            .resolve_call_path(expr.func.as_ref())
+                                            .is_some_and(|call_path| {
+                                                matches!(call_path.as_slice(), ["logging", "error"])
+                                            })
+                                        {
+                                            Applicability::Safe
+                                        } else {
+                                            Applicability::Unsafe
+                                        },
+                                    ))
                                 });
                             }
                             _ => {}

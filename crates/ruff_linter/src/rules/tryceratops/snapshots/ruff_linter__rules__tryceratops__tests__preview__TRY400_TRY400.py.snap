@@ -51,7 +51,7 @@ TRY400.py:26:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Safe fix
+ℹ Unsafe fix
 23 23 |     try:
 24 24 |         a = 1
 25 25 |     except Exception:
@@ -69,7 +69,7 @@ TRY400.py:29:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Safe fix
+ℹ Unsafe fix
 26 26 |         logger.error("Context message here")
 27 27 | 
 28 28 |         if True:
@@ -90,7 +90,7 @@ TRY400.py:36:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Safe fix
+ℹ Unsafe fix
 33 33 |     try:
 34 34 |         a = 1
 35 35 |     except Exception:
@@ -108,7 +108,7 @@ TRY400.py:39:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Safe fix
+ℹ Unsafe fix
 36 36 |         log.error("Context message here")
 37 37 | 
 38 38 |         if True:
@@ -129,7 +129,7 @@ TRY400.py:46:9: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Safe fix
+ℹ Unsafe fix
 43 43 |     try:
 44 44 |         a = 1
 45 45 |     except Exception:
@@ -147,7 +147,7 @@ TRY400.py:49:13: TRY400 [*] Use `logging.exception` instead of `logging.error`
    |
    = help: Replace with `exception`
 
-ℹ Safe fix
+ℹ Unsafe fix
 46 46 |         self.logger.error("Context message here")
 47 47 | 
 48 48 |         if True:
