@@ -1,13 +1,13 @@
-use ast::{Expr, ExprAttribute};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{self as ast, ExceptHandler};
+use ruff_python_ast::{self as ast, ExceptHandler, Expr};
 use ruff_python_semantic::analyze::logging::exc_info;
 use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 
 /// ## What it does
@@ -76,11 +76,27 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
                     let mut diagnostic = Diagnostic::new(ErrorInsteadOfException, expr.range());
                     if checker.settings.preview.is_enabled() {
-                        if let Expr::Attribute(ExprAttribute { attr, .. }) = expr.func.as_ref() {
-                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                                "exception".to_string(),
-                                attr.range(),
-                            )));
+                        match expr.func.as_ref() {
+                            Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
+                                diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                    "exception".to_string(),
+                                    attr.range(),
+                                )));
+                            }
+                            Expr::Name(_) => {
+                                diagnostic.try_set_fix(|| {
+                                    let (import_edit, binding) =
+                                        checker.importer().get_or_import_symbol(
+                                            &ImportRequest::import("logging", "exception"),
+                                            expr.start(),
+                                            checker.semantic(),
+                                        )?;
+                                    let name_edit =
+                                        Edit::range_replacement(binding, expr.func.range());
+                                    Ok(Fix::safe_edits(import_edit, [name_edit]))
+                                });
+                            }
+                            _ => {}
                         }
                     }
                     checker.diagnostics.push(diagnostic);
