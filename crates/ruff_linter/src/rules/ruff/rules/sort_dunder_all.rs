@@ -838,12 +838,12 @@ impl Ranged for DunderAllItem {
 /// See inline comments in
 /// `MultilineDunderAllValue::into_sorted_source_code()`
 /// for a definition of the term "prelude" in this context.
-fn multiline_dunder_all_prelude(
+fn multiline_dunder_all_prelude<'a>(
     first_item_start_offset: TextSize,
     newline: &str,
     dunder_all_offset: TextSize,
-    locator: &Locator,
-) -> String {
+    locator: &'a Locator,
+) -> Cow<'a, str> {
     let prelude_end = {
         let first_item_line_offset = locator.line_start(first_item_start_offset);
         if first_item_line_offset == locator.line_start(dunder_all_offset) {
@@ -853,7 +853,11 @@ fn multiline_dunder_all_prelude(
         }
     };
     let prelude = locator.slice(TextRange::new(dunder_all_offset, prelude_end));
-    format!("{}{}", prelude.trim_end(), newline)
+    if prelude.ends_with(['\r', '\n']) {
+        Cow::Borrowed(prelude)
+    } else {
+        Cow::Owned(format!("{}{}", prelude.trim_end(), newline))
+    }
 }
 
 /// Join the elements and comments of a multiline `__all__`
@@ -919,16 +923,17 @@ fn multiline_dunder_all_postlude<'a>(
         }
     };
     let postlude = locator.slice(TextRange::new(postlude_start, dunder_all_range_end));
-    if !postlude.starts_with(newline) {
+    let newline_chars = ['\r', '\n'];
+    if !postlude.starts_with(newline_chars) {
         return Cow::Borrowed(postlude);
     }
-    if TextSize::of(leading_indentation(postlude.trim_start_matches(newline)))
+    if TextSize::of(leading_indentation(postlude.trim_start_matches(newline_chars)))
         <= TextSize::of(item_indent)
     {
         return Cow::Borrowed(postlude);
     }
     let trimmed_postlude = postlude.trim_start();
-    if trimmed_postlude.starts_with(']') || trimmed_postlude.starts_with(')') {
+    if trimmed_postlude.starts_with([']', ')']) {
         return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
     }
     Cow::Borrowed(postlude)
