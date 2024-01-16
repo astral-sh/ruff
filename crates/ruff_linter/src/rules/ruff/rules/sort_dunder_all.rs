@@ -100,7 +100,7 @@ pub(crate) fn sort_dunder_all_aug_assign(checker: &mut Checker, node: &ast::Stmt
     }
 }
 
-/// Sort an `__all__` mutation from a call to `.extend()`.
+/// Sort a tuple or list passed to `__all__.extend()`.
 pub(crate) fn sort_dunder_all_extend_call(
     checker: &mut Checker,
     ast::ExprCall {
@@ -133,6 +133,11 @@ pub(crate) fn sort_dunder_all_ann_assign(checker: &mut Checker, node: &ast::Stmt
     }
 }
 
+/// Sort a tuple or list that defines or mutates the global variable `__all__`.
+///
+/// This routine checks whether the tuple or list is sorted, and emits a
+/// violation if it is not sorted. If the tuple/list was not sorted,
+/// it attempts to set a `Fix` on the violation.
 fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) {
     let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
@@ -183,12 +188,28 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     checker.diagnostics.push(diagnostic);
 }
 
+/// An enumeration of the two valid ways of defining
+/// `__all__`: as a list, or as a tuple.
+///
+/// Whereas lists are always parenthesized
+/// (they always start with `[` and end with `]`),
+/// single-line tuples *can* be unparenthesized.
+/// We keep the original AST node around for the
+/// Tuple variant so that this can be queried later.
+#[derive(Debug)]
 enum DunderAllKind<'a> {
     List,
     Tuple(&'a ast::ExprTuple),
 }
 
 impl DunderAllKind<'_> {
+    fn is_parenthesized(&self, source: &str) -> bool {
+        match self {
+            Self::List => true,
+            Self::Tuple(ast_node) => ast_node.is_parenthesized(source),
+        }
+    }
+
     fn opening_token_for_multiline_definition(&self) -> Tok {
         match self {
             Self::List => Tok::Lsqb,
@@ -204,6 +225,8 @@ impl DunderAllKind<'_> {
     }
 }
 
+/// Given an array of strings, return `true` if they are already
+/// ordered accoding to an isort-style sort.
 fn dunder_all_is_already_sorted(string_elements: &[&str]) -> bool {
     let mut element_iter = string_elements.iter();
     let Some(this) = element_iter.next() else {
@@ -220,6 +243,11 @@ fn dunder_all_is_already_sorted(string_elements: &[&str]) -> bool {
     true
 }
 
+/// A struct to implement logic necessary to achieve
+/// an "isort-style sort".
+///
+/// See the docs for this module as a whole for the
+/// definition we use here of an "isort-style sort".
 struct AllItemSortKey {
     category: InferredMemberType,
     value: String,
@@ -293,6 +321,15 @@ impl InferredMemberType {
     }
 }
 
+/// Attempt to return `Some(fix)`, where `fix` is a `Fix`
+/// that can be set on the diagnostic to sort the user's
+/// `__all__` definition
+///
+/// Return `None` if it's a multiline `__all__` definition
+/// and the token-based analysis in
+/// `MultilineDunderAllValue::from_source_range()` encounters
+/// something it doesn't expect, meaning the violation
+/// is unfixable in this instance.
 fn get_fix(
     range: TextRange,
     elts: &[ast::Expr],
@@ -304,6 +341,19 @@ fn get_fix(
     let is_multiline = locator.contains_line_break(range);
 
     let sorted_source_code = {
+        // The machinery in the `MultilineDunderAllValue` is actually
+        // sophisticated enough that it would work just as well for
+        // single-line `__all__` definitions, and we could reduce
+        // the number of lines of code in this file by doing that.
+        // Unfortunately, however, `MultilineDunderAllValue::from_source_range()`
+        // must process every token in an `__all__` definition as
+        // part of its analysis, and this is quite costly in terms
+        // of performance. For single-line `__all__` definitions, it's
+        // also unnecessary, as it's impossible to have comments in
+        // between the `__all__` elements if the `__all__`
+        // definition is all on a single line. Therfore, as an
+        // optimisation, we do the bare minimum of token-processing
+        // for single-line `__all__` definitions:
         if is_multiline {
             let value = MultilineDunderAllValue::from_source_range(range, kind, locator)?;
             assert_eq!(value.items.len(), elts.len());
@@ -628,6 +678,13 @@ impl LineWithItems {
     }
 }
 
+/// An enumeration of the possible kinds of source-code lines
+/// that can exist in a multiline `__all__` tuple or list:
+///
+/// - A line that has no string elements, but does have a comment.
+/// - A line that has one or more string elements,
+///   and may also have a trailing comment.
+/// - An entirely empty line.
 #[derive(Debug)]
 enum DunderAllLine {
     JustAComment(LineWithJustAComment),
@@ -775,6 +832,12 @@ impl Ranged for DunderAllItem {
     }
 }
 
+/// Return a string representing the "prelude" for a
+/// multiline `__all__` definition.
+///
+/// See inline comments in
+/// `MultilineDunderAllValue::into_sorted_source_code()`
+/// for a definition of the term "prelude" in this context.
 fn multiline_dunder_all_prelude(
     first_item_start_offset: TextSize,
     newline: &str,
@@ -793,6 +856,14 @@ fn multiline_dunder_all_prelude(
     format!("{}{}", prelude.trim_end(), newline)
 }
 
+/// Join the elements and comments of a multiline `__all__`
+/// definition into a single string.
+///
+/// The resulting string does not include the "prelude" or
+/// "postlude" of the `__all__` definition.
+/// (See inline comments in `MultilineDunderAllValue::into_sorted_source_code()`
+/// for definitions of the terms "prelude" and "postlude"
+/// in this context.)
 fn join_multiline_dunder_all_items(
     sorted_items: &[DunderAllItem],
     locator: &Locator,
@@ -825,6 +896,12 @@ fn join_multiline_dunder_all_items(
     new_dunder_all
 }
 
+/// Return a string representing the "postlude" for a
+/// multiline `__all__` definition.
+///
+/// See inline comments in
+/// `MultilineDunderAllValue::into_sorted_source_code()`
+/// for a definition of the term "postlude" in this context.
 fn multiline_dunder_all_postlude<'a>(
     last_item_end_offset: TextSize,
     newline: &str,
@@ -857,6 +934,9 @@ fn multiline_dunder_all_postlude<'a>(
     Cow::Borrowed(postlude)
 }
 
+/// Create a string representing a fixed-up single-line
+/// `__all__` definition, that can be inserted into the
+/// source code as a `range_replacement` autofix.
 fn sort_single_line_dunder_all(
     elts: &[ast::Expr],
     elements: &[&str],
@@ -871,12 +951,9 @@ fn sort_single_line_dunder_all(
         .join(", ");
     match kind {
         DunderAllKind::List => format!("[{joined_items}]"),
-        DunderAllKind::Tuple(tuple_node) => {
-            if tuple_node.is_parenthesized(locator.contents()) {
-                format!("({joined_items})")
-            } else {
-                joined_items
-            }
+        DunderAllKind::Tuple(_) if kind.is_parenthesized(locator.contents()) => {
+            format!("({joined_items})")
         }
+        DunderAllKind::Tuple(_) => joined_items,
     }
 }
