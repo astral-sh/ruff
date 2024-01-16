@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_cli/tests/show_settings.rs
+source: crates/ruff/tests/show_settings.rs
 info:
   program: ruff
   args:
@@ -10,7 +10,7 @@ info:
 success: true
 exit_code: 0
 ----- stdout -----
-Resolved settings for: "[BASEPATH]/crates/ruff_cli/resources/test/fixtures/unformatted.py"
+Resolved settings for: "[BASEPATH]/crates/ruff/resources/test/fixtures/unformatted.py"
 Settings path: "[BASEPATH]/pyproject.toml"
 
 # General Settings
