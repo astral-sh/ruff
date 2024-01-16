@@ -16,7 +16,6 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     if !checker.any_enabled(&[
         Rule::AsyncioDanglingTask,
         Rule::GlobalVariableNotAssigned,
-        Rule::ImportPrivateName,
         Rule::ImportShadowedByLoopVar,
         Rule::NoSelfUse,
         Rule::RedefinedArgumentFromLocal,
@@ -372,10 +371,6 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
 
             if checker.enabled(Rule::UnusedImport) {
                 pyflakes::rules::unused_import(checker, scope, &mut diagnostics);
-            }
-
-            if checker.enabled(Rule::ImportPrivateName) {
-                pylint::rules::import_private_name(checker, scope, &mut diagnostics);
             }
         }
 
