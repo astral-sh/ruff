@@ -75,18 +75,14 @@ pub(crate) fn error_instead_of_exception(checker: &mut Checker, handlers: &[Exce
             if matches!(logging_level, LoggingLevel::Error) {
                 if exc_info(&expr.arguments, checker.semantic()).is_none() {
                     let mut diagnostic = Diagnostic::new(ErrorInsteadOfException, expr.range());
-
                     if checker.settings.preview.is_enabled() {
-                        let Expr::Attribute(ExprAttribute { attr, .. }) = expr.func.as_ref() else {
-                            return;
-                        };
-
-                        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                            "exception".to_string(),
-                            attr.range(),
-                        )));
+                        if let Expr::Attribute(ExprAttribute { attr, .. }) = expr.func.as_ref() {
+                            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                                "exception".to_string(),
+                                attr.range(),
+                            )));
+                        }
                     }
-
                     checker.diagnostics.push(diagnostic);
                 }
             }
