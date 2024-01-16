@@ -974,7 +974,7 @@ fn sort_single_line_dunder_all(
     locator: &Locator,
 ) -> String {
     let mut element_pairs = elts.iter().zip(elements).collect_vec();
-    element_pairs.sort_by_cached_key(|(_, elem)| AllItemSortKey::from(**elem));
+    element_pairs.sort_by_key(|(_, elem)| AllItemSortKey::from(**elem));
     let joined_items = element_pairs
         .iter()
         .map(|(elt, _)| locator.slice(elt))
