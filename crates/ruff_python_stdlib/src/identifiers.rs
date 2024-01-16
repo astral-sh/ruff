@@ -33,9 +33,12 @@ fn is_identifier_start(c: char) -> bool {
 // Checks if the character c is a valid continuation character as described
 // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
 fn is_identifier_continuation(c: char) -> bool {
-    match c {
-        'a'..='z' | 'A'..='Z' | '_' | '0'..='9' => true,
-        c => is_xid_continue(c),
+    // Arrange things such that ASCII codepoints never
+    // result in the slower `is_xid_continue` getting called.
+    if c.is_ascii() {
+        matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
+    } else {
+        is_xid_continue(c)
     }
 }
 

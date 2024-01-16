@@ -1267,7 +1267,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::UnusedLoopControlVariable,
                 Rule::YieldInForLoop,
             ]) {
-                checker.deferred.for_loops.push(checker.semantic.snapshot());
+                checker.analyze.for_loops.push(checker.semantic.snapshot());
             }
             if checker.enabled(Rule::LoopVariableOverridesIterator) {
                 flake8_bugbear::rules::loop_variable_overrides_iterator(checker, target, iter);
