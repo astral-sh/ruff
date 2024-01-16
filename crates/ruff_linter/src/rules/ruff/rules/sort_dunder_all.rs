@@ -999,6 +999,10 @@ fn sort_single_line_dunder_all(
     kind: &DunderAllKind,
     locator: &Locator,
 ) -> String {
+    // We grab the original source-code ranges using `locator.slice()`
+    // rather than using the expression generator, as this approach allows
+    // us to easily preserve stylistic choices in the original source code
+    // such as whether double or single quotes were used.
     let mut element_pairs = elts.iter().zip(elements).collect_vec();
     element_pairs.sort_by_key(|(_, elem)| AllItemSortKey::from(**elem));
     let joined_items = element_pairs
