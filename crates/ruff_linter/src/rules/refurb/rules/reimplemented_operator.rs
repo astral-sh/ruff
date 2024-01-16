@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
+
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, Expr, Stmt};
@@ -80,7 +81,8 @@ pub(crate) fn reimplemented_operator(checker: &mut Checker, target: &FunctionLik
         },
         target.range(),
     );
-    diagnostic.try_set_fix(|| target.try_fix(operator, checker.importer(), checker.semantic()));
+    diagnostic
+        .try_set_optional_fix(|| target.try_fix(operator, checker.importer(), checker.semantic()));
     checker.diagnostics.push(diagnostic);
 }
 
@@ -150,7 +152,7 @@ impl FunctionLike<'_> {
         operator: &'static str,
         importer: &Importer,
         semantic: &SemanticModel,
-    ) -> Result<Fix> {
+    ) -> Result<Option<Fix>> {
         match self {
             Self::Lambda(_) => {
                 let (edit, binding) = importer.get_or_import_symbol(
@@ -158,12 +160,12 @@ impl FunctionLike<'_> {
                     self.start(),
                     semantic,
                 )?;
-                Ok(Fix::safe_edits(
+                Ok(Some(Fix::safe_edits(
                     Edit::range_replacement(binding, self.range()),
                     [edit],
-                ))
+                )))
             }
-            Self::Function(_) => bail!("No fix available"),
+            Self::Function(_) => Ok(None),
         }
     }
 }
