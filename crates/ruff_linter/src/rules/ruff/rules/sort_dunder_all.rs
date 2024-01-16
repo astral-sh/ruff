@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 
-use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_codegen::Stylist;
@@ -60,11 +60,14 @@ use natord;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix should be safe for single-line `__all__` definitions
-/// and for multiline `__all__` definitions without comments.
-/// For multiline `__all__` definitions that include comments,
-/// the fix is marked as unsafe, as it can be hard to tell where the comments
-/// should be moved to when sorting the contents of `__all__`.
+/// This rule's fix is marked as always being safe, in that
+/// it should never alter the semantics of any Python code.
+/// However, note that for multiline `__all__` definitions
+/// that include comments on their own line, it can be hard
+/// to tell where the comments should be moved to when sorting
+/// the contents of `__all__`. While this rule's fix will
+/// never delete a comment, it might *sometimes* move a
+/// comment to an unexpected location.
 #[violation]
 pub struct UnsortedDunderAll;
 
@@ -347,13 +350,13 @@ fn create_fix(
         // the number of lines of code in this file by doing that.
         // Unfortunately, however, `MultilineDunderAllValue::from_source_range()`
         // must process every token in an `__all__` definition as
-        // part of its analysis, and this is quite costly in terms
-        // of performance. For single-line `__all__` definitions, it's
-        // also unnecessary, as it's impossible to have comments in
-        // between the `__all__` elements if the `__all__`
-        // definition is all on a single line. Therefore, as an
-        // optimisation, we do the bare minimum of token-processing
-        // for single-line `__all__` definitions:
+        // part of its analysis, and this is quite slow. For
+        // single-line `__all__` definitions, it's also unnecessary,
+        // as it's impossible to have comments in between the
+        // `__all__` elements if the `__all__` definition is all on
+        // a single line. Therefore, as an optimisation, we do the
+        // bare minimum of token-processing for single-line `__all__`
+        // definitions:
         if is_multiline {
             let value = MultilineDunderAllValue::from_source_range(range, kind, locator)?;
             assert_eq!(value.items.len(), elts.len());
@@ -363,16 +366,10 @@ fn create_fix(
         }
     };
 
-    let applicability = {
-        if is_multiline && checker.indexer().comment_ranges().intersects(range) {
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        }
-    };
-
-    let edit = Edit::range_replacement(sorted_source_code, range);
-    Some(Fix::applicable_edit(edit, applicability))
+    Some(Fix::safe_edit(Edit::range_replacement(
+        sorted_source_code,
+        range,
+    )))
 }
 
 /// An instance of this struct encapsulates an analysis

@@ -266,7 +266,7 @@ RUF022.py:32:11: RUF022 [*] `__all__` is not sorted
    |
    = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 30 30 | ####################################
 31 31 | 
 32 32 | __all__ = (
@@ -301,7 +301,7 @@ RUF022.py:40:11: RUF022 [*] `__all__` is not sorted
    |
    = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 38 38 | )
 39 39 | 
 40 40 | __all__ = [
@@ -416,7 +416,7 @@ RUF022.py:91:11: RUF022 [*] `__all__` is not sorted
    |
    = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 88  88  | ##########################################
 89  89  | 
 90  90  | # comment0
@@ -457,7 +457,7 @@ RUF022.py:101:11: RUF022 [*] `__all__` is not sorted
     |
     = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 99  99  | # comment7
 100 100 | 
 101 101 | __all__ = [  # comment0
@@ -583,7 +583,7 @@ RUF022.py:125:28: RUF022 [*] `__all__` is not sorted
     |
     = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 123 123 |            "register_error", "lookup_error"]
 124 124 | 
 125 125 | __all__: tuple[str, ...] = (  # a comment about the opening paren
@@ -617,7 +617,7 @@ RUF022.py:138:11: RUF022 [*] `__all__` is not sorted
     |
     = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 136 136 | # Also, this doesn't end with a trailing comma,
 137 137 | # so the autofix shouldn't introduce one:
 138 138 | __all__ = (
@@ -650,7 +650,7 @@ RUF022.py:145:16: RUF022 [*] `__all__` is not sorted
     |
     = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 143 143 | )
 144 144 | 
 145 145 | __all__.extend((  # comment0
@@ -682,7 +682,7 @@ RUF022.py:155:5: RUF022 [*] `__all__` is not sorted
     |
     = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 153 153 | __all__.extend(  # comment0
 154 154 |     # comment1
 155 155 |     (  # comment2
@@ -715,7 +715,7 @@ RUF022.py:164:16: RUF022 [*] `__all__` is not sorted
     |
     = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 162 162 | )  # comment2
 163 163 | 
 164 164 | __all__.extend([  # comment0
@@ -747,7 +747,7 @@ RUF022.py:174:5: RUF022 [*] `__all__` is not sorted
     |
     = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 172 172 | __all__.extend(  # comment0
 173 173 |     # comment1
 174 174 |     [  # comment2
@@ -777,7 +777,7 @@ RUF022.py:183:11: RUF022 [*] `__all__` is not sorted
     |
     = help: Apply an isort-style sorting to `__all__`
 
-ℹ Unsafe fix
+ℹ Safe fix
 180 180 |     ]  # comment4
 181 181 | )  # comment2
 182 182 | 
