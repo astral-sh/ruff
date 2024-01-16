@@ -6,8 +6,8 @@ use crate::rules::{flake8_pie, pylint, refurb};
 
 /// Run lint rules over all deferred lambdas in the [`SemanticModel`].
 pub(crate) fn deferred_lambdas(checker: &mut Checker) {
-    while !checker.deferred.lambdas.is_empty() {
-        let lambdas = std::mem::take(&mut checker.deferred.lambdas);
+    while !checker.analyze.lambdas.is_empty() {
+        let lambdas = std::mem::take(&mut checker.analyze.lambdas);
         for snapshot in lambdas {
             checker.semantic.restore(snapshot);
 

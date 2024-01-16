@@ -77,7 +77,7 @@ pub(crate) fn deferred_scopes(checker: &mut Checker) {
     };
 
     let mut diagnostics: Vec<Diagnostic> = vec![];
-    for scope_id in checker.deferred.scopes.iter().rev().copied() {
+    for scope_id in checker.analyze.scopes.iter().rev().copied() {
         let scope = &checker.semantic.scopes[scope_id];
 
         if checker.enabled(Rule::UndefinedLocal) {
