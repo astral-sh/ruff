@@ -1,5 +1,5 @@
 use ast::ExprAttribute;
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::logging;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -52,7 +52,7 @@ impl Violation for DeprecatedLogWarn {
 }
 
 /// PGH002
-pub(crate) fn deprecated_log_warn(checker: &mut Checker, call: &ExprCall) {
+pub(crate) fn deprecated_log_warn(checker: &mut Checker, call: &ast::ExprCall) {
     match call.func.as_ref() {
         Expr::Attribute(ast::ExprAttribute { attr, .. }) => {
             if !logging::is_logger_candidate(
@@ -82,17 +82,13 @@ pub(crate) fn deprecated_log_warn(checker: &mut Checker, call: &ExprCall) {
     }
 
     let mut diagnostic = Diagnostic::new(DeprecatedLogWarn, call.func.range());
-
     if checker.settings.preview.is_enabled() {
-        let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
-            return;
-        };
-
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            "warning".to_string(),
-            attr.range(),
-        )));
+        if let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() {
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "warning".to_string(),
+                attr.range(),
+            )));
+        }
     }
-
     checker.diagnostics.push(diagnostic);
 }
