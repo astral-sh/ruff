@@ -226,7 +226,7 @@ impl DunderAllKind<'_> {
 }
 
 /// Given an array of strings, return `true` if they are already
-/// ordered accoding to an isort-style sort.
+/// ordered according to an isort-style sort.
 fn dunder_all_is_already_sorted(string_elements: &[&str]) -> bool {
     let mut element_iter = string_elements.iter();
     let Some(this) = element_iter.next() else {
@@ -351,7 +351,7 @@ fn create_fix(
         // of performance. For single-line `__all__` definitions, it's
         // also unnecessary, as it's impossible to have comments in
         // between the `__all__` elements if the `__all__`
-        // definition is all on a single line. Therfore, as an
+        // definition is all on a single line. Therefore, as an
         // optimisation, we do the bare minimum of token-processing
         // for single-line `__all__` definitions:
         if is_multiline {
