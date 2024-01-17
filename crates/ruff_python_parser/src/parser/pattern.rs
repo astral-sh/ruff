@@ -3,6 +3,7 @@ use ruff_python_ast::{
 };
 use ruff_text_size::{Ranged, TextSize};
 
+use crate::parser::progress::ParserProgress;
 use crate::parser::{Parser, SequenceMatchPatternParentheses, NEWLINE_EOF_SET};
 use crate::token_set::TokenSet;
 use crate::{ParseErrorType, Tok, TokenKind};
@@ -44,8 +45,10 @@ impl<'src> Parser<'src> {
         // Or pattern
         if self.at(TokenKind::Vbar) {
             let mut patterns = vec![lhs];
+            let mut progress = ParserProgress::default();
 
             while self.eat(TokenKind::Vbar) {
+                progress.assert_progressing(self);
                 let pattern = self.parse_match_pattern_lhs();
                 patterns.push(pattern);
             }

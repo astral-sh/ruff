@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextSize};
 use std::fmt::Display;
 
 use crate::parser::expression::ParsedExpr;
+use crate::parser::progress::ParserProgress;
 use crate::parser::{
     helpers, FunctionKind, Parser, ParserCtxFlags, EXPR_SET, LITERAL_SET, NEWLINE_EOF_SET,
 };
@@ -120,8 +121,10 @@ impl<'src> Parser<'src> {
     fn parse_simple_statements(&mut self) -> Vec<Stmt> {
         let mut stmts = vec![];
         let start = self.node_start();
+        let mut progress = ParserProgress::default();
 
         loop {
+            progress.assert_progressing(self);
             stmts.push(self.parse_simple_statement());
 
             if !self.eat(TokenKind::Semi) {
@@ -334,8 +337,11 @@ impl<'src> Parser<'src> {
 
         let mut module = None;
         let mut level = if self.eat(TokenKind::Ellipsis) { 3 } else { 0 };
+        let mut progress = ParserProgress::default();
 
         while self.at_ts(DOT_ELLIPSIS_SET) {
+            progress.assert_progressing(self);
+
             if self.eat(TokenKind::Dot) {
                 level += 1;
             }
@@ -522,8 +528,10 @@ impl<'src> Parser<'src> {
     fn parse_assign_statement(&mut self, target: ParsedExpr, start: TextSize) -> ast::StmtAssign {
         let mut targets = vec![target.expr];
         let mut value = self.parse_expression();
+        let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Equal) {
+            progress.assert_progressing(self);
             let mut parsed_expr = self.parse_expression();
 
             std::mem::swap(&mut value, &mut parsed_expr);
@@ -655,8 +663,11 @@ impl<'src> Parser<'src> {
 
     fn parse_elif_else_clauses(&mut self) -> Vec<ast::ElifElseClause> {
         let mut elif_else_stmts = vec![];
+        let mut progress = ParserProgress::default();
 
         while self.at(TokenKind::Elif) {
+            progress.assert_progressing(self);
+
             let elif_start = self.node_start();
             self.bump(TokenKind::Elif);
 
@@ -705,8 +716,10 @@ impl<'src> Parser<'src> {
         let mut handlers = vec![];
 
         let has_except = self.at(TokenKind::Except);
+        let mut progress = ParserProgress::default();
 
         while self.at(TokenKind::Except) {
+            progress.assert_progressing(self);
             let except_start = self.node_start();
             self.bump(TokenKind::Except);
 
@@ -1214,7 +1227,10 @@ impl<'src> Parser<'src> {
         }
 
         let mut cases = vec![];
+        let mut progress = ParserProgress::default();
+
         while self.at(TokenKind::Case) {
+            progress.assert_progressing(self);
             cases.push(self.parse_match_case());
         }
 
@@ -1273,8 +1289,10 @@ impl<'src> Parser<'src> {
         let start_offset = self.node_start();
 
         let mut decorators = vec![];
+        let mut progress = ParserProgress::default();
 
         while self.at(TokenKind::At) {
+            progress.assert_progressing(self);
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
@@ -1325,7 +1343,11 @@ impl<'src> Parser<'src> {
         if self.eat(TokenKind::Indent) {
             const BODY_END_SET: TokenSet =
                 TokenSet::new(&[TokenKind::Dedent]).union(NEWLINE_EOF_SET);
+            let mut progress = ParserProgress::default();
+
             while !self.at_ts(BODY_END_SET) {
+                progress.assert_progressing(self);
+
                 if self.at(TokenKind::Indent) {
                     self.handle_unexpected_indentation(
                         &mut stmts,
@@ -1540,7 +1562,10 @@ impl<'src> Parser<'src> {
 
         self.parse_identifier();
 
+        let mut progress = ParserProgress::default();
         while self.eat(TokenKind::Dot) {
+            progress.assert_progressing(self);
+
             let id = self.parse_identifier();
             if !id.is_valid() {
                 self.add_error(
@@ -1573,7 +1598,6 @@ impl<'src> Parser<'src> {
         }
 
         let name = self.parse_dotted_name();
-
         let asname = self.eat(TokenKind::As).then(|| self.parse_identifier());
 
         ast::Alias {

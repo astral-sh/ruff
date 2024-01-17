@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::lexer::Spanned;
 use crate::parser::helpers::token_kind_to_cmp_op;
+use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser, ParserCtxFlags, EXPR_SET, NEWLINE_EOF_SET};
 use crate::string::{
     concatenated_strings, parse_fstring_literal_element, parse_string_literal, StringType,
@@ -172,7 +173,11 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         let mut lhs = self.parse_lhs_expression();
 
+        let mut progress = ParserProgress::default();
+
         loop {
+            progress.assert_progressing(self);
+
             let (op_bp, op, associativity) = self.current_op();
             if op_bp < bp {
                 break;
@@ -637,10 +642,12 @@ impl<'src> Parser<'src> {
         op_bp: u8,
     ) -> ast::ExprBoolOp {
         let mut values = vec![lhs];
+        let mut progress = ParserProgress::default();
 
         // Keep adding `expr` to `values` until we see a different
         // boolean operation than `op`.
         loop {
+            progress.assert_progressing(self);
             let parsed_expr = self.parse_expression_with_precedence(op_bp);
             values.push(parsed_expr.expr);
 
@@ -673,7 +680,10 @@ impl<'src> Parser<'src> {
             self.next_token();
         }
 
+        let mut progress = ParserProgress::default();
+
         loop {
+            progress.assert_progressing(self);
             let parsed_expr = self.parse_expression_with_precedence(op_bp);
             comparators.push(parsed_expr.expr);
 
@@ -704,12 +714,15 @@ impl<'src> Parser<'src> {
         start: TextSize,
     ) -> Expr {
         let mut strings = vec![];
+        let mut progress = ParserProgress::default();
+
         while let Tok::String {
             value,
             kind,
             triple_quoted,
         } = tok
         {
+            progress.assert_progressing(self);
             match parse_string_literal(&value, kind, triple_quoted, tok_range) {
                 Ok(string) => {
                     strings.push(string);
@@ -772,7 +785,10 @@ impl<'src> Parser<'src> {
     /// Handles implicit concatenated f-strings, e.g. `f"{x}" f"hello"`, and
     /// implicit concatenated f-strings with strings, e.g. `f"{x}" "xyz" f"{x}"`.
     fn handle_implicit_concatenated_strings(&mut self, strings: &mut Vec<StringType>) {
+        let mut progress = ParserProgress::default();
+
         loop {
+            progress.assert_progressing(self);
             let start = self.node_start();
 
             if self.eat(TokenKind::FStringStart) {
@@ -854,7 +870,11 @@ impl<'src> Parser<'src> {
             TokenSet::new(&[TokenKind::FStringEnd, TokenKind::Rbrace]).union(NEWLINE_EOF_SET);
         let mut elements = vec![];
 
+        let mut progress = ParserProgress::default();
+
         while !self.at_ts(FSTRING_END_SET) {
+            progress.assert_progressing(self);
+
             let element = match self.current_kind() {
                 TokenKind::Lbrace => {
                     FStringElement::Expression(self.parse_fstring_expression_element())
@@ -1276,7 +1296,10 @@ impl<'src> Parser<'src> {
         );
 
         let mut ifs = vec![];
+        let mut progress = ParserProgress::default();
+
         while self.eat(TokenKind::If) {
+            progress.assert_progressing(self);
             ifs.push(self.parse_simple_expression().expr);
         }
 
@@ -1291,8 +1314,12 @@ impl<'src> Parser<'src> {
 
     fn parse_generators(&mut self) -> Vec<ast::Comprehension> {
         const GENERATOR_SET: TokenSet = TokenSet::new(&[TokenKind::For, TokenKind::Async]);
+
         let mut generators = vec![];
+        let mut progress = ParserProgress::default();
+
         while self.at_ts(GENERATOR_SET) {
+            progress.assert_progressing(self);
             generators.push(self.parse_comprehension());
         }
 

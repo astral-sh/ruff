@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::lexer::lex;
+use crate::parser::progress::ParserProgress;
 use crate::{
     lexer::{LexResult, Spanned},
     token_set::TokenSet,
@@ -15,6 +16,7 @@ use crate::{
 mod expression;
 mod helpers;
 mod pattern;
+mod progress;
 mod statement;
 #[cfg(test)]
 mod tests;
@@ -467,8 +469,10 @@ impl<'src> Parser<'src> {
         mut func: impl FnMut(&mut Parser<'src>),
     ) {
         let ending_set = NEWLINE_EOF_SET.union(ending_set.into());
+        let mut progress = ParserProgress::default();
 
         while !self.at_ts(ending_set) {
+            progress.assert_progressing(self);
             func(self);
 
             // exit the loop if a trailing `delim` is not allowed
@@ -501,7 +505,11 @@ impl<'src> Parser<'src> {
             self.current_range(),
         );
 
+        let mut progress = ParserProgress::default();
+
         while !self.at(TokenKind::Dedent) && !self.at(TokenKind::EndOfFile) {
+            progress.assert_progressing(self);
+
             let stmt = self.parse_statement();
             stmts.push(stmt);
         }
