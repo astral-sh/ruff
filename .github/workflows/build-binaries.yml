@@ -1,21 +1,23 @@
-name: "[ruff] Release"
+# Build ruff on all platforms.
+#
+# Generates both wheels (for PyPI) and archived binaries (for GitHub releases).
+#
+# Assumed to run as a subworkflow of .github/workflows/release.yml; specifically, as a local
+# artifacts job within `cargo-dist`.
+name: "Build binaries"
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
-      tag:
-        description: "The version to tag, without the leading 'v'. If omitted, will initiate a dry run (no uploads)."
-        type: string
-      sha:
-        description: "The full sha of the commit to be released. If omitted, the latest commit on the default branch will be used."
-        default: ""
+      plan:
+        required: true
         type: string
   pull_request:
     paths:
-      # When we change pyproject.toml, we want to ensure that the maturin builds still work
+      # When we change pyproject.toml, we want to ensure that the maturin builds still work.
       - pyproject.toml
       # And when we change this workflow itself...
-      - .github/workflows/release.yaml
+      - .github/workflows/build-binaries.yml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,6 +25,7 @@ concurrency:
 
 env:
   PACKAGE_NAME: ruff
+  MODULE_NAME: ruff
   PYTHON_VERSION: "3.11"
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
@@ -31,11 +34,12 @@ env:
 
 jobs:
   sdist:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha }}
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -49,8 +53,8 @@ jobs:
       - name: "Test sdist"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
-          ruff --help
-          python -m ruff --help
+          ${{ env.MODULE_NAME }} --help
+          python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload sdist"
         uses: actions/upload-artifact@v4
         with:
@@ -58,11 +62,12 @@ jobs:
           path: dist
 
   macos-x86_64:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: macos-12
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha }}
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -73,12 +78,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: x86_64
-          args: --release --locked --out dist
-      - name: "Test wheel - x86_64"
-        run: |
-          pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          ruff --help
-          python -m ruff --help
+          args: --release --locked --out dist --features self-update
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -86,23 +86,29 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ inputs.tag }}-x86_64-apple-darwin.tar.gz
-          tar czvf $ARCHIVE_FILE -C target/x86_64-apple-darwin/release ruff
+          TARGET=x86_64-apple-darwin
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-macos-x86_64
+          name: artifacts-macos-x86_64
           path: |
             *.tar.gz
             *.sha256
 
   macos-aarch64:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha }}
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -113,7 +119,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: aarch64
-          args: --release --locked --out dist
+          args: --release --locked --out dist --features self-update
       - name: "Test wheel - aarch64"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
@@ -126,18 +132,24 @@ jobs:
           path: dist
       - name: "Archive binary"
         run: |
-          ARCHIVE_FILE=ruff-${{ inputs.tag }}-aarch64-apple-darwin.tar.gz
-          tar czvf $ARCHIVE_FILE -C target/aarch64-apple-darwin/release ruff
+          TARGET=aarch64-apple-darwin
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-aarch64-apple-darwin
+          name: artifacts-aarch64-apple-darwin
           path: |
             *.tar.gz
             *.sha256
 
   windows:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: windows-latest
     strategy:
       matrix:
@@ -146,12 +158,10 @@ jobs:
             arch: x64
           - target: i686-pc-windows-msvc
             arch: x86
-          - target: aarch64-pc-windows-msvc
-            arch: x64
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha }}
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -162,7 +172,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --locked --out dist
+          args: --release --locked --out dist --features self-update
         env:
           # aarch64 build fails, see https://github.com/PyO3/maturin/issues/2110
           XWIN_VERSION: 16
@@ -171,8 +181,8 @@ jobs:
         shell: bash
         run: |
           python -m pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          ruff --help
-          python -m ruff --help
+          ${{ env.MODULE_NAME }} --help
+          python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
@@ -181,18 +191,19 @@ jobs:
       - name: "Archive binary"
         shell: bash
         run: |
-          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.zip
+          ARCHIVE_FILE=ruff-${{ matrix.platform.target }}.zip
           7z a $ARCHIVE_FILE ./target/${{ matrix.platform.target }}/release/ruff.exe
           sha256sum $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.platform.target }}
+          name: artifacts-${{ matrix.platform.target }}
           path: |
             *.zip
             *.sha256
 
   linux:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -202,7 +213,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha }}
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -214,32 +225,56 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --locked --out dist
+          args: --release --locked --out dist --features self-update
+          # See: https://github.com/sfackler/rust-openssl/issues/2036#issuecomment-1724324145
+          before-script-linux: |
+            # If we're running on rhel centos, install needed packages.
+            if command -v yum &> /dev/null; then
+                yum update -y && yum install -y perl-core openssl openssl-devel pkgconfig libatomic
+
+                # If we're running on i686 we need to symlink libatomic
+                # in order to build openssl with -latomic flag.
+                if [[ ! -d "/usr/lib64" ]]; then
+                    ln -s /usr/lib/libatomic.so.1 /usr/lib/libatomic.so
+                fi
+            else
+                # If we're running on debian-based system.
+                apt update -y && apt-get install -y libssl-dev openssl pkg-config
+            fi
       - name: "Test wheel"
         if: ${{ startsWith(matrix.target, 'x86_64') }}
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-          ruff --help
-          python -m ruff --help
+          ${{ env.MODULE_NAME }} --help
+          python -m ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.target }}
           path: dist
       - name: "Archive binary"
+        shell: bash
         run: |
-          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
-          tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
+          set -euo pipefail
+
+          TARGET=${{ matrix.target }}
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.target }}
+          name: artifacts-${{ matrix.target }}
           path: |
             *.tar.gz
             *.sha256
 
-  linux-cross:
+  linux-arm:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -251,21 +286,80 @@ jobs:
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: armv7-unknown-linux-gnueabihf
             arch: armv7
-          - target: s390x-unknown-linux-gnu
-            arch: s390x
-          - target: powerpc64le-unknown-linux-gnu
-            arch: ppc64le
-            # see https://github.com/astral-sh/ruff/issues/10073
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
-          - target: powerpc64-unknown-linux-gnu
-            arch: ppc64
-            # see https://github.com/astral-sh/ruff/issues/10073
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
+          - target: arm-unknown-linux-musleabihf
+            arch: arm
 
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha }}
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          # On `aarch64`, use `manylinux: 2_28`; otherwise, use `manylinux: auto`.
+          manylinux: ${{ matrix.platform.arch == 'aarch64' && '2_28' || 'auto' }}
+          docker-options: ${{ matrix.platform.maturin_docker_options }}
+          args: --release --locked --out dist --features self-update
+      - uses: uraimo/run-on-arch-action@v2
+        name: Test wheel
+        with:
+          arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
+          distro: ${{ matrix.platform.arch == 'arm' && 'bullseye' || 'ubuntu20.04' }}
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update
+            apt-get install -y --no-install-recommends python3 python3-pip
+            pip3 install -U pip
+          run: |
+            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
+            ${{ env.MODULE_NAME }} --help
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.platform.target }}
+          path: dist
+      - name: "Archive binary"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGET=${{ matrix.platform.target }}
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+      - name: "Upload binary"
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.platform.target }}
+          path: |
+            *.tar.gz
+            *.sha256
+
+  # Like `linux-arm`, but use `--no-default-features --features flate2/rust_backend` when
+  # building ruff.
+  linux-s390x:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform:
+          - target: s390x-unknown-linux-gnu
+            arch: s390x
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -277,7 +371,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: auto
           docker-options: ${{ matrix.platform.maturin_docker_options }}
-          args: --release --locked --out dist
+          args: --release --locked --out dist --no-default-features --features flate2/rust_backend --features self-update
       - uses: uraimo/run-on-arch-action@v2
         if: matrix.platform.arch != 'ppc64'
         name: Test wheel
@@ -291,26 +385,111 @@ jobs:
             pip3 install -U pip
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            ruff --help
+            ${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: "Archive binary"
+        shell: bash
         run: |
-          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.tar.gz
-          tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
+          set -euo pipefail
+
+          TARGET=${{ matrix.platform.target }}
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.platform.target }}
+          name: artifacts-${{ matrix.platform.target }}
+          path: |
+            *.tar.gz
+            *.sha256
+
+  # Like `linux-arm`, but use `--no-default-features --features flate2/rust_backend` when
+  # building ruff, and install the `gcc-powerpc64-linux-gnu` package.
+  linux-powerpc:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform:
+          - target: powerpc64le-unknown-linux-gnu
+            arch: ppc64le
+          - target: powerpc64-unknown-linux-gnu
+            arch: ppc64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          manylinux: auto
+          docker-options: ${{ matrix.platform.maturin_docker_options }}
+          args: --release --locked --out dist --no-default-features --features flate2/rust_backend --features self-update
+          before-script-linux: |
+            if command -v yum &> /dev/null; then
+                yum update -y
+                yum -y install epel-release
+                yum repolist
+                yum install -y gcc-powerpc64-linux-gnu
+            fi
+      - uses: uraimo/run-on-arch-action@v2
+        if: matrix.platform.arch != 'ppc64'
+        name: Test wheel
+        with:
+          arch: ${{ matrix.platform.arch }}
+          distro: ubuntu20.04
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update
+            apt-get install -y --no-install-recommends python3 python3-pip
+            pip3 install -U pip
+          run: |
+            pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
+            ${{ env.MODULE_NAME }} --help
+      - name: "Upload wheels"
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.platform.target }}
+          path: dist
+      - name: "Archive binary"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TARGET=${{ matrix.platform.target }}
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
+          shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
+      - name: "Upload binary"
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-${{ matrix.platform.target }}
           path: |
             *.tar.gz
             *.sha256
 
   musllinux:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -320,7 +499,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha }}
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -332,7 +511,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist
+          args: --release --locked --out dist --features self-update
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
@@ -343,26 +522,35 @@ jobs:
             apk add python3
             python -m venv .venv
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            .venv/bin/ruff check --help
+            .venv/bin/${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.target }}
           path: dist
       - name: "Archive binary"
+        shell: bash
         run: |
-          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
-          tar czvf $ARCHIVE_FILE -C target/${{ matrix.target }}/release ruff
+          set -euo pipefail
+
+          TARGET=${{ matrix.target }}
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.target }}
+          name: artifacts-${{ matrix.target }}
           path: |
             *.tar.gz
             *.sha256
 
   musllinux-cross:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -376,7 +564,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.sha }}
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -387,7 +575,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
-          args: --release --locked --out dist
+          args: --release --locked --out dist --features self-update
           docker-options: ${{ matrix.platform.maturin_docker_options }}
       - uses: uraimo/run-on-arch-action@v2
         name: Test wheel
@@ -400,204 +588,29 @@ jobs:
           run: |
             python -m venv .venv
             .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            .venv/bin/ruff check --help
+            .venv/bin/${{ env.MODULE_NAME }} --help
       - name: "Upload wheels"
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.platform.target }}
           path: dist
       - name: "Archive binary"
+        shell: bash
         run: |
-          ARCHIVE_FILE=ruff-${{ inputs.tag }}-${{ matrix.platform.target }}.tar.gz
-          tar czvf $ARCHIVE_FILE -C target/${{ matrix.platform.target }}/release ruff
+          set -euo pipefail
+
+          TARGET=${{ matrix.platform.target }}
+          ARCHIVE_NAME=ruff-$TARGET
+          ARCHIVE_FILE=$ARCHIVE_NAME.tar.gz
+
+          mkdir -p $ARCHIVE_NAME
+          cp target/$TARGET/release/ruff $ARCHIVE_NAME/ruff
+          tar czvf $ARCHIVE_FILE $ARCHIVE_NAME
           shasum -a 256 $ARCHIVE_FILE > $ARCHIVE_FILE.sha256
       - name: "Upload binary"
         uses: actions/upload-artifact@v4
         with:
-          name: binaries-${{ matrix.platform.target }}
+          name: artifacts-${{ matrix.platform.target }}
           path: |
             *.tar.gz
             *.sha256
-
-  validate-tag:
-    name: Validate tag
-    runs-on: ubuntu-latest
-    # If you don't set an input tag, it's a dry run (no uploads).
-    if: ${{ inputs.tag }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main # We checkout the main branch to check for the commit
-      - name: Check main branch
-        if: ${{ inputs.sha }}
-        run: |
-          # Fetch the main branch since a shallow checkout is used by default
-          git fetch origin main --unshallow
-          if ! git branch --contains ${{ inputs.sha }} | grep -E '(^|\s)main$'; then
-            echo "The specified sha is not on the main branch" >&2
-            exit 1
-          fi
-      - name: Check tag consistency
-        run: |
-          # Switch to the commit we want to release
-          git checkout ${{ inputs.sha }}
-          version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
-          if [ "${{ inputs.tag }}" != "${version}" ]; then
-            echo "The input tag does not match the version from pyproject.toml:" >&2
-            echo "${{ inputs.tag }}" >&2
-            echo "${version}" >&2
-            exit 1
-          else
-            echo "Releasing ${version}"
-          fi
-
-  upload-release:
-    name: Upload to PyPI
-    runs-on: ubuntu-latest
-    needs:
-      - macos-aarch64
-      - macos-x86_64
-      - windows
-      - linux
-      - linux-cross
-      - musllinux
-      - musllinux-cross
-      - validate-tag
-    # If you don't set an input tag, it's a dry run (no uploads).
-    if: ${{ inputs.tag }}
-    environment:
-      name: release
-    permissions:
-      # For pypi trusted publishing
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: wheels-*
-          path: wheels
-          merge-multiple: true
-      - name: Publish to PyPi
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          skip-existing: true
-          packages-dir: wheels
-          verbose: true
-
-  tag-release:
-    name: Tag release
-    runs-on: ubuntu-latest
-    needs: upload-release
-    # If you don't set an input tag, it's a dry run (no uploads).
-    if: ${{ inputs.tag }}
-    permissions:
-      # For git tag
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.sha }}
-      - name: git tag
-        run: |
-          git config user.email "hey@astral.sh"
-          git config user.name "Ruff Release CI"
-          git tag -m "v${{ inputs.tag }}" "v${{ inputs.tag }}"
-          # If there is duplicate tag, this will fail. The publish to pypi action will have been a noop (due to skip
-          # existing), so we make a non-destructive exit here
-          git push --tags
-
-  publish-release:
-    name: Publish to GitHub
-    runs-on: ubuntu-latest
-    needs: tag-release
-    # If you don't set an input tag, it's a dry run (no uploads).
-    if: ${{ inputs.tag }}
-    permissions:
-      # For GitHub release publishing
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: binaries-*
-          path: binaries
-          merge-multiple: true
-      - name: "Publish to GitHub"
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          files: binaries/*
-          tag_name: v${{ inputs.tag }}
-
-  docker-publish:
-    # This action doesn't need to wait on any other task, it's easy to re-tag if something failed and we're validating
-    # the tag here also
-    name: Push Docker image ghcr.io/astral-sh/ruff
-    runs-on: ubuntu-latest
-    environment:
-      name: release
-    permissions:
-      # For the docker push
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.sha }}
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/astral-sh/ruff
-
-      - name: Check tag consistency
-        # Unlike validate-tag we don't check if the commit is on the main branch, but it seems good enough since we can
-        # change docker tags
-        if: ${{ inputs.tag }}
-        run: |
-          version=$(grep "version = " pyproject.toml | sed -e 's/version = "\(.*\)"/\1/g')
-          if [ "${{ inputs.tag }}" != "${version}" ]; then
-            echo "The input tag does not match the version from pyproject.toml:" >&2
-            echo "${{ inputs.tag }}" >&2
-            echo "${version}" >&2
-            exit 1
-          else
-            echo "Releasing ${version}"
-          fi
-
-      - name: "Build and push Docker image"
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          # Reuse the builder
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          push: ${{ inputs.tag != '' }}
-          tags: ghcr.io/astral-sh/ruff:latest,ghcr.io/astral-sh/ruff:${{ inputs.tag || 'dry-run' }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  # After the release has been published, we update downstream repositories
-  # This is separate because if this fails the release is still fine, we just need to do some manual workflow triggers
-  update-dependents:
-    name: Update dependents
-    runs-on: ubuntu-latest
-    needs: publish-release
-    steps:
-      - name: "Update pre-commit mirror"
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.RUFF_PRE_COMMIT_PAT }}
-          script: |
-            github.rest.actions.createWorkflowDispatch({
-              owner: 'astral-sh',
-              repo: 'ruff-pre-commit',
-              workflow_id: 'main.yml',
-              ref: 'main',
-            })
