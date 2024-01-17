@@ -12,7 +12,7 @@ mod tests {
         let mode = Mode::Module;
         let lexer = lex(src, mode);
         let parser = Parser::new(src, mode, lexer.collect());
-        let program = parser.parse();
+        let program = parser.parse_program();
 
         assert_eq!(&program.parse_errors, &[]);
         program
