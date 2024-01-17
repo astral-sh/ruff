@@ -4,6 +4,8 @@ use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast as ast;
 use ruff_python_semantic::ScopeKind;
+use ruff_source_file::Locator;
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::sorting_helpers::{
@@ -63,6 +65,8 @@ impl Violation for UnsortedDunderSlots {
     }
 }
 
+/// Enumeration of the two special class dunders
+/// that we're interested in for this rule: `__match_args__` and `__slots__`
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 enum SpecialClassDunder {
     Slots,
@@ -125,7 +129,38 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
         return;
     };
 
-    let (elts, range, display_kind) = match (dunder_kind, node) {
+    let Some((elts, range, display_kind)) = extract_elts(dunder_kind, node) else {
+        return;
+    };
+
+    let elts_analysis = SortClassification::from_elements(&elts, natord::compare);
+    if elts_analysis.is_not_a_list_of_string_literals() || elts_analysis.is_sorted() {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        UnsortedDunderSlots {
+            class_name: class_name.to_string(),
+            class_variable: dunder_kind,
+        },
+        range,
+    );
+
+    if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
+        let locator = checker.locator();
+        if !locator.contains_line_break(range) {
+            diagnostic.set_fix(create_fix(display_kind, &elts, &items, range, locator));
+        }
+    }
+
+    checker.diagnostics.push(diagnostic);
+}
+
+fn extract_elts(
+    dunder_kind: SpecialClassDunder,
+    node: &ast::Expr,
+) -> Option<(Vec<&ast::Expr>, TextRange, DisplayKind<'_>)> {
+    let result = match (dunder_kind, node) {
         (_, ast::Expr::List(ast::ExprList { elts, range, .. })) => (
             elts.iter().collect(),
             *range,
@@ -153,47 +188,39 @@ fn sort_dunder_slots(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr
                 if let Some(key) = key {
                     narrowed_keys.push(key);
                 } else {
-                    return;
+                    return None;
                 }
             }
+            // If `None` was present in the keys, it indicates a "** splat", .e.g
+            // `__slots__ = {"foo": "bar", **other_dict}`
+            // If `None` wasn't present in the keys,
+            // the length of the keys should always equal the length of the values
             assert_eq!(narrowed_keys.len(), values.len());
             (narrowed_keys, *range, DisplayKind::Dict { values })
         }
-        _ => return,
+        _ => return None,
     };
+    Some(result)
+}
 
-    let elts_analysis = SortClassification::from_elements(&elts, natord::compare);
-    if elts_analysis.is_not_a_list_of_string_literals() || elts_analysis.is_sorted() {
-        return;
-    }
-
-    let mut diagnostic = Diagnostic::new(
-        UnsortedDunderSlots {
-            class_name: class_name.to_string(),
-            class_variable: dunder_kind,
-        },
-        range,
-    );
-
-    if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
-        let locator = checker.locator();
-        if !locator.contains_line_break(range) {
-            let new_var = match display_kind {
-                DisplayKind::Dict { values } => {
-                    sort_single_line_elements_dict(&elts, &items, values, locator, natord::compare)
-                }
-                DisplayKind::Sequence(sequence_kind) => sort_single_line_elements_sequence(
-                    &sequence_kind,
-                    &elts,
-                    &items,
-                    locator,
-                    natord::compare,
-                ),
-            };
-            let fix = Fix::safe_edit(Edit::range_replacement(new_var, range));
-            diagnostic.set_fix(fix);
+fn create_fix(
+    display_kind: DisplayKind<'_>,
+    elts: &[&ast::Expr],
+    items: &[&str],
+    range: TextRange,
+    locator: &Locator,
+) -> Fix {
+    let new_var = match display_kind {
+        DisplayKind::Dict { values } => {
+            sort_single_line_elements_dict(elts, items, values, locator, natord::compare)
         }
-    }
-
-    checker.diagnostics.push(diagnostic);
+        DisplayKind::Sequence(sequence_kind) => sort_single_line_elements_sequence(
+            &sequence_kind,
+            elts,
+            items,
+            locator,
+            natord::compare,
+        ),
+    };
+    Fix::safe_edit(Edit::range_replacement(new_var, range))
 }

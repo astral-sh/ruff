@@ -2,7 +2,7 @@
 ///
 /// Examples where these are useful:
 /// - Sorting `__all__` in the global scope,
-/// - Sorting `__slots__` in a class scope
+/// - Sorting `__slots__` or `__match_args__` in a class scope
 use std::cmp::Ordering;
 
 use ruff_python_ast as ast;
@@ -18,7 +18,13 @@ use itertools::{izip, Itertools};
 /// (I'm aware a set isn't actually a "sequence",
 /// *but* for our purposes it's conceptually a sequence,
 /// since in terms of the AST structure it's almost identical
-/// to tuples/lists. Dicts are the "odd one out" here.)
+/// to tuples/lists.)
+///
+/// Whereas lists, dicts and sets are always parenthesized
+/// (e.g. lists always start with `[` and end with `]`),
+/// single-line tuples *can* be unparenthesized.
+/// We keep the original AST node around for the
+/// Tuple variant so that this can be queried later.
 #[derive(Debug)]
 pub(crate) enum SequenceKind<'a> {
     List,
@@ -59,14 +65,8 @@ impl SequenceKind<'_> {
 }
 
 /// An enumeration of the various kinds of
-///
+/// [display literals](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries)
 /// Python provides for builtin containers.
-///
-/// Whereas lists, dicts and sets are always parenthesized
-/// (e.g. lists always start with `[` and end with `]`),
-/// single-line tuples *can* be unparenthesized.
-/// We keep the original AST node around for the
-/// Tuple variant so that this can be queried later.
 #[derive(Debug, is_macro::Is)]
 pub(crate) enum DisplayKind<'a> {
     Sequence(SequenceKind<'a>),
