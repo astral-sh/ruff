@@ -2,7 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::Scope;
+use ruff_python_semantic::{Scope, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -267,9 +267,11 @@ pub(crate) fn unused_private_type_alias(
     scope: &Scope,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    let semantic = checker.semantic();
+
     for binding in scope
         .binding_ids()
-        .map(|binding_id| checker.semantic().binding(binding_id))
+        .map(|binding_id| semantic.binding(binding_id))
     {
         if !(binding.kind.is_assignment() && binding.is_private_declaration()) {
             continue;
@@ -281,29 +283,37 @@ pub(crate) fn unused_private_type_alias(
         let Some(source) = binding.source else {
             continue;
         };
-        let Stmt::AnnAssign(ast::StmtAnnAssign {
-            target, annotation, ..
-        }) = checker.semantic().statement(source)
-        else {
-            continue;
-        };
-        let Some(ast::ExprName { id, .. }) = target.as_name_expr() else {
-            continue;
-        };
 
-        if !checker
-            .semantic()
-            .match_typing_expr(annotation, "TypeAlias")
-        {
+        let Some(alias_name) = extract_type_alias_name(semantic.statement(source), semantic) else {
             continue;
-        }
+        };
 
         diagnostics.push(Diagnostic::new(
             UnusedPrivateTypeAlias {
-                name: id.to_string(),
+                name: alias_name.to_string(),
             },
             binding.range(),
         ));
+    }
+}
+
+fn extract_type_alias_name<'a>(stmt: &'a ast::Stmt, semantic: &SemanticModel) -> Option<&'a str> {
+    match stmt {
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign {
+            target, annotation, ..
+        }) => {
+            let ast::ExprName { id, .. } = target.as_name_expr()?;
+            if semantic.match_typing_expr(annotation, "TypeAlias") {
+                Some(id)
+            } else {
+                None
+            }
+        }
+        ast::Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {
+            let ast::ExprName { id, .. } = name.as_name_expr()?;
+            Some(id)
+        }
+        _ => None,
     }
 }
 
