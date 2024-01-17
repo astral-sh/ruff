@@ -43,26 +43,16 @@ impl<'src> Parser<'src> {
     /// Parses every Python expression.
     pub(super) fn parse_expression(&mut self) -> ParsedExpr {
         let start = self.node_start();
-        let parsed_expr = self.parse_expr();
+        let parsed_expr = self.parse_conditional_expression_or_higher();
 
         if self.at(TokenKind::Comma) {
-            Expr::Tuple(self.parse_tuple_expr(parsed_expr.expr, start, false, Parser::parse_expr))
-                .into()
-        } else {
-            parsed_expr
-        }
-    }
-
-    /// Parses every Python expression except unparenthesized tuple and named expressions.
-    ///
-    /// NOTE: If you have expressions separated by commas and want to parse them individually,
-    /// instead of a tuple, use this function!
-    pub(super) fn parse_expr(&mut self) -> ParsedExpr {
-        let start = self.node_start();
-        let parsed_expr = self.parse_expr_simple();
-
-        if self.at(TokenKind::If) {
-            Expr::IfExp(self.parse_if_expr(parsed_expr.expr, start)).into()
+            Expr::Tuple(self.parse_tuple_expression(
+                parsed_expr.expr,
+                start,
+                false,
+                Parser::parse_conditional_expression_or_higher,
+            ))
+            .into()
         } else {
             parsed_expr
         }
@@ -72,19 +62,38 @@ impl<'src> Parser<'src> {
     ///
     /// NOTE: If you have expressions separated by commas and want to parse them individually,
     /// instead of a tuple, use this function!
-    pub(super) fn parse_expr2(&mut self) -> ParsedExpr {
+    pub(super) fn parse_named_expression_or_higher(&mut self) -> ParsedExpr {
         let start = self.node_start();
-        let parsed_expr = self.parse_expr();
+        let parsed_expr = self.parse_conditional_expression_or_higher();
 
         if self.at(TokenKind::ColonEqual) {
-            Expr::NamedExpr(self.parse_named_expr(parsed_expr.expr, start)).into()
+            Expr::NamedExpr(self.parse_named_expression(parsed_expr.expr, start)).into()
         } else {
             parsed_expr
         }
     }
 
-    /// Parses every Python expression except unparenthesized tuple and `if` expression.
-    fn parse_expr_simple(&mut self) -> ParsedExpr {
+    /// Parses every Python expression except unparenthesized tuple and named expressions.
+    ///
+    /// NOTE: If you have expressions separated by commas and want to parse them individually,
+    /// instead of a tuple, use this function!
+    ///
+    /// TODO: This seems to match the `expression` node in the python grammar?
+    pub(super) fn parse_conditional_expression_or_higher(&mut self) -> ParsedExpr {
+        let start = self.node_start();
+        let parsed_expr = self.parse_simple_expression();
+
+        if self.at(TokenKind::If) {
+            Expr::IfExp(self.parse_if_expression(parsed_expr.expr, start)).into()
+        } else {
+            parsed_expr
+        }
+    }
+
+    /// Parses every Python expression except unparenthesized tuples, named expressions, and `if` expression.
+    ///
+    /// TODO: This seems to match the `disjunction` grammar node except that it also handles lambda expressions?
+    fn parse_simple_expression(&mut self) -> ParsedExpr {
         self.parse_expression_with_precedence(1)
     }
 
@@ -184,13 +193,16 @@ impl<'src> Parser<'src> {
             // We need to create a dedicated node for boolean operations,
             // even though boolean operations are infix.
             if op.is_bool_operator() {
-                lhs = Expr::BoolOp(self.parse_bool_op_expr(lhs.expr, start, op, op_bp)).into();
+                lhs =
+                    Expr::BoolOp(self.parse_bool_operation_expression(lhs.expr, start, op, op_bp))
+                        .into();
                 continue;
             }
 
             // Same here as well
             if op.is_compare_operator() {
-                lhs = Expr::Compare(self.parse_compare_op_expr(lhs.expr, start, op, op_bp)).into();
+                lhs =
+                    Expr::Compare(self.parse_compare_expression(lhs.expr, start, op, op_bp)).into();
                 continue;
             }
 
@@ -226,16 +238,16 @@ impl<'src> Parser<'src> {
         let token = self.next_token();
         let mut lhs = match token.0 {
             token @ (Tok::Plus | Tok::Minus | Tok::Not | Tok::Tilde) => {
-                Expr::UnaryOp(self.parse_unary_expr(&token, start)).into()
+                Expr::UnaryOp(self.parse_unary_expression(&token, start)).into()
             }
-            Tok::Star => Expr::Starred(self.parse_starred_expr(start)).into(),
-            Tok::Await => Expr::Await(self.parse_await_expr(start)).into(),
+            Tok::Star => Expr::Starred(self.parse_starred_expression(start)).into(),
+            Tok::Await => Expr::Await(self.parse_await_expression(start)).into(),
             Tok::Lambda => Expr::Lambda(self.parse_lambda_expr(start)).into(),
             _ => self.parse_atom(token, start),
         };
 
         if self.is_current_token_postfix() {
-            lhs = self.parse_postfix_expr(lhs.expr, start).into();
+            lhs = self.parse_postfix_expression(lhs.expr, start).into();
         }
 
         lhs
@@ -300,14 +312,14 @@ impl<'src> Parser<'src> {
                     value,
                 })
             }
-            tok @ Tok::String { .. } => self.parse_string_expr((tok, token_range), start),
-            Tok::FStringStart => self.parse_fstring_expr(start),
+            tok @ Tok::String { .. } => self.parse_string_expression((tok, token_range), start),
+            Tok::FStringStart => self.parse_fstring_expression(start),
             Tok::Lpar => {
-                return self.parse_parenthesized_expr(start);
+                return self.parse_parenthesized_expression(start);
             }
-            Tok::Lsqb => self.parse_bracketsized_expr(start),
-            Tok::Lbrace => self.parse_bracesized_expr(start),
-            Tok::Yield => self.parse_yield_expr(start),
+            Tok::Lsqb => self.parse_list_like_expression(start),
+            Tok::Lbrace => self.parse_set_or_dict_like_expression(start),
+            Tok::Yield => self.parse_yield_expression(start),
             // `Invalid` tokens are created when there's a lexical error, to
             // avoid creating an "unexpected token" error for `Tok::Invalid`
             // we handle it here. We try to parse an expression to avoid
@@ -350,18 +362,18 @@ impl<'src> Parser<'src> {
         lhs.into()
     }
 
-    fn parse_postfix_expr(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
+    fn parse_postfix_expression(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
         loop {
             lhs = match self.current_kind() {
-                TokenKind::Lpar => Expr::Call(self.parse_call_expr(lhs, start)),
-                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expr(lhs, start)),
-                TokenKind::Dot => Expr::Attribute(self.parse_attribute_expr(lhs, start)),
+                TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
+                TokenKind::Lsqb => Expr::Subscript(self.parse_subscript_expression(lhs, start)),
+                TokenKind::Dot => Expr::Attribute(self.parse_attribute_expression(lhs, start)),
                 _ => break lhs,
             };
         }
     }
 
-    fn parse_call_expr(&mut self, lhs: Expr, start: TextSize) -> ast::ExprCall {
+    fn parse_call_expression(&mut self, lhs: Expr, start: TextSize) -> ast::ExprCall {
         assert_eq!(self.current_kind(), TokenKind::Lpar);
         let arguments = self.parse_arguments();
 
@@ -392,7 +404,7 @@ impl<'src> Parser<'src> {
                 if parser.at(TokenKind::DoubleStar) {
                     parser.eat(TokenKind::DoubleStar);
 
-                    let value = parser.parse_expr();
+                    let value = parser.parse_conditional_expression_or_higher();
                     keywords.push(ast::Keyword {
                         arg: None,
                         value: value.expr,
@@ -402,11 +414,11 @@ impl<'src> Parser<'src> {
                     has_seen_kw_unpack = true;
                 } else {
                     let start = parser.node_start();
-                    let mut parsed_expr = parser.parse_expr2();
+                    let mut parsed_expr = parser.parse_named_expression_or_higher();
 
                     match parser.current_kind() {
                         TokenKind::Async | TokenKind::For => {
-                            parsed_expr = Expr::GeneratorExp(parser.parse_generator_expr(
+                            parsed_expr = Expr::GeneratorExp(parser.parse_generator_expression(
                                 parsed_expr.expr,
                                 start,
                                 false,
@@ -441,7 +453,7 @@ impl<'src> Parser<'src> {
                             }
                         };
 
-                        let value = parser.parse_expr();
+                        let value = parser.parse_conditional_expression_or_higher();
 
                         keywords.push(ast::Keyword {
                             arg: Some(arg),
@@ -474,7 +486,11 @@ impl<'src> Parser<'src> {
         arguments
     }
 
-    fn parse_subscript_expr(&mut self, mut value: Expr, start: TextSize) -> ast::ExprSubscript {
+    fn parse_subscript_expression(
+        &mut self,
+        mut value: Expr,
+        start: TextSize,
+    ) -> ast::ExprSubscript {
         self.bump(TokenKind::Lsqb);
 
         // To prevent the `value` context from being `Del` within a `del` statement,
@@ -531,17 +547,17 @@ impl<'src> Parser<'src> {
         }
     }
 
-    const UPPER_END_SET: TokenSet =
-        TokenSet::new(&[TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
-            .union(NEWLINE_EOF_SET);
-    const STEP_END_SET: TokenSet =
-        TokenSet::new(&[TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
-
     fn parse_slice(&mut self) -> Expr {
+        const UPPER_END_SET: TokenSet =
+            TokenSet::new(&[TokenKind::Comma, TokenKind::Colon, TokenKind::Rsqb])
+                .union(NEWLINE_EOF_SET);
+        const STEP_END_SET: TokenSet =
+            TokenSet::new(&[TokenKind::Comma, TokenKind::Rsqb]).union(NEWLINE_EOF_SET);
+
         let start = self.node_start();
 
         let lower = if self.at_expr() {
-            let lower = self.parse_expr2();
+            let lower = self.parse_named_expression_or_higher();
 
             if !self.at(TokenKind::Colon) || lower.expr.is_named_expr_expr() {
                 return lower.expr;
@@ -555,17 +571,17 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Colon);
 
         let lower = lower.map(Box::new);
-        let upper = if self.at_ts(Self::UPPER_END_SET) {
+        let upper = if self.at_ts(UPPER_END_SET) {
             None
         } else {
-            Some(Box::new(self.parse_expr().expr))
+            Some(Box::new(self.parse_conditional_expression_or_higher().expr))
         };
 
         let step = if self.eat(TokenKind::Colon) {
-            if self.at_ts(Self::STEP_END_SET) {
+            if self.at_ts(STEP_END_SET) {
                 None
             } else {
-                Some(Box::new(self.parse_expr().expr))
+                Some(Box::new(self.parse_conditional_expression_or_higher().expr))
             }
         } else {
             None
@@ -579,7 +595,7 @@ impl<'src> Parser<'src> {
         })
     }
 
-    fn parse_unary_expr(&mut self, operator: &Tok, start: TextSize) -> ast::ExprUnaryOp {
+    fn parse_unary_expression(&mut self, operator: &Tok, start: TextSize) -> ast::ExprUnaryOp {
         let op =
             UnaryOp::try_from(operator).expect("Expected operator to be a unary operator token.");
         let rhs = if matches!(op, UnaryOp::Not) {
@@ -596,7 +612,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub(super) fn parse_attribute_expr(
+    pub(super) fn parse_attribute_expression(
         &mut self,
         value: Expr,
         start: TextSize,
@@ -613,7 +629,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_bool_op_expr(
+    fn parse_bool_operation_expression(
         &mut self,
         lhs: Expr,
         start: TextSize,
@@ -642,7 +658,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_compare_op_expr(
+    fn parse_compare_expression(
         &mut self,
         lhs: Expr,
         start: TextSize,
@@ -682,7 +698,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub(super) fn parse_string_expr(
+    pub(super) fn parse_string_expression(
         &mut self,
         (mut tok, mut tok_range): Spanned,
         start: TextSize,
@@ -753,7 +769,6 @@ impl<'src> Parser<'src> {
         })
     }
 
-    const FSTRING_SET: TokenSet = TokenSet::new(&[TokenKind::FStringStart, TokenKind::String]);
     /// Handles implicit concatenated f-strings, e.g. `f"{x}" f"hello"`, and
     /// implicit concatenated f-strings with strings, e.g. `f"{x}" "xyz" f"{x}"`.
     fn handle_implicit_concatenated_strings(&mut self, strings: &mut Vec<StringType>) {
@@ -796,10 +811,12 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_fstring_expr(&mut self, start: TextSize) -> Expr {
+    fn parse_fstring_expression(&mut self, start: TextSize) -> Expr {
+        const FSTRING_SET: TokenSet = TokenSet::new(&[TokenKind::FStringStart, TokenKind::String]);
+
         let fstring = self.parse_fstring(start);
 
-        if !self.at_ts(Self::FSTRING_SET) {
+        if !self.at_ts(FSTRING_SET) {
             return Expr::FString(ast::ExprFString {
                 value: ast::FStringValue::single(fstring),
                 range: self.node_range(start),
@@ -832,14 +849,16 @@ impl<'src> Parser<'src> {
         }
     }
 
-    const FSTRING_END_SET: TokenSet =
-        TokenSet::new(&[TokenKind::FStringEnd, TokenKind::Rbrace]).union(NEWLINE_EOF_SET);
     fn parse_fstring_elements(&mut self) -> Vec<FStringElement> {
+        const FSTRING_END_SET: TokenSet =
+            TokenSet::new(&[TokenKind::FStringEnd, TokenKind::Rbrace]).union(NEWLINE_EOF_SET);
         let mut elements = vec![];
 
-        while !self.at_ts(Self::FSTRING_END_SET) {
+        while !self.at_ts(FSTRING_END_SET) {
             let element = match self.current_kind() {
-                TokenKind::Lbrace => FStringElement::Expression(self.parse_fstring_expr_element()),
+                TokenKind::Lbrace => {
+                    FStringElement::Expression(self.parse_fstring_expression_element())
+                }
                 TokenKind::FStringMiddle => {
                     let (Tok::FStringMiddle { value, is_raw }, range) = self.next_token() else {
                         unreachable!()
@@ -880,7 +899,7 @@ impl<'src> Parser<'src> {
         elements
     }
 
-    fn parse_fstring_expr_element(&mut self) -> ast::FStringExpressionElement {
+    fn parse_fstring_expression_element(&mut self) -> ast::FStringExpressionElement {
         let range = self.current_range();
 
         let has_open_brace = self.eat(TokenKind::Lbrace);
@@ -960,7 +979,8 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_bracketsized_expr(&mut self, start: TextSize) -> Expr {
+    /// Parses a list or a list comprehension expression.
+    fn parse_list_like_expression(&mut self, start: TextSize) -> Expr {
         // Nice error message when having a unclosed open bracket `[`
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
@@ -978,17 +998,18 @@ impl<'src> Parser<'src> {
             });
         }
 
-        let parsed_expr = self.parse_expr2();
+        let parsed_expr = self.parse_named_expression_or_higher();
 
         match self.current_kind() {
             TokenKind::Async | TokenKind::For => {
-                Expr::ListComp(self.parse_list_comprehension_expr(parsed_expr.expr, start))
+                Expr::ListComp(self.parse_list_comprehension_expression(parsed_expr.expr, start))
             }
-            _ => Expr::List(self.parse_list_expr(parsed_expr.expr, start)),
+            _ => Expr::List(self.parse_list_expression(parsed_expr.expr, start)),
         }
     }
 
-    fn parse_bracesized_expr(&mut self, start: TextSize) -> Expr {
+    /// Parses a set, dict, set comprehension, or dict comprehension.
+    fn parse_set_or_dict_like_expression(&mut self, start: TextSize) -> Expr {
         // Nice error message when having a unclosed open brace `{`
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
@@ -1008,35 +1029,40 @@ impl<'src> Parser<'src> {
 
         if self.eat(TokenKind::DoubleStar) {
             // Handle dict unpack
-            let value = self.parse_expr();
-            return Expr::Dict(self.parse_dict_expr(None, value.expr, start));
+            let value = self.parse_conditional_expression_or_higher();
+            return Expr::Dict(self.parse_dictionary_expression(None, value.expr, start));
         }
 
-        let key_or_value = self.parse_expr2();
+        let key_or_value = self.parse_named_expression_or_higher();
 
         match self.current_kind() {
             TokenKind::Async | TokenKind::For => {
-                Expr::SetComp(self.parse_set_comprehension_expr(key_or_value.expr, start))
+                Expr::SetComp(self.parse_set_comprehension_expression(key_or_value.expr, start))
             }
             TokenKind::Colon => {
                 self.bump(TokenKind::Colon);
-                let value = self.parse_expr();
+                let value = self.parse_conditional_expression_or_higher();
 
                 if matches!(self.current_kind(), TokenKind::Async | TokenKind::For) {
-                    Expr::DictComp(self.parse_dict_comprehension_expr(
+                    Expr::DictComp(self.parse_dictionary_comprehension_expression(
                         key_or_value.expr,
                         value.expr,
                         start,
                     ))
                 } else {
-                    Expr::Dict(self.parse_dict_expr(Some(key_or_value.expr), value.expr, start))
+                    Expr::Dict(self.parse_dictionary_expression(
+                        Some(key_or_value.expr),
+                        value.expr,
+                        start,
+                    ))
                 }
             }
-            _ => Expr::Set(self.parse_set_expr(key_or_value.expr, start)),
+            _ => Expr::Set(self.parse_set_expression(key_or_value.expr, start)),
         }
     }
 
-    fn parse_parenthesized_expr(&mut self, start: TextSize) -> ParsedExpr {
+    /// Parses an expression in parentheses, a tuple expression, or a generator expression.
+    fn parse_parenthesized_expression(&mut self, start: TextSize) -> ParsedExpr {
         self.set_ctx(ParserCtxFlags::PARENTHESIZED_EXPR);
 
         // Nice error message when having a unclosed open parenthesis `(`
@@ -1061,12 +1087,16 @@ impl<'src> Parser<'src> {
             .into();
         }
 
-        let mut parsed_expr = self.parse_expr2();
+        let mut parsed_expr = self.parse_named_expression_or_higher();
 
         let parsed = match self.current_kind() {
             TokenKind::Comma => {
-                let tuple =
-                    self.parse_tuple_expr(parsed_expr.expr, start, true, Parser::parse_expr2);
+                let tuple = self.parse_tuple_expression(
+                    parsed_expr.expr,
+                    start,
+                    true,
+                    Parser::parse_named_expression_or_higher,
+                );
 
                 ParsedExpr {
                     expr: tuple.into(),
@@ -1074,8 +1104,11 @@ impl<'src> Parser<'src> {
                 }
             }
             TokenKind::Async | TokenKind::For => {
-                let generator =
-                    Expr::GeneratorExp(self.parse_generator_expr(parsed_expr.expr, start, true));
+                let generator = Expr::GeneratorExp(self.parse_generator_expression(
+                    parsed_expr.expr,
+                    start,
+                    true,
+                ));
 
                 ParsedExpr {
                     expr: generator,
@@ -1094,15 +1127,17 @@ impl<'src> Parser<'src> {
 
         parsed
     }
-
     const END_SEQUENCE_SET: TokenSet = END_EXPR_SET.remove(TokenKind::Comma);
+
     /// Parses multiple items separated by a comma into a `TupleExpr` node.
     /// Uses `parse_func` to parse each item.
-    pub(super) fn parse_tuple_expr(
+    pub(super) fn parse_tuple_expression(
         &mut self,
         first_element: Expr,
         start: TextSize,
         parenthesized: bool,
+        // TODO: I would have expected that `parse_func` is the same depending on whether `parenthesized` is true or not, but that's not the case
+        // verify precedence.
         mut parse_func: impl FnMut(&mut Parser<'src>) -> ParsedExpr,
     ) -> ast::ExprTuple {
         // In case of the tuple only having one element, we need to cover the
@@ -1129,7 +1164,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_list_expr(&mut self, first_element: Expr, start: TextSize) -> ast::ExprList {
+    fn parse_list_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprList {
         if !self.at_ts(Self::END_SEQUENCE_SET) {
             self.expect(TokenKind::Comma);
         }
@@ -1137,7 +1172,7 @@ impl<'src> Parser<'src> {
         let mut elts = vec![first_element];
 
         self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
-            elts.push(parser.parse_expr2().expr);
+            elts.push(parser.parse_named_expression_or_higher().expr);
         });
 
         self.expect(TokenKind::Rsqb);
@@ -1149,7 +1184,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_set_expr(&mut self, first_element: Expr, start: TextSize) -> ast::ExprSet {
+    fn parse_set_expression(&mut self, first_element: Expr, start: TextSize) -> ast::ExprSet {
         if !self.at_ts(Self::END_SEQUENCE_SET) {
             self.expect(TokenKind::Comma);
         }
@@ -1157,7 +1192,7 @@ impl<'src> Parser<'src> {
         let mut elts = vec![first_element];
 
         self.parse_separated(true, TokenKind::Comma, Self::END_SEQUENCE_SET, |parser| {
-            elts.push(parser.parse_expr2().expr);
+            elts.push(parser.parse_named_expression_or_higher().expr);
         });
 
         self.expect(TokenKind::Rbrace);
@@ -1168,7 +1203,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_dict_expr(
+    fn parse_dictionary_expression(
         &mut self,
         key: Option<Expr>,
         value: Expr,
@@ -1185,14 +1220,14 @@ impl<'src> Parser<'src> {
             if parser.eat(TokenKind::DoubleStar) {
                 keys.push(None);
             } else {
-                keys.push(Some(parser.parse_expr().expr));
+                keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
 
                 parser.expect_and_recover(
                     TokenKind::Colon,
                     TokenSet::new(&[TokenKind::Comma]).union(EXPR_SET),
                 );
             }
-            values.push(parser.parse_expr().expr);
+            values.push(parser.parse_conditional_expression_or_higher().expr);
         });
 
         self.expect(TokenKind::Rbrace);
@@ -1224,7 +1259,7 @@ impl<'src> Parser<'src> {
         self.expect_and_recover(TokenKind::In, TokenSet::new(&[TokenKind::Rsqb]));
 
         let iter = self.parse_expr_with_recovery(
-            Parser::parse_expr_simple,
+            Parser::parse_simple_expression,
             EXPR_SET.union(
                 [
                     TokenKind::Rpar,
@@ -1242,7 +1277,7 @@ impl<'src> Parser<'src> {
 
         let mut ifs = vec![];
         while self.eat(TokenKind::If) {
-            ifs.push(self.parse_expr_simple().expr);
+            ifs.push(self.parse_simple_expression().expr);
         }
 
         ast::Comprehension {
@@ -1264,7 +1299,7 @@ impl<'src> Parser<'src> {
         generators
     }
 
-    fn parse_generator_expr(
+    fn parse_generator_expression(
         &mut self,
         element: Expr,
         start: TextSize,
@@ -1283,7 +1318,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_list_comprehension_expr(
+    fn parse_list_comprehension_expression(
         &mut self,
         element: Expr,
         start: TextSize,
@@ -1299,7 +1334,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_dict_comprehension_expr(
+    fn parse_dictionary_comprehension_expression(
         &mut self,
         key: Expr,
         value: Expr,
@@ -1317,7 +1352,11 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_set_comprehension_expr(&mut self, element: Expr, start: TextSize) -> ast::ExprSetComp {
+    fn parse_set_comprehension_expression(
+        &mut self,
+        element: Expr,
+        start: TextSize,
+    ) -> ast::ExprSetComp {
         let generators = self.parse_generators();
 
         self.expect(TokenKind::Rbrace);
@@ -1329,8 +1368,8 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_starred_expr(&mut self, start: TextSize) -> ast::ExprStarred {
-        let parsed_expr = self.parse_expr();
+    fn parse_starred_expression(&mut self, start: TextSize) -> ast::ExprStarred {
+        let parsed_expr = self.parse_conditional_expression_or_higher();
 
         ast::ExprStarred {
             value: Box::new(parsed_expr.expr),
@@ -1339,7 +1378,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_await_expr(&mut self, start: TextSize) -> ast::ExprAwait {
+    fn parse_await_expression(&mut self, start: TextSize) -> ast::ExprAwait {
         let parsed_expr = self.parse_expression_with_precedence(19);
 
         if matches!(parsed_expr.expr, Expr::Starred(_)) {
@@ -1357,9 +1396,9 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_yield_expr(&mut self, start: TextSize) -> Expr {
+    fn parse_yield_expression(&mut self, start: TextSize) -> Expr {
         if self.eat(TokenKind::From) {
-            return self.parse_yield_from_expr(start);
+            return self.parse_yield_from_expression(start);
         }
 
         let value = self
@@ -1372,7 +1411,7 @@ impl<'src> Parser<'src> {
         })
     }
 
-    fn parse_yield_from_expr(&mut self, start: TextSize) -> Expr {
+    fn parse_yield_from_expression(&mut self, start: TextSize) -> Expr {
         let parsed_expr = self.parse_expression();
 
         match &parsed_expr.expr {
@@ -1404,7 +1443,7 @@ impl<'src> Parser<'src> {
         })
     }
 
-    fn parse_named_expr(&mut self, mut target: Expr, start: TextSize) -> ast::ExprNamedExpr {
+    fn parse_named_expression(&mut self, mut target: Expr, start: TextSize) -> ast::ExprNamedExpr {
         self.bump(TokenKind::ColonEqual);
 
         if !helpers::is_valid_assignment_target(&target) {
@@ -1412,7 +1451,7 @@ impl<'src> Parser<'src> {
         }
         helpers::set_expr_ctx(&mut target, ExprContext::Store);
 
-        let value = self.parse_expr();
+        let value = self.parse_conditional_expression_or_higher();
 
         ast::ExprNamedExpr {
             target: Box::new(target),
@@ -1458,7 +1497,7 @@ impl<'src> Parser<'src> {
             _ => {}
         }
 
-        let body = self.parse_expr();
+        let body = self.parse_conditional_expression_or_higher();
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -1467,15 +1506,15 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_if_expr(&mut self, body: Expr, start: TextSize) -> ast::ExprIfExp {
+    fn parse_if_expression(&mut self, body: Expr, start: TextSize) -> ast::ExprIfExp {
         self.bump(TokenKind::If);
 
-        let test = self.parse_expr_simple();
+        let test = self.parse_simple_expression();
 
         self.expect_and_recover(TokenKind::Else, TokenSet::EMPTY);
 
         let orelse = self.parse_expr_with_recovery(
-            Parser::parse_expr,
+            Parser::parse_conditional_expression_or_higher,
             TokenSet::EMPTY,
             "expecting expression after `else` keyword",
         );

@@ -26,198 +26,47 @@ const END_EXPR_SET: TokenSet = TokenSet::new(&[
 ]);
 
 impl<'src> Parser<'src> {
-    fn parse_attr_expr_for_match_pattern(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
-        while self.current_kind() == TokenKind::Dot {
-            lhs = Expr::Attribute(self.parse_attribute_expr(lhs, start));
-        }
-
-        lhs
-    }
-
-    fn parse_match_pattern_literal(&mut self) -> Pattern {
+    pub(super) fn parse_match_patterns(&mut self) -> Pattern {
         let start = self.node_start();
-        let (tok, tok_range) = self.next_token();
-        match tok {
-            Tok::None => Pattern::MatchSingleton(ast::PatternMatchSingleton {
-                value: Singleton::None,
-                range: tok_range,
-            }),
-            Tok::True => Pattern::MatchSingleton(ast::PatternMatchSingleton {
-                value: Singleton::True,
-                range: tok_range,
-            }),
-            Tok::False => Pattern::MatchSingleton(ast::PatternMatchSingleton {
-                value: Singleton::False,
-                range: tok_range,
-            }),
-            tok @ Tok::String { .. } => {
-                let str = self.parse_string_expr((tok, tok_range), start);
+        let pattern = self.parse_match_pattern();
 
-                Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(str),
-                    range: self.node_range(start),
-                })
-            }
-            Tok::Complex { real, imag } => Pattern::MatchValue(ast::PatternMatchValue {
-                value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Complex { real, imag },
-                    range: tok_range,
-                })),
-                range: tok_range,
-            }),
-            Tok::Int { value } => Pattern::MatchValue(ast::PatternMatchValue {
-                value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Int(value),
-                    range: tok_range,
-                })),
-                range: tok_range,
-            }),
-            Tok::Float { value } => Pattern::MatchValue(ast::PatternMatchValue {
-                value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Float(value),
-                    range: tok_range,
-                })),
-                range: tok_range,
-            }),
-            Tok::Name { name } if self.at(TokenKind::Dot) => {
-                let id = Expr::Name(ast::ExprName {
-                    id: name,
-                    ctx: ExprContext::Load,
-                    range: tok_range,
-                });
-
-                let attribute = self.parse_attr_expr_for_match_pattern(id, start);
-
-                Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(attribute),
-                    range: self.node_range(start),
-                })
-            }
-            Tok::Name { name } => Pattern::MatchAs(ast::PatternMatchAs {
-                range: tok_range,
-                pattern: None,
-                name: if name == "_" {
-                    None
-                } else {
-                    Some(ast::Identifier {
-                        id: name,
-                        range: tok_range,
-                    })
-                },
-            }),
-            Tok::Minus
-                if matches!(
-                    self.current_kind(),
-                    TokenKind::Int | TokenKind::Float | TokenKind::Complex
-                ) =>
-            {
-                // Since the `Minus` token was consumed `parse_lhs` will not
-                // be able to parse an `UnaryOp`, therefore we create the node
-                // manually.
-                let parsed_expr = self.parse_lhs_expression();
-
-                let range = self.node_range(start);
-                Pattern::MatchValue(ast::PatternMatchValue {
-                    value: Box::new(Expr::UnaryOp(ast::ExprUnaryOp {
-                        range,
-                        op: UnaryOp::USub,
-                        operand: Box::new(parsed_expr.expr),
-                    })),
-                    range,
-                })
-            }
-            kind => {
-                const RECOVERY_SET: TokenSet =
-                    TokenSet::new(&[TokenKind::Colon]).union(NEWLINE_EOF_SET);
-                self.add_error(
-                    ParseErrorType::InvalidMatchPatternLiteral {
-                        pattern: kind.into(),
-                    },
-                    tok_range,
-                );
-                self.skip_until(RECOVERY_SET);
-
-                Pattern::Invalid(ast::PatternMatchInvalid {
-                    value: self.src_text(tok_range).into(),
-                    range: self.node_range(start),
-                })
-            }
-        }
-    }
-
-    fn parse_delimited_match_pattern(&mut self) -> Pattern {
-        let start = self.node_start();
-        let parentheses = if self.eat(TokenKind::Lpar) {
-            SequenceMatchPatternParentheses::Tuple
+        if self.at(TokenKind::Comma) {
+            Pattern::MatchSequence(self.parse_sequence_match_pattern(pattern, start, None))
         } else {
-            self.bump(TokenKind::Lsqb);
-            SequenceMatchPatternParentheses::List
-        };
-
-        if matches!(self.current_kind(), TokenKind::Newline | TokenKind::Colon) {
-            self.add_error(
-                ParseErrorType::OtherError(format!(
-                    "missing `{closing}`",
-                    closing = if parentheses.is_list() { "]" } else { ")" }
-                )),
-                self.current_range(),
-            );
+            pattern
         }
+    }
 
-        if self.eat(parentheses.closing_kind()) {
-            return Pattern::MatchSequence(ast::PatternMatchSequence {
-                patterns: vec![],
+    fn parse_match_pattern(&mut self) -> Pattern {
+        let start = self.node_start();
+        let mut lhs = self.parse_match_pattern_lhs();
+
+        // Or pattern
+        if self.at(TokenKind::Vbar) {
+            let mut patterns = vec![lhs];
+
+            while self.eat(TokenKind::Vbar) {
+                let pattern = self.parse_match_pattern_lhs();
+                patterns.push(pattern);
+            }
+
+            lhs = Pattern::MatchOr(ast::PatternMatchOr {
                 range: self.node_range(start),
+                patterns,
             });
         }
 
-        let mut pattern = self.parse_match_pattern();
-
-        if parentheses.is_list() || self.at(TokenKind::Comma) {
-            pattern = Pattern::MatchSequence(self.parse_sequence_match_pattern(
-                pattern,
-                start,
-                Some(parentheses),
-            ));
-        } else {
-            self.expect_and_recover(parentheses.closing_kind(), TokenSet::EMPTY);
+        // As pattern
+        if self.eat(TokenKind::As) {
+            let ident = self.parse_identifier();
+            lhs = Pattern::MatchAs(ast::PatternMatchAs {
+                range: self.node_range(start),
+                name: Some(ident),
+                pattern: Some(Box::new(lhs)),
+            });
         }
 
-        pattern
-    }
-
-    fn parse_sequence_match_pattern(
-        &mut self,
-        first_elt: Pattern,
-        start: TextSize,
-        parentheses: Option<SequenceMatchPatternParentheses>,
-    ) -> ast::PatternMatchSequence {
-        let ending = parentheses.map_or(
-            TokenKind::Colon,
-            SequenceMatchPatternParentheses::closing_kind,
-        );
-
-        if parentheses.is_some_and(|parentheses| {
-            self.at(parentheses.closing_kind()) || self.peek_nth(1) == parentheses.closing_kind()
-        }) {
-            // The comma is optional if it is a single-element sequence
-            self.eat(TokenKind::Comma);
-        } else {
-            self.expect(TokenKind::Comma);
-        }
-
-        let mut patterns = vec![first_elt];
-
-        self.parse_separated(true, TokenKind::Comma, [ending].as_slice(), |parser| {
-            patterns.push(parser.parse_match_pattern());
-        });
-
-        if let Some(parentheses) = parentheses {
-            self.expect(parentheses.closing_kind());
-        }
-
-        let range = self.node_range(start);
-        ast::PatternMatchSequence { range, patterns }
+        lhs
     }
 
     fn parse_match_pattern_lhs(&mut self) -> Pattern {
@@ -318,44 +167,66 @@ impl<'src> Parser<'src> {
         lhs
     }
 
-    fn parse_match_pattern(&mut self) -> Pattern {
+    fn parse_match_pattern_mapping(&mut self) -> ast::PatternMatchMapping {
         let start = self.node_start();
-        let mut lhs = self.parse_match_pattern_lhs();
+        let mut keys = vec![];
+        let mut patterns = vec![];
+        let mut rest = None;
 
-        if self.at(TokenKind::Vbar) {
-            let mut patterns = vec![lhs];
+        self.parse_delimited(
+            true,
+            TokenKind::Lbrace,
+            TokenKind::Comma,
+            TokenKind::Rbrace,
+            |parser| {
+                if parser.eat(TokenKind::DoubleStar) {
+                    rest = Some(parser.parse_identifier());
+                } else {
+                    let key = match parser.parse_match_pattern_lhs() {
+                        Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
+                        Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range }) => {
+                            match value {
+                                Singleton::None => {
+                                    Expr::NoneLiteral(ast::ExprNoneLiteral { range })
+                                }
+                                Singleton::True => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                                    value: true,
+                                    range,
+                                }),
+                                Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                                    value: false,
+                                    range,
+                                }),
+                            }
+                        }
+                        pattern => {
+                            parser.add_error(
+                                ParseErrorType::OtherError(format!(
+                                    "invalid mapping pattern key `{}`",
+                                    parser.src_text(&pattern)
+                                )),
+                                &pattern,
+                            );
+                            Expr::Invalid(ast::ExprInvalid {
+                                value: parser.src_text(&pattern).into(),
+                                range: pattern.range(),
+                            })
+                        }
+                    };
+                    keys.push(key);
 
-            while self.eat(TokenKind::Vbar) {
-                let pattern = self.parse_match_pattern_lhs();
-                patterns.push(pattern);
-            }
+                    parser.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
 
-            lhs = Pattern::MatchOr(ast::PatternMatchOr {
-                range: self.node_range(start),
-                patterns,
-            });
-        }
+                    patterns.push(parser.parse_match_pattern());
+                }
+            },
+        );
 
-        if self.eat(TokenKind::As) {
-            let ident = self.parse_identifier();
-            lhs = Pattern::MatchAs(ast::PatternMatchAs {
-                range: self.node_range(start),
-                name: Some(ident),
-                pattern: Some(Box::new(lhs)),
-            });
-        }
-
-        lhs
-    }
-
-    pub(super) fn parse_match_patterns(&mut self) -> Pattern {
-        let start = self.node_start();
-        let pattern = self.parse_match_pattern();
-
-        if self.at(TokenKind::Comma) {
-            Pattern::MatchSequence(self.parse_sequence_match_pattern(pattern, start, None))
-        } else {
-            pattern
+        ast::PatternMatchMapping {
+            range: self.node_range(start),
+            keys,
+            patterns,
+            rest,
         }
     }
 
@@ -373,6 +244,200 @@ impl<'src> Parser<'src> {
                 Some(ident)
             },
         }
+    }
+
+    fn parse_delimited_match_pattern(&mut self) -> Pattern {
+        let start = self.node_start();
+        let parentheses = if self.eat(TokenKind::Lpar) {
+            SequenceMatchPatternParentheses::Tuple
+        } else {
+            self.bump(TokenKind::Lsqb);
+            SequenceMatchPatternParentheses::List
+        };
+
+        if matches!(self.current_kind(), TokenKind::Newline | TokenKind::Colon) {
+            self.add_error(
+                ParseErrorType::OtherError(format!(
+                    "missing `{closing}`",
+                    closing = if parentheses.is_list() { "]" } else { ")" }
+                )),
+                self.current_range(),
+            );
+        }
+
+        if self.eat(parentheses.closing_kind()) {
+            return Pattern::MatchSequence(ast::PatternMatchSequence {
+                patterns: vec![],
+                range: self.node_range(start),
+            });
+        }
+
+        let mut pattern = self.parse_match_pattern();
+
+        if parentheses.is_list() || self.at(TokenKind::Comma) {
+            pattern = Pattern::MatchSequence(self.parse_sequence_match_pattern(
+                pattern,
+                start,
+                Some(parentheses),
+            ));
+        } else {
+            self.expect_and_recover(parentheses.closing_kind(), TokenSet::EMPTY);
+        }
+
+        pattern
+    }
+
+    fn parse_sequence_match_pattern(
+        &mut self,
+        first_elt: Pattern,
+        start: TextSize,
+        parentheses: Option<SequenceMatchPatternParentheses>,
+    ) -> ast::PatternMatchSequence {
+        let ending = parentheses.map_or(
+            TokenKind::Colon,
+            SequenceMatchPatternParentheses::closing_kind,
+        );
+
+        if parentheses.is_some_and(|parentheses| {
+            self.at(parentheses.closing_kind()) || self.peek_nth(1) == parentheses.closing_kind()
+        }) {
+            // The comma is optional if it is a single-element sequence
+            self.eat(TokenKind::Comma);
+        } else {
+            self.expect(TokenKind::Comma);
+        }
+
+        let mut patterns = vec![first_elt];
+
+        self.parse_separated(true, TokenKind::Comma, [ending].as_slice(), |parser| {
+            patterns.push(parser.parse_match_pattern());
+        });
+
+        if let Some(parentheses) = parentheses {
+            self.expect(parentheses.closing_kind());
+        }
+
+        let range = self.node_range(start);
+        ast::PatternMatchSequence { range, patterns }
+    }
+
+    fn parse_match_pattern_literal(&mut self) -> Pattern {
+        let start = self.node_start();
+        let (tok, tok_range) = self.next_token();
+        match tok {
+            Tok::None => Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                value: Singleton::None,
+                range: tok_range,
+            }),
+            Tok::True => Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                value: Singleton::True,
+                range: tok_range,
+            }),
+            Tok::False => Pattern::MatchSingleton(ast::PatternMatchSingleton {
+                value: Singleton::False,
+                range: tok_range,
+            }),
+            tok @ Tok::String { .. } => {
+                let str = self.parse_string_expression((tok, tok_range), start);
+
+                Pattern::MatchValue(ast::PatternMatchValue {
+                    value: Box::new(str),
+                    range: self.node_range(start),
+                })
+            }
+            Tok::Complex { real, imag } => Pattern::MatchValue(ast::PatternMatchValue {
+                value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Complex { real, imag },
+                    range: tok_range,
+                })),
+                range: tok_range,
+            }),
+            Tok::Int { value } => Pattern::MatchValue(ast::PatternMatchValue {
+                value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Int(value),
+                    range: tok_range,
+                })),
+                range: tok_range,
+            }),
+            Tok::Float { value } => Pattern::MatchValue(ast::PatternMatchValue {
+                value: Box::new(Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Float(value),
+                    range: tok_range,
+                })),
+                range: tok_range,
+            }),
+            Tok::Name { name } if self.at(TokenKind::Dot) => {
+                let id = Expr::Name(ast::ExprName {
+                    id: name,
+                    ctx: ExprContext::Load,
+                    range: tok_range,
+                });
+
+                let attribute = self.parse_attr_expr_for_match_pattern(id, start);
+
+                Pattern::MatchValue(ast::PatternMatchValue {
+                    value: Box::new(attribute),
+                    range: self.node_range(start),
+                })
+            }
+            Tok::Name { name } => Pattern::MatchAs(ast::PatternMatchAs {
+                range: tok_range,
+                pattern: None,
+                name: if name == "_" {
+                    None
+                } else {
+                    Some(ast::Identifier {
+                        id: name,
+                        range: tok_range,
+                    })
+                },
+            }),
+            Tok::Minus
+                if matches!(
+                    self.current_kind(),
+                    TokenKind::Int | TokenKind::Float | TokenKind::Complex
+                ) =>
+            {
+                // Since the `Minus` token was consumed `parse_lhs` will not
+                // be able to parse an `UnaryOp`, therefore we create the node
+                // manually.
+                let parsed_expr = self.parse_lhs_expression();
+
+                let range = self.node_range(start);
+                Pattern::MatchValue(ast::PatternMatchValue {
+                    value: Box::new(Expr::UnaryOp(ast::ExprUnaryOp {
+                        range,
+                        op: UnaryOp::USub,
+                        operand: Box::new(parsed_expr.expr),
+                    })),
+                    range,
+                })
+            }
+            kind => {
+                const RECOVERY_SET: TokenSet =
+                    TokenSet::new(&[TokenKind::Colon]).union(NEWLINE_EOF_SET);
+                self.add_error(
+                    ParseErrorType::InvalidMatchPatternLiteral {
+                        pattern: kind.into(),
+                    },
+                    tok_range,
+                );
+                self.skip_until(RECOVERY_SET);
+
+                Pattern::Invalid(ast::PatternMatchInvalid {
+                    value: self.src_text(tok_range).into(),
+                    range: self.node_range(start),
+                })
+            }
+        }
+    }
+
+    fn parse_attr_expr_for_match_pattern(&mut self, mut lhs: Expr, start: TextSize) -> Expr {
+        while self.current_kind() == TokenKind::Dot {
+            lhs = Expr::Attribute(self.parse_attribute_expression(lhs, start));
+        }
+
+        lhs
     }
 
     fn parse_match_pattern_class(
@@ -478,69 +543,6 @@ impl<'src> Parser<'src> {
                 range: arguments_range,
             },
             range: self.node_range(start),
-        }
-    }
-
-    fn parse_match_pattern_mapping(&mut self) -> ast::PatternMatchMapping {
-        let start = self.node_start();
-        let mut keys = vec![];
-        let mut patterns = vec![];
-        let mut rest = None;
-
-        self.parse_delimited(
-            true,
-            TokenKind::Lbrace,
-            TokenKind::Comma,
-            TokenKind::Rbrace,
-            |parser| {
-                if parser.eat(TokenKind::DoubleStar) {
-                    rest = Some(parser.parse_identifier());
-                } else {
-                    let key = match parser.parse_match_pattern_lhs() {
-                        Pattern::MatchValue(ast::PatternMatchValue { value, .. }) => *value,
-                        Pattern::MatchSingleton(ast::PatternMatchSingleton { value, range }) => {
-                            match value {
-                                Singleton::None => {
-                                    Expr::NoneLiteral(ast::ExprNoneLiteral { range })
-                                }
-                                Singleton::True => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                                    value: true,
-                                    range,
-                                }),
-                                Singleton::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                                    value: false,
-                                    range,
-                                }),
-                            }
-                        }
-                        pattern => {
-                            parser.add_error(
-                                ParseErrorType::OtherError(format!(
-                                    "invalid mapping pattern key `{}`",
-                                    parser.src_text(&pattern)
-                                )),
-                                &pattern,
-                            );
-                            Expr::Invalid(ast::ExprInvalid {
-                                value: parser.src_text(&pattern).into(),
-                                range: pattern.range(),
-                            })
-                        }
-                    };
-                    keys.push(key);
-
-                    parser.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
-
-                    patterns.push(parser.parse_match_pattern());
-                }
-            },
-        );
-
-        ast::PatternMatchMapping {
-            range: self.node_range(start),
-            keys,
-            patterns,
-            rest,
         }
     }
 }
