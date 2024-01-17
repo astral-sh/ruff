@@ -38,7 +38,7 @@ jobs:
         if: steps.pr-number.outputs.pr-number
         with:
           name: ecosystem-result
-          workflow: ci.yaml
+          workflow: ci.yml
           pr: ${{ steps.pr-number.outputs.pr-number }}
           path: pr/ecosystem
           workflow_conclusion: completed

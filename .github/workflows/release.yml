@@ -15,7 +15,7 @@ on:
       # When we change pyproject.toml, we want to ensure that the maturin builds still work
       - pyproject.toml
       # And when we change this workflow itself...
-      - .github/workflows/release.yaml
+      - .github/workflows/release.yml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

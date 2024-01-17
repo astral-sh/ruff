@@ -329,7 +329,7 @@ We use an experimental in-house tool for managing releases.
 1. Run `cargo check`. This should update the lock file with new versions.
 1. Create a pull request with the changelog and version updates
 1. Merge the PR
-1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yaml) with:
+1. Run the [release workflow](https://github.com/astral-sh/ruff/actions/workflows/release.yml) with:
     - The new version number (without starting `v`)
     - The commit hash of the merged release pull request on `main`
 1. The release workflow will do the following:

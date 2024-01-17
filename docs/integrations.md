@@ -255,7 +255,7 @@ Ruff can also be integrated via
   <code>efm</code>
 </a>
 in just a
-<a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yaml#L14-L20">
+<a href="https://github.com/JafarAbdi/myconfigs/blob/6f0b6b2450e92ec8fc50422928cd22005b919110/efm-langserver/config.yml#L14-L20">
   few lines.
 </a>
 </summary>

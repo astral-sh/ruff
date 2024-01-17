@@ -49,7 +49,7 @@ jobs:
               - "!crates/ruff_shrinking/**"
               - scripts/*
               - python/**
-              - .github/workflows/ci.yaml
+              - .github/workflows/ci.yml
 
             formatter:
               - Cargo.toml
@@ -65,7 +65,7 @@ jobs:
               - crates/ruff_dev/**
               - scripts/*
               - python/**
-              - .github/workflows/ci.yaml
+              - .github/workflows/ci.yml
 
             code:
               - "**/*"
@@ -374,7 +374,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cache/pre-commit
-          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yml') }}
       - name: "Run pre-commit"
         run: |
           echo '```console' > $GITHUB_STEP_SUMMARY
