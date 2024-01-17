@@ -12,8 +12,10 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::rules::ruff::rules::sorting_helpers::{
+    sort_single_line_elements_sequence, SequenceKind, SortClassification,
+};
 
-use is_macro;
 use itertools::Itertools;
 use natord;
 
@@ -157,119 +159,30 @@ fn sort_dunder_all(checker: &mut Checker, target: &ast::Expr, node: &ast::Expr) 
     }
 
     let (elts, range, kind) = match node {
-        ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, *range, DunderAllKind::List),
+        ast::Expr::List(ast::ExprList { elts, range, .. }) => (elts, *range, SequenceKind::List),
         ast::Expr::Tuple(tuple_node @ ast::ExprTuple { elts, range, .. }) => {
-            (elts, *range, DunderAllKind::Tuple(tuple_node))
+            (elts, *range, SequenceKind::Tuple(tuple_node))
         }
         _ => return,
     };
+    let elts = elts.iter().collect_vec();
 
-    let elts_analysis = DunderAllSortClassification::from_elements(elts);
+    let elts_analysis = SortClassification::from_elements(&elts, |a, b| {
+        AllItemSortKey::from(a).cmp(&AllItemSortKey::from(b))
+    });
     if elts_analysis.is_not_a_list_of_string_literals() || elts_analysis.is_sorted() {
         return;
     }
 
     let mut diagnostic = Diagnostic::new(UnsortedDunderAll, range);
 
-    if let DunderAllSortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
-        if let Some(fix) = create_fix(range, elts, &items, &kind, checker) {
+    if let SortClassification::UnsortedAndMaybeFixable { items } = elts_analysis {
+        if let Some(fix) = create_fix(range, &elts, &items, &kind, checker) {
             diagnostic.set_fix(fix);
         }
     }
 
     checker.diagnostics.push(diagnostic);
-}
-
-/// An enumeration of the two valid ways of defining
-/// `__all__`: as a list, or as a tuple.
-///
-/// Whereas lists are always parenthesized
-/// (they always start with `[` and end with `]`),
-/// single-line tuples *can* be unparenthesized.
-/// We keep the original AST node around for the
-/// Tuple variant so that this can be queried later.
-#[derive(Debug)]
-enum DunderAllKind<'a> {
-    List,
-    Tuple(&'a ast::ExprTuple),
-}
-
-impl DunderAllKind<'_> {
-    fn is_parenthesized(&self, source: &str) -> bool {
-        match self {
-            Self::List => true,
-            Self::Tuple(ast_node) => ast_node.is_parenthesized(source),
-        }
-    }
-
-    fn opening_token_for_multiline_definition(&self) -> Tok {
-        match self {
-            Self::List => Tok::Lsqb,
-            Self::Tuple(_) => Tok::Lpar,
-        }
-    }
-
-    fn closing_token_for_multiline_definition(&self) -> Tok {
-        match self {
-            Self::List => Tok::Rsqb,
-            Self::Tuple(_) => Tok::Rpar,
-        }
-    }
-}
-
-/// An enumeration of the possible conclusions we could come to
-/// regarding the ordering of the elements in an `__all__` definition:
-///
-/// 1. `__all__` is a list of string literals that is already sorted
-/// 2. `__all__` is an unsorted list of string literals,
-///    but we wouldn't be able to autofix it
-/// 3. `__all__` is an unsorted list of string literals,
-///    and it's possible we could generate a fix for it
-/// 4. `__all__` contains one or more items that are not string
-///    literals.
-///
-/// ("Sorted" here means "ordered according to an isort-style sort".
-/// See the module-level docs for a definition of "isort-style sort.")
-#[derive(Debug, is_macro::Is)]
-enum DunderAllSortClassification<'a> {
-    Sorted,
-    UnsortedButUnfixable,
-    UnsortedAndMaybeFixable { items: Vec<&'a str> },
-    NotAListOfStringLiterals,
-}
-
-impl<'a> DunderAllSortClassification<'a> {
-    fn from_elements(elements: &'a [ast::Expr]) -> Self {
-        let Some((first, rest @ [_, ..])) = elements.split_first() else {
-            return Self::Sorted;
-        };
-        let Some(string_node) = first.as_string_literal_expr() else {
-            return Self::NotAListOfStringLiterals;
-        };
-        let mut this = string_node.value.to_str();
-
-        for expr in rest {
-            let Some(string_node) = expr.as_string_literal_expr() else {
-                return Self::NotAListOfStringLiterals;
-            };
-            let next = string_node.value.to_str();
-            if AllItemSortKey::from(next) < AllItemSortKey::from(this) {
-                let mut items = Vec::with_capacity(elements.len());
-                for expr in elements {
-                    let Some(string_node) = expr.as_string_literal_expr() else {
-                        return Self::NotAListOfStringLiterals;
-                    };
-                    if string_node.value.is_implicit_concatenated() {
-                        return Self::UnsortedButUnfixable;
-                    }
-                    items.push(string_node.value.to_str());
-                }
-                return Self::UnsortedAndMaybeFixable { items };
-            }
-            this = next;
-        }
-        Self::Sorted
-    }
 }
 
 /// A struct to implement logic necessary to achieve
@@ -361,9 +274,9 @@ impl InferredMemberType {
 /// is unfixable in this instance.
 fn create_fix(
     range: TextRange,
-    elts: &[ast::Expr],
+    elts: &[&ast::Expr],
     string_items: &[&str],
-    kind: &DunderAllKind,
+    kind: &SequenceKind,
     checker: &Checker,
 ) -> Option<Fix> {
     let locator = checker.locator();
@@ -388,7 +301,9 @@ fn create_fix(
             assert_eq!(value.items.len(), elts.len());
             value.into_sorted_source_code(locator, checker.stylist())
         } else {
-            sort_single_line_dunder_all(elts, string_items, kind, locator)
+            sort_single_line_elements_sequence(kind, elts, string_items, locator, |a, b| {
+                AllItemSortKey::from(a).cmp(&AllItemSortKey::from(b))
+            })
         }
     };
 
@@ -413,7 +328,7 @@ impl MultilineDunderAllValue {
     /// if the analysis fails for whatever reason.
     fn from_source_range(
         range: TextRange,
-        kind: &DunderAllKind,
+        kind: &SequenceKind,
         locator: &Locator,
     ) -> Option<MultilineDunderAllValue> {
         // Parse the multiline `__all__` definition using the raw tokens.
@@ -546,7 +461,7 @@ impl Ranged for MultilineDunderAllValue {
 /// in the original source code.
 fn collect_dunder_all_lines(
     range: TextRange,
-    kind: &DunderAllKind,
+    kind: &SequenceKind,
     locator: &Locator,
 ) -> Option<(Vec<DunderAllLine>, bool)> {
     // These first two variables are used for keeping track of state
@@ -988,32 +903,4 @@ fn multiline_dunder_all_postlude<'a>(
         return Cow::Owned(format!("{newline}{leading_indent}{trimmed_postlude}"));
     }
     Cow::Borrowed(postlude)
-}
-
-/// Create a string representing a fixed-up single-line
-/// `__all__` definition, that can be inserted into the
-/// source code as a `range_replacement` autofix.
-fn sort_single_line_dunder_all(
-    elts: &[ast::Expr],
-    elements: &[&str],
-    kind: &DunderAllKind,
-    locator: &Locator,
-) -> String {
-    // We grab the original source-code ranges using `locator.slice()`
-    // rather than using the expression generator, as this approach allows
-    // us to easily preserve stylistic choices in the original source code
-    // such as whether double or single quotes were used.
-    let mut element_pairs = elts.iter().zip(elements).collect_vec();
-    element_pairs.sort_by_key(|(_, elem)| AllItemSortKey::from(**elem));
-    let joined_items = element_pairs
-        .iter()
-        .map(|(elt, _)| locator.slice(elt))
-        .join(", ");
-    match kind {
-        DunderAllKind::List => format!("[{joined_items}]"),
-        DunderAllKind::Tuple(_) if kind.is_parenthesized(locator.contents()) => {
-            format!("({joined_items})")
-        }
-        DunderAllKind::Tuple(_) => joined_items,
-    }
 }
