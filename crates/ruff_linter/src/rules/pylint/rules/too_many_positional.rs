@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{self as ast, identifier::Identifier};
-use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::analyze::{function_type, visibility};
 
 use crate::checkers::ast::Checker;
 
@@ -57,7 +57,7 @@ impl Violation for TooManyPositional {
 
 /// PLR0917
 pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::StmtFunctionDef) {
-    let num_positional_args = function_def
+    let mut num_positional_args = function_def
         .parameters
         .args
         .iter()
@@ -70,11 +70,30 @@ pub(crate) fn too_many_positional(checker: &mut Checker, function_def: &ast::Stm
         })
         .count();
 
+    let semantic = checker.semantic();
+
+    // Check if the function is a method or class method.
+    if matches!(
+        function_type::classify(
+            &function_def.name,
+            &function_def.decorator_list,
+            semantic.current_scope(),
+            semantic,
+            &checker.settings.pep8_naming.classmethod_decorators,
+            &checker.settings.pep8_naming.staticmethod_decorators,
+        ),
+        function_type::FunctionType::Method | function_type::FunctionType::ClassMethod
+    ) {
+        // If so, we need to subtract one from the number of positional arguments, since the first
+        // argument is always `self` or `cls`.
+        num_positional_args = num_positional_args.saturating_sub(1);
+    }
+
     if num_positional_args > checker.settings.pylint.max_positional_args {
         // Allow excessive arguments in `@override` or `@overload` methods, since they're required
         // to adhere to the parent signature.
-        if visibility::is_override(&function_def.decorator_list, checker.semantic())
-            || visibility::is_overload(&function_def.decorator_list, checker.semantic())
+        if visibility::is_override(&function_def.decorator_list, semantic)
+            || visibility::is_overload(&function_def.decorator_list, semantic)
         {
             return;
         }
