@@ -1,4 +1,4 @@
-/// Miscellaneous helpers for sorting constant lists of string literals.
+/// Utilities for sorting constant lists of string literals.
 ///
 /// Examples where these are useful:
 /// - Sorting `__all__` in the global scope,
@@ -26,7 +26,7 @@ use itertools::{izip, Itertools};
 /// We keep the original AST node around for the
 /// Tuple variant so that this can be queried later.
 #[derive(Debug)]
-pub(crate) enum SequenceKind<'a> {
+pub(super) enum SequenceKind<'a> {
     List,
     Set,
     Tuple(&'a ast::ExprTuple),
@@ -47,7 +47,7 @@ impl SequenceKind<'_> {
         }
     }
 
-    pub(crate) fn opening_token_for_multiline_definition(&self) -> Tok {
+    pub(super) fn opening_token_for_multiline_definition(&self) -> Tok {
         match self {
             Self::List => Tok::Lsqb,
             Self::Set => Tok::Lbrace,
@@ -55,7 +55,7 @@ impl SequenceKind<'_> {
         }
     }
 
-    pub(crate) fn closing_token_for_multiline_definition(&self) -> Tok {
+    pub(super) fn closing_token_for_multiline_definition(&self) -> Tok {
         match self {
             Self::List => Tok::Rsqb,
             Self::Set => Tok::Rbrace,
@@ -68,7 +68,7 @@ impl SequenceKind<'_> {
 /// [display literals](https://docs.python.org/3/reference/expressions.html#displays-for-lists-sets-and-dictionaries)
 /// Python provides for builtin containers.
 #[derive(Debug, is_macro::Is)]
-pub(crate) enum DisplayKind<'a> {
+pub(super) enum DisplayKind<'a> {
     Sequence(SequenceKind<'a>),
     Dict { values: &'a Vec<ast::Expr> },
 }
@@ -77,7 +77,7 @@ pub(crate) enum DisplayKind<'a> {
 /// definition of `__all__` or `__slots__` (etc.),
 /// that can be inserted into the
 /// source code as a `range_replacement` autofix.
-pub(crate) fn sort_single_line_elements_sequence<F>(
+pub(super) fn sort_single_line_elements_sequence<F>(
     kind: &SequenceKind,
     elts: &[&ast::Expr],
     elements: &[&str],
@@ -113,7 +113,7 @@ where
 /// definition of `__all__` or `__slots__` (etc.),
 /// that can be inserted into the
 /// source code as a `range_replacement` autofix.
-pub(crate) fn sort_single_line_elements_dict<F>(
+pub(super) fn sort_single_line_elements_dict<F>(
     key_elts: &[&ast::Expr],
     elements: &[&str],
     value_elts: &[ast::Expr],
@@ -157,7 +157,7 @@ where
 /// 4. The display contains one or more items that are not string
 ///    literals.
 #[derive(Debug, is_macro::Is)]
-pub(crate) enum SortClassification<'a> {
+pub(super) enum SortClassification<'a> {
     Sorted,
     UnsortedButUnfixable,
     UnsortedAndMaybeFixable { items: Vec<&'a str> },
@@ -165,7 +165,7 @@ pub(crate) enum SortClassification<'a> {
 }
 
 impl<'a> SortClassification<'a> {
-    pub(crate) fn from_elements<F>(elements: &'a [&ast::Expr], mut cmp_fn: F) -> Self
+    pub(super) fn from_elements<F>(elements: &'a [&ast::Expr], mut cmp_fn: F) -> Self
     where
         F: FnMut(&str, &str) -> Ordering,
     {

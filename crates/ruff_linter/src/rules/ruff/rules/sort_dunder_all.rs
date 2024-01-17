@@ -12,7 +12,7 @@ use ruff_source_file::Locator;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::rules::sorting_helpers::{
+use crate::rules::ruff::rules::sequence_sorting::{
     sort_single_line_elements_sequence, SequenceKind, SortClassification,
 };
 
