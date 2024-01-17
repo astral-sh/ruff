@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 
 use ast::Mod;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::lexer::lex;
@@ -87,17 +87,11 @@ pub(crate) struct Parser<'src> {
     /// Specify the mode in which the code will be parsed.
     mode: Mode,
 
-    /// Defer the creation of the invalid node for the skipped unexpected tokens.
-    /// Holds the range of the skipped tokens.
-    defer_invalid_node_creation: Option<TextRange>,
-
     current: Spanned,
 
     /// The end of the last processed. Used to determine a node's end.
     last_token_end: TextSize,
 }
-
-// TODO: Review use of `ParsedExpr`: Can we reduce usage?
 
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new(&[TokenKind::Newline, TokenKind::EndOfFile]);
 const LITERAL_SET: TokenSet = TokenSet::new(&[
@@ -146,8 +140,6 @@ impl<'src> Parser<'src> {
             tokens,
             last_token_end: TextSize::default(),
             current,
-
-            defer_invalid_node_creation: None,
         }
     }
 
@@ -157,7 +149,9 @@ impl<'src> Parser<'src> {
         let ast = if self.mode == Mode::Expression {
             let start = self.node_start();
             let parsed_expr = self.parse_expression();
+            let mut progress = ParserProgress::default();
             loop {
+                progress.assert_progressing(&self);
                 if !self.eat(TokenKind::Newline) {
                     break;
                 }
@@ -170,30 +164,26 @@ impl<'src> Parser<'src> {
             })
         } else {
             let is_src_empty = self.at(TokenKind::EndOfFile);
+            let mut progress = ParserProgress::default();
             while !self.at(TokenKind::EndOfFile) {
+                progress.assert_progressing(&self);
                 if self.at(TokenKind::Indent) {
                     self.handle_unexpected_indentation(&mut body, "unexpected indentation");
                     continue;
                 }
 
-                body.push(self.parse_statement());
-
-                if let Some(range) = self.defer_invalid_node_creation {
-                    self.defer_invalid_node_creation = None;
-                    body.push(Stmt::Expr(ast::StmtExpr {
-                        value: Box::new(Expr::Invalid(ast::ExprInvalid {
-                            value: self.src_text(range).into(),
-                            range,
-                        })),
-                        range,
-                    }));
+                if self.is_at_stmt() {
+                    body.push(self.parse_statement());
+                } else {
+                    // SKip over the unexpected token.
+                    self.next_token();
                 }
             }
             ast::Mod::Module(ast::ModModule {
                 body,
                 // If the `source` only contains comments or empty spaces, return
                 // an empty range.
-                // FIXME(micha): The modul should always enclose the entire file
+                // FIXME(micha): The module should always enclose the entire file
                 range: if is_src_empty {
                     TextRange::default()
                 } else {
@@ -220,8 +210,8 @@ impl<'src> Parser<'src> {
         assert_eq!(self.ctx, ParserCtxFlags::empty());
         assert_eq!(&self.ctx_stack, &[]);
         assert_eq!(
-            self.current,
-            (Tok::EndOfFile, TextRange::empty(self.source.text_len())),
+            self.current_kind(),
+            TokenKind::EndOfFile,
             "Parser should be at the end of the file."
         );
 
@@ -284,7 +274,12 @@ impl<'src> Parser<'src> {
         TextRange::new(start, self.last_token_end)
     }
 
+    fn missing_node_range(&self) -> TextRange {
+        TextRange::empty(self.last_token_end)
+    }
+
     /// Moves the parser to the next token. Returns the old current token as an owned value.
+    /// FIXME(micha): Using `next_token` is almost always incorrect if there's a case where the current token is not of the expected type.
     fn next_token(&mut self) -> Spanned {
         let next = self
             .tokens
@@ -309,7 +304,7 @@ impl<'src> Parser<'src> {
         current
     }
 
-    fn peek_nth(&mut self, offset: usize) -> TokenKind {
+    fn peek_nth(&self, offset: usize) -> TokenKind {
         if offset == 0 {
             self.current_kind()
         } else {
@@ -351,7 +346,7 @@ impl<'src> Parser<'src> {
     ///
     /// # Returns
     /// The current token
-    fn bump(&mut self, kind: TokenKind) -> Spanned {
+    fn bump(&mut self, kind: TokenKind) -> (Tok, TextRange) {
         assert_eq!(self.current_kind(), kind);
 
         self.next_token()
@@ -367,51 +362,41 @@ impl<'src> Parser<'src> {
         false
     }
 
-    /// Expects a specific token kind, skipping leading unexpected tokens if needed.
-    fn expect_and_recover(&mut self, expected: TokenKind, recover_set: TokenSet) {
-        if !self.expect(expected) {
-            let expected_set = NEWLINE_EOF_SET
-                .union(recover_set)
-                .union([expected].as_slice().into());
-            // Skip leading unexpected tokens
-            let range = self.skip_until(expected_set);
-            self.defer_invalid_node_creation = Some(range);
-
-            self.add_error(
-                ParseErrorType::OtherError("unexpected tokens".into()),
-                range,
-            );
-
-            self.eat(expected);
-        }
-    }
-
     fn add_error<T>(&mut self, error: ParseErrorType, ranged: T)
     where
         T: Ranged,
     {
-        self.errors.push(ParseError {
-            error,
-            location: ranged.range(),
-        });
+        fn inner(errors: &mut Vec<ParseError>, error: ParseErrorType, range: TextRange) {
+            // Avoid flagging multiple errors at the same location
+            let is_same_location = errors
+                .last()
+                .is_some_and(|last| last.location.start() == range.start());
+
+            if !is_same_location {
+                errors.push(ParseError {
+                    error,
+                    location: range,
+                });
+            }
+        }
+
+        inner(&mut self.errors, error, ranged.range());
     }
 
     /// Skip tokens until [`TokenSet`]. Returns the range of the skipped tokens.
-    fn skip_until(&mut self, token_set: TokenSet) -> TextRange {
-        let mut final_range = self.current_range();
+    fn skip_until(&mut self, token_set: TokenSet) {
+        let mut progress = ParserProgress::default();
         while !self.at_ts(token_set) {
-            let (_, range) = self.next_token();
-            final_range = final_range.cover(range);
+            progress.assert_progressing(self);
+            self.next_token();
         }
-
-        final_range
     }
 
-    fn at(&mut self, kind: TokenKind) -> bool {
+    fn at(&self, kind: TokenKind) -> bool {
         self.current_kind() == kind
     }
 
-    fn at_ts(&mut self, ts: TokenSet) -> bool {
+    fn at_ts(&self, ts: TokenSet) -> bool {
         ts.contains(self.current_kind())
     }
 
@@ -454,7 +439,7 @@ impl<'src> Parser<'src> {
 
         self.parse_separated(allow_trailing_delim, delim, [closing].as_slice(), func);
 
-        self.expect_and_recover(closing, TokenSet::EMPTY);
+        self.expect(closing);
     }
 
     /// Parses a sequence of elements separated by a delimiter. This function stops

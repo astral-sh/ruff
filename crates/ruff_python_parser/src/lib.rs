@@ -275,7 +275,8 @@ pub fn parse_expression_starts_at(source: &str, offset: TextSize) -> Result<Expr
 /// assert!(program.is_ok());
 /// ```
 pub fn parse(source: &str, mode: Mode) -> Result<Mod, ParseError> {
-    parse_starts_at(source, mode, TextSize::default())
+    let lxr = lexer::lex(source, mode);
+    parse_tokens(lxr.collect(), source, mode)
 }
 
 /// Parse the given Python source code using the specified [`Mode`] and [`TextSize`].

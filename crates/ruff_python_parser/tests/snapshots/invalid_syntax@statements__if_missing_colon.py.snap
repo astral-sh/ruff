@@ -28,17 +28,6 @@ Module(
                     elif_else_clauses: [],
                 },
             ),
-            Expr(
-                StmtExpr {
-                    range: 7..8,
-                    value: Invalid(
-                        ExprInvalid {
-                            value: "\n",
-                            range: 7..8,
-                        },
-                    ),
-                },
-            ),
             Assign(
                 StmtAssign {
                     range: 18..24,
@@ -70,15 +59,6 @@ Module(
   |
 1 | if True
   |        ^ Syntax Error: expected Colon, found Newline
-2 |     pass
-3 | 
-4 | a = 10
-  |
-
-
-  |
-1 | if True
-  |        ^ Syntax Error: unexpected tokens
 2 |     pass
 3 | 
 4 | a = 10

@@ -26,6 +26,7 @@ const COMPOUND_STMT_SET: TokenSet = TokenSet::new(&[
     TokenKind::Def,
     TokenKind::Class,
     TokenKind::Async,
+    TokenKind::At,
 ]);
 
 /// Tokens that represent simple statements, but doesn't include expressions.
@@ -43,17 +44,23 @@ const SIMPLE_STMT_SET: TokenSet = TokenSet::new(&[
     TokenKind::Import,
     TokenKind::From,
     TokenKind::Type,
+    TokenKind::EscapeCommand,
 ]);
+
 /// Tokens that represent simple statements, including expressions.
 const SIMPLE_STMT_SET2: TokenSet = SIMPLE_STMT_SET.union(EXPR_SET);
 
 impl<'src> Parser<'src> {
-    fn at_compound_stmt(&mut self) -> bool {
+    fn at_compound_stmt(&self) -> bool {
         self.at_ts(COMPOUND_STMT_SET)
     }
 
-    fn at_simple_stmt(&mut self) -> bool {
+    fn at_simple_stmt(&self) -> bool {
         self.at_ts(SIMPLE_STMT_SET2)
+    }
+
+    pub(super) fn is_at_stmt(&self) -> bool {
+        self.at_simple_stmt() || self.at_compound_stmt()
     }
 
     /// Parses a compound or a simple statement.
@@ -199,8 +206,8 @@ impl<'src> Parser<'src> {
                     })
                 } else {
                     Stmt::Expr(ast::StmtExpr {
-                        value: Box::new(parsed_expr.expr),
                         range: self.node_range(start),
+                        value: Box::new(parsed_expr.expr),
                     })
                 }
             }
@@ -363,7 +370,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        self.expect_and_recover(TokenKind::Import, TokenSet::EMPTY);
+        self.expect(TokenKind::Import);
 
         let mut names = vec![];
         if self.at(TokenKind::Lpar) {
@@ -500,7 +507,7 @@ impl<'src> Parser<'src> {
         };
         let type_params = self.try_parse_type_params();
 
-        self.expect_and_recover(TokenKind::Equal, EXPR_SET);
+        self.expect(TokenKind::Equal);
 
         let value = self.parse_conditional_expression_or_higher();
 
@@ -643,7 +650,7 @@ impl<'src> Parser<'src> {
             [TokenKind::Colon].as_slice(),
             "expecting expression after `if` keyword",
         );
-        self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+        self.expect(TokenKind::Colon);
 
         let body = self.parse_block(Clause::If);
 
@@ -676,7 +683,7 @@ impl<'src> Parser<'src> {
                 [TokenKind::Colon].as_slice(),
                 "expecting expression after `elif` keyword",
             );
-            self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+            self.expect(TokenKind::Colon);
 
             let body = self.parse_block(Clause::ElIf);
 
@@ -690,7 +697,7 @@ impl<'src> Parser<'src> {
         if self.at(TokenKind::Else) {
             let else_start = self.node_start();
             self.bump(TokenKind::Else);
-            self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+            self.expect(TokenKind::Colon);
 
             let body = self.parse_block(Clause::Else);
 
@@ -707,7 +714,7 @@ impl<'src> Parser<'src> {
     fn parse_try_statement(&mut self) -> ast::StmtTry {
         let try_start = self.node_start();
         self.bump(TokenKind::Try);
-        self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+        self.expect(TokenKind::Colon);
 
         let mut is_star = false;
 
@@ -749,7 +756,7 @@ impl<'src> Parser<'src> {
 
             let name = self.eat(TokenKind::As).then(|| self.parse_identifier());
 
-            self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+            self.expect(TokenKind::Colon);
 
             let except_body = self.parse_block(Clause::Except);
 
@@ -769,14 +776,14 @@ impl<'src> Parser<'src> {
         }
 
         let orelse = if self.eat(TokenKind::Else) {
-            self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+            self.expect(TokenKind::Colon);
             self.parse_block(Clause::Else)
         } else {
             vec![]
         };
 
         let (finalbody, has_finally) = if self.eat(TokenKind::Finally) {
-            self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+            self.expect(TokenKind::Colon);
             (self.parse_block(Clause::Finally), true)
         } else {
             (vec![], false)
@@ -817,19 +824,20 @@ impl<'src> Parser<'src> {
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
-        self.expect_and_recover(TokenKind::In, TokenSet::new(&[TokenKind::Colon]));
+        self.expect(TokenKind::In);
 
         let iter = self.parse_expr_with_recovery(
             Parser::parse_expression,
             EXPR_SET.union([TokenKind::Colon, TokenKind::Indent].as_slice().into()),
             "expecting an expression after `in` keyword",
         );
-        self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+
+        self.expect(TokenKind::Colon);
 
         let body = self.parse_block(Clause::For);
 
         let orelse = if self.eat(TokenKind::Else) {
-            self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+            self.expect(TokenKind::Colon);
 
             self.parse_block(Clause::Else)
         } else {
@@ -855,12 +863,13 @@ impl<'src> Parser<'src> {
             [TokenKind::Colon].as_slice(),
             "expecting expression after `while` keyword",
         );
-        self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+
+        self.expect(TokenKind::Colon);
 
         let body = self.parse_block(Clause::While);
 
         let orelse = if self.eat(TokenKind::Else) {
-            self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+            self.expect(TokenKind::Colon);
             self.parse_block(Clause::Else)
         } else {
             vec![]
@@ -884,24 +893,9 @@ impl<'src> Parser<'src> {
         let type_params = self.try_parse_type_params();
 
         let parameters_start = self.node_start();
-        self.expect_and_recover(
-            TokenKind::Lpar,
-            EXPR_SET.union(
-                [TokenKind::Colon, TokenKind::Rarrow, TokenKind::Comma]
-                    .as_slice()
-                    .into(),
-            ),
-        );
-
+        self.expect(TokenKind::Lpar);
         let mut parameters = self.parse_parameters(FunctionKind::FunctionDef);
-
-        self.expect_and_recover(
-            TokenKind::Rpar,
-            SIMPLE_STMT_SET
-                .union(COMPOUND_STMT_SET)
-                .union([TokenKind::Colon, TokenKind::Rarrow].as_slice().into()),
-        );
-
+        self.expect(TokenKind::Rpar);
         parameters.range = self.node_range(parameters_start);
 
         let returns = self.eat(TokenKind::Rarrow).then(|| {
@@ -917,12 +911,7 @@ impl<'src> Parser<'src> {
             Box::new(returns.expr)
         });
 
-        self.expect_and_recover(
-            TokenKind::Colon,
-            SIMPLE_STMT_SET
-                .union(COMPOUND_STMT_SET)
-                .union([TokenKind::Rarrow].as_slice().into()),
-        );
+        self.expect(TokenKind::Colon);
 
         let body = self.parse_block(Clause::FunctionDef);
 
@@ -951,7 +940,7 @@ impl<'src> Parser<'src> {
             .at(TokenKind::Lpar)
             .then(|| Box::new(self.parse_arguments()));
 
-        self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+        self.expect(TokenKind::Colon);
 
         let body = self.parse_block(Clause::Class);
 
@@ -969,7 +958,7 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::With);
 
         let items = self.parse_with_items();
-        self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+        self.expect(TokenKind::Colon);
 
         let body = self.parse_block(Clause::With);
 
@@ -1116,7 +1105,7 @@ impl<'src> Parser<'src> {
         }
 
         if !treat_it_as_expr && has_seen_lpar {
-            self.expect_and_recover(TokenKind::Rpar, TokenSet::new(&[TokenKind::Colon]));
+            self.expect(TokenKind::Rpar);
         }
 
         items
@@ -1194,7 +1183,7 @@ impl<'src> Parser<'src> {
             [TokenKind::Colon].as_slice(),
             "expecting expression after `match` keyword",
         );
-        self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+        self.expect(TokenKind::Colon);
 
         self.eat(TokenKind::Newline);
         if !self.eat(TokenKind::Indent) {
@@ -1247,7 +1236,7 @@ impl<'src> Parser<'src> {
             .eat(TokenKind::If)
             .then(|| Box::new(self.parse_named_expression_or_higher().expr));
 
-        self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+        self.expect(TokenKind::Colon);
         let body = self.parse_block(Clause::Match);
 
         ast::MatchCase {
@@ -1354,6 +1343,13 @@ impl<'src> Parser<'src> {
                         "indentation doesn't match previous indentation",
                     );
                     continue;
+                }
+
+                // TODO: Probably necessary to add an error? Or how does that work?
+                if !self.is_at_stmt() {
+                    while !self.is_at_stmt() && !self.at_ts(BODY_END_SET) {
+                        self.next_token();
+                    }
                 }
 
                 stmts.push(self.parse_statement());
@@ -1500,7 +1496,7 @@ impl<'src> Parser<'src> {
         };
 
         if let Err(error) = helpers::validate_parameters(&parameters) {
-            self.errors.push(error);
+            self.add_error(error.error, error.location);
         }
 
         parameters

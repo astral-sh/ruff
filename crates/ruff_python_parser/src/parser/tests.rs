@@ -1,3 +1,7 @@
+use crate::parser::Parser;
+use crate::token_source::TokenSource;
+use crate::Mode;
+
 mod parser;
 mod suite;
 
@@ -12,4 +16,21 @@ fn ok_ipy_escape_command() {
     let tokens = crate::lexer::lex(src, Mode::Ipython).collect();
     let ast = crate::parse_tokens(tokens, src, Mode::Ipython);
     insta::assert_debug_snapshot!(ast);
+}
+
+// Test that is intentionally ignored by default.
+// Use it for quicky debugging a parser issue.
+#[test]
+#[ignore]
+fn parser_quick_test() {
+    let src = r"
+a = (🐶 +
+    # comment
+🐶)
+";
+
+    let tokens = crate::lexer::lex(src, Mode::Module).collect();
+    let ast = Parser::new(src, Mode::Module, TokenSource::new(tokens)).parse_program();
+
+    assert_eq!(&ast.parse_errors, &[]);
 }

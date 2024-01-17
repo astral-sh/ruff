@@ -451,7 +451,6 @@ impl StringKind {
     }
 }
 
-// TODO move to ruff_python_parser?
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TokenKind {
     /// Token value for a name, commonly known as an identifier.
@@ -982,11 +981,19 @@ impl TryFrom<&Tok> for UnaryOp {
     type Error = ();
 
     fn try_from(value: &Tok) -> Result<Self, Self::Error> {
+        TokenKind::from_token(value).try_into()
+    }
+}
+
+impl TryFrom<TokenKind> for UnaryOp {
+    type Error = ();
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
         Ok(match value {
-            Tok::Plus => UnaryOp::UAdd,
-            Tok::Minus => UnaryOp::USub,
-            Tok::Tilde => UnaryOp::Invert,
-            Tok::Not => UnaryOp::Not,
+            TokenKind::Plus => UnaryOp::UAdd,
+            TokenKind::Minus => UnaryOp::USub,
+            TokenKind::Tilde => UnaryOp::Invert,
+            TokenKind::Not => UnaryOp::Not,
             _ => return Err(()),
         })
     }

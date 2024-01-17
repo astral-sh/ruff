@@ -211,21 +211,7 @@ impl<'src> Parser<'src> {
                 continue;
             }
 
-            let rhs = if self.at_expr() {
-                self.parse_expression_with_precedence(op_bp)
-            } else {
-                let rhs_range = self.current_range();
-                self.add_error(
-                    ParseErrorType::OtherError("expecting an expression after operand".into()),
-                    rhs_range,
-                );
-
-                Expr::Invalid(ast::ExprInvalid {
-                    value: self.src_text(rhs_range).into(),
-                    range: rhs_range,
-                })
-                .into()
-            };
+            let rhs = self.parse_expression_with_precedence(op_bp);
 
             lhs.expr = Expr::BinOp(ast::ExprBinOp {
                 left: Box::new(lhs.expr),
@@ -240,15 +226,14 @@ impl<'src> Parser<'src> {
 
     pub(super) fn parse_lhs_expression(&mut self) -> ParsedExpr {
         let start = self.node_start();
-        let token = self.next_token();
-        let mut lhs = match token.0 {
-            token @ (Tok::Plus | Tok::Minus | Tok::Not | Tok::Tilde) => {
-                Expr::UnaryOp(self.parse_unary_expression(&token, start)).into()
+        let mut lhs = match self.current_kind() {
+            TokenKind::Plus | TokenKind::Minus | TokenKind::Not | TokenKind::Tilde => {
+                Expr::UnaryOp(self.parse_unary_expression()).into()
             }
-            Tok::Star => Expr::Starred(self.parse_starred_expression(start)).into(),
-            Tok::Await => Expr::Await(self.parse_await_expression(start)).into(),
-            Tok::Lambda => Expr::Lambda(self.parse_lambda_expr(start)).into(),
-            _ => self.parse_atom(token, start),
+            TokenKind::Star => Expr::Starred(self.parse_starred_expression()).into(),
+            TokenKind::Await => Expr::Await(self.parse_await_expression()).into(),
+            TokenKind::Lambda => Expr::Lambda(self.parse_lambda_expr()).into(),
+            _ => self.parse_atom(),
         };
 
         if self.is_current_token_postfix() {
@@ -277,90 +262,134 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_atom(&mut self, (token, token_range): Spanned, start: TextSize) -> ParsedExpr {
-        let lhs = match token {
-            Tok::Float { value } => Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: Number::Float(value),
-                range: self.node_range(start),
-            }),
-            Tok::Complex { real, imag } => Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: Number::Complex { real, imag },
-                range: self.node_range(start),
-            }),
-            Tok::Int { value } => Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: Number::Int(value),
-                range: self.node_range(start),
-            }),
-            Tok::True => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                value: true,
-                range: self.node_range(start),
-            }),
-            Tok::False => Expr::BooleanLiteral(ast::ExprBooleanLiteral {
-                value: false,
-                range: self.node_range(start),
-            }),
-            Tok::None => Expr::NoneLiteral(ast::ExprNoneLiteral {
-                range: self.node_range(start),
-            }),
-            Tok::Ellipsis => Expr::EllipsisLiteral(ast::ExprEllipsisLiteral {
-                range: self.node_range(start),
-            }),
-            Tok::Name { name } => Expr::Name(ast::ExprName {
-                id: name,
-                ctx: ExprContext::Load,
-                range: self.node_range(start),
-            }),
-            Tok::IpyEscapeCommand { value, kind } if self.mode == Mode::Ipython => {
-                Expr::IpyEscapeCommand(ast::ExprIpyEscapeCommand {
+    fn parse_atom(&mut self) -> ParsedExpr {
+        let start = self.node_start();
+
+        let lhs = match self.current_kind() {
+            TokenKind::Float => {
+                let (Tok::Float { value }, _) = self.bump(TokenKind::Float) else {
+                    unreachable!()
+                };
+
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Float(value),
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::Complex => {
+                let (Tok::Complex { real, imag }, _) = self.bump(TokenKind::Complex) else {
+                    unreachable!()
+                };
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Complex { real, imag },
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::Int => {
+                let (Tok::Int { value }, _) = self.bump(TokenKind::Int) else {
+                    unreachable!()
+                };
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Int(value),
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::True => {
+                self.bump(TokenKind::True);
+                Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                    value: true,
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::False => {
+                self.bump(TokenKind::False);
+                Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                    value: false,
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::None => {
+                self.bump(TokenKind::None);
+                Expr::NoneLiteral(ast::ExprNoneLiteral {
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::Ellipsis => {
+                self.bump(TokenKind::Ellipsis);
+                Expr::EllipsisLiteral(ast::ExprEllipsisLiteral {
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::Name => {
+                let (Tok::Name { name }, _) = self.bump(TokenKind::Name) else {
+                    unreachable!()
+                };
+                Expr::Name(ast::ExprName {
+                    id: name,
+                    ctx: ExprContext::Load,
+                    range: self.node_range(start),
+                })
+            }
+            TokenKind::EscapeCommand => {
+                let (Tok::IpyEscapeCommand { value, kind }, _) =
+                    self.bump(TokenKind::EscapeCommand)
+                else {
+                    unreachable!()
+                };
+
+                let command = ast::ExprIpyEscapeCommand {
                     range: self.node_range(start),
                     kind,
                     value,
-                })
-            }
-            tok @ Tok::String { .. } => self.parse_string_expression((tok, token_range), start),
-            Tok::FStringStart => self.parse_fstring_expression(start),
-            Tok::Lpar => {
-                return self.parse_parenthesized_expression(start);
-            }
-            Tok::Lsqb => self.parse_list_like_expression(start),
-            Tok::Lbrace => self.parse_set_or_dict_like_expression(start),
-            Tok::Yield => self.parse_yield_expression(start),
-            // `Invalid` tokens are created when there's a lexical error, to
-            // avoid creating an "unexpected token" error for `Tok::Invalid`
-            // we handle it here. We try to parse an expression to avoid
-            // creating "statements in the same line" error in some cases.
-            Tok::Unknown => {
-                if self.at_expr() {
-                    self.parse_expression().expr
-                } else {
-                    Expr::Invalid(ast::ExprInvalid {
-                        value: self.src_text(token_range).into(),
-                        range: token_range,
-                    })
-                }
-            }
-            // Handle unexpected token
-            tok => {
-                // Try to parse an expression after seeing an unexpected token
-                let lhs = Expr::Invalid(ast::ExprInvalid {
-                    value: self.src_text(token_range).into(),
-                    range: token_range,
-                });
+                };
 
-                if matches!(tok, Tok::IpyEscapeCommand { .. }) {
+                if self.mode != Mode::Ipython {
                     self.add_error(
                         ParseErrorType::OtherError(
                             "IPython escape commands are only allowed in `Mode::Ipython`".into(),
                         ),
-                        token_range,
-                    );
-                } else {
-                    self.add_error(
-                        ParseErrorType::OtherError(format!("unexpected token `{tok}`")),
-                        token_range,
+                        &command,
                     );
                 }
-                lhs
+
+                Expr::IpyEscapeCommand(command)
+            }
+            TokenKind::String => {
+                let start = self.node_start();
+                let (string @ Tok::String { .. }, string_range) = self.bump(TokenKind::String)
+                else {
+                    unreachable!()
+                };
+                self.parse_string_expression((string, string_range), start)
+            }
+            TokenKind::FStringStart => self.parse_fstring_expression(),
+            TokenKind::Lpar => {
+                return self.parse_parenthesized_expression();
+            }
+
+            TokenKind::Lsqb => self.parse_list_like_expression(),
+            TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
+            TokenKind::Yield => self.parse_yield_expression(),
+
+            // Handle unexpected token
+            // FIXME(micha): This seems to panic because we don't push a token
+            // and the `last_token_end` range is smaller than `self.node_start()`.
+            // Seems to only happen if it is a single node statement.
+            // Try with "👍"
+            kind => {
+                if kind != TokenKind::Unknown {
+                    self.add_error(
+                        ParseErrorType::OtherError("Expected an expression".to_string()),
+                        self.current_range(),
+                    );
+                }
+
+                // Create a placeholder expression
+                Expr::Name(ast::ExprName {
+                    range: self.missing_node_range(),
+                    id: String::new(),
+                    ctx: ExprContext::Load,
+                })
             }
         };
 
@@ -485,7 +514,7 @@ impl<'src> Parser<'src> {
         };
 
         if let Err(error) = helpers::validate_arguments(&arguments) {
-            self.errors.push(error);
+            self.add_error(error.error, error.location);
         }
 
         arguments
@@ -505,7 +534,7 @@ impl<'src> Parser<'src> {
         // Create an error when receiving a empty slice to parse, e.g. `l[]`
         if !self.at(TokenKind::Colon) && !self.at_expr() {
             let slice_range = TextRange::empty(self.current_range().start());
-            self.expect_and_recover(TokenKind::Rsqb, TokenSet::EMPTY);
+            self.expect(TokenKind::Rsqb);
 
             let range = self.node_range(start);
             self.add_error(ParseErrorType::EmptySlice, range);
@@ -542,7 +571,7 @@ impl<'src> Parser<'src> {
             });
         }
 
-        self.expect_and_recover(TokenKind::Rsqb, TokenSet::EMPTY);
+        self.expect(TokenKind::Rsqb);
 
         ast::ExprSubscript {
             value: Box::new(value),
@@ -600,10 +629,14 @@ impl<'src> Parser<'src> {
         })
     }
 
-    fn parse_unary_expression(&mut self, operator: &Tok, start: TextSize) -> ast::ExprUnaryOp {
-        let op =
-            UnaryOp::try_from(operator).expect("Expected operator to be a unary operator token.");
-        let rhs = if matches!(op, UnaryOp::Not) {
+    fn parse_unary_expression(&mut self) -> ast::ExprUnaryOp {
+        let start = self.node_start();
+
+        let op = UnaryOp::try_from(self.current_kind())
+            .expect("Expected operator to be a unary operator token.");
+        self.bump(self.current_kind());
+
+        let operand = if matches!(op, UnaryOp::Not) {
             self.parse_expression_with_precedence(6)
         } else {
             // plus, minus and tilde
@@ -612,7 +645,7 @@ impl<'src> Parser<'src> {
 
         ast::ExprUnaryOp {
             op,
-            operand: Box::new(rhs.expr),
+            operand: Box::new(operand.expr),
             range: self.node_range(start),
         }
     }
@@ -791,8 +824,8 @@ impl<'src> Parser<'src> {
             progress.assert_progressing(self);
             let start = self.node_start();
 
-            if self.eat(TokenKind::FStringStart) {
-                strings.push(StringType::FString(self.parse_fstring(start)));
+            if self.at(TokenKind::FStringStart) {
+                strings.push(StringType::FString(self.parse_fstring()));
             } else if self.at(TokenKind::String) {
                 let (
                     Tok::String {
@@ -827,10 +860,11 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_fstring_expression(&mut self, start: TextSize) -> Expr {
+    fn parse_fstring_expression(&mut self) -> Expr {
         const FSTRING_SET: TokenSet = TokenSet::new(&[TokenKind::FStringStart, TokenKind::String]);
 
-        let fstring = self.parse_fstring(start);
+        let start = self.node_start();
+        let fstring = self.parse_fstring();
 
         if !self.at_ts(FSTRING_SET) {
             return Expr::FString(ast::ExprFString {
@@ -854,7 +888,10 @@ impl<'src> Parser<'src> {
         })
     }
 
-    fn parse_fstring(&mut self, start: TextSize) -> ast::FString {
+    fn parse_fstring(&mut self) -> ast::FString {
+        let start = self.node_start();
+
+        self.bump(TokenKind::FStringStart);
         let elements = self.parse_fstring_elements();
 
         self.expect(TokenKind::FStringEnd);
@@ -1000,7 +1037,11 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses a list or a list comprehension expression.
-    fn parse_list_like_expression(&mut self, start: TextSize) -> Expr {
+    fn parse_list_like_expression(&mut self) -> Expr {
+        let start = self.node_start();
+
+        self.bump(TokenKind::Lsqb);
+
         // Nice error message when having a unclosed open bracket `[`
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
@@ -1029,7 +1070,10 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses a set, dict, set comprehension, or dict comprehension.
-    fn parse_set_or_dict_like_expression(&mut self, start: TextSize) -> Expr {
+    fn parse_set_or_dict_like_expression(&mut self) -> Expr {
+        let start = self.node_start();
+        self.bump(TokenKind::Lbrace);
+
         // Nice error message when having a unclosed open brace `{`
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
@@ -1082,8 +1126,11 @@ impl<'src> Parser<'src> {
     }
 
     /// Parses an expression in parentheses, a tuple expression, or a generator expression.
-    fn parse_parenthesized_expression(&mut self, start: TextSize) -> ParsedExpr {
+    fn parse_parenthesized_expression(&mut self) -> ParsedExpr {
+        let start = self.node_start();
         self.set_ctx(ParserCtxFlags::PARENTHESIZED_EXPR);
+
+        self.bump(TokenKind::Lpar);
 
         // Nice error message when having a unclosed open parenthesis `(`
         if self.at_ts(NEWLINE_EOF_SET) {
@@ -1136,7 +1183,7 @@ impl<'src> Parser<'src> {
                 }
             }
             _ => {
-                self.expect_and_recover(TokenKind::Rpar, TokenSet::EMPTY);
+                self.expect(TokenKind::Rpar);
 
                 parsed_expr.is_parenthesized = true;
                 parsed_expr
@@ -1242,10 +1289,7 @@ impl<'src> Parser<'src> {
             } else {
                 keys.push(Some(parser.parse_conditional_expression_or_higher().expr));
 
-                parser.expect_and_recover(
-                    TokenKind::Colon,
-                    TokenSet::new(&[TokenKind::Comma]).union(EXPR_SET),
-                );
+                parser.expect(TokenKind::Colon);
             }
             values.push(parser.parse_conditional_expression_or_higher().expr);
         });
@@ -1276,7 +1320,7 @@ impl<'src> Parser<'src> {
 
         helpers::set_expr_ctx(&mut target.expr, ExprContext::Store);
 
-        self.expect_and_recover(TokenKind::In, TokenSet::new(&[TokenKind::Rsqb]));
+        self.expect(TokenKind::In);
 
         let iter = self.parse_expr_with_recovery(
             Parser::parse_simple_expression,
@@ -1395,7 +1439,9 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_starred_expression(&mut self, start: TextSize) -> ast::ExprStarred {
+    fn parse_starred_expression(&mut self) -> ast::ExprStarred {
+        let start = self.node_start();
+        self.bump(TokenKind::Star);
         let parsed_expr = self.parse_conditional_expression_or_higher();
 
         ast::ExprStarred {
@@ -1405,7 +1451,9 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_await_expression(&mut self, start: TextSize) -> ast::ExprAwait {
+    fn parse_await_expression(&mut self) -> ast::ExprAwait {
+        let start = self.node_start();
+        self.bump(TokenKind::Await);
         let parsed_expr = self.parse_expression_with_precedence(19);
 
         if matches!(parsed_expr.expr, Expr::Starred(_)) {
@@ -1423,7 +1471,10 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_yield_expression(&mut self, start: TextSize) -> Expr {
+    fn parse_yield_expression(&mut self) -> Expr {
+        let start = self.node_start();
+        self.bump(TokenKind::Yield);
+
         if self.eat(TokenKind::From) {
             return self.parse_yield_from_expression(start);
         }
@@ -1487,14 +1538,17 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_lambda_expr(&mut self, start: TextSize) -> ast::ExprLambda {
+    fn parse_lambda_expr(&mut self) -> ast::ExprLambda {
+        let start = self.node_start();
+        self.bump(TokenKind::Lambda);
+
         let parameters: Option<Box<ast::Parameters>> = if self.at(TokenKind::Colon) {
             None
         } else {
             Some(Box::new(self.parse_parameters(FunctionKind::Lambda)))
         };
 
-        self.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+        self.expect(TokenKind::Colon);
 
         // Check for forbidden tokens in the `lambda`'s body
         match self.current_kind() {
@@ -1538,7 +1592,7 @@ impl<'src> Parser<'src> {
 
         let test = self.parse_simple_expression();
 
-        self.expect_and_recover(TokenKind::Else, TokenSet::EMPTY);
+        self.expect(TokenKind::Else);
 
         let orelse = self.parse_expr_with_recovery(
             Parser::parse_conditional_expression_or_higher,

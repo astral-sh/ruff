@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod tests {
     use insta::assert_debug_snapshot;
-    use ruff_text_size::TextSize;
 
     use crate::{lexer, parse, parse_expression, parse_suite, parse_tokens, Mode};
 
@@ -869,7 +868,7 @@ a = 1
 %timeit a == 1
     "
         .trim();
-        let lxr = lexer::lex_starts_at(source, Mode::Ipython, TextSize::default());
+        let lxr = lexer::lex(source, Mode::Ipython);
         let parse_err = parse_tokens(lxr.collect(), source, Mode::Module).unwrap_err();
         assert_eq!(
             parse_err.to_string(),

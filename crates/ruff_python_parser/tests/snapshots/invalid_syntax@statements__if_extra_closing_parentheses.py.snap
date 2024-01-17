@@ -11,32 +11,20 @@ Module(
         body: [
             If(
                 StmtIf {
-                    range: 90..109,
+                    range: 90..97,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
                             range: 93..97,
                             value: true,
                         },
                     ),
-                    body: [
-                        Pass(
-                            StmtPass {
-                                range: 105..109,
-                            },
-                        ),
-                    ],
+                    body: [],
                     elif_else_clauses: [],
                 },
             ),
-            Expr(
-                StmtExpr {
-                    range: 97..99,
-                    value: Invalid(
-                        ExprInvalid {
-                            value: "))",
-                            range: 97..99,
-                        },
-                    ),
+            Pass(
+                StmtPass {
+                    range: 105..109,
                 },
             ),
         ],
@@ -56,8 +44,8 @@ Module(
   |
 1 | # FIXME(micha): This creates two syntax errors instead of just one (and overlapping ones)
 2 | if True)):
-  |        ^^ Syntax Error: unexpected tokens
 3 |     pass
+  |     ^^^^ Syntax Error: unexpected indentation
   |
 
 

@@ -218,7 +218,7 @@ impl<'src> Parser<'src> {
                     };
                     keys.push(key);
 
-                    parser.expect_and_recover(TokenKind::Colon, TokenSet::EMPTY);
+                    parser.expect(TokenKind::Colon);
 
                     patterns.push(parser.parse_match_pattern());
                 }
@@ -284,7 +284,7 @@ impl<'src> Parser<'src> {
                 Some(parentheses),
             ));
         } else {
-            self.expect_and_recover(parentheses.closing_kind(), TokenSet::EMPTY);
+            self.expect(parentheses.closing_kind());
         }
 
         pattern
@@ -325,6 +325,9 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_match_pattern_literal(&mut self) -> Pattern {
+        // FIXME: This has the same issue as `parse_atom` had. We consume the token
+        // and then don't know what to do if it is an unexpected token.
+
         let start = self.node_start();
         let (tok, tok_range) = self.next_token();
         match tok {

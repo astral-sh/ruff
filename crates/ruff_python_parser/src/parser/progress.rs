@@ -1,17 +1,18 @@
 use crate::parser::Parser;
+use crate::TokenKind;
 use ruff_text_size::TextSize;
 
 /// Captures the progress of the parser and allows to test if the parsing is still making progress
 #[derive(Debug, Copy, Clone, Default)]
-pub(super) struct ParserProgress(Option<TextSize>);
+pub(super) struct ParserProgress(Option<(TokenKind, TextSize)>);
 
 impl ParserProgress {
     /// Returns true if the parser has passed this position
     #[inline]
-    fn has_progressed(&self, p: &Parser) -> bool {
+    fn has_progressed(self, p: &Parser) -> bool {
         match self.0 {
             None => true,
-            Some(pos) => pos < p.current_range().start(),
+            Some(snapshot) => snapshot != (p.current_kind(), p.current_range().start()),
         }
     }
 
@@ -30,6 +31,6 @@ impl ParserProgress {
             p.current_range(),
         );
 
-        self.0 = Some(p.current_range().start());
+        self.0 = Some((p.current_kind(), p.current_range().start()));
     }
 }
